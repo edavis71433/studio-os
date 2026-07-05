@@ -126,13 +126,21 @@ Per-migration effect on prod:
   1. Ensure the Netlify build for the commit containing `b5a633c` has run (a
      push to `main`, or a manual "Trigger deploy" in Netlify, or confirming the
      branch/wiring).
-  2. VERIFY live:
+  2. VERIFY live — the CORRECT check is the file hash, NOT a bare grep. The
+     admin panel already uses `x-dds-user-jwt` in ~80 OTHER places, so
+     `grep -c 'x-dds-user-jwt'` is a FALSE POSITIVE (this bit us on the first
+     execution attempt, 2026-07-05). Use either:
 
+         # (a) hash equality with the repo copy — definitive
+         curl -s https://davisdigitalstudio.com/dds-studio-manage-9k2p.html | sha256sum
+         sha256sum dds-studio-manage-9k2p.html      # must MATCH
+
+         # (b) or check notify() SPECIFICALLY carries the jwt call
          curl -s https://davisdigitalstudio.com/dds-studio-manage-9k2p.html \
-           | grep -c 'x-dds-user-jwt'      # must be >= 1
+           | grep -A6 'async function notify(type' | grep -c 'adminJwt()'   # must be 1
 
-     Only when this returns >= 1 is Step A complete. Do NOT start Step C until
-     it does.
+     Only when the hashes MATCH (or the notify()-scoped grep returns 1) is
+     Step A complete. Do NOT start Step C until then.
 - **Backend (Step C):** deploy the function. It is an ATOMIC deploy carrying
   BOTH step-2 parts (part 1: notify catch-all closure + intake rate-limiting +
   config-driven env; part 2: approval_needed/invoice_reminder staff-gating).
