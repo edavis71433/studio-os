@@ -7,8 +7,12 @@ const FROM = 'Davis Digital Studio <noreply@davisdigitalstudio.com>';
 const PSI_KEY = Deno.env.get('PSI_KEY') || ''; // set as an Edge Function secret in Supabase; rotate the old hardcoded key in Google Cloud
 
 // Service-role key + project URL for privileged server-side calls (creating auth users).
-// These MUST be set as Edge Function secrets in Supabase (see deploy notes).
-const SB_URL = Deno.env.get('SUPABASE_URL') || 'https://qksstlqzbhesadrrofgn.supabase.co';
+// SUPABASE_URL is auto-injected by Supabase into every Edge Function with the
+// project's OWN value, so staging talks to staging and prod to prod with no code
+// change. The old hardcoded production fallback was a config-only-variance
+// violation (Build Brief 2.8): on staging it would have silently pointed writes
+// at production. Removed. If the var is ever missing the loud guard below fires.
+const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // Anon (publishable) key. Paired with a caller's user-JWT, REST reads run UNDER
 // that user's identity, so RLS scopes the rows. Used for client-portal reads
@@ -16,15 +20,23 @@ const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SE
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || '';
 
 // ── CORS: allowlist real origins instead of '*' ──
-// Add any new front-end origin here (e.g. a Netlify deploy-preview URL) if needed.
-const ALLOWED_ORIGINS = [
+// Config-only variance (Build Brief 2.8): the allowlist comes from the
+// ALLOWED_ORIGINS env var (comma-separated) so staging can add its Netlify
+// preview/staging origin WITHOUT a code edit. If the var is unset we fall back
+// to the two production origins, so production behavior is byte-identical to
+// before this change. Example staging value:
+//   ALLOWED_ORIGINS=https://staging--studio-os.netlify.app,https://davisdigitalstudio.com
+const DEFAULT_ORIGINS = [
   'https://davisdigitalstudio.com',
   'https://www.davisdigitalstudio.com',
 ];
+const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') || '')
+  .split(',').map((o) => o.trim()).filter(Boolean);
+const CORS_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
 
 function corsFor(req: Request) {
   const origin = req.headers.get('origin') || '';
-  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allow = CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
@@ -36,7 +48,7 @@ function corsFor(req: Request) {
 // Kept for the email/notification helpers below that reference `cors` directly.
 // Uses the canonical origin; per-request CORS is applied at the response layer.
 const cors = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
+  'Access-Control-Allow-Origin': CORS_ORIGINS[0],
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Vary': 'Origin',
@@ -401,6 +413,30 @@ const PUBLIC_ROUTES = new Set([
   'quote_view',                  // client-facing quote page; gated by a 36-hex CSPRNG token in the link
 ]);
 
+// ── NOTIFY RELAY ALLOWLIST (closes the catch-all bypass) ──
+// The generic notify handler near the end of serve() sends a branded email.
+// It USED to be reachable by ANY unregistered `type` whose body merely carried
+// a clientName/message/subject shape — an attacker could invent a type and make
+// the studio's Resend account send arbitrary email (to Eric, or, via the
+// `eric_*`/`approval_needed`/`invoice_reminder` client-email branch, to an
+// address of their choosing). That is a spam/phishing vector.
+//
+// Now the relay is reachable ONLY by this explicit allowlist — the exact set of
+// types the real front-ends send through it, verified against portal.html and
+// dds-studio-manage-9k2p.html on 2026-07-05:
+//   • portal client-activity notices (all email ERIC, never a caller-supplied address)
+//   • the ops-alert family (also email ERIC)
+//   • the two admin→client notices, which already require being in PUBLIC_ROUTES
+// Any other unregistered type now fails closed at the gate with 403.
+const NOTIFY_RELAY_TYPES = new Set([
+  // portal -> Eric (no dedicated handler; ride the generic relay)
+  'approval_action', 'brief_submitted', 'client_message', 'contract_acked', 'file_uploaded',
+  // ops alerts -> Eric (also present in PUBLIC_ROUTES)
+  'bug', 'outage', 'security',
+  // admin -> client notices (also present in PUBLIC_ROUTES; see RESIDUAL note at the handler)
+  'approval_needed', 'invoice_reminder',
+]);
+
 // ── ONE due-date parser (launch fix) ──
 // due_date is legacy freetext; the form now writes ISO, but old rows may say
 // "Due Jun 30, 2026" — which raw `new Date()` rejects, making the engine and
@@ -419,7 +455,14 @@ function _isOverdue(inv: any, nowMs?: number): boolean {
 
 
 // ── Simple in-memory per-IP rate limiter for cost-bearing AI/PSI routes ──
-const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft']);
+// The four public intake routes (lead_intake, discovery_intake, audit_lead,
+// report_card) are added here: they are unauthenticated, world-reachable, and
+// each triggers a DB write plus an outbound email, so an unthrottled loop is a
+// spam/cost vector. (This shipped as an unapplied diff on 2026-06-30; applied
+// now as part of step 2.) NOTE: this limiter is in-memory per instance — a
+// durable, table-backed, per-tenant limiter is the step-2 pipeline's job; this
+// is the interim floor.
+const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft', 'lead_intake', 'discovery_intake', 'audit_lead', 'report_card']);
 const RATE_MAX = 12;
 const RATE_WINDOW_MS = 60_000;
 const rateHits = new Map<string, { count: number; resetAt: number }>();
@@ -446,6 +489,13 @@ function json(payload: unknown, status = 200, corsHeaders: Record<string, string
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status,
   });
+}
+
+// Loud startup guard: SUPABASE_URL is auto-injected; if it is ever empty the
+// function cannot reach the database or auth at all. Fail loud in the logs
+// rather than silently building broken request URLs.
+if (!SB_URL) {
+  console.error('[config] SUPABASE_URL is not set — every DB/auth call will fail. This should be auto-injected by Supabase.');
 }
 
 // Loud startup guard: if Resend isn't configured, every send will fail. Make
@@ -3987,15 +4037,14 @@ serve(async (req) => {
         const staff = await verifyStaff(req);
         if (!staff) return json({ error: 'unauthorized' }, 401, reqCors);
         if (!atLeast(staff.role, minRole)) return json({ error: 'forbidden' }, 403, reqCors);
-      } else if (!PUBLIC_ROUTES.has(String(type))) {
-        // GENERIC NOTIFY RELAY EXCEPTION: a long-standing catch-all below
-        // accepts arbitrary type strings when the body carries a notification
-        // shape (clientName/message/subject) — the portal's "request change"
-        // and the ops alert family ride it. Deny-by-default must not break
-        // that pre-existing contract; notify-shaped requests pass through to
-        // the relay, everything else unregistered fails closed.
-        const notifyShaped = body && (body.clientName !== undefined || body.message !== undefined || body.subject !== undefined);
-        if (!notifyShaped) return json({ error: 'unknown_route' }, 403, reqCors);
+      } else if (!PUBLIC_ROUTES.has(String(type)) && !NOTIFY_RELAY_TYPES.has(String(type))) {
+        // Deny-by-default. Previously this branch accepted ANY unregistered
+        // type as long as the body looked like a notification (clientName /
+        // message / subject present) — the catch-all bypass. That let an
+        // attacker invent a type and drive the generic notify relay. Now an
+        // unregistered type must be an explicit notify-relay type (or a public
+        // route, checked above) or it fails closed here.
+        return json({ error: 'unknown_route' }, 403, reqCors);
       }
     }
 
@@ -9329,12 +9378,18 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
     }
 
     // ── GENERIC NOTIFY ──
-    if (type && (body.clientName !== undefined || body.message !== undefined || body.subject !== undefined)) {
+    // Defense in depth: the gate already restricts unregistered types to
+    // NOTIFY_RELAY_TYPES, but this handler re-checks so it can never be driven
+    // by an arbitrary type even if the gate logic changes. Only the two
+    // admin->client notices may email a caller-supplied address; everything
+    // else emails ERIC only. The old `startsWith('eric_')` client-email branch
+    // (attacker-controlled recipient) is deleted.
+    if (type && NOTIFY_RELAY_TYPES.has(String(type))) {
       const name = body.clientName || (body.client && body.client.name) || 'A client';
       const subject = body.subject || '';
       const message = body.message || '';
       const pretty = String(type).replace(/_/g, ' ');
-      const toClient = String(type).startsWith('eric_') || type === 'approval_needed' || type === 'invoice_reminder';
+      const toClient = type === 'approval_needed' || type === 'invoice_reminder';
       const recipient = toClient
         ? (body.clientEmail || (body.client && (body.client.contact_email || body.client.email)) || '')
         : ERIC;
