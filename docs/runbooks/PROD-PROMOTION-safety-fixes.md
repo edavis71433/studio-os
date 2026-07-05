@@ -297,3 +297,9 @@ admins drop NOT run.
 CLI is now linked to PROD (was staging). Re-link staging before further staging
 work. Function-logs not checkable via this CLI version; behavioral tests
 substitute.
+
+## Step D manual checks — COMPLETE 2026-07-05 (3/3 pass)
+1. Admin panel loads with real data, no auth errors (staff gate + real session JWT). PASS
+2. Email Templates load + save succeeds; no RLS diagnostic. PASS
+3. Client portal login loads normally across tabs. PASS
+Deployment marked COMPLETE. Baseline: docs/PRODUCTION-BASELINE.md, tag prod-baseline-2026-07-05.
