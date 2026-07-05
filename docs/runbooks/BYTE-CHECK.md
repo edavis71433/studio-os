@@ -75,4 +75,15 @@ may still be deployed — it is the 226-line email stub with a dead hardcoded
 key and `Access-Control-Allow-Origin: *`. If it exists, delete it in the
 dashboard and note the deletion date in this file:
 
-- bright-service checked on: ____ , result: ____
+- bright-service checked on: 2026-07-05, result: **existed and was DELETED
+  from the dashboard by Eric the same day.** Deployed inventory is now exactly
+  `clever-api` + `stripe-webhook`, both byte-verified against this repo.
+
+## 5. Storage bucket fact (recorded 2026-07-05)
+
+`client-files` bucket is **PRIVATE** (confirmed by Eric). Note for the Files
+module (build step 7): the admin panel constructs
+`/object/public/client-files/...` URLs on upload
+(`dds-studio-manage-9k2p.html`, `uploadFiles`) and stores them in `files.url`
+— against a private bucket those URLs are dead weight; real downloads go
+through `createSignedUrl`. Clean up when the Files module is built.

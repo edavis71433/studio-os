@@ -7,9 +7,9 @@ Build Brief step 1. Nothing below touches production except where marked
 
 | Piece | State |
 |---|---|
-| Canonical repo | This folder, git-initialized 2026-07-05 |
-| Production Supabase | `qksstlqzbhesadrrofgn` (Postgres, Auth, Storage, 2 Edge Functions expected) |
-| Staging Supabase | DOES NOT EXIST YET — step A below |
+| Canonical repo | This folder; remote: https://github.com/edavis71433/studio-os (private) |
+| Production Supabase | `qksstlqzbhesadrrofgn` — Edge Functions: exactly `clever-api` + `stripe-webhook` (legacy `bright-service` deleted 2026-07-05); `client-files` bucket is PRIVATE |
+| Staging Supabase | `wjlpursnwbmlcdwbeowv` (created 2026-07-05) |
 | Migration runner | Supabase CLI (`supabase migration`/`db push`), files in `supabase/migrations/` |
 | Scripted deploy | `.github/workflows/deploy.yml` (staging on push, prod manual) |
 | Schema baseline | Pending — capture via `schema-dump.yml` workflow (step C) |
