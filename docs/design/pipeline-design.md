@@ -291,3 +291,15 @@ held; service-role cutover not started.
   trigger advances on UPDATE (→ 20:57:32 on PATCH). Ledger 0007 applied; 0003–0005
   pending. Function unregressed. Production untouched.
   Next: tenant resolver (additive seam) — pending Eric's go.
+
+- **Tenant resolver — DEPLOYED TO STAGING 2026-07-05 (additive seam).** `resolvePrincipal()`
+  returns a Principal for every request; called once at the top of serve() with a
+  per-request structured log line (request-id logging floor). `_resolver_probe` public
+  diagnostic added for verification. NOTHING enforces on the principal yet; gate + handlers
+  unchanged. Verified via real JWTs: anonymous→public, staff→{staff, tenant …0001, staff},
+  client→{client, tenant …0001, client}, wrong/no secret→public. Smoke matrix 8/8 unchanged
+  (version, unknown→403, injected→403, invoice_reminder no-jwt→401 / staff→200, whoami,
+  relay→200, CORS). deno check clean (0 new errors). PROD untouched (still v249; _resolver_probe
+  404/403s there). Note: system+valid-secret positive path not directly harness-tested (staging
+  SCHEDULER_SECRET not held by the test harness); it uses the identical comparison run_scheduled_jobs
+  already relies on. Next: revocation stage — pending Eric's go.

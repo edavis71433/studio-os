@@ -419,6 +419,7 @@ const PUBLIC_ROUTES = new Set([
   'contract_get',                // portal reads the agreement text (public read of one doc)
   'gsc_ingest',                  // self-gated inside: staff JWT or scheduler secret
   'quote_view',                  // client-facing quote page; gated by a 36-hex CSPRNG token in the link
+  '_resolver_probe',             // additive: read-only echo of the caller's own resolved principal (pipeline seam verification)
 ]);
 
 // ── NOTIFY RELAY ALLOWLIST (closes the catch-all bypass) ──
@@ -4020,6 +4021,89 @@ function progressFor(s: ClientSnapshot): ProgressBrief {
 
 
 
+// ════════════════════════════════════════════════════════════════════════════
+//  PIPELINE STAGE 1 — TENANT RESOLVER (additive seam; nothing enforces on it yet)
+//
+//  Runs once per request at the top of serve() and returns a Principal. This is
+//  the identity+tenant stage of the request pipeline made a first-class object.
+//
+//  ADDITIVE ONLY (this phase): the existing authorization gate and every handler
+//  are UNCHANGED — they still call verifyStaff / their own JWT checks. Nothing
+//  reads this Principal for enforcement. It exists so the next increments
+//  (revocation, durable rate limiting, audit) and the later service-role cutover
+//  have one place to get {who, which tenant, what role, request id}.
+//
+//  Contract: NEVER throws (any error resolves to a public principal). Public
+//  requests (no JWT, no secret) cost zero I/O. Authenticated requests reuse the
+//  same auth/membership lookups the handlers already do — during this seam phase
+//  that is briefly redundant with the gate's verifyStaff; it collapses to a
+//  single resolution when the gate is cut over to consume the Principal in a
+//  later increment.
+// ════════════════════════════════════════════════════════════════════════════
+type PrincipalKind = 'staff' | 'client' | 'public' | 'system';
+interface Principal {
+  kind: PrincipalKind;
+  userId: string | null;
+  tenantId: string | null;
+  role: string | null;      // owner|admin|staff|readonly for staff; 'client'; else null
+  jwt: string | null;       // the caller's token, for future RLS-scoped reads
+  requestId: string;        // minted here; threads into logs + (later) audit_log
+}
+
+async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
+  const requestId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+  const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, jwt: null, requestId };
+  try {
+    // system: a valid scheduler/webhook shared secret in the body (run_scheduled_jobs, gsc_ingest, pi_weekly)
+    if (body && typeof body.secret === 'string' && body.secret && SCHEDULER_SECRET && body.secret === SCHEDULER_SECRET) {
+      return { ...pub, kind: 'system' };
+    }
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    if (!jwt) return pub; // no token => public, zero I/O
+
+    // staff first — reuse the existing fail-closed membership check
+    const staff = await verifyStaff(req);
+    if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, jwt, requestId };
+
+    // otherwise validate the token and see if it belongs to a client (portal user)
+    let user: any = null;
+    try {
+      const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
+      if (uRes.ok) user = await uRes.json();
+    } catch (_) { /* fall through to public */ }
+    if (!user || !user.id) return { ...pub, jwt };
+
+    const uid = String(user.id);
+    const email = (user.email ? String(user.email) : '').toLowerCase();
+    const svc = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` };
+    try {
+      // client linkage: a contact carrying this auth_user_id, or a client row by email.
+      // tenantId comes from the owning client record (falls back to DDS #1).
+      let tenantId: string | null = null;
+      const cr = await fetch(`${SB_URL}/rest/v1/contacts?auth_user_id=eq.${encodeURIComponent(uid)}&select=id&limit=1`, { headers: svc });
+      const contacts = cr.ok ? await cr.json() : [];
+      if (Array.isArray(contacts) && contacts.length) {
+        const clr = await fetch(`${SB_URL}/rest/v1/clients?contact_id=eq.${encodeURIComponent(contacts[0].id)}&select=tenant_id&limit=1`, { headers: svc });
+        const cls = clr.ok ? await clr.json() : [];
+        if (Array.isArray(cls) && cls.length) tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : null;
+      }
+      if (tenantId === null && email) {
+        const clr = await fetch(`${SB_URL}/rest/v1/clients?or=(email.eq.${encodeURIComponent(email)},contact_email.eq.${encodeURIComponent(email)})&select=tenant_id&limit=1`, { headers: svc });
+        const cls = clr.ok ? await clr.json() : [];
+        if (Array.isArray(cls) && cls.length) { tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : TENANT_ID; }
+      }
+      if (tenantId !== null) {
+        return { kind: 'client', userId: uid, tenantId, role: 'client', jwt, requestId };
+      }
+    } catch (_) { /* fall through */ }
+
+    // valid token but neither staff nor a known client — authenticated but unscoped
+    return { ...pub, userId: uid, jwt };
+  } catch (_) {
+    return pub; // NEVER throw from the resolver
+  }
+}
+
 serve(async (req) => {
   const reqCors = corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: reqCors });
@@ -4036,6 +4120,16 @@ serve(async (req) => {
       if (!body || !body.type) { const qt = _url.searchParams.get('type'); if (qt) body.type = qt; }
     }
     const { type } = body;
+
+    // ── PIPELINE STAGE 1: resolve the principal once (additive; not enforced) ──
+    // Emits one structured log line per request (the request-id logging floor,
+    // Brief §13). Nothing below reads `principal` yet — the gate and handlers are
+    // unchanged. Wrapped so a resolver hiccup can never affect request handling.
+    let principal: Principal | null = null;
+    try {
+      principal = await resolvePrincipal(req, body);
+      console.log(JSON.stringify({ rid: principal.requestId, kind: principal.kind, tenant: principal.tenantId, role: principal.role, route: String(type || '') }));
+    } catch (_) { /* resolver is additive; never blocks a request */ }
 
     // ═══════════════════════════════════════════════════════════════════════
     //  SINGLE FAIL-CLOSED AUTHORIZATION GATE (Part 2a)
@@ -4073,6 +4167,17 @@ serve(async (req) => {
       const staff = await verifyStaff(req);
       if (!staff) return json({ role: null, isTeam: false }, 200, reqCors);
       return json({ role: staff.role, isTeam: true, email: staff.email }, 200, reqCors);
+    }
+
+    // ── _resolver_probe — read-only verification of the tenant resolver ──
+    // Additive diagnostic (public route). Returns the caller's OWN resolved
+    // principal (never the jwt). Reveals nothing an authenticated caller could
+    // not already learn about themselves, exactly like whoami. Used to verify
+    // the resolver's output for staff / client / anonymous during the seam
+    // phase; harmless to leave in place.
+    if (type === '_resolver_probe') {
+      const p = principal || await resolvePrincipal(req, body);
+      return json({ kind: p.kind, tenantId: p.tenantId, role: p.role, userId: p.userId, hasJwt: !!p.jwt, requestId: p.requestId }, 200, reqCors);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
