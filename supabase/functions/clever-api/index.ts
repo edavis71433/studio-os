@@ -557,6 +557,9 @@ async function durableRateCheck(bucketKey: string): Promise<'allowed' | 'limited
       method: 'POST',
       headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ p_bucket: bucketKey, p_window: windowStart, p_max: RATE_MAX }),
+      // Hard bound: a hung limiter RPC must not block the request; on timeout we
+      // return 'error' and the caller falls back to the in-memory limiter.
+      signal: AbortSignal.timeout(2500),
     });
     if (!r.ok) return 'error';
     const allowed = await r.json(); // rate_hit returns boolean: true = allowed
@@ -4160,6 +4163,9 @@ async function auditWrite(
         p_target: opts.target ?? null,
         p_detail: opts.detail || {},
       }),
+      // Hard bound so a hung RPC can never block the request path (the catch
+      // handles thrown errors, but only a timeout stops an indefinite await).
+      signal: AbortSignal.timeout(2500),
     });
   } catch (_) { /* audit is best-effort; never breaks the request path */ }
 }

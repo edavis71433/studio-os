@@ -355,3 +355,16 @@ decision, not a gap.
   wrote exactly one 'action' row; rate-limited still 429; smoke 6/6; deno check 0 new. PROD
   untouched (v249; audit_log absent there — 404). Synthetic test rows cleaned. Ledger 0009
   applied; 0003-0005 held.
+
+- **0009 REVIEW FIXES 2026-07-05 (two defects found + fixed).**
+  (1) SECURITY: anon/authenticated could invoke audit_write() and rate_hit()
+  directly (Supabase grants execute to those roles beyond PUBLIC; SECURITY
+  DEFINER then inserted) — audit-log poisoning. Verified: anon POST 200, forged
+  rows landed. FIX: migration 0010 revokes execute from public/anon/authenticated
+  on both RPCs (service_role only). Re-verified: anon audit_write 401, client 403,
+  anon rate_hit 401, 0 forged rows; edge-function service-role path still writes
+  audit rows; limiter still works.
+  (2) BLOCKING: auditWrite/durableRateCheck fetch had no timeout — a hung RPC
+  could block the request path (catch stops throws, not hangs). FIX: AbortSignal.
+  timeout(2500) on both. deno check 0 new. PROD untouched (v249). Ledger 0010
+  applied; 0003-0005 held.
