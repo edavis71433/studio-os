@@ -51,6 +51,20 @@ Local alternative (no GitHub needed):
 
     npx supabase db dump --db-url "<SUPABASE_DB_URL>" --schema public -f supabase/migrations/0000_baseline.sql
 
+**Connection-string lesson (2026-07-05, hard-won — do not re-debug):**
+
+- The DIRECT connection string (`db.<ref>.supabase.co:5432`) FAILS from
+  IPv4-only networks — Supabase direct connections are IPv6. Symptom:
+  connection timeout / unreachable.
+- Use the **transaction pooler URI** instead
+  (`...pooler.supabase.com:6543`, username `postgres.<project-ref>`). This is
+  what the `SUPABASE_DB_URL` GitHub secret holds.
+- The pooler failed AUTH until the database password was reset to **letters
+  and numbers only** — special characters in the password break the URI
+  (they need percent-encoding, and some tooling still mishandles them).
+  Rule: DB passwords here are alphanumeric-only, or must be URL-encoded in
+  every connection string.
+
 Then apply the baseline to STAGING to prove the runner end-to-end:
 
     npx supabase link --project-ref <STAGING_REF>
