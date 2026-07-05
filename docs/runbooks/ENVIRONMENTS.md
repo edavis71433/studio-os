@@ -92,12 +92,16 @@ Then apply the baseline to STAGING to prove the runner end-to-end:
 
 ## F. Definition of done for step 1
 
-- [ ] Staging project exists; secrets set per inventory
-- [ ] `0000_baseline.sql` committed with rollback note
-- [ ] Baseline applied to staging via the runner (`supabase db push`)
-- [ ] `clever-api` canonical file landed (BYTE-CHECK.md item 1) and deployed
-      to STAGING via the workflow; smoke test: `{"type":"version"}` returns
-      build `2026-07-04.11`
-- [ ] `stripe-webhook` byte-confirmed (BYTE-CHECK.md item 2)
-- [ ] Netlify staging context live
-- [ ] Report to Eric before any production action
+- [x] Staging project exists (`wjlpursnwbmlcdwbeowv`, 2026-07-05); secrets
+      per inventory (Eric working through the fill-in checklist)
+- [x] `0000_baseline.sql` committed with rollback note (commit c000cea)
+- [x] Baseline applied to staging via the runner — `supabase db push`,
+      ledger `local 0000 = remote 0000`, REST-probed **78/78 relations
+      present** (2026-07-05)
+- [x] `clever-api` canonical file landed (BYTE-CHECK.md item 1) and deployed
+      to STAGING; smoke test returned build `2026-07-04.11`; unknown route
+      → 403 (deny-by-default gate alive on staging)
+- [x] `stripe-webhook` byte-confirmed (BYTE-CHECK.md item 2); staging
+      negative tests: unsigned POST → 400, GET → 405
+- [ ] Netlify staging context live (Eric, dashboard — §B)
+- [x] Nothing has touched production (all prod interactions read-only)
