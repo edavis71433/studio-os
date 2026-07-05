@@ -13,6 +13,33 @@ Eric's prod `agencies` check), the route-registry refactor, any admins drop.
 
 Production project ref: `qksstlqzbhesadrrofgn`.
 
+Confirmed by Eric (2026-07-05):
+- Netlify deploys the site automatically from this GitHub repo.
+- A recent production backup exists: **2026-07-05 17:11:31 UTC** (the migration
+  restore point).
+
+### ⚠ Finding that changes Step A — the pushed admin-panel change is NOT live yet
+Read-only check of `https://davisdigitalstudio.com/dds-studio-manage-9k2p.html`
+(2026-07-05): the live file is still the ORIGINAL (hash `ec3112…`; `notify()`
+sends only `Authorization: Bearer SB_KEY`, no `x-dds-user-jwt`). The JWT change
+(commit `b5a633c`, on `main` for hours) has NOT auto-deployed. So either the
+Netlify↔repo auto-deploy was connected AFTER those commits, watches a branch
+other than `main`, or has not built them.
+
+Implications for the plan:
+- Step A is genuinely PENDING (good — the frontend is not ahead of the
+  function; nothing is half-deployed).
+- Do NOT assume "push == deployed." Step A must be a VERIFY-LIVE gate: confirm
+  the live admin panel actually carries the JWT change (fetch it, grep for
+  `x-dds-user-jwt`) BEFORE deploying the function in Step C.
+- Because the function (Step C) is deployed manually via the CLI/workflow (NOT
+  via Netlify), we fully control its timing and can hard-gate it on a
+  verified-live Step A. The ordering guarantee therefore holds regardless of
+  Netlify's build timing.
+- Before execution, Eric confirms the Netlify↔repo↔branch wiring is active for
+  `main` (so a push actually publishes), or identifies the manual
+  trigger/branch.
+
 ---
 
 ## 0. Critical pre-fact — the migration ledger
@@ -41,9 +68,10 @@ The one hard rule: **frontend before the function** (the admin panel must send
 invoice_reminder/approval_needed). The DB migrations are independent of both and
 are sequenced in the middle where they are safest.
 
-    Step A  Frontend  — deploy the admin panel to Netlify
+    Step A  Frontend  — ensure the admin panel is LIVE on Netlify, then VERIFY
+                        the live file carries the x-dds-user-jwt change
     Step B  Database  — repair 0000, then push 0001, 0002, 0006 (hold 0003–0005)
-    Step C  Backend   — deploy the clever-api function
+    Step C  Backend   — deploy the clever-api function (HARD-GATED on Step A verified live)
     Step D  Verify    — run the live checklist (section 6)
 
 Rationale for A→B→C:
@@ -92,10 +120,19 @@ Per-migration effect on prod:
 
 - **Frontend (Step A):** only ONE file changed — `dds-studio-manage-9k2p.html`
   (+5/−1: `notify()` now sends `x-dds-user-jwt`). `portal.html` and all other
-  pages are unchanged. Deploy via whatever mechanism currently publishes the
-  site to Netlify. **CONFIRM the mechanism first** (GitHub-connected auto-deploy
-  vs manual upload). If manual, deploying just the one changed file is
-  sufficient; a full-site redeploy is also safe (byte-identical elsewhere).
+  pages are unchanged. Netlify auto-deploys from GitHub, so the change publishes
+  when `main` builds. BUT it is not live yet (see the finding in section 0), so
+  Step A is a two-part gate, both required before Step C:
+  1. Ensure the Netlify build for the commit containing `b5a633c` has run (a
+     push to `main`, or a manual "Trigger deploy" in Netlify, or confirming the
+     branch/wiring).
+  2. VERIFY live:
+
+         curl -s https://davisdigitalstudio.com/dds-studio-manage-9k2p.html \
+           | grep -c 'x-dds-user-jwt'      # must be >= 1
+
+     Only when this returns >= 1 is Step A complete. Do NOT start Step C until
+     it does.
 - **Backend (Step C):** deploy the function. It is an ATOMIC deploy carrying
   BOTH step-2 parts (part 1: notify catch-all closure + intake rate-limiting +
   config-driven env; part 2: approval_needed/invoice_reminder staff-gating).
@@ -204,16 +241,20 @@ Run in this order immediately after Step C:
 
 ## 8. Go / No-Go checklist (Eric confirms each before Step A)
 
-- [ ] Staging matrix is green for all four changes (DONE — see step-3-checklist
+- [x] Staging matrix is green for all four changes (DONE — see step-3-checklist
       and the step-2 commits).
-- [ ] A recent production backup exists and its timestamp is noted (so the
-      migrations have a restore point).
-- [ ] The Netlify deploy mechanism for the site is confirmed (auto vs manual).
+- [x] A recent production backup exists — **2026-07-05 17:11:31 UTC** (restore
+      point for the migrations).
+- [x] Netlify deploy mechanism confirmed — **auto-deploy from GitHub**. Note the
+      section-0 finding: verify the admin panel is actually live before Step C.
+- [ ] Netlify↔repo↔`main` wiring confirmed active (a push to `main` actually
+      publishes) OR the manual trigger/branch is identified. (Open — the
+      `b5a633c` change has not published yet.)
 - [ ] A low-traffic window is chosen (portal + admin quiet).
 - [ ] `SUPABASE_ACCESS_TOKEN` + prod pooler connection available to the runner.
 - [ ] `ALLOWED_ORIGINS` on prod confirmed unset-or-correct.
-- [ ] Rollback steps (section 5) are understood and the pre-step-2 function
-      commit (`5b048b7`) is identified.
+- [x] Rollback steps (section 5) understood; pre-step-2 function commit
+      identified: **`5b048b7`**.
 - [ ] Eric gives an explicit go for THIS promotion (the four items only).
 
 On all boxes checked, proceed A → B → C → D. Stop and report after Step D before
