@@ -30,10 +30,12 @@ jobs:
       - name: Guard — canonical clever-api file must exist
         run: test -f supabase/functions/clever-api/index.ts || { echo "clever-api/index.ts missing — see docs/runbooks/BYTE-CHECK.md item 1"; exit 1; }
 
+      # verify_jwt=false mirrors production (v247 setting): the function's own
+      # fail-closed gate is the auth layer; cron + public site call it bare.
       - name: Deploy clever-api (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy clever-api --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes supabase functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Deploy stripe-webhook (staging, no JWT verification)
         env:
@@ -70,7 +72,7 @@ jobs:
       - name: Deploy clever-api (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy clever-api --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes supabase functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy stripe-webhook (PRODUCTION, no JWT verification)
         env:
