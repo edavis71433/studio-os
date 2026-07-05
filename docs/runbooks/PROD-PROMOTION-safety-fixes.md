@@ -268,3 +268,32 @@ Run in this order immediately after Step C:
 On all boxes checked, proceed A → B → C → D. Stop and report after Step D before
 declaring done. Any red verification item → roll back that piece per section 5
 and report.
+
+---
+
+## EXECUTION RESULT — 2026-07-05 (COMPLETE, all green)
+
+Promoted the four approved items to production. `0003–0005`, route registry, and
+admins drop NOT run.
+
+- **ALLOWED_ORIGINS** set on prod = studio-os-dds.netlify.app + davisdigitalstudio.com
+  + www (updated 20:17 UTC).
+- **Step A** PASS — admin panel live at studio-os-dds.netlify.app (hash match;
+  notify() sends x-dds-user-jwt).
+- **Step B** — `migration repair --status applied 0000` then pushed 0001, 0002,
+  0006. Prod ledger: `0000,0001,0002,0006` applied; `0003,0004,0005` pending.
+  Effects verified: tenants.state=active; 0002 copied plan=founder +
+  owner_email from the real prod agencies row; 0006 backfilled email_templates
+  tenant_id on the 12 real templates.
+- **Step C** — clever-api deployed, now **v249** (was v247). stripe-webhook
+  untouched.
+- **Step D automated** — 7/7 pass: version=2026-07-04.11; unknown→403; injected
+  notify→403; invoice_reminder & approval_needed no-jwt→401; CORS echoes BOTH
+  studio-os-dds.netlify.app and davisdigitalstudio.com. Portal serves 200.
+- **Step D manual (Eric)** — pending: (1) from the new admin panel send a real
+  invoice reminder end-to-end; (2) Email Templates section loads/edits; (3) a
+  real client portal login loads normally.
+
+CLI is now linked to PROD (was staging). Re-link staging before further staging
+work. Function-logs not checkable via this CLI version; behavioral tests
+substitute.

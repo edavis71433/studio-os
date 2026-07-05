@@ -7,12 +7,12 @@ forward-only, reversible, staging-first.
 
 | File | Purpose | Staging | Production | Gate |
 |---|---|---|---|---|
-| `0001_tenants_enrich` | add lifecycle `state` enum + plan/brand/owner_email/updated_at/deleted_at + touch trigger | ✅ applied 2026-07-05 | ⛔ hold | — |
-| `0002_agency_attr_backfill` | copy agencies.{plan,brand,owner_email} → tenants | ✅ applied 2026-07-05 | ⛔ hold | — |
+| `0001_tenants_enrich` | add lifecycle state + attrs + trigger | ✅ staging | ✅ PROD 2026-07-05 | — |
+| `0002_agency_attr_backfill` | copy agencies attrs -> tenants | ✅ staging | ✅ PROD 2026-07-05 | — |
 | `0003_org_scope_converge` | drop organizations.agency_id, keep tenant_id | ⏸ pending | ⛔ hold | per-row agency_id=tenant_id |
 | `0004_drop_agency_columns` | drop agency_id from 18 tables | ⏸ pending | ⛔ hold | per-table agency_id=tenant_id |
 | `0005_drop_agencies_table` | drop agencies | ⏸ pending | ⛔ hold | **Eric: `select id,slug,name,plan from agencies;` on prod + confirm no external readers** + row-count ≤ 1 |
-| `0006_rls_holes` | tenant-scope email_templates (admins drop stays commented) | ✅ applied 2026-07-05 (email_templates only) | ⛔ hold | — |
+| `0006_rls_holes` | tenant-scope email_templates (admins NOT dropped) | ✅ staging | ✅ PROD 2026-07-05 | — |
 
 ## 0001 staging result (applied 2026-07-05)
 
