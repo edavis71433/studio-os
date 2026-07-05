@@ -316,3 +316,17 @@ held; service-role cutover not started.
   (client_hq)→200; smoke 7/7; resolver unaffected. deno check 0 new errors. PROD
   untouched (v249). Public/client routes unaffected (revocation only fires on
   ROUTE_MIN_ROLE staff routes). Next: durable rate limiter — pending Eric's go.
+
+---
+
+## Documented follow-up — client-side tenant-state enforcement (NOT yet built)
+
+Revocation (as shipped 2026-07-05) enforces on STAFF routes only. A suspended /
+closed tenant does not yet block that tenant's CLIENTS at the pipeline, because
+client-portal routes are self-gated (not in ROUTE_MIN_ROLE). Brief §8 wants
+suspended/closed tenants rejected at the pipeline for everyone. This is deferred
+to the client-route pipeline work (part of the service-role cutover), by Eric's
+instruction. When that lands: resolve the client principal's tenantId, check
+tenants.state the same way staffRevocation does, reject clients of
+suspended/closed tenants with a clear message. Tracked here so it is a conscious
+decision, not a gap.
