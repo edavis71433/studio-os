@@ -12,7 +12,7 @@ forward-only, reversible, staging-first.
 | `0003_org_scope_converge` | drop organizations.agency_id, keep tenant_id | ⏸ pending | ⛔ hold | per-row agency_id=tenant_id |
 | `0004_drop_agency_columns` | drop agency_id from 18 tables | ⏸ pending | ⛔ hold | per-table agency_id=tenant_id |
 | `0005_drop_agencies_table` | drop agencies | ⏸ pending | ⛔ hold | **Eric: `select id,slug,name,plan from agencies;` on prod + confirm no external readers** + row-count ≤ 1 |
-| `0006_rls_holes` | tenant-scope email_templates; (optional) drop unused admins | ⏸ pending (prepared, do NOT run yet) | ⛔ hold | — |
+| `0006_rls_holes` | tenant-scope email_templates (admins drop stays commented) | ✅ applied 2026-07-05 (email_templates only) | ⛔ hold | — |
 
 ## 0001 staging result (applied 2026-07-05)
 
@@ -46,6 +46,30 @@ whoami 200).
 Staging seed note: a test `agencies` row now exists on staging (id = DDS uuid).
 Harmless — 0005's row-count≤1 gate still passes; it will be dropped by 0005 when
 that runs on staging.
+
+## 0006 staging result (applied 2026-07-05 — email_templates only)
+
+Closes the `email_templates` hole (`authenticated USING(true)` let any logged-in
+CLIENT read/write all staff templates). Adds `tenant_id` (default DDS, FK to
+tenants, backfilled) and replaces the open policy with
+`tenant_id IN current_tenant_ids()`. Access matrix, verified with real JWTs:
+
+| Identity | read (before) | read (after) | write (after) |
+|---|---|---|---|
+| Client (no membership) | 200, sees rows | **[] (locked out)** | **403** |
+| Staff (member of tenant #1) | 200 | 200, sees tenant rows | **201** |
+| Service role (system) | full | full (RLS bypass) | full |
+
+`tenant_id` backfilled to DDS on all rows. Function unregressed. The `admins`
+optional drop remains COMMENTED in 0006 (Eric: do not drop yet).
+
+### ⚠ Ledger is intentionally OUT OF ORDER
+0006 was applied ahead of 0003–0005 (which are held for the agency-cleanup
+gate). Remote ledger: `0000,0001,0002,0006` applied; `0003,0004,0005` pending.
+When 0003–0005 are later applied (after Eric's prod agencies check), the runner
+will apply them even though they are numbered below the already-applied 0006;
+`supabase db push` may print an "older than latest remote" note but still
+applies them. This is expected and safe — the three are independent of 0006.
 
 ## Pipeline stages (after migrations, on staging)
 
