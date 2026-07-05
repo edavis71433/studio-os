@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design System · Davis Digital Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tokens.css">
+<link rel="stylesheet" href="./components.css">
+<style>
+  body{ margin:0; background:var(--bg); font-family:var(--sans); color:var(--ink); }
+  .wrap{ max-width:960px; margin:0 auto; padding:var(--s7) var(--s5); }
+  .sg-head{ margin-bottom:var(--s7); }
+  .sg-sec{ margin:var(--s7) 0; padding-top:var(--s6); border-top:1px solid var(--line); }
+  .sg-sec > h2{ font-family:var(--mono); font-size:var(--t-xs); letter-spacing:1.5px; text-transform:uppercase; color:var(--brass); margin:0 0 var(--s5); }
+  .sg-grid{ display:flex; flex-wrap:wrap; gap:var(--s3); align-items:center; }
+  .sg-stack{ display:flex; flex-direction:column; gap:var(--s4); }
+  .sg-swatch{ width:88px; }
+  .sg-swatch__chip{ height:52px; border-radius:var(--r-sm); border:1px solid var(--line); }
+  .sg-swatch__name{ font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:6px; }
+  .sg-note{ font-size:var(--t-sm); color:var(--muted); margin-top:var(--s3); }
+</style>
+</head>
+<body class="dds">
+<div class="wrap">
+
+  <header class="sg-head">
+    <div class="dds-eyebrow">Davis Digital Studio</div>
+    <h1 class="dds-display">The Design System</h1>
+    <p class="dds-body" style="max-width:560px;">One language for the public site, login, onboarding, client portal, and admin. Every screen is built from these parts. If a component you need isn't here, add it here first, then use it. That is how the product stays one product.</p>
+  </header>
+
+  <!-- COLOR -->
+  <section class="sg-sec">
+    <h2>Color</h2>
+    <div class="sg-grid">
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--p)"></div><div class="sg-swatch__name">--p</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--p-600)"></div><div class="sg-swatch__name">--p-600</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--p-700)"></div><div class="sg-swatch__name">--p-700</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--p-deep)"></div><div class="sg-swatch__name">--p-deep</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--brass)"></div><div class="sg-swatch__name">--brass</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--ink)"></div><div class="sg-swatch__name">--ink</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--green)"></div><div class="sg-swatch__name">--green</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--amber)"></div><div class="sg-swatch__name">--amber</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--red)"></div><div class="sg-swatch__name">--red</div></div>
+      <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--surface-3)"></div><div class="sg-swatch__name">--surface-3</div></div>
+    </div>
+  </section>
+
+  <!-- TYPE -->
+  <section class="sg-sec">
+    <h2>Typography — Fraunces · Inter · Geist Mono</h2>
+    <div class="sg-stack">
+      <div class="dds-display">Display — Fraunces</div>
+      <div class="dds-h1">Heading 1 — Fraunces</div>
+      <div class="dds-h2">Heading 2 — Fraunces</div>
+      <div class="dds-h3">Heading 3 — Inter 600</div>
+      <div class="dds-body">Body — Inter. The quick brown fox jumps over the lazy dog, then files an invoice and approves the homepage copy.</div>
+      <div class="dds-data" style="font-size:18px;">Data — Geist Mono · 64 → 71 · $3,800 · 91%</div>
+      <div class="dds-eyebrow">Eyebrow — Geist Mono uppercase</div>
+    </div>
+    <p class="sg-note">DM Serif Display and DM Sans are removed. Three families, three jobs.</p>
+  </section>
+
+  <!-- BUTTONS -->
+  <section class="sg-sec">
+    <h2>Buttons</h2>
+    <div class="sg-grid">
+      <button class="dds-btn dds-btn--primary">Approve</button>
+      <button class="dds-btn dds-btn--secondary">Ask Eric</button>
+      <button class="dds-btn dds-btn--ghost">Not now</button>
+      <button class="dds-btn dds-btn--danger">Delete</button>
+      <button class="dds-btn dds-btn--danger-soft">Unsend</button>
+      <button class="dds-btn dds-btn--primary dds-btn--sm">Small</button>
+      <button class="dds-btn dds-btn--primary dds-btn--lg">Large</button>
+      <button class="dds-btn dds-btn--primary" disabled>Disabled</button>
+    </div>
+  </section>
+
+  <!-- CARDS -->
+  <section class="sg-sec">
+    <h2>Cards</h2>
+    <div class="sg-stack" style="max-width:420px;">
+      <div class="dds-card">
+        <div class="dds-card__header"><div class="dds-card__title">Top priority</div><span class="dds-chip dds-chip--brand"><span class="dds-chip__dot"></span>High impact</span></div>
+        <div class="dds-card__body"><div class="dds-body" style="margin:0;">Get on Google Maps for "wine bar". Eight of ten people looking for a wine bar near you start on Google Maps, and right now you don't appear.</div></div>
+        <div class="dds-card__footer"><button class="dds-btn dds-btn--primary dds-btn--sm">Approve</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FORMS -->
+  <section class="sg-sec">
+    <h2>Forms</h2>
+    <div style="max-width:420px;">
+      <div class="dds-field">
+        <label class="dds-label">Business name</label>
+        <input class="dds-input" placeholder="Bacchus Kitchen">
+      </div>
+      <div class="dds-field">
+        <label class="dds-label">What do you want most from your site?</label>
+        <textarea class="dds-textarea" placeholder="More reservations on weeknights…"></textarea>
+        <div class="dds-hint">Plain language is perfect. This shapes the whole project.</div>
+      </div>
+      <div class="dds-field">
+        <label class="dds-label">Email</label>
+        <input class="dds-input" aria-invalid="true" value="not-an-email">
+        <div class="dds-error">That doesn't look like an email address yet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="sg-sec">
+    <h2>Table</h2>
+    <div class="dds-card" style="overflow:auto;">
+      <table class="dds-table">
+        <thead><tr><th class="dds-sortable" aria-sort="ascending">Client</th><th class="dds-sortable">Stage</th><th>Status</th><th class="dds-sortable" style="text-align:right;">Amount</th></tr></thead>
+        <tbody>
+          <tr class="dds-row-click"><td>Bacchus Kitchen</td><td>Build</td><td><span class="dds-chip dds-chip--ok"><span class="dds-chip__dot"></span>On track</span></td><td class="dds-num">$3,800</td></tr>
+          <tr class="dds-row-click" aria-selected="true"><td>Foreign Code</td><td>Review</td><td><span class="dds-chip dds-chip--warn"><span class="dds-chip__dot"></span>Waiting</span></td><td class="dds-num">$6,500</td></tr>
+          <tr class="dds-row-click"><td>Mesa Salon</td><td>Kickoff</td><td><span class="dds-chip dds-chip--stop"><span class="dds-chip__dot"></span>Blocked</span></td><td class="dds-num">$1,500</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- BADGES -->
+  <section class="sg-sec">
+    <h2>Badges & chips</h2>
+    <div class="sg-grid">
+      <span class="dds-chip"><span class="dds-chip__dot"></span>Neutral</span>
+      <span class="dds-chip dds-chip--ok"><span class="dds-chip__dot"></span>On track</span>
+      <span class="dds-chip dds-chip--warn"><span class="dds-chip__dot"></span>Waiting</span>
+      <span class="dds-chip dds-chip--stop"><span class="dds-chip__dot"></span>Blocked</span>
+      <span class="dds-chip dds-chip--brand"><span class="dds-chip__dot"></span>Growth</span>
+      <span class="dds-badge">3</span>
+    </div>
+  </section>
+
+  <!-- EMPTY -->
+  <section class="sg-sec">
+    <h2>Empty state</h2>
+    <div class="dds-card">
+      <div class="dds-empty">
+        <svg class="dds-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+        <div class="dds-empty__title">No recommendations yet</div>
+        <div class="dds-empty__body">Eric reviews your site each month and adds recommendations here. Your first one is on the way.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOADING -->
+  <section class="sg-sec">
+    <h2>Loading — skeletons for data, spinner for actions</h2>
+    <div class="dds-card" style="margin-bottom:var(--s4);">
+      <div class="dds-card__body">
+        <div class="dds-skel dds-skel--title"></div>
+        <div class="dds-skel dds-skel--line"></div>
+        <div class="dds-skel dds-skel--line" style="width:80%;"></div>
+        <div class="dds-skel dds-skel--card" style="margin-top:var(--s4);"></div>
+      </div>
+    </div>
+    <button class="dds-btn dds-btn--primary"><span class="dds-spinner"></span> Saving…</button>
+  </section>
+
+  <!-- TOASTS / MODAL triggers -->
+  <section class="sg-sec">
+    <h2>Toasts & modal</h2>
+    <div class="sg-grid">
+      <button class="dds-btn dds-btn--secondary" onclick="ddsToast('Saved','ok')">Show success toast</button>
+      <button class="dds-btn dds-btn--secondary" onclick="ddsToast('Something went wrong','err')">Show error toast</button>
+      <button class="dds-btn dds-btn--secondary" onclick="document.getElementById('demo-modal').style.display='flex'">Open modal</button>
+    </div>
+  </section>
+
+  <!-- SHELL preview -->
+  <section class="sg-sec">
+    <h2>App shell (top bar + sidebar)</h2>
+    <div class="dds-card" style="overflow:hidden;">
+      <div class="dds-topbar" style="position:static;border-radius:0;">
+        <a class="dds-topbar__logo" href="#">Davis<span>Digital</span> Studio</a>
+        <div style="display:flex;align-items:center;gap:var(--s3);"><span class="dds-topbar__role">OWNER</span><button class="dds-topbar__out">Log out</button></div>
+      </div>
+      <div style="display:flex;">
+        <nav class="dds-sidebar" style="position:static;height:auto;">
+          <div class="dds-sidebar__label">Workspace</div>
+          <button class="dds-nav is-active"><svg class="dds-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>Home</button>
+          <button class="dds-nav">Pipeline</button>
+          <button class="dds-nav">Clients <span class="dds-nav__badge dds-badge">2</span></button>
+          <button class="dds-nav">Growth</button>
+          <div class="dds-divider"></div>
+          <div class="dds-sidebar__label">Tools</div>
+          <button class="dds-nav">Visibility</button>
+          <button class="dds-nav">Settings</button>
+        </nav>
+        <div style="flex:1;padding:var(--s5);background:var(--bg);">
+          <div class="dds-h2" style="margin:0 0 var(--s2);">Home</div>
+          <div class="dds-body" style="margin:0;">Content area uses the app canvas, sidebar uses surface. This shell is shared by admin and portal; only the nav items and role differ.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Modal -->
+<div class="dds-modal-overlay" id="demo-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="dm-title">
+  <div class="dds-modal">
+    <div class="dds-modal__header"><h3 class="dds-modal__title" id="dm-title">Delete this invoice?</h3></div>
+    <div class="dds-modal__body"><p class="dds-body" style="margin:0;">The client will no longer see this invoice in their portal. This can't be undone.</p></div>
+    <div class="dds-modal__footer">
+      <button class="dds-btn dds-btn--ghost" onclick="document.getElementById('demo-modal').style.display='none'">Cancel</button>
+      <button class="dds-btn dds-btn--danger" onclick="document.getElementById('demo-modal').style.display='none';ddsToast('Invoice deleted','ok')">Delete invoice</button>
+    </div>
+  </div>
+</div>
+
+<div class="dds-toast-wrap" id="dds-toasts"></div>
+
+<script>
+// Canonical toast helper — the one in-app notification primitive.
+function ddsToast(msg, kind){
+  var wrap = document.getElementById('dds-toasts');
+  var t = document.createElement('div');
+  t.className = 'dds-toast' + (kind==='ok'?' dds-toast--ok':kind==='err'?' dds-toast--err':'');
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(function(){ t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 300); }, 2600);
+}
+// Modal: ESC to close, click-overlay to close, focus trap entry.
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ var m=document.getElementById('demo-modal'); if(m) m.style.display='none'; }});
+document.getElementById('demo-modal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
+</script>
+</body>
+</html>

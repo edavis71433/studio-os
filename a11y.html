@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DDS OS · Accessibility Check</title>
+<style>
+  :root{ --p:#5b3fa0; --ink:#291942; --muted:#6a5d7e; --cream:#faf7f2; --line:rgba(41,25,66,.1); }
+  *{ margin:0; padding:0; box-sizing:border-box; font-family:'Inter',system-ui,sans-serif; }
+  body{ background:var(--cream); color:var(--ink); padding:24px; max-width:900px; margin:0 auto; }
+  h1{ font-family:Georgia,serif; font-weight:400; font-size:26px; margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:20px; line-height:1.5; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:18px 20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(41,25,66,.04); }
+  .btn{ background:var(--p); color:#fff; border:none; border-radius:10px; padding:11px 18px; font-size:14px; font-weight:600; cursor:pointer; margin:4px 4px 4px 0; }
+  .summary{ font-size:20px; font-weight:700; padding:12px 0; }
+  .grp{ font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--muted); margin:16px 0 6px; }
+  .row{ display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-top:1px solid var(--line); font-size:13px; line-height:1.5; }
+  .badge{ font-weight:800; font-size:10px; letter-spacing:.05em; padding:2px 8px; border-radius:100px; flex:none; margin-top:1px; }
+  .pass{ color:#1a7e49; background:#e7f6ee; } .fail{ color:#c0392b; background:#fbecea; } .warn{ color:#9a7a1a; background:#fdf6e3; }
+  .muted{ color:var(--muted); font-size:12px; }
+  pre{ background:#12101a; color:#e8e4f0; border-radius:12px; padding:14px; font-size:11px; overflow:auto; white-space:pre-wrap; margin-top:12px; }
+  code{ background:rgba(91,63,160,.08); padding:1px 5px; border-radius:5px; font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>DDS OS · Accessibility Check</h1>
+  <div class="sub">Fetches a deployed page and runs accessibility checks against its markup — contrast, labels, alt text, headings, landmarks, focusable controls. Uses <b>axe-core</b> if reachable; otherwise a built-in checker covering the same high-value rules. No terminal needed.</div>
+
+  <div class="card">
+    <div class="grp" style="margin-top:0;">CHECK A PAGE</div>
+    <button class="btn" onclick="check('dds-studio-manage-9k2p.html')">Check Admin</button>
+    <button class="btn" onclick="check('portal.html')">Check Portal</button>
+    <div class="muted" id="engine" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <div class="summary" id="summary">Running…</div>
+    <div id="results"></div>
+    <button class="btn" style="background:#fff;color:var(--p);border:1px solid var(--line);margin-top:14px;" onclick="copyReport()">Copy report</button>
+    <pre id="report" style="display:none;"></pre>
+    <div class="muted" style="margin-top:12px;">Send the copied report or a top-to-bottom screenshot. <b>FAIL</b> = a real barrier to fix. <b>WARN</b> = worth a human look (may be a false positive on dynamic content).</div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"></script>
+<script>
+// ── UI-only a11y checker. Loads the target page into a hidden iframe (same
+// origin) and runs axe-core against it; falls back to a built-in ruleset if
+// axe can't load (CDN blocked). Same operator-run pattern as the RLS/logic
+// harnesses. Does not replace manual screen-reader testing, which no automated
+// tool can. ──
+let out = [], P = 0, F = 0, W = 0;
+function add(group, badge, name, detail){
+  if (badge==='PASS') P++; else if (badge==='FAIL') F++; else W++;
+  out.push({group, badge, name, detail: detail||''});
+}
+
+async function check(file){
+  out = []; P = 0; F = 0; W = 0;
+  document.getElementById('resultsCard').style.display = 'block';
+  document.getElementById('summary').textContent = 'Loading ' + file + '…';
+  const eng = document.getElementById('engine');
+
+  // load target into a hidden iframe
+  let iframe = document.getElementById('_target');
+  if (iframe) iframe.remove();
+  iframe = document.createElement('iframe');
+  iframe.id = '_target'; iframe.style.cssText = 'position:fixed;left:-9999px;width:1200px;height:900px;';
+  iframe.src = file + '?_a11y=' + Date.now();
+  document.body.appendChild(iframe);
+
+  await new Promise(res => { iframe.onload = res; setTimeout(res, 4000); });
+  const doc = iframe.contentDocument;
+  if (!doc){ add('Load','FAIL','could not read the page (cross-origin?)',''); return render(); }
+
+  if (typeof axe !== 'undefined'){
+    eng.textContent = 'Engine: axe-core 4.9 (industry standard)';
+    try {
+      const r = await axe.run(doc, { runOnly: ['wcag2a','wcag2aa'] });
+      r.violations.forEach(v => {
+        v.nodes.slice(0,3).forEach(n => add('axe: '+v.impact, v.impact==='critical'||v.impact==='serious'?'FAIL':'WARN', v.help, (n.target||[]).join(' ')));
+      });
+      add('axe','PASS', r.passes.length + ' axe rules passed', v => v);
+      if (!r.violations.length) add('axe','PASS','zero WCAG 2 A/AA violations','');
+    } catch(e){ add('axe','WARN','axe run failed, using built-in', e.message); builtin(doc); }
+  } else {
+    eng.textContent = 'Engine: built-in checker (axe CDN unreachable)';
+    builtin(doc);
+  }
+  render();
+}
+
+// ── built-in high-value ruleset (used if axe is blocked) ──
+function builtin(doc){
+  // 1. inputs need an accessible name
+  const inputs = [...doc.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')];
+  const unlabeled = inputs.filter(el => {
+    if (el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title')) return false;
+    if (el.id && doc.querySelector('label[for="'+el.id+'"]')) return false;
+    if (el.closest('label')) return false;
+    if (el.getAttribute('placeholder')) return false; // placeholder is weak but common; warn not fail
+    return true;
+  });
+  add('Forms', unlabeled.length? 'FAIL':'PASS', (inputs.length-unlabeled.length)+'/'+inputs.length+' inputs have an accessible name',
+      unlabeled.length? unlabeled.slice(0,3).map(e=>e.outerHTML.slice(0,50)).join(' | '):'');
+
+  // 2. images need alt
+  const imgs = [...doc.querySelectorAll('img')];
+  const noalt = imgs.filter(i => !i.hasAttribute('alt'));
+  add('Images', noalt.length?'FAIL':'PASS', (imgs.length-noalt.length)+'/'+imgs.length+' images have alt', '');
+
+  // 3. buttons need a name (text or aria-label)
+  const btns = [...doc.querySelectorAll('button')];
+  const nameless = btns.filter(b => !(b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('title')));
+  add('Buttons', nameless.length?'FAIL':'PASS', (btns.length-nameless.length)+'/'+btns.length+' buttons have a name',
+      nameless.length? nameless.slice(0,3).map(b=>b.outerHTML.slice(0,50)).join(' | '):'');
+
+  // 4. page has one main landmark + lang
+  add('Landmarks', doc.documentElement.getAttribute('lang')?'PASS':'FAIL', 'html has lang attribute', '');
+  const mains = doc.querySelectorAll('main, [role=main]').length;
+  add('Landmarks', mains>=1?'PASS':'WARN', mains+' main landmark(s)', mains===0?'add a <main> wrapper':'');
+
+  // 5. heading present
+  add('Headings', doc.querySelector('h1,h2,[class*=pt]')?'PASS':'WARN', 'page has a top-level heading', '');
+
+  // 6. no positive tabindex (focus-order traps)
+  const pos = [...doc.querySelectorAll('[tabindex]')].filter(e => parseInt(e.getAttribute('tabindex'),10) > 0);
+  add('Focus order', pos.length?'FAIL':'PASS', pos.length? pos.length+' positive tabindex (breaks natural order)':'no positive tabindex', '');
+
+  // 7. dialogs carry role + modal
+  const dialogs = [...doc.querySelectorAll('[role=dialog]')];
+  const badDlg = dialogs.filter(d => d.getAttribute('aria-modal')!=='true');
+  add('Dialogs', dialogs.length? (badDlg.length?'WARN':'PASS') : 'PASS',
+      dialogs.length+' dialog(s), '+(dialogs.length-badDlg.length)+' with aria-modal', '');
+}
+
+function render(){
+  const groups = {};
+  out.forEach(r => { (groups[r.group]=groups[r.group]||[]).push(r); });
+  let html = '';
+  Object.keys(groups).forEach(g => {
+    html += '<div class="grp">'+g+'</div>';
+    groups[g].forEach(r => {
+      const cls = r.badge==='PASS'?'pass':r.badge==='FAIL'?'fail':'warn';
+      html += '<div class="row"><span class="badge '+cls+'">'+r.badge+'</span><span>'+r.name+(r.detail?' <span class="muted">— '+String(r.detail).replace(/</g,'&lt;')+'</span>':'')+'</span></div>';
+    });
+  });
+  document.getElementById('results').innerHTML = html;
+  const s = document.getElementById('summary');
+  s.textContent = P+' pass · '+F+' fail · '+W+' warn';
+  s.style.color = F? '#c0392b' : W? '#9a7a1a' : '#1a7e49';
+  let rep = 'DDS OS ACCESSIBILITY REPORT\n'+new Date().toISOString()+'\n'+P+' pass, '+F+' fail, '+W+' warn\n\n';
+  out.forEach(r => rep += r.badge+' ['+r.group+'] '+r.name+(r.detail?' — '+r.detail:'')+'\n');
+  document.getElementById('report').textContent = rep;
+}
+function copyReport(){
+  const t = document.getElementById('report').textContent;
+  navigator.clipboard.writeText(t).then(()=>alert('Report copied.'), ()=>{ const p=document.getElementById('report'); p.style.display='block'; });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<!-- DDS v3.0 20260621-1655 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Website ROI Calculator | Davis Digital Studio</title>
+<meta name="description" content="Find out how much a better website could be worth to your small business. Free ROI calculator from Davis Digital Studio.">
+<link rel="canonical" href="https://davisdigitalstudio.com/roi-calculator">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<meta name="theme-color" content="#5b3fa0">
+<meta property="og:title" content="Website ROI Calculator. Davis Digital Studio">
+<meta property="og:description" content="Find out how much a better website could be worth to your business. Free, instant, no signup.">
+<meta property="og:locale" content="en_US">
+<meta property="og:type" content="website">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@davisdigitalstudio">
+<meta property="og:url" content="https://davisdigitalstudio.com/roi-calculator">
+<meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<script>(function(){if(localStorage.getItem('cookie_consent')==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}})();</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-V4WF04NX7F',{anonymize_ip:true});</script>
+<link rel="stylesheet" href="styles.css">
+<style>
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;overflow-x:hidden;}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;}
+:root{--p:#5B3FA0;--pxl:#c4aee8;--pdark:#2A1B4A;--ink:#1B1525;--muted:#6B6276;--brass:#B08D57;--paper:#FBFAF7;--serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;}
+.skip-link{position:absolute;left:-9999px;top:8px;background:var(--p);color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;}
+:focus:not(:focus-visible){outline:none;}
+.tool-wrap{max-width:760px;margin:0 auto;padding:56px 24px 80px;}
+.calc-card{background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:20px;padding:40px;margin-bottom:32px;box-shadow:0 24px 48px -32px rgba(27,21,37,.2);}
+.label{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px;display:block;letter-spacing:0.2px;}
+.sublabel{font-size:12px;color:var(--muted);margin-bottom:12px;display:block;}
+.slider-row{margin-bottom:28px;}
+input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;margin-bottom:6px;}
+.slider-val{font-size:15px;font-weight:600;color:var(--p);}
+.results{background:var(--pdark);border-radius:20px;padding:36px;color:#fff;margin-bottom:32px;}
+.results-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:28px;}
+.result-box{background:rgba(255,255,255,0.07);border-radius:12px;padding:18px;text-align:center;}
+.result-num{font-family:var(--serif);font-size:clamp(22px,4vw,32px);font-weight:400;color:#fff;line-height:1;}
+.result-num.highlight{color:var(--pxl);}
+.result-label{font-size:11px;color:rgba(255,255,255,0.45);margin-top:6px;line-height:1.4;}
+.roi-bar{background:rgba(255,255,255,0.08);border-radius:100px;height:10px;margin:20px 0 8px;overflow:hidden;}
+.roi-fill{height:100%;border-radius:100px;background:var(--p);transition:width 0.4s ease;}
+.roi-labels{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.4);}
+.cta-row{text-align:center;margin-top:24px;}
+.assumptions{background:rgba(91,63,160,0.05);border:1px solid rgba(91,63,160,0.12);border-radius:12px;padding:20px 24px;margin-bottom:32px;}
+.assumptions h2{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:12px;}
+.assumptions ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.assumptions li{font-size:13px;color:var(--muted);display:flex;align-items:flex-start;gap:6px;}
+.assumptions li::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--p);flex-shrink:0;margin-top:5px;}
+.disclaimer{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;margin-top:8px;}
+@media(max-width:700px){.results-grid{grid-template-columns:1fr 1fr;}.calc-card{padding:24px;}.results{padding:24px;}.assumptions ul{grid-template-columns:1fr;}}
+
+
+/* ── Footer mobile responsive fix ── */
+@media (max-width: 768px) {
+}
+@media (max-width: 480px) {
+}
+
+/* NAV-FINAL-V5 */
+
+.skip-link{position:absolute;left:-9999px;top:8px;background:#5b3fa0;color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;border-radius:4px;}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}}
+
+
+/* ---------------------------------------------------------------
+   TOOL SWITCHER — cross-tool navigation, added so a visitor on any
+   one tool has a clear, designed path to the other five, plus back
+   to the Resources hub. Not a footer link dump — real cards with
+   the same shadow/radius language used across the rest of V2.
+   --------------------------------------------------------------- */
+.tool-switch-section{padding:72px 24px;background:#fff;position:relative;}
+.tool-switch-inner{max-width:1080px;margin:0 auto;}
+.tool-switch-head{text-align:center;margin-bottom:40px;}
+.tool-switch-head span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);}
+.tool-switch-head h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;letter-spacing:-.5px;margin-top:10px;}
+.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
+.tool-switch-head p a{color:var(--p);text-decoration:underline;}
+.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.tool-switch-item{display:block;background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:18px;padding:22px 20px;text-decoration:none;transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
+.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 26px 50px -28px rgba(27,21,37,.24);}
+.tool-switch-item h3{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--ink);margin-bottom:6px;}
+.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5;}
+.tool-switch-item.current{background:var(--p);border-color:var(--p);cursor:default;box-shadow:0 22px 44px -24px rgba(91,63,160,.42);pointer-events:none;}
+.tool-switch-item.current h3{color:#fff;}
+.tool-switch-item.current p{color:rgba(255,255,255,.72);}
+.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:100px;margin-bottom:8px;}
+@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr;}}
+
+
+/* Tool-hero two-column grid — was inline-only with zero mobile breakpoint,
+   causing horizontal overflow on phones (confirmed via screenshot: the
+   sample card was spilling off-screen). Now a real class with a real
+   breakpoint. */
+.tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
+@media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Website ROI Calculator","url":"https://davisdigitalstudio.com/roi-calculator","applicationCategory":"BusinessApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Calculate how much a better website could be worth to your small business. Free and instant.","provider":{"@type":"Person","name":"Eric Davis","url":"https://davisdigitalstudio.com"}}
+</script>
+<link rel="stylesheet" href="/enhance.css">
+</head>
+<body data-page="roi-calculator">
+
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<header class="nav">
+<div class="wrap nav-in">
+  <a href="index.html" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="how-we-work.html">How we work</a>
+    <a href="the-experience.html">The experience</a>
+    <span class="nav-has-sub"><a href="services.html" class="nav-sub-toggle" aria-haspopup="true" aria-expanded="false">Services <i class="caret" aria-hidden="true"></i></a>
+      <span class="nav-sub">
+        <a href="services.html">All services<small>Pricing and the full picture</small></a>
+        <a href="web-design.html">Web design<small>Strategy-led sites that convert</small></a>
+        <a href="seo-strategy.html">SEO strategy<small>Get found by people searching</small></a>
+        <a href="monthly-retainer.html">Ongoing care<small>Keep your site working after launch</small></a>
+      </span></span>
+    <a href="industries.html">Industries</a>
+    <a href="about.html">About</a>
+    <a href="audit.html">Free site review</a>
+  </nav>
+  <div class="nav-actions">
+    <a href="portal.html" class="nav-login">Client login</a>
+    <a href="contact.html" class="btn btn-primary" style="padding:11px 20px">Book a free call</a>
+  </div>
+  <button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+</div>
+</header>
+<main id="main-content" tabindex="-1">
+<section class="page-hero-v2" style="padding:64px 24px 72px;background:linear-gradient(180deg,#FBFAF7 0%,#ede8f7 100%);position:relative;overflow:hidden;">
+  <div class="tool-hero-grid" style="max-width:1100px;margin:0 auto;gap:56px;align-items:center;position:relative;z-index:1;">
+    <div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; ROI Calculator</div>
+      <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">What's a better website <em style="color:var(--p);font-style:italic;">worth to you?</em></h1>
+      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Adjust the sliders to see the potential return on a web design investment based on your actual business numbers.</p>
+    </div>
+    <div style="background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);" aria-hidden="true">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:18px;">Example</div>
+      <div style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;"><span>Monthly revenue</span><span style="color:var(--ink);font-weight:600;">$15,000</span></div>
+        <div style="height:6px;background:#ede8f7;border-radius:100px;"><div style="width:38%;height:100%;background:var(--p);border-radius:100px;position:relative;"><span style="position:absolute;right:-7px;top:-4px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--p);"></span></div></div>
+      </div>
+      <div style="margin-bottom:22px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;"><span>Conversion lift</span><span style="color:var(--ink);font-weight:600;">+18%</span></div>
+        <div style="height:6px;background:#ede8f7;border-radius:100px;"><div style="width:62%;height:100%;background:var(--brass);border-radius:100px;position:relative;"><span style="position:absolute;right:-7px;top:-4px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--brass);"></span></div></div>
+      </div>
+      <div style="padding:14px;background:#f7f4fd;border-radius:12px;text-align:center;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--p);text-transform:uppercase;margin-bottom:4px;">Potential monthly lift</div>
+        <div style="font-family:var(--serif);font-size:26px;color:var(--ink);">+$2,700</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="tool-wrap">
+
+  <div class="calc-card">
+    <div class="slider-row">
+      <label class="label" for="revenue">Monthly revenue</label>
+      <span class="sublabel">Your average monthly revenue right now</span>
+      <input type="range" id="revenue" min="2000" max="200000" step="1000" value="15000" oninput="calc()">
+      <div class="slider-val" id="revenue-val">$15,000 / mo</div>
+    </div>
+
+    <div class="slider-row">
+      <label class="label" for="web-pct">Percentage of customers from online</label>
+      <span class="sublabel">How much of your business comes from Google, social, or your website?</span>
+      <input type="range" id="web-pct" min="5" max="90" step="5" value="30" oninput="calc()">
+      <div class="slider-val" id="web-pct-val">30%</div>
+    </div>
+
+    <div class="slider-row">
+      <label class="label" for="improvement">Expected improvement with a better site</label>
+      <span class="sublabel">Studies show a well-optimized site with strong SEO increases online-sourced revenue by 15–40%</span>
+      <input type="range" id="improvement" min="10" max="50" step="5" value="25" oninput="calc()">
+      <div class="slider-val" id="improvement-val">25% increase</div>
+    </div>
+
+    <div class="slider-row">
+      <label class="label" for="package">Investment level</label>
+      <span class="sublabel">Which package are you considering?</span>
+      <input type="range" id="package" min="1500" max="6500" step="100" value="3800" oninput="calc()">
+      <div class="slider-val" id="package-val">$3,800 (Custom + Photography)</div>
+    </div>
+  </div>
+
+  <div class="results" role="region" aria-label="ROI calculation results">
+    <div class="results-grid">
+      <div class="result-box">
+        <div class="result-num" id="res-monthly">$1,520</div>
+        <div class="result-label">Additional revenue per month</div>
+      </div>
+      <div class="result-box">
+        <div class="result-num" id="res-annual">$18,240</div>
+        <div class="result-label">Additional revenue per year</div>
+      </div>
+      <div class="result-box">
+        <div class="result-num highlight" id="res-roi">382%</div>
+        <div class="result-label">First-year ROI</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:6px;font-size:13px;color:rgba(255,255,255,0.5);">Investment vs. annual return</div>
+    <div class="roi-bar">
+      <div class="roi-fill" id="roi-fill" style="width:79%;"></div>
+    </div>
+    <div class="roi-labels">
+      <span id="roi-left-label">Investment: $3,800</span>
+      <span id="res-payback">Pays for itself in 2.5 months</span>
+    </div>
+
+    <div class="cta-row">
+      <a href="audit.html" class="btn btn-primary">Get a full audit &rarr;</a>
+      <a href="contact.html" class="btn btn-ghost">Book a free call</a>
+    </div>
+  </div>
+
+  <div class="assumptions">
+    <h2>How this is calculated</h2>
+    <ul>
+      <li>Online revenue = monthly revenue × % from online sources</li>
+      <li>Monthly gain = online revenue × improvement percentage</li>
+      <li>Annual gain = monthly gain × 12 months</li>
+      <li>ROI = (annual gain − investment) ÷ investment × 100</li>
+      <li>Payback period = investment ÷ monthly gain</li>
+      <li>Based on industry averages. actual results vary by business</li>
+    </ul>
+  </div>
+
+  <p class="disclaimer">This calculator provides estimates for illustrative purposes only. Results are not guaranteed. Actual revenue impact depends on many factors including market conditions, business type, competition, and implementation quality. Davis Digital Studio does not guarantee specific revenue outcomes from web design or SEO services.</p>
+
+</div>
+<section class="tool-switch-section">
+  <div class="tool-switch-inner">
+    <div class="tool-switch-head">
+      <span>Free tools</span>
+      <h2>Explore the other free tools.</h2>
+      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="tools.html">the Resources hub &rarr;</a></p>
+    </div>
+    <div class="tool-switch-grid">
+    <a href="audit.html" class="tool-switch-item">
+      <h3>Site Audit</h3>
+      <p>Get your free site score and see exactly what's costing you customers.</p>
+    </a>
+    <a href="ai-critique.html" class="tool-switch-item">
+      <h3>AI Website Review</h3>
+      <p>A free AI read on what's costing you clicks, in plain English.</p>
+    </a>
+    <a href="report-card.html" class="tool-switch-item">
+      <h3>Digital Report Card</h3>
+      <p>A prioritized snapshot of what to fix first.</p>
+    </a>
+    <span class="tool-switch-item current">
+      <span class="tsw-badge">You're here</span>
+      <h3>ROI Calculator</h3>
+      <p>See what a better site could actually be worth.</p>
+    </span>
+    <a href="pricing-estimator.html" class="tool-switch-item">
+      <h3>Pricing Estimator</h3>
+      <p>Get a real ballpark price for your project.</p>
+    </a>
+    <a href="local-visibility.html" class="tool-switch-item">
+      <h3>Local Visibility Score</h3>
+      <p>Check how findable your business actually is nearby.</p>
+    </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+
+<section class="dds-final-cta" aria-label="Get in touch" style="background:linear-gradient(135deg,#2A1B4A 0%,#5b3fa0 100%);padding:48px 24px;position:relative;overflow:hidden;">
+  <div aria-hidden="true" style="position:absolute;top:-100px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.18) 0%,transparent 65%);pointer-events:none;"></div>
+  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;position:relative;z-index:1;">
+    <div style="flex-shrink:0;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c4aee8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </div>
+    <div style="flex:1;min-width:260px;color:#fff;text-align:left;">
+      <h3 style="font-family:var(--serif);font-size:clamp(22px,3.5vw,28px);font-weight:400;margin:0 0 6px;line-height:1.2;letter-spacing:-0.5px;color:#fff;">Ready to grow your business online?</h3>
+      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0;line-height:1.6;">Let's build a website that works as hard as you do.</p>
+    </div>
+    <a href="/contact" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#2A1B4A;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;font-family:var(--sans);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Book a free call &rarr;</a>
+  </div>
+</section>
+
+<footer class="site">
+<div class="wrap">
+  <div class="fwrap">
+    <div>
+      <div class="brand serif">Davis Digital Studio</div>
+      <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.4)">Los Angeles &middot; working with businesses nationwide</p>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Studio</p>
+      <a href="how-we-work.html">How we work</a>
+      <a href="services.html">Services</a>
+      <a href="industries.html">Industries</a>
+      <a href="about.html">About</a>
+      <a href="work.html">Work</a>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Start</p>
+      <a href="audit.html">Free site review</a>
+      <a href="tools.html">Free tools</a>
+      <a href="contact.html">Book a free call</a>
+      <a href="portal.html">Client login</a>
+    </div>
+  </div>
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="accessibility.html">Accessibility</a>
+    </span>
+  </div>
+</div>
+</footer>
+
+<div id="cookieBanner" role="dialog" aria-label="Cookie consent" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99998;background:#2A1B4A;border-top:1px solid rgba(196,174,232,0.2);padding:16px 24px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <p style="font-size:13px;color:rgba(255,255,255,0.65);margin:0;flex:1;min-width:200px;">We use cookies and Google Analytics to understand how visitors use our site. <a href="/privacy" style="color:#c4aee8;text-decoration:underline;">Privacy Policy</a></p>
+  <div style="display:flex;gap:10px;flex-shrink:0;">
+    <button onclick="acceptCookies()" style="background:#5b3fa0;color:#fff;border:none;padding:8px 20px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Got it</button>
+    <button onclick="declineCookies()" style="background:transparent;color:rgba(255,255,255,0.55);border:1px solid rgba(255,255,255,0.2);padding:8px 16px;border-radius:100px;font-size:13px;cursor:pointer;font-family:var(--sans);">Decline</button>
+  </div>
+</div>
+
+<script>
+function fmt(n){return '$'+Math.round(n).toLocaleString();}
+function calc(){
+  var rev = parseInt(document.getElementById('revenue').value);
+  var webPct = parseInt(document.getElementById('web-pct').value)/100;
+  var imp = parseInt(document.getElementById('improvement').value)/100;
+  var inv = parseInt(document.getElementById('package').value);
+
+  document.getElementById('revenue-val').textContent = fmt(rev)+' / mo';
+  document.getElementById('web-pct-val').textContent = Math.round(webPct*100)+'%';
+  document.getElementById('improvement-val').textContent = Math.round(imp*100)+'% increase';
+
+  var pkg = inv;
+  var label = pkg <= 1800 ? 'Template' : pkg <= 4500 ? 'Custom + Photography' : 'Custom HTML';
+  document.getElementById('package-val').textContent = fmt(pkg)+' ('+label+')';
+
+  var onlineRev = rev * webPct;
+  var monthlyGain = onlineRev * imp;
+  var annualGain = monthlyGain * 12;
+  var roi = ((annualGain - inv) / inv) * 100;
+  var payback = inv / monthlyGain;
+
+  document.getElementById('res-monthly').textContent = fmt(monthlyGain);
+  document.getElementById('res-annual').textContent = fmt(annualGain);
+  document.getElementById('res-roi').textContent = Math.round(roi)+'%';
+  document.getElementById('roi-left-label').textContent = 'Investment: '+fmt(inv);
+
+  var paybackText;
+  if(payback < 1) paybackText = 'Pays for itself in under a month';
+  else if(payback < 2) paybackText = 'Pays for itself in about '+Math.round(payback*10)/10+' month';
+  else paybackText = 'Pays for itself in '+Math.round(payback*10)/10+' months';
+  document.getElementById('res-payback').textContent = paybackText;
+
+  var barPct = Math.min(100, (annualGain / (inv * 2)) * 100);
+  document.getElementById('roi-fill').style.width = barPct+'%';
+
+  if(typeof gtag==='function'){
+    gtag('event','roi_calculator_used',{event_category:'engagement',event_label:label,value:Math.round(annualGain)});
+  }
+}
+
+(function(){
+  var consent=localStorage.getItem('cookie_consent');
+  if(!consent){setTimeout(function(){var b=document.getElementById('cookieBanner');if(b)b.style.display='flex';},2000);}
+  if(consent==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}
+})();
+function acceptCookies(){localStorage.setItem('cookie_consent','accepted');document.getElementById('cookieBanner').style.display='none';}
+function declineCookies(){localStorage.setItem('cookie_consent','declined');window['ga-disable-G-V4WF04NX7F']=true;document.getElementById('cookieBanner').style.display='none';}
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}
+calc();
+</script>
+
+<script>
+</script>
+  <script src="/concierge.js" defer></script>
+<script src="/enhance.js" defer></script>
+<script src="nav.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+/* ============================================================
+   Davis Digital Studio — contact.css
+   CONTACT-PAGE-ONLY layer, scoped under body[data-page="contact"].
+   Loaded after styles.css.
+
+   The most functionally delicate page in this pass — a real
+   working form with real backend calls (lead_intake CRM primary,
+   Formspree fallback) and a JS-driven confirmation state. Every
+   element ID the script depends on is untouched; only the
+   wrapping containers and visual treatment changed.
+
+   IMPORTANT: the card chrome (background, padding, shadow, radius)
+   is applied directly to #contactForm, not to .ct-form-panel. The
+   existing JS hides #contactForm itself on success
+   (form.style.display='none') — if the chrome lived on a wrapper
+   div instead, submitting would leave an empty, broken-looking
+   card shell behind. Putting it on the form element means the
+   whole card disappears cleanly when the script hides it.
+
+   Device: a genuine split-screen — an elevated, considered form on
+   the left, a warm, quiet reassurance column on the right. Also
+   fixes a real pre-existing layout quirk: #thanks and <aside> were
+   siblings in a 2-column grid, so <aside> wrapped to a second row
+   instead of occupying the second column consistently. Grouping
+   them under one .ct-side wrapper fixes that.
+   ============================================================ */
+
+body[data-page="contact"] .ct-grid{
+  display:grid;
+  grid-template-columns:1.05fr .95fr;
+  gap:56px;
+  align-items:start;
+}
+
+body[data-page="contact"] #contactForm{
+  background:#fff;
+  border-radius:24px;
+  padding:44px 40px;
+  box-shadow:0 30px 60px -34px rgba(27,21,37,.24);
+}
+
+body[data-page="contact"] .ct-side{
+  background:var(--panel-warm,#F4F0E9);
+  border-radius:24px;
+  padding:40px 36px;
+}
+body[data-page="contact"] .ct-expect{
+  border-top:1px solid var(--hair);
+  padding-top:24px;
+}
+
+@media(max-width:880px){
+  body[data-page="contact"] .ct-grid{ grid-template-columns:1fr; gap:32px; }
+  body[data-page="contact"] #contactForm{ padding:32px 26px; }
+  body[data-page="contact"] .ct-side{ padding:30px 26px; }
+}

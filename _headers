@@ -1,0 +1,34 @@
+/*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(self "https://buy.stripe.com")
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://buy.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com https://images.unsplash.com https://plus.unsplash.com https://picsum.photos https://fastly.picsum.photos; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://formspree.io https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com https://api.resend.com https://www.googleapis.com https://pagespeedonline.googleapis.com; frame-src https://buy.stripe.com https://calendly.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self' https://formspree.io https://buy.stripe.com
+  Cache-Control: public, max-age=3600
+
+/*.html
+  Cache-Control: no-cache, must-revalidate
+
+/portal.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex
+
+/dds-studio-manage-9k2p.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex
+
+/og-image.jpg
+  Cache-Control: public, max-age=604800
+
+/sitemap.xml
+  Cache-Control: public, max-age=86400
+
+/*.js
+  Cache-Control: public, max-age=86400
+
+/*.css
+  Cache-Control: public, max-age=86400
+
+# Updated Sun Jun 21 14:58:53 UTC 2026

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Accessibility — Davis Digital Studio</title>
+<meta name="description" content="Accessibility">
+<link rel="canonical" href="https://davisdigitalstudio.com/accessibility">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="accessibility"><a href="#main-content" class="skip-link">Skip to main content</a>
+<header class="nav">
+<div class="wrap nav-in">
+  <a href="index.html" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="how-we-work.html">How we work</a>
+    <a href="the-experience.html">The experience</a>
+    <span class="nav-has-sub"><a href="services.html" class="nav-sub-toggle" aria-haspopup="true" aria-expanded="false">Services <i class="caret" aria-hidden="true"></i></a>
+      <span class="nav-sub">
+        <a href="services.html">All services<small>Pricing and the full picture</small></a>
+        <a href="web-design.html">Web design<small>Strategy-led sites that convert</small></a>
+        <a href="seo-strategy.html">SEO strategy<small>Get found by people searching</small></a>
+        <a href="monthly-retainer.html">Ongoing care<small>Keep your site working after launch</small></a>
+      </span></span>
+    <a href="industries.html">Industries</a>
+    <a href="about.html">About</a>
+    <a href="audit.html">Free site review</a>
+  </nav>
+  <div class="nav-actions">
+    <a href="portal.html" class="nav-login">Client login</a>
+    <a href="contact.html" class="btn btn-primary" style="padding:11px 20px">Book a free call</a>
+  </div>
+  <button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+</div>
+</header>
+
+<main id="main-content" tabindex="-1">
+
+<section class="hero"><div class="wrap" style="max-width:760px">
+  <span class="eyebrow reveal">Commitment</span>
+  <h1 class="reveal mt-m" style="font-size:clamp(32px,5vw,52px)">Accessibility</h1>
+</div></section>
+<section class="pad-sm"><div class="wrap" style="max-width:720px"><div class="reveal"><p class="lead-muted mt-m">Good design works for everyone. This site is built to be usable with a keyboard, readable by screen readers, and respectful of reduced-motion preferences.</p><p class="lead-muted mt-m">If anything here is hard to use, I want to know. Reach out through the contact page and I'll fix it.</p><p class="lead-muted mt-m">This commitment extends to every site I build for clients.</p></div></div></section>
+</main>
+
+<footer class="site">
+<div class="wrap">
+  <div class="fwrap">
+    <div>
+      <div class="brand serif">Davis Digital Studio</div>
+      <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.4)">Los Angeles &middot; working with businesses nationwide</p>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Studio</p>
+      <a href="how-we-work.html">How we work</a>
+      <a href="services.html">Services</a>
+      <a href="industries.html">Industries</a>
+      <a href="about.html">About</a>
+      <a href="work.html">Work</a>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Start</p>
+      <a href="audit.html">Free site review</a>
+      <a href="tools.html">Free tools</a>
+      <a href="contact.html">Book a free call</a>
+      <a href="portal.html">Client login</a>
+    </div>
+  </div>
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="accessibility.html">Accessibility</a>
+    </span>
+  </div>
+</div>
+</footer>
+<script>
+// Opt into animation only when JS runs; content is visible by default otherwise.
+document.documentElement.classList.add('js-anim');
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+const els=document.querySelectorAll('.reveal');
+els.forEach(el=>io.observe(el));
+// safety net: if anything is still hidden after load, show it
+window.addEventListener('load',()=>setTimeout(()=>els.forEach(el=>el.classList.add('in')),1200));
+</script>
+<script src="nav.js" defer></script>
+</body>
+</html>

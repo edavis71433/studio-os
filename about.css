@@ -1,0 +1,74 @@
+/* ============================================================
+   Davis Digital Studio — about.css
+   ABOUT-PAGE-ONLY layer, scoped under body[data-page="about"].
+   Loaded after styles.css.
+
+   Full visual redesign pass. Two real devices, both distinct from
+   every other page in this pass:
+
+   1. ORIGIN — the portrait used to sit stranded alone in its own
+      section, disconnected from the story text directly below it.
+      Merged into one asymmetric split-screen: portrait and story
+      read as a single unified moment, editorial-profile style,
+      instead of "photo, then separate paragraph block."
+
+   2. THREE BELIEFS — deliberately NOT built from .trio/.promise,
+      which already belongs to the homepage. A manifesto-style
+      numbered list instead: quieter than Work's zig-zag, warmer
+      than Solutions' panels, its own thing.
+   ============================================================ */
+
+/* ---------------------------------------------------------------
+   ORIGIN — asymmetric split-screen
+   --------------------------------------------------------------- */
+body[data-page="about"] .ab-origin-grid{
+  display:grid;
+  grid-template-columns:.78fr 1fr;
+  gap:64px;
+  align-items:center;
+}
+body[data-page="about"] .ab-portrait{
+  margin:0;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 32px 60px -34px rgba(27,21,37,.26);
+}
+body[data-page="about"] .ab-portrait img{
+  display:block; width:100%; height:auto;
+}
+body[data-page="about"] .ab-origin-copy p{ font-size:16px; line-height:1.7; }
+
+@media(max-width:880px){
+  body[data-page="about"] .ab-origin-grid{ grid-template-columns:1fr; gap:32px; }
+  body[data-page="about"] .ab-portrait{ max-width:420px; margin:0 auto; }
+}
+
+/* ---------------------------------------------------------------
+   THREE BELIEFS — manifesto list
+   --------------------------------------------------------------- */
+body[data-page="about"] .ab-beliefs-section{
+  background:
+    radial-gradient(ellipse 800px 420px at 100% 100%, rgba(91,63,160,.045), transparent 60%),
+    var(--paper);
+}
+body[data-page="about"] .ab-beliefs{
+  display:flex; flex-direction:column;
+}
+body[data-page="about"] .ab-belief{
+  display:grid;
+  grid-template-columns:64px 1fr;
+  gap:20px;
+  padding:32px 0;
+  border-top:1px solid var(--hair);
+}
+body[data-page="about"] .ab-belief:last-child{ padding-bottom:0; }
+body[data-page="about"] .ab-belief-num{
+  font-family:var(--mono); font-size:13px; color:var(--brass-deep);
+  letter-spacing:.08em; padding-top:6px;
+}
+body[data-page="about"] .ab-belief h3{ font-size:22px; margin-bottom:10px; }
+body[data-page="about"] .ab-belief p{ color:var(--muted); font-size:15.5px; max-width:56ch; }
+
+@media(max-width:600px){
+  body[data-page="about"] .ab-belief{ grid-template-columns:40px 1fr; gap:14px; }
+}

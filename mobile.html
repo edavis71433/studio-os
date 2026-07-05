@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DDS OS · Mobile Runbook</title>
+<style>
+  :root{ --p:#5b3fa0; --ink:#291942; --muted:#6a5d7e; --cream:#faf7f2; --line:rgba(41,25,66,.1); }
+  *{ margin:0; padding:0; box-sizing:border-box; font-family:'Inter',system-ui,sans-serif; }
+  body{ background:var(--cream); color:var(--ink); padding:20px; max-width:720px; margin:0 auto; }
+  h1{ font-family:Georgia,serif; font-weight:400; font-size:24px; margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:14px; line-height:1.5; }
+  .device{ background:#291942; color:#fff; border-radius:12px; padding:12px 14px; font-size:12px; font-family:monospace; margin-bottom:16px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin-bottom:14px; }
+  .grp{ font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--muted); margin-bottom:8px; }
+  label.chk{ display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-top:1px solid var(--line); font-size:13.5px; line-height:1.5; cursor:pointer; }
+  label.chk input{ width:22px; height:22px; flex:none; margin-top:1px; accent-color:var(--p); }
+  a{ color:var(--p); font-weight:600; text-decoration:none; }
+  .prog{ font-size:15px; font-weight:700; margin-bottom:12px; }
+  .btn{ background:#fff; color:var(--p); border:1px solid var(--line); border-radius:10px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; margin-right:8px; }
+</style>
+</head>
+<body>
+  <h1>Mobile Verification Runbook</h1>
+  <div class="sub">Run this <b>on the actual phone</b>. Checks persist on this device, so you can do a few at a time. Repeat the whole list once on a small iPhone, once on a large one, and once on a tablet if available — orientation both ways.</div>
+  <div class="device" id="device">reading device…</div>
+  <div class="prog" id="prog"></div>
+  <button class="btn" onclick="resetAll()">Reset checklist</button>
+  <button class="btn" onclick="copyStatus()">Copy status</button>
+  <div id="list" style="margin-top:14px;"></div>
+
+<script>
+const CHECKS = [
+ ['Overflow (use the built-in debugger)', [
+  ['Admin: open <a href="dds-studio-manage-9k2p.html?debugw=1" target="_blank">admin?debugw=1</a>, visit Today, Clients hub, Lifecycle, Invoices, Tasks, Timeline, Site Monitor, Analytics — panel says "nothing overflows ✓" on each'],
+  ['Portal: open <a href="portal.html?debugw=1" target="_blank">portal?debugw=1</a>, visit Home, The Work, Conversation, Billing — panel says "nothing overflows ✓" on each'],
+ ]],
+ ['Forms & keyboard (the iOS zoom fix)', [
+  ['Tap into any admin form field (New client, invoice form) — the page does NOT zoom in when the keyboard opens'],
+  ['Tap the portal message box — no zoom, and the send button stays reachable above the keyboard'],
+  ['Date fields open the native picker and the chosen value displays fully'],
+ ]],
+ ['Sticky elements & navigation', [
+  ['Admin bottom nav: all five items tappable, nothing hides behind the iPhone home indicator'],
+  ['Focus Mode: open a client — the ribbon appears, tabs swipe horizontally, ✕ stays reachable, and the ribbon never covers page content while scrolling'],
+  ['Drawer (More): opens as a slide-out, scrolls to the bottom item, closes by scrim tap, and the Search button opens the command palette'],
+  ['Command palette on phone: opens from drawer Search, keyboard appears, typing filters, tapping a result navigates'],
+ ]],
+ ['Modals & panels', [
+  ['Open an opportunity/prospect side panel — it fills the width, scrolls internally, close button reachable'],
+  ['Open any confirm/action modal — fully visible, buttons not clipped by the keyboard or bottom edge'],
+ ]],
+ ['Touch targets', [
+  ['Row action pills (Open →, Record renewal, etc.) are comfortably tappable without hitting neighbors'],
+  ['Table rows with actions: horizontal scroll works with a finger; no accidental taps while scrolling'],
+ ]],
+ ['Portal client flows (the ones clients actually do on phones)', [
+  ['Approve a deliverable end-to-end with one thumb — Waiting on you → tap Approve → confirmation visible'],
+  ['Open a delivered report in The Work — expands readably, no sideways scrolling of text'],
+  ['Pay-invoice button on Billing is reachable and the Stripe page opens'],
+  ['Upload a file from the phone (camera roll) via The Work upload zone'],
+  ['Concierge bubble: doesn\u2019t cover the send button; panel fits with keyboard open'],
+ ]],
+ ['Landscape & tablet', [
+  ['Rotate to landscape on any page — no overflow panel entries, sticky bars behave'],
+  ['Tablet width (or iPad): admin shows the full sidebar layout, nothing doubles up'],
+ ]],
+];
+
+const KEY='dds_mobile_runbook_v1';
+let state={}; try{ state=JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){}
+
+function render(){
+  let total=0, done=0, html='';
+  CHECKS.forEach((g,gi)=>{
+    html+='<div class="card"><div class="grp">'+g[0]+'</div>';
+    g[1].forEach((c,ci)=>{
+      const id=gi+'.'+ci; total++; if(state[id])done++;
+      html+='<label class="chk"><input type="checkbox" '+(state[id]?'checked':'')+' onchange="tick(\''+id+'\',this.checked)"><span>'+c[0]+'</span></label>';
+    });
+    html+='</div>';
+  });
+  document.getElementById('list').innerHTML=html;
+  const p=document.getElementById('prog');
+  p.textContent=done+' of '+total+' verified on this device';
+  p.style.color = done===total ? '#1a7e49' : 'var(--ink)';
+}
+function tick(id,v){ state[id]=v; try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} render(); }
+function resetAll(){ if(confirm('Clear all checks on this device?')){ state={}; localStorage.setItem(KEY,'{}'); render(); } }
+function copyStatus(){
+  let total=0,done=0; CHECKS.forEach((g,gi)=>g[1].forEach((c,ci)=>{ total++; if(state[gi+'.'+ci])done++; }));
+  const t='DDS mobile runbook: '+done+'/'+total+' verified · '+document.getElementById('device').textContent;
+  navigator.clipboard.writeText(t).then(()=>alert('Copied.'),()=>alert(t));
+}
+document.getElementById('device').textContent =
+  window.innerWidth+'\u00d7'+window.innerHeight+'px \u00b7 dpr '+ (window.devicePixelRatio||1) +' \u00b7 '+
+  (navigator.userAgent.match(/iPhone|iPad|Android/)||['desktop'])[0] +
+  (window.matchMedia('(orientation: landscape)').matches?' \u00b7 landscape':' \u00b7 portrait');
+render();
+</script>
+</body>
+</html>

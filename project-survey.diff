@@ -1,0 +1,44 @@
+--- /home/claude/work/dds/davis-digital-studio-main/project-survey.html	2026-06-30 13:27:58.000000000 +0000
++++ project-survey.html	2026-06-30 15:34:42.981412819 +0000
+@@ -164,9 +164,10 @@
+       });
+     } catch(e){ console.log("survey save err:", e); }
+ 
+-    // Notify Eric by email via the existing Edge Function
++    // Notify Eric by email via the existing Edge Function.
++    var notifyOk = false;
+     try {
+-      await fetch(SB_URL + "/functions/v1/clever-api", {
++      var resp = await fetch(SB_URL + "/functions/v1/clever-api", {
+         method: "POST",
+         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+         body: JSON.stringify({
+@@ -180,7 +181,9 @@
+           meta: payload
+         })
+       });
+-    } catch(e){ console.log("notify err:", e); }
++      var jr = {}; try { jr = await resp.json(); } catch(e){}
++      notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
++    } catch(e){ console.log("notify err:", e); notifyOk = false; }
+ 
+     // Branch the experience on rating
+     document.getElementById("surveyForm").classList.add("hidden");
+@@ -190,6 +193,17 @@
+     } else {
+       document.getElementById("plainThanks").classList.remove("hidden");
+     }
++    // If the response didn't reach Eric, the survey was still saved to the
++    // database. Add a calm, non-alarming note rather than a false clean success.
++    if (!notifyOk) {
++      var active = rating >= 4 ? document.getElementById("reviewPrompt") : document.getElementById("plainThanks");
++      if (active) {
++        var note = document.createElement("p");
++        note.style.cssText = "margin-top:14px;font-size:13px;opacity:0.7;";
++        note.innerHTML = "Your feedback is saved. If anything didn't go through, you can always reach me at <a href=\"mailto:eric@davisdigitalstudio.com\">eric@davisdigitalstudio.com</a>.";
++        active.appendChild(note);
++      }
++    }
+   }
+ </script>
+ </body>

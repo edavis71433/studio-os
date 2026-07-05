@@ -1,0 +1,84 @@
+/* ============================================================================
+   DAVIS DIGITAL STUDIO — DESIGN TOKENS
+   The single source of truth. Linked by every page BEFORE its own styles.
+
+   Provenance: promoted from the portal's mature token layer (the strongest of
+   the three systems that existed pre-consolidation). Conflicts with the admin
+   copy were resolved here once, so they can never drift again.
+
+   RULES (enforced by convention, see styleguide.html):
+   - No raw hex in page CSS. Reference a token.
+   - No raw radius/shadow px in page CSS. Reference a token.
+   - Only --serif / --sans / --mono fonts. DM Serif Display + DM Sans are GONE.
+   - Spacing comes from the --s* scale. No hand-typed gaps.
+   ========================================================================== */
+
+:root{
+  /* ── Surface ramp (light → structural) ─────────────────────────────────── */
+  --bg:#f7f5f2;            /* app canvas */
+  --surface:#ffffff;       /* cards, panels */
+  --surface-2:#faf9fc;     /* nested / subtle fills */
+  --surface-3:#f3f0f9;     /* hover wash, selected rows */
+  --line:#ece8f1;          /* hairlines */
+  --line-strong:#ddd6ea;   /* dividers that need to register */
+
+  /* ── Ink (text) ────────────────────────────────────────────────────────── */
+  --ink:#171221;           /* primary text */
+  --ink-2:#574d68;         /* secondary text */
+  --muted:#8b8098;         /* hints, captions — NOT for body copy on tints */
+
+  /* ── Brand purple ramp ─────────────────────────────────────────────────── */
+  --p:#5b3fa0;             /* primary brand */
+  --p-600:#4a3286;         /* hover */
+  --p-700:#3a2769;         /* pressed / deep panels */
+  --p-soft:#f1ecf9;        /* tinted backgrounds */
+  --p-ring:rgba(91,63,160,.22); /* focus ring */
+  --p-deep:#2A1B4A;        /* dark hero panels */
+
+  /* ── Brass accent (used with restraint, eyebrows + metallic moments) ────── */
+  --brass:#B08D57;
+  --brass-deep:#8A6B3C;
+
+  /* ── Status — each with a soft pair ────────────────────────────────────── */
+  --green:#1f9d57; --green-soft:#e7f6ee;
+  --red:#dc4747;   --red-soft:#fdecec;
+  --amber:#d68a12; --amber-soft:#fdf3e3;
+
+  /* ── Radius scale — the ONLY allowed values besides --pill ─────────────── */
+  --r-sm:8px; --r:12px; --r-lg:16px; --r-xl:22px; --pill:100px;
+
+  /* ── Elevation — four steps, nothing else ──────────────────────────────── */
+  --sh-1:0 1px 2px rgba(23,18,33,.05), 0 1px 1px rgba(23,18,33,.03);
+  --sh-2:0 4px 16px rgba(23,18,33,.07), 0 1px 3px rgba(23,18,33,.04);
+  --sh-3:0 14px 44px rgba(23,18,33,.16);
+  --sh-pop:0 24px 70px rgba(23,18,33,.26);
+
+  /* ── Spacing — 4px base. The only allowed margins/paddings/gaps ────────── */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px;
+
+  /* ── Typography — THREE families, product-wide ─────────────────────────── */
+  --serif:'Fraunces',Georgia,serif;                 /* display / headings */
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; /* all UI text */
+  --mono:'Geist Mono','SF Mono',ui-monospace,monospace;       /* data / IDs / metrics */
+
+  /* Type scale (clamped for fluid sizing where useful) */
+  --t-display:clamp(28px,4vw,40px);
+  --t-h1:24px; --t-h2:19px; --t-h3:16px;
+  --t-body:14.5px; --t-sm:13px; --t-xs:11.5px;
+  --lh-tight:1.15; --lh-snug:1.4; --lh-body:1.6;
+
+  /* ── Motion ────────────────────────────────────────────────────────────── */
+  --ease:cubic-bezier(.32,.72,0,1);
+  --dur-fast:120ms; --dur:200ms; --dur-slow:320ms;
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  --maxw:1120px;
+  --sidebar-w:236px;
+  --topbar-h:56px;
+}
+
+/* Honor reduced-motion globally. */
+@media (prefers-reduced-motion: reduce){
+  :root{ --dur-fast:0ms; --dur:0ms; --dur-slow:0ms; }
+  *,*::before,*::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+}

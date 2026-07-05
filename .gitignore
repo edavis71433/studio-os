@@ -1,0 +1,16 @@
+# Source archives (superseded by the working tree; kept on disk, not in git)
+*.zip
+
+# Secrets / env — never committed
+.env
+.env.*
+**/.env
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+node_modules/

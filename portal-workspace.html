@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your Growth Workspace — Davis Digital Studio</title>
+<meta name="description" content="Your partnership with Davis Digital Studio. Everything we're doing for your business, in one place.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   DAVIS DIGITAL STUDIO — GROWTH WORKSPACE (client-facing)
+   Design system: aubergine + brass on warm paper. Same language as the
+   marketing site and the project portal. The signature motif — the "journey
+   spine" — continues here: the marketing journey ended at a dimmed 5th station
+   "After launch." This workspace IS that station, lit up.
+   ============================================================================ */
+:root{
+  --ink:#1B1525; --paper:#FBFAF7; --paper-2:#F4F0E9;
+  --p:#5B3FA0; --p-deep:#2A1B4A; --p-mist:#EDE8F7;
+  --brass:#B08D57; --brass-deep:#8A6B3C;
+  --muted:#6B6276; --hair:#E7E1D6;
+  --ok:#3F7D5B; --ok-mist:#E6F0E9;
+  --warn:#B5781D; --warn-mist:#F7EEDD;
+  --stop:#A8443A; --stop-mist:#F6E5E2;
+  --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 30px rgba(27,21,37,.06);
+  --shadow-lift:0 2px 6px rgba(27,21,37,.06),0 18px 50px rgba(27,21,37,.10);
+  --r:16px; --r-s:11px; --r-pill:100px;
+  --wrap:1080px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans); background:var(--paper); color:var(--ink);
+  font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  font-feature-settings:"ss01","cv05";
+}
+a{color:inherit}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,textarea,select{font-family:inherit;font-size:inherit}
+::selection{background:var(--p-mist)}
+.serif{font-family:var(--serif)}
+.mono{font-family:var(--mono)}
+
+/* ── layout primitives ── */
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 24px}
+.row{display:flex;gap:14px}
+.col{display:flex;flex-direction:column}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.wrap-tight{max-width:760px}
+.grid{display:grid;gap:16px}
+
+/* ── eyebrow / labels ── */
+.eyebrow{
+  font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--brass-deep); display:inline-flex; align-items:center; gap:9px;
+}
+.eyebrow::before{content:"";width:18px;height:1px;background:var(--brass);display:inline-block}
+
+/* ── top bar ── */
+.topbar{
+  position:sticky; top:0; z-index:50; background:rgba(251,250,247,.86);
+  backdrop-filter:saturate(150%) blur(14px); border-bottom:1px solid var(--hair);
+}
+.topbar-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:550;font-size:15px;letter-spacing:-.01em;text-decoration:none}
+.brand .mark{flex:none}
+.brand small{color:var(--muted);font-weight:450}
+.topbar-actions{display:flex;align-items:center;gap:8px}
+.who{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:9px}
+.who .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+
+/* ── buttons ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-size:14px;font-weight:550;letter-spacing:-.01em;
+  padding:11px 18px;border-radius:var(--r-pill);transition:.18s ease;
+  background:var(--paper-2);color:var(--ink);border:1px solid transparent;white-space:nowrap;
+}
+.btn:hover{background:#ECE6DC}
+.btn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+.btn-primary{background:var(--p);color:#fff}
+.btn-primary:hover{background:var(--p-deep)}
+.btn-ghost{background:transparent;border-color:var(--hair)}
+.btn-ghost:hover{background:var(--paper-2)}
+.btn-sm{padding:8px 14px;font-size:13px}
+.btn-block{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── cards ── */
+.card{background:#fff;border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-pad{padding:24px}
+.card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:4px}
+.card-title{font-family:var(--serif);font-size:19px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
+.card-sub{font-size:13.5px;color:var(--muted);margin-top:3px}
+
+/* ── chips / pills ── */
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);
+  font-size:11px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;
+  padding:4px 10px;border-radius:var(--r-pill);background:var(--paper-2);color:var(--muted);
+}
+.chip-ok{background:var(--ok-mist);color:var(--ok)}
+.chip-warn{background:var(--warn-mist);color:var(--warn)}
+.chip-stop{background:var(--stop-mist);color:var(--stop)}
+.chip-p{background:var(--p-mist);color:var(--p)}
+.chip-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* ── the journey spine (signature) ── */
+.spine{position:relative;padding-left:30px}
+.spine::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:1.5px;
+  background:linear-gradient(var(--brass),var(--hair))}
+.spine-node{position:relative;padding-bottom:22px}
+.spine-node::before{content:"";position:absolute;left:-26px;top:4px;width:11px;height:11px;border-radius:50%;
+  background:var(--paper);border:1.5px solid var(--brass)}
+.spine-node.lit::before{background:var(--brass)}
+.spine-node:last-child{padding-bottom:0}
+
+/* ── section heading ── */
+.sec{margin-top:40px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:16px}
+.sec-h h2{font-family:var(--serif);font-size:24px;font-weight:500;letter-spacing:-.02em}
+.sec-h .sec-meta{font-size:13px;color:var(--muted)}
+
+/* ── stat tiles ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
+.stat{background:#fff;border:1px solid var(--hair);border-radius:var(--r-s);padding:18px 18px 16px}
+.stat .n{font-family:var(--serif);font-size:30px;font-weight:500;line-height:1;letter-spacing:-.02em}
+.stat .l{font-size:12.5px;color:var(--muted);margin-top:7px}
+.stat .delta{font-family:var(--mono);font-size:11px;margin-top:8px;display:inline-flex;align-items:center;gap:5px}
+.delta.up{color:var(--ok)} .delta.down{color:var(--stop)} .delta.flat{color:var(--muted)}
+
+/* ── list rows ── */
+.lrow{display:flex;gap:14px;padding:15px 0;border-top:1px solid var(--hair)}
+.lrow:first-child{border-top:none}
+.lrow .lmark{flex:none;margin-top:2px}
+.lrow .lbody{flex:1;min-width:0}
+.lrow .lt{font-weight:500;font-size:15px;letter-spacing:-.01em}
+.lrow .ld{font-size:13.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+.lrow .lmeta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em;margin-top:7px;text-transform:uppercase}
+
+/* check mark for completed work */
+.tick{width:18px;height:18px;border-radius:50%;background:var(--ok-mist);display:grid;place-items:center}
+.tick svg{width:11px;height:11px;stroke:var(--ok);stroke-width:2.4;fill:none}
+
+/* ── recommendation card ── */
+.rec{border:1px solid var(--hair);border-radius:var(--r-s);padding:18px;background:#fff}
+.rec + .rec{margin-top:12px}
+.rec-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.rec-why{font-size:13px;color:var(--p);background:var(--p-mist);border-radius:9px;padding:9px 12px;margin-top:12px;line-height:1.5}
+.rec-meta{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+.rec-actions{display:flex;gap:8px;margin-top:14px}
+
+/* ── tabs (mobile section nav) ── */
+.tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 0;margin-bottom:4px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;font-size:13.5px;font-weight:500;color:var(--muted);padding:8px 14px;border-radius:var(--r-pill);transition:.15s}
+.tab.on{background:var(--ink);color:var(--paper)}
+
+/* ── empty states ── */
+.empty{text-align:center;padding:30px 20px;color:var(--muted)}
+.empty .ei{font-family:var(--serif);font-size:17px;color:var(--ink);margin-bottom:5px}
+.empty p{font-size:13.5px;max-width:340px;margin:0 auto;line-height:1.55}
+
+/* ── login gate ── */
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+.gate-card{width:100%;max-width:400px;text-align:center}
+.gate h1{font-family:var(--serif);font-size:32px;font-weight:500;letter-spacing:-.02em;margin-top:14px}
+.gate p.sub{color:var(--muted);font-size:14.5px;margin-top:8px}
+.field{text-align:left;margin-top:16px}
+.field label{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:6px;letter-spacing:.01em}
+.field input{width:100%;padding:13px 14px;border:1px solid var(--hair);border-radius:var(--r-s);background:#fff;transition:.15s}
+.field input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-mist)}
+.gate-msg{font-size:13.5px;margin-top:14px;min-height:20px}
+.gate-msg.err{color:var(--stop)}
+.gate-msg.ok{color:var(--ok)}
+.gate-foot{margin-top:22px;font-size:12.5px;color:var(--muted)}
+.gate-foot a{color:var(--p);text-decoration:none;font-weight:500}
+
+/* ── modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(27,21,37,.4);backdrop-filter:blur(3px);z-index:100;display:grid;place-items:end center;padding:0}
+@media(min-width:640px){.modal-bg{place-items:center}}
+.modal{background:var(--paper);border-radius:20px 20px 0 0;width:100%;max-width:520px;box-shadow:var(--shadow-lift);max-height:92vh;overflow:auto}
+@media(min-width:640px){.modal{border-radius:20px}}
+.modal-pad{padding:26px}
+.modal-h{font-family:var(--serif);font-size:22px;font-weight:500;letter-spacing:-.01em}
+.modal-sub{color:var(--muted);font-size:14px;margin-top:6px}
+textarea.in{width:100%;padding:13px 14px;border:1px solid var(--hair);border-radius:var(--r-s);background:#fff;min-height:120px;resize:vertical;line-height:1.5}
+textarea.in:focus,input.in:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-mist)}
+input.in{width:100%;padding:13px 14px;border:1px solid var(--hair);border-radius:var(--r-s);background:#fff}
+
+/* ── toast ── */
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:var(--paper);font-size:13.5px;font-weight:500;
+  padding:12px 20px;border-radius:var(--r-pill);box-shadow:var(--shadow-lift);
+  opacity:0;transition:.25s;z-index:200;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── skeleton ── */
+.sk{background:linear-gradient(90deg,var(--paper-2) 25%,#EFE9DF 50%,var(--paper-2) 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px}
+@keyframes sh{to{background-position:-200% 0}}
+.sk-line{height:13px;margin:8px 0}
+
+/* ── utility ── */
+.mt-xs{margin-top:6px}.mt-s{margin-top:12px}.mt-m{margin-top:20px}.mt-l{margin-top:32px}
+.muted{color:var(--muted)}
+.hide{display:none!important}
+.center{text-align:center}
+.divider{height:1px;background:var(--hair);margin:24px 0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── responsive ── */
+.app-grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:880px){
+  .app-grid{grid-template-columns:1.5fr 1fr;align-items:start}
+  .two{grid-template-columns:1fr 1fr}
+}
+.two{display:grid;gap:16px}
+</style>
+</head>
+<body>
+
+<!-- ════════════════ LOGIN GATE ════════════════ -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <a href="/" class="brand" style="justify-content:center">
+      <svg class="mark" width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+        <path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+        <circle cx="22" cy="11" r="1.5" fill="#B08D57"/>
+      </svg>
+    </a>
+    <span class="eyebrow" style="justify-content:center;margin-top:20px">Your growth workspace</span>
+    <h1>Welcome back.</h1>
+    <p class="sub">Everything we're doing to grow your business, in one place.</p>
+    <form id="loginForm" autocomplete="on">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button id="loginBtn" type="submit" class="btn btn-primary btn-block mt-m">Sign in</button>
+      <div id="gateMsg" class="gate-msg"></div>
+    </form>
+    <div class="gate-foot">
+      <a href="#" id="forgotLink">Forgot your password?</a>
+      <div class="mt-s">New here? Eric sends your login when your partnership begins.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ APP ════════════════ -->
+<div id="app" class="hide">
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a href="/" class="brand">
+        <svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+          <path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+          <circle cx="22" cy="11" r="1.5" fill="#B08D57"/>
+        </svg>
+        Davis Digital Studio <small>· Growth</small>
+      </a>
+      <div class="topbar-actions">
+        <span class="who"><span class="dot"></span><span id="whoName"></span></span>
+        <button class="btn btn-ghost btn-sm" id="signOut">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" style="padding-top:28px;padding-bottom:80px">
+    <div id="content"><!-- rendered by JS --></div>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================================
+   CONFIG
+   SUPABASE_ANON_KEY is the public "publishable" key (safe in the browser — it's
+   the same anon key your other client pages use, NOT the service role key).
+   Paste it once below. The project URL + function endpoint are already wired.
+   ============================================================================ */
+const CONFIG = {
+  SUPABASE_URL: 'https://qksstlqzbhesadrrofgn.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo',
+  FN: 'https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api',
+};
+
+/* ── Supabase client (auth/session only; all data goes through the edge fn) ── */
+let sb = null;
+try {
+  sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
+} catch (e) { console.error('Supabase init failed', e); }
+
+/* ── tiny DOM helpers ── */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const el = (tag, props = {}, kids = []) => {
+  const n = document.createElement(tag);
+  for (const k in props) {
+    if (k === 'class') n.className = props[k];
+    else if (k === 'html') n.innerHTML = props[k];
+    else if (k === 'text') n.textContent = props[k];
+    else if (k.startsWith('on') && typeof props[k] === 'function') n.addEventListener(k.slice(2), props[k]);
+    else if (props[k] != null) n.setAttribute(k, props[k]);
+  }
+  (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && n.append(c.nodeType ? c : document.createTextNode(c)));
+  return n;
+};
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+
+let TOAST_T;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(TOAST_T); TOAST_T = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ── API: every data call goes through clever-api with the user's JWT ── */
+async function api(type, payload = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { showGate(); throw new Error('no session'); }
+  const res = await fetch(CONFIG.FN, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-dds-user-jwt': session.access_token,
+    },
+    body: JSON.stringify({ type, ...payload }),
+  });
+  let json = {};
+  try { json = await res.json(); } catch (_) {}
+  if (json && json.error) {
+    if (res.status === 401) { showGate(); }
+    throw new Error(json.error);
+  }
+  return json;
+}
+
+/* ── date / period helpers ── */
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function periodLabel(p) {            // "2026-06" -> "June 2026"
+  if (!p || !/^\d{4}-\d{2}$/.test(p)) return p || '';
+  const [y, m] = p.split('-'); return `${['','January','February','March','April','May','June','July','August','September','October','November','December'][+m]} ${y}`;
+}
+function shortDate(iso) {
+  if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return '';
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+function relDays(iso) {
+  if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'today'; if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`; if (days < 60) return 'last month';
+  return `${Math.floor(days/30)} months ago`;
+}
+
+/* ── gate / app toggle ── */
+function showGate() { $('#app').classList.add('hide'); $('#gate').classList.remove('hide'); }
+function showApp() { $('#gate').classList.add('hide'); $('#app').classList.remove('hide'); }
+
+/* state */
+const STATE = { ws: null, tab: 'overview', acting: false };
+
+/* (rendering + boot defined in the next script block) */
+</script>
+<script>
+/* ============================================================================
+   RENDERING
+   The workspace is rendered from a single gp_workspace payload:
+     { partnership, goals, recommendations, work_log, content, reviews,
+       health, requests, site_health }
+   Sections render only when they have content; each has a purposeful empty
+   state. Order follows the strategy: who you are → how the business is doing →
+   this month's review → the work → what's recommended → goals → what's planned.
+   ============================================================================ */
+
+const SEGMENT_LABEL = {
+  new_business: 'New business', established: 'Established', maintenance: 'Maintenance', growth: 'Growth',
+};
+const HEALTH_CHIP = { green:'chip-ok', yellow:'chip-warn', red:'chip-stop' };
+
+/* ---- HERO: the lit 5th station of the journey ---- */
+function renderHero(p) {
+  const seg = SEGMENT_LABEL[p.segment] || 'Partnership';
+  const since = p.started_at ? new Date(p.started_at) : (p.launched_at ? new Date(p.launched_at) : null);
+  const sinceTxt = since && !isNaN(since) ? `${['January','February','March','April','May','June','July','August','September','October','November','December'][since.getMonth()]} ${since.getFullYear()}` : null;
+  return el('section', { class:'card card-pad', html: `
+    <span class="eyebrow">After launch · the work continues</span>
+    <div class="spread" style="align-items:flex-end;margin-top:14px">
+      <div>
+        <h1 class="serif" style="font-size:30px;font-weight:500;letter-spacing:-.02em;line-height:1.1">
+          Your growth workspace
+        </h1>
+        <p class="muted" style="margin-top:8px;font-size:15px;max-width:48ch">
+          This is everything we're doing to grow ${p.primary_site ? `<span class="mono" style="font-size:13px">${esc(p.primary_site.replace(/^https?:\/\//,''))}</span>` : 'your business'} — the work, the results, and what's next. One person accountable for all of it.
+        </p>
+      </div>
+      <div class="col" style="align-items:flex-end;gap:8px;flex:none">
+        <span class="chip chip-p"><span class="chip-dot"></span>${esc(p.plan_label || seg)}</span>
+        ${sinceTxt ? `<span class="mono muted" style="font-size:11.5px;letter-spacing:.04em">Partners since ${sinceTxt}</span>` : ''}
+      </div>
+    </div>
+  `});
+}
+
+/* ---- BUSINESS HEALTH: the few numbers that map to revenue ---- */
+function renderBusinessHealth(health) {
+  if (!health || !health.length) return null;
+  const latest = health[0], prev = health[1] || {};
+  const defs = [
+    ['calls','Calls from your site'],
+    ['forms','Form enquiries'],
+    ['bookings','Bookings'],
+    ['visits','Site visits'],
+  ];
+  const tiles = defs.filter(([k]) => latest[k] != null).map(([k, label]) => {
+    const now = latest[k], was = prev[k];
+    let delta = '';
+    if (was != null && was !== 0) {
+      const pct = Math.round(((now - was) / Math.abs(was)) * 100);
+      const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+      const arrow = pct > 0 ? '↑' : pct < 0 ? '↓' : '→';
+      delta = `<span class="delta ${dir}">${arrow} ${Math.abs(pct)}% vs last month</span>`;
+    } else if (was == null) {
+      delta = `<span class="delta flat">new this month</span>`;
+    }
+    return `<div class="stat"><div class="n">${esc(String(now))}</div><div class="l">${esc(label)}</div>${delta}</div>`;
+  }).join('');
+  if (!tiles) return null;
+  return section('Business health', periodLabel(latest.period), `
+    <p class="muted" style="font-size:13.5px;margin-bottom:16px;max-width:60ch">The numbers that actually matter: how many people your website is turning into real customers.</p>
+    <div class="stats">${tiles}</div>
+    ${latest.notes ? `<p class="muted" style="font-size:13.5px;margin-top:16px;line-height:1.55">${esc(latest.notes)}</p>` : ''}
+  `);
+}
+
+/* ---- WEBSITE HEALTH: latest site_check ---- */
+function renderSiteHealth(s) {
+  if (!s) return null;
+  const pillar = (val, label) => {
+    if (val == null) return '';
+    const tone = val >= 80 ? 'ok' : val >= 55 ? 'warn' : 'stop';
+    return `<div class="stat"><div class="n" style="color:var(--${tone==='ok'?'ok':tone==='warn'?'warn':'stop'})">${val}</div><div class="l">${label}</div></div>`;
+  };
+  const tiles = [
+    pillar(s.overall,'Overall'), pillar(s.performance,'Speed'),
+    pillar(s.visibility,'Search visibility'), pillar(s.local,'Local presence'),
+  ].filter(Boolean).join('');
+  const findings = Array.isArray(s.findings) ? s.findings.slice(0,4) : [];
+  return section('Website health', s.checked_at ? `Checked ${relDays(s.checked_at)}` : '', `
+    <p class="muted" style="font-size:13.5px;margin-bottom:16px;max-width:60ch">A regular check on the things that keep your site fast, findable, and trusted.</p>
+    <div class="stats">${tiles}</div>
+    ${findings.length ? `<div style="margin-top:18px">${findings.map(f => {
+      const sev = f.sev === 'high' ? 'stop' : f.sev === 'medium' ? 'warn' : 'muted';
+      return `<div class="lrow"><span class="chip chip-${sev==='stop'?'stop':sev==='warn'?'warn':''}" style="flex:none">${esc(f.sev||'note')}</span><div class="lbody"><div class="lt" style="font-size:14px;font-weight:450">${esc(f.title||'')}</div></div></div>`;
+    }).join('')}<p class="muted" style="font-size:12.5px;margin-top:10px">I'm already on these — they're here so you can see what I'm watching.</p>` : `<p class="muted" style="font-size:13px;margin-top:14px">No issues flagged on the last check. Your site's in good shape.</p>`}
+  `);
+}
+
+/* ---- MONTHLY REVIEW: the heartbeat artifact ---- */
+function renderReview(reviews) {
+  if (!reviews || !reviews.length) return null;
+  const r = reviews[0];
+  const parts = [
+    ['What got better', r.improved],
+    ['What I did', r.work_done],
+    ['What I found', r.found],
+    ["What's next", r.next_up],
+    ['How it\u2019s paying off', r.payoff],
+  ].filter(([, v]) => v && String(v).trim());
+  if (!parts.length && !r.headline && !r.intro) return null;
+  const body = parts.map(([h, v], i) => `
+    <div class="spine-node ${i===0?'lit':''}">
+      <div class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--brass-deep);margin-bottom:5px">${esc(h)}</div>
+      <p style="font-size:15px;line-height:1.6">${esc(v).replace(/\n/g,'<br>')}</p>
+    </div>`).join('');
+  return section(`${periodLabel(r.period)} review`, 'From Eric', `
+    <div class="card card-pad" style="box-shadow:none;background:var(--paper);border-color:var(--hair)">
+      ${r.headline ? `<h3 class="serif" style="font-size:21px;font-weight:500;letter-spacing:-.01em;line-height:1.25">${esc(r.headline)}</h3>` : ''}
+      ${r.intro ? `<p class="muted" style="font-size:14.5px;margin-top:8px;line-height:1.6">${esc(r.intro).replace(/\n/g,'<br>')}</p>` : ''}
+      ${parts.length ? `<div class="spine" style="margin-top:20px">${body}</div>` : ''}
+    </div>
+    ${reviews.length > 1 ? `<details style="margin-top:14px"><summary class="mono" style="font-size:12px;letter-spacing:.04em;color:var(--p);cursor:pointer">Earlier reviews (${reviews.length-1})</summary>
+      <div style="margin-top:12px">${reviews.slice(1).map(pr => `<div class="lrow"><div class="lbody"><div class="lt" style="font-size:14px">${esc(periodLabel(pr.period))}</div><div class="ld">${esc(pr.headline||'Monthly review')}</div></div></div>`).join('')}</div>
+    </details>` : ''}
+  `);
+}
+
+/* ---- COMPLETED WORK: the receipt ---- */
+function renderWork(work) {
+  if (!work || !work.length) {
+    return section('Completed work', '', emptyState('The work log starts filling in here', 'Every change, post, and fix I make to your site shows up here as I do it.'));
+  }
+  // group by period
+  const groups = {};
+  work.forEach(w => { const k = w.period || 'recent'; (groups[k] = groups[k] || []).push(w); });
+  const keys = Object.keys(groups).sort().reverse();
+  const blocks = keys.map(k => `
+    <div style="margin-bottom:18px">
+      <div class="mono" style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${k==='recent'?'Recently':esc(periodLabel(k))}</div>
+      ${groups[k].map(w => `
+        <div class="lrow">
+          <span class="lmark tick"><svg viewBox="0 0 14 14"><path d="M2 7.5l3.2 3.2L12 3.8"/></svg></span>
+          <div class="lbody">
+            <div class="lt" style="font-weight:450;font-size:14.5px">${esc(w.title)}</div>
+            ${w.detail ? `<div class="ld">${esc(w.detail)}</div>` : ''}
+            ${w.category ? `<div class="lmeta">${esc(w.category)}</div>` : ''}
+          </div>
+          <span class="muted mono" style="font-size:11px;flex:none">${esc(shortDate(w.done_at))}</span>
+        </div>`).join('')}
+    </div>`).join('');
+  return section('Completed work', `${work.length} item${work.length>1?'s':''}`, blocks);
+}
+
+/* ---- RECOMMENDATIONS: the trusted-advisor surface ---- */
+function renderRecs(recs) {
+  const shared = (recs || []).filter(r => r.status === 'shared' || r.status === 'accepted' || r.status === 'declined' || r.status === 'done');
+  if (!shared.length) return null;
+  const order = { shared: 0, accepted: 1, done: 2, declined: 3 };
+  shared.sort((a,b) => (order[a.status]??9) - (order[b.status]??9));
+  const cards = shared.map(r => {
+    const decided = r.status === 'accepted' || r.status === 'declined' || r.status === 'done';
+    const impChip = r.impact ? `<span class="chip">${esc(r.impact)} impact</span>` : '';
+    const effChip = r.effort ? `<span class="chip">${esc(r.effort)} effort</span>` : '';
+    const catChip = r.category ? `<span class="chip chip-p">${esc(r.category)}</span>` : '';
+    let foot;
+    if (r.status === 'accepted') foot = `<span class="chip chip-ok"><span class="chip-dot"></span>You said yes — it's on my list</span>`;
+    else if (r.status === 'done') foot = `<span class="chip chip-ok"><span class="chip-dot"></span>Done</span>`;
+    else if (r.status === 'declined') foot = `<span class="chip"><span class="chip-dot"></span>Not right now</span>`;
+    else foot = `<div class="rec-actions">
+        <button class="btn btn-primary btn-sm" data-rec-accept="${esc(r.id||'')}">Yes, let's do it</button>
+        <button class="btn btn-ghost btn-sm" data-rec-decline="${esc(r.id||'')}">Not now</button>
+      </div>`;
+    return `<div class="rec">
+      <div class="rec-top">
+        <div><div class="lt" style="font-size:15.5px">${esc(r.title)}</div>
+        ${r.detail ? `<div class="ld" style="margin-top:5px">${esc(r.detail)}</div>` : ''}</div>
+      </div>
+      ${r.why ? `<div class="rec-why"><strong style="font-weight:550">Why it matters:</strong> ${esc(r.why)}</div>` : ''}
+      <div class="rec-meta">${catChip}${impChip}${effChip}</div>
+      <div style="margin-top:12px">${foot}</div>
+    </div>`;
+  }).join('');
+  return section('Recommended next', 'Worth considering', `
+    <p class="muted" style="font-size:13.5px;margin-bottom:16px;max-width:60ch">Opportunities I've spotted for your business. No pressure — these are yours to weigh, and I'll only act on the ones you want.</p>
+    ${cards}
+  `);
+}
+
+/* ---- recommendation IDs aren't selected by gp_workspace; handle gracefully ---- */
+/* (gp_workspace selects rec fields WITHOUT id; respond actions require id, so we
+    re-fetch ids lazily only if the backend includes them. If absent, the accept/
+    decline buttons are hidden — see boot's post-render guard.) */
+
+/* ---- GOALS ---- */
+function renderGoals(goals) {
+  if (!goals || !goals.length) return null;
+  const rows = goals.map(g => {
+    const tone = g.status === 'hit' ? 'chip-ok' : g.status === 'missed' ? 'chip-stop' : g.status === 'archived' ? 'chip' : 'chip-p';
+    const label = g.status === 'hit' ? 'Hit' : g.status === 'missed' ? 'Missed' : g.status === 'archived' ? 'Archived' : 'Active';
+    return `<div class="lrow">
+      <div class="lbody">
+        <div class="lt">${esc(g.title)}</div>
+        ${g.detail ? `<div class="ld">${esc(g.detail)}</div>` : ''}
+        ${(g.metric||g.target) ? `<div class="lmeta">${esc(g.metric||'')}${g.target?` · target ${esc(g.target)}`:''}${g.quarter?` · ${esc(g.quarter)}`:''}</div>` : (g.quarter?`<div class="lmeta">${esc(g.quarter)}</div>`:'')}
+      </div>
+      <span class="chip ${tone}" style="flex:none">${label}</span>
+    </div>`;
+  }).join('');
+  return section('Goals we\u2019re working toward', '', rows);
+}
+
+/* ---- CONTENT CALENDAR ---- */
+function renderContent(content) {
+  const upcoming = (content || []).filter(c => c.status !== 'published');
+  const published = (content || []).filter(c => c.status === 'published');
+  if (!upcoming.length && !published.length) return null;
+  const statusChip = (s) => {
+    const map = { idea:'chip', planned:'chip', in_progress:'chip-warn', scheduled:'chip-p', published:'chip-ok' };
+    const lbl = { idea:'Idea', planned:'Planned', in_progress:'In progress', scheduled:'Scheduled', published:'Published' };
+    return `<span class="chip ${map[s]||'chip'}">${lbl[s]||esc(s)}</span>`;
+  };
+  const rowsUp = upcoming.map(c => `<div class="lrow">
+      <div class="lbody"><div class="lt" style="font-size:14.5px;font-weight:450">${esc(c.title)}</div>
+      <div class="lmeta">${esc(c.kind||'post')}${c.scheduled_for?` · ${esc(shortDate(c.scheduled_for))}`:''}</div></div>
+      ${statusChip(c.status)}
+    </div>`).join('');
+  return section('What\u2019s planned', upcoming.length?`${upcoming.length} upcoming`:'', `
+    ${rowsUp || `<p class="muted" style="font-size:13.5px">Nothing scheduled yet this month.</p>`}
+    ${published.length ? `<details style="margin-top:14px"><summary class="mono" style="font-size:12px;letter-spacing:.04em;color:var(--p);cursor:pointer">Published (${published.length})</summary>
+      <div style="margin-top:10px">${published.map(c=>`<div class="lrow"><div class="lbody"><div class="lt" style="font-size:14px;font-weight:450">${esc(c.title)}</div><div class="lmeta">${esc(c.kind||'post')}${c.published_at?` · ${esc(shortDate(c.published_at))}`:''}</div></div>${statusChip('published')}</div>`).join('')}</div>
+    </details>` : ''}
+  `);
+}
+
+/* ---- REQUESTS (from existing client_requests) ---- */
+function renderRequests(requests) {
+  const statusChip = (s) => {
+    const map = { new:'chip-p', in_progress:'chip-warn', 'in progress':'chip-warn', done:'chip-ok', completed:'chip-ok', closed:'chip' };
+    return `<span class="chip ${map[(s||'').toLowerCase()]||'chip'}">${esc(s||'new')}</span>`;
+  };
+  const rows = (requests||[]).length
+    ? requests.map(r => `<div class="lrow"><div class="lbody"><div class="lt" style="font-size:14.5px">${esc(r.title||r.detail||'Request')}</div>${r.detail&&r.title?`<div class="ld">${esc(r.detail)}</div>`:''}<div class="lmeta">${esc(shortDate(r.created_at))}</div></div>${statusChip(r.status)}</div>`).join('')
+    : emptyState('Need something changed?', 'Send me a request any time — a new page, an update, a question. I\u2019ll pick it up and you\u2019ll see it move here.');
+  return section('Your requests', '', `
+    <div style="margin-bottom:14px"><button class="btn btn-primary btn-sm" id="newRequest">+ New request</button></div>
+    ${rows}
+  `);
+}
+
+/* ---- section + empty helpers ---- */
+function section(title, meta, innerHTML) {
+  const wrap = el('section', { class:'sec' });
+  wrap.innerHTML = `<div class="sec-h"><h2>${esc(title)}</h2>${meta?`<span class="sec-meta">${esc(meta)}</span>`:''}</div><div class="card card-pad">${innerHTML}</div>`;
+  return wrap;
+}
+function emptyState(title, body) {
+  return `<div class="empty"><div class="ei">${esc(title)}</div><p>${esc(body)}</p></div>`;
+}
+
+/* ---- master render ---- */
+function render() {
+  const ws = STATE.ws;
+  const root = $('#content');
+  root.innerHTML = '';
+  if (!ws || !ws.partnership) { root.append(renderNoPartnership()); return; }
+  const p = ws.partnership;
+  $('#whoName').textContent = p.plan_label || SEGMENT_LABEL[p.segment] || 'Your workspace';
+
+  root.append(renderHero(p));
+  [
+    renderBusinessHealth(ws.health),
+    renderReview(ws.reviews),
+    renderSiteHealth(ws.site_health),
+    renderRecs(ws.recommendations),
+    renderWork(ws.work_log),
+    renderGoals(ws.goals),
+    renderContent(ws.content),
+    renderRequests(ws.requests),
+  ].forEach(node => node && root.append(node));
+
+  wireActions();
+}
+
+function renderNoPartnership() {
+  return el('section', { class:'card card-pad', style:'text-align:center;padding:48px 24px', html:`
+    <span class="eyebrow" style="justify-content:center">Growth workspace</span>
+    <h1 class="serif" style="font-size:26px;font-weight:500;margin-top:14px">You're all set up to sign in.</h1>
+    <p class="muted" style="max-width:42ch;margin:10px auto 0;font-size:14.5px;line-height:1.6">
+      Your growth partnership isn't active in here just yet. If your site recently launched, I'm getting your workspace ready — it'll fill in shortly. Any questions, just email me.
+    </p>
+    <a class="btn btn-primary mt-m" href="mailto:eric@davisdigitalstudio.com">Email Eric</a>
+  `});
+}
+</script>
+<script>
+/* ============================================================================
+   INTERACTIONS + BOOT
+   ============================================================================ */
+
+/* ---- wire per-render action buttons ---- */
+function wireActions() {
+  const nr = $('#newRequest');
+  if (nr) nr.addEventListener('click', openRequestModal);
+
+  $$('[data-rec-accept]').forEach(b => b.addEventListener('click', () => respondRec(b.getAttribute('data-rec-accept'), 'accept', b)));
+  $$('[data-rec-decline]').forEach(b => b.addEventListener('click', () => respondRec(b.getAttribute('data-rec-decline'), 'decline', b)));
+
+  // Guard: if a rec lacks an id (older payloads), disable its buttons so a
+  // click can't fire a request with an empty id.
+  $$('[data-rec-accept=""],[data-rec-decline=""]').forEach(b => { b.disabled = true; b.title = 'Refresh to act on this'; });
+}
+
+async function respondRec(id, decision, btn) {
+  if (!id || STATE.acting) return;
+  STATE.acting = true;
+  const card = btn.closest('.rec');
+  $$('.btn', card).forEach(b => b.disabled = true);
+  try {
+    await api('gp_rec_respond', { id, decision });
+    toast(decision === 'accept' ? "Great — I'll take it from here." : "No problem, noted.");
+    await load(true);  // refresh to reflect new status
+  } catch (e) {
+    toast('That didn\u2019t go through. Try again in a moment.');
+    $$('.btn', card).forEach(b => b.disabled = false);
+  } finally { STATE.acting = false; }
+}
+
+/* ---- request modal ---- */
+function openRequestModal() {
+  const bg = el('div', { class:'modal-bg', onclick:(e)=>{ if(e.target===bg) bg.remove(); } });
+  bg.innerHTML = `
+    <div class="modal"><div class="modal-pad">
+      <div class="modal-h">Send a request</div>
+      <p class="modal-sub">A new page, a change, a question — tell me what you need and I'll pick it up.</p>
+      <div class="field" style="margin-top:18px">
+        <label for="rqTitle">What do you need?</label>
+        <input id="rqTitle" class="in" maxlength="200" placeholder="e.g. Update our holiday hours">
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label for="rqDetail">Any details (optional)</label>
+        <textarea id="rqDetail" class="in" maxlength="4000" placeholder="The more I know, the faster I can do it right."></textarea>
+      </div>
+      <div class="row" style="margin-top:18px;justify-content:flex-end">
+        <button class="btn btn-ghost" id="rqCancel">Cancel</button>
+        <button class="btn btn-primary" id="rqSend">Send to Eric</button>
+      </div>
+    </div></div>`;
+  document.body.append(bg);
+  const title = $('#rqTitle', bg); title.focus();
+  $('#rqCancel', bg).addEventListener('click', () => bg.remove());
+  $('#rqSend', bg).addEventListener('click', async () => {
+    const t = title.value.trim(), d = $('#rqDetail', bg).value.trim();
+    if (!t) { title.focus(); title.style.borderColor = 'var(--stop)'; return; }
+    $('#rqSend', bg).disabled = true; $('#rqSend', bg).textContent = 'Sending…';
+    try {
+      await api('gp_submit_request', { title: t, detail: d });
+      bg.remove(); toast('Sent — I\u2019ll be in touch.'); await load(true);
+    } catch (e) {
+      $('#rqSend', bg).disabled = false; $('#rqSend', bg).textContent = 'Send to Eric';
+      toast('Couldn\u2019t send that. Try again in a moment.');
+    }
+  });
+}
+
+/* ---- skeleton while loading ---- */
+function renderSkeleton() {
+  $('#content').innerHTML = `
+    <section class="card card-pad">
+      <div class="sk sk-line" style="width:30%"></div>
+      <div class="sk" style="height:30px;width:55%;margin-top:14px"></div>
+      <div class="sk sk-line" style="width:80%;margin-top:16px"></div>
+    </section>
+    <section class="sec"><div class="sk sk-line" style="width:24%;height:18px"></div>
+      <div class="card card-pad" style="margin-top:12px">
+        <div class="stats">${'<div class="stat"><div class="sk" style="height:30px;width:50%"></div><div class="sk sk-line" style="width:80%;margin-top:10px"></div></div>'.repeat(4)}</div>
+      </div></section>`;
+}
+
+/* ---- load workspace ---- */
+async function load(silent) {
+  if (!silent) renderSkeleton();
+  try {
+    const r = await api('gp_workspace');
+    STATE.ws = (r && r.data) ? r.data : { partnership: null };
+    render();
+  } catch (e) {
+    if (String(e.message) === 'no session') return; // gate already shown
+    $('#content').innerHTML = `<section class="card card-pad"><div class="empty"><div class="ei">We couldn\u2019t load your workspace</div><p>Give it a moment and refresh. If it keeps happening, email <a href="mailto:eric@davisdigitalstudio.com" style="color:var(--p)">eric@davisdigitalstudio.com</a> and I\u2019ll sort it out.</p><button class="btn btn-ghost mt-s" onclick="load()">Try again</button></div></section>`;
+  }
+}
+
+/* ---- auth: login ---- */
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = $('#gateMsg'); msg.className = 'gate-msg'; msg.textContent = '';
+  const btn = $('#loginBtn'); btn.disabled = true; btn.textContent = 'Signing in…';
+  const email = $('#email').value.trim(), password = $('#password').value;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    msg.className = 'gate-msg ok'; msg.textContent = 'Welcome back.';
+    await boot();
+  } catch (err) {
+    msg.className = 'gate-msg err';
+    msg.textContent = /invalid/i.test(err.message || '') ? 'That email and password don\u2019t match. Try again?' : (err.message || 'Could not sign in.');
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+});
+
+/* ---- auth: forgot password ---- */
+$('#forgotLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const email = $('#email').value.trim();
+  const msg = $('#gateMsg');
+  if (!email) { msg.className = 'gate-msg err'; msg.textContent = 'Enter your email first, then tap reset.'; $('#email').focus(); return; }
+  try {
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://davisdigitalstudio.com/set-password.html' });
+    msg.className = 'gate-msg ok'; msg.textContent = 'Check your email for a reset link.';
+  } catch (err) {
+    msg.className = 'gate-msg err'; msg.textContent = 'Couldn\u2019t send that. Double-check the email?';
+  }
+});
+
+/* ---- sign out ---- */
+$('#signOut').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  STATE.ws = null; showGate();
+  $('#loginBtn').disabled = false; $('#loginBtn').textContent = 'Sign in';
+  $('#password').value = '';
+});
+
+/* ---- boot ---- */
+async function boot() {
+  if (!sb) {
+    $('#gateMsg').className = 'gate-msg err';
+    $('#gateMsg').textContent = 'Sign-in isn\u2019t configured yet. (Missing Supabase key.)';
+    return;
+  }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { showGate(); return; }
+  showApp();
+  await load();
+}
+
+/* config sanity: if the anon key wasn't pasted, tell the developer clearly */
+if (CONFIG.SUPABASE_ANON_KEY === 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE') {
+  console.warn('[DDS] Set CONFIG.SUPABASE_ANON_KEY to your project anon (publishable) key for login to work.');
+}
+
+boot();
+</script>
+</body>
+</html>

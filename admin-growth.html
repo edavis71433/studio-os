@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Growth · Studio OS — Davis Digital Studio</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   DAVIS DIGITAL STUDIO — GROWTH PARTNERSHIP · ADMIN MODULE (Studio OS)
+   Eric's side. Manage partnerships, run the monthly engine, hold the review
+   gate. Same design system as the client workspace + marketing site, tuned for
+   a working tool: denser, faster, more controls — but still calm and premium.
+   "The intelligence is the assistant's, the judgment is always mine."
+   ============================================================================ */
+:root{
+  --ink:#1B1525; --paper:#FBFAF7; --paper-2:#F4F0E9;
+  --p:#5B3FA0; --p-deep:#2A1B4A; --p-mist:#EDE8F7;
+  --brass:#B08D57; --brass-deep:#8A6B3C;
+  --muted:#6B6276; --hair:#E7E1D6;
+  --ok:#3F7D5B; --ok-mist:#E6F0E9;
+  --warn:#B5781D; --warn-mist:#F7EEDD;
+  --stop:#A8443A; --stop-mist:#F6E5E2;
+  --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 30px rgba(27,21,37,.06);
+  --shadow-lift:0 2px 6px rgba(27,21,37,.06),0 18px 50px rgba(27,21,37,.12);
+  --r:14px; --r-s:10px; --r-pill:100px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--paper-2);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","cv05"}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit}
+::selection{background:var(--p-mist)}
+.serif{font-family:var(--serif)}.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}.hide{display:none!important}.center{text-align:center}
+
+/* ── eyebrow ── */
+.eyebrow{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--brass-deep);display:inline-flex;align-items:center;gap:8px}
+.eyebrow::before{content:"";width:16px;height:1px;background:var(--brass)}
+
+/* ── buttons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13.5px;font-weight:550;letter-spacing:-.01em;padding:9px 15px;border-radius:var(--r-pill);transition:.16s ease;background:#fff;border:1px solid var(--hair);white-space:nowrap}
+.btn:hover{background:var(--paper-2)}
+.btn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+.btn-primary{background:var(--p);color:#fff;border-color:transparent}
+.btn-primary:hover{background:var(--p-deep)}
+.btn-ink{background:var(--ink);color:var(--paper);border-color:transparent}
+.btn-ink:hover{opacity:.9}
+.btn-sm{padding:6px 12px;font-size:12.5px}
+.btn-danger{color:var(--stop);border-color:var(--stop-mist)}
+.btn-danger:hover{background:var(--stop-mist)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-block{width:100%}
+
+/* ── layout: sidebar + main ── */
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.side{background:var(--ink);color:var(--paper);padding:20px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px}
+.side .brand{display:flex;align-items:center;gap:9px;font-weight:550;font-size:14px;color:#fff;text-decoration:none;padding:6px 8px 16px}
+.side .navlink{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;font-size:13.5px;font-weight:500;color:rgba(251,250,247,.62);transition:.14s;cursor:pointer}
+.side .navlink:hover{background:rgba(255,255,255,.06);color:#fff}
+.side .navlink.on{background:rgba(255,255,255,.1);color:#fff}
+.side .navlink .ic{width:16px;height:16px;flex:none;opacity:.8}
+.side .spacer{flex:1}
+.side .sidefoot{font-size:11.5px;color:rgba(251,250,247,.4);padding:8px;border-top:1px solid rgba(255,255,255,.08);margin-top:8px}
+.side .sidefoot a{color:rgba(251,250,247,.6);text-decoration:none}
+.main{padding:26px 30px 80px;max-width:1180px;width:100%}
+
+/* mobile: collapse sidebar to top bar */
+.mtop{display:none}
+@media(max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .side{display:none}
+  .mtop{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);color:#fff;padding:12px 18px;position:sticky;top:0;z-index:40}
+  .mtop .brand{display:flex;align-items:center;gap:8px;font-weight:550;font-size:14px;color:#fff;text-decoration:none}
+  .mtabs{display:flex;gap:4px;overflow-x:auto;background:var(--ink);padding:0 12px 10px;position:sticky;top:46px;z-index:39;scrollbar-width:none}
+  .mtabs::-webkit-scrollbar{display:none}
+  .mtab{flex:none;font-size:12.5px;font-weight:500;color:rgba(251,250,247,.6);padding:7px 12px;border-radius:var(--r-pill);white-space:nowrap}
+  .mtab.on{background:rgba(255,255,255,.14);color:#fff}
+  .main{padding:18px 16px 80px}
+}
+
+/* ── page header ── */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.ph h1{font-family:var(--serif);font-size:27px;font-weight:500;letter-spacing:-.02em;line-height:1.1}
+.ph p{color:var(--muted);font-size:13.5px;margin-top:5px}
+.ph-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── cards ── */
+.card{background:#fff;border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-pad{padding:20px}
+.card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card-h h3{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em}
+.card-h .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+
+/* ── grid helpers ── */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+
+/* ── stat tile ── */
+.stat{background:#fff;border:1px solid var(--hair);border-radius:var(--r-s);padding:16px}
+.stat .n{font-family:var(--serif);font-size:27px;font-weight:500;line-height:1;letter-spacing:-.02em}
+.stat .l{font-size:12px;color:var(--muted);margin-top:6px}
+.stat.click{cursor:pointer;transition:.14s}
+.stat.click:hover{border-color:var(--p);box-shadow:var(--shadow-lift)}
+
+/* ── chips ── */
+.chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:var(--r-pill);background:var(--paper-2);color:var(--muted);white-space:nowrap}
+.chip-ok{background:var(--ok-mist);color:var(--ok)}
+.chip-warn{background:var(--warn-mist);color:var(--warn)}
+.chip-stop{background:var(--stop-mist);color:var(--stop)}
+.chip-p{background:var(--p-mist);color:var(--p)}
+.chip-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.dot-g{color:var(--ok)}.dot-y{color:var(--warn)}.dot-r{color:var(--stop)}
+
+/* ── table-ish list ── */
+.row{display:flex;align-items:center;gap:13px;padding:13px 0;border-top:1px solid var(--hair)}
+.row:first-child{border-top:none}
+.row .rbody{flex:1;min-width:0}
+.row .rt{font-weight:500;font-size:14.5px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis}
+.row .rd{font-size:12.5px;color:var(--muted);margin-top:2px}
+.row .rmeta{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.03em;text-transform:uppercase}
+.row-click{cursor:pointer}
+.row-click:hover{background:var(--paper)}
+
+/* partnership list card */
+.pcard{display:flex;align-items:center;gap:14px;padding:15px 16px;border:1px solid var(--hair);border-radius:var(--r-s);background:#fff;cursor:pointer;transition:.14s}
+.pcard:hover{border-color:var(--p);box-shadow:var(--shadow-lift)}
+.pcard + .pcard{margin-top:10px}
+.pcard .pav{width:38px;height:38px;border-radius:9px;background:var(--p-mist);color:var(--p);display:grid;place-items:center;font-family:var(--serif);font-weight:500;font-size:16px;flex:none}
+.pcard .pn{font-weight:550;font-size:15px;letter-spacing:-.01em}
+.pcard .pm{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── forms ── */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:550;color:var(--muted);margin-bottom:5px;letter-spacing:.01em}
+.in{width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:var(--r-s);background:#fff;transition:.14s}
+.in:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-mist)}
+textarea.in{min-height:90px;resize:vertical;line-height:1.5}
+select.in{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%236B6276' stroke-width='1.3' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.field-row{grid-template-columns:1fr}}
+
+/* ── tabs within detail ── */
+.dtabs{display:flex;gap:3px;overflow-x:auto;border-bottom:1px solid var(--hair);margin-bottom:20px;scrollbar-width:none}
+.dtabs::-webkit-scrollbar{display:none}
+.dtab{flex:none;font-size:13.5px;font-weight:500;color:var(--muted);padding:10px 13px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.14s;white-space:nowrap}
+.dtab:hover{color:var(--ink)}
+.dtab.on{color:var(--p);border-bottom-color:var(--p)}
+
+/* ── review gate banner ── */
+.gate-banner{background:var(--p-mist);border:1px solid #DCD0F0;border-radius:var(--r-s);padding:13px 15px;font-size:13px;color:var(--p-deep);display:flex;gap:10px;align-items:flex-start;line-height:1.5;margin-bottom:16px}
+
+/* ── empty ── */
+.empty{text-align:center;padding:34px 20px;color:var(--muted)}
+.empty .ei{font-family:var(--serif);font-size:16px;color:var(--ink);margin-bottom:4px}
+.empty p{font-size:13px;max-width:330px;margin:0 auto;line-height:1.5}
+
+/* ── modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(27,21,37,.42);backdrop-filter:blur(3px);z-index:100;display:grid;place-items:end center}
+@media(min-width:640px){.modal-bg{place-items:center}}
+.modal{background:var(--paper);border-radius:18px 18px 0 0;width:100%;max-width:560px;box-shadow:var(--shadow-lift);max-height:94vh;overflow:auto}
+@media(min-width:640px){.modal{border-radius:18px}}
+.modal-pad{padding:24px}
+.modal-h{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.01em}
+.modal-sub{color:var(--muted);font-size:13px;margin-top:5px}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+/* ── toast ── */
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);font-size:13px;font-weight:500;padding:11px 19px;border-radius:var(--r-pill);box-shadow:var(--shadow-lift);opacity:0;transition:.25s;z-index:200;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--stop)}
+
+/* ── skeleton ── */
+.sk{background:linear-gradient(90deg,var(--paper-2) 25%,#EFE9DF 50%,var(--paper-2) 75%);background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px}
+@keyframes sh{to{background-position:-200% 0}}
+
+/* ── login gate ── */
+.lg{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--paper)}
+.lg-card{width:100%;max-width:380px;text-align:center}
+.lg h1{font-family:var(--serif);font-size:28px;font-weight:500;margin-top:14px;letter-spacing:-.02em}
+.lg p.s{color:var(--muted);font-size:13.5px;margin-top:6px}
+.lg .field{text-align:left;margin-top:14px}
+.lg-msg{font-size:13px;margin-top:12px;min-height:18px}
+.lg-msg.err{color:var(--stop)}.lg-msg.ok{color:var(--ok)}
+
+.mt-s{margin-top:12px}.mt-m{margin-top:20px}.mt-l{margin-top:30px}
+.divider{height:1px;background:var(--hair);margin:20px 0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ════════ LOGIN GATE ════════ -->
+<div id="gate" class="lg">
+  <div class="lg-card">
+    <a href="/" style="display:inline-flex">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+        <path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+        <circle cx="22" cy="11" r="1.5" fill="#B08D57"/>
+      </svg>
+    </a>
+    <span class="eyebrow" style="justify-content:center;margin-top:18px">Studio OS · Growth</span>
+    <h1>Sign in</h1>
+    <p class="s">Team access only.</p>
+    <form id="loginForm" autocomplete="on">
+      <div class="field"><label for="email">Email</label><input id="email" class="in" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="password">Password</label><input id="password" class="in" type="password" autocomplete="current-password" required></div>
+      <button id="loginBtn" type="submit" class="btn btn-primary btn-block mt-s">Sign in</button>
+      <div id="gateMsg" class="lg-msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ════════ APP ════════ -->
+<div id="app" class="hide">
+  <div class="mtop">
+    <a href="/" class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/><path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#fff" stroke-width="1.4" fill="none"/><circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>
+      Growth
+    </a>
+    <button class="btn btn-sm" id="signOutM" style="background:rgba(255,255,255,.12);color:#fff;border:none">Sign out</button>
+  </div>
+  <div class="mtabs" id="mtabs"></div>
+
+  <div class="shell">
+    <aside class="side">
+      <a href="/" class="brand">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/><path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#fff" stroke-width="1.4" fill="none"/><circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>
+        Studio OS · Growth
+      </a>
+      <div class="navlink" data-nav="dashboard"><span class="ic">▦</span> Dashboard</div>
+      <div class="navlink" data-nav="partnerships"><span class="ic">◇</span> Partnerships</div>
+      <div class="navlink" data-nav="reminders"><span class="ic">◷</span> What needs me</div>
+      <div class="spacer"></div>
+      <div class="navlink" id="signOut"><span class="ic">⏻</span> Sign out</div>
+      <div class="sidefoot">Signed in as <span id="whoEmail" class="mono"></span><br><span id="whoRole" class="mono"></span></div>
+    </aside>
+
+    <main class="main" id="main"><!-- rendered by JS --></main>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================================
+   CONFIG  — same project + anon key as the client portal.
+   ============================================================================ */
+const CONFIG = {
+  SUPABASE_URL: 'https://qksstlqzbhesadrrofgn.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo',
+  FN: 'https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api',
+};
+
+let sb = null;
+try {
+  sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
+} catch (e) { console.error('Supabase init failed', e); }
+
+/* ── helpers ── */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+const el = (tag, props = {}, kids = []) => {
+  const n = document.createElement(tag);
+  for (const k in props) {
+    if (k === 'class') n.className = props[k];
+    else if (k === 'html') n.innerHTML = props[k];
+    else if (k.startsWith('on') && typeof props[k] === 'function') n.addEventListener(k.slice(2), props[k]);
+    else if (props[k] != null) n.setAttribute(k, props[k]);
+  }
+  (Array.isArray(kids) ? kids : [kids]).forEach(c => c != null && n.append(c.nodeType ? c : document.createTextNode(c)));
+  return n;
+};
+let TT;
+function toast(msg, isErr) { const t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : ''); clearTimeout(TT); TT = setTimeout(() => t.className = 'toast', 2600); }
+
+async function api(type, payload = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { showGate(); throw new Error('no session'); }
+  const res = await fetch(CONFIG.FN, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': session.access_token },
+    body: JSON.stringify({ type, ...payload }),
+  });
+  let j = {}; try { j = await res.json(); } catch (_) {}
+  if (j && j.error) { if (res.status === 401) showGate(); if (res.status === 403) { throw new Error('forbidden'); } throw new Error(j.error); }
+  return j;
+}
+
+/* ── date utils ── */
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function thisPeriod() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function periodLabel(p) { if (!p || !/^\d{4}-\d{2}$/.test(p)) return p || ''; const [y,m]=p.split('-'); return `${MONTHS_FULL[+m-1]} ${y}`; }
+function shortDate(iso) { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return ''; return `${MONTHS[d.getMonth()]} ${d.getDate()}`; }
+function isoDate(iso) { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return ''; return d.toISOString().slice(0,10); }
+function daysUntil(iso) { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; return Math.ceil((d.getTime()-Date.now())/86400000); }
+
+function showGate() { $('#app').classList.add('hide'); $('#gate').classList.remove('hide'); }
+function showApp() { $('#gate').classList.add('hide'); $('#app').classList.remove('hide'); }
+
+/* ── app state ── */
+const STATE = { nav:'dashboard', me:null, role:null, detail:null, dtab:'overview', cache:{} };
+
+/* (views + boot in following script blocks) */
+</script>
+<script>
+/* ============================================================================
+   TOP-LEVEL VIEWS: dashboard · partnerships (+create) · reminders
+   ============================================================================ */
+
+const NAV = [
+  ['dashboard','Dashboard'],
+  ['partnerships','Partnerships'],
+  ['reminders','What needs me'],
+];
+const SEG = { new_business:'New business', established:'Established', maintenance:'Maintenance', growth:'Growth' };
+const SEG_OPTS = Object.entries(SEG);
+const STATUS_OPTS = [['onboarding','Onboarding'],['active','Active'],['paused','Paused'],['ended','Ended']];
+const HEALTH_DOT = { green:'dot-g', yellow:'dot-y', red:'dot-r' };
+
+function initials(name){ return (name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function money(n){ const v=Number(n)||0; return '$'+v.toLocaleString('en-US'); }
+
+/* ---------- skeleton ---------- */
+function skeleton(){
+  $('#main').innerHTML = `<div class="ph"><div><div class="sk" style="height:14px;width:120px"></div><div class="sk" style="height:28px;width:240px;margin-top:10px"></div></div></div>
+    <div class="stat-row">${'<div class="stat"><div class="sk" style="height:26px;width:50%"></div><div class="sk" style="height:12px;width:75%;margin-top:10px"></div></div>'.repeat(4)}</div>`;
+}
+
+/* ════════ DASHBOARD ════════ */
+async function viewDashboard(){
+  skeleton();
+  let d;
+  try { d = (await api('partnership_dashboard')).data; }
+  catch(e){ return errorPane('dashboard', e); }
+  STATE.cache.dashboard = d;
+  const c = d.counts || {};
+  const main = $('#main'); main.innerHTML = '';
+  main.append(elHeader('Growth dashboard', 'Your whole book of business, at a glance.', [
+    { label:'+ New partnership', cls:'btn-primary', on:openCreatePartnership },
+  ]));
+
+  // stat tiles
+  const stats = el('div',{class:'stat-row'});
+  const tiles = [
+    ['Active clients', c.activeClients ?? 0, ()=>go('partnerships')],
+    ['Monthly recurring', money(c.mrr), null],
+    ['Renewals (45d)', c.renewalsSoon ?? 0, null],
+    ['At risk', c.atRisk ?? 0, null],
+    ['Need review', c.needsReviewThisMonth ?? 0, null],
+    ['AI recs to review', c.pendingRecs ?? 0, null],
+  ];
+  tiles.forEach(([l,n,fn])=>{
+    const t = el('div',{class:'stat'+(fn?' click':''), html:`<div class="n">${esc(String(n))}</div><div class="l">${esc(l)}</div>`});
+    if(fn) t.addEventListener('click',fn);
+    stats.append(t);
+  });
+  main.append(stats);
+
+  // segments
+  if(d.bySegment && Object.keys(d.bySegment).length){
+    const seg = el('div',{class:'card card-pad',style:'margin-top:18px'});
+    seg.innerHTML = `<div class="card-h"><div><h3>By segment</h3></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${Object.entries(d.bySegment).map(([k,v])=>`<span class="chip chip-p">${esc(SEG[k]||k)} · ${v}</span>`).join('')}</div>`;
+    main.append(seg);
+  }
+
+  // two columns: needs review + renewals/at-risk
+  const cols = el('div',{class:'grid g2',style:'margin-top:18px'});
+
+  const review = el('div',{class:'card card-pad'});
+  review.innerHTML = `<div class="card-h"><div><h3>Needs a review this month</h3><div class="sub">${periodLabel(thisPeriod())}</div></div></div>`;
+  if((d.needsReview||[]).length){
+    d.needsReview.forEach(p=>{
+      const r = el('div',{class:'row row-click',html:`<div class="rbody"><div class="rt">${esc(p.client_name||'Client')}</div><div class="rd">${esc(SEG[p.segment]||p.segment||'')}</div></div><span class="chip chip-warn">No review yet</span>`});
+      r.addEventListener('click',()=>openDetail(p.id,'review'));
+      review.append(r);
+    });
+  } else { review.append(el('div',{class:'empty',html:`<div class="ei">All caught up</div><p>Every active client has this month's review.</p>`})); }
+  cols.append(review);
+
+  const risk = el('div',{class:'card card-pad'});
+  risk.innerHTML = `<div class="card-h"><div><h3>Attention</h3><div class="sub">Renewals & health</div></div></div>`;
+  const attn = [...(d.renewals||[]).map(p=>({p,kind:'renewal'})), ...(d.atRisk||[]).map(p=>({p,kind:'risk'}))];
+  if(attn.length){
+    attn.forEach(({p,kind})=>{
+      const meta = kind==='renewal' ? `<span class="chip">Renews ${shortDate(p.renews_at)}</span>` : `<span class="chip chip-stop"><span class="chip-dot"></span>${esc(p.health)}</span>`;
+      const r = el('div',{class:'row row-click',html:`<div class="rbody"><div class="rt">${esc(p.client_name||'Client')}</div><div class="rd">${kind==='renewal'?'Renewal coming up':(p.health_note?esc(p.health_note):'Health flagged')}</div></div>${meta}`});
+      r.addEventListener('click',()=>openDetail(p.id));
+      risk.append(r);
+    });
+  } else { risk.append(el('div',{class:'empty',html:`<div class="ei">Nothing flagged</div><p>No renewals due soon, no clients at risk.</p>`})); }
+  cols.append(risk);
+
+  main.append(cols);
+}
+
+/* ════════ PARTNERSHIPS LIST ════════ */
+async function viewPartnerships(){
+  skeleton();
+  let rows;
+  try { rows = (await api('partnership_list')).data || []; }
+  catch(e){ return errorPane('partnerships', e); }
+  STATE.cache.partnerships = rows;
+  const main = $('#main'); main.innerHTML = '';
+  main.append(elHeader('Partnerships', `${rows.length} client${rows.length===1?'':'s'} in your book.`, [
+    { label:'+ New partnership', cls:'btn-primary', on:openCreatePartnership },
+  ]));
+
+  if(!rows.length){
+    main.append(el('div',{class:'card card-pad',html:`<div class="empty"><div class="ei">No partnerships yet</div><p>Create your first one to start the post-launch experience for a client. Their workspace lights up the moment you do.</p></div><div class="center" style="margin-top:6px"><button class="btn btn-primary" id="emptyCreate">+ New partnership</button></div>`}));
+    $('#emptyCreate').addEventListener('click',openCreatePartnership);
+    return;
+  }
+
+  // filter chips
+  const filter = el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px'});
+  const segCounts = {};
+  rows.forEach(r=>{ segCounts[r.segment]=(segCounts[r.segment]||0)+1; });
+  let active='all';
+  const chip=(key,label)=>{ const c=el('button',{class:'chip'+(active===key?' chip-p':''),html:esc(label)}); c.addEventListener('click',()=>{active=key;draw();}); return c; };
+  function draw(){
+    filter.innerHTML=''; filter.append(chip('all',`All · ${rows.length}`));
+    Object.entries(segCounts).forEach(([k,v])=>filter.append(chip(k,`${SEG[k]||k} · ${v}`)));
+    list.innerHTML='';
+    rows.filter(r=>active==='all'||r.segment===active).forEach(p=>list.append(pcard(p)));
+  }
+  const list = el('div',{});
+  main.append(filter); main.append(list); draw();
+}
+
+function pcard(p){
+  const card = el('div',{class:'pcard'});
+  const reviewBadge = p.last_review_period===thisPeriod() ? '' : `<span class="chip chip-warn">review due</span>`;
+  const recsBadge = Number(p.pending_recs)>0 ? `<span class="chip chip-p">${p.pending_recs} rec${p.pending_recs>1?'s':''}</span>` : '';
+  card.innerHTML = `<div class="pav">${esc(initials(p.client_name))}</div>
+    <div style="flex:1;min-width:0">
+      <div class="pn">${esc(p.client_name||'Client')}</div>
+      <div class="pm">
+        <span class="chip"><span class="chip-dot ${HEALTH_DOT[p.health]||''}"></span>${esc(p.health||'green')}</span>
+        <span class="chip chip-p">${esc(SEG[p.segment]||p.segment||'')}</span>
+        <span class="chip">${esc(p.status||'')}</span>
+        ${p.monthly_amount?`<span class="chip">${money(p.monthly_amount)}/mo</span>`:''}
+        ${reviewBadge}${recsBadge}
+      </div>
+    </div>`;
+  card.addEventListener('click',()=>openDetail(p.id));
+  return card;
+}
+
+/* ════════ CREATE PARTNERSHIP ════════ */
+async function openCreatePartnership(){
+  // load clients + contacts to pick from (via admin_query, GET-only)
+  let clients=[], contacts=[];
+  try {
+    const [c1,c2] = await Promise.all([
+      api('admin_query',{path:'clients?select=id,name,contact_email,website,url,site_url,domain&order=name.asc&limit=500'}),
+      api('admin_query',{path:'contacts?select=id,name,email&order=name.asc&limit=500'}),
+    ]);
+    clients = c1.data||[]; contacts = c2.data||[];
+  } catch(e){ toast('Could not load clients','err'); }
+
+  const bg = modal(`Start a partnership`, `Link this to an existing client. Their growth workspace activates immediately.`, `
+    <div class="field"><label>Client</label>
+      <select class="in" id="np_client"><option value="">Choose a client…</option>
+        ${clients.map(c=>`<option value="${esc(c.id)}" data-site="${esc(c.website||c.url||c.site_url||c.domain||'')}" data-email="${esc(c.contact_email||'')}">${esc(c.name||'(unnamed)')}</option>`).join('')}
+      </select></div>
+    <div class="field"><label>Contact (the person who logs in)</label>
+      <select class="in" id="np_contact"><option value="">Choose a contact…</option>
+        ${contacts.map(c=>`<option value="${esc(c.id)}" data-email="${esc(c.email||'')}">${esc(c.name||'(unnamed)')}${c.email?` · ${esc(c.email)}`:''}</option>`).join('')}
+      </select>
+      <div class="sub muted" style="font-size:11.5px;margin-top:5px">This must match the email they sign in with. If they don't have a login yet, create one in the main admin first.</div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Segment</label><select class="in" id="np_segment">${SEG_OPTS.map(([k,l])=>`<option value="${k}"${k==='established'?' selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select class="in" id="np_status">${STATUS_OPTS.map(([k,l])=>`<option value="${k}"${k==='active'?' selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Plan label</label><input class="in" id="np_plan" placeholder="Managed, HTML Managed…"></div>
+      <div class="field"><label>Monthly amount ($)</label><input class="in" id="np_amount" type="number" min="0" step="50" placeholder="400"></div>
+    </div>
+    <div class="field"><label>Primary site</label><input class="in" id="np_site" placeholder="https://theirsite.com"></div>
+    <div class="field"><label>Renews on (optional)</label><input class="in" id="np_renews" type="date"></div>
+  `, [
+    { label:'Cancel', cls:'', on:(b)=>b.remove() },
+    { label:'Create partnership', cls:'btn-primary', on:saveNewPartnership },
+  ]);
+
+  // auto-fill site + match contact when a client is picked
+  $('#np_client',bg).addEventListener('change',e=>{
+    const opt = e.target.selectedOptions[0];
+    if(opt && opt.dataset.site && !$('#np_site',bg).value) $('#np_site',bg).value = opt.dataset.site;
+    // try to auto-match a contact by the client's contact_email
+    const email = opt?.dataset.email;
+    if(email){ const m = contacts.find(c=>(c.email||'').toLowerCase()===email.toLowerCase()); if(m) $('#np_contact',bg).value = m.id; }
+  });
+}
+
+async function saveNewPartnership(btn){
+  const bg = btn.closest('.modal-bg');
+  const client_id = $('#np_client',bg).value;
+  const contact_id = $('#np_contact',bg).value;
+  if(!client_id && !contact_id){ toast('Pick a client or contact','err'); return; }
+  const payload = {
+    client_id: client_id||undefined,
+    contact_id: contact_id||undefined,
+    segment: $('#np_segment',bg).value,
+    status: $('#np_status',bg).value,
+    plan_label: $('#np_plan',bg).value.trim()||undefined,
+    monthly_amount: $('#np_amount',bg).value?Number($('#np_amount',bg).value):undefined,
+    primary_site: $('#np_site',bg).value.trim()||undefined,
+    renews_at: $('#np_renews',bg).value?new Date($('#np_renews',bg).value).toISOString():undefined,
+  };
+  btn.disabled=true; btn.textContent='Creating…';
+  try {
+    const r = await api('partnership_upsert', payload);
+    bg.remove(); toast('Partnership created');
+    const id = r.data && r.data.id;
+    if(id) openDetail(id); else go('partnerships');
+  } catch(e){ btn.disabled=false; btn.textContent='Create partnership'; toast('Could not create: '+e.message,'err'); }
+}
+
+/* ════════ REMINDERS ════════ */
+async function viewReminders(){
+  skeleton();
+  let d;
+  try { d = (await api('reminders_feed')).data; }
+  catch(e){ return errorPane('reminders', e); }
+  const items = (d&&d.items)||[];
+  const main = $('#main'); main.innerHTML='';
+  main.append(elHeader('What needs me', 'Across every partnership, in one calm list.', []));
+  const card = el('div',{class:'card card-pad'});
+  if(!items.length){ card.append(el('div',{class:'empty',html:`<div class="ei">You're clear</div><p>No reminders, renewals, or reviews waiting right now.</p>`})); }
+  else {
+    const KIND = {
+      reminder:['chip','Reminder'], renewal:['chip-warn','Renewal'], at_risk:['chip-stop','At risk'],
+      review_due:['chip-p','Review due'], recs:['chip-p','AI recs'],
+    };
+    items.forEach(it=>{
+      const [cls,label] = KIND[it.kind]||['chip','Note'];
+      const r = el('div',{class:'row row-click',html:`<span class="chip ${cls}" style="flex:none">${label}</span><div class="rbody"><div class="rt" style="font-weight:450;font-size:14px">${esc(it.title)}</div>${it.detail?`<div class="rd">${esc(it.detail)}</div>`:''}${it.when?`<div class="rmeta" style="margin-top:4px">${esc(shortDate(it.when))}</div>`:''}</div>`});
+      if(it.partnership_id) r.addEventListener('click',()=>openDetail(it.partnership_id, it.kind==='review_due'?'review':it.kind==='recs'?'recs':'overview'));
+      card.append(r);
+    });
+  }
+  main.append(card);
+}
+
+/* ---------- shared header + error + modal builders ---------- */
+function elHeader(title, sub, actions){
+  const h = el('div',{class:'ph'});
+  h.innerHTML = `<div><span class="eyebrow">Growth partnership</span><h1>${esc(title)}</h1>${sub?`<p>${esc(sub)}</p>`:''}</div>`;
+  if(actions&&actions.length){
+    const a = el('div',{class:'ph-actions'});
+    actions.forEach(ac=>{ const b=el('button',{class:'btn '+(ac.cls||''),html:esc(ac.label)}); b.addEventListener('click',()=>ac.on(b)); a.append(b); });
+    h.append(a);
+  }
+  return h;
+}
+function errorPane(which, e){
+  if(String(e.message)==='no session') return;
+  $('#main').innerHTML = `<div class="card card-pad"><div class="empty"><div class="ei">Couldn't load ${esc(which)}</div><p>${e.message==='forbidden'?'Your account doesn\'t have access to this. Ask Eric to grant staff access.':'Give it a moment and try again.'}</p><button class="btn mt-s" onclick="route()">Try again</button></div></div>`;
+}
+function modal(title, sub, innerHTML, actions){
+  const bg = el('div',{class:'modal-bg',onclick:(e)=>{ if(e.target===bg) bg.remove(); }});
+  bg.innerHTML = `<div class="modal"><div class="modal-pad"><div class="modal-h">${esc(title)}</div>${sub?`<div class="modal-sub">${esc(sub)}</div>`:''}<div style="margin-top:18px">${innerHTML}</div></div></div>`;
+  const foot = el('div',{class:'modal-foot'});
+  (actions||[]).forEach(ac=>{ const b=el('button',{class:'btn '+(ac.cls||''),html:esc(ac.label)}); b.addEventListener('click',()=>ac.on(b)); foot.append(b); });
+  $('.modal-pad',bg).append(foot);
+  document.body.append(bg);
+  return bg;
+}
+</script>
+<script>
+/* ============================================================================
+   PARTNERSHIP DETAIL — the workspace where the monthly engine runs.
+   Tabs: Overview · Goals · Work · Reviews · Recommendations · Content · Health · Notes
+   ============================================================================ */
+
+const DTABS = [
+  ['overview','Overview'],['goals','Goals'],['work','Work log'],['review','Reviews'],
+  ['recs','Recommendations'],['content','Content'],['health','Health'],['notes','Notes'],
+];
+
+async function openDetail(id, tab){
+  STATE.detail = id; STATE.dtab = tab || 'overview';
+  setNav('partnerships');
+  skeleton();
+  let d;
+  try { d = (await api('partnership_get',{id})).data; }
+  catch(e){ return errorPane('this partnership', e); }
+  STATE.cache.detail = d;
+  drawDetail();
+}
+
+function drawDetail(){
+  const d = STATE.cache.detail; if(!d) return;
+  const p = d.partnership;
+  const main = $('#main'); main.innerHTML='';
+
+  // header
+  const h = el('div',{class:'ph'});
+  h.innerHTML = `<div>
+    <span class="eyebrow"><span style="cursor:pointer" id="backLink">← Partnerships</span></span>
+    <h1>${esc(p.client_name||'Client')}</h1>
+    <p>${esc(SEG[p.segment]||p.segment||'')} · ${esc(p.status||'')}${p.primary_site?` · <span class="mono">${esc(p.primary_site.replace(/^https?:\/\//,''))}</span>`:''}</p>
+  </div>
+  <div class="ph-actions">
+    <span class="chip"><span class="chip-dot ${HEALTH_DOT[p.health]||''}"></span>${esc(p.health||'green')}</span>
+    <button class="btn btn-sm" id="editP">Edit</button>
+  </div>`;
+  main.append(h);
+  $('#backLink').addEventListener('click',()=>go('partnerships'));
+  $('#editP').addEventListener('click',()=>openEditPartnership(p));
+
+  // tabs
+  const tabs = el('div',{class:'dtabs'});
+  DTABS.forEach(([k,l])=>{
+    const badge = k==='recs' && Number(p.pending_recs)>0 ? ` (${p.pending_recs})` : '';
+    const t = el('button',{class:'dtab'+(STATE.dtab===k?' on':''),html:esc(l)+badge});
+    t.addEventListener('click',()=>{ STATE.dtab=k; drawDetail(); });
+    tabs.append(t);
+  });
+  main.append(tabs);
+
+  const body = el('div',{id:'dbody'});
+  main.append(body);
+  ({
+    overview:tabOverview, goals:tabGoals, work:tabWork, review:tabReview,
+    recs:tabRecs, content:tabContent, health:tabHealth, notes:tabNotes,
+  }[STATE.dtab]||tabOverview)(body, d);
+}
+
+function refreshDetail(){ openDetail(STATE.detail, STATE.dtab); }
+
+/* ---------- OVERVIEW ---------- */
+function tabOverview(root, d){
+  const p = d.partnership;
+  const stat=(n,l)=>`<div class="stat"><div class="n">${esc(String(n))}</div><div class="l">${esc(l)}</div></div>`;
+  const lastReview = p.last_review_period ? periodLabel(p.last_review_period) : 'None yet';
+  root.innerHTML = `
+    <div class="stat-row" style="margin-bottom:18px">
+      ${stat(d.goals.filter(g=>g.status==='active').length,'Active goals')}
+      ${stat(d.tasks.filter(t=>t.status!=='done').length,'Open tasks')}
+      ${stat(d.recommendations.filter(r=>r.status==='suggested').length,'Recs to review')}
+      ${stat(d.work_log.length,'Work logged')}
+    </div>
+    <div class="grid g2">
+      <div class="card card-pad">
+        <div class="card-h"><div><h3>This month</h3><div class="sub">${periodLabel(thisPeriod())}</div></div></div>
+        <div class="row"><div class="rbody"><div class="rt" style="font-size:14px;font-weight:450">Monthly review</div></div>${p.last_review_period===thisPeriod()?'<span class="chip chip-ok">Published</span>':'<span class="chip chip-warn">Not yet</span>'}</div>
+        <div class="row"><div class="rbody"><div class="rt" style="font-size:14px;font-weight:450">Plan</div></div><span class="chip">${esc(p.plan_label||'—')}${p.monthly_amount?` · ${money(p.monthly_amount)}/mo`:''}</span></div>
+        <div class="row"><div class="rbody"><div class="rt" style="font-size:14px;font-weight:450">Last review</div></div><span class="chip">${esc(lastReview)}</span></div>
+        ${p.renews_at?`<div class="row"><div class="rbody"><div class="rt" style="font-size:14px;font-weight:450">Renews</div></div><span class="chip">${esc(shortDate(p.renews_at))} (${daysUntil(p.renews_at)}d)</span></div>`:''}
+      </div>
+      <div class="card card-pad">
+        <div class="card-h"><div><h3>Quick actions</h3></div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-block" data-act="logwork">+ Log work done</button>
+          <button class="btn btn-block" data-act="addrec">+ Add a recommendation</button>
+          <button class="btn btn-block" data-act="gen">✦ Let the assistant find opportunities</button>
+          <button class="btn btn-block btn-primary" data-act="review">Draft this month's review</button>
+        </div>
+      </div>
+    </div>`;
+  root.querySelector('[data-act="logwork"]').addEventListener('click',()=>openLogWork(p.id));
+  root.querySelector('[data-act="addrec"]').addEventListener('click',()=>openAddRec(p.id));
+  root.querySelector('[data-act="gen"]').addEventListener('click',()=>genRecs(p.id));
+  root.querySelector('[data-act="review"]').addEventListener('click',()=>{ STATE.dtab='review'; drawDetail(); });
+}
+
+/* ---------- GOALS ---------- */
+function tabGoals(root, d){
+  root.append(sectionCard('Goals', '+ Add goal', ()=>openGoal(d.partnership.id), (body)=>{
+    if(!d.goals.length){ body.append(emptyEl('No goals yet','What does this client want their site to do for the business? Add it here.')); return; }
+    d.goals.forEach(g=>{
+      const tone = g.status==='hit'?'chip-ok':g.status==='missed'?'chip-stop':g.status==='archived'?'chip':'chip-p';
+      const r = el('div',{class:'row'});
+      r.innerHTML = `<div class="rbody"><div class="rt">${esc(g.title)}</div>${g.detail?`<div class="rd">${esc(g.detail)}</div>`:''}<div class="rmeta" style="margin-top:4px">${[g.metric,g.target&&`target ${g.target}`,g.quarter,g.client_visible?'shown to client':'private'].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <span class="chip ${tone}">${esc(g.status)}</span>`;
+      const edit=el('button',{class:'btn btn-sm',html:'Edit'}); edit.addEventListener('click',()=>openGoal(d.partnership.id,g));
+      const wrap=el('div',{style:'display:flex;gap:6px;flex:none'},[edit]);
+      r.append(wrap);
+      body.append(r);
+    });
+  }));
+}
+
+/* ---------- WORK LOG ---------- */
+function tabWork(root, d){
+  root.append(sectionCard('Work log', '+ Log work', ()=>openLogWork(d.partnership.id), (body)=>{
+    if(!d.work_log.length){ body.append(emptyEl('Nothing logged yet','Every change you make for this client lands here, and becomes their monthly receipt.')); return; }
+    d.work_log.forEach(w=>{
+      const r = el('div',{class:'row'});
+      r.innerHTML = `<div class="rbody"><div class="rt" style="font-weight:450">${esc(w.title)}</div>${w.detail?`<div class="rd">${esc(w.detail)}</div>`:''}<div class="rmeta" style="margin-top:4px">${[w.category,w.period&&periodLabel(w.period),w.client_visible?'visible':'private'].filter(Boolean).map(esc).join(' · ')}</div></div><span class="rmeta">${esc(shortDate(w.done_at))}</span>`;
+      body.append(r);
+    });
+  }));
+}
+
+/* ---------- REVIEWS ---------- */
+function tabReview(root, d){
+  const p = d.partnership;
+  const thisOne = d.reviews.find(r=>r.period===thisPeriod());
+  const wrap = el('div',{});
+
+  // current month panel
+  const cur = el('div',{class:'card card-pad'});
+  cur.innerHTML = `<div class="card-h"><div><h3>${periodLabel(thisPeriod())} review</h3><div class="sub">${thisOne?(thisOne.status==='published'?'Published to client':'Draft — not sent'):'Not started'}</div></div>
+    ${thisOne&&thisOne.status==='published'?'<span class="chip chip-ok">Published</span>':thisOne?'<span class="chip chip-warn">Draft</span>':''}</div>`;
+  if(thisOne){
+    cur.append(reviewEditor(p, thisOne));
+  } else {
+    cur.append(el('div',{class:'empty',html:`<div class="ei">No review for this month yet</div><p>Draft one in your voice, grounded in the real work logged this month. The assistant gets you started; you finish it.</p>`}));
+    const acts = el('div',{class:'center',style:'margin-top:6px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap'});
+    const ai = el('button',{class:'btn btn-primary',html:'✦ Draft with assistant'}); ai.addEventListener('click',()=>draftReview(p.id));
+    const blank = el('button',{class:'btn',html:'Start blank'}); blank.addEventListener('click',()=>{ startBlankReview(p.id); });
+    acts.append(ai,blank); cur.append(acts);
+  }
+  wrap.append(cur);
+
+  // past reviews
+  const past = d.reviews.filter(r=>r.period!==thisPeriod());
+  if(past.length){
+    const pc = el('div',{class:'card card-pad',style:'margin-top:16px'});
+    pc.innerHTML = `<div class="card-h"><div><h3>Past reviews</h3></div></div>`;
+    past.forEach(r=>{
+      const row = el('div',{class:'row row-click',html:`<div class="rbody"><div class="rt" style="font-size:14px">${esc(periodLabel(r.period))}</div><div class="rd">${esc(r.headline||'—')}</div></div><span class="chip ${r.status==='published'?'chip-ok':'chip-warn'}">${esc(r.status)}</span>`});
+      row.addEventListener('click',()=>openReviewModal(p, r));
+      pc.append(row);
+    });
+    wrap.append(pc);
+  }
+  root.append(wrap);
+}
+
+/* the inline review editor (five sections + publish gate) */
+function reviewEditor(p, review){
+  const box = el('div',{});
+  const F = [
+    ['headline','Headline','One warm, specific sentence about the month'],
+    ['intro','Intro','2-3 warm sentences setting it up'],
+    ['improved','What got better',''],
+    ['work_done','What I did',''],
+    ['found','What I found',''],
+    ['next_up','What we should do next',''],
+    ['payoff','How it’s paying off',''],
+  ];
+  box.innerHTML = `<div class="gate-banner">✎ This is your draft. Edit anything before it reaches the client. Nothing sends until you publish.</div>`;
+  F.forEach(([k,label,ph])=>{
+    const f = el('div',{class:'field'});
+    const big = ['intro','improved','work_done','found','next_up','payoff'].includes(k);
+    f.innerHTML = `<label>${label}</label>${big?`<textarea class="in" data-f="${k}" placeholder="${esc(ph)}">${esc(review[k]||'')}</textarea>`:`<input class="in" data-f="${k}" placeholder="${esc(ph)}" value="${esc(review[k]||'')}">`}`;
+    box.append(f);
+  });
+  const foot = el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px'});
+  const save = el('button',{class:'btn',html:'Save draft'});
+  save.addEventListener('click',()=>saveReview(p.id, review, box, save));
+  const pub = el('button',{class:'btn btn-primary',html:review.status==='published'?'Re-send to client':'Publish & email client'});
+  pub.addEventListener('click',()=>publishReview(review.id, pub));
+  const redraft = el('button',{class:'btn',html:'✦ Re-draft with assistant'});
+  redraft.addEventListener('click',()=>draftReview(p.id));
+  foot.append(save,pub,redraft);
+  box.append(foot);
+  return box;
+}
+
+async function saveReview(pid, review, box, btn){
+  const payload = { partnership_id:pid, period:review.period||thisPeriod() };
+  $$('[data-f]',box).forEach(i=>payload[i.getAttribute('data-f')]=i.value);
+  btn.disabled=true; btn.textContent='Saving…';
+  try { await api('review_upsert', payload); toast('Draft saved'); refreshDetail(); }
+  catch(e){ btn.disabled=false; btn.textContent='Save draft'; toast('Could not save','err'); }
+}
+async function draftReview(pid){
+  toast('Drafting from this month’s work…');
+  try { await api('review_draft',{partnership_id:pid, period:thisPeriod()}); toast('Draft ready — review it'); STATE.dtab='review'; refreshDetail(); }
+  catch(e){ toast('Draft failed: '+e.message,'err'); }
+}
+async function startBlankReview(pid){
+  try { await api('review_upsert',{partnership_id:pid, period:thisPeriod(), status:'draft', headline:'', intro:''}); refreshDetail(); }
+  catch(e){ toast('Could not start','err'); }
+}
+async function publishReview(id, btn){
+  if(!confirm('Publish this review and email it to the client?')) return;
+  btn.disabled=true; btn.textContent='Publishing…';
+  try { await api('review_publish',{id}); toast('Published & emailed'); refreshDetail(); }
+  catch(e){ btn.disabled=false; toast('Could not publish','err'); }
+}
+function openReviewModal(p, r){
+  const bg = modal(`${periodLabel(r.period)} review`, r.status==='published'?'Published':'Draft', `<div id="rmEdit"></div>`, [{label:'Close',cls:'',on:(b)=>b.remove()}]);
+  $('#rmEdit',bg).append(reviewEditor(p, r));
+}
+
+/* ---------- RECOMMENDATIONS (the review gate) ---------- */
+function tabRecs(root, d){
+  const p = d.partnership;
+  const groups = {
+    suggested: d.recommendations.filter(r=>r.status==='suggested'),
+    approved: d.recommendations.filter(r=>r.status==='approved'),
+    shared: d.recommendations.filter(r=>['shared','accepted','declined','done'].includes(r.status)),
+    dismissed: d.recommendations.filter(r=>r.status==='dismissed'),
+  };
+  const head = el('div',{class:'ph',style:'margin-bottom:14px'});
+  head.innerHTML = `<div><h3 class="serif" style="font-size:18px;font-weight:500">Recommendations</h3><p class="muted" style="font-size:12.5px">The intelligence is the assistant's. The judgment is yours: nothing reaches the client until you share it.</p></div>`;
+  const acts = el('div',{class:'ph-actions'});
+  const add=el('button',{class:'btn btn-sm',html:'+ Add'}); add.addEventListener('click',()=>openAddRec(p.id));
+  const gen=el('button',{class:'btn btn-sm btn-primary',html:'✦ Generate'}); gen.addEventListener('click',()=>genRecs(p.id));
+  acts.append(add,gen); head.append(acts); root.append(head);
+
+  if(groups.suggested.length){
+    root.append(el('div',{class:'gate-banner',html:`✦ ${groups.suggested.length} suggestion${groups.suggested.length>1?'s':''} from the assistant, waiting for your call. Approve, share, or dismiss.`}));
+  }
+
+  const order = [['suggested','Waiting for you'],['approved','Approved (not shared)'],['shared','With the client'],['dismissed','Dismissed']];
+  let any=false;
+  order.forEach(([key,label])=>{
+    const arr = groups[key]; if(!arr.length) return; any=true;
+    const c = el('div',{class:'card card-pad',style:'margin-bottom:14px'});
+    c.innerHTML = `<div class="card-h"><div><h3 style="font-size:16px">${label}</h3></div></div>`;
+    arr.forEach(r=>c.append(recRow(r, p.id)));
+    root.append(c);
+  });
+  if(!any) root.append(el('div',{class:'card card-pad',html:emptyEl('No recommendations yet','Add one yourself, or let the assistant scan this client’s data for opportunities.').outerHTML}));
+}
+
+function recRow(r, pid){
+  const row = el('div',{class:'row'});
+  const srcChip = r.source==='ai'?'<span class="chip chip-p">✦ AI</span>':'<span class="chip">You</span>';
+  row.innerHTML = `<div class="rbody">
+    <div class="rt">${esc(r.title)}</div>
+    ${r.detail?`<div class="rd">${esc(r.detail)}</div>`:''}
+    ${r.why?`<div class="rd" style="color:var(--p)">Why: ${esc(r.why)}</div>`:''}
+    <div class="rmeta" style="margin-top:5px">${[r.category, r.impact&&`${r.impact} impact`, r.effort&&`${r.effort} effort`].filter(Boolean).map(esc).join(' · ')}</div>
+  </div>`;
+  const meta = el('div',{style:'display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex:none'});
+  meta.innerHTML = srcChip;
+  const acts = el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end'});
+  const mk=(label,cls,decision)=>{ const b=el('button',{class:'btn btn-sm '+(cls||''),html:label}); b.addEventListener('click',()=>decideRec(r.id,decision,b)); return b; };
+  if(r.status==='suggested'){ acts.append(mk('Approve','',{d:'approve'}.d), mk('Share now','btn-primary','share'), mk('Dismiss','btn-danger','dismiss')); }
+  else if(r.status==='approved'){ acts.append(mk('Share with client','btn-primary','share'), mk('Make a task','',null)); acts.lastChild.addEventListener('click',()=>recToTask(r.id)); }
+  else if(r.status==='shared'){ acts.append(el('span',{class:'chip chip-ok',html:'Shared'}), mk('Mark done','','done')); }
+  else if(r.status==='accepted'){ acts.append(el('span',{class:'chip chip-ok',html:'Client said yes'}), mk('Mark done','','done')); }
+  else if(r.status==='declined'){ acts.append(el('span',{class:'chip',html:'Client declined'})); }
+  else if(r.status==='done'){ acts.append(el('span',{class:'chip chip-ok',html:'Done'})); }
+  meta.append(acts); row.append(meta);
+  return row;
+}
+async function decideRec(id, decision, btn){
+  if(!decision) return;
+  btn.disabled=true;
+  try { await api('rec_decide',{id, decision}); toast(decision==='share'?'Shared with client':decision==='approve'?'Approved':decision==='dismiss'?'Dismissed':'Updated'); refreshDetail(); }
+  catch(e){ btn.disabled=false; toast('Could not update','err'); }
+}
+async function recToTask(id){
+  try { await api('rec_to_task',{id}); toast('Added to your task queue'); refreshDetail(); }
+  catch(e){ toast('Could not create task','err'); }
+}
+async function genRecs(pid){
+  toast('Scanning this client’s data…');
+  try { const r = await api('rec_generate',{partnership_id:pid}); const n=(r.data||[]).length; toast(n?`${n} new suggestion${n>1?'s':''} ready`:'Nothing new to suggest'); STATE.dtab='recs'; refreshDetail(); }
+  catch(e){ toast('Could not generate: '+e.message,'err'); }
+}
+
+/* ---------- CONTENT ---------- */
+function tabContent(root, d){
+  root.append(sectionCard('Content calendar','+ Add',()=>openContent(d.partnership.id),(body)=>{
+    if(!d.content.length){ body.append(emptyEl('Nothing planned','Map out posts, pages, and campaigns. Scheduled items show in the client’s workspace.')); return; }
+    d.content.forEach(c=>{
+      const map={idea:'chip',planned:'chip',in_progress:'chip-warn',scheduled:'chip-p',published:'chip-ok'};
+      const r=el('div',{class:'row'});
+      r.innerHTML=`<div class="rbody"><div class="rt" style="font-weight:450">${esc(c.title)}</div><div class="rmeta" style="margin-top:4px">${[c.kind,c.scheduled_for&&shortDate(c.scheduled_for),c.client_visible?'visible':'private'].filter(Boolean).map(esc).join(' · ')}</div></div><span class="chip ${map[c.status]||'chip'}">${esc(c.status)}</span>`;
+      const edit=el('button',{class:'btn btn-sm',html:'Edit',style:'flex:none'}); edit.addEventListener('click',()=>openContent(d.partnership.id,c));
+      r.append(edit); body.append(r);
+    });
+  }));
+}
+
+/* ---------- HEALTH ---------- */
+function tabHealth(root, d){
+  root.append(sectionCard('Business health','+ This month’s numbers',()=>openHealth(d.partnership.id, d.health[0]),(body)=>{
+    if(!d.health.length){ body.append(emptyEl('No numbers yet','Track the few metrics that map to revenue: calls, forms, bookings, visits. The client sees the trend.')); return; }
+    d.health.forEach(h=>{
+      const r=el('div',{class:'row'});
+      r.innerHTML=`<div class="rbody"><div class="rt" style="font-size:14px">${esc(periodLabel(h.period))}</div><div class="rmeta" style="margin-top:4px">${['calls','forms','bookings','visits'].filter(k=>h[k]!=null).map(k=>`${k} ${h[k]}`).join(' · ')||'no numbers'}</div></div>`;
+      const edit=el('button',{class:'btn btn-sm',html:'Edit',style:'flex:none'}); edit.addEventListener('click',()=>openHealth(d.partnership.id,h));
+      r.append(edit); body.append(r);
+    });
+  }));
+}
+
+/* ---------- NOTES (relationship memory) ---------- */
+function tabNotes(root, d){
+  root.append(sectionCard('Relationship notes','+ Add note',()=>openNote(d.partnership.id),(body)=>{
+    body.insertAdjacentHTML('afterbegin','<div class="gate-banner" style="background:var(--paper-2);border-color:var(--hair);color:var(--muted)">Private to you. The studio remembers so you don’t have to.</div>');
+    if(!d.notes.length){ body.append(emptyEl('No notes yet','Preferences, important dates, what matters to this client. All private.')); return; }
+    d.notes.forEach(n=>{
+      const r=el('div',{class:'row'});
+      r.innerHTML=`<div class="rbody"><div class="rt" style="font-weight:450;font-size:14px">${n.pinned?'📌 ':''}${esc(n.body)}</div><div class="rmeta" style="margin-top:4px">${[n.kind,n.remind_at&&`remind ${shortDate(n.remind_at)}`,shortDate(n.created_at)].filter(Boolean).map(esc).join(' · ')}</div></div>`;
+      const del=el('button',{class:'btn btn-sm btn-danger',html:'Delete',style:'flex:none'}); del.addEventListener('click',()=>delNote(n.id));
+      r.append(del); body.append(r);
+    });
+  }));
+}
+async function delNote(id){ if(!confirm('Delete this note?'))return; try{ await api('note_delete',{id}); toast('Deleted'); refreshDetail(); }catch(e){ toast('Could not delete','err'); } }
+
+/* ---------- shared small builders ---------- */
+function sectionCard(title, addLabel, onAdd, fill){
+  const c = el('div',{class:'card card-pad'});
+  const head = el('div',{class:'card-h'});
+  head.innerHTML = `<div><h3>${esc(title)}</h3></div>`;
+  if(addLabel){ const b=el('button',{class:'btn btn-sm',html:esc(addLabel)}); b.addEventListener('click',onAdd); head.append(b); }
+  c.append(head);
+  const body = el('div',{}); fill(body); c.append(body);
+  return c;
+}
+function emptyEl(title, body){ return el('div',{class:'empty',html:`<div class="ei">${esc(title)}</div><p>${esc(body)}</p>`}); }
+</script>
+<script>
+/* ============================================================================
+   EDIT MODALS + ROUTING + BOOT
+   ============================================================================ */
+
+/* ---- generic field-saver: collects [data-f] inputs, calls api(type) ---- */
+async function saveModal(bg, type, base, btn, okMsg){
+  const payload = { ...base };
+  $$('[data-f]',bg).forEach(i=>{
+    const k=i.getAttribute('data-f');
+    let v=i.value;
+    if(i.type==='checkbox') v=i.checked;
+    else if(i.type==='number') v=v===''?undefined:Number(v);
+    else if(i.dataset.iso && v) v=new Date(v).toISOString();
+    else if(v==='') v=undefined;
+    if(v!==undefined) payload[k]=v;
+  });
+  btn.disabled=true; const old=btn.textContent; btn.textContent='Saving…';
+  try { await api(type, payload); bg.remove(); toast(okMsg||'Saved'); refreshDetail(); }
+  catch(e){ btn.disabled=false; btn.textContent=old; toast('Could not save: '+e.message,'err'); }
+}
+
+/* ---- GOAL ---- */
+function openGoal(pid, g){
+  g=g||{};
+  const bg = modal(g.id?'Edit goal':'New goal','What this client wants their site to achieve.',`
+    <div class="field"><label>Goal</label><input class="in" data-f="title" value="${esc(g.title||'')}" placeholder="20+ catering enquiries a month"></div>
+    <div class="field"><label>Detail</label><textarea class="in" data-f="detail" placeholder="Any context…">${esc(g.detail||'')}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Metric</label><input class="in" data-f="metric" value="${esc(g.metric||'')}" placeholder="form enquiries"></div>
+      <div class="field"><label>Target</label><input class="in" data-f="target" value="${esc(g.target||'')}" placeholder="20/mo"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Quarter</label><input class="in" data-f="quarter" value="${esc(g.quarter||'')}" placeholder="2026-Q3"></div>
+      <div class="field"><label>Status</label><select class="in" data-f="status">${['active','hit','missed','archived'].map(s=>`<option${g.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" data-f="client_visible" ${g.client_visible!==false?'checked':''}> Show this goal to the client</label>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:g.id?'Save':'Add goal',cls:'btn-primary',on:b=>saveModal(b.closest('.modal-bg'),'goal_upsert',{id:g.id||undefined,partnership_id:pid},b)}]);
+}
+
+/* ---- WORK LOG ---- */
+function openLogWork(pid, w){
+  w=w||{};
+  const bg = modal('Log work done','This becomes part of the client’s monthly receipt.',`
+    <div class="field"><label>What you did (plain English)</label><input class="in" data-f="title" value="${esc(w.title||'')}" placeholder="Published the summer menu page"></div>
+    <div class="field"><label>Detail (optional)</label><textarea class="in" data-f="detail" placeholder="A line or two the client would appreciate.">${esc(w.detail||'')}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Category</label><select class="in" data-f="category">${['','content','seo','design','fix','local'].map(s=>`<option${w.category===s?' selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Month</label><input class="in" data-f="period" value="${esc(w.period||thisPeriod())}" placeholder="2026-06"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" data-f="client_visible" ${w.client_visible!==false?'checked':''}> Show in the client’s workspace</label>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:'Log it',cls:'btn-primary',on:b=>saveModal(b.closest('.modal-bg'),'worklog_upsert',{id:w.id||undefined,partnership_id:pid},b,'Logged')}]);
+}
+
+/* ---- CONTENT ---- */
+function openContent(pid, c){
+  c=c||{};
+  const bg = modal(c.id?'Edit content':'Plan content','',`
+    <div class="field"><label>Title</label><input class="in" data-f="title" value="${esc(c.title||'')}" placeholder="July 4th hours post"></div>
+    <div class="field-row">
+      <div class="field"><label>Kind</label><select class="in" data-f="kind">${['post','page','gbp','email','campaign'].map(s=>`<option${c.kind===s?' selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select class="in" data-f="status">${['idea','planned','in_progress','scheduled','published'].map(s=>`<option${c.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Scheduled for</label><input class="in" data-f="scheduled_for" type="date" value="${esc(isoDate(c.scheduled_for))}"></div>
+    <div class="field"><label>Notes</label><textarea class="in" data-f="notes">${esc(c.notes||'')}</textarea></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" data-f="client_visible" ${c.client_visible!==false?'checked':''}> Show in the client’s workspace</label>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:c.id?'Save':'Add',cls:'btn-primary',on:b=>saveModal(b.closest('.modal-bg'),'content_upsert',{id:c.id||undefined,partnership_id:pid},b)}]);
+}
+
+/* ---- HEALTH ---- */
+function openHealth(pid, h){
+  h=h||{};
+  const bg = modal('Business health numbers','The few metrics that map to revenue.',`
+    <div class="field"><label>Month</label><input class="in" data-f="period" value="${esc(h.period||thisPeriod())}" placeholder="2026-06"></div>
+    <div class="field-row">
+      <div class="field"><label>Calls from site</label><input class="in" data-f="calls" type="number" min="0" value="${h.calls??''}"></div>
+      <div class="field"><label>Form enquiries</label><input class="in" data-f="forms" type="number" min="0" value="${h.forms??''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Bookings</label><input class="in" data-f="bookings" type="number" min="0" value="${h.bookings??''}"></div>
+      <div class="field"><label>Site visits</label><input class="in" data-f="visits" type="number" min="0" value="${h.visits??''}"></div>
+    </div>
+    <div class="field"><label>Notes (optional)</label><textarea class="in" data-f="notes">${esc(h.notes||'')}</textarea></div>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:'Save',cls:'btn-primary',on:b=>saveModal(b.closest('.modal-bg'),'health_upsert',{partnership_id:pid},b)}]);
+}
+
+/* ---- NOTE ---- */
+function openNote(pid){
+  const bg = modal('New note','Private to you. The studio remembers.',`
+    <div class="field"><label>Note</label><textarea class="in" data-f="body" placeholder="Prefers a call over email. Anniversary in March."></textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Kind</label><select class="in" data-f="kind">${['note','preference','date','milestone'].map(s=>`<option>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Remind me on (optional)</label><input class="in" data-f="remind_at" data-iso="1" type="date"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" data-f="pinned"> Pin to top</label>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:'Add note',cls:'btn-primary',on:b=>saveModal(b.closest('.modal-bg'),'note_upsert',{partnership_id:pid},b)}]);
+}
+
+/* ---- ADD REC (Eric-authored) ---- */
+function openAddRec(pid){
+  const bg = modal('Add a recommendation','Yours to write. Choose whether to share it with the client now.',`
+    <div class="field"><label>Title</label><input class="in" data-f="title" placeholder="Add online booking to the homepage"></div>
+    <div class="field"><label>Detail</label><textarea class="in" data-f="detail" placeholder="What it is and what to do."></textarea></div>
+    <div class="field"><label>Why it matters</label><input class="in" data-f="why" placeholder="One sentence the client will understand."></div>
+    <div class="field-row">
+      <div class="field"><label>Category</label><select class="in" data-f="category">${['visibility','local','demand','competitor','seasonal','content','performance'].map(s=>`<option>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Impact</label><select class="in" data-f="impact">${['low','medium','high'].map(s=>`<option${s==='medium'?' selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Effort</label><select class="in" data-f="effort">${['low','medium','high'].map(s=>`<option${s==='medium'?' selected':''}>${s}</option>`).join('')}</select></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" data-f="_share"> Share with the client immediately</label>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:'Add',cls:'btn-primary',on:saveNewRec}]);
+  bg._pid = pid;
+}
+async function saveNewRec(btn){
+  const bg = btn.closest('.modal-bg');
+  const share = $('[data-f="_share"]',bg).checked;
+  const payload = { partnership_id: bg._pid, source:'eric', status: share?'shared':'suggested', client_visible: share };
+  ['title','detail','why','category','impact','effort'].forEach(k=>{ const v=$(`[data-f="${k}"]`,bg).value; if(v) payload[k]=v; });
+  if(!payload.title){ toast('Title required','err'); return; }
+  if(share){ payload.shared_at = new Date().toISOString(); }
+  btn.disabled=true; btn.textContent='Adding…';
+  try {
+    const r = await api('rec_upsert', payload);
+    // if sharing, decide('share') triggers the client email + gate flip cleanly
+    if(share && r.data && r.data.id){ try{ await api('rec_decide',{id:r.data.id, decision:'share'}); }catch(_){} }
+    bg.remove(); toast(share?'Added & shared':'Added'); refreshDetail();
+  } catch(e){ btn.disabled=false; btn.textContent='Add'; toast('Could not add: '+e.message,'err'); }
+}
+
+/* ---- EDIT PARTNERSHIP ---- */
+function openEditPartnership(p){
+  const bg = modal('Edit partnership','',`
+    <div class="field-row">
+      <div class="field"><label>Segment</label><select class="in" data-f="segment">${SEG_OPTS.map(([k,l])=>`<option value="${k}"${p.segment===k?' selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select class="in" data-f="status">${STATUS_OPTS.map(([k,l])=>`<option value="${k}"${p.status===k?' selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Plan label</label><input class="in" data-f="plan_label" value="${esc(p.plan_label||'')}"></div>
+      <div class="field"><label>Monthly ($)</label><input class="in" data-f="monthly_amount" type="number" min="0" value="${p.monthly_amount??''}"></div>
+    </div>
+    <div class="field"><label>Primary site</label><input class="in" data-f="primary_site" value="${esc(p.primary_site||'')}"></div>
+    <div class="field-row">
+      <div class="field"><label>Health</label><select class="in" data-f="health">${['green','yellow','red'].map(s=>`<option${p.health===s?' selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Renews on</label><input class="in" data-f="renews_at" data-iso="1" type="date" value="${esc(isoDate(p.renews_at))}"></div>
+    </div>
+    <div class="field"><label>Health note (private)</label><input class="in" data-f="health_note" value="${esc(p.health_note||'')}"></div>
+    <div class="divider"></div>
+    <button class="btn btn-danger btn-sm" id="delP">Delete this partnership</button>
+  `,[{label:'Cancel',cls:'',on:b=>b.closest('.modal-bg').remove()},{label:'Save',cls:'btn-primary',on:b=>saveModal(b.closest('.modal-bg'),'partnership_upsert',{id:p.id},b)}]);
+  $('#delP',bg).addEventListener('click',async()=>{
+    if(!confirm('Delete this partnership and all its goals, work, reviews, and recs? This cannot be undone.'))return;
+    try{ await api('partnership_delete',{id:p.id}); bg.remove(); toast('Partnership deleted'); go('partnerships'); }
+    catch(e){ toast('Could not delete','err'); }
+  });
+}
+
+/* ============================================================================
+   ROUTING + NAV
+   ============================================================================ */
+function setNav(nav){
+  STATE.nav = nav;
+  $$('.navlink[data-nav]').forEach(n=>n.classList.toggle('on', n.getAttribute('data-nav')===nav));
+  $$('.mtab').forEach(n=>n.classList.toggle('on', n.getAttribute('data-nav')===nav));
+}
+function go(nav){ STATE.detail=null; setNav(nav); route(); }
+function route(){
+  if(STATE.detail){ return; } // detail is drawn directly by openDetail
+  ({ dashboard:viewDashboard, partnerships:viewPartnerships, reminders:viewReminders }[STATE.nav]||viewDashboard)();
+}
+
+/* build mobile tabs + wire nav */
+function wireNav(){
+  const mt = $('#mtabs'); mt.innerHTML='';
+  NAV.forEach(([k,l])=>{
+    const t = el('div',{class:'mtab',html:esc(l)}); t.setAttribute('data-nav',k);
+    t.addEventListener('click',()=>go(k)); mt.append(t);
+  });
+  $$('.navlink[data-nav]').forEach(n=>n.addEventListener('click',()=>go(n.getAttribute('data-nav'))));
+  $('#signOut').addEventListener('click',doSignOut);
+  $('#signOutM').addEventListener('click',doSignOut);
+}
+
+async function doSignOut(){ await sb.auth.signOut(); STATE.me=null; location.reload(); }
+
+/* ============================================================================
+   AUTH + BOOT  (role-gated: staff and up only)
+   ============================================================================ */
+$('#loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const msg=$('#gateMsg'); msg.className='lg-msg'; msg.textContent='';
+  const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='Signing in…';
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email:$('#email').value.trim(), password:$('#password').value });
+    if(error) throw error;
+    await boot();
+  } catch(err){
+    msg.className='lg-msg err';
+    msg.textContent=/invalid/i.test(err.message||'')?'That email and password don’t match.':(err.message||'Could not sign in.');
+    btn.disabled=false; btn.textContent='Sign in';
+  }
+});
+
+async function boot(){
+  if(!sb){ $('#gateMsg').className='lg-msg err'; $('#gateMsg').textContent='Sign-in isn’t configured (missing key).'; return; }
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ showGate(); return; }
+  // role check: only team members (staff+) get in
+  let who;
+  try { who = await api('whoami'); }
+  catch(e){ showGate(); return; }
+  if(!who || !who.isTeam){
+    $('#gateMsg').className='lg-msg err';
+    $('#gateMsg').textContent='This account isn’t on the team. Client logins use the portal.';
+    await sb.auth.signOut();
+    showGate(); return;
+  }
+  STATE.me = who.email; STATE.role = who.role;
+  $('#whoEmail').textContent = who.email||'';
+  $('#whoRole').textContent = who.role||'';
+  showApp(); wireNav(); setNav('dashboard'); route();
+}
+
+if(CONFIG.SUPABASE_ANON_KEY.startsWith('PASTE_')) console.warn('[DDS] Set CONFIG.SUPABASE_ANON_KEY');
+boot();
+</script>
+</body>
+</html>

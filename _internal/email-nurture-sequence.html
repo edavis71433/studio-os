@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Email Nurture Sequence | Davis Digital Studio</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f4f1;color:#1a1523;padding:32px 24px;max-width:680px;margin:0 auto;}
+h1{font-size:18px;font-weight:600;margin-bottom:4px;}
+.sub{font-size:13px;color:#6b6478;margin-bottom:28px;}
+.email-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:14px;margin-bottom:20px;overflow:hidden;}
+.email-header{background:#1e1338;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
+.email-num{font-size:11px;font-weight:700;color:#c4aee8;letter-spacing:1px;text-transform:uppercase;}
+.email-timing{font-size:12px;color:rgba(255,255,255,0.4);}
+.email-body{padding:24px;}
+.field{margin-bottom:16px;}
+.field-label{font-size:11px;font-weight:600;color:#6b6478;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
+.field-val{font-size:13px;color:#1a1523;background:#f8f7f5;border:1px solid rgba(0,0,0,0.07);border-radius:8px;padding:10px 14px;line-height:1.6;white-space:pre-wrap;}
+.subject-val{font-size:14px;font-weight:600;color:#5b3fa0;background:#f3f0fb;border:1px solid rgba(91,63,160,0.15);border-radius:8px;padding:10px 14px;}
+.tip{background:#f0f8f0;border-left:3px solid #27ae60;border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#1a4a2a;margin-top:12px;line-height:1.5;}
+.note{font-size:12px;color:#6b6478;margin-top:20px;line-height:1.6;padding:12px 16px;background:#faf9f7;border-radius:8px;}
+</style>
+</head>
+<body>
+
+<h1>Email Nurture Sequence</h1>
+<p class="sub">3 emails · Send via Kit, Mailchimp, or Resend · Triggered after report card or mini audit submission</p>
+
+<div class="email-card">
+  <div class="email-header">
+    <span class="email-num">Email 1 of 3</span>
+    <span class="email-timing">Send immediately after form submission</span>
+  </div>
+  <div class="email-body">
+    <div class="field">
+      <div class="field-label">Subject line</div>
+      <div class="subject-val">A few things I noticed about {{business_name}}</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Body</div>
+      <div class="field-val">Hi {{first_name}},
+
+Thanks for submitting. I had a chance to take a quick look at your online presence.
+
+Without doing the full audit, here's what I can tell you right now: most {{business_type}} businesses in {{city}} are leaving customers on the table because of three very fixable things: Google visibility, mobile performance, and how clearly the site communicates what you actually do.
+
+I don't know yet which of those applies to {{business_name}}, but I'd guess at least two of them do.
+
+If you want to know for sure, the Digital Health Check gives you a complete picture in 5 business days, and the $299 comes off any project if you decide to move forward.
+
+Otherwise, reply to this email and tell me what's been frustrating you about your current site. Happy to take a look for free.
+
+Eric Davis
+Davis Digital Studio
+davisdigitalstudio.com</div>
+    </div>
+    <div class="tip">Keep it short and personal. No graphics, no formatting. Reads like a real email from a real person. That's the point.</div>
+  </div>
+</div>
+
+<div class="email-card">
+  <div class="email-header">
+    <span class="email-num">Email 2 of 3</span>
+    <span class="email-timing">Send 3 days after Email 1 (if no reply)</span>
+  </div>
+  <div class="email-body">
+    <div class="field">
+      <div class="field-label">Subject line</div>
+      <div class="subject-val">What a better website is actually worth (quick math)</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Body</div>
+      <div class="field-val">Hi {{first_name}},
+
+Quick follow-up. I built a calculator that shows exactly what a better web presence could be worth to a business like yours.
+
+If {{business_name}} does $X in revenue per month and 30% of your customers find you online, even a 25% improvement in that channel adds up fast. Plug in your real numbers here:
+
+→ davisdigitalstudio.com/roi-calculator
+
+Most businesses I work with see the investment pay for itself within 2-3 months. The ones that don't act usually tell me a year later they wish they had.
+
+No pressure — just thought the math might be useful.
+
+Eric</div>
+    </div>
+    <div class="tip">The ROI calculator link is the hook here. Make sure roi-calculator.html is deployed. Replace $X with the actual number if you know it from the form submission.</div>
+  </div>
+</div>
+
+<div class="email-card">
+  <div class="email-header">
+    <span class="email-num">Email 3 of 3</span>
+    <span class="email-timing">Send 7 days after Email 2 (if no reply)</span>
+  </div>
+  <div class="email-body">
+    <div class="field">
+      <div class="field-label">Subject line</div>
+      <div class="subject-val">Last thing, then I'll leave you alone</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Body</div>
+      <div class="field-val">Hi {{first_name}},
+
+Last email, I promise.
+
+I know you're busy running {{business_name}} and my emails probably aren't the priority. That's fair.
+
+If the timing's not right, no problem. I'll be here when it is.
+
+But if you've been thinking about it and just haven't pulled the trigger, here's the simplest next step: book a free 30-minute call. No pitch, no pressure. I'll tell you honestly what I think your site needs and what it would take to fix it.
+
+→ calendly.com/eric-davisdigitalstudio/30min
+
+Either way — good luck with the business. I hope it grows.
+
+Eric Davis
+Davis Digital Studio</div>
+    </div>
+    <div class="tip">The "last email" line dramatically increases open rates because it feels respectful. The soft CTA (free call) converts better at this stage than pushing the paid product.</div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>How to set this up:</strong><br>
+  1. Create a free account at kit.com (formerly ConvertKit)<br>
+  2. Create a new Sequence with these 3 emails<br>
+  3. Set delays: Email 1 = immediately, Email 2 = 3 days, Email 3 = 7 days<br>
+  4. Add a subscribe action to your Formspree form webhook, or manually add leads to the sequence after each report card submission<br>
+  5. Replace {{business_name}}, {{first_name}}, {{business_type}}, {{city}} with merge tags from your email platform
+</div>
+
+</body>
+</html>

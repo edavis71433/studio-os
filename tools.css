@@ -1,0 +1,66 @@
+/* ============================================================
+   Davis Digital Studio — tools.css
+   RESOURCES-PAGE-ONLY layer, scoped under body[data-page="tools"].
+   Loaded after styles.css.
+
+   Full visual redesign pass. Copy is byte-for-byte identical to
+   the approved version (verified against this page's own FAQPage
+   JSON-LD, which is unaffected by this pass and remains the
+   source of truth).
+
+   Device: asymmetric magazine grid, replacing the plain vertical
+   list of six hairline-divided articles. Two questions ("Why isn't
+   my website getting calls?" and "Does my website need to be
+   redesigned?") are the most central/common ones, so they get a
+   featured, larger treatment; the other four sit as standard cards
+   around them — a genuine varied composition, not six identical
+   boxes. Each card gets a small tool-badge naming which of the
+   site's six real tools it routes to.
+   ============================================================ */
+
+body[data-page="tools"] .res-questions-section{
+  position:relative;
+  background:
+    radial-gradient(ellipse 900px 460px at 8% 100%, rgba(91,63,160,.05), transparent 62%),
+    var(--paper);
+}
+
+body[data-page="tools"] .res-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:22px;
+}
+body[data-page="tools"] .res-card-feature{ grid-column:span 2; }
+
+body[data-page="tools"] .res-card{
+  position:relative;
+  background:#fff;
+  border-radius:20px;
+  padding:32px 30px 28px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.22);
+  transition:transform .3s cubic-bezier(.32,.72,0,1), box-shadow .3s cubic-bezier(.32,.72,0,1);
+}
+body[data-page="tools"] .res-card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 30px 56px -30px rgba(27,21,37,.26);
+}
+body[data-page="tools"] .res-card-feature{ padding:38px 36px 34px; }
+
+body[data-page="tools"] .res-card-tag{
+  display:inline-block;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--brass-deep);
+  background:rgba(176,141,87,.1);
+  border-radius:100px; padding:4px 11px;
+  margin-bottom:14px;
+}
+body[data-page="tools"] .res-card h3{ font-size:19px; margin-bottom:10px; line-height:1.3; }
+body[data-page="tools"] .res-card-feature h3{ font-size:24px; max-width:22ch; }
+body[data-page="tools"] .res-card p{ color:var(--muted); font-size:14.5px; }
+body[data-page="tools"] .res-card-feature p{ font-size:15.5px; max-width:52ch; }
+
+@media(max-width:760px){
+  body[data-page="tools"] .res-grid{ grid-template-columns:1fr; }
+  body[data-page="tools"] .res-card-feature{ grid-column:span 1; padding:30px 26px 26px; }
+  body[data-page="tools"] .res-card{ padding:28px 24px 24px; }
+}

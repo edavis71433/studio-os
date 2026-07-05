@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>How did it go? | Davis Digital Studio</title>
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --p:#5b3fa0; --pdark:#1e1338; --ink:#1a1523; --muted:#5e5270; --cream:#faf8f5;
+    --pxl:#c4aee8; --pxxxl:#f3eefb; --serif:'DM Serif Display',Georgia,serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;overflow-x:hidden;max-width:100vw;font-family:"DM Sans",sans-serif;background:var(--cream);color:var(--ink);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;line-height:1.6;}
+  .card{background:#fff;border-radius:22px;border:1px solid rgba(91,63,160,0.1);
+    max-width:540px;width:100%;padding:40px 36px;box-shadow:0 20px 60px rgba(30,19,56,0.08);}
+  .brand{font-family:var(--serif);font-size:20px;color:var(--ink);margin-bottom:6px;}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:14px;}
+  h1{font-family:var(--serif);font-size:28px;font-weight:400;line-height:1.2;margin:0 0 10px;}
+  p.sub{font-size:14px;color:var(--muted);margin:0 0 26px;}
+  .label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;}
+  .stars{display:flex;gap:8px;margin-bottom:24px;}
+  .star{font-size:38px;cursor:pointer;color:#ddd6e8;transition:transform .12s,color .12s;background:none;border:none;padding:0;line-height:1;}
+  .star:hover{transform:scale(1.12);}
+  .star.on{color:#f5a623;}
+  textarea,input{width:100%;padding:12px 14px;border:1.5px solid rgba(91,63,160,0.15);
+    border-radius:11px;font-size:14px;font-family:"DM Sans",sans-serif;outline:none;resize:vertical;}
+  textarea:focus,input:focus{border-color:var(--p);}
+  .fg{margin-bottom:20px;}
+  .btn{background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;
+    font-size:14px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;width:100%;}
+  .btn:hover{background:#4a3284;}
+  .consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);margin-bottom:22px;}
+  .consent input{width:auto;margin-top:3px;}
+  .hidden{display:none;}
+  .review-box{background:var(--pxxxl);border-radius:14px;padding:24px;text-align:center;margin-top:8px;}
+  .review-box h3{font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;}
+  .review-box p{font-size:13px;color:var(--muted);margin:0 0 16px;}
+  .btn-review{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--p);
+    border:1.5px solid var(--p);padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;text-decoration:none;}
+  .thanks{text-align:center;padding:20px 0;}
+  .thanks .big{font-size:52px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">Davis Digital Studio</div>
+
+    <!-- SURVEY FORM -->
+    <div id="surveyForm">
+      <div class="eyebrow">Your project is live</div>
+      <h1>How did it go?</h1>
+      <p class="sub">Your honest feedback helps me get better, and it means a lot coming from someone I actually built for. Takes about a minute.</p>
+
+      <div class="fg">
+        <span class="label">Overall, how was the experience?</span>
+        <div class="stars" id="stars">
+          <button class="star" data-v="1" aria-label="1 star">★</button>
+          <button class="star" data-v="2" aria-label="2 stars">★</button>
+          <button class="star" data-v="3" aria-label="3 stars">★</button>
+          <button class="star" data-v="4" aria-label="4 stars">★</button>
+          <button class="star" data-v="5" aria-label="5 stars">★</button>
+        </div>
+      </div>
+
+      <div class="fg">
+        <label class="label" for="best">What worked well?</label>
+        <textarea id="best" rows="3" placeholder="The part of the process or the result you were happiest with"></textarea>
+      </div>
+
+      <div class="fg">
+        <label class="label" for="improve">Anything I could have done better?</label>
+        <textarea id="improve" rows="2" placeholder="Be honest — this is how I improve"></textarea>
+      </div>
+
+      <div class="fg">
+        <label class="label" for="quote">In a sentence, how would you describe working with me?</label>
+        <textarea id="quote" rows="2" placeholder="e.g. Eric made the whole thing painless and our bookings are up"></textarea>
+      </div>
+
+      <div class="consent">
+        <input type="checkbox" id="consent">
+        <label for="consent">You can use my response as a testimonial on your website and marketing.</label>
+      </div>
+
+      <button class="btn" onclick="submitSurvey()">Send feedback →</button>
+    </div>
+
+    <!-- POSITIVE: REVIEW PROMPT -->
+    <div id="reviewPrompt" class="hidden">
+      <div class="thanks">
+        <div class="big">🙏</div>
+        <h1>Thank you</h1>
+        <p class="sub">That genuinely means a lot. One small thing that would help my studio more than almost anything:</p>
+      </div>
+      <div class="review-box">
+        <h3>Would you leave a quick Google review?</h3>
+        <p>As a new studio, a public review from a real client is the single most helpful thing you can do. It takes 30 seconds.</p>
+        <a class="btn-review" id="googleReviewLink" href="#" target="_blank" rel="noopener">Leave a Google review →</a>
+      </div>
+    </div>
+
+    <!-- NEUTRAL/LOW: PLAIN THANKS -->
+    <div id="plainThanks" class="hidden">
+      <div class="thanks">
+        <div class="big">✅</div>
+        <h1>Thank you</h1>
+        <p class="sub">I appreciate you taking the time. I read every response personally, and I'll use it to do better. If anything still needs attention, just reply to my email and I'm on it.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---- CONFIG ----
+  // Replace with your real Google review link once your Business Profile is verified:
+  var GOOGLE_REVIEW_URL = "https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID";
+
+  var SB_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+  var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+
+  // Pull client id/name from URL (?c=CLIENT_ID&n=NAME) so the email link ties the response to a client
+  var params = new URLSearchParams(location.search);
+  var clientId = params.get("c") || "";
+  var clientName = params.get("n") || "";
+
+  var rating = 0;
+  var starEls = document.querySelectorAll(".star");
+  starEls.forEach(function(s){
+    s.addEventListener("click", function(){
+      rating = parseInt(s.dataset.v, 10);
+      starEls.forEach(function(x){ x.classList.toggle("on", parseInt(x.dataset.v,10) <= rating); });
+    });
+  });
+
+  async function submitSurvey(){
+    if(rating === 0){ alert("Please tap a star rating first."); return; }
+    var payload = {
+      client_id: clientId,
+      client_name: clientName,
+      rating: rating,
+      what_worked: document.getElementById("best").value,
+      improve: document.getElementById("improve").value,
+      quote: document.getElementById("quote").value,
+      testimonial_consent: document.getElementById("consent").checked,
+      created_at: new Date().toISOString()
+    };
+
+    // Save to Supabase (table: project_surveys). Fails quietly so the user still gets the thank-you.
+    try {
+      await fetch(SB_URL + "/rest/v1/project_surveys", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SB_KEY,
+          "Authorization": "Bearer " + SB_KEY,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch(e){ console.log("survey save err:", e); }
+
+    // Notify Eric by email via the existing Edge Function.
+    var notifyOk = false;
+    try {
+      var resp = await fetch(SB_URL + "/functions/v1/clever-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+        body: JSON.stringify({
+          type: "survey_response",
+          clientName: clientName,
+          clientEmail: "",
+          subject: "New project survey: " + rating + "★ from " + (clientName || "a client"),
+          message: "Rating: " + rating + "/5\n\nWhat worked: " + payload.what_worked +
+                   "\n\nImprove: " + payload.improve + "\n\nQuote: " + payload.quote +
+                   "\n\nTestimonial consent: " + (payload.testimonial_consent ? "YES" : "no"),
+          meta: payload
+        })
+      });
+      var jr = {}; try { jr = await resp.json(); } catch(e){}
+      notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
+    } catch(e){ console.log("notify err:", e); notifyOk = false; }
+
+    // Branch the experience on rating
+    document.getElementById("surveyForm").classList.add("hidden");
+    if(rating >= 4){
+      document.getElementById("googleReviewLink").href = GOOGLE_REVIEW_URL;
+      document.getElementById("reviewPrompt").classList.remove("hidden");
+    } else {
+      document.getElementById("plainThanks").classList.remove("hidden");
+    }
+    // If the response didn't reach Eric, the survey was still saved to the
+    // database. Add a calm, non-alarming note rather than a false clean success.
+    if (!notifyOk) {
+      var active = rating >= 4 ? document.getElementById("reviewPrompt") : document.getElementById("plainThanks");
+      if (active) {
+        var note = document.createElement("p");
+        note.style.cssText = "margin-top:14px;font-size:13px;opacity:0.7;";
+        note.innerHTML = "Your feedback is saved. If anything didn't go through, you can always reach me at <a href=\"mailto:eric@davisdigitalstudio.com\">eric@davisdigitalstudio.com</a>.";
+        active.appendChild(note);
+      }
+    }
+  }
+</script>
+</body>
+</html>

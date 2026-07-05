@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<!-- DDS v4.0 20260621-1800 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<title>Free AI Website Review | Davis Digital Studio</title>
+<meta name="description" content="Get a free AI-powered website review in under a minute. Plain-English feedback on what is working, what is hurting, and what to fix first.">
+<link rel="canonical" href="https://davisdigitalstudio.com/ai-critique">
+<meta property="og:title" content="Free AI Website Review | Davis Digital Studio">
+<meta property="og:description" content="A free, honest review of your website in under a minute. No signup.">
+<meta property="og:locale" content="en_US">
+<meta property="og:type" content="website">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@davisdigitalstudio">
+<meta property="og:url" content="https://davisdigitalstudio.com/ai-critique">
+<meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
+<meta name="theme-color" content="#5b3fa0">
+<link rel="manifest" href="/manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<script>(function(){if(localStorage.getItem('cookie_consent')==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}})()</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
+<link rel="stylesheet" href="styles.css">
+<style>
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;overflow-x:hidden;}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;}
+:root{--p:#5B3FA0;--pxl:#c4aee8;--pxxl:#EDE8F7;--pxxxl:#f7f4fd;--pdark:#2A1B4A;--ink:#1B1525;--muted:#6B6276;--brass:#B08D57;--paper:#FBFAF7;--serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;}
+*:focus-visible{outline:2px solid var(--p);outline-offset:3px;}
+a{color:inherit;}
+
+/* NAV */
+.skip-link{position:absolute;left:-9999px;top:6px;background:var(--p);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:6px;}
+
+/* PAGE HERO */
+
+/* FREE AUDIT TOOL */
+.audit-section{background:#F4F0E9;padding:0 24px 80px;position:relative;}
+.audit-section::before{content:'';position:absolute;top:-100px;right:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.08) 0%,transparent 65%);pointer-events:none;}
+.audit-inner{max-width:760px;margin:0 auto;position:relative;z-index:1;}
+.audit-header{text-align:center;padding-top:0;margin-bottom:40px;}
+.audit-header .hero-label{color:var(--p);}
+.audit-header h2{font-family:var(--serif);font-size:clamp(28px,4vw,44px);font-weight:400;color:var(--ink);letter-spacing:-0.8px;margin-bottom:12px;}
+.audit-header h2 em{font-style:italic;color:var(--p);}
+.audit-header p{font-size:15px;color:var(--muted);line-height:1.7;max-width:500px;margin:0 auto;}
+
+/* FORM CARD */
+.audit-card{background:#fff;border:1px solid #E7E1D6;border-radius:20px;padding:36px;box-shadow:0 24px 48px -32px rgba(27,21,37,0.18);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-field{display:flex;flex-direction:column;gap:6px;}
+.form-field.full{grid-column:span 2;}
+.form-label{font-size:12px;font-weight:600;color:var(--ink);letter-spacing:0.3px;}
+.form-input,.form-select{background:var(--paper);border:1.5px solid #E7E1D6;border-radius:10px;padding:12px 14px;font-family:var(--sans);font-size:14px;color:var(--ink);outline:none;transition:border-color 0.15s;width:100%;appearance:none;}
+.form-input::placeholder{color:rgba(27,21,37,0.35);}
+.form-input:focus,.form-select:focus{border-color:var(--p);background:#fff;}
+.form-select option{background:#fff;color:var(--ink);}
+.submit-row{margin-top:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.audit-btn{background:var(--p);color:#fff;font-family:var(--sans);font-size:14px;font-weight:600;padding:13px 32px;border-radius:100px;border:none;cursor:pointer;transition:opacity 0.15s,transform 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;}
+.audit-btn:hover{opacity:0.88;transform:translateY(-1px);}
+.audit-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.submit-note{font-size:12px;color:var(--muted);}
+.error-box{background:#fdf0f0;border:1px solid rgba(224,85,85,0.35);border-radius:10px;padding:12px 16px;font-size:13px;color:#b23b3b;margin-top:12px;display:none;}
+
+/* LOADING */
+.loading-card{background:#fff;border:1px solid #E7E1D6;border-radius:20px;padding:52px 36px;text-align:center;display:none;box-shadow:0 24px 48px -32px rgba(27,21,37,0.18);}
+.loading-orb{width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,var(--p) 0%,transparent 70%);margin:0 auto 24px;animation:orbPulse 1.5s ease-in-out infinite;}
+@keyframes orbPulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.15);opacity:0.7;}}
+.loading-url{font-size:15px;color:var(--ink);margin-bottom:20px;}
+.loading-url span{color:var(--p);}
+.loading-steps{display:flex;flex-direction:column;gap:10px;max-width:360px;margin:0 auto;}
+.loading-step{display:flex;align-items:center;gap:10px;background:var(--pxxxl);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);opacity:0;transform:translateX(-8px);transition:opacity 0.4s,transform 0.4s;}
+.loading-step.show{opacity:1;transform:translateX(0);}
+.loading-dot{width:8px;height:8px;border-radius:50%;background:var(--p);animation:dotPulse 1s ease-in-out infinite;flex-shrink:0;}
+@keyframes dotPulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.loading-timer{font-size:12px;color:var(--muted);margin-top:16px;}
+
+/* RESULTS */
+.results-card{background:#fff;border:1px solid #E7E1D6;border-radius:20px;padding:36px;display:none;box-shadow:0 24px 48px -32px rgba(27,21,37,0.14);}
+.results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #E7E1D6;}
+.results-biz{font-family:var(--serif);font-size:22px;color:var(--ink);font-weight:400;}
+.results-label{font-size:10px;color:var(--p);letter-spacing:2px;text-transform:uppercase;font-weight:600;margin-bottom:6px;}
+.score-ring{position:relative;width:80px;height:80px;flex-shrink:0;}
+.score-ring svg{width:80px;height:80px;}
+.score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:22px;color:var(--ink);}
+.results-body{display:flex;flex-direction:column;gap:16px;}
+
+/* SCORE SECTIONS */
+.score-summary{font-size:14px;color:#4a4258;line-height:1.7;padding:16px;background:var(--pxxxl);border-radius:12px;border-left:3px solid var(--brass);}
+.scores-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.score-card{background:var(--pxxxl);border-radius:10px;padding:14px;text-align:center;}
+.score-card-num{font-size:26px;font-weight:600;line-height:1;}
+.score-card-label{font-size:11px;color:var(--muted);margin-top:3px;}
+.score-good{color:#1a7e49;}
+.score-ok{color:#a96a00;}
+.score-poor{color:#c0392b;}
+.analysis-block{background:var(--pxxxl);border-radius:10px;padding:14px 16px;border-left:2px solid #f0b429;}
+.analysis-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+.analysis-text{font-size:13px;color:#4a4258;line-height:1.7;}
+.vitals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;}
+.vital-card{background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;text-align:center;}
+.vital-val{font-size:14px;font-weight:600;}
+.vital-name{font-size:10px;color:var(--muted);margin-top:2px;}
+.section-label-sm{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
+
+/* ISSUES */
+.issue-item{display:flex;gap:12px;align-items:flex-start;background:var(--pxxxl);border-radius:12px;padding:14px 16px;border-left:3px solid #f0b429;}
+.issue-icon{flex-shrink:0;margin-top:2px;color:var(--muted);}
+.issue-title{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px;}
+.issue-body{font-size:12px;color:var(--muted);line-height:1.65;}
+.issue-sev{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:6px;}
+.issue-high{border-left-color:#e05555;}.issue-high .issue-sev{color:#e05555;}
+.issue-medium{border-left-color:#f0b429;}.issue-medium .issue-sev{color:#f0b429;}
+.issue-low{border-left-color:#6abf69;}.issue-low .issue-sev{color:#6abf69;}
+
+/* EMAIL GATE */
+.gate-box{background:var(--pxxxl);border:1.5px solid rgba(91,63,160,0.25);border-radius:16px;padding:28px;text-align:center;}
+.gate-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:8px;}
+.gate-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px;}
+.gate-form{display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto;}
+.gate-input{background:#fff;border:1.5px solid #E7E1D6;border-radius:10px;padding:12px 16px;font-size:14px;font-family:var(--sans);color:var(--ink);outline:none;text-align:center;width:100%;}
+.gate-btn{background:var(--p);color:#fff;border:none;border-radius:100px;padding:13px 24px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:opacity 0.15s;}
+.gate-btn:hover{opacity:0.88;}
+.gate-msg{font-size:12px;color:var(--muted);margin-top:4px;}
+
+/* UPSELL */
+.upsell-box{background:rgba(91,63,160,0.2);border:1px solid rgba(196,174,232,0.2);border-radius:16px;padding:24px;display:flex;gap:24px;align-items:flex-start;}
+.upsell-text{flex:1;}
+.upsell-title{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px;}
+.upsell-desc{font-size:12px;color:var(--muted);line-height:1.7;}
+.upsell-price-side{text-align:center;flex-shrink:0;}
+.upsell-price{font-family:var(--serif);font-size:32px;color:var(--pxl);line-height:1;}
+.upsell-note{font-size:10px;color:var(--muted);margin-top:2px;}
+.upsell-link{display:inline-block;background:var(--p);color:#fff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:100px;text-decoration:none;margin-top:10px;transition:opacity 0.15s;}
+.upsell-link:hover{opacity:0.88;}
+.reset-btn{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:var(--sans);padding:0;transition:color 0.15s;margin-top:4px;}
+.reset-btn:hover{color:var(--ink);}
+
+/* PRICING */
+.pricing-section{padding:80px 24px;background:#fff;}
+.pricing-inner{max-width:1060px;margin:0 auto;}
+.section-header{text-align:center;margin-bottom:48px;}
+.section-header h2{font-family:var(--serif);font-size:clamp(28px,3.5vw,44px);font-weight:400;letter-spacing:-0.8px;}
+.section-header h2 em{font-style:italic;color:var(--p);}
+.section-header p{font-size:15px;color:var(--muted);margin-top:12px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.7;}
+.tiers-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
+.tier{background:#fff;border:1px solid rgba(91,63,160,0.12);border-radius:20px;padding:28px;display:flex;flex-direction:column;position:relative;box-shadow:0 20px 42px -32px rgba(27,21,37,.18);}
+.tier.featured{border:2px solid var(--p);}
+.tier-popular{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--p);color:#fff;font-size:11px;font-weight:700;padding:3px 14px;border-radius:100px;white-space:nowrap;}
+.tier-badge{display:inline-block;background:rgba(91,63,160,0.08);color:var(--p);font-size:12px;font-weight:700;padding:3px 10px;border-radius:100px;margin-bottom:10px;}
+.tier-badge.free{background:rgba(26,126,73,0.1);color:#1a7e49;}
+.tier-name{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:6px;}
+.tier-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;}
+.tier-price{font-family:var(--serif);font-size:32px;color:var(--ink);padding:12px 0;border-top:1px solid rgba(91,63,160,0.08);border-bottom:1px solid rgba(91,63,160,0.08);margin-bottom:14px;}
+.tier-cadence{font-size:11px;color:var(--muted);margin-top:2px;}
+.tier-list{list-style:none;flex:1;margin-bottom:20px;}
+.tier-list li{font-size:12px;color:var(--muted);padding:5px 0;border-bottom:1px solid rgba(91,63,160,0.06);display:flex;gap:7px;align-items:flex-start;line-height:1.4;}
+.tier-list li::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--p);flex-shrink:0;margin-top:5px;}
+.tier-list li:last-child{border-bottom:none;}
+.tier-cta{display:block;text-align:center;background:var(--p);color:#fff;font-size:13px;font-weight:600;padding:11px 20px;border-radius:100px;text-decoration:none;transition:opacity 0.15s;margin-top:auto;}
+.tier-cta:hover{opacity:0.88;}
+.tier-cta.ghost{background:transparent;color:var(--p);border:1.5px solid var(--pxl);}
+.tier-cta.ghost:hover{background:var(--pxxxl);}
+
+/* FAQ */
+.faq-section{padding:80px 24px;background:var(--pxxxl);}
+.faq-inner{max-width:700px;margin:0 auto;}
+.faq-item{border-bottom:1px solid rgba(91,63,160,0.1);padding:20px 0;}
+.faq-item:last-child{border-bottom:none;}
+.faq-q{font-size:15px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;min-height:44px;}
+.faq-q::after{content:'+';color:var(--p);font-size:22px;font-weight:300;transition:transform 0.2s;}
+.faq-item.open .faq-q::after{transform:rotate(45deg);}
+.faq-a{font-size:14px;color:var(--muted);line-height:1.8;max-height:0;overflow:hidden;transition:max-height 0.3s ease,padding 0.3s;}
+.faq-item.open .faq-a{max-height:300px;padding-top:12px;}
+
+/* CTA BAND */
+.cta-band{padding:80px 24px;background:var(--p);text-align:center;position:relative;overflow:hidden;}
+.cta-band::before{content:'';position:absolute;top:-100px;right:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.08) 0%,transparent 60%);pointer-events:none;}
+.cta-band h2{font-family:var(--serif);font-size:clamp(28px,4vw,48px);font-weight:400;color:#fff;letter-spacing:-1px;margin-bottom:12px;position:relative;}
+.cta-band h2 em{font-style:italic;color:var(--pxl);}
+.cta-band p{font-size:16px;color:rgba(255,255,255,0.6);margin-bottom:28px;position:relative;}
+
+/* FOOTER */
+
+/* COOKIE */
+.cookie-banner{display:none;position:fixed;bottom:0;left:0;right:0;z-index:99998;background:#2A1B4A;border-top:1px solid rgba(196,174,232,0.2);padding:16px 24px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.cookie-text{font-size:13px;color:rgba(255,255,255,0.65);flex:1;min-width:200px;}
+.cookie-text a{color:var(--pxl);}
+.cookie-btns{display:flex;gap:10px;flex-shrink:0;}
+.cookie-accept{background:var(--p);color:#fff;border:none;padding:8px 20px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+.cookie-decline{background:transparent;color:rgba(255,255,255,0.45);border:1px solid rgba(255,255,255,0.15);padding:8px 16px;border-radius:100px;font-size:13px;cursor:pointer;font-family:var(--sans);}
+
+@media(max-width:900px){
+  .form-grid{grid-template-columns:1fr;}.form-field.full{grid-column:span 1;}
+  .submit-row{flex-direction:column;align-items:flex-start;}
+  .results-header{flex-direction:column;align-items:flex-start;gap:14px;}
+  .upsell-box{flex-direction:column;}
+  .scores-row{grid-template-columns:repeat(3,1fr);}
+  .tiers-grid{grid-template-columns:1fr;}
+}
+@media(max-width:480px){
+  .scores-row{grid-template-columns:repeat(3,1fr);}
+}
+
+/* ── Footer mobile responsive fix ── */
+
+/* NAV-FINAL-V5 */
+
+.skip-link{position:absolute;left:-9999px;top:8px;background:#5b3fa0;color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;border-radius:4px;}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}}
+
+
+/* Dropdown gap fix - bridge pseudo-element */
+
+
+/* Dropdown bridge - prevents menu closing when moving mouse down */
+
+
+/* ---------------------------------------------------------------
+   TOOL SWITCHER — cross-tool navigation, added so a visitor on any
+   one tool has a clear, designed path to the other five, plus back
+   to the Resources hub. Not a footer link dump — real cards with
+   the same shadow/radius language used across the rest of V2.
+   --------------------------------------------------------------- */
+.tool-switch-section{padding:72px 24px;background:#fff;position:relative;}
+.tool-switch-inner{max-width:1080px;margin:0 auto;}
+.tool-switch-head{text-align:center;margin-bottom:40px;}
+.tool-switch-head span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);}
+.tool-switch-head h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;letter-spacing:-.5px;margin-top:10px;}
+.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
+.tool-switch-head p a{color:var(--p);text-decoration:underline;}
+.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.tool-switch-item{display:block;background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:18px;padding:22px 20px;text-decoration:none;transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
+.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 26px 50px -28px rgba(27,21,37,.24);}
+.tool-switch-item h3{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--ink);margin-bottom:6px;}
+.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5;}
+.tool-switch-item.current{background:var(--p);border-color:var(--p);cursor:default;box-shadow:0 22px 44px -24px rgba(91,63,160,.42);pointer-events:none;}
+.tool-switch-item.current h3{color:#fff;}
+.tool-switch-item.current p{color:rgba(255,255,255,.72);}
+.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:100px;margin-bottom:8px;}
+@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr;}}
+
+</style>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"Service",
+  "name":"Website Audit",
+  "provider":{
+    "@type":"ProfessionalService",
+    "name":"Davis Digital Studio",
+    "url":"https://davisdigitalstudio.com"
+  },
+  "description":"full website audit covering Lighthouse performance scores, mobile usability, search visibility, and local presence. Includes a prioritized fix list delivered as a 6-page branded report within 5 business days.",
+  "areaServed":{"@type":"Country","name":"United States"},
+  "offers":[
+    {"@type":"Offer","name":"Essential Audit","price":"99","priceCurrency":"USD","description":"Core site audit with prioritized fix list, 5 business day turnaround."},
+    {"@type":"Offer","name":"Growth Audit","price":"499","priceCurrency":"USD","description":"Full audit plus keyword analysis, competitor benchmark, and content recommendations."},
+    {"@type":"Offer","name":"Studio Audit","price":"899","priceCurrency":"USD","description":"Complete audit with implementation roadmap and 30 minutes of strategy consultation."}
+  ],
+  "serviceType":["Website Audit","SEO Audit","Performance Audit","Site Score Analysis"]
+}
+</script>
+<link rel="stylesheet" href="/enhance.css">
+<link rel="stylesheet" href="/hero-grid.css">
+</head>
+<body data-page="ai-critique">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<header class="nav">
+<div class="wrap nav-in">
+  <a href="index.html" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="how-we-work.html">How we work</a>
+    <a href="the-experience.html">The experience</a>
+    <span class="nav-has-sub"><a href="services.html" class="nav-sub-toggle" aria-haspopup="true" aria-expanded="false">Services <i class="caret" aria-hidden="true"></i></a>
+      <span class="nav-sub">
+        <a href="services.html">All services<small>Pricing and the full picture</small></a>
+        <a href="web-design.html">Web design<small>Strategy-led sites that convert</small></a>
+        <a href="seo-strategy.html">SEO strategy<small>Get found by people searching</small></a>
+        <a href="monthly-retainer.html">Ongoing care<small>Keep your site working after launch</small></a>
+      </span></span>
+    <a href="industries.html">Industries</a>
+    <a href="about.html">About</a>
+    <a href="audit.html">Free tools</a>
+  </nav>
+  <div class="nav-actions">
+    <a href="portal.html" class="nav-login">Client login</a>
+    <a href="contact.html" class="btn btn-primary" style="padding:11px 20px">Book a free call</a>
+  </div>
+  <button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+</div>
+</header>
+<style>
+/* ===== AI CRITIQUE TOOL ===== */
+.crit-hero{background:linear-gradient(180deg,#FBFAF7 0%,#ede8f7 100%);padding:72px 24px 88px;position:relative;overflow:hidden;}
+.crit-hero::before{content:'';position:absolute;top:-100px;right:-80px;width:560px;height:560px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.42) 0%,transparent 64%);pointer-events:none;}
+.crit-hero::after{content:'';position:absolute;bottom:-160px;left:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.14) 0%,transparent 66%);pointer-events:none;}
+.crit-hero-inner{max-width:680px;margin:0 auto;position:relative;z-index:1;text-align:center;}
+.crit-scan-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:22px 0 28px;}
+.crit-scan-row span{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.75);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:100px;padding:6px 14px;}
+.crit-hero h1{font-family:var(--serif);font-size:clamp(34px,5vw,58px);font-weight:400;color:var(--ink);line-height:1.06;letter-spacing:-1.5px;margin:14px 0 18px;}
+.crit-hero h1 em{font-style:italic;color:var(--pxl);}
+.crit-hero > .crit-hero-inner > p{font-size:16px;color:rgba(255,255,255,0.55);line-height:1.75;max-width:540px;margin:0 auto 36px;}
+
+/* card */
+.crit-card{background:#fff;border-radius:20px;padding:32px 30px;box-shadow:0 24px 60px rgba(15,8,32,0.42);text-align:left;max-width:520px;margin:0 auto;}
+.crit-q{display:block;font-family:var(--serif);font-size:22px;color:var(--ink);margin-bottom:18px;line-height:1.25;}
+.crit-input{width:100%;border:1.5px solid rgba(91,63,160,0.22);border-radius:12px;padding:15px 16px;font-size:16px;color:var(--ink);font-family:inherit;background:#fdfcff;transition:border-color .15s,box-shadow .15s;}
+.crit-input::placeholder{color:#a99fbb;}
+.crit-input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 4px rgba(91,63,160,0.1);}
+/* URL input with a built-in https:// prefix so visitors know they don't type it */
+.crit-url-wrap{display:flex;align-items:stretch;border:1.5px solid rgba(91,63,160,0.22);border-radius:12px;background:#fdfcff;overflow:hidden;transition:border-color .15s,box-shadow .15s;}
+.crit-url-wrap:focus-within{border-color:var(--p);box-shadow:0 0 0 4px rgba(91,63,160,0.1);}
+.crit-url-prefix{display:flex;align-items:center;padding:0 4px 0 16px;font-size:16px;color:#a99fbb;background:#f3eefb;border-right:1.5px solid rgba(91,63,160,0.14);white-space:nowrap;user-select:none;}
+.crit-url-wrap .crit-input{border:none;border-radius:0;box-shadow:none;background:transparent;flex:1;}
+.crit-url-wrap .crit-input:focus{box-shadow:none;}
+.crit-hint{font-size:13px;color:var(--muted);line-height:1.5;margin:11px 0 0;}
+.crit-next,.crit-go{margin-top:20px;width:100%;background:var(--p);color:#fff;border:none;border-radius:100px;padding:14px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;transition:opacity .15s,transform .08s;}
+.crit-next:hover,.crit-go:hover{opacity:.9;}
+.crit-next:active,.crit-go:active{transform:translateY(1px);}
+.crit-next:disabled,.crit-go:disabled{opacity:.4;cursor:not-allowed;}
+.crit-go{background:linear-gradient(135deg,#5b3fa0,#7c5dc4);}
+.crit-back{background:none;border:none;color:var(--muted);font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;padding:14px 4px;}
+.crit-back:hover{color:var(--p);}
+.crit-step-nav{display:flex;align-items:center;gap:12px;margin-top:20px;}
+.crit-step-nav .crit-next,.crit-step-nav .crit-go{margin-top:0;flex:1;}
+
+/* chips */
+.crit-chips{display:flex;flex-wrap:wrap;gap:9px;}
+.crit-chip{border:1.5px solid rgba(91,63,160,0.2);background:#fdfcff;color:var(--ink);border-radius:100px;padding:10px 16px;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .14s;}
+.crit-chip:hover{border-color:var(--p);background:var(--pxxxl);}
+.crit-chip.sel{background:var(--p);border-color:var(--p);color:#fff;}
+
+.crit-foot-note{font-size:13px;color:var(--muted);margin:22px auto 0;max-width:460px;}
+
+/* loading */
+.crit-loading{background:#F4F0E9;padding:80px 24px 96px;text-align:center;}
+.crit-loading-inner{max-width:480px;margin:0 auto;}
+.crit-spinner{width:46px;height:46px;border:3px solid rgba(196,174,232,0.25);border-top-color:var(--pxl);border-radius:50%;margin:0 auto 26px;animation:critspin .8s linear infinite;}
+@keyframes critspin{to{transform:rotate(360deg);}}
+.crit-loading h2{font-family:var(--serif);font-size:25px;font-weight:400;color:var(--ink);margin-bottom:10px;line-height:1.25;}
+.crit-loading > .crit-loading-inner > p{font-size:15px;color:var(--muted);margin-bottom:30px;}
+.crit-load-steps{list-style:none;padding:0;max-width:320px;margin:0 auto;text-align:left;}
+.crit-load-steps li{font-size:14px;color:var(--muted);padding:9px 0 9px 30px;position:relative;transition:color .3s;}
+.crit-load-steps li::before{content:'';position:absolute;left:0;top:11px;width:14px;height:14px;border-radius:50%;border:2px solid rgba(91,63,160,0.2);transition:all .3s;}
+.crit-load-steps li.active{color:rgba(255,255,255,0.85);}
+.crit-load-steps li.active::before{border-color:var(--pxl);}
+.crit-load-steps li.done{color:var(--ink);}
+.crit-load-steps li.done::before{background:var(--pxl);border-color:var(--pxl);}
+
+/* results */
+.crit-results{background:linear-gradient(180deg,#FBFAF7 0%,#f3eefb 100%);padding:56px 24px 72px;}
+.crit-results-inner{max-width:720px;margin:0 auto;}
+.crit-result-head{text-align:center;margin-bottom:36px;}
+.crit-result-head h2{font-family:var(--serif);font-size:clamp(28px,4vw,40px);font-weight:400;color:var(--ink);line-height:1.15;letter-spacing:-1px;margin:12px 0 14px;}
+.crit-intro{font-size:16px;color:var(--muted);line-height:1.7;max-width:560px;margin:0 auto;}
+
+.crit-body{display:flex;flex-direction:column;gap:16px;}
+/* AI-rendered blocks */
+.crit-block{background:#fff;border-radius:16px;padding:24px 24px 22px;box-shadow:0 4px 20px rgba(91,63,160,0.07);border:1px solid rgba(91,63,160,0.06);}
+.crit-block-head{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+.crit-tag{font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;padding:4px 11px;border-radius:100px;flex-shrink:0;}
+.crit-tag.win{background:#e8f6ee;color:#1d7a45;}
+.crit-tag.fix{background:#fdeede;color:#b5651d;}
+.crit-tag.watch{background:#fbe9ea;color:#a83440;}
+.crit-block h3{font-family:var(--serif);font-size:19px;font-weight:400;color:var(--ink);line-height:1.3;margin:0;}
+.crit-block p{font-size:15px;color:#4a4258;line-height:1.7;margin:0;}
+.crit-block p + p{margin-top:10px;}
+.crit-block .crit-why{font-size:13.5px;color:var(--muted);margin-top:11px;padding-top:11px;border-top:1px dashed rgba(91,63,160,0.14);}
+.crit-block .crit-why strong{color:var(--p);font-weight:600;}
+
+/* close / cta */
+.crit-close{background:var(--pdark);border-radius:20px;padding:36px 32px;margin-top:30px;text-align:center;position:relative;overflow:hidden;}
+.crit-close::before{content:'';position:absolute;top:-90px;right:-70px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(124,93,196,0.4) 0%,transparent 65%);pointer-events:none;}
+.crit-close h3{font-family:var(--serif);font-size:24px;font-weight:400;color:#fff;margin:0 0 12px;position:relative;}
+.crit-close > p{font-size:15px;color:rgba(255,255,255,0.6);line-height:1.7;max-width:480px;margin:0 auto 24px;position:relative;}
+.crit-close-btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;position:relative;}
+.crit-close-primary{display:inline-block;background:#fff;color:var(--pdark);font-size:15px;font-weight:600;padding:14px 26px;border-radius:100px;text-decoration:none;transition:transform .08s,box-shadow .15s;}
+.crit-close-primary:hover{box-shadow:0 8px 24px rgba(0,0,0,0.25);}
+.crit-close-secondary{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:15px;font-weight:500;padding:14px 24px;border-radius:100px;cursor:pointer;font-family:inherit;transition:background .15s;}
+.crit-close-secondary:hover{background:rgba(255,255,255,0.14);}
+.crit-email-row{display:flex;gap:10px;max-width:440px;margin:18px auto 0;position:relative;}
+.crit-email-row .crit-input{background:rgba(255,255,255,0.95);}
+.crit-email-row .crit-next{margin-top:0;width:auto;white-space:nowrap;padding:14px 22px;}
+.crit-email-done{color:var(--pxl);font-size:14px;margin:16px 0 0;position:relative;}
+
+.crit-restart{display:block;margin:28px auto 0;background:none;border:1px solid rgba(91,63,160,0.25);color:var(--p);font-size:14px;font-weight:500;padding:11px 22px;border-radius:100px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.crit-restart:hover{background:var(--p);color:#fff;border-color:var(--p);}
+
+/* trust strip */
+.crit-trust{background:#fff;padding:64px 24px;border-top:1px solid rgba(91,63,160,0.06);}
+.crit-trust-inner{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
+.crit-trust-item{text-align:left;}
+.crit-trust-num{width:38px;height:38px;border-radius:50%;background:var(--pxxxl);color:var(--p);font-family:var(--serif);font-size:18px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
+.crit-trust-item h3{font-family:var(--serif);font-size:19px;font-weight:400;color:var(--ink);margin:0 0 9px;}
+.crit-trust-item p{font-size:14.5px;color:var(--muted);line-height:1.65;margin:0;}
+
+/* error */
+.crit-error{background:#fbe9ea;border:1px solid rgba(168,52,64,0.2);border-radius:12px;padding:14px 16px;font-size:14px;color:#a83440;line-height:1.55;margin-top:14px;}
+
+@media(max-width:760px){
+  .crit-trust-inner{grid-template-columns:1fr;gap:30px;}
+  .crit-card{padding:26px 22px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .crit-spinner{animation:none;}
+  .crit-next:active,.crit-go:active{transform:none;}
+}
+</style>
+<main id="main-content" tabindex="-1">
+
+<!-- BREADCRUMBS -->
+<nav aria-label="Breadcrumb" style="background:#FBFAF7;padding:14px 24px;border-bottom:1px solid rgba(91,63,160,0.06);">
+  <div style="max-width:1140px;margin:0 auto;display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted);opacity:0.5;flex-shrink:0;" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    <a href="/" style="color:var(--muted);text-decoration:none;">Home</a>
+    <span style="color:var(--muted);opacity:0.4;">/</span>
+    <a href="tools.html" style="color:var(--muted);text-decoration:none;">Free Tools</a>
+    <span style="color:var(--muted);opacity:0.4;">/</span>
+    <span style="color:var(--p);font-weight:600;">AI Website Review</span>
+  </div>
+</nav>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+  {"@type":"ListItem","position":1,"name":"Home","item":"https://davisdigitalstudio.com/"},
+  {"@type":"ListItem","position":2,"name":"Free Tools","item":"https://davisdigitalstudio.com/tools.html"},
+  {"@type":"ListItem","position":3,"name":"AI Website Review"}
+]}
+</script>
+
+<!-- HERO + TOOL -->
+<section class="crit-hero">
+  <div class="crit-hero-inner">
+    <span class="hero-label">Free · No signup · Under a minute</span>
+    <h1>A second pair of eyes on your website. <em>Free.</em></h1>
+    <p>Paste your web address and answer two quick questions. You'll get a clear, plain-English read on what's working, what's quietly costing you business, and what I'd fix first. No jargon, no sales pitch hiding in the results.</p>
+
+    <div class="crit-scan-row" aria-hidden="true">
+      <span>Homepage clarity</span>
+      <span>Mobile experience</span>
+      <span>Trust signals</span>
+      <span>Calls to action</span>
+    </div>
+
+    <!-- STEP CARD -->
+    <div class="crit-card" id="critCard">
+
+      <!-- STEP 1: URL -->
+      <div class="crit-step" id="step1">
+        <label class="crit-q" for="critUrl">What's your website address?</label>
+        <div class="crit-url-row">
+          <div class="crit-url-wrap">
+            <span class="crit-url-prefix">https://</span>
+            <input type="text" id="critUrl" class="crit-input" placeholder="yourbusiness.com" autocomplete="url" inputmode="url" spellcheck="false">
+          </div>
+        </div>
+        <p class="crit-hint">Just your domain is fine, no need to type the https part. I only read what's already public, the same as Google does.</p>
+        <button class="crit-next" id="toStep2">Next</button>
+      </div>
+
+      <!-- STEP 2: business type -->
+      <div class="crit-step" id="step2" hidden>
+        <label class="crit-q">What kind of business is this?</label>
+        <div class="crit-chips" id="bizChips" role="group" aria-label="Business type">
+          <button type="button" class="crit-chip" data-val="Restaurant, bar, or cafe">Restaurant / bar</button>
+          <button type="button" class="crit-chip" data-val="Salon, spa, or wellness">Salon / spa</button>
+          <button type="button" class="crit-chip" data-val="Retail or boutique">Retail / shop</button>
+          <button type="button" class="crit-chip" data-val="Home or trade services">Home services</button>
+          <button type="button" class="crit-chip" data-val="Health or medical practice">Health / medical</button>
+          <button type="button" class="crit-chip" data-val="Professional or other service">Professional service</button>
+          <button type="button" class="crit-chip" data-val="Something else">Something else</button>
+        </div>
+        <div class="crit-step-nav">
+          <button class="crit-back" id="back1">Back</button>
+          <button class="crit-next" id="toStep3" disabled>Next</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: goal -->
+      <div class="crit-step" id="step3" hidden>
+        <label class="crit-q">What matters most for this site right now?</label>
+        <div class="crit-chips" id="goalChips" role="group" aria-label="Primary goal">
+          <button type="button" class="crit-chip" data-val="Getting more phone calls and bookings">More calls &amp; bookings</button>
+          <button type="button" class="crit-chip" data-val="Showing up on Google for local searches">Showing up on Google</button>
+          <button type="button" class="crit-chip" data-val="Looking more professional and trustworthy">Looking more professional</button>
+          <button type="button" class="crit-chip" data-val="Selling products or services online">Selling online</button>
+          <button type="button" class="crit-chip" data-val="Just not sure what is wrong">Not sure what's wrong</button>
+        </div>
+        <div class="crit-step-nav">
+          <button class="crit-back" id="back2">Back</button>
+          <button class="crit-go" id="runCrit" disabled>Review my site</button>
+        </div>
+      </div>
+
+    </div>
+    <p class="crit-foot-note">I'm Eric. This review is AI-powered. If you book a call or become a client, I use the results as a starting point and build the strategy from there.</p>
+    <p class="crit-foot-note" style="font-size:12px;opacity:0.6;margin-top:10px;">AI-generated and informational only, not professional advice, and no guaranteed results. I only read what's already public. <a href="/ai-disclaimer" style="color:var(--pxl);text-decoration:underline;">Full AI disclaimer</a>.</p>
+  </div>
+</section>
+
+<!-- LOADING -->
+<section class="crit-loading" id="critLoading" hidden aria-live="polite">
+  <div class="crit-loading-inner">
+    <div class="crit-spinner" aria-hidden="true"></div>
+    <h2 id="loadHead">Reading your site the way a visitor would…</h2>
+    <p id="loadSub">Checking the front door first, then the details.</p>
+    <ul class="crit-load-steps">
+      <li id="ls0">Opening <span id="loadUrl">your site</span></li>
+      <li id="ls1">Looking at what a first-time visitor sees</li>
+      <li id="ls2">Checking how Google reads the page</li>
+      <li id="ls3">Writing up what I'd focus on</li>
+    </ul>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section class="crit-results" id="critResults" hidden>
+  <div class="crit-results-inner">
+
+    <div class="crit-result-head">
+      <span class="hero-label" style="color:var(--p);">Your free review</span>
+      <h2 id="resTitle">Here's what I found on your site.</h2>
+      <p id="resIntro" class="crit-intro"></p>
+    </div>
+
+    <!-- AI verdict body renders here -->
+    <div id="resBody" class="crit-body"></div>
+
+    <!-- soft close -->
+    <div class="crit-close">
+      <h3>Want to talk through any of this?</h3>
+      <p>No charge, no obligation. If even one of these fixes is worth doing, I'll tell you how to do it yourself. If it's bigger than that, we can talk about whether it makes sense to work together. Either way you'll leave knowing more than when you came in.</p>
+      <div class="crit-close-btns">
+        <a href="/contact" class="crit-close-primary">Book a free 30-minute call →</a>
+        <button class="crit-close-secondary" id="emailMe">Email me this review instead</button>
+      </div>
+      <div class="crit-email-row" id="emailRow" hidden>
+        <input type="email" id="critEmail" class="crit-input" placeholder="you@yourbusiness.com" autocomplete="email" inputmode="email">
+        <button class="crit-next" id="sendEmail">Send it</button>
+      </div>
+      <p class="crit-email-done" id="emailDone" hidden>Sent. Check your inbox in a minute or two.</p>
+    </div>
+
+    <button class="crit-restart" id="restart">Review a different site</button>
+  </div>
+</section>
+
+<!-- HOW IT WORKS / TRUST STRIP -->
+<section class="crit-trust">
+  <div class="crit-trust-inner">
+    <div class="crit-trust-item">
+      <div class="crit-trust-num">1</div>
+      <h3>You paste your URL</h3>
+      <p>I read the public version of your page, exactly what Google and your customers already see. Nothing private, nothing stored against you.</p>
+    </div>
+    <div class="crit-trust-item">
+      <div class="crit-trust-num">2</div>
+      <h3>You get an honest read</h3>
+      <p>Plain language, no scare tactics. The good and the bad, sorted by what actually moves the needle for a business like yours.</p>
+    </div>
+    <div class="crit-trust-item">
+      <div class="crit-trust-num">3</div>
+      <h3>You decide what's next</h3>
+      <p>Fix it yourself with what I give you, or talk to me about it. There's no version of this where you owe me anything for looking.</p>
+    </div>
+  </div>
+</section>
+
+<section class="tool-switch-section">
+  <div class="tool-switch-inner">
+    <div class="tool-switch-head">
+      <span>Free tools</span>
+      <h2>Explore the other free tools.</h2>
+      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="tools.html">the Resources hub &rarr;</a></p>
+    </div>
+    <div class="tool-switch-grid">
+    <a href="audit.html" class="tool-switch-item">
+      <h3>Site Audit</h3>
+      <p>Get your free site score and see exactly what's costing you customers.</p>
+    </a>
+    <span class="tool-switch-item current">
+      <span class="tsw-badge">You're here</span>
+      <h3>AI Website Review</h3>
+      <p>A free AI read on what's costing you clicks, in plain English.</p>
+    </span>
+    <a href="report-card.html" class="tool-switch-item">
+      <h3>Digital Report Card</h3>
+      <p>A prioritized snapshot of what to fix first.</p>
+    </a>
+    <a href="roi-calculator.html" class="tool-switch-item">
+      <h3>ROI Calculator</h3>
+      <p>See what a better site could actually be worth.</p>
+    </a>
+    <a href="pricing-estimator.html" class="tool-switch-item">
+      <h3>Pricing Estimator</h3>
+      <p>Get a real ballpark price for your project.</p>
+    </a>
+    <a href="local-visibility.html" class="tool-switch-item">
+      <h3>Local Visibility Score</h3>
+      <p>Check how findable your business actually is nearby.</p>
+    </a>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="site">
+<div class="wrap">
+  <div class="fwrap">
+    <div>
+      <div class="brand serif">Davis Digital Studio</div>
+      <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.4)">Los Angeles &middot; working with businesses nationwide</p>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Studio</p>
+      <a href="how-we-work.html">How we work</a>
+      <a href="services.html">Services</a>
+      <a href="industries.html">Industries</a>
+      <a href="about.html">About</a>
+      <a href="work.html">Work</a>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Start</p>
+      <a href="audit.html">Free tools</a>
+      <a href="tools.html">Free tools</a>
+      <a href="contact.html">Book a free call</a>
+      <a href="portal.html">Client login</a>
+    </div>
+  </div>
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="accessibility.html">Accessibility</a>
+    </span>
+  </div>
+</div>
+</footer>
+
+<div class="cookie-banner" id="cookieBanner" role="dialog" aria-label="Cookie consent">
+  <p class="cookie-text">We use cookies and Google Analytics to understand how visitors use our site. <a href="/privacy">Privacy Policy</a></p>
+  <div class="cookie-btns">
+    <button class="cookie-accept" onclick="acceptCookies()">Got it</button>
+    <button class="cookie-decline" onclick="declineCookies()">Decline</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var EDGE_FN = 'https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api';
+
+  var state = { url:'', biz:'', goal:'', result:null };
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---- step navigation ----
+  function show(stepId){
+    ['step1','step2','step3'].forEach(function(s){ var el=$(s); if(el) el.hidden = (s!==stepId); });
+  }
+
+  function normalizeUrl(raw){
+    var u = (raw||'').trim();
+    if(!u) return '';
+    if(!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    return u;
+  }
+  function validUrl(raw){
+    var u = normalizeUrl(raw);
+    try { var x = new URL(u); return !!x.hostname && x.hostname.indexOf('.') > 0; }
+    catch(e){ return false; }
+  }
+
+  // step 1
+  $('toStep2').addEventListener('click', function(){
+    if(!validUrl($('critUrl').value)){
+      $('critUrl').style.borderColor = '#a83440';
+      $('critUrl').focus();
+      return;
+    }
+    state.url = normalizeUrl($('critUrl').value);
+    show('step2');
+  });
+  $('critUrl').addEventListener('input', function(){ this.style.borderColor=''; });
+  $('critUrl').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); $('toStep2').click(); } });
+
+  // chips: biz
+  $('bizChips').addEventListener('click', function(e){
+    var b = e.target.closest('.crit-chip'); if(!b) return;
+    this.querySelectorAll('.crit-chip').forEach(function(c){ c.classList.remove('sel'); });
+    b.classList.add('sel');
+    state.biz = b.getAttribute('data-val');
+    $('toStep3').disabled = false;
+  });
+  $('back1').addEventListener('click', function(){ show('step1'); });
+  $('toStep3').addEventListener('click', function(){ if(state.biz) show('step3'); });
+
+  // chips: goal
+  $('goalChips').addEventListener('click', function(e){
+    var b = e.target.closest('.crit-chip'); if(!b) return;
+    this.querySelectorAll('.crit-chip').forEach(function(c){ c.classList.remove('sel'); });
+    b.classList.add('sel');
+    state.goal = b.getAttribute('data-val');
+    $('runCrit').disabled = false;
+  });
+  $('back2').addEventListener('click', function(){ show('step2'); });
+
+  // ---- run ----
+  $('runCrit').addEventListener('click', runCritique);
+
+  var loadTimers = [];
+  function clearLoadTimers(){ loadTimers.forEach(clearTimeout); loadTimers = []; }
+
+  function runCritique(){
+    if(!state.goal) return;
+    $('critCard').closest('.crit-hero').hidden = true;
+    $('critResults').hidden = true;
+    $('critLoading').hidden = false;
+    try { var host = new URL(state.url).hostname.replace(/^www\./,''); $('loadUrl').textContent = host; } catch(e){}
+    $('critLoading').scrollIntoView({behavior:'smooth', block:'start'});
+
+    // animate the loading checklist
+    var steps = ['ls0','ls1','ls2','ls3'];
+    steps.forEach(function(s){ $(s).classList.remove('active','done'); });
+    $('ls0').classList.add('active');
+    loadTimers.push(setTimeout(function(){ $('ls0').classList.add('done'); $('ls1').classList.add('active'); }, 2200));
+    loadTimers.push(setTimeout(function(){ $('ls1').classList.add('done'); $('ls2').classList.add('active'); }, 5200));
+    loadTimers.push(setTimeout(function(){ $('ls2').classList.add('done'); $('ls3').classList.add('active'); }, 8800));
+
+    fetch(EDGE_FN, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        type: 'ai_critique',
+        url: state.url,
+        businessType: state.biz,
+        goal: state.goal
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      clearLoadTimers();
+      if(res && res.error){ return fail(res.error, res.message); }
+      var data = (res && res.data) ? res.data : res;
+      if(!data || !data.blocks || !data.blocks.length){ return fail('empty'); }
+      state.result = data;
+      renderResult(data);
+      if(typeof gtag === 'function'){ gtag('event', 'ai_review_complete', { tool: 'ai_critique' }); }
+    })
+    .catch(function(err){
+      clearLoadTimers();
+      fail('network', String(err));
+    });
+  }
+
+  function fail(code, msg){
+    $('critLoading').hidden = true;
+    var hero = $('critCard').closest('.crit-hero');
+    hero.hidden = false;
+    hero.scrollIntoView({behavior:'smooth', block:'start'});
+    var existing = $('critErr'); if(existing) existing.remove();
+    var div = document.createElement('div');
+    div.className = 'crit-error';
+    div.id = 'critErr';
+    var book = '<a href="https://calendly.com/eric-davisdigitalstudio/30min" target="_blank" rel="noopener" style="color:#5b3fa0;font-weight:600;text-decoration:underline;">book a quick call</a>';
+    if(code === 'fetch_failed' || code === 'unreachable'){
+      div.innerHTML = "I couldn't load that site to review it. A few sites block automated tools, or it may be temporarily down. Double-check the address and try again, or " + book + " and I'll look at it with you directly.";
+    } else if(code === 'network'){
+      div.innerHTML = "Something went wrong on my end, not yours. Give it another try in a moment, or " + book + " if it keeps happening.";
+    } else {
+      div.innerHTML = "I couldn't finish the review this time. Try again, or " + book + " and I'll walk through your site with you.";
+    }
+    $('critCard').appendChild(div);
+  }
+
+  // ---- render ----
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function renderResult(data){
+    $('critLoading').hidden = true;
+    $('critResults').hidden = false;
+
+    if(data.headline){ $('resTitle').textContent = data.headline; }
+    $('resIntro').textContent = data.intro || '';
+
+    var tagClass = { win:'win', strength:'win', fix:'fix', improve:'fix', watch:'watch', risk:'watch' };
+    var tagLabel = { win:'Working', strength:'Working', fix:'Worth fixing', improve:'Worth fixing', watch:'Keep an eye on', risk:'Keep an eye on' };
+
+    var html = '';
+    data.blocks.forEach(function(b){
+      var t = (b.type||'fix').toLowerCase();
+      var cls = tagClass[t] || 'fix';
+      var lbl = b.label || tagLabel[t] || 'Worth a look';
+      html += '<div class="crit-block">';
+      html += '<div class="crit-block-head"><span class="crit-tag '+cls+'">'+esc(lbl)+'</span><h3>'+esc(b.title)+'</h3></div>';
+      html += '<p>'+esc(b.detail)+'</p>';
+      if(b.why){ html += '<div class="crit-why"><strong>Why it matters:</strong> '+esc(b.why)+'</div>'; }
+      html += '</div>';
+    });
+    $('resBody').innerHTML = html;
+    $('critResults').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  // ---- email me this ----
+  $('emailMe').addEventListener('click', function(){
+    var row = $('emailRow');
+    row.hidden = !row.hidden;
+    if(!row.hidden) $('critEmail').focus();
+  });
+  $('critEmail').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); $('sendEmail').click(); } });
+  $('sendEmail').addEventListener('click', function(){
+    var email = ($('critEmail').value||'').trim();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+      $('critEmail').style.borderColor = '#a83440';
+      $('critEmail').focus();
+      return;
+    }
+    $('sendEmail').disabled = true;
+    $('sendEmail').textContent = 'Sending…';
+    fetch(EDGE_FN, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        type: 'ai_critique_email',
+        email: email,
+        url: state.url,
+        businessType: state.biz,
+        goal: state.goal,
+        result: state.result
+      })
+    }).then(function(r){ return r.json(); }).then(function(){
+      $('emailRow').hidden = true;
+      $('emailDone').hidden = false;
+    }).catch(function(){
+      $('emailRow').hidden = true;
+      $('emailDone').hidden = false;
+    });
+  });
+
+  // ---- restart ----
+  $('restart').addEventListener('click', function(){
+    state = { url:'', biz:'', goal:'', result:null };
+    $('critUrl').value = '';
+    $('bizChips').querySelectorAll('.crit-chip').forEach(function(c){ c.classList.remove('sel'); });
+    $('goalChips').querySelectorAll('.crit-chip').forEach(function(c){ c.classList.remove('sel'); });
+    $('toStep3').disabled = true;
+    $('runCrit').disabled = true;
+    var e = $('critErr'); if(e) e.remove();
+    show('step1');
+    $('critResults').hidden = true;
+    $('critLoading').hidden = true;
+    $('critCard').closest('.crit-hero').hidden = false;
+    $('critCard').closest('.crit-hero').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+})();
+</script>
+<script>
+
+// Cookie
+(function(){
+  var c = localStorage.getItem('cookie_consent');
+  if (!c) setTimeout(function(){ var b=document.getElementById('cookieBanner'); if(b) b.style.display='flex'; }, 2000);
+})();
+function acceptCookies(){ localStorage.setItem('cookie_consent','accepted'); document.getElementById('cookieBanner').style.display='none'; }
+function declineCookies(){ localStorage.setItem('cookie_consent','declined'); window['ga-disable-G-V4WF04NX7F']=true; document.getElementById('cookieBanner').style.display='none'; }
+
+
+// PWA
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+
+// Progress bar
+var pb = document.createElement('div');
+pb.style.cssText = 'position:fixed;top:0;left:0;height:3px;background:linear-gradient(to right,#5b3fa0,#c4aee8);z-index:99999;width:0;pointer-events:none;transition:width 0.08s;';
+document.body.appendChild(pb);
+window.addEventListener('scroll', function(){ var h=document.documentElement.scrollHeight-window.innerHeight; if(h>0) pb.style.width=(window.scrollY/h*100)+'%'; });
+</script>
+  <script src="/concierge.js" defer></script>
+<script src="/enhance.js" defer></script>
+<script src="nav.js" defer></script>
+</body>
+</html>

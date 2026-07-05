@@ -1,0 +1,96 @@
+--- dds/davis-digital-studio-main/contact.html	2026-06-30 13:27:58.000000000 +0000
++++ deliver-p1/contact.html	2026-06-30 16:20:31.448174015 +0000
+@@ -112,6 +112,10 @@
+ </div>
+ </footer>
+ <script>
++// Supabase project (anon key — public by design; RLS scopes all access).
++var SB_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
++var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
++
+ function submitContact(ev){
+   ev.preventDefault();
+   var form = document.getElementById('contactForm');
+@@ -134,36 +138,59 @@
+   btn.disabled = true;
+   btn.textContent = 'Sending\u2026';
+ 
+-  fetch('https://formspree.io/f/mvznevlo', {
+-    method: 'POST',
+-    headers: { 'Content-Type': 'application/json' },
++  function showThanks(){
++    form.style.display = 'none';
++    document.getElementById('thanks').style.display = 'block';
++    if (typeof gtag === 'function') {
++      gtag('event', 'generate_lead', { event_category: 'lead', event_label: 'contact_form' });
++    }
++  }
++
++  // Compose the message body once, used by both the CRM and the fallback.
++  var msgBody = (goal || 'Not provided')
++    + (business ? '\n\nBusiness: ' + business : '')
++    + (website ? '\nWebsite: ' + website : '');
++
++  // PRIMARY: drop the lead straight into the CRM (leads table) via lead_intake.
++  // Puts the lead into the pipeline, gives it tracking + reminders, emails Eric.
++  fetch(SB_URL + "/functions/v1/clever-api", {
++    method: "POST",
++    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+     body: JSON.stringify({
+-      _subject: 'New contact from ' + name + (business ? ' (' + business + ')' : ''),
+-      _replyto: email,
++      type: "lead_intake",
++      source: "website_form",
+       name: name,
+       email: email,
+-      business: business || 'Not provided',
+-      website: website || 'Not provided',
+-      message: goal || 'Not provided'
++      subject: "New contact from " + name + (business ? " (" + business + ")" : ""),
++      message: msgBody
+     })
+   })
+-  .then(function(r){
+-    if (r.ok) {
+-      form.style.display = 'none';
+-      document.getElementById('thanks').style.display = 'block';
+-      if (typeof gtag === 'function') {
+-        gtag('event', 'generate_lead', { event_category: 'lead', event_label: 'contact_form' });
+-      }
+-    } else {
+-      throw new Error('bad_status');
+-    }
++  .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; }); })
++  .then(function(res){
++    if (res.ok && res.j && res.j.ok) { showThanks(); }
++    else { throw new Error('crm_failed'); }
+   })
+   .catch(function(){
+-    // Failure: keep everything the visitor typed, show a clear error + fallbacks.
+-    btn.disabled = false;
+-    btn.innerHTML = original;
+-    errBox.innerHTML = 'Something went wrong sending that \u2014 your message is still here. Please try again, or reach me directly at <a href="mailto:eric@davisdigitalstudio.com" style="color:#c0392b;text-decoration:underline">eric@davisdigitalstudio.com</a> or <a href="https://calendly.com/eric-davisdigitalstudio/30min" target="_blank" rel="noopener" style="color:#c0392b;text-decoration:underline">book a time directly</a>.';
+-    errBox.style.display = 'block';
++    // FALLBACK: Formspree, so a lead is never silently dropped if the CRM is down.
++    fetch('https://formspree.io/f/mvznevlo', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({
++        _subject: 'New contact from ' + name + (business ? ' (' + business + ')' : ''),
++        _replyto: email,
++        name: name, email: email,
++        business: business || 'Not provided',
++        website: website || 'Not provided',
++        message: goal || 'Not provided'
++      })
++    })
++    .then(function(r){ if (r.ok) { showThanks(); } else { throw new Error('bad_status'); } })
++    .catch(function(){
++      btn.disabled = false;
++      btn.innerHTML = original;
++      errBox.innerHTML = 'Something went wrong sending that \u2014 your message is still here. Please try again, or reach me directly at <a href="mailto:eric@davisdigitalstudio.com" style="color:#c0392b;text-decoration:underline">eric@davisdigitalstudio.com</a> or <a href="https://calendly.com/eric-davisdigitalstudio/30min" target="_blank" rel="noopener" style="color:#c0392b;text-decoration:underline">book a time directly</a>.';
++      errBox.style.display = 'block';
++    });
+   });
+ 
+   return false;

@@ -1,0 +1,109 @@
+/* ============================================================
+   Davis Digital Studio — monthly-retainer.css
+   GROWTH-PARTNERSHIP-PAGE-ONLY layer, scoped under
+   body[data-page="retainer"]. Loaded after styles.css.
+
+   Full visual redesign pass, matching the ambition level set on
+   Solutions. Copy, pricing, and message unchanged — only
+   composition changed.
+
+   Deliberately NOT a copy of Solutions' bento-panel treatment:
+   this page's Recognition section is genuinely chronological
+   (week one -> months in -> a year later), not three parallel
+   problems, so it gets its own device — a horizontal connected
+   timeline instead of a panel grid. The hero's new decorative
+   graphic is a peak-then-decline curve, using only labels that
+   already exist later in the page. Its color story (vibrant purple
+   fading to muted gray) is echoed in the timeline's dots below,
+   tying the two devices together without repeating either one.
+   ============================================================ */
+
+/* ---------------------------------------------------------------
+   HERO — asymmetric two-column, curve diagram on the right.
+   --------------------------------------------------------------- */
+body[data-page="retainer"] .gp-hero-grid{ align-items:center; }
+
+body[data-page="retainer"] .gp-curve{
+  background:var(--paper);
+  border:1px solid var(--hair);
+  border-radius:24px;
+  padding:32px 30px 26px;
+  box-shadow:0 34px 64px -36px rgba(43,27,74,.26);
+}
+body[data-page="retainer"] .gp-curve svg{ display:block; }
+body[data-page="retainer"] .gp-curve-labels{
+  display:flex; justify-content:space-between; margin-top:14px;
+  padding-top:14px; border-top:1px solid var(--hair);
+}
+body[data-page="retainer"] .gp-curve-labels span{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.03em;
+  color:var(--muted); text-transform:uppercase;
+}
+body[data-page="retainer"] .gp-curve-labels span:first-child{ color:var(--p); font-weight:600; }
+body[data-page="retainer"] .gp-curve-labels span:last-child{ text-align:right; }
+
+/* ---------------------------------------------------------------
+   RECOGNITION — horizontal connected timeline. Rail spans the top,
+   dots sit on it above each card, color fading from vibrant to
+   muted left-to-right to echo the hero curve's own decline story.
+   --------------------------------------------------------------- */
+body[data-page="retainer"] .gp-timeline-section{
+  position:relative;
+  background:
+    radial-gradient(ellipse 900px 460px at 88% 0%, rgba(91,63,160,.05), transparent 62%),
+    var(--paper);
+}
+
+body[data-page="retainer"] .gp-timeline{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:26px;
+  padding-top:8px;
+}
+body[data-page="retainer"] .gp-timeline-rail{
+  position:absolute; left:16.6%; right:16.6%; top:8px; height:2px;
+  background:linear-gradient(90deg,var(--p),var(--brass) 55%,var(--hair));
+  opacity:.6;
+}
+body[data-page="retainer"] .gp-timeline-stop{ position:relative; }
+body[data-page="retainer"] .gp-timeline-dot{
+  position:absolute; top:1px; left:50%; transform:translateX(-50%);
+  width:14px; height:14px; border-radius:50%;
+  border:3px solid var(--paper);
+  box-shadow:0 0 0 1px var(--hair);
+  z-index:1;
+}
+body[data-page="retainer"] .gp-timeline-stop-1 .gp-timeline-dot{ background:var(--p); }
+body[data-page="retainer"] .gp-timeline-stop-2 .gp-timeline-dot{ background:var(--brass); }
+body[data-page="retainer"] .gp-timeline-stop-3 .gp-timeline-dot{ background:var(--muted); }
+
+body[data-page="retainer"] .gp-timeline-card{
+  margin-top:34px;
+  background:#fff;
+  border-radius:20px;
+  padding:32px 28px 28px;
+  box-shadow:0 24px 48px -32px rgba(27,21,37,.22);
+  transition:transform .35s cubic-bezier(.32,.72,0,1), box-shadow .35s cubic-bezier(.32,.72,0,1);
+}
+body[data-page="retainer"] .gp-timeline-card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 32px 60px -30px rgba(27,21,37,.28);
+}
+body[data-page="retainer"] .gp-timeline-card h3{ font-size:22px; margin:10px 0 8px; }
+body[data-page="retainer"] .gp-timeline-card p{ color:var(--muted); font-size:15px; }
+body[data-page="retainer"] .gp-timeline-stop-3 .gp-timeline-card{ opacity:.94; }
+
+@media(max-width:880px){
+  body[data-page="retainer"] .gp-hero-grid{ grid-template-columns:1fr; gap:32px; }
+  body[data-page="retainer"] .gp-curve{ order:2; padding:26px 22px 22px; }
+  body[data-page="retainer"] .gp-timeline{ grid-template-columns:1fr; gap:0; padding-top:0; }
+  body[data-page="retainer"] .gp-timeline-rail{
+    left:20px; right:auto; top:8px; bottom:8px; width:2px; height:auto;
+    background:linear-gradient(var(--p),var(--brass) 55%,var(--hair));
+  }
+  body[data-page="retainer"] .gp-timeline-stop{ padding-left:48px; padding-bottom:26px; }
+  body[data-page="retainer"] .gp-timeline-stop:last-child{ padding-bottom:0; }
+  body[data-page="retainer"] .gp-timeline-dot{ top:6px; left:20px; transform:translateX(-50%); }
+  body[data-page="retainer"] .gp-timeline-card{ margin-top:0; padding:26px 24px 22px; }
+}

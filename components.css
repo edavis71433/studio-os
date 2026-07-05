@@ -1,0 +1,182 @@
+/* ============================================================================
+   DAVIS DIGITAL STUDIO — COMPONENT LIBRARY
+   Built entirely on tokens.css. Linked by every page AFTER tokens.css.
+
+   These are the canonical implementations. They replace the three divergent
+   copies that existed before consolidation (public-site, admin, portal).
+   Every component is prefixed `dds-` so it can coexist with legacy classes
+   during a screen-by-screen migration, then legacy classes get deleted.
+   ========================================================================== */
+
+/* ── Reset (scoped, gentle) ─────────────────────────────────────────────── */
+.dds *{ box-sizing:border-box; }
+.dds{ font-family:var(--sans); color:var(--ink); -webkit-font-smoothing:antialiased; }
+
+/* ── Type roles ─────────────────────────────────────────────────────────── */
+.dds-display{ font-family:var(--serif); font-weight:400; font-size:var(--t-display); line-height:var(--lh-tight); letter-spacing:-.5px; color:var(--ink); }
+.dds-h1{ font-family:var(--serif); font-weight:400; font-size:var(--t-h1); line-height:var(--lh-tight); letter-spacing:-.3px; color:var(--ink); }
+.dds-h2{ font-family:var(--serif); font-weight:400; font-size:var(--t-h2); line-height:var(--lh-snug); color:var(--ink); }
+.dds-h3{ font-family:var(--sans); font-weight:600; font-size:var(--t-h3); line-height:var(--lh-snug); color:var(--ink); }
+.dds-body{ font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink-2); }
+.dds-sm{ font-size:var(--t-sm); line-height:var(--lh-snug); color:var(--ink-2); }
+.dds-eyebrow{ font-family:var(--mono); font-size:var(--t-xs); letter-spacing:1.5px; text-transform:uppercase; color:var(--brass); }
+.dds-data{ font-family:var(--mono); font-variant-numeric:tabular-nums; }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+/* One button. Variants by class, sizes by class. Pill geometry is the brand. */
+.dds-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--s2);
+  font-family:var(--sans); font-size:var(--t-sm); font-weight:600;
+  padding:11px 20px; border-radius:var(--pill); border:1px solid transparent;
+  cursor:pointer; transition:background var(--dur) var(--ease), color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur) var(--ease);
+  text-decoration:none; white-space:nowrap; user-select:none;
+}
+.dds-btn:active{ transform:translateY(1px); }
+.dds-btn:focus-visible{ outline:none; box-shadow:0 0 0 3px var(--p-ring); }
+
+.dds-btn--primary{ background:var(--p); color:#fff; }
+.dds-btn--primary:hover{ background:var(--p-600); }
+.dds-btn--primary:active{ background:var(--p-700); }
+
+.dds-btn--secondary{ background:var(--surface); color:var(--ink); border-color:var(--line-strong); }
+.dds-btn--secondary:hover{ background:var(--surface-3); border-color:var(--p); color:var(--p); }
+
+.dds-btn--ghost{ background:transparent; color:var(--ink-2); }
+.dds-btn--ghost:hover{ background:var(--surface-3); color:var(--ink); }
+
+.dds-btn--danger{ background:var(--red); color:#fff; }
+.dds-btn--danger:hover{ filter:brightness(.94); }
+.dds-btn--danger-soft{ background:var(--red-soft); color:var(--red); }
+.dds-btn--danger-soft:hover{ background:var(--red); color:#fff; }
+
+.dds-btn--sm{ padding:7px 14px; font-size:var(--t-xs); }
+.dds-btn--lg{ padding:14px 26px; font-size:var(--t-body); }
+.dds-btn--block{ width:100%; }
+.dds-btn[disabled],.dds-btn--loading{ opacity:.55; pointer-events:none; }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.dds-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden; }
+.dds-card--flat{ box-shadow:none; }
+.dds-card--pop{ box-shadow:var(--sh-2); }
+.dds-card__header{ display:flex; align-items:center; justify-content:space-between; gap:var(--s3); padding:var(--s4) var(--s5); border-bottom:1px solid var(--line); }
+.dds-card__title{ font-family:var(--sans); font-size:var(--t-h3); font-weight:600; color:var(--ink); display:flex; align-items:center; gap:var(--s2); }
+.dds-card__body{ padding:var(--s5); }
+.dds-card__footer{ padding:var(--s4) var(--s5); border-top:1px solid var(--line); background:var(--surface-2); }
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+.dds-field{ margin-bottom:var(--s4); }
+.dds-label{ display:block; font-size:var(--t-sm); font-weight:600; color:var(--ink); margin-bottom:var(--s2); letter-spacing:.1px; }
+.dds-input,.dds-textarea,.dds-select{
+  width:100%; font-family:var(--sans); font-size:var(--t-body); color:var(--ink);
+  background:var(--bg); border:1px solid var(--line-strong); border-radius:var(--r);
+  padding:12px 14px; outline:none; transition:border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.dds-input::placeholder,.dds-textarea::placeholder{ color:var(--muted); }
+.dds-input:focus,.dds-textarea:focus,.dds-select:focus{ border-color:var(--p); background:var(--surface); box-shadow:0 0 0 3px var(--p-ring); }
+.dds-input[aria-invalid="true"]{ border-color:var(--red); box-shadow:0 0 0 3px var(--red-soft); }
+.dds-hint{ font-size:var(--t-xs); color:var(--muted); margin-top:var(--s2); }
+.dds-error{ font-size:var(--t-xs); color:var(--red); margin-top:var(--s2); }
+.dds-textarea{ min-height:96px; resize:vertical; line-height:var(--lh-body); }
+
+/* ── Tables (the new primitive admin lacked) ────────────────────────────── */
+.dds-table{ width:100%; border-collapse:collapse; font-size:var(--t-sm); }
+.dds-table thead th{
+  position:sticky; top:0; background:var(--surface-2); z-index:1;
+  text-align:left; font-weight:600; color:var(--muted); font-size:var(--t-xs);
+  letter-spacing:.4px; text-transform:uppercase; padding:10px var(--s4); border-bottom:1px solid var(--line-strong);
+  cursor:default; user-select:none;
+}
+.dds-table thead th.dds-sortable{ cursor:pointer; }
+.dds-table thead th.dds-sortable:hover{ color:var(--ink); }
+.dds-table thead th[aria-sort]{ color:var(--p); }
+.dds-table tbody td{ padding:13px var(--s4); border-bottom:1px solid var(--line); color:var(--ink-2); vertical-align:middle; }
+.dds-table tbody tr{ transition:background var(--dur-fast) var(--ease); }
+.dds-table tbody tr:hover{ background:var(--surface-3); }
+.dds-table tbody tr[aria-selected="true"]{ background:var(--p-soft); }
+.dds-table .dds-num{ font-family:var(--mono); font-variant-numeric:tabular-nums; text-align:right; color:var(--ink); }
+.dds-row-click{ cursor:pointer; }
+
+/* ── Badges & chips ─────────────────────────────────────────────────────── */
+.dds-chip{ display:inline-flex; align-items:center; gap:var(--s1); font-family:var(--mono); font-size:var(--t-xs);
+  letter-spacing:.3px; padding:3px 10px; border-radius:var(--pill); background:var(--surface-3); color:var(--ink-2); }
+.dds-chip__dot{ width:6px; height:6px; border-radius:50%; background:currentColor; flex:none; }
+.dds-chip--ok{ background:var(--green-soft); color:var(--green); }
+.dds-chip--warn{ background:var(--amber-soft); color:var(--amber-deep,#a8690c); }
+.dds-chip--stop{ background:var(--red-soft); color:var(--red); }
+.dds-chip--brand{ background:var(--p-soft); color:var(--p); }
+.dds-badge{ display:inline-block; min-width:18px; padding:1px 6px; border-radius:var(--pill); background:var(--p); color:#fff;
+  font-family:var(--sans); font-size:10px; font-weight:700; text-align:center; line-height:16px; }
+
+/* ── Empty states (one component, fed by good microcopy) ────────────────── */
+.dds-empty{ text-align:center; padding:var(--s7) var(--s5); color:var(--muted); }
+.dds-empty__icon{ width:40px; height:40px; margin:0 auto var(--s4); color:var(--line-strong); }
+.dds-empty__title{ font-family:var(--serif); font-size:var(--t-h3); color:var(--ink-2); margin-bottom:var(--s2); }
+.dds-empty__body{ font-size:var(--t-sm); color:var(--muted); max-width:340px; margin:0 auto var(--s4); line-height:var(--lh-body); }
+
+/* ── Loading: skeletons (replace spinners on data loads) ────────────────── */
+.dds-skel{ position:relative; overflow:hidden; background:var(--surface-3); border-radius:var(--r-sm); }
+.dds-skel::after{ content:""; position:absolute; inset:0; transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); animation:dds-shimmer 1.3s var(--ease) infinite; }
+.dds-skel--line{ height:12px; margin:var(--s2) 0; }
+.dds-skel--title{ height:18px; width:48%; margin-bottom:var(--s3); }
+.dds-skel--card{ height:88px; }
+@keyframes dds-shimmer{ to{ transform:translateX(100%); } }
+
+/* Spinner — kept ONLY for discrete actions (saving/sending), not data loads. */
+.dds-spinner{ width:16px; height:16px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff;
+  border-radius:50%; animation:dds-spin .7s linear infinite; display:inline-block; vertical-align:middle; }
+@keyframes dds-spin{ to{ transform:rotate(360deg); } }
+
+/* ── Toasts (in-app, to match the premium email system) ─────────────────── */
+.dds-toast-wrap{ position:fixed; bottom:var(--s5); left:50%; transform:translateX(-50%); z-index:1000;
+  display:flex; flex-direction:column; gap:var(--s2); align-items:center; pointer-events:none; }
+.dds-toast{ display:flex; align-items:center; gap:var(--s3); background:var(--ink); color:#fff;
+  padding:12px 18px; border-radius:var(--pill); box-shadow:var(--sh-3); font-size:var(--t-sm); font-weight:500;
+  animation:dds-toast-in var(--dur-slow) var(--ease); pointer-events:auto; max-width:90vw; }
+.dds-toast--ok{ background:var(--green); }
+.dds-toast--err{ background:var(--red); }
+@keyframes dds-toast-in{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+
+/* ── Modal (the canonical dialog admin lacked) ──────────────────────────── */
+.dds-modal-overlay{ position:fixed; inset:0; background:rgba(23,18,33,.5); backdrop-filter:blur(2px);
+  display:flex; align-items:center; justify-content:center; padding:var(--s5); z-index:900;
+  animation:dds-fade var(--dur) var(--ease); }
+.dds-modal{ background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-pop);
+  width:100%; max-width:460px; max-height:90vh; overflow:auto; animation:dds-modal-in var(--dur-slow) var(--ease); }
+.dds-modal__header{ padding:var(--s5) var(--s5) 0; }
+.dds-modal__title{ font-family:var(--serif); font-size:var(--t-h2); color:var(--ink); margin:0 0 var(--s2); }
+.dds-modal__body{ padding:var(--s4) var(--s5); }
+.dds-modal__footer{ padding:0 var(--s5) var(--s5); display:flex; gap:var(--s2); justify-content:flex-end; }
+@keyframes dds-fade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes dds-modal-in{ from{ opacity:0; transform:translateY(12px) scale(.98); } to{ opacity:1; transform:translateY(0) scale(1); } }
+
+/* ── App shell: top bar + sidebar (shared by admin & portal) ────────────── */
+.dds-topbar{ height:var(--topbar-h); background:var(--p-deep); display:flex; align-items:center; justify-content:space-between;
+  padding:0 var(--s5); position:sticky; top:0; z-index:100; }
+.dds-topbar__logo{ font-family:var(--serif); font-size:16px; color:#fff; display:flex; align-items:center; gap:var(--s3); text-decoration:none; }
+.dds-topbar__logo span{ color:#c4aee8; }
+.dds-topbar__role{ background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.16); color:#fff; font-family:var(--mono);
+  font-size:10px; font-weight:700; padding:2px 8px; border-radius:var(--pill); letter-spacing:1px; }
+.dds-topbar__out{ background:none; border:none; color:rgba(255,255,255,.5); font-size:var(--t-sm); font-family:var(--sans);
+  cursor:pointer; padding:6px 10px; border-radius:var(--r-sm); transition:color var(--dur) var(--ease); }
+.dds-topbar__out:hover{ color:#fff; }
+
+.dds-sidebar{ background:var(--surface); border-right:1px solid var(--line); padding:var(--s3) 0; width:var(--sidebar-w);
+  position:sticky; top:var(--topbar-h); height:calc(100vh - var(--topbar-h)); overflow-y:auto; }
+.dds-sidebar__label{ font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--muted); padding:var(--s4) var(--s4) var(--s1); }
+.dds-nav{ display:flex; align-items:center; gap:var(--s3); padding:9px var(--s4); width:100%; border:none; background:none;
+  font-family:var(--sans); font-size:var(--t-sm); font-weight:500; color:var(--ink-2); text-align:left; cursor:pointer;
+  border-radius:0; transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.dds-nav:hover{ background:var(--surface-3); color:var(--ink); }
+.dds-nav.is-active{ background:var(--p-soft); color:var(--p); font-weight:600; box-shadow:inset 3px 0 0 var(--p); }
+.dds-nav:focus-visible{ outline:none; box-shadow:inset 0 0 0 2px var(--p-ring); }
+.dds-nav__icon{ width:18px; height:18px; flex:none; }
+.dds-nav__badge{ margin-left:auto; }
+.dds-divider{ height:1px; background:var(--line); margin:var(--s2) 0; }
+
+/* ── Accessibility floor: visible focus on EVERYTHING interactive ───────── */
+.dds a:focus-visible,.dds [tabindex]:focus-visible,.dds input:focus-visible,
+.dds select:focus-visible,.dds textarea:focus-visible{ outline:none; box-shadow:0 0 0 3px var(--p-ring); border-radius:var(--r-sm); }
+.dds-sr{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }

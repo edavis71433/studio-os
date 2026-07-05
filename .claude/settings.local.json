@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rnoE 're_[A-Za-z0-9_]{20,}' C:/Users/edavi/AppData/Local/Temp/claude/C--Users-edavi-Documents-app/35005bf6-adae-4998-a925-9176b0c2aaa2/scratchpad/x/davis-digital-studio-main/davis-digital-studio-main)"
+    ]
+  }
+}

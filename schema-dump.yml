@@ -1,0 +1,30 @@
+name: Schema dump (one-time provisioning foundation)
+
+# Runs ONLY when you click "Run workflow" in the Actions tab.
+# Produces a schema-ONLY dump of production (structure, no business data)
+# as a downloadable artifact. Nothing is committed to the repo.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump schema (structure only, no data)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          npx --yes supabase db dump --db-url "$DB_URL" --schema public -f 00-schema-foundation.sql
+          echo "── sanity: file size and first lines ──"
+          wc -l 00-schema-foundation.sql
+          head -20 00-schema-foundation.sql
+          echo "── data-leak guard: these greps must find NOTHING ──"
+          ! grep -iE "bacchus|hettie|@gmail|@yahoo" 00-schema-foundation.sql || (echo "POSSIBLE DATA IN DUMP — do not use" && exit 1)
+
+      - name: Upload as artifact (download from the run page)
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-foundation
+          path: 00-schema-foundation.sql
+          retention-days: 3

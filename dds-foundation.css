@@ -1,0 +1,201 @@
+/* ============================================================================
+   DAVIS DIGITAL STUDIO — FOUNDATION
+   The single shared design-token and typography system for the whole product.
+
+   This is the canonical source of truth required by the Product Constitution,
+   Article VII (one type system, one token sheet, family-wide). Both seats of
+   the operating system — the Admin Platform and the Client Portal — import this
+   identical block. Neither seat redefines a foundation token locally. Surface-
+   specific values (layout widths, one-off component colors) may extend, but the
+   tokens below are never overridden per surface.
+
+   Provenance / conflict resolutions (decided from the live files, not guessed):
+   - TYPE: unified to Fraunces (display) + Inter (text) + Geist Mono (code).
+     The admin previously loaded DM Serif Display + DM Sans globally and only
+     used the target system inside its #page-growth scope. The Growth tab was
+     built later, to the newer standard; the rest of the admin never caught up.
+     We promote the newer system product-wide. DM Sans / DM Serif Display are
+     retired.
+   - --ink: two near-identical values existed (#1a1523 and #171221). Canonical
+     is #1a1523 (the value both files' first block already shared). One ink,
+     everywhere.
+   - --serif: was declared up to three times per file across layered blocks,
+     with the last (Fraunces) winning but never loaded in the admin. Now single.
+   - SEMANTIC STATE PALETTE (ok / warn / stop + mists): promoted up from the
+     admin's #page-growth scope into the shared sheet, because the Client
+     Portal's honest bad-news mode (Constitution II.8, VIII.33) needs the same
+     calm good/watch/problem vocabulary the admin already had.
+   - Shadows, radii, easing: reconciled to one set (minor px differences in the
+     two prior --sh-2/--sh-3 definitions collapsed to a single scale).
+   ========================================================================== */
+
+/* ---- FONTS ----------------------------------------------------------------
+   Load identically in the <head> of BOTH seats (replaces the old DM Sans /
+   DM Serif Display link in the admin):
+
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap">
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* ---- BRAND: purple spine ---- */
+  --p:        #5b3fa0;   /* the brand purple. one value, lowercase, everywhere */
+  --p-600:    #4a3286;
+  --p-700:    #3a2769;
+  --p-deep:   #2A1B4A;
+  --p-soft:   #f1ecf9;
+  --p-mist:   #ede8f7;
+  --p-ring:   rgba(91,63,160,0.22);   /* focus ring + selection */
+  --pxl:      #c4aee8;
+  --pxxl:     #ede8f7;
+  --pxxxl:    #f7f4fd;
+  --pdark:    #0f0820;   /* login / immersive dark surfaces */
+
+  /* ---- BRASS: the quiet premium accent ---- */
+  --brass:      #B08D57;
+  --brass-deep: #8A6B3C;
+
+  /* ---- INK & TEXT ---- */
+  --ink:    #1a1523;   /* canonical primary text. resolves the #1a1523/#171221 split */
+  --ink-2:  #574d68;   /* secondary text */
+  --muted:  #7a6d8e;   /* tertiary / supporting text */
+
+  /* ---- SURFACES ---- */
+  --bg:        #f7f5f2;   /* app background. resolves the f6f4f1/f7f5f2 split */
+  --cream:     #faf8f5;
+  --warm:      #f5f0e8;
+  --surface:   #ffffff;
+  --surface-2: #faf9fc;
+  --surface-3: #f3f0f9;
+
+  /* ---- LINES / HAIRLINES ---- */
+  --line:        #ece8f1;
+  --line-strong: #ddd6ea;
+  --hair:        #E7E1D6;
+
+  /* ---- SEMANTIC STATE PALETTE — good / watch / problem ----
+     One shared vocabulary for both seats. On the client side these are calm by
+     default and never alarm without cause (Constitution VII.27). --stop is used
+     only for genuine problems, and even then in service of the honest, no-panic
+     bad-news mode (Constitution VIII.33), never as decoration. */
+  --ok:        #3F7D5B;   --ok-mist:   #E6F0E9;   /* good / done / healthy */
+  --warn:      #B5781D;   --warn-mist: #F7EEDD;   /* watch / needs attention */
+  --stop:      #A8443A;   --stop-mist: #F6E5E2;   /* problem / honest bad news */
+
+  /* legacy aliases retained so existing markup keeps resolving; prefer the
+     semantic tokens above for anything new */
+  --green:      #1f9d57;  --green-soft: #e7f6ee;
+  --red:        #dc4747;  --red-soft:   #fdecec;
+  --amber:      #d68a12;  --amber-soft: #fdf3e3;
+  --blue:       #2f6df0;  --blue-soft:  #eaf1fe;
+  --yellow:     #f0b429;
+
+  /* ---- TYPOGRAPHY: one system, family-wide ----
+     Fraunces is the display serif and carries every headline. Inter is the
+     text workhorse. Geist Mono is for code/IDs only. Type is never re-chosen
+     per surface (Constitution VII.26). */
+  --serif: "Fraunces", Georgia, serif;
+  --sans:  "Inter", system-ui, sans-serif;
+  --mono:  "Geist Mono", ui-monospace, monospace;
+
+  /* ---- RADII ---- */
+  --r-sm:   8px;
+  --r-s:    10px;
+  --r:      12px;    /* default card/control radius */
+  --r-lg:   16px;
+  --r-xl:   22px;
+  --r-pill: 100px;
+
+  /* ---- SHADOWS: one elevation scale ---- */
+  --sh-1:   0 1px 2px rgba(23,18,33,0.05), 0 1px 1px rgba(23,18,33,0.03);
+  --sh-2:   0 4px 16px rgba(23,18,33,0.07), 0 1px 3px rgba(23,18,33,0.04);
+  --sh-3:   0 14px 44px rgba(23,18,33,0.16), 0 4px 12px rgba(23,18,33,0.08);
+  --sh-pop: 0 24px 70px rgba(23,18,33,0.27);
+
+  /* ---- MOTION: one easing curve, family-wide (Constitution VII.28) ----
+     Quick and purposeful by default. The single slow exception is progress
+     fills, which are allowed to feel momentous. */
+  --ease:      cubic-bezier(.32,.72,0,1);
+  --dur-fast:  .15s;   /* default UI transitions */
+  --dur-mid:   .22s;   /* larger reveals */
+  --dur-prog:  1s;     /* progress fills only — the one momentous motion */
+
+  /* ---- COMPATIBILITY ALIASES ----
+     Names the admin used locally before unification, now pointed at the
+     canonical tokens so existing markup keeps resolving against ONE source of
+     truth. New code uses the canonical names above; these exist only so the
+     migration breaks nothing. The values proved identical or interchangeable
+     with their canonical counterparts when reconciled from the live files. */
+  --bf-line:     var(--line);          /* was #ece8f1 — identical to --line */
+  --bf-line2:    var(--line-strong);   /* was #ddd6ea — identical to --line-strong */
+  --paper:       var(--cream);         /* was #FBFAF7 — folds into --cream */
+  --paper-2:     var(--warm);          /* was #F4F0E9 — folds into --warm */
+  --shadow:      var(--sh-2);          /* maps onto the canonical elevation scale */
+  --shadow-lift: var(--sh-3);          /* maps onto the canonical elevation scale */
+}
+
+/* ---- BASE ELEMENTS — identical in both seats -------------------------------
+   The body sans is now Inter in BOTH seats (the admin's old "DM Sans" body and
+   its stray Helvetica Neue export body are retired). */
+body {
+  font-family: var(--sans);
+  background:  var(--bg);
+  color:       var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overflow-x:  hidden;
+  max-width:   100vw;
+}
+
+/* Headlines are the serif. The serif is never decorative noise — it marks the
+   single most important thing on a surface (Constitution III.11, VII.26). */
+h1, h2, .display, .bf-headline, .hq-headline-text, .hq-welcome-h {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: -.015em;
+  color: var(--ink);
+}
+
+::selection { background: var(--p-ring); }
+
+/* One focus style, family-wide. Accessibility is a floor, not a feature
+   (Constitution IX.35): every interactive element is keyboard-reachable and
+   shows this ring. */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--p-ring);
+  border-radius: var(--r-sm);
+}
+
+/* Motion respects the user's reduced-motion preference (Constitution IX.35). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- SHARED KEYFRAMES — one set, both seats ---- */
+@keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+@keyframes spin    { to { transform:rotate(360deg); } }
+@keyframes shimmer { 0% { background-position:-400px 0; } 100% { background-position:400px 0; } }
+
+/* ---- LOADING: skeletons, never spinners (Constitution VIII.32) ----
+   The skeleton shows the shape of the answer forming. The .spinner below is
+   retained only for inline button-busy affordances, not for page loads. */
+.skel {
+  background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-2) 37%, var(--surface-3) 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.spinner {
+  width:16px; height:16px;
+  border:2px solid rgba(255,255,255,0.3);
+  border-top-color:#fff; border-radius:50%;
+  animation: spin .8s linear infinite;
+  display:inline-block; vertical-align:middle; margin-right:6px;
+}

@@ -1,0 +1,87 @@
+name: Deploy Edge Functions
+
+# Staging: every push to the `staging` branch deploys both functions to the
+# staging Supabase project.
+# Production: manual only. Actions tab -> Run workflow -> type
+# `deploy-production` into the confirmation box. Deploys from `main`.
+#
+# Config-only variance: identical commands, different project ref per
+# environment (Build Brief section 2.8).
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type deploy-production to deploy main to PRODUCTION"
+        required: true
+
+jobs:
+  deploy-staging:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard — canonical clever-api file must exist
+        run: test -f supabase/functions/clever-api/index.ts || { echo "clever-api/index.ts missing — see docs/runbooks/BYTE-CHECK.md item 1"; exit 1; }
+
+      - name: Deploy clever-api (staging)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy clever-api --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
+      - name: Deploy stripe-webhook (staging, no JWT verification)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
+      - name: Smoke test — version handshake
+        run: |
+          sleep 5
+          curl -s --fail -X POST \
+            "https://${{ secrets.SUPABASE_PROJECT_REF_STAGING }}.supabase.co/functions/v1/clever-api" \
+            -H "Content-Type: application/json" \
+            -d '{"type":"version"}' | tee /tmp/version.json
+          grep -q '"build"' /tmp/version.json
+
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirmation gate
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy-production" ]; then
+            echo "Confirmation phrase not provided. Aborting."; exit 1
+          fi
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "Production deploys only from main. Aborting."; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Guard — canonical clever-api file must exist
+        run: test -f supabase/functions/clever-api/index.ts || { echo "clever-api/index.ts missing — see docs/runbooks/BYTE-CHECK.md item 1"; exit 1; }
+
+      - name: Deploy clever-api (PRODUCTION)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy clever-api --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
+      - name: Deploy stripe-webhook (PRODUCTION, no JWT verification)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
+      - name: Smoke test — version handshake
+        run: |
+          sleep 5
+          curl -s --fail -X POST \
+            "https://${{ secrets.SUPABASE_PROJECT_REF_PROD }}.supabase.co/functions/v1/clever-api" \
+            -H "Content-Type: application/json" \
+            -d '{"type":"version"}' | tee /tmp/version.json
+          grep -q '"build"' /tmp/version.json

@@ -1,0 +1,423 @@
+/* ============================================================
+   Davis Digital Studio — elevated design system
+   Aubergine + brass on warm paper. Calm, considered, premium.
+   ============================================================ */
+:root{
+  --ink:#1B1525;          /* aubergine-black, primary text */
+  --paper:#FBFAF7;        /* warm paper, less yellow than before */
+  --paper-2:#F4F0E9;      /* warm panel */
+  --p:#5B3FA0;            /* primary purple, used sparingly */
+  --p-deep:#2A1B4A;       /* deep panel purple */
+  --p-mist:#EDE8F7;       /* faint purple wash */
+  --brass:#B08D57;        /* restrained metallic accent */
+  --brass-deep:#8A6B3C;
+  --muted:#6B6276;        /* secondary text */
+  --hair:#E7E1D6;         /* hairline on paper */
+  --hair-dk:rgba(255,255,255,.12);
+  --serif:'Fraunces',Georgia,serif;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:'Geist Mono','SF Mono',ui-monospace,monospace;
+  --maxw:1120px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);
+  -webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+
+/* ---------- type ---------- */
+.serif{font-family:var(--serif)}
+h1,h2,h3{font-family:var(--serif);font-weight:380;letter-spacing:-.02em;line-height:1.04}
+/* Color is a 5% darkening of --brass-deep, not the token itself — .eyebrow is the
+   only component of the ~12 that use --brass-deep which regularly sits on
+   .panel-warm (#F4F0E9), where the token's own value measures 4.35:1, just under
+   AA's 4.5:1 floor. This passes there (4.76:1) and everywhere else the token
+   already passed (5.18:1 on paper, vs. 4.74:1 before) — a strict improvement,
+   not a trade-off. Found on the homepage, confirmed recurring on Solutions;
+   fixed at the source instead of patching per-page from here on. */
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:#836539;font-weight:500;display:inline-flex;align-items:center;gap:10px}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
+
+/* ---------- layout ---------- */
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px}
+section{position:relative}
+.pad{padding:104px 0}
+.pad-sm{padding:72px 0}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:9px;font-family:var(--sans);font-size:14.5px;
+  font-weight:550;padding:15px 28px;border-radius:2px;transition:.2s ease;cursor:pointer;border:none;
+  letter-spacing:.01em}
+.btn-primary{background:var(--ink);color:var(--paper)}
+.btn-primary:hover{background:var(--p-deep);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--hair);padding:14px 27px}
+.btn-ghost:hover{border-color:var(--ink)}
+.btn-light{background:var(--paper);color:var(--ink)}
+.btn-light:hover{transform:translateY(-1px)}
+.btn .arr{transition:transform .2s ease}
+.btn:hover .arr{transform:translateX(3px)}
+.btn-sm{font-size:13px;padding:9px 16px}
+/* Services dropdown — desktop hover/focus, mobile stacks inline */
+.nav-has-sub{position:relative}
+.nav-sub-toggle{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.nav-sub-toggle .caret{width:8px;height:8px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);margin-top:-3px;transition:.15s;opacity:.6}
+.nav-sub{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(6px);
+  min-width:230px;background:var(--paper);border:1px solid var(--hair);border-radius:14px;
+  box-shadow:0 12px 34px rgba(27,21,37,.12);padding:8px;opacity:0;visibility:hidden;transition:.16s;z-index:60}
+.nav-has-sub:hover .nav-sub,.nav-has-sub:focus-within .nav-sub{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+.nav-has-sub:hover .caret,.nav-has-sub:focus-within .caret{opacity:1;transform:rotate(225deg);margin-top:2px}
+.nav-sub a{display:block;padding:10px 12px;border-radius:9px;font-size:14px;color:var(--ink);font-weight:450}
+.nav-sub a:hover{background:var(--paper-2,#F4F0E9)}
+.nav-sub a small{display:block;font-size:11.5px;color:var(--muted);font-weight:400;margin-top:1px}
+@media(max-width:880px){
+  .nav-sub{position:static;transform:none;opacity:1;visibility:visible;box-shadow:none;border:none;
+    background:transparent;padding:4px 0 4px 14px;min-width:0}
+  .nav-sub a{padding:8px 0}
+  .nav-sub-toggle .caret{display:none}
+}
+
+.textlink{font-weight:550;border-bottom:1px solid var(--brass);padding-bottom:1px;transition:.15s}
+.textlink:hover{color:var(--brass-deep)}
+
+/* ---------- nav ---------- */
+header.nav{position:sticky;top:0;z-index:50;background:rgba(251,250,247,.82);
+  backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--hair)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:70px}
+.brand{font-family:var(--serif);font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.brand .mark{width:26px;height:26px;flex:none}
+.nav-links{display:flex;align-items:center;gap:30px}
+.nav-links a{font-size:14px;color:var(--muted);font-weight:450;transition:.15s;position:relative}
+.nav-links a:hover{color:var(--ink)}
+.nav-links a.cta{color:var(--ink);font-weight:550}
+.nav-actions{display:flex;align-items:center;gap:14px}
+.nav-login{font-size:13.5px;color:var(--muted)}
+.nav-login:hover{color:var(--ink)}
+.burger{display:none;background:none;border:none;cursor:pointer;padding:8px}
+.burger span{display:block;width:22px;height:1.5px;background:var(--ink);margin:5px 0;transition:.2s}
+
+/* ---------- hero ---------- */
+.hero{padding:96px 0 88px;position:relative;overflow:hidden}
+.hero h1{font-size:clamp(40px,6.2vw,76px);max-width:14ch}
+.hero h1 em{font-style:italic;color:var(--p)}
+.hero .lede{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:50ch;margin:28px 0 36px;line-height:1.65}
+.hero-cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+
+/* ---------- journey spine (the signature) ---------- */
+.spine{position:relative;margin-top:18px}
+.spine-line{position:absolute;left:23px;top:8px;bottom:8px;width:1px;
+  background:linear-gradient(var(--brass),var(--hair))}
+.station{position:relative;padding:0 0 56px 76px}
+.station:last-child{padding-bottom:0}
+.station .num{position:absolute;left:0;top:-4px;width:48px;height:48px;border-radius:50%;
+  background:var(--paper);border:1px solid var(--brass);color:var(--brass-deep);
+  font-family:var(--mono);font-size:14px;display:flex;align-items:center;justify-content:center;z-index:1}
+.station h3{font-size:25px;margin-bottom:10px}
+.station p{color:var(--muted);max-width:54ch;font-size:16px}
+.station .feel{display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--brass-deep);
+  text-transform:uppercase}
+.station .feel::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--brass)}
+
+/* ---------- panels ---------- */
+.panel-dark{background:var(--p-deep);color:var(--paper)}
+.panel-dark h2{color:var(--paper)}
+.panel-dark .muted{color:rgba(255,255,255,.6)}
+.panel-warm{background:var(--paper-2)}
+
+/* ---------- promise trio ---------- */
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--hair)}
+.promise{padding:38px 32px 38px 0;border-right:1px solid var(--hair)}
+.promise:last-child{border-right:none;padding-right:0;padding-left:32px}
+.promise:first-child{padding-left:0}
+.promise .pn{font-family:var(--mono);font-size:12px;color:var(--brass-deep);letter-spacing:.1em}
+.promise h3{font-size:21px;margin:14px 0 10px}
+.promise p{color:var(--muted);font-size:15px}
+
+/* ---------- experience strip ---------- */
+.nothing-slips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;
+  background:var(--hair);border:1px solid var(--hair)}
+.ns-item{background:var(--paper);padding:30px 26px}
+.ns-item .x{font-family:var(--mono);font-size:12px;color:var(--brass-deep);margin-bottom:10px;display:block}
+.ns-item h4{font-family:var(--serif);font-size:18px;font-weight:400;margin-bottom:7px}
+.ns-item p{font-size:14.5px;color:var(--muted)}
+
+/* ---------- cards / services ---------- */
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.svc{background:var(--paper);border:none;border-radius:18px;padding:34px 30px;display:flex;flex-direction:column;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2);
+  transition:transform .3s cubic-bezier(.32,.72,0,1), box-shadow .3s cubic-bezier(.32,.72,0,1)}
+.svc:hover{transform:translateY(-4px);box-shadow:0 30px 56px -30px rgba(27,21,37,.26)}
+.svc .tier{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-deep)}
+.svc h2{font-size:26px;margin:16px 0 6px}
+.svc .price{font-family:var(--serif);font-size:34px;color:var(--ink);margin:8px 0 4px}
+.svc .price small{font-size:14px;color:var(--muted);font-family:var(--sans)}
+.svc p{color:var(--muted);font-size:15px;margin:12px 0 22px;flex:1}
+.svc ul{list-style:none;margin:0 0 24px;border-top:1px solid var(--hair);padding-top:18px}
+.svc li{font-size:14px;color:var(--ink);padding:7px 0 7px 22px;position:relative}
+.svc li::before{content:"";position:absolute;left:0;top:13px;width:9px;height:9px;border:1px solid var(--brass);border-radius:50%}
+
+/* ---------- quote / testimonial ---------- */
+.quote{max-width:760px}
+.quote blockquote{font-family:var(--serif);font-size:clamp(24px,3.4vw,34px);font-weight:380;
+  line-height:1.32;letter-spacing:-.01em}
+.quote .by{margin-top:24px;font-size:14px;color:var(--muted);font-family:var(--mono);letter-spacing:.03em}
+
+/* ---------- forms ---------- */
+.field{margin-bottom:20px}
+.field label{display:block;font-size:13px;font-weight:550;margin-bottom:7px;letter-spacing:.01em}
+.field input,.field textarea,.field select{width:100%;font-family:var(--sans);font-size:15px;
+  padding:13px 15px;border:1px solid var(--hair);border-radius:2px;background:var(--paper);color:var(--ink);
+  transition:.15s}
+.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(91,63,160,.25)}
+.field textarea{min-height:130px;resize:vertical}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+
+/* ---------- footer ---------- */
+footer.site{background:var(--ink);color:rgba(255,255,255,.55);padding:64px 0 36px}
+footer.site .fwrap{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:40px;padding-bottom:48px;
+  border-bottom:1px solid var(--hair-dk)}
+footer.site .brand{color:var(--paper);font-size:22px;margin-bottom:14px}
+footer.site p{font-size:14px;max-width:34ch;line-height:1.7}
+footer.site .fcol-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.4);margin-bottom:16px}
+footer.site .fcol a{display:block;font-size:14px;color:rgba(255,255,255,.62);padding:6px 0;transition:.15s}
+footer.site .fcol a:hover{color:var(--paper)}
+footer.site .fbase{display:flex;justify-content:space-between;align-items:center;padding-top:28px;
+  font-size:12.5px;flex-wrap:wrap;gap:10px}
+footer.site .fbase a{color:rgba(255,255,255,.5)}
+
+/* ---------- misc ---------- */
+.kicker{font-size:clamp(28px,4vw,46px);max-width:20ch;line-height:1.08}
+.lead-muted{font-size:18px;color:var(--muted);max-width:56ch;line-height:1.65}
+.reveal{opacity:1;transform:none}
+.js-anim .reveal{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s ease}
+.js-anim .reveal.in{opacity:1;transform:none}
+.center{text-align:center}
+.mt-s{margin-top:16px}.mt-m{margin-top:28px}.mt-l{margin-top:48px}
+.divider{height:1px;background:var(--hair);border:none;margin:0}
+
+/* ---------- responsive ---------- */
+@media(max-width:880px){
+  .nav-links{display:none}
+  .burger{display:block}
+  .trio{grid-template-columns:1fr}
+  .promise{border-right:none;border-bottom:1px solid var(--hair);padding:28px 0!important}
+  .promise:last-child{border-bottom:none}
+  .svc-grid{grid-template-columns:1fr}
+  footer.site .fwrap{grid-template-columns:1fr;gap:28px}
+  .pad{padding:72px 0}.hero{padding:60px 0 56px}
+  .mobile-open .nav-links{display:flex;position:absolute;top:70px;left:0;right:0;flex-direction:column;
+    background:var(--paper);padding:20px 32px;gap:18px;border-bottom:1px solid var(--hair)}
+  /* mobile submenu: stack links cleanly instead of collapsing into one line */
+  .mobile-open .nav-has-sub{display:flex;flex-direction:column;gap:14px}
+  .mobile-open .nav-sub{position:static;opacity:1;visibility:visible;transform:none;
+    display:flex;flex-direction:column;gap:2px;box-shadow:none;border:none;padding:0 0 0 14px;
+    margin-top:6px;background:transparent;min-width:0}
+  .mobile-open .nav-sub a{padding:7px 0}
+  .mobile-open .nav-sub a small{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+  .mobile-open .nav-sub-toggle .caret{display:none}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+
+/* ---------------------------------------------------------------
+   GLOBAL CHROME — skip link, focus visibility, current-page state.
+   Added as part of the nav/footer baseline pass. Additive only;
+   nothing here changes existing layout or palette.
+   --------------------------------------------------------------- */
+.skip-link{
+  position:absolute; left:-9999px; top:auto;
+  background:var(--ink); color:var(--paper); padding:12px 20px;
+  font-family:var(--sans); font-size:14px; font-weight:550;
+  border-radius:0 0 8px 0; z-index:200;
+}
+.skip-link:focus{ left:0; top:0; }
+
+/* styles.css previously styled :focus only on form fields; nav and
+   footer links fell back to the bare browser default outline. One
+   consistent, on-brand ring for primary navigation and footer links. */
+.nav a:focus-visible,
+.nav button:focus-visible{
+  outline:none; box-shadow:0 0 0 3px rgba(91,63,160,.35); border-radius:4px;
+}
+.nav .btn:focus-visible{ border-radius:100px; }
+footer.site a:focus-visible{
+  outline:none; box-shadow:0 0 0 3px rgba(255,255,255,.55); border-radius:4px;
+}
+
+/* Current-page indicator. Replaces the old `.active` class, which had
+   no associated styling anywhere in this file and was therefore
+   invisible to sighted and assistive-tech users alike. aria-current
+   is both the semantic and the visual signal now — one mechanism. */
+.nav-links a[aria-current="page"]{
+  color:var(--ink); font-weight:600;
+}
+.nav-links a[aria-current="page"]::after{
+  content:""; position:absolute; left:0; right:0; bottom:-4px; height:2px;
+  background:var(--brass);
+}
+
+/* Mega-menu escape-to-close: JS adds .closed on Escape and removes it
+   on the next focus/hover, overriding the CSS-only :hover/:focus-within
+   reveal so keyboard users get a working Escape key. No-JS: this class
+   is simply never added, and :hover/:focus-within continue to work
+   exactly as before. */
+.nav-has-sub.closed .nav-sub{
+  opacity:0 !important; visibility:hidden !important;
+}
+
+/* ---------- hero grid + project card ---------- */
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+.hero-card{background:var(--paper);border:1px solid var(--hair);border-radius:3px;padding:24px 24px 20px;
+  box-shadow:0 30px 60px -34px rgba(27,21,37,.28)}
+.hc-head{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--brass-deep);display:flex;align-items:center;gap:9px;padding-bottom:16px;border-bottom:1px solid var(--hair);margin-bottom:6px}
+.hc-dot{width:7px;height:7px;border-radius:50%;background:var(--brass)}
+.hc-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:11px 0;font-size:14.5px;color:var(--ink)}
+.hc-row + .hc-row{border-top:1px solid var(--hair)}
+.hc-n{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.hc-row.dim{color:var(--muted)}.hc-row.dim .hc-n{opacity:.6}
+.hc-row.active{color:var(--ink);font-weight:550}
+.hc-tick{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--brass-deep)}
+.hc-tick.now{color:var(--p);background:var(--p-mist);padding:3px 8px;border-radius:100px}
+.hc-foot{margin-top:14px;padding-top:14px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--muted);line-height:1.5}
+@media(max-width:880px){.hero-grid{grid-template-columns:1fr;gap:36px}.hero-card{order:2}}
+
+/* ---------- industry page layout (was an inline style with no mobile
+   breakpoint at all — found during Batch 2 mobile verification) ---------- */
+.industry-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+@media(max-width:760px){.industry-grid{grid-template-columns:1fr;gap:32px}}
+
+/* ---------- industry page hero icon badge (added in design sprint 2,
+   following the CD review that flagged this cluster as under-differentiated) ---------- */
+.ind-page-icon{
+  position:absolute; top:40px; right:max(32px, calc(50% - 380px));
+  background:#fff; border-radius:16px; padding:14px;
+  box-shadow:0 20px 42px -28px rgba(27,21,37,.24);
+}
+@media(max-width:880px){
+  .ind-page-icon{ position:static; display:inline-block; margin-bottom:20px; }
+}
+
+/* ---------- feature box (industry "what this means") ---------- */
+.feature-box{background:var(--paper);border:none;border-radius:20px;padding:34px 32px;
+  box-shadow:0 24px 50px -34px rgba(27,21,37,.24)}
+.fb-label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass-deep);margin-bottom:20px}
+.fb-list{list-style:none}
+.fb-list li{position:relative;padding:13px 0 13px 28px;font-size:15.5px;color:var(--ink);
+  border-top:1px solid var(--hair)}
+.fb-list li:first-child{border-top:none;padding-top:4px}
+.fb-list li::before{content:"";position:absolute;left:0;top:18px;width:9px;height:9px;
+  border:1px solid var(--brass);border-radius:50%}
+.fb-list li:first-child::before{top:9px}
+
+/* ---------- link affordance fix: arrow link, clearer than faint underline ---------- */
+.textlink{font-weight:550;color:var(--brass-deep);border-bottom:1px solid var(--brass);
+  padding-bottom:1px;transition:.15s}
+.textlink:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- mobile nav tightening ---------- */
+@media(max-width:880px){
+  .nav-in{height:62px}
+  .brand{font-size:17px;gap:8px}
+  .brand .mark{width:22px;height:22px}
+  .nav-actions .btn{padding:9px 14px;font-size:13px}
+  .nav-login{display:none}
+}
+@media(max-width:420px){
+  .wrap{padding:0 20px}
+  .nav-actions .btn{padding:8px 12px;font-size:12.5px}
+}
+
+/* hero signature — small face + one honest credential at the "keep reading?" moment */
+.hero-sig{display:flex;align-items:center;gap:13px;margin-top:34px}
+.hero-sig img{width:46px;height:46px;border-radius:50%;object-fit:cover;object-position:center top;border:1px solid var(--hair);flex-shrink:0}
+.hero-sig-txt{font-size:13.5px;line-height:1.45;color:var(--muted)}
+.hero-sig-txt strong{display:block;color:var(--ink);font-weight:550;font-size:14px}
+
+/* how-we-work process shot — a real person runs the process */
+.hww-shot{margin:36px 0 0;border-radius:14px;overflow:hidden}
+.hww-shot img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--hair)}
+.hww-shot figcaption{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);margin-top:12px;text-align:center}
+
+/* about — portrait anchors "who am I hiring?"; life photo is one human note */
+.about-portrait{margin:8px 0 0;border-radius:16px;overflow:hidden;max-width:460px}
+.about-portrait img{display:block;width:100%;height:auto;border-radius:16px;border:1px solid var(--hair)}
+.about-life{margin:28px 0 0;max-width:340px;border-radius:14px;overflow:hidden}
+.about-life img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--hair)}
+
+/* portal screenshots as product photography — framed, calm, never busy */
+.portal-proof{margin:0;border-radius:16px;overflow:hidden;border:1px solid var(--hair);box-shadow:0 30px 60px -34px rgba(27,21,37,.28);background:#fff}
+.portal-proof img{display:block;width:100%;height:auto}
+.portal-proof figcaption{font-family:var(--mono);font-size:12.5px;letter-spacing:.03em;color:var(--muted);padding:14px 20px;border-top:1px solid var(--hair);background:#fff;text-align:center}
+
+/* ============================================================
+   MOBILE-FIRST COMPOSITION LAYER
+   Mobile is treated as its own experience, not stacked desktop.
+   Re-composes type scale, spacing rhythm, and image art-direction
+   for phones. Desktop composition above is untouched.
+   ============================================================ */
+@media(max-width:600px){
+
+  /* — Type scale: calmer, tuned for a 393px column — */
+  .hero h1{font-size:clamp(32px,8.5vw,38px);line-height:1.12;letter-spacing:-0.5px;max-width:none;text-wrap:balance}
+  .hero .lede{font-size:16.5px;line-height:1.6;margin:18px 0 26px;max-width:none}
+  .kicker{font-size:clamp(26px,7vw,32px) !important;line-height:1.15;letter-spacing:-0.4px;text-wrap:balance}
+  h2,.section h2{text-wrap:balance}
+
+  /* — Journey spine: the 48px numbered circle + 76px left padding was tuned
+       for desktop and never had a mobile pass (first live use is the
+       Solutions page). Smaller circle, tighter padding, so the text column
+       isn't squeezed to ~200px on a 375px phone. — */
+  .station{padding:0 0 40px 56px}
+  .station .num{width:36px;height:36px;font-size:12px}
+  .station h3{font-size:21px}
+  .station p{font-size:15px}
+  .spine-line{left:17px}
+
+  /* — Spacing rhythm: a real mobile scale, not desktop padding — */
+  .hero{padding:32px 0 40px}
+  .pad{padding:48px 0}
+  .pad-sm{padding:36px 0}
+  .mt-l{margin-top:28px}
+
+  /* — Hero: face leads as a proper introduction, card fills first scroll — */
+  .hero-grid{gap:28px}
+  .hero-sig{margin-top:24px;gap:14px}
+  .hero-sig img{width:60px;height:60px}
+  .hero-sig-txt{font-size:14px}
+  .hero-sig-txt strong{font-size:15px}
+  .hero-card{padding:20px 18px 16px}
+
+  /* — One CTA per viewport: the hero owns the action; header CTA calms down — */
+  .nav-actions .btn{padding:9px 14px;font-size:12.5px}
+
+  /* — About portrait: art-directed, face-filled, not a full-height snapshot — */
+  .about-portrait{max-width:300px;margin-left:auto;margin-right:auto}
+  .about-portrait img{aspect-ratio:4/5;object-fit:cover;object-position:center 22%}
+
+  /* — How-we-work desk shot: contained, not full-bleed — */
+  .hww-shot img{aspect-ratio:3/2;object-fit:cover}
+
+  /* — Portal proof: focused, framed, legible. Real mobile capture swapped
+       in via <picture> in markup; this just frames it calmly — */
+  .portal-proof,.xp-proof{box-shadow:0 16px 40px -22px rgba(27,21,37,.26)}
+  .portal-proof figcaption,.xp-proof-cap{font-size:11.5px;padding:12px 16px}
+
+  /* — Stacked sections get rhythm: tighten card gaps, lighten dividers — */
+  .nothing-slips{gap:12px}
+  .ns-item{padding:18px}
+
+  /* — Reveal animation: instant-feeling on mobile — */
+  .js-anim .reveal{transition:opacity .4s ease,transform .4s ease}
+
+  /* — Contact: collapse the two-column form/aside grid to one column.
+       (overrides an inline desktop grid; !important is required to beat inline) — */
+  body[data-page="contact"] .wrap[style*="grid"]{grid-template-columns:1fr !important;gap:36px !important}
+
+  /* — Tap targets: 44px minimum (HIG) for the two real offenders — */
+  .burger{padding:13px;margin:-5px -8px -5px 0}
+  footer.site .fcol a{padding:9px 0}
+}

@@ -1,0 +1,317 @@
+/* ============================================================
+   Davis Digital Studio — home.css
+   HOMEPAGE-ONLY layer. Every rule is scoped under
+   body[data-page="home"] (index.html is the only page with that
+   attribute — verified against every other template) so this file
+   cannot bleed into any other page. Loaded AFTER styles.css so it
+   wins on equal specificity for anything it touches.
+
+   Reuses existing tokens declared in styles.css :root (--ink,
+   --paper, --p, --brass, --hair, --muted, --serif, --sans, --mono)
+   rather than redeclaring them. Adds only the small set of new
+   custom properties the V2 homepage needs, scoped locally so they
+   can't affect any other template.
+
+   Contains: hero "Reply" moment, credibility whisper, sharpened
+   promise trio spacing, Experience section + "Convergence" moment,
+   Selective-by-Design section, "Quiet Line" moment, merged
+   Founder/Philosophy section, single-CTA closing panel.
+   ============================================================ */
+
+body[data-page="home"]{
+  --r-card:20px;         /* new premium card radius, homepage-only */
+  --sh-card:0 30px 60px -34px rgba(27,21,37,.28);   /* matches existing hero-card shadow value */
+  --ease-moment:cubic-bezier(.32,.72,0,1);           /* same curve already used sitewide */
+}
+
+/* ---------------------------------------------------------------
+   SKIP LINK — now defined sitewide in styles.css as part of the global
+   chrome pass; the homepage-specific copy that used to live here has
+   been removed to avoid two sources of truth for the same rule.
+   --------------------------------------------------------------- */
+
+/* Standard visually-hidden pattern: present for screen-reader heading
+   navigation, removed from visual flow without affecting layout. */
+.visually-hidden{
+  position:absolute !important; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+
+
+/* ---------------------------------------------------------------
+   FOCUS VISIBILITY — styles.css only styles focus on form fields;
+   links/buttons fall back to the browser default outline, which
+   reads inconsistently on warm paper and fails visually on the
+   dark CTA panel. This gives the homepage one consistent, on-brand
+   ring (same purple used on form-field focus) without touching the
+   shared stylesheet other pages depend on.
+   --------------------------------------------------------------- */
+body[data-page="home"] a:focus-visible,
+body[data-page="home"] button:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(91,63,160,.35);
+  border-radius:4px;
+}
+body[data-page="home"] .panel-dark a:focus-visible,
+body[data-page="home"] .final-cta a:focus-visible{
+  box-shadow:0 0 0 3px rgba(255,255,255,.55);
+}
+body[data-page="home"] .btn:focus-visible{ border-radius:100px; }
+
+body[data-page="home"] .hero-sig img{
+  box-shadow:0 6px 16px -6px rgba(27,21,37,.28);
+}
+body[data-page="home"] .hero h1{ max-width:15ch; }
+
+body[data-page="home"] .hero-card.reply-card{
+  border-radius:var(--r-card);
+  padding:26px 26px 22px;
+  box-shadow:var(--sh-card);
+}
+body[data-page="home"] .reply-card .hc-head{ position:relative; }
+body[data-page="home"] .reply-card .hc-dot{ opacity:1; transition:opacity .3s var(--ease-moment); }
+.js-anim body[data-page="home"] .reply-card .hc-dot{ opacity:0; }
+.js-anim body[data-page="home"] .reply-card.in .hc-dot{
+  opacity:1; transition-delay:.25s;
+}
+
+body[data-page="home"] .reply-msg{
+  font-size:14.5px; color:var(--ink); line-height:1.5; padding:14px 0;
+  display:flex; flex-direction:column; gap:4px;
+}
+body[data-page="home"] .reply-msg + .reply-msg{ border-top:1px solid var(--hair); }
+body[data-page="home"] .who{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted);
+}
+body[data-page="home"] .quote-text{ font-size:14.5px; color:var(--ink); line-height:1.5; }
+body[data-page="home"] .reply-foot{
+  margin-top:12px; padding-top:12px; border-top:1px solid var(--hair);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em;
+  color:var(--brass-deep); text-transform:uppercase;
+}
+
+/* ---------------------------------------------------------------
+   PROMISE TRIO — elevated to match the hero card's premium treatment.
+   Same tokens (--r-card, --sh-card, --ease-moment) already used above;
+   this just extends that language instead of inventing a new one.
+   Was a flat, shadowless, hairline-divided list; becomes three
+   distinct cards with real breathing room between them.
+   --------------------------------------------------------------- */
+body[data-page="home"] .trio{
+  border-top:none;
+  gap:24px;
+}
+body[data-page="home"] .promise{
+  background:var(--paper);
+  border-right:none;
+  border-radius:var(--r-card);
+  box-shadow:0 20px 44px -30px rgba(27,21,37,.22);
+  padding:36px 32px 34px;
+  transition:transform .35s var(--ease-moment), box-shadow .35s var(--ease-moment);
+}
+body[data-page="home"] .promise:first-child,
+body[data-page="home"] .promise:last-child{
+  padding:36px 32px 34px; /* override styles.css's asymmetric first/last padding — every card now matches */
+}
+body[data-page="home"] .promise:hover{
+  transform:translateY(-3px);
+  box-shadow:var(--sh-card);
+}
+@media(max-width:880px){
+  body[data-page="home"] .trio{ grid-template-columns:1fr; gap:18px; }
+  body[data-page="home"] .promise{
+    border-bottom:none !important;
+    padding:30px 26px !important;
+  }
+}
+
+/* Default (no JS, or reduced motion): everything visible, fully resolved. */
+body[data-page="home"] .reply-a,
+body[data-page="home"] .reply-foot{ opacity:1; transform:none; }
+
+/* Enhanced (JS present + motion allowed): sequence the reply in on reveal. */
+.js-anim body[data-page="home"] .reply-a,
+.js-anim body[data-page="home"] .reply-foot{
+  opacity:0; transform:translateY(6px);
+}
+.js-anim body[data-page="home"] .reply-card.in .reply-a{
+  transition:opacity .35s var(--ease-moment) .55s, transform .35s var(--ease-moment) .55s;
+  opacity:1; transform:none;
+}
+.js-anim body[data-page="home"] .reply-card.in .reply-foot{
+  transition:opacity .3s var(--ease-moment) .95s, transform .3s var(--ease-moment) .95s;
+  opacity:1; transform:none;
+}
+
+/* ---------------------------------------------------------------
+   CREDIBILITY WHISPER — one quiet line, no section chrome
+   --------------------------------------------------------------- */
+body[data-page="home"] .credibility{
+  padding:22px 0; text-align:center;
+}
+body[data-page="home"] .credibility p{
+  font-family:var(--mono); font-size:12px; letter-spacing:.06em;
+  color:var(--muted); text-transform:uppercase;
+}
+
+/* ---------------------------------------------------------------
+   PROMISE TRIO — sharpened, plus the quiet portal chip under #3
+   --------------------------------------------------------------- */
+body[data-page="home"] .promise-chip{
+  display:inline-flex; align-items:center; gap:6px; margin-top:14px;
+  padding:4px 2px;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em;
+  color:var(--brass-deep); border-bottom:1px solid transparent; transition:.15s;
+}
+body[data-page="home"] .promise-chip:hover{ color:var(--ink); border-color:var(--brass); }
+
+/* ---------------------------------------------------------------
+   EXPERIENCE SECTION — asymmetric layout + "The Convergence"
+   --------------------------------------------------------------- */
+body[data-page="home"] .xp-grid{
+  display:grid; grid-template-columns:.72fr 1fr; gap:56px; align-items:start;
+}
+/* The eyebrow-on-panel-warm contrast fix that used to be scoped here was
+   promoted to styles.css's shared .eyebrow rule during the Solutions page
+   build, once the same gap was confirmed to recur sitewide rather than
+   being homepage-specific. Nothing to override here anymore. */
+body[data-page="home"] .xp-list{ list-style:none; margin-top:28px; }
+body[data-page="home"] .xp-list li{
+  position:relative; padding:14px 0 14px 26px; font-size:15px; color:var(--ink);
+  border-top:1px solid var(--hair);
+}
+body[data-page="home"] .xp-list li:first-child{ border-top:none; padding-top:0; }
+body[data-page="home"] .xp-list li::before{
+  content:""; position:absolute; left:0; top:19px; width:8px; height:8px;
+  border:1px solid var(--brass); border-radius:50%;
+}
+body[data-page="home"] .xp-list li:first-child::before{ top:5px; }
+body[data-page="home"] .xp-list .from{ color:var(--muted); }
+
+body[data-page="home"] .conv-wrap{ position:relative; }
+body[data-page="home"] .conv-overlay{
+  display:none; /* off by default: no-JS and reduced-motion never render it */
+}
+/* Only draw the "before" icon flourish when JS has confirmed motion is welcome. */
+.js-anim body[data-page="home"] .conv-wrap .conv-overlay{
+  display:block; position:absolute; inset:0; pointer-events:none; z-index:2;
+}
+.js-anim body[data-page="home"] .conv-wrap .conv-icon{
+  position:absolute; top:50%; left:50%; width:20px; height:20px; color:var(--muted);
+  opacity:.5; transform:translate(-50%,-50%) translate(var(--tx),var(--ty)) scale(1);
+  transition:opacity .5s var(--ease-moment), transform .5s var(--ease-moment);
+  transition-delay:var(--tdelay,0s);
+}
+.js-anim body[data-page="home"] .conv-wrap.in .conv-icon{
+  opacity:0; transform:translate(-50%,-50%) translate(0,0) scale(.4);
+}
+.js-anim body[data-page="home"] .conv-wrap .portal-proof{
+  transition-delay:.5s;
+}
+
+/* ---------------------------------------------------------------
+   SELECTIVE BY DESIGN — spacious, centered, restrained on purpose
+   --------------------------------------------------------------- */
+body[data-page="home"] .selective{
+  padding:clamp(88px,13vh,132px) 0; text-align:center;
+}
+body[data-page="home"] .selective .wrap{ max-width:640px; }
+body[data-page="home"] .selective h2{ font-size:clamp(28px,4vw,42px); line-height:1.15; }
+body[data-page="home"] .selective .fine{
+  margin-top:18px; font-family:var(--mono); font-size:12px; color:var(--muted);
+  letter-spacing:.02em;
+}
+
+/* ---------------------------------------------------------------
+   THE QUIET LINE — almost nothing, on purpose. No CTA here.
+   --------------------------------------------------------------- */
+body[data-page="home"] .quiet-line{
+  padding:clamp(120px,18vh,200px) 0; text-align:center; background:var(--paper);
+}
+body[data-page="home"] .quiet-line h2{
+  font-size:clamp(28px,4.2vw,46px); font-weight:380; max-width:18ch; margin:0 auto;
+  line-height:1.2;
+}
+body[data-page="home"] .quiet-line .sub{
+  margin-top:16px; font-size:16px; color:var(--muted);
+}
+.js-anim body[data-page="home"] .quiet-line .sub{ transition-delay:.35s; }
+
+/* ---------------------------------------------------------------
+   FOUNDER + PHILOSOPHY — merged two-up
+   --------------------------------------------------------------- */
+body[data-page="home"] .founder-grid{
+  display:grid; grid-template-columns:.85fr 1.15fr; gap:64px; align-items:center;
+}
+body[data-page="home"] .about-portrait{
+  box-shadow:0 24px 48px -32px rgba(27,21,37,.24);
+  border-radius:18px;
+}
+body[data-page="home"] .about-portrait img{ border-radius:18px; border:none; }
+body[data-page="home"] .founder-bio p{ font-size:15.5px; color:var(--muted); line-height:1.7; margin-top:16px; }
+body[data-page="home"] .philosophy{ position:relative; padding-left:28px; }
+body[data-page="home"] .philosophy::before{
+  content:""; position:absolute; left:0; top:6px; width:32px; height:2px; background:var(--brass);
+}
+body[data-page="home"] .philosophy blockquote{
+  font-family:var(--serif); font-weight:380; font-size:clamp(24px,3.2vw,34px);
+  line-height:1.32; letter-spacing:-.01em; color:var(--ink);
+}
+
+/* ---------------------------------------------------------------
+   FINAL CTA — one true button, one quiet secondary link
+   --------------------------------------------------------------- */
+body[data-page="home"] .final-cta .secondary-link{
+  display:inline-block; margin-top:18px; font-size:13.5px;
+  color:rgba(255,255,255,.6); border-bottom:1px solid rgba(255,255,255,.3);
+  padding-bottom:1px; transition:.15s;
+}
+body[data-page="home"] .final-cta .secondary-link:hover{ color:var(--paper); border-color:var(--paper); }
+
+/* ---------------------------------------------------------------
+   REDUCED MOTION — explicit safety net for the new custom classes.
+   styles.css already forces every *.reveal element to opacity:1 and
+   kills all transitions globally; these rules cover the additional
+   home-only classes that carry their own hidden-by-default state,
+   since the universal transition:none rule does not by itself
+   reset an opacity that a class selector explicitly set to 0.
+   --------------------------------------------------------------- */
+@media(prefers-reduced-motion:reduce){
+  body[data-page="home"] .reply-a,
+  body[data-page="home"] .reply-foot,
+  body[data-page="home"] .reply-card .hc-dot,
+  body[data-page="home"] .quiet-line .sub{
+    opacity:1 !important; transform:none !important;
+  }
+  body[data-page="home"] .conv-overlay{ display:none !important; }
+}
+
+/* ---------------------------------------------------------------
+   RESPONSIVE — mobile-first re-composition (mirrors styles.css's
+   existing 880px / 600px breakpoints and philosophy)
+   --------------------------------------------------------------- */
+@media(max-width:880px){
+  body[data-page="home"] .xp-grid{ grid-template-columns:1fr; gap:32px; }
+  body[data-page="home"] .founder-grid{ grid-template-columns:1fr; gap:36px; }
+  body[data-page="home"] .philosophy{ padding-left:0; padding-top:22px; border-top:1px solid var(--hair); }
+  body[data-page="home"] .philosophy::before{ top:0; left:0; }
+}
+
+@media(max-width:600px){
+  body[data-page="home"] .hero-card.reply-card{ padding:20px 18px 16px; }
+  body[data-page="home"] .credibility{ padding:16px 0; }
+  body[data-page="home"] .credibility p{ font-size:11px; padding:0 12px; }
+  body[data-page="home"] .selective{ padding:clamp(64px,10vh,88px) 0; }
+  body[data-page="home"] .quiet-line{ padding:clamp(80px,14vh,120px) 0; }
+  body[data-page="home"] .quiet-line h2{ font-size:clamp(26px,7.5vw,32px); }
+  /* Icon flourish is a desktop/tablet nicety; skip on small phones — the
+     available space is too tight for it to read as anything but clutter. */
+  .js-anim body[data-page="home"] .conv-wrap .conv-overlay{ display:none; }
+}
+
+/* Print: kill the decorative overlay, keep the resolved content only */
+@media print{
+  body[data-page="home"] .conv-overlay{ display:none !important; }
+}

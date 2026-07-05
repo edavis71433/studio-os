@@ -1,0 +1,40 @@
+/* ============================================================
+   Davis Digital Studio — industries.css
+   INDUSTRIES-PAGE-ONLY layer, scoped under body[data-page="industries"].
+   Loaded after styles.css.
+
+   Design-sprint pass (second round, following the CD review that
+   flagged this cluster as the weakest on the site). Introduces
+   five custom line-icons — restaurant, salon, retail, home
+   services, health & wellness — built in the exact style of the
+   existing brand mark (thin stroke, no fill, brass ring, ink
+   linework). This is a genuinely new device: nothing else on the
+   site uses per-topic iconography, so it's real differentiation,
+   not a repeat of an existing pattern.
+   ============================================================ */
+
+body[data-page="industries"] .ind-hero-grid{
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:48px;
+  align-items:center;
+}
+body[data-page="industries"] .ind-hero-icons{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+  background:#fff;
+  border-radius:22px;
+  padding:28px;
+  box-shadow:0 34px 64px -36px rgba(43,27,74,.26);
+  justify-items:center;
+  max-width:260px;
+  margin-left:auto;
+}
+
+body[data-page="industries"] .svc-icon{ margin-bottom:6px; }
+
+@media(max-width:880px){
+  body[data-page="industries"] .ind-hero-grid{ grid-template-columns:1fr; gap:32px; }
+  body[data-page="industries"] .ind-hero-icons{ max-width:280px; margin:0 auto; }
+}

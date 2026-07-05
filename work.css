@@ -1,0 +1,78 @@
+/* ============================================================
+   Davis Digital Studio — work.css
+   WORK-PAGE-ONLY layer, scoped under body[data-page="work"].
+   Loaded after styles.css.
+
+   Contains the pre-existing minimal styling for the signature
+   moment's native <details> element (moved here from an inline
+   <style> block for consistency with the rest of the site), plus
+   the full visual redesign of the "Four decisions" section.
+
+   Deliberately the most restrained page in this whole redesign
+   pass: no cards, no shadows, no gradient wash. The page's own
+   content argues explicitly against decoration ("I've talked
+   clients out of effects... the best decision is sometimes the
+   invisible one") — using heavy chrome here would contradict what
+   the page is actually saying. The visual sophistication instead
+   comes from scale contrast, alternating alignment, and generous
+   whitespace: an editorial zig-zag essay, not another panel grid.
+   ============================================================ */
+
+/* ---------------------------------------------------------------
+   SIGNATURE MOMENT — native <details>, unchanged from original.
+   --------------------------------------------------------------- */
+body[data-page="work"] .decision-reveal summary{
+  cursor:pointer; list-style:none; display:flex; align-items:center;
+  justify-content:space-between; gap:16px;
+}
+body[data-page="work"] .decision-reveal summary::-webkit-details-marker{ display:none; }
+body[data-page="work"] .decision-reveal summary::marker{ content:""; }
+body[data-page="work"] .decision-reveal .toggle-icon{
+  font-family:var(--mono); font-size:14px; color:#836539;
+  flex-shrink:0; transition:transform .2s ease;
+}
+body[data-page="work"] .decision-reveal[open] .toggle-icon{ transform:rotate(45deg); }
+
+/* ---------------------------------------------------------------
+   FOUR DECISIONS — editorial zig-zag essay.
+   --------------------------------------------------------------- */
+body[data-page="work"] .wk-decisions{
+  display:flex; flex-direction:column; gap:64px;
+}
+body[data-page="work"] .wk-decision{
+  display:grid;
+  grid-template-columns:120px 1fr;
+  gap:8px;
+  align-items:start;
+}
+body[data-page="work"] .wk-decision + .wk-decision{
+  padding-top:56px;
+  border-top:1px solid var(--hair);
+}
+body[data-page="work"] .wk-decision-num{
+  font-family:var(--serif); font-weight:340; font-size:88px; line-height:.85;
+  color:var(--brass); opacity:.32;
+}
+body[data-page="work"] .wk-decision-body h3{
+  font-size:clamp(24px,3vw,32px); line-height:1.28; max-width:22ch;
+  margin-bottom:14px;
+}
+body[data-page="work"] .wk-decision-body p{
+  color:var(--muted); font-size:16px; max-width:56ch;
+}
+
+/* Zig-zag: the "b" decisions (2 and 4) shift right on wide screens,
+   giving the essay real asymmetric rhythm instead of a repeating
+   left-aligned list. */
+body[data-page="work"] .wk-decision-b{
+  margin-left:auto;
+  max-width:calc(100% - 64px);
+}
+
+@media(max-width:720px){
+  body[data-page="work"] .wk-decision{ grid-template-columns:64px 1fr; gap:4px; }
+  body[data-page="work"] .wk-decision-num{ font-size:52px; }
+  body[data-page="work"] .wk-decision-b{ margin-left:0; max-width:100%; }
+  body[data-page="work"] .wk-decisions{ gap:44px; }
+  body[data-page="work"] .wk-decision + .wk-decision{ padding-top:40px; }
+}

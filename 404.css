@@ -1,0 +1,27 @@
+/* ============================================================
+   Davis Digital Studio — 404.css
+   404-PAGE-ONLY layer, scoped under body[data-page="404"].
+   Loaded after styles.css.
+
+   Minimal, restrained touch — the copy was already good and
+   on-brand ("This page wandered off. It happens."), so this isn't
+   a rewrite. Just a large ghost numeral behind the content, the
+   same typographic device already used on Solutions and Work, so
+   this page feels like part of the same family instead of a bare
+   afterthought with no visual identity of its own.
+   ============================================================ */
+
+body[data-page="404"] .p404-ghost{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  font-family:var(--serif);
+  font-weight:340;
+  font-size:min(48vw, 420px);
+  line-height:1;
+  color:var(--p);
+  opacity:.05;
+  pointer-events:none;
+  user-select:none;
+  z-index:0;
+}

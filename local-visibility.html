@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<!-- DDS v3.8 20260621-1700 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<title>Free Local Visibility Score | Davis Digital Studio</title>
+<meta name="description" content="Check how visible your business is in local Google search. GBP status, local pack presence, review signals, and your top opportunity. Free, no signup.">
+<link rel="canonical" href="https://davisdigitalstudio.com/local-visibility">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:site" content="@davisdigitalstudio">
+<meta property="og:url" content="https://davisdigitalstudio.com/local-visibility">
+<meta property="og:title" content="Free Local Visibility Score · Davis Digital Studio">
+<meta property="og:description" content="How visible is your business in local search? Answer 6 questions, get a real score and your biggest opportunity to rank higher on Google.">
+<meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<script>(function(){if(localStorage.getItem('cookie_consent')==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}})();</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-V4WF04NX7F',{anonymize_ip:true});</script>
+<link rel="stylesheet" href="styles.css">
+<style>
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw;}
+:root{--p:#5B3FA0;--pxl:#c4aee8;--pxxl:#EDE8F7;--pxxxl:#f7f4fd;--pdark:#2A1B4A;--ink:#1B1525;--muted:#6B6276;--brass:#B08D57;--paper:#FBFAF7;--serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;}
+.skip-link{position:absolute;left:-9999px;top:8px;background:var(--p);color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+
+
+.tool-wrap{max-width:680px;margin:0 auto;padding:56px 24px 80px;}
+
+/* Stepper */
+.step-indicator{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:40px;}
+.step-dot{width:32px;height:32px;border-radius:50%;border:2px solid var(--pxl);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--muted);transition:all 0.3s;background:#fff;position:relative;z-index:1;}
+.step-dot.active{border-color:var(--p);color:var(--p);background:var(--pxxxl);}
+.step-dot.done{border-color:var(--p);background:var(--p);color:#fff;}
+.step-line{height:2px;width:48px;background:var(--pxl);transition:background 0.3s;}
+.step-line.done{background:var(--p);}
+
+/* Question cards */
+.q-card{background:#fff;border-radius:24px;padding:40px;box-shadow:0 4px 40px rgba(91,63,160,0.08);border:1px solid rgba(91,63,160,0.1);display:none;}
+.q-card.active{display:block;}
+.q-num{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
+.q-card h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:8px;letter-spacing:-0.5px;line-height:1.2;}
+.q-card p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+.options{display:flex;flex-direction:column;gap:10px;}
+.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1.5px solid rgba(91,63,160,0.15);border-radius:12px;cursor:pointer;transition:all 0.15s;background:#fff;}
+.opt:hover{border-color:var(--p);background:var(--pxxxl);}
+.opt.selected{border-color:var(--p);background:var(--pxxxl);}
+.opt-icon{width:36px;height:36px;border-radius:10px;background:var(--pxxxl);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.opt.selected .opt-icon{background:var(--p);}
+.opt-text h3{font-size:14px;font-weight:600;margin-bottom:2px;}
+.opt-text p{font-size:12px;color:var(--muted);line-height:1.4;}
+.text-input{width:100%;border:1.5px solid rgba(91,63,160,0.2);border-radius:12px;padding:14px 18px;font-size:15px;font-family:var(--sans);color:var(--ink);background:#fff;transition:border-color 0.15s;outline:none;margin-bottom:8px;}
+.text-input:focus{border-color:var(--p);}
+.text-input::placeholder{color:#b0a8c0;}
+.back-btn{background:transparent;border:1.5px solid var(--pxl);color:var(--p);border-radius:100px;padding:10px 22px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:background 0.15s;}
+.back-btn:hover{background:var(--pxxxl);}
+.next-btn{background:var(--p);color:#fff;border:none;border-radius:100px;padding:11px 28px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:opacity 0.15s;margin-left:auto;}
+.next-btn:hover{opacity:0.88;}
+.next-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* Results */
+.results{display:none;}
+.score-hero{background:var(--pdark);border-radius:24px;padding:40px;text-align:center;margin-bottom:24px;position:relative;overflow:hidden;}
+.score-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.5) 0%,transparent 65%);pointer-events:none;}
+.score-big{font-family:var(--serif);font-size:80px;font-weight:400;line-height:1;position:relative;}
+.score-big.poor{color:#e05555;}
+.score-big.ok{color:#f0b429;}
+.score-big.good{color:#6abf69;}
+.score-label{font-size:13px;color:rgba(255,255,255,0.5);margin-top:4px;margin-bottom:8px;position:relative;}
+.score-grade{display:inline-block;font-size:13px;font-weight:700;padding:4px 16px;border-radius:100px;position:relative;}
+.score-grade.poor{background:rgba(224,85,85,0.2);color:#ff6b6b;}
+.score-grade.ok{background:rgba(240,180,41,0.2);color:#f0b429;}
+.score-grade.good{background:rgba(106,191,105,0.2);color:#6abf69;}
+.biz-name-display{font-size:14px;color:rgba(255,255,255,0.4);margin-top:16px;position:relative;}
+
+.signals-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.signal-card{background:#fff;border-radius:16px;padding:20px;border:1px solid rgba(91,63,160,0.1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
+.signal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.signal-title{font-size:13px;font-weight:600;}
+.signal-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;white-space:nowrap;}
+.signal-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+
+.opp-card{background:linear-gradient(135deg,var(--pxxxl),#fff);border:2px solid var(--p);border-radius:20px;padding:28px;margin-bottom:20px;box-shadow:0 24px 48px -32px rgba(91,63,160,.22);}
+.opp-card .opp-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
+.opp-card h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:10px;}
+.opp-card p{font-size:14px;color:var(--muted);line-height:1.7;}
+
+.actions-list{background:#fff;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid rgba(91,63,160,0.1);}
+.actions-list h3{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+.action-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid rgba(91,63,160,0.06);}
+.action-item:last-child{border-bottom:none;padding-bottom:0;}
+.action-num{width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.action-body h4{font-size:14px;font-weight:600;margin-bottom:3px;}
+.action-body p{font-size:12px;color:var(--muted);line-height:1.5;}
+
+.upgrade-card{background:var(--pdark);border-radius:20px;padding:32px;text-align:center;position:relative;overflow:hidden;box-shadow:0 30px 60px -30px rgba(0,0,0,.35);}
+.upgrade-card::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.5) 0%,transparent 65%);pointer-events:none;}
+.upgrade-card h3{font-family:var(--serif);font-size:24px;font-weight:400;color:#fff;margin-bottom:10px;position:relative;}
+.upgrade-card p{font-size:14px;color:rgba(255,255,255,0.55);margin-bottom:24px;line-height:1.7;position:relative;}
+.upgrade-btns{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;position:relative;}
+.restart-btn{display:block;text-align:center;margin-top:20px;font-size:13px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:var(--sans);text-decoration:underline;}
+
+
+@media(max-width:700px){
+  .signals-grid{grid-template-columns:1fr;}
+  .step-line{width:28px;}
+}
+
+
+/* NAV-FINAL-V5 */
+
+.skip-link{position:absolute;left:-9999px;top:8px;background:#5b3fa0;color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;border-radius:4px;}
+body{}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}}
+
+
+/* Dropdown gap fix - bridge pseudo-element */
+
+
+/* Dropdown bridge - prevents menu closing when moving mouse down */
+
+
+/* ---------------------------------------------------------------
+   TOOL SWITCHER — cross-tool navigation, added so a visitor on any
+   one tool has a clear, designed path to the other five, plus back
+   to the Resources hub. Not a footer link dump — real cards with
+   the same shadow/radius language used across the rest of V2.
+   --------------------------------------------------------------- */
+.tool-switch-section{padding:72px 24px;background:#fff;position:relative;}
+.tool-switch-inner{max-width:1080px;margin:0 auto;}
+.tool-switch-head{text-align:center;margin-bottom:40px;}
+.tool-switch-head span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);}
+.tool-switch-head h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;letter-spacing:-.5px;margin-top:10px;}
+.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
+.tool-switch-head p a{color:var(--p);text-decoration:underline;}
+.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.tool-switch-item{display:block;background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:18px;padding:22px 20px;text-decoration:none;transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
+.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 26px 50px -28px rgba(27,21,37,.24);}
+.tool-switch-item h3{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--ink);margin-bottom:6px;}
+.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5;}
+.tool-switch-item.current{background:var(--p);border-color:var(--p);cursor:default;box-shadow:0 22px 44px -24px rgba(91,63,160,.42);pointer-events:none;}
+.tool-switch-item.current h3{color:#fff;}
+.tool-switch-item.current p{color:rgba(255,255,255,.72);}
+.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:100px;margin-bottom:8px;}
+@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr;}}
+
+
+/* Tool-hero two-column grid — was inline-only with zero mobile breakpoint,
+   causing horizontal overflow on phones (confirmed via screenshot: the
+   sample card was spilling off-screen). Now a real class with a real
+   breakpoint. */
+.tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
+@media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
+</style>
+<link rel="stylesheet" href="/enhance.css">
+</head>
+<body data-page="local-visibility">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<header class="nav">
+<div class="wrap nav-in">
+  <a href="index.html" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="how-we-work.html">How we work</a>
+    <a href="the-experience.html">The experience</a>
+    <span class="nav-has-sub"><a href="services.html" class="nav-sub-toggle" aria-haspopup="true" aria-expanded="false">Services <i class="caret" aria-hidden="true"></i></a>
+      <span class="nav-sub">
+        <a href="services.html">All services<small>Pricing and the full picture</small></a>
+        <a href="web-design.html">Web design<small>Strategy-led sites that convert</small></a>
+        <a href="seo-strategy.html">SEO strategy<small>Get found by people searching</small></a>
+        <a href="monthly-retainer.html">Ongoing care<small>Keep your site working after launch</small></a>
+      </span></span>
+    <a href="industries.html">Industries</a>
+    <a href="about.html">About</a>
+    <a href="audit.html">Free site review</a>
+  </nav>
+  <div class="nav-actions">
+    <a href="portal.html" class="nav-login">Client login</a>
+    <a href="contact.html" class="btn btn-primary" style="padding:11px 20px">Book a free call</a>
+  </div>
+  <button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+</div>
+</header>
+<main id="main-content" tabindex="-1">
+<section class="page-hero-v2" style="padding:64px 24px 72px;background:linear-gradient(180deg,#FBFAF7 0%,#ede8f7 100%);position:relative;overflow:hidden;">
+  <div class="tool-hero-grid" style="max-width:1100px;margin:0 auto;gap:56px;align-items:center;position:relative;z-index:1;">
+    <div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; Local Visibility</div>
+      <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">How visible is your business in <em style="color:var(--p);font-style:italic;">local search?</em></h1>
+      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Answer 6 questions and get a real local visibility score with your single biggest opportunity to rank higher on Google.</p>
+    </div>
+    <div style="background:#fff;border-radius:22px;padding:34px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);display:flex;flex-direction:column;align-items:center;" aria-hidden="true">
+      <svg viewBox="0 0 120 120" width="100" height="100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="60" cy="60" r="52" stroke="var(--p)" stroke-width="1" opacity="0.15"/>
+        <circle cx="60" cy="60" r="36" stroke="var(--p)" stroke-width="1" opacity="0.3"/>
+        <circle cx="60" cy="60" r="20" stroke="var(--p)" stroke-width="1" opacity="0.5"/>
+        <path d="M60 40c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z" fill="var(--p)"/>
+        <circle cx="60" cy="54" r="5" fill="#fff"/>
+      </svg>
+      <div style="margin-top:18px;padding:14px 20px;background:#f7f4fd;border-radius:12px;text-align:center;width:100%;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--p);text-transform:uppercase;margin-bottom:4px;">Sample visibility score</div>
+        <div style="font-family:var(--serif);font-size:26px;color:var(--ink);">62 / 100</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="tool-wrap">
+
+  <div class="step-indicator" id="stepIndicator" aria-label="Progress">
+    <div class="step-dot active" id="sd1">1</div>
+    <div class="step-line" id="sl1"></div>
+    <div class="step-dot" id="sd2">2</div>
+    <div class="step-line" id="sl2"></div>
+    <div class="step-dot" id="sd3">3</div>
+    <div class="step-line" id="sl3"></div>
+    <div class="step-dot" id="sd4">4</div>
+    <div class="step-line" id="sl4"></div>
+    <div class="step-dot" id="sd5">5</div>
+    <div class="step-line" id="sl5"></div>
+    <div class="step-dot" id="sd6">6</div>
+  </div>
+
+  <!-- Q1: Business type -->
+  <div class="q-card active" id="q1">
+    <div class="q-num">Question 1 of 6</div>
+    <h2>What kind of business do you have?</h2>
+    <p>Local search works differently depending on your industry. This helps us score you accurately.</p>
+    <div class="options">
+      <div class="opt" onclick="selectOpt(1,'restaurant')" id="q1_restaurant">
+        <div class="opt-icon">🍽️</div>
+        <div class="opt-text"><h3>Restaurant or Bar</h3><p>Food service, cafe, wine bar, brewery</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(1,'service')" id="q1_service">
+        <div class="opt-icon">🔧</div>
+        <div class="opt-text"><h3>Home Services</h3><p>Plumber, electrician, landscaper, cleaner</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(1,'salon')" id="q1_salon">
+        <div class="opt-icon">✂️</div>
+        <div class="opt-text"><h3>Salon or Spa</h3><p>Hair, nails, massage, skincare</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(1,'retail')" id="q1_retail">
+        <div class="opt-icon">🛍️</div>
+        <div class="opt-text"><h3>Retail or Boutique</h3><p>Clothing, gifts, specialty shop</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(1,'health')" id="q1_health">
+        <div class="opt-icon">🏥</div>
+        <div class="opt-text"><h3>Health or Wellness</h3><p>Gym, yoga, chiropractor, therapist</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(1,'other')" id="q1_other">
+        <div class="opt-icon">💼</div>
+        <div class="opt-text"><h3>Other Local Business</h3><p>Professional services, creative, etc.</p></div>
+      </div>
+    </div>
+    <div class="nav-btns"><button class="next-btn" id="q1next" onclick="nextStep(1)" disabled>Next</button></div>
+  </div>
+
+  <!-- Q2: GBP status -->
+  <div class="q-card" id="q2">
+    <div class="q-num">Question 2 of 6</div>
+    <h2>Do you have a Google Business Profile?</h2>
+    <p>This is the listing that shows your business in Google Maps and the local pack. It's free and one of the highest-impact things you can have.</p>
+    <div class="options">
+      <div class="opt" onclick="selectOpt(2,'yes_claimed')" id="q2_yes_claimed">
+        <div class="opt-icon">✅</div>
+        <div class="opt-text"><h3>Yes, and I manage it actively</h3><p>I post updates, respond to reviews, and keep it current</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(2,'yes_unclaimed')" id="q2_yes_unclaimed">
+        <div class="opt-icon">⚠️</div>
+        <div class="opt-text"><h3>Yes, but I don't really manage it</h3><p>It exists but I rarely update it</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(2,'no')" id="q2_no">
+        <div class="opt-icon">❌</div>
+        <div class="opt-text"><h3>No, I don't have one</h3><p>Or I'm not sure if I do</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="prevStep(2)">Back</button>
+      <button class="next-btn" id="q2next" onclick="nextStep(2)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Q3: Reviews -->
+  <div class="q-card" id="q3">
+    <div class="q-num">Question 3 of 6</div>
+    <h2>How are your Google reviews?</h2>
+    <p>Review count and rating are two of the strongest local ranking signals Google uses.</p>
+    <div class="options">
+      <div class="opt" onclick="selectOpt(3,'great')" id="q3_great">
+        <div class="opt-icon">⭐</div>
+        <div class="opt-text"><h3>50+ reviews, 4.5 stars or above</h3><p>Strong review presence</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(3,'decent')" id="q3_decent">
+        <div class="opt-icon">🌟</div>
+        <div class="opt-text"><h3>10-50 reviews, 4.0 or above</h3><p>Decent but room to grow</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(3,'few')" id="q3_few">
+        <div class="opt-icon">💫</div>
+        <div class="opt-text"><h3>Fewer than 10 reviews</h3><p>Just getting started</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(3,'bad')" id="q3_bad">
+        <div class="opt-icon">😬</div>
+        <div class="opt-text"><h3>Reviews are mixed or below 4.0</h3><p>Needs attention</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="prevStep(3)">Back</button>
+      <button class="next-btn" id="q3next" onclick="nextStep(3)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Q4: Website -->
+  <div class="q-card" id="q4">
+    <div class="q-num">Question 4 of 6</div>
+    <h2>How's your website for local SEO?</h2>
+    <p>Google uses your website to confirm your location, services, and relevance for local searches.</p>
+    <div class="options">
+      <div class="opt" onclick="selectOpt(4,'optimized')" id="q4_optimized">
+        <div class="opt-icon">🎯</div>
+        <div class="opt-text"><h3>City and service mentioned throughout</h3><p>My site clearly mentions where I am and what I do</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(4,'partial')" id="q4_partial">
+        <div class="opt-icon">📄</div>
+        <div class="opt-text"><h3>I have a website but it's basic</h3><p>It exists but probably isn't optimized for local search</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(4,'none')" id="q4_none">
+        <div class="opt-icon">🚫</div>
+        <div class="opt-text"><h3>No website or it's very outdated</h3><p>I rely mainly on social media or word of mouth</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="prevStep(4)">Back</button>
+      <button class="next-btn" id="q4next" onclick="nextStep(4)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Q5: Citations -->
+  <div class="q-card" id="q5">
+    <div class="q-num">Question 5 of 6</div>
+    <h2>Are you listed in other directories?</h2>
+    <p>Consistent listings on Yelp, Apple Maps, Bing, and industry directories reinforce your location to Google.</p>
+    <div class="options">
+      <div class="opt" onclick="selectOpt(5,'many')" id="q5_many">
+        <div class="opt-icon">📋</div>
+        <div class="opt-text"><h3>Yes, on Yelp, Apple Maps, Bing, and more</h3><p>Multiple consistent listings</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(5,'some')" id="q5_some">
+        <div class="opt-icon">📌</div>
+        <div class="opt-text"><h3>A few, maybe Yelp or one or two others</h3><p>Limited directory presence</p></div>
+      </div>
+      <div class="opt" onclick="selectOpt(5,'none')" id="q5_none">
+        <div class="opt-icon">🔍</div>
+        <div class="opt-text"><h3>I'm not sure, or probably not many</h3><p>Haven't focused on this</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="prevStep(5)">Back</button>
+      <button class="next-btn" id="q5next" onclick="nextStep(5)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Q6: Business name -->
+  <div class="q-card" id="q6">
+    <div class="q-num">Question 6 of 6</div>
+    <h2>Last one, what's your business name and city?</h2>
+    <p>So I can personalize your results. No spam, ever.</p>
+    <input type="text" class="text-input" id="q6_name" placeholder="Business name (e.g. your business)" oninput="checkQ6()">
+    <input type="text" class="text-input" id="q6_city" placeholder="City (e.g. Los Angeles, CA)" oninput="checkQ6()" style="margin-top:10px;">
+    <div class="nav-btns">
+      <button class="back-btn" onclick="prevStep(6)">Back</button>
+      <button class="next-btn" id="q6next" onclick="showResults()" disabled>See my score</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="lvResults">
+    <div id="lvSummary" style="display:none;font-size:15px;color:var(--ink);line-height:1.8;padding:18px 22px;background:var(--pxxxl,#f7f4fd);border-radius:12px;margin-bottom:20px;border-left:3px solid var(--p);"></div>
+    <div class="score-hero">
+      <div class="score-big" id="lvScoreNum">0</div>
+      <div class="score-label">Local Visibility Score out of 100</div>
+      <div class="score-grade" id="lvGrade"></div>
+      <div class="biz-name-display" id="lvBizName"></div>
+    </div>
+
+    <div class="signals-grid" id="signalsGrid"></div>
+
+    <div class="opp-card" id="oppCard">
+      <div class="opp-label">Your #1 opportunity</div>
+      <h3 id="oppTitle"></h3>
+      <p id="oppDesc"></p>
+    </div>
+
+    <div class="actions-list">
+      <h3>Priority actions</h3>
+      <div id="actionsList"></div>
+    </div>
+
+    <div class="upgrade-card">
+      <h3>Want to go deeper on local SEO?</h3>
+      <p>The full Digital Health Check includes a Google Business Profile audit, keyword gap analysis, and a ranked action plan. Delivered in 5 business days.</p>
+      <div class="upgrade-btns">
+        <a href="audit.html" class="btn btn-light">See audit options from $99</a>
+        <a href="contact.html" class="btn btn-ghost" style="color:var(--paper);border-color:rgba(255,255,255,.3)">Book a free call</a>
+      </div>
+    </div>
+    <button class="restart-btn" onclick="restart()">Start over with a different business</button>
+  </div>
+
+</div>
+<section class="tool-switch-section">
+  <div class="tool-switch-inner">
+    <div class="tool-switch-head">
+      <span>Free tools</span>
+      <h2>Explore the other free tools.</h2>
+      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="tools.html">the Resources hub &rarr;</a></p>
+    </div>
+    <div class="tool-switch-grid">
+    <a href="audit.html" class="tool-switch-item">
+      <h3>Site Audit</h3>
+      <p>Get your free site score and see exactly what's costing you customers.</p>
+    </a>
+    <a href="ai-critique.html" class="tool-switch-item">
+      <h3>AI Website Review</h3>
+      <p>A free AI read on what's costing you clicks, in plain English.</p>
+    </a>
+    <a href="report-card.html" class="tool-switch-item">
+      <h3>Digital Report Card</h3>
+      <p>A prioritized snapshot of what to fix first.</p>
+    </a>
+    <a href="roi-calculator.html" class="tool-switch-item">
+      <h3>ROI Calculator</h3>
+      <p>See what a better site could actually be worth.</p>
+    </a>
+    <a href="pricing-estimator.html" class="tool-switch-item">
+      <h3>Pricing Estimator</h3>
+      <p>Get a real ballpark price for your project.</p>
+    </a>
+    <span class="tool-switch-item current">
+      <span class="tsw-badge">You're here</span>
+      <h3>Local Visibility Score</h3>
+      <p>Check how findable your business actually is nearby.</p>
+    </span>
+    </div>
+  </div>
+</section>
+
+</main>
+
+
+<section class="dds-final-cta" aria-label="Get in touch" style="background:linear-gradient(135deg,#2A1B4A 0%,#5b3fa0 100%);padding:48px 24px;position:relative;overflow:hidden;">
+  <div aria-hidden="true" style="position:absolute;top:-100px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.18) 0%,transparent 65%);pointer-events:none;"></div>
+  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;position:relative;z-index:1;">
+    <div style="flex-shrink:0;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c4aee8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </div>
+    <div style="flex:1;min-width:260px;color:#fff;text-align:left;">
+      <h3 style="font-family:var(--serif);font-size:clamp(22px,3.5vw,28px);font-weight:400;margin:0 0 6px;line-height:1.2;letter-spacing:-0.5px;color:#fff;">Ready to grow your business online?</h3>
+      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0;line-height:1.6;">Let's build a website that works as hard as you do.</p>
+    </div>
+    <a href="/contact" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#2A1B4A;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;font-family:var(--sans);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Book a free call &rarr;</a>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<section style="background:var(--pdark);padding:32px 24px;border-top:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;padding:22px 28px;background:rgba(196,174,232,0.06);border:1px solid rgba(196,174,232,0.10);border-radius:16px;">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Founder</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Eric Davis</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Web Design &amp; SEO Strategist</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Background</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise digital team</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Domain Name Manager &amp; Content Producer &middot; 9+ years</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Education</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">M.S. Business Analytics</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">CSUN &middot; Dean's Scholar</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Scale</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise scale</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Enterprise governance experience</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+<div class="wrap">
+  <div class="fwrap">
+    <div>
+      <div class="brand serif">Davis Digital Studio</div>
+      <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.4)">Los Angeles &middot; working with businesses nationwide</p>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Studio</p>
+      <a href="how-we-work.html">How we work</a>
+      <a href="services.html">Services</a>
+      <a href="industries.html">Industries</a>
+      <a href="about.html">About</a>
+      <a href="work.html">Work</a>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Start</p>
+      <a href="audit.html">Free site review</a>
+      <a href="tools.html">Free tools</a>
+      <a href="contact.html">Book a free call</a>
+      <a href="portal.html">Client login</a>
+    </div>
+  </div>
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="accessibility.html">Accessibility</a>
+    </span>
+  </div>
+</div>
+</footer>
+
+<script>
+var answers = {};
+var currentStep = 1;
+
+function selectOpt(q, val) {
+  // Deselect all
+  document.querySelectorAll('#q' + q + ' .opt').forEach(function(el) { el.classList.remove('selected'); });
+  document.getElementById('q' + q + '_' + val).classList.add('selected');
+  answers['q' + q] = val;
+  document.getElementById('q' + q + 'next').disabled = false;
+}
+
+function checkQ6() {
+  var name = document.getElementById('q6_name').value.trim();
+  var city = document.getElementById('q6_city').value.trim();
+  document.getElementById('q6next').disabled = !(name && city);
+}
+
+function nextStep(from) {
+  document.getElementById('q' + from).classList.remove('active');
+  document.getElementById('sd' + from).className = 'step-dot done';
+  document.getElementById('sd' + from).textContent = '✓';
+  if (document.getElementById('sl' + from)) document.getElementById('sl' + from).classList.add('done');
+  var next = from + 1;
+  if (next <= 6) {
+    document.getElementById('q' + next).classList.add('active');
+    document.getElementById('sd' + next).classList.add('active');
+    currentStep = next;
+  }
+}
+
+function prevStep(from) {
+  document.getElementById('q' + from).classList.remove('active');
+  document.getElementById('sd' + from).classList.remove('active');
+  var prev = from - 1;
+  document.getElementById('q' + prev).classList.add('active');
+  document.getElementById('sd' + prev).className = 'step-dot active';
+  document.getElementById('sd' + prev).textContent = prev;
+  if (document.getElementById('sl' + prev)) document.getElementById('sl' + prev).classList.remove('done');
+  currentStep = prev;
+}
+
+function calcScore() {
+  var score = 0;
+
+  // GBP (40 pts max)
+  if (answers.q2 === 'yes_claimed') score += 40;
+  else if (answers.q2 === 'yes_unclaimed') score += 20;
+  // no GBP = 0
+
+  // Reviews (25 pts max)
+  if (answers.q3 === 'great') score += 25;
+  else if (answers.q3 === 'decent') score += 15;
+  else if (answers.q3 === 'few') score += 5;
+  else if (answers.q3 === 'bad') score += 2;
+
+  // Website (20 pts max)
+  if (answers.q4 === 'optimized') score += 20;
+  else if (answers.q4 === 'partial') score += 8;
+  // none = 0
+
+  // Citations (15 pts max)
+  if (answers.q5 === 'many') score += 15;
+  else if (answers.q5 === 'some') score += 7;
+  // none = 0
+
+  return score;
+}
+
+function showResults() {
+  var bizName = document.getElementById('q6_name').value.trim();
+  var city = document.getElementById('q6_city').value.trim();
+
+  document.getElementById('q6').classList.remove('active');
+  document.getElementById('sd6').className = 'step-dot done';
+  document.getElementById('sd6').textContent = '✓';
+  if (document.getElementById('sl6')) document.getElementById('sl6').classList.add('done');
+
+  var score = calcScore();
+  var scoreClass = score >= 70 ? 'good' : score >= 40 ? 'ok' : 'poor';
+
+  // Conversational overall summary
+  var summaryText;
+  if (score >= 70) {
+    summaryText = bizName + ' has a solid local search presence in ' + city + ', your Google Business Profile, reviews, and web signals are working together. The opportunities below will help you pull further ahead of competitors who are still getting the basics right.';
+  } else if (score >= 40) {
+    summaryText = bizName + ' has some local visibility in ' + city + ' but is likely leaving customers on the table. The gaps I found are common and fixable, most of them are free and take less than an hour. Here is what matters most right now.';
+  } else {
+    summaryText = bizName + ' is largely invisible in local Google search right now, which means customers looking for what you offer in ' + city + ' are finding your competitors first. The good news is that the highest-impact fixes are free and the results can show up within weeks.';
+  }
+
+  var gradeText = score >= 70 ? 'Strong local presence' : score >= 40 ? 'Room to improve' : 'Needs immediate attention';
+
+  document.getElementById('lvBizName').textContent = bizName + ' · ' + city;
+  document.getElementById('lvGrade').textContent = gradeText;
+  document.getElementById('lvGrade').className = 'score-grade ' + scoreClass;
+
+  // Animate score
+  var scoreEl = document.getElementById('lvScoreNum');
+  scoreEl.className = 'score-big ' + scoreClass;
+  var n = 0;
+  var t = setInterval(function() { n += 2; if (n >= score) { n = score; clearInterval(t); } scoreEl.textContent = n; }, 20);
+
+  // Summary paragraph
+  var summaryEl = document.getElementById('lvSummary');
+  if (summaryEl) {
+    summaryEl.textContent = summaryText;
+    summaryEl.style.display = 'block';
+  }
+
+  // Signal cards with conversational analysis
+  var signals = [
+    {
+      title: 'Google Business Profile',
+      status: answers.q2 === 'yes_claimed' ? 'good' : answers.q2 === 'yes_unclaimed' ? 'ok' : 'poor',
+      badge: answers.q2 === 'yes_claimed' ? 'Active' : answers.q2 === 'yes_unclaimed' ? 'Not managed' : 'Missing',
+      analysis: answers.q2 === 'yes_claimed'
+        ? 'Your GBP is active and managed, this is the single most powerful local ranking asset you have. Businesses with complete, actively managed profiles get 7x more clicks than those without. Keep posting weekly and responding to every review.'
+        : answers.q2 === 'yes_unclaimed'
+        ? 'You have a listing but you are not actively managing it, which means Google has less confidence in your business and ranks you lower than competitors who are. Logging in and filling out every field, especially photos, hours, and services, can move the needle within days.'
+        : 'You have no Google Business Profile, which means you are invisible on Google Maps and the local pack, where most customers search before choosing a business. This is the single highest-impact fix available to you and it is completely free. Go to business.google.com and claim your listing today.'
+    },
+    {
+      title: 'Review Signals',
+      status: answers.q3 === 'great' ? 'good' : answers.q3 === 'decent' ? 'ok' : 'poor',
+      badge: answers.q3 === 'great' ? 'Strong' : answers.q3 === 'decent' ? 'Moderate' : answers.q3 === 'bad' ? 'Needs work' : 'Low volume',
+      analysis: answers.q3 === 'great'
+        ? 'With 50+ reviews above 4.5 stars, your review profile is a genuine competitive advantage. Google uses review volume, recency, and rating as direct local ranking signals. Your job now is to keep the momentum, make asking for reviews part of every positive customer interaction.'
+        : answers.q3 === 'decent'
+        ? 'Your reviews are decent but not yet a differentiator. Competitors with 50+ reviews will consistently outrank you in the local pack even if your service is better. The fix is simple: create a one-click Google review link and share it with every satisfied customer.'
+        : answers.q3 === 'bad'
+        ? 'Mixed or low ratings are actively hurting your local rankings and deterring potential customers who check reviews before deciding. Responding to every negative review professionally, and generating fresh positive ones, is the most urgent fix for your local presence.'
+        : 'With fewer than 10 reviews you are at a significant disadvantage versus competitors who have 30, 50, or 100+. Reviews are the second strongest local ranking signal after your GBP. Text your best customers a direct Google review link this week.'
+    },
+    {
+      title: 'Website Local SEO',
+      status: answers.q4 === 'optimized' ? 'good' : answers.q4 === 'partial' ? 'ok' : 'poor',
+      badge: answers.q4 === 'optimized' ? 'Optimized' : answers.q4 === 'partial' ? 'Basic' : 'Missing',
+      analysis: answers.q4 === 'optimized'
+        ? 'Your site clearly communicates your location and services. Google can confidently match you to local searches. This is harder to get right than most people realize, and you have it covered. Make sure your NAP (name, address, phone) is consistent across your site and your GBP.'
+        : answers.q4 === 'partial'
+        ? 'Your site exists but likely is not telling Google enough about where you are and what you do locally. Adding your city name, neighborhood, and service keywords to your page titles, headings, and meta descriptions would meaningfully improve how Google maps your site to local searches.'
+        : 'Without a website, or with a very outdated one, you are missing a key signal Google uses to validate local businesses. A basic site that clearly names your city, services, and contact information does more for local rankings than most people expect.'
+    },
+    {
+      title: 'Directory Listings',
+      status: answers.q5 === 'many' ? 'good' : answers.q5 === 'some' ? 'ok' : 'poor',
+      badge: answers.q5 === 'many' ? 'Strong' : answers.q5 === 'some' ? 'Partial' : 'Weak',
+      analysis: answers.q5 === 'many'
+        ? 'Multiple consistent directory listings reinforce your business name, address, and phone number across the web, what SEOs call citation signals. This gives Google more confidence that your business is legitimate and where you say it is. Make sure all listings use exactly the same NAP format.'
+        : answers.q5 === 'some'
+        ? 'A handful of listings helps but leaves signals on the table. Getting listed on Yelp, Apple Maps, Bing Places, and one or two industry-specific directories would meaningfully strengthen how Google sees your location and legitimacy.'
+        : 'Few or no directory listings means Google has little outside confirmation of your business details. Claiming your free listings on Yelp, Apple Maps, and Bing Places takes about an hour and is one of the higher-ROI things you can do for local visibility.'
+    }
+  ];
+
+  document.getElementById('signalsGrid').innerHTML = signals.map(function(s) {
+    var statusColors = { good: '#6abf69', ok: '#f0b429', poor: '#e05555' };
+    var badgeBg = { good: 'rgba(106,191,105,0.12)', ok: 'rgba(240,180,41,0.12)', poor: 'rgba(224,85,85,0.12)' };
+    var col = statusColors[s.status];
+    var bg = badgeBg[s.status];
+    return '<div class="signal-card" style="border-left:3px solid ' + col + ';">' +
+      '<div class="signal-head"><div class="signal-title">' + s.title + '</div>' +
+      '<span class="signal-badge" style="background:' + bg + ';color:' + col + ';">' + s.badge + '</span></div>' +
+      '<p class="signal-desc" style="margin-top:8px;">' + s.analysis + '</p>' +
+    '</div>';
+  }).join('');
+
+  // Opportunity
+  var opps = {
+    no_gbp: { title: 'Claim your Google Business Profile today', desc: 'This is the single most impactful thing a local business can do online. A verified, complete GBP gets you on Google Maps, into the local pack, and in front of customers who are actively searching for what you offer. It is free and takes about 30 minutes at business.google.com. Businesses with complete profiles receive 7x more clicks than those without.' },
+    bad_reviews: { title: 'Build a review recovery and generation system', desc: 'Your review profile is the second strongest local ranking signal after your GBP, and right now it is working against you. Start by responding professionally to every existing negative review, this shows Google and potential customers that you care. Then create a direct Google review link and send it to every customer who has had a positive experience. Even 5 fresh 5-star reviews can shift your local ranking.' },
+    few_reviews: { title: 'Start asking for Google reviews this week', desc: 'With fewer than 10 reviews, you are at a measurable disadvantage against competitors who have built up their review count. The easiest approach is to get your Google review link from your GBP, shorten it, and text it to your best customers with a brief personal message. Aim for 20 reviews in the next 60 days, this alone can move you up in the local pack.' },
+    no_website: { title: 'Build a locally optimized website', desc: 'Without a website, Google cannot confirm your location, services, or legitimacy, all of which affect your local rankings. Even a simple 3-page site that clearly names your city, what you do, and how to contact you makes a significant difference. Your GBP and website work together, and without both pieces you are leaving ranking potential on the table.' },
+    partial_website: { title: 'Add local SEO signals to your existing site', desc: 'Your site exists but likely is not doing enough to help Google connect you to local searches. The highest-impact additions are: putting your city and neighborhood in your page title and H1 heading, adding a LocalBusiness schema block to your code, and making sure your name, address, and phone match exactly what is on your GBP. These are technical but achievable.' },
+    no_citations: { title: 'Build out your directory listing profile', desc: 'Consistent citations across Yelp, Apple Maps, Bing Places, and industry directories send Google a strong confirmation signal about your business location and legitimacy. Each listing you add is another data point that reinforces your GBP. Start with the three big ones and work your way through industry-specific directories after that.' },
+    manage_gbp: { title: 'Activate your existing Google Business Profile', desc: 'You have a listing but you are not using it, and that gap is costing you rankings. Active GBPs rank significantly higher than dormant ones because Google rewards recency and engagement. This week: add 5+ photos, fill out every field including services and description, post an update, and respond to any existing reviews. The results can show up in local search within 2-4 weeks.' }
+  };
+
+  var opp;
+  if (answers.q2 === 'no') opp = opps.no_gbp;
+  else if (answers.q3 === 'bad') opp = opps.bad_reviews;
+  else if (answers.q2 === 'yes_unclaimed') opp = opps.manage_gbp;
+  else if (answers.q3 === 'few') opp = opps.few_reviews;
+  else if (answers.q4 === 'none') opp = opps.no_website;
+  else if (answers.q4 === 'partial') opp = opps.partial_website;
+  else opp = opps.no_citations;
+
+  document.getElementById('oppTitle').textContent = opp.title;
+  document.getElementById('oppDesc').textContent = opp.desc;
+
+  // Action items
+  var actions = [];
+  if (answers.q2 === 'no') actions.push({ h: 'Claim your Google Business Profile', p: 'Go to business.google.com and verify your listing. Fill in every field: hours, photos, description, services, and website. Businesses with complete profiles rank higher immediately.' });
+  if (answers.q2 === 'yes_unclaimed') actions.push({ h: 'Activate and complete your GBP this week', p: 'Log in at business.google.com, complete every field, add at least 5 photos, and post your first update. Set a reminder to post weekly and respond to every review within 24 hours.' });
+  if (answers.q3 !== 'great') actions.push({ h: 'Create and share a Google review link', p: 'Go to your GBP → Get more reviews → copy the link. Shorten it and text it to your 10 best customers this week with a personal note asking for their feedback.' });
+  if (answers.q4 !== 'optimized') actions.push({ h: 'Add ' + city + ' to your page titles and headings', p: 'Your most important pages, especially the homepage, should include your city name in the title tag, H1 heading, and first paragraph. This signals to Google exactly who you serve locally.' });
+  if (answers.q5 !== 'many') actions.push({ h: 'Claim Yelp, Apple Maps, and Bing Places', p: 'These three directories are the most impactful after Google. Make sure your business name, address, and phone number match your GBP exactly, inconsistencies confuse Google.' });
+  actions.push({ h: 'Add LocalBusiness schema to your website', p: 'This structured data tells Google your exact business name, address, phone, hours, and category in machine-readable format, it directly improves how Google understands and ranks your local presence.' });
+
+  document.getElementById('actionsList').innerHTML = actions.slice(0, 4).map(function(a, i) {
+    return '<div class="action-item">' +
+      '<div class="action-num">' + (i+1) + '</div>' +
+      '<div class="action-body"><h4>' + a.h + '</h4><p>' + a.p + '</p></div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('lvResults').style.display = 'block';
+  document.getElementById('stepIndicator').style.display = 'none';
+
+  if (typeof gtag === 'function') gtag('event', 'local_visibility_complete', { event_category: 'tools', event_label: bizName, value: score });
+}
+
+function restart() {
+  answers = {};
+  currentStep = 1;
+  document.getElementById('lvResults').style.display = 'none';
+  document.getElementById('stepIndicator').style.display = 'flex';
+  for (var i = 1; i <= 6; i++) {
+    document.getElementById('q' + i).classList.remove('active');
+    document.getElementById('sd' + i).className = 'step-dot';
+    document.getElementById('sd' + i).textContent = i;
+    if (document.getElementById('sl' + i)) document.getElementById('sl' + i).classList.remove('done');
+    var nextBtn = document.getElementById('q' + i + 'next');
+    if (nextBtn) nextBtn.disabled = true;
+    document.querySelectorAll('#q' + i + ' .opt').forEach(function(el) { el.classList.remove('selected'); });
+  }
+  document.getElementById('q6_name').value = '';
+  document.getElementById('q6_city').value = '';
+  document.getElementById('q1').classList.add('active');
+  document.getElementById('sd1').classList.add('active');
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+</script>
+
+
+  <script src="/concierge.js" defer></script>
+<script src="/enhance.js" defer></script>
+<script src="nav.js" defer></script>
+</body>
+</html>

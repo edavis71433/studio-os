@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client Archive — Davis Digital Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./dds-system/tokens.css">
+<link rel="stylesheet" href="./dds-system/components.css">
+<style>
+  body{ margin:0; background:var(--bg); font-family:var(--sans); color:var(--ink); }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:var(--s6) var(--s5); }
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s4); margin-bottom:var(--s5); flex-wrap:wrap; }
+  .arch-meta{ display:flex; gap:var(--s5); flex-wrap:wrap; }
+  .arch-meta__item{ font-size:var(--t-sm); }
+  .arch-meta__k{ font-family:var(--mono); font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:2px; }
+  .arch-actions{ display:flex; gap:var(--s2); }
+  @media(max-width:640px){ .dds-table thead{ display:none; } .dds-table tbody td{ display:block; padding:6px var(--s4); border:none; }
+    .dds-table tbody tr{ display:block; border-bottom:1px solid var(--line); padding:var(--s3) 0; }
+    .arch-actions{ padding:var(--s2) var(--s4); } }
+</style>
+</head>
+<body class="dds">
+<div class="wrap">
+
+  <div class="page-head">
+    <div>
+      <div class="dds-eyebrow">Clients</div>
+      <h1 class="dds-h1">Recently archived</h1>
+      <p class="dds-body" style="margin:6px 0 0; max-width:520px;">Archived clients are hidden everywhere else in the studio but kept here, fully recoverable. Restore brings back the client and every project, invoice, message, file, and Growth record exactly as it was.</p>
+    </div>
+  </div>
+
+  <div class="dds-card" id="archCard">
+    <div class="dds-card__body" id="archBody" style="padding:0;">
+      <!-- skeleton while loading -->
+      <div style="padding:var(--s5);" id="archSkel">
+        <div class="dds-skel dds-skel--line"></div>
+        <div class="dds-skel dds-skel--line" style="width:70%;"></div>
+        <div class="dds-skel dds-skel--line" style="width:85%;"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ARCHIVE confirm modal -->
+<div class="dds-modal-overlay" id="archiveModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="am-title">
+  <div class="dds-modal">
+    <div class="dds-modal__header"><h3 class="dds-modal__title" id="am-title">Archive this client?</h3></div>
+    <div class="dds-modal__body">
+      <p class="dds-body" id="am-desc" style="margin:0 0 var(--s4);"></p>
+      <div class="dds-field">
+        <label class="dds-label" for="am-reason">Reason (optional)</label>
+        <textarea class="dds-textarea" id="am-reason" placeholder="e.g. Project complete, partnership ended amicably."></textarea>
+        <div class="dds-hint">Saved to the audit trail. Helpful future context, never shown to the client.</div>
+      </div>
+    </div>
+    <div class="dds-modal__footer">
+      <button class="dds-btn dds-btn--ghost" onclick="closeModal('archiveModal')">Cancel</button>
+      <button class="dds-btn dds-btn--primary" id="am-confirm" onclick="doArchive()">Archive client</button>
+    </div>
+  </div>
+</div>
+
+<!-- PURGE (owner-only) modal with typed confirmation -->
+<div class="dds-modal-overlay" id="purgeModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pm-title">
+  <div class="dds-modal">
+    <div class="dds-modal__header"><h3 class="dds-modal__title" id="pm-title" style="color:var(--red);">Permanently delete?</h3></div>
+    <div class="dds-modal__body">
+      <p class="dds-body" style="margin:0 0 var(--s3);">This permanently deletes <strong id="pm-name"></strong> and <strong>every related record</strong> — projects, invoices, messages, files, and all Growth history. This <strong>cannot be undone</strong> and is not recoverable.</p>
+      <div class="dds-field">
+        <label class="dds-label" for="pm-input">Type the client name to confirm</label>
+        <input class="dds-input" id="pm-input" autocomplete="off" oninput="checkPurgeName()" placeholder="">
+        <div class="dds-error" id="pm-err" style="display:none;">Name doesn't match yet.</div>
+      </div>
+    </div>
+    <div class="dds-modal__footer">
+      <button class="dds-btn dds-btn--ghost" onclick="closeModal('purgeModal')">Cancel</button>
+      <button class="dds-btn dds-btn--danger" id="pm-confirm" onclick="doPurge()" disabled>Permanently delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="dds-toast-wrap" id="dds-toasts"></div>
+
+<script>
+// ── Config: wire these to your real API + auth ──────────────────────────────
+const API = 'https://qksstlqzbhesadrrofgn.functions.supabase.co/clever-api'; // adjust to your function URL
+function authHeaders(){ // reuse the admin panel's existing JWT
+  const jwt = (window.DDS && DDS.jwt) || localStorage.getItem('dds_jwt') || '';
+  return { 'Content-Type':'application/json', 'x-dds-user-jwt': jwt };
+}
+// Role drives whether Permanently Delete shows. Owner only.
+const ROLE = (window.DDS && DDS.role) || 'admin';
+
+let ARCHIVED = [];
+let target = null; // the row currently being archived/purged
+
+// ── Toast + modal helpers (canonical) ───────────────────────────────────────
+function ddsToast(msg, kind){
+  var wrap=document.getElementById('dds-toasts'); var t=document.createElement('div');
+  t.className='dds-toast'+(kind==='ok'?' dds-toast--ok':kind==='err'?' dds-toast--err':''); t.textContent=msg;
+  wrap.appendChild(t); setTimeout(()=>{ t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); },2600);
+}
+function openModal(id){ document.getElementById(id).style.display='flex'; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal('archiveModal'); closeModal('purgeModal'); }});
+['archiveModal','purgeModal'].forEach(id=>document.getElementById(id).addEventListener('click', function(e){ if(e.target===this) closeModal(id); }));
+
+// ── Load the Recently Archived list ─────────────────────────────────────────
+async function loadArchived(){
+  try{
+    const r = await fetch(API, { method:'POST', headers:authHeaders(), body:JSON.stringify({ type:'archived_clients_list' }) });
+    const j = await r.json();
+    ARCHIVED = (j && j.data) || [];
+    render();
+  }catch(e){
+    document.getElementById('archBody').innerHTML =
+      '<div class="dds-empty"><div class="dds-empty__title">Could not load the archive</div><div class="dds-empty__body">Check your connection and try again.</div></div>';
+  }
+}
+
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+
+function render(){
+  const body = document.getElementById('archBody');
+  if(!ARCHIVED.length){
+    body.innerHTML =
+      '<div class="dds-empty">'+
+      '<svg class="dds-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="4" rx="1"/><path d="M5 7v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7"/><path d="M10 11h4"/></svg>'+
+      '<div class="dds-empty__title">Nothing archived</div>'+
+      '<div class="dds-empty__body">When you archive a client, they\'ll wait here, fully recoverable. Nothing is ever deleted automatically.</div>'+
+      '</div>';
+    return;
+  }
+  const canPurge = ROLE==='owner';
+  let rows = ARCHIVED.map(c=>{
+    const purgeBtn = canPurge
+      ? '<button class="dds-btn dds-btn--danger-soft dds-btn--sm" onclick="askPurge(\''+c.id+'\')">Permanently delete</button>'
+      : '';
+    return '<tr>'+
+      '<td><div style="font-weight:600;color:var(--ink);">'+(c.name||'Unnamed')+'</div>'+
+        (c.archive_reason?'<div class="dds-sm" style="color:var(--muted);margin-top:2px;">'+c.archive_reason+'</div>':'')+'</td>'+
+      '<td><span class="dds-data">'+fmtDate(c.archived_at)+'</span></td>'+
+      '<td class="dds-sm">'+(c.archived_by||'—')+'</td>'+
+      '<td><div class="arch-actions">'+
+        '<button class="dds-btn dds-btn--secondary dds-btn--sm" onclick="doRestore(\''+c.id+'\',\''+(c.name||'').replace(/\'/g,"")+'\')">Restore</button>'+
+        purgeBtn+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+  body.innerHTML =
+    '<div style="overflow:auto;"><table class="dds-table"><thead><tr>'+
+    '<th>Client</th><th>Archived</th><th>By</th><th>Actions</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ── Archive (called from the client record elsewhere; included here for demo) ─
+function askArchive(id, name){ target={id,name}; document.getElementById('am-desc').innerHTML='You\'re about to archive <strong>'+name+'</strong>. They\'ll be hidden from your active clients, dashboards, and reports, and moved here. You can restore them any time.'; document.getElementById('am-reason').value=''; openModal('archiveModal'); }
+async function doArchive(){
+  if(!target) return;
+  const btn=document.getElementById('am-confirm'); btn.innerHTML='<span class="dds-spinner"></span> Archiving…'; btn.classList.add('dds-btn--loading');
+  try{
+    const r = await fetch(API,{method:'POST',headers:authHeaders(),body:JSON.stringify({ type:'client_archive', clientId:target.id, reason:document.getElementById('am-reason').value })});
+    const j = await r.json();
+    if(j.ok){ closeModal('archiveModal'); ddsToast(target.name+' archived','ok'); loadArchived(); }
+    else ddsToast(j.error||'Could not archive','err');
+  }catch(e){ ddsToast('Could not archive','err'); }
+  btn.innerHTML='Archive client'; btn.classList.remove('dds-btn--loading');
+}
+
+// ── Restore ─────────────────────────────────────────────────────────────────
+async function doRestore(id,name){
+  try{
+    const r = await fetch(API,{method:'POST',headers:authHeaders(),body:JSON.stringify({ type:'client_restore', clientId:id })});
+    const j = await r.json();
+    if(j.ok){ ddsToast((name||'Client')+' restored','ok'); loadArchived(); }
+    else ddsToast(j.error||'Could not restore','err');
+  }catch(e){ ddsToast('Could not restore','err'); }
+}
+
+// ── Purge (owner only, typed confirmation) ──────────────────────────────────
+function askPurge(id){ const c=ARCHIVED.find(x=>x.id===id); if(!c) return; target=c; document.getElementById('pm-name').textContent=c.name||'this client'; document.getElementById('pm-input').value=''; document.getElementById('pm-confirm').disabled=true; document.getElementById('pm-err').style.display='none'; openModal('purgeModal'); }
+function checkPurgeName(){ const v=document.getElementById('pm-input').value.trim(); const ok = target && v===(target.name||'').trim(); document.getElementById('pm-confirm').disabled=!ok; document.getElementById('pm-err').style.display = (v && !ok)?'block':'none'; }
+async function doPurge(){
+  if(!target) return;
+  const btn=document.getElementById('pm-confirm'); btn.innerHTML='<span class="dds-spinner"></span> Deleting…'; btn.classList.add('dds-btn--loading');
+  try{
+    const r = await fetch(API,{method:'POST',headers:authHeaders(),body:JSON.stringify({ type:'client_purge', clientId:target.id, confirmName:document.getElementById('pm-input').value })});
+    const j = await r.json();
+    if(j.ok){ closeModal('purgeModal'); ddsToast(target.name+' permanently deleted','ok'); loadArchived(); }
+    else if(j.error==='name_mismatch'){ document.getElementById('pm-err').style.display='block'; }
+    else ddsToast(j.error||'Could not delete','err');
+  }catch(e){ ddsToast('Could not delete','err'); }
+  btn.innerHTML='Permanently delete'; btn.classList.remove('dds-btn--loading');
+}
+
+// Demo seed so this file renders standalone. Remove when wired to the live API.
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(location.protocol==='file:'){
+    ARCHIVED=[
+      {id:'c1',name:'Bacchus Kitchen',archived_at:'2026-06-20T00:00:00Z',archived_by:'eric@davisdigitalstudio.com',archive_reason:'Project complete, moved to DIY plan.'},
+      {id:'c2',name:'Mesa Salon',archived_at:'2026-05-02T00:00:00Z',archived_by:'eric@davisdigitalstudio.com',archive_reason:''},
+    ];
+    document.getElementById('archSkel').remove(); render();
+  } else { loadArchived(); }
+});
+</script>
+</body>
+</html>

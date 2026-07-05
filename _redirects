@@ -1,0 +1,21 @@
+# Free Site Review maps to the real diagnostic tool specifically
+# (matches the nav label "Free site review" -> audit.html)
+/free-site-review  /audit              301
+
+# Deleted page: contact notice folded into Privacy
+/contact-disclaimer /privacy           301
+
+# Pre-call intake retired into contact
+/start             /contact            301
+
+# Clean URLs for the tools (each keeps its own page; no longer funneled to a dead hub)
+/audit             /audit.html         200
+/ai-critique       /ai-critique.html   200
+/report-card       /report-card.html   200
+/roi-calculator    /roi-calculator.html 200
+/pricing-estimator /pricing-estimator.html 200
+/local-visibility  /local-visibility.html 200
+
+# Resources hub — permanent as of V2 (previously retired to /audit; that
+# redirect is removed, this clean-URL rewrite added in its place)
+/tools             /tools.html         200

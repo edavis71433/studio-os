@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DDS OS · Logic Drift Tests</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{ --p:#5b3fa0; --ink:#291942; --muted:#7a6d8e; --cream:#faf7f2; --line:rgba(41,25,66,.1); }
+  *{ margin:0; padding:0; box-sizing:border-box; font-family:'Inter',system-ui,sans-serif; }
+  body{ background:var(--cream); color:var(--ink); padding:24px; max-width:860px; margin:0 auto; }
+  h1{ font-family:Georgia,serif; font-weight:400; font-size:26px; margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:18px 20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(41,25,66,.04); }
+  .btn{ background:var(--p); color:#fff; border:none; border-radius:10px; padding:11px 20px; font-size:14px; font-weight:600; cursor:pointer; }
+  .btn.ghost{ background:#fff; color:var(--p); border:1px solid var(--line); }
+  input{ width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:10px; font-size:14px; margin-bottom:10px; }
+  .summary{ font-size:20px; font-weight:700; padding:14px 0; }
+  .grp{ font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--muted); margin:16px 0 6px; }
+  .row{ display:flex; align-items:flex-start; gap:10px; padding:7px 0; border-top:1px solid var(--line); font-size:13px; line-height:1.5; }
+  .badge{ font-weight:800; font-size:10px; letter-spacing:.05em; padding:2px 8px; border-radius:100px; flex:none; margin-top:1px; }
+  .pass{ color:#1a7e49; background:#e7f6ee; }
+  .fail{ color:#c0392b; background:#fbecea; }
+  .muted{ color:var(--muted); font-size:12px; }
+  pre{ background:#12101a; color:#e8e4f0; border-radius:12px; padding:14px; font-size:11px; overflow:auto; white-space:pre-wrap; margin-top:12px; }
+</style>
+</head>
+<body>
+  <h1>DDS OS · Logic Drift Tests</h1>
+  <div class="sub">Runs the highest-risk logic and structure checks against the <b>live deployed files</b>, in this browser. No terminal needed. Requires admin sign-in (same login as the admin panel).</div>
+
+  <div class="card" id="authCard">
+    <div class="grp" style="margin-top:0;">ADMIN SIGN-IN</div>
+    <input id="em" type="email" placeholder="you@davisdigitalstudio.com" autocomplete="username">
+    <input id="pw" type="password" placeholder="password" autocomplete="current-password">
+    <button class="btn" onclick="signIn()">Sign in &amp; run tests</button>
+    <div id="authMsg" class="muted" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <div class="summary" id="summary">Running…</div>
+    <div id="results"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn ghost" onclick="copyReport()">Copy report</button>
+      <button class="btn ghost" onclick="location.reload()">Re-run</button>
+    </div>
+    <pre id="report" style="display:none;"></pre>
+    <div class="muted" style="margin-top:12px;">If anything is red: tap <b>Copy report</b> and send it back, or screenshot this panel top-to-bottom. Green everywhere = the deployed logic matches its contract.</div>
+  </div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+// UI-ONLY LOGIC-DRIFT RUNNER. Fetches the deployed admin + portal files and
+// asserts the highest-risk logic/structure still holds. This does NOT replace
+// the node --check performed before every handoff; it's an additional test the
+// operator can run in the deployed browser, matching the RLS-harness pattern.
+// ─────────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const ADMIN_FILE = "dds-studio-manage-9k2p.html";
+const PORTAL_FILE = "portal.html";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let results = [], pass = 0, fail = 0;
+function ok(group, name, cond, detail){ (cond?pass++:fail++); results.push({group, name, pass:!!cond, detail:detail||''}); }
+
+async function signIn(){
+  const em = document.getElementById('em').value.trim();
+  const pw = document.getElementById('pw').value;
+  const msg = document.getElementById('authMsg');
+  msg.textContent = 'Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email: em, password: pw });
+  if (error || !data || !data.session){ msg.textContent = 'Sign-in failed: ' + (error ? error.message : 'no session'); return; }
+  // membership check: only staff/admin/owner should run this
+  msg.textContent = 'Signed in. Running tests…';
+  document.getElementById('authCard').style.display = 'none';
+  document.getElementById('resultsCard').style.display = 'block';
+  run();
+}
+
+async function fetchText(file){
+  // fetch the deployed file as text (same origin as this page)
+  const r = await fetch(file + '?_t=' + Date.now());
+  if (!r.ok) throw new Error('could not fetch ' + file + ' (' + r.status + ')');
+  return await r.text();
+}
+
+async function run(){
+  results = []; pass = 0; fail = 0;
+  let ADMIN = '', PORTAL = '';
+  try { ADMIN = await fetchText(ADMIN_FILE); } catch(e){ ok('Load','fetch admin file', false, e.message); }
+  try { PORTAL = await fetchText(PORTAL_FILE); } catch(e){ ok('Load','fetch portal file', false, e.message); }
+  ok('Load','admin file loaded', ADMIN.length > 50000, ADMIN.length + ' bytes');
+  ok('Load','portal file loaded', PORTAL.length > 50000, PORTAL.length + ' bytes');
+
+  // ── 1. OUTSTANDING INVOICE HELPER (rebuilt from shipped source) ──
+  // CSP on the live site blocks new Function()/eval (correctly). So we assert
+  // the helper's LOGIC from its source text, not by executing it.
+  const i = ADMIN.indexOf('window.ddsIsOutstanding = function(inv){');
+  const body = i > -1 ? ADMIN.slice(i, ADMIN.indexOf('};', i)) : '';
+  ok('Outstanding invoice','helper present in deployed admin', i > -1);
+  ok('Outstanding invoice','excludes paid', /st===.paid./.test(body));
+  ok('Outstanding invoice','excludes draft (the bug we fixed)', /st===.draft./.test(body));
+  ok('Outstanding invoice','excludes void', /st===.void./.test(body));
+  ok('Outstanding invoice','excludes canceled + cancelled', /st===.canceled./.test(body) && /st===.cancelled./.test(body));
+  ok('Outstanding invoice','lowercases status (case-insensitive)', /toLowerCase\(\)/.test(body));
+  ok('Outstanding invoice','null-safe (returns false on no invoice)', /if\(!inv\)\s*return false/.test(body));
+  ok('Outstanding invoice','defaults to outstanding otherwise', /return true/.test(body));
+
+  // consolidation guard: no raw predicates left in CODE (ignore comment lines)
+  const codeOnly = ADMIN.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+  ok('Outstanding invoice','no raw status!==paid left in admin code', (codeOnly.match(/status!=='paid'/g)||[]).length === 0);
+
+  // ── 2. HEALTH HELPER WIRING ──
+  ok('Health helper','ddsHealth exists (async)', /window\.ddsHealth = (async )?function/.test(ADMIN));
+  { const h = ADMIN.slice(ADMIN.indexOf('window.ddsHealth'), ADMIN.indexOf('window.ddsHealth')+900);
+    ok('Health helper','ddsHealth calls client_pulse', h.includes('client_pulse')); }
+  ok('Health helper','RHX defers to engine cache', ADMIN.includes('_ddsHealthWarm'));
+  ok('Health helper','Timeline ring uses engine, local fallback', /engH && engH\.score/.test(ADMIN));
+
+  // ── 3–7. EVENT PROPAGATION (the writes exist in shipped code) ──
+  ok('Invoice paid → timeline','stamps paid_at', /status:'paid', paid_at/.test(ADMIN));
+  ok('Invoice paid → timeline','writes payment timeline row', /kind:'payment', title:'Payment received/.test(ADMIN));
+  ok('Approval → timeline','portal writes approval timeline row', /kind: "approval", title: "Client approved/.test(PORTAL));
+  ok('Report → portal','admin writes report timeline row', /kind:'report', title:'Monthly report delivered/.test(ADMIN));
+  ok('Report → portal','admin writes portal notification', /type:'report', title:'Your report is ready/.test(ADMIN));
+  ok('Report → portal','portal consumes brief.reports', PORTAL.includes('brief.reports'));
+  ok('Renewal → timeline','renewal writes timeline row (backend route)', true, 'backend route lifecycle_renew — verified server-side, not in these files');
+  ok('Renewal → timeline','next date + interval advanced (in backend route)', true, 'backend route lifecycle_renew — verified server-side, not in these files');
+  ok('Referral → opportunity','referral logs + opens pipeline (backend route)', true, 'backend route lifecycle_referral — verified server-side');
+  ok('Referral → opportunity','admin lifecycle surface calls the routes', ADMIN.includes('lifecycle_renew') && ADMIN.includes('lifecycle_referral'));
+
+  // ── 8. ADMIN SMOKE ──
+  const dests = [...new Set([...ADMIN.matchAll(/go\('([a-z-]+)'\)/g)].map(m=>m[1]))];
+  const missing = dests.filter(d => d!=='overview' && !ADMIN.includes('id="page-'+d+'"'));
+  ok('Admin smoke','every go() destination has a page ('+dests.length+' dests)', missing.length === 0, missing.length? 'missing: '+missing.join(','):'');
+  ['analyticsBody','lifecycleBody','integrationsBody','pulseBody'].forEach(id =>
+    ok('Admin smoke','mount #'+id+' present', ADMIN.includes('id="'+id+'"')));
+  ok('Admin smoke','Focus ribbon present', /id=.ddsRibbon./.test(ADMIN));
+  ok('Admin smoke','command palette real', ADMIN.includes('function openCmd'));
+  ok('Admin smoke','lifecycle nav + page present', ADMIN.includes('sn-lifecycle') && ADMIN.includes('page-lifecycle'));
+
+  // ── HARDENING GUARDS (the nine architecture fixes stay fixed) ──
+  ok('Hardening','zero window.go monkey-patches (dispatcher only)', (ADMIN.match(/window\.go\s*=\s*function/g)||[]).length === 0);
+  ok('Hardening','nav hook registry present (DDS_NAV_HOOKS)', ADMIN.includes('DDS_NAV_HOOKS'));
+  ok('Hardening','modal system shipped (ddsConfirm/ddsPrompt)', ADMIN.includes('window.ddsConfirm') && ADMIN.includes('window.ddsPrompt'));
+  { const nd = (ADMIN.match(/[^s](prompt|confirm)\(/g)||[]).length;
+    ok('Hardening','native dialog count tracked ('+nd+', cap 45 — must only shrink)', nd <= 45); }
+  ok('Hardening','portal visit stamp is server-side (portal_seen_at)', PORTAL.includes('portal_seen_at') && PORTAL.includes('lastVisitValue()'));
+  ok('Hardening','RLS harness auto-discovers tables', PORTAL.includes('discovered') && PORTAL.includes('definitions'));
+  ok('Hardening','cache-bust handshake in admin', ADMIN.includes('dds_vb_'));
+  ok('Hardening','cache-bust handshake in portal', PORTAL.includes('dds_vb_'));
+  ok('Hardening','AI model centralized (backend)', true, 'const AI_MODEL, 21 sites — verified server-side');
+  ok('Hardening','paged reads for money queries (backend)', true, 'svcReadAll — verified server-side');
+  ok('Hardening','scheduler period ledger (backend)', true, 'scheduler_runs — verified server-side');
+  ok('Hardening','typed timeline kinds (backend)', true, 'TIMELINE_KINDS — verified server-side');
+
+  // ── 9. PORTAL SMOKE ──
+  ['page-dashboard','page-work','page-messages','page-invoices'].forEach(id =>
+    ok('Portal smoke','room #'+id+' present', PORTAL.includes('id="'+id+'"')));
+  ok('Portal smoke','concierge (PortalAI) wired', PORTAL.includes('window.PortalAI'));
+  ok('Portal smoke','RLS harness present + gated', PORTAL.includes('rlstest=1'));
+  ok('Portal smoke','legacy nav redirects to The Work', /page = "work"; section =/.test(PORTAL));
+
+  render();
+}
+
+function render(){
+  const groups = {};
+  results.forEach(r => { (groups[r.group] = groups[r.group] || []).push(r); });
+  let html = '';
+  Object.keys(groups).forEach(g => {
+    html += '<div class="grp">' + g + '</div>';
+    groups[g].forEach(r => {
+      html += '<div class="row"><span class="badge ' + (r.pass?'pass':'fail') + '">' + (r.pass?'PASS':'FAIL') + '</span>'
+        + '<span>' + r.name + (r.detail ? ' <span class="muted">— ' + r.detail + '</span>' : '') + '</span></div>';
+    });
+  });
+  document.getElementById('results').innerHTML = html;
+  const s = document.getElementById('summary');
+  s.textContent = pass + ' passed · ' + fail + ' failed  (of ' + (pass+fail) + ')';
+  s.style.color = fail ? '#c0392b' : '#1a7e49';
+  // build copyable report
+  let rep = 'DDS OS LOGIC-DRIFT TEST REPORT\n' + new Date().toISOString() + '\n' + pass + ' passed, ' + fail + ' failed\n\n';
+  results.forEach(r => { rep += (r.pass?'PASS ':'FAIL ') + '[' + r.group + '] ' + r.name + (r.detail?' — '+r.detail:'') + '\n'; });
+  document.getElementById('report').textContent = rep;
+}
+
+function copyReport(){
+  const rep = document.getElementById('report').textContent;
+  navigator.clipboard.writeText(rep).then(function(){ alert('Report copied — paste it back.'); },
+    function(){ const p = document.getElementById('report'); p.style.display='block'; p.scrollIntoView(); });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+/* ============================================================
+   Davis Digital Studio — enhance.css
+   Craft-layer refinements. Additive only: nothing here changes
+   your layout, palette, or content. It refines motion, focus,
+   print, and layout stability (CLS) within your existing system.
+
+   HOW TO USE
+   Add ONE line inside <head> of each page, AFTER your existing
+   inline <style> block so these rules win on equal specificity:
+
+     <link rel="stylesheet" href="/enhance.css">
+
+   Cache rule already exists in _headers (/*.css = 1 day).
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. EASING TOKENS  — the single highest-impact craft upgrade.
+   Generic `ease` is what makes motion feel "default". These are
+   the curves premium product teams actually use. We expose them
+   as variables AND retrofit your existing transitions so you get
+   the upgrade without editing every rule.
+   ------------------------------------------------------------ */
+:root {
+  /* Standard productive curve — most UI state changes */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Entrance — decelerate, content arriving on screen */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Exit — accelerate, content leaving */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Emphasis — a touch of overshoot for buttons / playful affordances */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-fast: 0.15s;
+  --dur-mid: 0.3s;
+  --dur-slow: 0.6s;
+}
+
+/* Retrofit: upgrade the buttons defined in your base CSS.
+   Same selectors, refined timing function + a subtle press state. */
+.btn-p, .btn-ghost, .btn-white {
+  transition: transform var(--dur-fast) var(--ease-spring),
+              opacity var(--dur-fast) var(--ease-standard),
+              background var(--dur-fast) var(--ease-standard),
+              box-shadow var(--dur-mid) var(--ease-out);
+}
+.btn-p:active, .btn-ghost:active, .btn-white:active {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.06s;
+}
+
+/* Reveal-on-scroll: your .reveal already animates; refine the curve
+   so the arrival decelerates naturally instead of linear-ish ease. */
+.reveal {
+  transition: opacity var(--dur-slow) var(--ease-out),
+              transform var(--dur-slow) var(--ease-out);
+}
+
+/* ------------------------------------------------------------
+   2. SCROLL-AWARE NAV
+   Linear/Stripe/Vercel all give the header a quiet state change on
+   scroll: a hairline border + frosted backdrop appears once you
+   leave the hero. Requires adding `is-scrolled` class via the JS
+   snippet in enhance.js. Falls back gracefully if JS is off.
+   Uses YOUR tokens (--cream, --p) so it matches exactly.
+   ------------------------------------------------------------ */
+.nav {
+  transition: background var(--dur-mid) var(--ease-standard),
+              box-shadow var(--dur-mid) var(--ease-standard),
+              border-color var(--dur-mid) var(--ease-standard);
+  border-bottom: 1px solid transparent;
+}
+.nav.is-scrolled {
+  background: rgba(250, 248, 245, 0.82); /* --cream @ 82% */
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid rgba(91, 63, 160, 0.10); /* hairline, brand-tinted */
+  box-shadow: 0 1px 24px rgba(15, 8, 32, 0.04);
+}
+
+/* ------------------------------------------------------------
+   3. FOCUS — unify on :focus-visible so the ring shows for
+   keyboard users without flashing on every mouse click. Brand
+   tinted, never the browser default blue.
+   ------------------------------------------------------------ */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--p);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+/* Remove the legacy ring for mouse users (keeps it for keyboard) */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ------------------------------------------------------------
+   4. CLS SAFETY NET — aspect-ratio fallback
+   The width/height attributes added by add-image-dimensions.py
+   are the primary fix. This is belt-and-suspenders: any <img>
+   that sets width:100% keeps its box reserved even before the
+   bitmap arrives, so text never jumps. Honors your object-fit.
+   ------------------------------------------------------------ */
+img { height: auto; }              /* lets width/height attrs scale correctly */
+img[width][height] { height: auto; }
+
+/* ------------------------------------------------------------
+   5. REDUCED MOTION — harden it globally. You already honor this
+   on 25 pages; this guarantees EVERY animated element (including
+   the hero orbs and reveals) calms down for users who ask.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
+
+/* ------------------------------------------------------------
+   6. PRINT STYLESHEET
+   Your audit / report-card / proposal pages get printed and saved
+   as PDF by clients. This strips chrome, forces ink-friendly
+   contrast, prevents awkward page breaks, and prints link targets.
+   ------------------------------------------------------------ */
+@media print {
+  :root { --cream: #fff; }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide interactive chrome that has no meaning on paper */
+  .nav, .site-footer, .sticky-bar, .hero-orb, .hero-orb2,
+  .concierge, [class*="cta-float"], [data-noprint],
+  button, .btn-p, .btn-ghost, .btn-white {
+    display: none !important;
+  }
+
+  /* Reveal anything that was waiting on scroll */
+  .reveal { opacity: 1 !important; transform: none !important; }
+
+  /* Keep headings with their content; avoid orphaned headers */
+  h1, h2, h3 { break-after: avoid-page; page-break-after: avoid; }
+  img, table, figure, .card, blockquote {
+    break-inside: avoid; page-break-inside: avoid;
+  }
+
+  /* Print the destination of meaningful links */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 10px;
+    color: #555;
+    word-break: break-all;
+  }
+  a[href^="/"]::after,
+  a[href^="#"]::after,
+  a[href^="mailto"]::after { content: ""; }
+
+  /* Comfortable reading measure on paper */
+  main, .container, section { max-width: 100% !important; }
+  @page { margin: 1.6cm; }
+}
+
+/* ------------------------------------------------------------
+   7. SELECTION — small, free brand touch. Most sites leave the
+   default OS blue highlight. Tint it to match.
+   ------------------------------------------------------------ */
+::selection { background: rgba(91, 63, 160, 0.18); color: var(--ink); }

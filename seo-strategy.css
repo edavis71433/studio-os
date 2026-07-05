@@ -1,0 +1,23 @@
+/* ============================================================
+   Davis Digital Studio — seo-strategy.css
+   SEO-STRATEGY-PAGE-ONLY layer, scoped under body[data-page="seo-strategy"].
+   Loaded after styles.css. Part of Phase 4 scope expansion.
+   ============================================================ */
+
+body[data-page="seo-strategy"] .seo-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+body[data-page="seo-strategy"] .seo-card{
+  background:#fff;
+  border-radius:18px;
+  padding:26px 24px 22px;
+  box-shadow:0 20px 42px -30px rgba(27,21,37,.2);
+}
+body[data-page="seo-strategy"] .seo-card h3{ font-size:18px; margin-bottom:8px; }
+body[data-page="seo-strategy"] .seo-card p{ color:var(--muted); font-size:14.5px; }
+
+@media(max-width:760px){
+  body[data-page="seo-strategy"] .seo-grid{ grid-template-columns:1fr; }
+}

@@ -1,0 +1,25 @@
+/* ============================================================
+   Davis Digital Studio — web-design.css
+   WEB-DESIGN-PAGE-ONLY layer, scoped under body[data-page="web-design"]
+   (verify actual data-page value below). Loaded after styles.css.
+   Part of Phase 4 scope expansion — this page was one click from
+   the redesigned Solutions page and still used the old system.
+   ============================================================ */
+
+body[data-page="web-design"] .wd-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+body[data-page="web-design"] .wd-card{
+  background:#fff;
+  border-radius:18px;
+  padding:26px 24px 22px;
+  box-shadow:0 20px 42px -30px rgba(27,21,37,.2);
+}
+body[data-page="web-design"] .wd-card h3{ font-size:18px; margin-bottom:8px; }
+body[data-page="web-design"] .wd-card p{ color:var(--muted); font-size:14.5px; }
+
+@media(max-width:760px){
+  body[data-page="web-design"] .wd-grid{ grid-template-columns:1fr; }
+}

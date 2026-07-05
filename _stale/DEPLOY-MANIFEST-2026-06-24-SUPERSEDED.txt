@@ -1,0 +1,69 @@
+!!! SUPERSEDED 2026-07-05 — DO NOT FOLLOW. This manifest names clever-api-COMPLETE.ts
+!!! as the deploy target; deploying that file would destroy production routes.
+!!! Canonical deploy source: supabase/functions/clever-api/index.ts (see docs/adr/0001).
+
+========================================
+  DAVIS DIGITAL STUDIO — DEPLOY MANIFEST
+  Everything changed today, June 24, 2026
+========================================
+
+NOTE: This zip is your COMPLETE site (73 files) - all HTML, CSS, JS,
+images, case-study photos, manifest, service worker, and config. Verified
+against your original upload so nothing is missing. Extract and deploy as-is. Below is what actually changed today, so you know
+what's new versus what's untouched.
+
+------------------------------------
+NEW FILES (didn't exist before today)
+------------------------------------
+  set-password.html ............ Client password-setup page (invite + reset land here)
+  supabase-email-templates.md .. Branded invite/reset email copy to paste in Supabase
+  (clever-api-COMPLETE.ts) ..... Updated Edge Function w/ invite_client + reset_password
+
+------------------------------------
+CHANGED FILES (deploy these)
+------------------------------------
+  portal.html .................. Mobile nav (bottom bar + More sheet), forgot-password,
+                                 welcome overlay rewrite, branding fix, referral card,
+                                 removed duplicate back-link
+  dds-studio-manage-9k2p.html .. Mobile nav (bottom bar + drawer), invite-client button,
+                                 font fix, branding consistency
+  index.html ................... Favicon consistency
+  ai-critique.html ............. Favicon, call-length (30-min)
+  audit.html ................... Favicon
+  speed-test.html .............. Favicon
+  local-visibility.html ........ Favicon
+  pricing-estimator.html ....... Favicon
+  email-nurture-sequence.html .. Em-dash cleanup, title separator
+  email-signature.html ......... Title separator
+  robots.txt ................... Reordered (rules grouped, sitemap last)
+
+------------------------------------
+DEPLOY ORDER (important)
+------------------------------------
+1. Supabase first:
+   - Deploy clever-api-COMPLETE.ts as your clever-api Edge Function
+   - Confirm SERVICE_ROLE_KEY secret is set
+   - Add redirect URL: https://davisdigitalstudio.com/set-password.html
+     (Authentication > URL Configuration > Redirect URLs)
+   - Paste the branded email templates (supabase-email-templates.md)
+2. Then push the site files to Netlify (one batched deploy)
+3. Then run through the test checklist (Section A & B first)
+
+------------------------------------
+STILL NEEDS YOU (not in any file)
+------------------------------------
+  - GA4 ID mismatch: confirm G-EQYY0DL8JL vs G-V4WF04NX7F, make them match
+  - E&O insurance quote (business audit)
+  - Track Bacchus hours vs fee (profitability)
+  - DBA notarization + GBP reinstatement
+  - The testimonial from Claud
+
+------------------------------------
+WHAT I DID NOT TOUCH (already correct)
+------------------------------------
+  - Your contract template: already has liability cap, kill fee, cancellation,
+    force majeure, indemnification, IP transfer. It's excellent. Don't change it.
+  - Your pricing tiers: the $99/$499 "contradiction" was a false alarm (tiers).
+  - Response-time messaging: "responds within 24 hours" already in portal.
+  - Security: no exposed secrets. Correct as-is.
+========================================

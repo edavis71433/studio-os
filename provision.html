@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Partner Provisioning Generator — Studio OS internal</title>
+<style>
+  :root{--ink:#1B1525;--paper:#FBFAF7;--paper2:#F4F0E9;--p:#5B3FA0;--brass:#B08D57;--muted:#6B6478;--line:#E3DED6;--ok:#2E7D52;--warn:#B26A00;--bad:#B3261E;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 Inter,system-ui,sans-serif;}
+  .wrap{max-width:880px;margin:0 auto;padding:34px 22px 80px;}
+  h1{font-family:Georgia,serif;font-size:27px;margin:0 0 4px;} .sub{color:var(--muted);font-size:14px;margin-bottom:22px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 4px;}
+  input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font:14px Inter,system-ui,sans-serif;background:#fff;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;} @media(max-width:640px){.grid{grid-template-columns:1fr;}}
+  .go{margin-top:18px;background:var(--p);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer;}
+  .step{border-left:3px solid var(--p);padding-left:14px;margin:22px 0 8px;}
+  .step h3{margin:0;font-family:Georgia,serif;font-size:17px;} .step .where{font-size:12px;color:var(--brass);font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+  pre{background:var(--ink);color:#F4F0E9;border-radius:10px;padding:14px;font:12.5px/1.55 ui-monospace,Consolas,monospace;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:8px 0 0;}
+  .cp{float:right;background:var(--brass);color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;margin-left:10px;}
+  .guard{background:#FDF3F2;border:1px solid rgba(179,38,30,.35);color:var(--bad);border-radius:10px;padding:11px 14px;font-size:13.5px;font-weight:600;margin:10px 0;}
+  .note{font-size:13px;color:var(--muted);margin-top:6px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px;} td,th{border:1px solid var(--line);padding:7px 10px;text-align:left;} th{background:var(--paper2);font-size:12px;}
+  #out{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Partner Provisioning Generator</h1>
+  <div class="sub">Internal tool. Fills every placeholder so nothing is hand-edited. Generates locally in your browser — no network calls, nothing stored, nothing deployed. Companion to PROVISIONING.md.</div>
+
+  <div class="card">
+    <div class="grid">
+      <div><label>Partner studio name</label><input id="f-name" placeholder="Hettie Orange Designs"></div>
+      <div><label>Partner email (becomes owner)</label><input id="f-email" placeholder="hettie@example.com"></div>
+      <div><label>Her Supabase project ref (from her project URL)</label><input id="f-ref" placeholder="abcdefghijklmnop"></div>
+      <div><label>Her anon key (her project → Settings → API)</label><input id="f-anon" placeholder="eyJ..."></div>
+      <div><label>Netlify site name (auto-suggested)</label><input id="f-site" placeholder="hettie-orange-studio"></div>
+      <div><label>Support admin (you)</label><input id="f-support" value="eric@davisdigitalstudio.com"></div>
+    </div>
+    <button class="go" onclick="gen()">Generate provisioning pack →</button>
+    <div class="note">A fresh SCHEDULER_SECRET is generated for her on every click — never reuse yours.</div>
+  </div>
+
+  <div id="out">
+    <div class="guard" id="guard"></div>
+
+    <div class="step"><span class="where">Her Supabase → SQL editor</span><h3>1 · Run the numbered files in order</h3></div>
+    <div class="note">00-schema-foundation.sql → 10-design-partner-mode.sql → then the two blocks below (pre-filled 12 &amp; 13 cron sections) after running each file's table/view portion → 14-partner-bootstrap.sql. The isolation self-check in 14 must return all zeros.</div>
+
+    <div class="step"><span class="where">Her Supabase → SQL editor</span><h3>2 · Cron blocks, pre-filled (replaces the placeholders in 12 &amp; 13)</h3><button class="cp" onclick="dl('c-cron',(document.getElementById('f-site').value||'partner')+'-cron.sql')">Download .sql</button><button class="cp" onclick="cp('c-cron',this)">Copy</button></div>
+    <pre id="c-cron"></pre>
+
+    <div class="step"><span class="where">Her Supabase → Edge Functions → clever-api → Secrets</span><h3>3 · Secrets, exactly these</h3></div>
+    <table id="c-secrets"></table>
+
+    <div class="step"><span class="where">Her Netlify site files</span><h3>4 · Her config.js (the only per-partner file)</h3><button class="cp" onclick="dl('c-config','config.js')">Download config.js</button><button class="cp" onclick="cp('c-config',this)">Copy</button></div>
+    <pre id="c-config"></pre>
+
+    <div class="step"><span class="where">Her Supabase → SQL editor</span><h3>5 · Create her owner account + your support access</h3><button class="cp" onclick="dl('c-boot',(document.getElementById('f-site').value||'partner')+'-bootstrap-owner.sql')">Download .sql</button><button class="cp" onclick="cp('c-boot',this)">Copy</button></div>
+    <pre id="c-boot"></pre>
+    <div class="note">Idempotent. Sends both set-password invites automatically. Run the membership check after: exactly her (owner) + you (admin), never more.</div>
+
+    <div class="step"><span class="where">Anywhere</span><h3>6 · Keep this secret somewhere safe</h3><button class="cp" onclick="dl('c-secret',(document.getElementById('f-site').value||'partner')+'-record.txt')">Download .txt</button><button class="cp" onclick="cp('c-secret',this)">Copy</button></div>
+    <pre id="c-secret"></pre>
+  </div>
+</div>
+<script>
+function slug(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);}
+function secret(){var a=new Uint8Array(24);crypto.getRandomValues(a);return Array.from(a,function(b){return b.toString(16).padStart(2,'0');}).join('');}
+document.getElementById('f-name').addEventListener('input',function(){var s=document.getElementById('f-site');if(!s.dataset.touched)s.value=slug(this.value)+(this.value?'-studio':'');});
+document.getElementById('f-site').addEventListener('input',function(){this.dataset.touched='1';});
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function cp(id, btn){
+  var t=document.getElementById(id).textContent;
+  function done(ok){ if(btn){ var was=btn.textContent; btn.textContent= ok?'Copied \u2713':'Select+copy manually'; setTimeout(function(){btn.textContent=was;},1800);} }
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(t).then(function(){done(true);},function(){fallback();});
+  } else { fallback(); }
+  function fallback(){
+    var ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0;';
+    document.body.appendChild(ta); ta.select();
+    var ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta); done(ok);
+  }
+}
+function dl(id, filename){
+  var t=document.getElementById(id).textContent;
+  var b=new Blob([t],{type:'text/plain'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
+function gen(){
+  var name=document.getElementById('f-name').value.trim();
+  var email=document.getElementById('f-email').value.trim().toLowerCase();
+  var ref=document.getElementById('f-ref').value.trim();
+  var anon=document.getElementById('f-anon').value.trim();
+  var site=document.getElementById('f-site').value.trim()||slug(name)+'-studio';
+  var support=document.getElementById('f-support').value.trim().toLowerCase();
+  if(!name||!email||!ref||!anon){alert('Name, email, project ref, and anon key are required.');return;}
+  if(!/^[a-z0-9]{15,30}$/.test(ref)){alert('That does not look like a project ref. The ref is the short lowercase string from her project URL: https://REF.supabase.co (Settings \u2192 API). It is NOT the project name.');return;}
+  if(ref==='qksstlqzbhesadrrofgn'){alert('That is your PRODUCTION ref. Enter HER project ref.');return;}
+  if(!/^eyJ/.test(anon)){alert('The anon key should start with eyJ (her project \u2192 Settings \u2192 API \u2192 anon public).');return;}
+  var sec=secret();
+  var url='https://'+ref+'.supabase.co';
+  var siteUrl='https://'+site+'.netlify.app';
+
+  document.getElementById('guard').textContent =
+    'WRONG-PROJECT GUARD: every SQL block below runs in the project whose editor URL contains \u201c'+ref+'\u201d. '+
+    'If the address bar shows qksstlqzbhesadrrofgn, that is PRODUCTION \u2014 stop.';
+
+  document.getElementById('c-cron').textContent =
+'-- Enable scheduling extensions (required once per fresh project)\n'+
+'create extension if not exists pg_cron;\ncreate extension if not exists pg_net;\n\n'+
+'-- PI weekly cron for '+name+' (paste in place of the cron block in 12/13)\n'+
+"select cron.unschedule('dds_product_intelligence') where exists (select 1 from cron.job where jobname = 'dds_product_intelligence');\n"+
+"select cron.schedule('dds_product_intelligence','0 15 * * *', $$\n"+
+"  select net.http_post(url := '"+url+"/functions/v1/clever-api',\n"+
+"    headers := '{\"Content-Type\":\"application/json\"}'::jsonb,\n"+
+"    body := '{\"type\":\"pi_weekly\",\"secret\":\""+sec+"\"}'::jsonb);\n$$);\n\n"+
+'-- Daily scheduler (surveys/nudges) for '+name+' (in place of 02\u2019s block)\n'+
+"select cron.unschedule('dds_scheduled_jobs') where exists (select 1 from cron.job where jobname = 'dds_scheduled_jobs');\n"+
+"select cron.schedule('dds_scheduled_jobs','0 16 * * *', $$\n"+
+"  select net.http_post(url := '"+url+"/functions/v1/clever-api',\n"+
+"    headers := '{\"Content-Type\":\"application/json\"}'::jsonb,\n"+
+"    body := '{\"type\":\"run_scheduled_jobs\",\"secret\":\""+sec+"\"}'::jsonb);\n$$);";
+
+  var rows=[['SCHEDULER_SECRET',sec],['ANTHROPIC_KEY','(your key \u2014 managed model provides the AI)'],
+    ['RESEND_KEY','(your key for now)'],['OWNER_EMAIL',email],
+    ['EMAIL_FROM',name+' <noreply@davisdigitalstudio.com>'],['SITE_URL',siteUrl],['ALLOWED_ORIGINS',siteUrl],
+    ['\u2014 SUPABASE_* values','AUTO-PROVIDED by Supabase \u2014 do NOT add these; the dashboard rejects the prefix']];
+  document.getElementById('c-secrets').innerHTML='<tr><th>Secret</th><th>Value</th></tr>'+
+    rows.map(function(r){return '<tr><td><b>'+esc(r[0])+'</b></td><td>'+esc(r[1])+'</td></tr>';}).join('');
+
+  document.getElementById('c-config').textContent =
+'window.DDS_CONFIG = {\n'+
+'  SUPABASE_URL: "'+url+'",\n'+
+'  SUPABASE_ANON_KEY: "'+anon+'",\n'+
+'  STUDIO_NAME: "'+name.replace(/"/g,'\\"')+'"\n'+
+'};';
+
+  document.getElementById('c-boot').textContent =
+"select net.http_post(\n"+
+"  url := '"+url+"/functions/v1/clever-api',\n"+
+"  headers := '{\"Content-Type\":\"application/json\"}'::jsonb,\n"+
+"  body := '{\"type\":\"bootstrap_owner\",\"secret\":\""+sec+"\",\"email\":\""+email+"\",\"support_email\":\""+support+"\"}'::jsonb\n"+
+");\n\n"+
+"-- verify (expect exactly 2 rows: "+email+" = owner, "+support+" = admin):\n"+
+"select m.role, u.email from memberships m join auth.users u on u.id = m.user_id;";
+
+  document.getElementById('c-secret').textContent =
+name+' \u2014 SCHEDULER_SECRET: '+sec+'\nProject: '+url+'\nSite: '+siteUrl+'\nProvisioned: '+new Date().toISOString().slice(0,10);
+
+  document.getElementById('out').style.display='block';
+  window.scrollTo({top:document.getElementById('out').offsetTop-20,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

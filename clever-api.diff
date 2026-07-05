@@ -1,0 +1,428 @@
+--- clever/notify-client.ts	2026-06-30 15:14:38.000000000 +0000
++++ out/clever-api.ts	2026-06-30 16:44:42.835637873 +0000
+@@ -284,7 +284,7 @@
+ 
+ 
+ // ── Simple in-memory per-IP rate limiter for cost-bearing AI/PSI routes ──
+-const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft']);
++const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft', 'lead_intake', 'discovery_intake', 'audit_lead', 'report_card']);
+ const RATE_MAX = 12;
+ const RATE_WINDOW_MS = 60_000;
+ const rateHits = new Map<string, { count: number; resetAt: number }>();
+@@ -313,7 +313,21 @@
+   });
+ }
+ 
++// Loud startup guard: if Resend isn't configured, every send will fail. Make
++// that obvious in the function logs instead of silently no-opping.
++if (!RESEND_KEY) {
++  console.error('[email] RESEND_KEY is not set — all Resend emails will fail. Set it as an Edge Function secret.');
++}
++
++// Core sender. Returns the raw Resend Response so the ~30 existing call sites
++// that ignore the return value keep working unchanged. New code should prefer
++// emailOk() below, which returns a clean boolean. Failures are always logged
++// with the exact Resend status + body so they're visible in dev/prod logs.
+ async function sendEmail(to: string, subject: string, html: string) {
++  if (!RESEND_KEY) {
++    console.error('[email] skipped send to', to, '— RESEND_KEY not configured. Subject:', subject);
++    return new Response(JSON.stringify({ error: 'resend_not_configured' }), { status: 500 });
++  }
+   try {
+     const r = await fetch('https://api.resend.com/emails', {
+       method: 'POST',
+@@ -323,27 +337,63 @@
+     if (!r.ok) {
+       let detail = '';
+       try { detail = await r.text(); } catch (_) { /* ignore */ }
+-      console.error('Resend send failed', r.status, 'to', to, detail);
++      console.error('[email] Resend send FAILED', r.status, 'to', to, '| subject:', subject, '| detail:', detail);
++    } else {
++      console.log('[email] sent to', to, '| subject:', subject);
+     }
+     return r;
+   } catch (e) {
+-    console.error('Resend send threw to', to, String(e));
++    console.error('[email] Resend send THREW to', to, '| subject:', subject, '|', String(e));
+     return new Response(null, { status: 500 });
+   }
+ }
+ 
++// Boolean wrapper for new code paths that want a truthful emailed flag without
++// inspecting a Response object. Never throws.
++async function emailOk(to: string, subject: string, html: string): Promise<boolean> {
++  try {
++    const r = await sendEmail(to, subject, html);
++    return !!(r && (r as Response).ok);
++  } catch (_) {
++    return false;
++  }
++}
++
++// H2/H4: escape user-controlled values before they go into email HTML.
++// Email clients sandbox scripts, but a crafted clientName/url could still
++// produce misleading markup or a hostile link to Eric. Neutralize both.
++function escHtmlSrv(s: unknown): string {
++  return String(s == null ? '' : s).replace(/[&<>"']/g, (m) => (
++    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] as string
++  ));
++}
++// Only allow http(s) links; anything else (javascript:, data:) becomes '#'.
++function safeUrl(u: unknown): string {
++  const s = String(u == null ? '' : u).trim();
++  return /^https?:\/\//i.test(s) ? escHtmlSrv(s) : '#';
++}
++
+ function emailWrap(body: string) {
+   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0f0820;font-family:'Helvetica Neue',Arial,sans-serif;">${body}</body></html>`;
+ }
+ 
+ function notifyShell(heading: string, lines: string[], cta?: { label: string; href: string }) {
++  // Defense-in-depth: every value here may originate from user/public input
++  // (e.g. lead_intake passes a visitor's name/subject/message as lines).
++  // Escape heading + lines as HTML text, and route the CTA href through safeUrl,
++  // so no caller can inject markup or a hostile link into Eric's email.
++  const h = escHtmlSrv(heading);
++  // Escape each line, THEN turn newlines into <br> so multi-line messages keep
++  // their breaks without allowing any other markup through. Callers should pass
++  // plain text with \n for breaks (not raw <br>).
++  const safeLines = lines.map((l) => escHtmlSrv(l).replace(/\n/g, '<br>'));
+   return emailWrap(`
+     <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+       <a href="https://davisdigitalstudio.com" style="font-family:Georgia,serif;font-size:18px;color:#fff;text-decoration:none;display:block;margin-bottom:20px;">Davis<span style="color:#c4aee8;">Digital</span> Studio</a>
+       <div style="background:#1e1338;border-radius:16px;padding:28px;">
+-        <h1 style="font-family:Georgia,serif;font-size:21px;font-weight:400;color:#fff;margin:0 0 14px;">${heading}</h1>
+-        ${lines.map(l => `<p style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 10px;">${l}</p>`).join('')}
+-        ${cta ? `<div style="text-align:center;margin-top:20px;"><a href="${cta.href}" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:11px 24px;border-radius:100px;text-decoration:none;">${cta.label}</a></div>` : ''}
++        <h1 style="font-family:Georgia,serif;font-size:21px;font-weight:400;color:#fff;margin:0 0 14px;">${h}</h1>
++        ${safeLines.map(l => `<p style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 10px;">${l}</p>`).join('')}
++        ${cta ? `<div style="text-align:center;margin-top:20px;"><a href="${safeUrl(cta.href)}" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:11px 24px;border-radius:100px;text-decoration:none;">${escHtmlSrv(cta.label)}</a></div>` : ''}
+       </div>
+     </div>
+   `);
+@@ -3309,11 +3359,41 @@
+       eventType: string,
+       contactId: string | null | undefined,
+       payload: Record<string, any> = {},
+-    ) => {
++    ): Promise<{ emailed: boolean; reason?: string }> => {
+       try {
+-        if (!eventType || !contactId || !CLIENT_EMAIL_EVENTS.has(eventType)) return;
++        if (!eventType || !CLIENT_EMAIL_EVENTS.has(eventType)) return { emailed: false, reason: 'not_a_client_email_event' };
++        if (!contactId) {
++          // The action saved, but we have no contact to email. Make this loud:
++          // tell Eric so a client never silently misses a portal notification.
++          console.error('[email] client notify skipped — no contactId for event', eventType);
++          try {
++            await sendEmail(ERIC, `Heads up: a client notification could not be sent`, notifyShell(
++              `A "${eventType}" update wasn't emailed`,
++              [
++                `You just performed a <strong>${eventType}</strong> action in the portal, but it isn't linked to a client contact, so no notification email went out.`,
++                `The action itself is saved. The client simply wasn't emailed.`,
++                `Fix: open the client record and make sure their contact (and email) is linked, then re-send if needed.`,
++              ],
++              { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
++            ));
++          } catch (_) { /* best-effort */ }
++          return { emailed: false, reason: 'no_contact_linked' };
++        }
+         const c = await contactEmail(contactId);
+-        if (!c) return;
++        if (!c) {
++          console.error('[email] client notify skipped — contact', contactId, 'has no email for event', eventType);
++          try {
++            await sendEmail(ERIC, `Heads up: a client notification could not be sent`, notifyShell(
++              `A "${eventType}" update wasn't emailed`,
++              [
++                `You just performed a <strong>${eventType}</strong> action, but the linked contact has no email on file, so no notification went out.`,
++                `The action itself is saved. Add an email to the contact to enable notifications.`,
++              ],
++              { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
++            ));
++          } catch (_) { /* best-effort */ }
++          return { emailed: false, reason: 'contact_has_no_email' };
++        }
+         const name = c.name || 'there';
+         let subject = 'An update on your project';
+         let heading = 'An update on your project';
+@@ -3356,8 +3436,12 @@
+           heading = `Congratulations, ${name}!`;
+           lines = [ `Your site just launched. It’s been a genuine pleasure building this with you.` ];
+         }
+-        await sendEmail(c.email, subject, notifyShell(heading, lines, cta));
+-      } catch (_) { /* never block on email */ }
++        const sent = await emailOk(c.email, subject, notifyShell(heading, lines, cta));
++        return { emailed: sent, reason: sent ? undefined : 'resend_send_failed' };
++      } catch (e) {
++        console.error('[email] notifyClientOfEvent threw', String(e));
++        return { emailed: false, reason: 'exception' };
++      }
+     };
+ 
+     if (type === 'emit_event') {
+@@ -3366,10 +3450,16 @@
+       const { eventType, actor, contact, project, payload, clientVisible } = body;
+       if (!eventType) return json({ error: 'eventType required' }, 400, reqCors);
+       const out = await emitEvent({ type: eventType, actor, contact, project, payload, clientVisible });
++      let notify: { emailed: boolean; reason?: string } = { emailed: false, reason: 'not_attempted' };
+       if (!out.error && contact) {
+-        await notifyClientOfEvent(eventType, contact, payload || {});
+-      }
+-      return out.error ? json({ error: out.error }, 200, reqCors) : json({ ok: true, id: out.id }, 200, reqCors);
++        notify = await notifyClientOfEvent(eventType, contact, payload || {});
++      } else if (!out.error && !contact && CLIENT_EMAIL_EVENTS.has(eventType)) {
++        // event saved but no contact passed → warn Eric, report it back
++        notify = await notifyClientOfEvent(eventType, null, payload || {});
++      }
++      return out.error
++        ? json({ error: out.error }, 200, reqCors)
++        : json({ ok: true, id: out.id, emailed: notify.emailed, notify_reason: notify.reason || null }, 200, reqCors);
+     }
+ 
+     if (type === 'advance_stage') {
+@@ -5587,10 +5677,10 @@
+           <a href="https://davisdigitalstudio.com" style="font-family:Georgia,serif;font-size:18px;color:#fff;text-decoration:none;display:block;margin-bottom:20px;">Davis<span style="color:#c4aee8;">Digital</span> Studio</a>
+           <div style="background:#1e1338;border-radius:16px;padding:28px;">
+             <div style="font-size:11px;color:#c4aee8;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">New Audit Lead</div>
+-            <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:400;color:#fff;margin:0 0 4px;">${clientName}</h1>
+-            <a href="${url}" target="_blank" style="display:block;color:#c4aee8;text-decoration:none;font-size:13px;margin-bottom:18px;">${url}</a>
++            <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:400;color:#fff;margin:0 0 4px;">${escHtmlSrv(clientName)}</h1>
++            <a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="display:block;color:#c4aee8;text-decoration:none;font-size:13px;margin-bottom:18px;">${escHtmlSrv(url)}</a>
+             <table style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px;">
+-              <tr><td style="padding:5px 0;color:rgba(255,255,255,0.4);width:80px;">Email</td><td><a href="mailto:${clientEmail}" style="color:#c4aee8;">${clientEmail}</a></td></tr>
++              <tr><td style="padding:5px 0;color:rgba(255,255,255,0.4);width:80px;">Email</td><td><a href="mailto:${escHtmlSrv(clientEmail)}" style="color:#c4aee8;">${escHtmlSrv(clientEmail)}</a></td></tr>
+               <tr><td style="padding:5px 0;color:rgba(255,255,255,0.4);">Type</td><td style="color:#fff;">${bizType || '—'}</td></tr>
+               <tr><td style="padding:5px 0;color:rgba(255,255,255,0.4);">City</td><td style="color:#fff;">${city || '—'}</td></tr>
+               <tr><td style="padding:5px 0;color:rgba(255,255,255,0.4);">Source</td><td style="color:#fff;">${fallback ? 'heuristic fallback' : 'PSI + deep audit'}</td></tr>
+@@ -5600,15 +5690,16 @@
+             </div>
+             ${topIssues.length ? `<div style="font-size:10px;color:rgba(255,255,255,0.25);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase;">Top issues</div>${topIssues.map((i: any, n: number) => `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;color:rgba(255,255,255,0.5);"><span style="color:${i.sev==='high'?'#e05555':i.sev==='medium'?'#f0b429':'#6abf69'};font-weight:700;">${n+1}. </span>${i.title}</div>`).join('')}` : ''}
+             <div style="text-align:center;margin-top:20px;">
+-              <a href="mailto:${clientEmail}" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:10px 22px;border-radius:100px;text-decoration:none;margin-right:8px;">Reply to lead →</a>
+-              <a href="${url}" target="_blank" style="display:inline-block;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:13px;font-weight:600;padding:10px 22px;border-radius:100px;text-decoration:none;">Visit site →</a>
++              <a href="mailto:${escHtmlSrv(clientEmail)}" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:10px 22px;border-radius:100px;text-decoration:none;margin-right:8px;">Reply to lead →</a>
++              <a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:13px;font-weight:600;padding:10px 22px;border-radius:100px;text-decoration:none;">Visit site →</a>
+             </div>
+           </div>
+         </div>
+       `);
+-      await sendEmail(ERIC, `New Audit Lead: ${clientName} (${url}) — ${score}/100`, ericHtml);
+-      if (clientEmail && userConfirmHtml) await sendEmail(clientEmail, `Your free site score for ${clientName}`, userConfirmHtml);
+-      return json({ ok: true });
++      const ericEmailed = await emailOk(ERIC, `New Audit Lead: ${clientName} (${url}) — ${score}/100`, ericHtml);
++      let leadEmailed = false;
++      if (clientEmail && userConfirmHtml) leadEmailed = await emailOk(clientEmail, `Your free site score for ${clientName}`, userConfirmHtml);
++      return json({ ok: true, emailed: ericEmailed, lead_emailed: leadEmailed });
+     }
+ 
+     // ── PROJECT COMPLETE ──
+@@ -5626,9 +5717,9 @@
+         ],
+         { label: 'Share your feedback →', href: surveyUrl }
+       );
+-      await sendEmail(email, `Your project is live 🎉 — one quick favor`, html);
+-      await sendEmail(ERIC, `Project complete: ${name}`, notifyShell(`Project marked complete`, [`${name} (${email}) was marked complete and sent the satisfaction survey.`]));
+-      return json({ ok: true });
++      const clientEmailed = await emailOk(email, `Your project is live 🎉 — one quick favor`, html);
++      const ericEmailed = await emailOk(ERIC, `Project complete: ${name}`, notifyShell(`Project marked complete`, [`${name} (${email}) was marked complete and sent the satisfaction survey.`]));
++      return json({ ok: true, emailed: clientEmailed, admin_emailed: ericEmailed });
+     }
+ 
+     if (type === 'welcome') {
+@@ -5645,9 +5736,9 @@
+         ],
+         { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }
+       );
+-      await sendEmail(email, `Your Davis Digital Studio portal is ready`, html);
+-      await sendEmail(ERIC, `Portal created: ${name}`, notifyShell(`New client portal created`, [`${name} (${email}) now has a portal.`]));
+-      return json({ ok: true });
++      const clientEmailed = await emailOk(email, `Your Davis Digital Studio portal is ready`, html);
++      const ericEmailed = await emailOk(ERIC, `Portal created: ${name}`, notifyShell(`New client portal created`, [`${name} (${email}) now has a portal.`]));
++      return json({ ok: true, emailed: clientEmailed, admin_emailed: ericEmailed });
+     }
+ 
+     // ── CONTACT REPLY ──
+@@ -5786,7 +5877,7 @@
+         if (cur.email) {
+           try {
+             await sendEmail(cur.email, `Re: your message to Davis Digital Studio`,
+-              notifyShell(`A reply from Davis Digital Studio`, [text.replace(/\n/g, '<br>')]));
++              notifyShell(`A reply from Davis Digital Studio`, [text]));
+           } catch (_) { /* never block on email */ }
+         }
+ 
+@@ -6284,7 +6375,7 @@
+       const heading = toClient ? `Update on your project` : `${name}: ${pretty}`;
+       const lines = [
+         subject ? `<strong>${subject}</strong>` : '',
+-        message ? message.replace(/\n/g, '<br>') : '',
++        message || '',
+       ].filter(Boolean);
+       const cta = toClient
+         ? { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }
+@@ -6328,8 +6419,8 @@
+       if (!email || !result) return json({ error: 'email and result required' }, 400);
+       const domain = (result && result.domain) ? result.domain : (url || 'your site');
+       try {
+-        await sendEmail(email, `Your free website review for ${domain}`, critiqueEmailHtml(domain, result));
+-        await sendEmail(ERIC, `New AI review run: ${domain}`, notifyShell(
++        const visitorEmailed = await emailOk(email, `Your free website review for ${domain}`, critiqueEmailHtml(domain, result));
++        const ericEmailed = await emailOk(ERIC, `New AI review run: ${domain}`, notifyShell(
+           'Someone just ran a free AI review',
+           [
+             `Site: ${domain}`,
+@@ -6338,9 +6429,9 @@
+           ],
+           { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' }
+         ));
+-        return json({ ok: true });
++        return json({ ok: true, emailed: visitorEmailed, admin_emailed: ericEmailed });
+       } catch (e) {
+-        return json({ error: 'email_failed', message: String(e) });
++        return json({ error: 'email_failed', message: String(e), emailed: false });
+       }
+     }
+ 
+@@ -6381,8 +6472,9 @@
+         }
+       } catch (_e) { /* lead capture is best-effort */ }
+ 
++      let visitorEmailed = false;
+       try {
+-        await sendEmail(
++        visitorEmailed = await emailOk(
+           email,
+           'Your Digital Report Card is on the way',
+           notifyShell(
+@@ -6395,8 +6487,9 @@
+         );
+       } catch (_e) { /* don't fail the request on visitor email */ }
+ 
++      let ericEmailed = false;
+       try {
+-        await sendEmail(
++        ericEmailed = await emailOk(
+           ERIC,
+           `Report Card request: ${name || email}`,
+           notifyShell(
+@@ -6412,7 +6505,119 @@
+         );
+       } catch (_e) { /* don't fail the request on notify email */ }
+ 
+-      return json({ ok: true });
++      return json({ ok: true, emailed: visitorEmailed, admin_emailed: ericEmailed });
++    }
++
++    // ── DISCOVERY INTAKE (start.html) ──
++    // start.html already writes the intake row directly via PostgREST; this
++    // route's job is the email heads-up to Eric + a confirmation to the
++    // submitter. Returns a truthful { emailed } flag so the form can show a
++    // calm fallback if the notify failed.
++    if (type === 'discovery_intake') {
++      const name = String(body.clientName || '').trim();
++      const email = String(body.clientEmail || '').trim();
++      const subject = String(body.subject || '').trim();
++      const message = String(body.message || '').trim();
++
++      const lines = message ? message.split('\n').filter((l: string) => l.trim().length) : [];
++      let ericEmailed = false;
++      try {
++        ericEmailed = await emailOk(
++          ERIC,
++          subject || `New discovery intake: ${name || email || 'a visitor'}`,
++          notifyShell(
++            'New discovery intake',
++            [
++              `From: ${name || '(no name)'}${email ? ' · ' + email : ''}`,
++              ...(lines.length ? lines : ['(no details provided)']),
++            ],
++            { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
++          ),
++        );
++      } catch (_e) { /* never fail the form on the notify email */ }
++
++      // best-effort confirmation to the submitter (does not affect the result)
++      if (email) {
++        try {
++          await sendEmail(
++            email,
++            `Thanks${name ? ', ' + name : ''} — I got your project details`,
++            notifyShell(
++              `Thanks${name ? ', ' + name : ''}`,
++              [
++                `I've received your project details and I'll be in touch personally within one business day.`,
++                `If anything is time-sensitive, just reply to this email and it comes straight to me.`,
++              ],
++            ),
++          );
++        } catch (_e) { /* ignore */ }
++      }
++
++      // ── Pipeline entry: also create a `leads` row so discovery intakes land
++      // in the unified Studio OS pipeline (alongside contact + audit leads),
++      // not just the standalone discovery_intake table. The rich structured
++      // payload stays in discovery_intake; this is the pipeline-visible record.
++      let leadId: string | null = null;
++      if (SB_SERVICE && (name || email)) {
++        try {
++          const r = await fetch(`${SB_URL}/rest/v1/leads`, {
++            method: 'POST',
++            headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
++            body: JSON.stringify({
++              name: name || null,
++              email: email || null,
++              source: 'website_form',
++              tag: 'discovery',
++              subject: subject || `Discovery intake: ${name || email || 'a visitor'}`,
++              message: message || null,
++              status: 'new',
++              unread: true,
++              last_message: (message || subject || '').slice(0, 160),
++              last_actor: 'them',
++            }),
++          });
++          if (r.ok) { const rows = await r.json(); leadId = Array.isArray(rows) && rows[0] ? String(rows[0].id) : null; }
++          else { console.error('[discovery_intake] leads insert failed', r.status, (await r.text()).slice(0, 200)); }
++          if (leadId) {
++            await fetch(`${SB_URL}/rest/v1/lead_messages`, {
++              method: 'POST',
++              headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
++              body: JSON.stringify({ lead_id: leadId, who: 'them', body: message || subject || '' }),
++            });
++          }
++        } catch (e) { console.error('[discovery_intake] pipeline entry threw', String(e)); }
++      }
++
++      // ok:true means the request was handled; emailed reflects the Eric notify
++      return json({ ok: true, emailed: ericEmailed, lead_id: leadId });
++    }
++
++    // ── PROJECT SURVEY (project-survey.html) ──
++    // Sends the survey responses to Eric. Returns a truthful { emailed } flag.
++    if (type === 'survey_response') {
++      const name = String(body.clientName || '').trim();
++      const email = String(body.clientEmail || '').trim();
++      const subject = String(body.subject || '').trim();
++      const message = String(body.message || '').trim();
++
++      const lines = message ? message.split('\n').filter((l: string) => l.trim().length) : [];
++      let ericEmailed = false;
++      try {
++        ericEmailed = await emailOk(
++          ERIC,
++          subject || `New project survey response${name ? ': ' + name : ''}`,
++          notifyShell(
++            'New project survey response',
++            [
++              `From: ${name || '(no name)'}${email ? ' · ' + email : ''}`,
++              ...(lines.length ? lines : ['(no details provided)']),
++            ],
++            { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
++          ),
++        );
++      } catch (_e) { /* ignore */ }
++
++      return json({ ok: true, emailed: ericEmailed });
+     }
+ 
+     // ── AI: DRAFT A REPLY (admin panel) ── (gate: staff)

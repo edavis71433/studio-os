@@ -1,0 +1,253 @@
+--- dds/davis-digital-studio-main/dds-studio-manage-9k2p.html	2026-06-30 13:27:58.000000000 +0000
++++ out/dds-studio-manage-9k2p.html	2026-06-30 16:47:03.949961939 +0000
+@@ -792,7 +792,7 @@
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ </head>
+ <body>
+-<div class="toast" id="toast"></div>
++<div class="toast" id="toast" role="status" aria-live="polite"></div>
+ 
+ <!-- LOGIN -->
+ <div class="login" id="loginWrap">
+@@ -2029,7 +2029,7 @@
+         return {
+           id: 'os_' + l.id,            // prefix so it never collides with audit_leads ids
+           _osLeadId: l.id,             // real leads-table id, for reply/detail
+-          tool: 'contact',
++          tool: (l.tag === 'discovery') ? 'discovery' : 'contact',
+           business_name: l.name || (l.email || 'Lead'),
+           client_email: l.email || '',
+           url: '',
+@@ -2115,12 +2115,12 @@
+       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">' +
+         '<input type="checkbox" onclick="event.stopPropagation();toggleLeadSelect(\''+l.id+'\',this.checked)" '+(_selectedLeads.has(l.id)?'checked':'')+' title="Select lead" style="flex-shrink:0;width:17px;height:17px;margin-top:2px;cursor:pointer;accent-color:var(--p);">' +
+         '<div style="flex:1;min-width:0;">' +
+-          '<div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:3px;">'+(l.business_name||'(no name)')+'</div>' +
+-          '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(l.url||'—')+' · '+(l.client_email||'—')+'</div>' +
++          '<div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:3px;">'+escHtml(l.business_name||'(no name)')+'</div>' +
++          '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(l.url||'—')+' · '+escHtml(l.client_email||'—')+'</div>' +
+           '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+             '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;background:'+tCol+'15;color:'+tCol+';letter-spacing:0.5px;text-transform:uppercase;">'+tLabel+'</span>' +
+             '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;background:'+statusCol+'15;color:'+statusCol+';letter-spacing:0.5px;text-transform:uppercase;">'+(l.status||'new')+'</span>' +
+-            (l.city ? '<span style="font-size:11px;color:var(--muted);">'+l.city+'</span>' : '') +
++            (l.city ? '<span style="font-size:11px;color:var(--muted);">'+escHtml(l.city)+'</span>' : '') +
+             '<span style="font-size:11px;color:var(--muted);margin-left:auto;">'+dateStr+'</span>' +
+           '</div>' +
+         '</div>' +
+@@ -2128,7 +2128,7 @@
+           '<div style="font-size:26px;font-weight:700;color:'+scoreCol+';line-height:1;">'+sc+'</div>' +
+           '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Score</div>' +
+         '</div>' +
+-        '<button onclick="event.stopPropagation();deleteOneLead(\''+l.id+'\',\''+String(l.business_name||'this lead').replace(/[\\\\\']/g,"")+'\')" title="Delete lead" style="flex-shrink:0;align-self:flex-start;background:none;border:1px solid rgba(224,85,85,0.25);color:var(--red);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:14px;line-height:1;">&times;</button>' +
++        '<button onclick="event.stopPropagation();deleteOneLead(\''+l.id+'\',\''+escHtml(String(l.business_name||'this lead').replace(/[\\\\\']/g,""))+'\')" title="Delete lead" style="flex-shrink:0;align-self:flex-start;background:none;border:1px solid rgba(224,85,85,0.25);color:var(--red);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:14px;line-height:1;">&times;</button>' +
+       '</div>' +
+     '</div>';
+   }).join('');
+@@ -2182,12 +2182,12 @@
+         return '<div draggable="true" ondragstart="leadDragStart(event,\''+l.id+'\')" onclick="showLeadDetail(\''+l.id+'\')" '+
+           'style="background:#fff;border:1px solid rgba(91,63,160,0.12);border-radius:10px;padding:11px;margin-bottom:9px;cursor:grab;">'+
+           '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'+
+-            '<div style="font-size:13px;font-weight:600;color:var(--ink);line-height:1.3;">'+(l.business_name||'(no name)')+'</div>'+
++            '<div style="font-size:13px;font-weight:600;color:var(--ink);line-height:1.3;">'+escHtml(l.business_name||'(no name)')+'</div>'+
+             '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'+sc+
+-              '<button onclick="event.stopPropagation();deleteOneLead(\''+l.id+'\',\''+String(l.business_name||'this lead').replace(/[\\\\\']/g,"")+'\')" title="Delete lead" style="background:none;border:1px solid rgba(224,85,85,0.25);color:var(--red);width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:13px;line-height:1;padding:0;">&times;</button>'+
++              '<button onclick="event.stopPropagation();deleteOneLead(\''+l.id+'\',\''+escHtml(String(l.business_name||'this lead').replace(/[\\\\\']/g,""))+'\')" title="Delete lead" style="background:none;border:1px solid rgba(224,85,85,0.25);color:var(--red);width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:13px;line-height:1;padding:0;">&times;</button>'+
+             '</div>'+
+           '</div>'+
+-          '<div style="font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(l.client_email||l.url||'')+'</div>'+
++          '<div style="font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(l.client_email||l.url||'')+'</div>'+
+           conv+
+         '</div>';
+       }).join('');
+@@ -2976,8 +2976,8 @@
+     html += leads.map(function(l){
+       var toolName = (l.tool||"tool").replace(/_/g," ");
+       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff;border:1px solid rgba(91,63,160,0.08);border-radius:10px;margin-bottom:6px;">'+
+-        '<div><div style="font-size:13px;font-weight:600;text-transform:capitalize;">'+toolName+(l.url?' · '+l.url:'')+'</div>'+
+-        '<div style="font-size:11px;color:var(--muted);">'+(l.business_name||"")+(l.city?" · "+l.city:"")+' · '+fmtDate(l.created_at)+'</div></div>'+
++        '<div><div style="font-size:13px;font-weight:600;text-transform:capitalize;">'+escHtml(toolName)+(l.url?' · '+escHtml(l.url):'')+'</div>'+
++        '<div style="font-size:11px;color:var(--muted);">'+escHtml(l.business_name||"")+(l.city?" · "+escHtml(l.city):"")+' · '+fmtDate(l.created_at)+'</div></div>'+
+         (l.score!=null?'<span style="font-size:12px;font-weight:700;color:var(--p);">'+l.score+'/100</span>':'')+
+       '</div>';
+     }).join("");
+@@ -3148,9 +3148,10 @@
+   if (!text) { toast("Enter a message."); return; }
+   if (ta) { ta.disabled = true; }
+   try {
+-    await api("messages", "POST", {client_id:c.id, from_who:"eric", sender_name:"Eric", text:text});
++    var saved = await api("messages", "POST", {client_id:c.id, from_who:"eric", sender_name:"Eric", text:text});
++    if (saved === null) { if (ta) { ta.disabled = false; } return; } // api() already toasted the failure
+     try { await api("notifications","POST",{client_id:c.id,type:"message",title:"New message from Eric",body:text.slice(0,90),link_tab:"messages"}); } catch(e){}
+-    try { await notify("eric_message", text, "", c); } catch(e){}
++    try { await emitClientMessageToFeed(c, text); } catch(e){}
+     toast("Message sent + client notified");
+     openHubClient(c.id);
+   } catch (e) {
+@@ -3303,10 +3304,23 @@
+     });
+     if (r.status === 401) { console.error("api error: unauthorized"); showLogin(); return null; }
+     var j = await r.json();
+-    if (j.error) { console.error("api error:", j.error, j.detail || ""); return null; }
++    if (j.error) {
++      console.error("api error:", j.error, j.detail || "");
++      // Honest failure surfacing: a mutation that fails must NEVER look like it
++      // succeeded. Reads stay quiet (the UI renders an empty/again state), but a
++      // failed write/update/delete shows a clear toast so Eric never trusts a
++      // green check that didn't happen. This is the launch-blocker reliability fix.
++      if (m !== "GET" && typeof toast === "function") {
++        toast("⚠ That didn't save. Nothing was changed — please try again.");
++      }
++      return null;
++    }
+     return j.data;
+   } catch (e) {
+     console.error("api fetch failed:", e);
++    if (m !== "GET" && typeof toast === "function") {
++      toast("⚠ Connection issue — that didn't save. Please try again.");
++    }
+     return null;
+   }
+ }
+@@ -4123,7 +4137,6 @@
+   if (!text) { toast("Enter a message."); return; }
+   await api("messages", "POST", {client_id:ctx.id, from_who:"eric", sender_name:"Eric", text:text});
+   try { await api("notifications","POST",{client_id:ctx.id,type:"message",title:"New message from Eric",body:text.slice(0,90),link_tab:"messages"}); } catch(e){}
+-  await notify("eric_message", text, "", ctx);
+   document.getElementById("msgText").value = "";
+   toast("✓ Message sent + client notified");
+   // Also surface this message in the client's project feed (best-effort).
+@@ -4136,21 +4149,32 @@
+ // email to their contact). Reused by approvals/files/invoices. Best-effort.
+ async function emitClientEventByCtx(ctx, eventType, payload){
+   try {
+-    if (!ctx) return;
++    if (!ctx) return { emailed:false, reason:"no_ctx" };
+     var email = (ctx.contact_email || ctx.email || "").toLowerCase();
+-    if (!email) return;
++    if (!email) {
++      if (typeof toast === "function") toast("⚠ Saved, but client has no email on file — they were not notified.");
++      return { emailed:false, reason:"no_email" };
++    }
+     if (!window.__ddsContactsByEmail || !Object.keys(window.__ddsContactsByEmail).length) {
+       if (typeof loadContactsMap === "function") await loadContactsMap();
+     }
+     var contactId = (window.__ddsContactsByEmail || {})[email];
+-    if (!contactId) return;
+-    var jwt = await adminJwt(); if (!jwt) return;
+-    await fetch(SB_URL + "/functions/v1/clever-api", {
++    if (!contactId) {
++      if (typeof toast === "function") toast("⚠ Saved, but this client's contact isn't linked — they were not emailed. Link their contact to enable notifications.");
++      return { emailed:false, reason:"contact_not_linked" };
++    }
++    var jwt = await adminJwt(); if (!jwt) return { emailed:false, reason:"no_jwt" };
++    var r = await fetch(SB_URL + "/functions/v1/clever-api", {
+       method: "POST",
+       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY, "x-dds-user-jwt": jwt },
+       body: JSON.stringify({ type: "emit_event", eventType: eventType, actor: "admin", contact: contactId, payload: payload || {}, clientVisible: true })
+     });
+-  } catch(e){}
++    var j = {}; try { j = await r.json(); } catch(e){}
++    if (j && j.emailed === false && typeof toast === "function") {
++      toast("⚠ Saved, but the notification email did not send" + (j.notify_reason ? " ("+j.notify_reason+")" : "") + ".");
++    }
++    return { emailed: !!(j && j.emailed), reason: j && j.notify_reason };
++  } catch(e){ return { emailed:false, reason:"exception" }; }
+ }
+ 
+ // Drops a client_visible "message" event into the spine feed for this client,
+@@ -4207,9 +4231,9 @@
+     if (!fr.ok) { toast("Upload failed"); continue; }
+     var pubUrl = SB_URL+"/storage/v1/object/public/client-files/"+path;
+     var size = file.size>1024*1024?(file.size/1024/1024).toFixed(1)+" MB":(file.size/1024).toFixed(0)+" KB";
+-    await api("files","POST",{client_id:ctx.id,name:file.name,size:size,type:file.name.split(".").pop().toUpperCase(),from_who:"eric",status:"pending",storage_path:path,url:pubUrl});
++    var fsaved = await api("files","POST",{client_id:ctx.id,name:file.name,size:size,type:file.name.split(".").pop().toUpperCase(),from_who:"eric",status:"pending",storage_path:path,url:pubUrl});
++    if (fsaved === null) { continue; } // failed write already toasted; skip notify for this file
+     try { await api("notifications","POST",{client_id:ctx.id,type:"file",title:"New file: "+file.name,body:"Eric uploaded a new file for you to review.",link_tab:"files"}); } catch(e){}
+-    await notify("eric_file",file.name+" ("+size+")","",ctx);
+     try { await emitClientEventByCtx(ctx, "file.shared", { name: file.name }); } catch(e){}
+     toast("✓ "+file.name+" uploaded");
+   }
+@@ -4229,10 +4253,10 @@
+   var title = document.getElementById("apprTitle").value.trim();
+   var desc = document.getElementById("apprDesc").value.trim();
+   if (!title) { toast("Enter a title."); return; }
+-  await api("approvals","POST",{client_id:ctx.id,title:title,description:desc,status:"pending"});
++  var asaved = await api("approvals","POST",{client_id:ctx.id,title:title,description:desc,status:"pending"});
++  if (asaved === null) return; // failed write already toasted
+   // In-portal notification for the client's notification bell
+   try { await api("notifications","POST",{client_id:ctx.id,type:"approval",title:"New item to review: "+title,body:desc||"",link_tab:"approvals"}); } catch(e){}
+-  await notify("approval_needed",desc,title,ctx);
+   document.getElementById("apprTitle").value="";
+   document.getElementById("apprDesc").value="";
+   try { await emitClientEventByCtx(ctx, "approval.requested", { title: title }); } catch(e){}
+@@ -4318,7 +4342,7 @@
+     );
+ 
+     out.style.color = "#1a7e49";
+-    out.innerHTML = "✓ Marked complete. Survey email sent to <strong>" + (ctx.contact_email || ctx.name) + "</strong>.";
++    out.innerHTML = "✓ Marked complete. Survey email sent to <strong>" + escHtml(ctx.contact_email || ctx.name) + "</strong>.";
+     toast("✓ " + ctx.name + " — project complete + survey email sent!");
+   } catch(e) {
+     out.style.color = "var(--red)";
+@@ -4395,12 +4419,13 @@
+   };
+   if (!payload.name||!payload.amount) { toast("Name and amount required."); return; }
+   if (editId) {
+-    await api("invoices?id=eq."+editId,"PATCH",payload);
++    var upd = await api("invoices?id=eq."+editId,"PATCH",payload);
++    if (upd === null) return; // api() already surfaced the failure
+     toast("✓ Invoice updated");
+   } else {
+-    await api("invoices","POST",payload);
++    var ins = await api("invoices","POST",payload);
++    if (ins === null) return; // failed write already toasted; don't claim success
+     try { await api("notifications","POST",{client_id:ctx.id,type:"invoice",title:"New invoice: "+payload.name,body:"Amount: "+payload.amount,link_tab:"invoices"}); } catch(e){}
+-    await notify("invoice",payload.amount,payload.name,ctx);
+     try { await emitClientEventByCtx(ctx, "invoice.sent", { amount: payload.amount, name: payload.name }); } catch(e){}
+     toast("✓ Invoice added + client notified");
+   }
+@@ -4434,7 +4459,7 @@
+   var ctx = selectedClients["contracts"];
+   if (!ctx) { toast("Select a client first."); return; }
+   await api("messages","POST",{client_id:ctx.id,from_who:"eric",sender_name:"Eric",text:"Your project agreement is ready to review and sign. Head to the Agreement tab in your portal, give it a read, and acknowledge at the bottom to get us started."});
+-  await notify("eric_message","Your project agreement is ready in the Agreement tab of your portal.","",ctx);
++  try { await emitClientEventByCtx(ctx, "message.sent", { preview: "Your project agreement is ready in the Agreement tab of your portal." }); } catch(e){}
+   toast("✓ Contract notification sent to "+ctx.name);
+ }
+ async function resetClientPassword(cid, email, name) {
+@@ -4537,7 +4562,7 @@
+     var pubUrl = SB_URL+"/storage/v1/object/public/client-files/"+path;
+     var size = file.size>1024*1024?(file.size/1024/1024).toFixed(1)+" MB":(file.size/1024).toFixed(0)+" KB";
+     await api("files","POST",{client_id:ctx.id,name:file.name,size:size,type:"PDF",from_who:"eric",status:"pending",storage_path:path,url:pubUrl});
+-    await notify("eric_file",file.name,"",ctx);
++    try { await emitClientEventByCtx(ctx, "file.shared", { name: file.name }); } catch(e){}
+     toast("✓ "+file.name+" sent to "+ctx.name);
+   }
+ }
+@@ -4694,7 +4719,7 @@
+   var result = document.getElementById("nc-result");
+   result.style.display = "block";
+   var warnNote = warnings.length ? ("<br><span style='font-size:12px;color:var(--red);'>Created, but these steps need a retry: " + warnings.join(", ") + ".</span>") : "";
+-  result.innerHTML = "✓ Portal created for <strong>"+name+"</strong>!<br><span style='font-size:12px;color:var(--muted);'>Login: <code>"+cemail+"</code> · Welcome email sent to client.</span>" + warnNote;
++  result.innerHTML = "✓ Portal created for <strong>"+escHtml(name)+"</strong>!<br><span style='font-size:12px;color:var(--muted);'>Login: <code>"+escHtml(cemail)+"</code> · Welcome email sent to client.</span>" + warnNote;
+   toast(warnings.length ? ("Portal created with " + warnings.length + " step(s) to retry.") : ("✓ " + name + " portal created + welcome email sent!"));
+   document.getElementById("nc-welcome").value = "";
+   cleanup();
+@@ -6090,7 +6115,7 @@
+     var o = document.createElement("div");
+     o.className = "cmdk-overlay"; o.id = "cmdkOverlay";
+     o.innerHTML =
+-      '<div class="cmdk" role="dialog" aria-label="Command palette">'+
++      '<div class="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">'+
+         '<div class="cmdk-input-row">'+
+           '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'+
+           '<input class="cmdk-input" id="cmdkInput" placeholder="Search clients, actions, pages…" autocomplete="off" spellcheck="false">'+
+@@ -6174,7 +6199,7 @@
+     var o=document.createElement("div");
+     o.className="ai-modal-overlay"; o.id="aiModal";
+     o.innerHTML=
+-      '<div class="ai-modal" role="dialog" aria-label="AI assistant">'+
++      '<div class="ai-modal" role="dialog" aria-modal="true" aria-label="AI assistant">'+
+         '<div class="ai-modal-head">'+
+           '<div class="ai-spark">'+ICONS.spark+'</div>'+
+           '<div><div class="t" id="aiTitle">Draft a reply</div><div class="s" id="aiSub">Claude writes a first draft in your voice</div></div>'+

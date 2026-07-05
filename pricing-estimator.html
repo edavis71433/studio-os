@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<!-- DDS v3.8 20260621-1700 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<title>Web Design Pricing Estimator | Davis Digital Studio</title>
+<meta name="description" content="Answer 5 questions for a real ballpark price on your web design project. No signup, no sales call. Honest estimates from Davis Digital Studio.">
+<link rel="canonical" href="https://davisdigitalstudio.com/pricing-estimator">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:site" content="@davisdigitalstudio">
+<meta property="og:url" content="https://davisdigitalstudio.com/pricing-estimator">
+<meta property="og:title" content="Free Pricing Estimator · Davis Digital Studio">
+<meta property="og:description" content="What will your web design project actually cost? Answer 5 questions and get a real price range in under a minute. No signup required.">
+<meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<script>(function(){if(localStorage.getItem('cookie_consent')==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}})();</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-V4WF04NX7F',{anonymize_ip:true});</script>
+<link rel="stylesheet" href="styles.css">
+<style>
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw;}
+:root{--p:#5B3FA0;--pxl:#c4aee8;--pxxl:#EDE8F7;--pxxxl:#f7f4fd;--pdark:#2A1B4A;--ink:#1B1525;--muted:#6B6276;--brass:#B08D57;--paper:#FBFAF7;--serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;}
+.skip-link{position:absolute;left:-9999px;top:8px;background:var(--p);color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+
+
+.tool-wrap{max-width:680px;margin:0 auto;padding:56px 24px 80px;}
+
+/* Progress bar */
+.progress-bar{height:4px;background:var(--pxxl);border-radius:2px;margin-bottom:40px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--p);border-radius:2px;transition:width 0.4s ease;}
+.progress-label{font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;}
+
+/* Question cards */
+.q-card{background:#fff;border-radius:24px;padding:40px;box-shadow:0 4px 40px rgba(91,63,160,0.08);border:1px solid rgba(91,63,160,0.1);display:none;animation:fadeUp 0.3s ease;}
+.q-card.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.q-num{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
+.q-card h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:8px;letter-spacing:-0.5px;line-height:1.2;}
+.q-card p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+
+.opts{display:flex;flex-direction:column;gap:10px;}
+.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1.5px solid rgba(91,63,160,0.15);border-radius:12px;cursor:pointer;transition:all 0.15s;background:#fff;}
+.opt:hover{border-color:var(--p);background:var(--pxxxl);}
+.opt.selected{border-color:var(--p);background:var(--pxxxl);}
+.opt-icon{width:36px;height:36px;border-radius:10px;background:var(--pxxxl);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.opt.selected .opt-icon{background:rgba(91,63,160,0.15);}
+.opt-text h3{font-size:14px;font-weight:600;margin-bottom:2px;}
+.opt-text p{font-size:12px;color:var(--muted);line-height:1.4;}
+.opt-price{font-size:12px;font-weight:700;color:var(--p);margin-left:auto;white-space:nowrap;padding-left:12px;}
+
+/* Multi-select note */
+.multi-note{font-size:12px;color:var(--muted);margin-bottom:16px;font-style:italic;}
+
+.back-btn{background:transparent;border:1.5px solid var(--pxl);color:var(--p);border-radius:100px;padding:10px 22px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:background 0.15s;}
+.back-btn:hover{background:var(--pxxxl);}
+.next-btn{background:var(--p);color:#fff;border:none;border-radius:100px;padding:11px 28px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:opacity 0.15s;margin-left:auto;}
+.next-btn:hover{opacity:0.88;}
+.next-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* Results */
+.results{display:none;animation:fadeUp 0.4s ease;}
+.tier-result{border-radius:24px;padding:40px;margin-bottom:20px;position:relative;overflow:hidden;}
+.tier-result.starter{background:linear-gradient(135deg,#f7f4fd,#fff);border:2px solid var(--p);}
+.tier-result.growth{background:linear-gradient(135deg,#2A1B4A,#2d1f55);border:2px solid #7c5cc4;}
+.tier-result.studio{background:linear-gradient(135deg,#0f0820,#2A1B4A);border:2px solid #c4aee8;}
+.tier-glow{position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;pointer-events:none;}
+.tier-badge{display:inline-block;font-size:11px;font-weight:700;padding:4px 14px;border-radius:100px;margin-bottom:16px;letter-spacing:0.5px;position:relative;}
+.tier-name{font-family:var(--serif);font-size:28px;font-weight:400;margin-bottom:6px;position:relative;}
+.tier-range{font-family:var(--serif);font-size:40px;font-weight:400;letter-spacing:-1px;margin-bottom:6px;position:relative;}
+.tier-cadence{font-size:13px;margin-bottom:20px;position:relative;}
+.tier-includes{list-style:none;margin-bottom:24px;position:relative;}
+.tier-includes li{font-size:13px;padding:7px 0;display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid rgba(91,63,160,0.06);}
+.tier-includes li:last-child{border-bottom:none;}
+.tier-includes li::before{content:'→';flex-shrink:0;font-weight:600;}
+.tier-cta{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;padding:13px 26px;border-radius:100px;text-decoration:none;transition:transform 0.15s,opacity 0.15s;position:relative;}
+.tier-cta:hover{transform:translateY(-2px);}
+
+.addons-note{background:#fff;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid rgba(91,63,160,0.1);}
+.addons-note h3{font-size:14px;font-weight:600;margin-bottom:12px;}
+.addons-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.addon-pill{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--pxxxl);border-radius:8px;font-size:12px;}
+.addon-pill span:first-child{color:var(--ink);font-weight:500;}
+.addon-pill span:last-child{color:var(--p);font-weight:700;}
+
+.disclaimer{font-size:12px;color:var(--muted);text-align:center;line-height:1.7;padding:16px;background:var(--pxxxl);border-radius:12px;margin-bottom:20px;}
+.restart-btn{display:block;text-align:center;font-size:13px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:var(--sans);text-decoration:underline;margin:0 auto;}
+
+
+@media(max-width:700px){
+  .addons-grid{grid-template-columns:1fr;}
+}
+
+
+/* NAV-FINAL-V5 */
+
+.skip-link{position:absolute;left:-9999px;top:8px;background:#5b3fa0;color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
+.skip-link:focus{left:8px;}
+*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;border-radius:4px;}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}}
+
+
+/* Dropdown gap fix - bridge pseudo-element */
+
+
+/* Dropdown bridge - prevents menu closing when moving mouse down */
+
+
+/* ---------------------------------------------------------------
+   TOOL SWITCHER — cross-tool navigation, added so a visitor on any
+   one tool has a clear, designed path to the other five, plus back
+   to the Resources hub. Not a footer link dump — real cards with
+   the same shadow/radius language used across the rest of V2.
+   --------------------------------------------------------------- */
+.tool-switch-section{padding:72px 24px;background:#fff;position:relative;}
+.tool-switch-inner{max-width:1080px;margin:0 auto;}
+.tool-switch-head{text-align:center;margin-bottom:40px;}
+.tool-switch-head span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);}
+.tool-switch-head h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;letter-spacing:-.5px;margin-top:10px;}
+.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
+.tool-switch-head p a{color:var(--p);text-decoration:underline;}
+.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.tool-switch-item{display:block;background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:18px;padding:22px 20px;text-decoration:none;transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
+.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 26px 50px -28px rgba(27,21,37,.24);}
+.tool-switch-item h3{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--ink);margin-bottom:6px;}
+.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5;}
+.tool-switch-item.current{background:var(--p);border-color:var(--p);cursor:default;box-shadow:0 22px 44px -24px rgba(91,63,160,.42);pointer-events:none;}
+.tool-switch-item.current h3{color:#fff;}
+.tool-switch-item.current p{color:rgba(255,255,255,.72);}
+.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:100px;margin-bottom:8px;}
+@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr;}}
+
+
+/* Tool-hero two-column grid — was inline-only with zero mobile breakpoint,
+   causing horizontal overflow on phones (confirmed via screenshot: the
+   sample card was spilling off-screen). Now a real class with a real
+   breakpoint. */
+.tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
+@media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
+</style>
+<link rel="stylesheet" href="/enhance.css">
+</head>
+<body data-page="pricing-estimator">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<header class="nav">
+<div class="wrap nav-in">
+  <a href="index.html" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="how-we-work.html">How we work</a>
+    <a href="the-experience.html">The experience</a>
+    <span class="nav-has-sub"><a href="services.html" class="nav-sub-toggle" aria-haspopup="true" aria-expanded="false">Services <i class="caret" aria-hidden="true"></i></a>
+      <span class="nav-sub">
+        <a href="services.html">All services<small>Pricing and the full picture</small></a>
+        <a href="web-design.html">Web design<small>Strategy-led sites that convert</small></a>
+        <a href="seo-strategy.html">SEO strategy<small>Get found by people searching</small></a>
+        <a href="monthly-retainer.html">Ongoing care<small>Keep your site working after launch</small></a>
+      </span></span>
+    <a href="industries.html">Industries</a>
+    <a href="about.html">About</a>
+    <a href="audit.html">Free site review</a>
+  </nav>
+  <div class="nav-actions">
+    <a href="portal.html" class="nav-login">Client login</a>
+    <a href="contact.html" class="btn btn-primary" style="padding:11px 20px">Book a free call</a>
+  </div>
+  <button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+</div>
+</header>
+<main id="main-content" tabindex="-1">
+<section class="page-hero-v2" style="padding:64px 24px 72px;background:linear-gradient(180deg,#FBFAF7 0%,#ede8f7 100%);position:relative;overflow:hidden;">
+  <div class="tool-hero-grid" style="max-width:1100px;margin:0 auto;gap:56px;align-items:center;position:relative;z-index:1;">
+    <div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; Pricing Estimator</div>
+      <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">What will your project <em style="color:var(--p);font-style:italic;">actually cost?</em></h1>
+      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Answer 5 questions and get a real price range in under a minute. No signup, no sales call unless you want one.</p>
+    </div>
+    <div style="background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);" aria-hidden="true">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">Example &middot; 5 quick questions</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--p);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10003;</span>
+          <span style="font-size:13px;color:var(--ink);">What kind of site do you need?</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--p);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10003;</span>
+          <span style="font-size:13px;color:var(--ink);">How many pages, roughly?</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:20px;height:20px;border-radius:50%;background:rgba(91,63,160,.15);color:var(--p);font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
+          <span style="font-size:13px;color:var(--muted);">Do you need ongoing SEO?</span>
+        </div>
+      </div>
+      <div style="padding:14px;background:#f7f4fd;border-radius:12px;text-align:center;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--p);text-transform:uppercase;margin-bottom:4px;">Estimated range</div>
+        <div style="font-family:var(--serif);font-size:26px;color:var(--ink);">$1,500 &ndash; $3,800</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="tool-wrap">
+
+  <div id="progressWrap">
+    <div class="progress-label" id="progressLabel">Question 1 of 5</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:20%"></div></div>
+  </div>
+
+  <!-- Q1: What do you need? -->
+  <div class="q-card active" id="q1">
+    <div class="q-num">Question 1 of 5</div>
+    <h2>What do you need built?</h2>
+    <p>This gives us a starting point. Most projects fall into one of these buckets.</p>
+    <div class="opts">
+      <div class="opt" onclick="pick(1,'new')" id="q1_new">
+        <div class="opt-icon">✨</div>
+        <div class="opt-text"><h3>Brand new website</h3><p>Starting from scratch, no existing site</p></div>
+      </div>
+      <div class="opt" onclick="pick(1,'redesign')" id="q1_redesign">
+        <div class="opt-icon">🔄</div>
+        <div class="opt-text"><h3>Redesign an existing site</h3><p>I have a site but it needs a full overhaul</p></div>
+      </div>
+      <div class="opt" onclick="pick(1,'additions')" id="q1_additions">
+        <div class="opt-icon">➕</div>
+        <div class="opt-text"><h3>Add pages or features to my site</h3><p>My site is decent but needs specific improvements</p></div>
+      </div>
+      <div class="opt" onclick="pick(1,'ecommerce')" id="q1_ecommerce">
+        <div class="opt-icon">🛒</div>
+        <div class="opt-text"><h3>E-commerce or online store</h3><p>I need to sell products or services online</p></div>
+      </div>
+    </div>
+    <div class="nav-btns"><button class="next-btn" id="q1next" onclick="go(1,2)" disabled>Next</button></div>
+  </div>
+
+  <!-- Q2: How many pages? -->
+  <div class="q-card" id="q2">
+    <div class="q-num">Question 2 of 5</div>
+    <h2>How many pages do you need?</h2>
+    <p>Count the main sections. Home, About, Services, Contact, etc. Don't overthink it.</p>
+    <div class="opts">
+      <div class="opt" onclick="pick(2,'1-3')" id="q2_1-3">
+        <div class="opt-icon">📄</div>
+        <div class="opt-text"><h3>1 to 3 pages</h3><p>One-pager or very simple site</p></div>
+        <span class="opt-price">Starter</span>
+      </div>
+      <div class="opt" onclick="pick(2,'4-7')" id="q2_4-7">
+        <div class="opt-icon">📑</div>
+        <div class="opt-text"><h3>4 to 7 pages</h3><p>Most small business sites</p></div>
+        <span class="opt-price">Growth</span>
+      </div>
+      <div class="opt" onclick="pick(2,'8-15')" id="q2_8-15">
+        <div class="opt-icon">📚</div>
+        <div class="opt-text"><h3>8 to 15 pages</h3><p>Larger site with multiple services or locations</p></div>
+        <span class="opt-price">Studio</span>
+      </div>
+      <div class="opt" onclick="pick(2,'15+')" id="q2_15+">
+        <div class="opt-icon">🗂️</div>
+        <div class="opt-text"><h3>15+ pages</h3><p>Complex site, blog, or large catalog</p></div>
+        <span class="opt-price">Studio+</span>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="go(2,1)">Back</button>
+      <button class="next-btn" id="q2next" onclick="go(2,3)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Q3: Platform -->
+  <div class="q-card" id="q3">
+    <div class="q-num">Question 3 of 5</div>
+    <h2>Do you have a platform preference?</h2>
+    <p>This affects cost and timeline. Not sure? I can recommend what fits your project best.</p>
+    <div class="opts">
+      <div class="opt" onclick="pick(3,'custom')" id="q3_custom">
+        <div class="opt-icon">⚡</div>
+        <div class="opt-text"><h3>Custom HTML/CSS (fastest, no monthly fees)</h3><p>Built from scratch, no platform dependency, fastest load times</p></div>
+      </div>
+      <div class="opt" onclick="pick(3,'squarespace')" id="q3_squarespace">
+        <div class="opt-icon">🟦</div>
+        <div class="opt-text"><h3>Squarespace or Wix</h3><p>Easy to update yourself, monthly platform fee</p></div>
+      </div>
+      <div class="opt" onclick="pick(3,'wordpress')" id="q3_wordpress">
+        <div class="opt-icon">🔵</div>
+        <div class="opt-text"><h3>WordPress</h3><p>Most flexible, good for blogs and larger sites</p></div>
+      </div>
+      <div class="opt" onclick="pick(3,'unsure')" id="q3_unsure">
+        <div class="opt-icon">🤔</div>
+        <div class="opt-text"><h3>Not sure, help me decide</h3><p>I'll recommend the right fit after we chat</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="go(3,2)">Back</button>
+      <button class="next-btn" id="q3next" onclick="go(3,4)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Q4: Add-ons -->
+  <div class="q-card" id="q4">
+    <div class="q-num">Question 4 of 5</div>
+    <h2>What extras do you need?</h2>
+    <p class="multi-note">Select all that apply.</p>
+    <div class="opts" id="q4opts">
+      <div class="opt" onclick="toggleMulti(4,'seo')" id="q4_seo">
+        <div class="opt-icon">🔍</div>
+        <div class="opt-text"><h3>SEO setup</h3><p>Keyword research, on-page optimization, Google Search Console</p></div>
+        <span class="opt-price">+$800</span>
+      </div>
+      <div class="opt" onclick="toggleMulti(4,'copy')" id="q4_copy">
+        <div class="opt-icon">✍️</div>
+        <div class="opt-text"><h3>Copywriting</h3><p>I need help writing the actual words on the site</p></div>
+        <span class="opt-price">+$400/pg</span>
+      </div>
+      <div class="opt" onclick="toggleMulti(4,'brand')" id="q4_brand">
+        <div class="opt-icon">🎨</div>
+        <div class="opt-text"><h3>Brand identity</h3><p>Logo, colors, fonts, visual identity package</p></div>
+        <span class="opt-price">+$500</span>
+      </div>
+      <div class="opt" onclick="toggleMulti(4,'booking')" id="q4_booking">
+        <div class="opt-icon">📅</div>
+        <div class="opt-text"><h3>Booking or reservations</h3><p>Online scheduling, reservations, or appointment booking</p></div>
+        <span class="opt-price">+$300</span>
+      </div>
+      <div class="opt" onclick="toggleMulti(4,'none')" id="q4_none">
+        <div class="opt-icon">👍</div>
+        <div class="opt-text"><h3>None of the above</h3><p>Just the website is fine for now</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="go(4,3)">Back</button>
+      <button class="next-btn" id="q4next" onclick="go(4,5)">Next</button>
+    </div>
+  </div>
+
+  <!-- Q5: Timeline -->
+  <div class="q-card" id="q5">
+    <div class="q-num">Question 5 of 5</div>
+    <h2>When do you need it done?</h2>
+    <p>Timeline affects scope and sometimes cost. Rush projects may include a surcharge.</p>
+    <div class="opts">
+      <div class="opt" onclick="pick(5,'flexible')" id="q5_flexible">
+        <div class="opt-icon">😌</div>
+        <div class="opt-text"><h3>Flexible, no hard deadline</h3><p>Standard timeline of 4-8 weeks is fine</p></div>
+      </div>
+      <div class="opt" onclick="pick(5,'2months')" id="q5_2months">
+        <div class="opt-icon">📅</div>
+        <div class="opt-text"><h3>Within 2 months</h3><p>Moderate urgency</p></div>
+      </div>
+      <div class="opt" onclick="pick(5,'1month')" id="q5_1month">
+        <div class="opt-icon">⚡</div>
+        <div class="opt-text"><h3>Within 1 month</h3><p>May include a 25% rush surcharge</p></div>
+      </div>
+      <div class="opt" onclick="pick(5,'asap')" id="q5_asap">
+        <div class="opt-icon">🚨</div>
+        <div class="opt-text"><h3>ASAP, under 2 weeks</h3><p>Rush surcharge applies, limited availability</p></div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="back-btn" onclick="go(5,4)">Back</button>
+      <button class="next-btn" id="q5next" onclick="showResults()" disabled>Get my estimate</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="peResults">
+    <div id="tierCard"></div>
+
+    <div class="addons-note" id="addonsNote" style="display:none;">
+      <h3>Add-ons in your estimate</h3>
+      <div class="addons-grid" id="addonsGrid"></div>
+    </div>
+
+    <div class="disclaimer">
+      This is a ballpark range based on your answers, not a quote. Final price depends on design complexity, content, and scope confirmed in a free discovery call. Every paid audit fee ($99+) is credited toward your project.
+    </div>
+
+    <div style="text-align:center;margin-bottom:20px;">
+      <a href="https://calendly.com/eric-davisdigitalstudio/30min" style="display:inline-flex;align-items:center;gap:8px;background:var(--p);color:#fff;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;transition:opacity 0.15s;" onmouseover="this.style.opacity=0.88" onmouseout="this.style.opacity=1">Book a free 30-min call to confirm scope →</a>
+    </div>
+
+    <button class="restart-btn" onclick="restart()">Start over</button>
+  </div>
+
+</div>
+<section class="tool-switch-section">
+  <div class="tool-switch-inner">
+    <div class="tool-switch-head">
+      <span>Free tools</span>
+      <h2>Explore the other free tools.</h2>
+      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="tools.html">the Resources hub &rarr;</a></p>
+    </div>
+    <div class="tool-switch-grid">
+    <a href="audit.html" class="tool-switch-item">
+      <h3>Site Audit</h3>
+      <p>Get your free site score and see exactly what's costing you customers.</p>
+    </a>
+    <a href="ai-critique.html" class="tool-switch-item">
+      <h3>AI Website Review</h3>
+      <p>A free AI read on what's costing you clicks, in plain English.</p>
+    </a>
+    <a href="report-card.html" class="tool-switch-item">
+      <h3>Digital Report Card</h3>
+      <p>A prioritized snapshot of what to fix first.</p>
+    </a>
+    <a href="roi-calculator.html" class="tool-switch-item">
+      <h3>ROI Calculator</h3>
+      <p>See what a better site could actually be worth.</p>
+    </a>
+    <span class="tool-switch-item current">
+      <span class="tsw-badge">You're here</span>
+      <h3>Pricing Estimator</h3>
+      <p>Get a real ballpark price for your project.</p>
+    </span>
+    <a href="local-visibility.html" class="tool-switch-item">
+      <h3>Local Visibility Score</h3>
+      <p>Check how findable your business actually is nearby.</p>
+    </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+
+<section class="dds-final-cta" aria-label="Get in touch" style="background:linear-gradient(135deg,#2A1B4A 0%,#5b3fa0 100%);padding:48px 24px;position:relative;overflow:hidden;">
+  <div aria-hidden="true" style="position:absolute;top:-100px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.18) 0%,transparent 65%);pointer-events:none;"></div>
+  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;position:relative;z-index:1;">
+    <div style="flex-shrink:0;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c4aee8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </div>
+    <div style="flex:1;min-width:260px;color:#fff;text-align:left;">
+      <h3 style="font-family:var(--serif);font-size:clamp(22px,3.5vw,28px);font-weight:400;margin:0 0 6px;line-height:1.2;letter-spacing:-0.5px;color:#fff;">Ready to grow your business online?</h3>
+      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0;line-height:1.6;">Let's build a website that works as hard as you do.</p>
+    </div>
+    <a href="/contact" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#2A1B4A;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;font-family:var(--sans);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Book a free call &rarr;</a>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<section style="background:var(--pdark);padding:32px 24px;border-top:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;padding:22px 28px;background:rgba(196,174,232,0.06);border:1px solid rgba(196,174,232,0.10);border-radius:16px;">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Founder</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Eric Davis</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Web Design &amp; SEO Strategist</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Background</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise digital team</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Domain Name Manager &amp; Content Producer &middot; 9+ years</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Education</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">M.S. Business Analytics</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">CSUN &middot; Dean's Scholar</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Scale</div>
+        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise scale</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Enterprise governance experience</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+<div class="wrap">
+  <div class="fwrap">
+    <div>
+      <div class="brand serif">Davis Digital Studio</div>
+      <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.4)">Los Angeles &middot; working with businesses nationwide</p>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Studio</p>
+      <a href="how-we-work.html">How we work</a>
+      <a href="services.html">Services</a>
+      <a href="industries.html">Industries</a>
+      <a href="about.html">About</a>
+      <a href="work.html">Work</a>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Start</p>
+      <a href="audit.html">Free site review</a>
+      <a href="tools.html">Free tools</a>
+      <a href="contact.html">Book a free call</a>
+      <a href="portal.html">Client login</a>
+    </div>
+  </div>
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="accessibility.html">Accessibility</a>
+    </span>
+  </div>
+</div>
+</footer>
+
+<script>
+var ans = {};
+var multiSel = {};
+
+function pick(q, val) {
+  document.querySelectorAll('#q' + q + ' .opt').forEach(function(el) { el.classList.remove('selected'); });
+  document.getElementById('q' + q + '_' + val).classList.add('selected');
+  ans['q' + q] = val;
+  document.getElementById('q' + q + 'next').disabled = false;
+}
+
+function toggleMulti(q, val) {
+  if (val === 'none') {
+    multiSel = {};
+    document.querySelectorAll('#q' + q + ' .opt').forEach(function(el) { el.classList.remove('selected'); });
+    document.getElementById('q' + q + '_' + val).classList.add('selected');
+    multiSel[val] = true;
+  } else {
+    delete multiSel['none'];
+    document.getElementById('q' + q + '_none').classList.remove('selected');
+    if (multiSel[val]) {
+      delete multiSel[val];
+      document.getElementById('q' + q + '_' + val).classList.remove('selected');
+    } else {
+      multiSel[val] = true;
+      document.getElementById('q' + q + '_' + val).classList.add('selected');
+    }
+  }
+}
+
+function go(from, to) {
+  document.getElementById('q' + from).classList.remove('active');
+  document.getElementById('q' + to).classList.add('active');
+  var pct = (to / 5) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = to <= 5 ? 'Question ' + to + ' of 5' : 'Your estimate';
+}
+
+function calcTier() {
+  var score = 0;
+  // Page count
+  if (ans.q2 === '1-3') score += 1;
+  else if (ans.q2 === '4-7') score += 2;
+  else if (ans.q2 === '8-15') score += 3;
+  else if (ans.q2 === '15+') score += 4;
+  // Type
+  if (ans.q1 === 'ecommerce') score += 2;
+  else if (ans.q1 === 'redesign' || ans.q1 === 'new') score += 1;
+  // Platform
+  if (ans.q3 === 'custom') score += 1;
+  if (ans.q3 === 'wordpress') score += 1;
+  // Rush
+  if (ans.q5 === 'asap' || ans.q5 === '1month') score += 1;
+
+  if (score <= 2) return 'starter';
+  if (score <= 4) return 'growth';
+  return 'studio';
+}
+
+function showResults() {
+  var tier = calcTier();
+  var rush = ans.q5 === 'asap' || ans.q5 === '1month';
+  var addons = Object.keys(multiSel).filter(function(k) { return k !== 'none'; });
+
+  // Build conversational reasoning
+  var pageLabel = { '1-3': '1 to 3 pages', '4-7': '4 to 7 pages', '8-15': '8 to 15 pages', '15+': '15+ pages' }[ans.q2] || '';
+  var typeLabel = { new: 'a new website', redesign: 'a full redesign', additions: 'additions to an existing site', ecommerce: 'an e-commerce build' }[ans.q1] || '';
+  var platformLabel = { custom: 'custom HTML', squarespace: 'Squarespace or Wix', wordpress: 'WordPress', unsure: 'a platform we will decide together' }[ans.q3] || '';
+  var timelineLabel = { flexible: 'no hard deadline', '2months': 'within 2 months', '1month': 'within 1 month', asap: 'as soon as possible' }[ans.q5] || '';
+
+  var reasoning = {
+    starter: 'Based on your answers, ' + typeLabel + ' with ' + pageLabel + ' on ' + platformLabel + ', this is a Starter-level project. These builds move fast, typically 2-4 weeks, and give you a clean professional presence without overbuilding for where your business is right now.',
+    growth: 'Based on ' + typeLabel + ' with ' + pageLabel + ' on ' + platformLabel + ', this falls into the Growth tier. This is the most common engagement for established small businesses, custom design, built to rank on Google, with enough pages to tell your full story and convert visitors into customers.',
+    studio: 'What you described, ' + typeLabel + ' with ' + pageLabel + ' on ' + platformLabel + ', is a Studio-level project. This scope needs a full custom design system, and depending on the complexity of your e-commerce or feature requirements, it will take 6-10 weeks to do right.'
+  }[tier];
+
+  var rushNote = rush ? ' Because your timeline is tight (' + timelineLabel + '), a 25% rush surcharge applies, this prioritizes your project and compresses the timeline.' : '';
+
+  var tiers = {
+    starter: {
+      name: 'Template',
+      range: rush ? '$1,875' : '$1,500',
+      cadence: '50% upfront · 50% at launch · 2-4 week timeline',
+      cls: 'starter',
+      items: [
+        'Template build on the platform that fits your business',
+        'Your branding applied: colors, fonts, logo',
+        'Up to 5 pages, mobile-optimized',
+        'Contact form and basic on-page SEO',
+        'Google Analytics and Search Console setup',
+        '1 revision round + launch walkthrough video',
+        'You manage updates after launch, no code'
+      ],
+      cta: 'Book a free call to confirm scope',
+      ctaUrl: 'https://calendly.com/eric-davisdigitalstudio/30min',
+      who: 'Best for: New businesses, pop-ups, or anyone who needs a clean professional presence fast without a large upfront investment.'
+    },
+    growth: {
+      name: 'Custom + Photography',
+      range: rush ? '$4,750' : '$3,800',
+      cadence: '50% upfront · 50% at launch · 4-6 week timeline',
+      cls: 'growth',
+      items: [
+        'Bespoke design with custom typography',
+        'Art-directed photography with shot list included',
+        'Mobile-first, performance-optimized build',
+        'Full on-page SEO with keyword research',
+        'Google Analytics 4 with conversion events',
+        'Google Business Profile setup and optimization',
+        '2 revision rounds + 30-day post-launch support'
+      ],
+      cta: 'Book a free call to confirm scope',
+      ctaUrl: 'https://calendly.com/eric-davisdigitalstudio/30min',
+      who: 'Best for: Established businesses ready to compete online and rank on Google, not just have a website, but have one that works.'
+    },
+    studio: {
+      name: 'Custom HTML',
+      range: rush ? '$8,125' : '$6,500',
+      cadence: '50% upfront · 25% at midpoint · 25% at launch',
+      cls: 'studio',
+      items: [
+        'Fully hand-coded HTML, CSS, and JavaScript',
+        'No template limits, fastest and most unique',
+        'full SEO strategy and implementation',
+        'Custom animations, interactions, and widgets',
+        'Performance optimization and Core Web Vitals audit',
+        '30-day post-launch support included',
+        'HTML Managed retainer required ($850/mo) since hand-coded'
+      ],
+      cta: "Book a free call about your project",
+      ctaUrl: '/contact',
+      who: 'Best for: Businesses with complex needs, multiple revenue streams, custom features, or a brand that needs to stand apart from every competitor in the market.'
+    }
+  };
+
+  var t = tiers[tier];
+  var rushHtml = rush ? '<div style="display:inline-block;background:rgba(240,180,41,0.15);color:#b8860b;font-size:11px;font-weight:700;padding:3px 12px;border-radius:100px;margin-bottom:14px;">⚡ Rush pricing applied, ' + timelineLabel + '</div><br>' : '';
+
+  // Conversational reasoning block
+  var reasoningHtml = '<div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:13px;color:rgba(255,255,255,0.6);line-height:1.75;border-left:3px solid var(--pxl);">' + reasoning + rushNote + '</div>';
+
+  document.getElementById('tierCard').innerHTML =
+    '<div class="tier-result ' + t.cls + '">' +
+    '<div class="tier-glow"></div>' +
+    rushHtml +
+    '<div class="tier-badge">' + t.name + ' Package</div>' +
+    '<div class="tier-name">' + t.name + '</div>' +
+    '<div class="tier-range">' + t.range + '</div>' +
+    '<div class="tier-cadence">' + t.cadence + '</div>' +
+    reasoningHtml +
+    '<ul class="tier-includes">' + t.items.map(function(i) { return '<li>' + i + '</li>'; }).join('') + '</ul>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:20px;font-style:italic;">' + t.who + '</div>' +
+    '<a href="' + t.ctaUrl + '" class="tier-cta">' + t.cta + ' →</a>' +
+    '</div>';
+
+  // What happens next block
+  var nextHtml = '<div style="background:#fff;border-radius:16px;border:1px solid rgba(91,63,160,0.1);padding:24px;margin-bottom:20px;">' +
+    '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">What happens next</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px;">' +
+    '<div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div><div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">Book a free 30-minute discovery call</div><div style="font-size:12px;color:var(--muted);">No pitch, no pressure. I want to understand your business before I give you a real number.</div></div></div>' +
+    '<div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div><div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">I send a confirmed scope and exact price</div><div style="font-size:12px;color:var(--muted);">No surprises. Everything is in writing before you decide.</div></div></div>' +
+    '<div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div><div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">We start on your timeline</div><div style="font-size:12px;color:var(--muted);">50% upfront to kick things off. The rest due at launch.</div></div></div>' +
+    '</div></div>';
+
+  // Inject next steps after tier card
+  document.getElementById('tierCard').innerHTML += nextHtml;
+
+  // Add-ons
+  var addonDetails = { seo:{label:'SEO Strategy',price:'$800',desc:'Keyword research, competitor analysis, and a 6-month content roadmap.'}, copy:{label:'Copywriting',price:'$400/page',desc:'Professional website copy written for clarity, SEO, and conversion.'}, brand:{label:'Brand Identity',price:'$500',desc:'Logo, color palette, typography system, and usage guidelines.'}, booking:{label:'Booking Integration',price:'$300',desc:'Online scheduling, reservations, or appointment booking setup.'} };
+  if (addons.length > 0) {
+    var addonsHtml = '<div style="background:#fff;border-radius:16px;border:1px solid rgba(91,63,160,0.1);padding:24px;margin-bottom:20px;">' +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Add-ons included in your estimate</div>' +
+      '<div class="addons-grid">' +
+      addons.map(function(k) {
+        var a = addonDetails[k];
+        return a ? '<div class="addon-pill" style="flex-direction:column;align-items:flex-start;gap:4px;padding:12px;"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;">' + a.label + '</span><span style="color:var(--p);font-weight:700;">' + a.price + '</span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
+      }).join('') +
+      '</div></div>';
+    document.getElementById('addonsNote').innerHTML = addonsHtml;
+    document.getElementById('addonsNote').style.display = 'block';
+  }
+
+  document.getElementById('progressWrap').style.display = 'none';
+  document.querySelectorAll('.q-card').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('peResults').style.display = 'block';
+
+  if (typeof gtag === 'function') gtag('event', 'pricing_estimate', { event_category: 'tools', event_label: tier });
+}
+
+function restart() {
+  ans = {};
+  multiSel = {};
+  document.getElementById('peResults').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('addonsNote').style.display = 'none';
+  for (var i = 1; i <= 5; i++) {
+    document.getElementById('q' + i).classList.remove('active');
+    document.querySelectorAll('#q' + i + ' .opt').forEach(function(el) { el.classList.remove('selected'); });
+    var nb = document.getElementById('q' + i + 'next');
+    if (nb && i !== 4) nb.disabled = true;
+  }
+  document.getElementById('q1').classList.add('active');
+  document.getElementById('progressFill').style.width = '20%';
+  document.getElementById('progressLabel').textContent = 'Question 1 of 5';
+}
+
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+</script>
+
+
+  <script src="/concierge.js" defer></script>
+<script src="/enhance.js" defer></script>
+<script src="nav.js" defer></script>
+</body>
+</html>

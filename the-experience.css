@@ -1,0 +1,86 @@
+/* ============================================================
+   Davis Digital Studio — the-experience.css
+   THE-EXPERIENCE-PAGE-ONLY layer, scoped under
+   body[data-page="experience"]. Loaded after styles.css.
+   Replaces the page's old unscoped inline <style> block.
+
+   Full visual redesign pass. Copy unchanged (verified against the
+   pristine original, byte-for-byte, after an earlier draft of this
+   pass accidentally trimmed several sentences and was corrected).
+
+   Device: this page's job is a pure product tour, so it gets a
+   tight, EQUAL-WEIGHT feature grid — deliberately not varied like
+   Resources' magazine layout, since these are six equally-weighted
+   product facts, not six questions of differing importance. Paired
+   with a larger, more showcase-style treatment for the actual
+   portal screenshot, since this page's whole purpose is "here is
+   the real thing" — its proof deserves more presence than a
+   standard supporting image.
+   ============================================================ */
+
+body[data-page="experience"] .xp-lead{ max-width:760px; }
+
+/* ---------------------------------------------------------------
+   SIX BEATS — tight equal-weight grid
+   --------------------------------------------------------------- */
+body[data-page="experience"] .xp-beats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:22px;
+}
+body[data-page="experience"] .xp-beat{
+  background:#fff;
+  border-radius:20px;
+  padding:30px 26px 26px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2);
+  transition:transform .3s cubic-bezier(.32,.72,0,1), box-shadow .3s cubic-bezier(.32,.72,0,1);
+}
+body[data-page="experience"] .xp-beat:hover{
+  transform:translateY(-3px);
+  box-shadow:0 30px 56px -30px rgba(27,21,37,.24);
+}
+body[data-page="experience"] .xp-beat-n{
+  font-family:var(--mono); font-size:12px; color:var(--brass-deep);
+  margin-bottom:12px; display:block;
+}
+body[data-page="experience"] .xp-beat h2{
+  font-family:var(--serif); font-size:19px; font-weight:400;
+  color:var(--ink); line-height:1.28; margin-bottom:10px;
+}
+body[data-page="experience"] .xp-beat p{ font-size:14.5px; line-height:1.6; color:var(--muted); }
+body[data-page="experience"] .xp-beat .xp-felt{
+  display:inline-block; margin-top:14px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em; color:var(--ink);
+  background:var(--paper); border:1px solid var(--hair); border-radius:100px; padding:5px 12px;
+}
+
+@media(max-width:880px){
+  body[data-page="experience"] .xp-beats{ grid-template-columns:1fr 1fr; }
+}
+@media(max-width:600px){
+  body[data-page="experience"] .xp-beats{ grid-template-columns:1fr; }
+}
+
+/* ---------------------------------------------------------------
+   PORTAL SCREENSHOT — showcase treatment, larger presence than a
+   standard supporting image, since it's the page's entire point.
+   --------------------------------------------------------------- */
+body[data-page="experience"] .xp-proof{
+  margin:14px 0 0;
+  border-radius:22px;
+  overflow:hidden;
+  border:none;
+  background:#fff;
+  box-shadow:0 40px 76px -36px rgba(43,27,74,.32);
+}
+body[data-page="experience"] .xp-proof img{ display:block; width:100%; height:auto; }
+body[data-page="experience"] .xp-proof-cap{
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--muted);
+  margin-top:16px; text-align:center;
+}
+
+body[data-page="experience"] .cta-band{
+  background:var(--p-deep,#1B1525);
+  padding:96px 24px;
+  text-align:center;
+}

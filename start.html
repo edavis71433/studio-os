@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Before our call | Davis Digital Studio</title>
+<meta name="description" content="A few quick questions before our discovery call so I can make the most of our time together.">
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --p:#5b3fa0; --pdark:#1e1338; --ink:#1a1523; --muted:#5e5270; --cream:#faf8f5;
+    --pxl:#c4aee8; --pxxxl:#f3eefb; --serif:'DM Serif Display',Georgia,serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;overflow-x:hidden;max-width:100vw;font-family:"DM Sans",sans-serif;background:var(--cream);color:var(--ink);
+    padding:32px 20px;line-height:1.6;}
+  .wrap{max-width:560px;margin:0 auto;}
+  .brand{font-family:var(--serif);font-size:20px;color:var(--ink);margin-bottom:24px;text-align:center;}
+  .card{background:#fff;border-radius:22px;border:1px solid rgba(91,63,160,0.1);
+    padding:36px 32px;box-shadow:0 20px 60px rgba(30,19,56,0.07);}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:14px;}
+  h1{font-family:var(--serif);font-size:28px;font-weight:400;line-height:1.2;margin:0 0 10px;}
+  p.sub{font-size:14px;color:var(--muted);margin:0 0 28px;}
+  .label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;}
+  .req{color:var(--p);}
+  textarea,input,select{width:100%;padding:12px 14px;border:1.5px solid rgba(91,63,160,0.15);
+    border-radius:11px;font-size:14px;font-family:"DM Sans",sans-serif;outline:none;resize:vertical;background:#fff;}
+  textarea:focus,input:focus,select:focus{border-color:var(--p);}
+  .fg{margin-bottom:22px;}
+  .btn{background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;
+    font-size:14px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;width:100%;}
+  .btn:hover{background:#4a3284;}
+  .hidden{display:none;}
+  .thanks{text-align:center;padding:24px 0;}
+  .thanks .big{font-size:52px;margin-bottom:12px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Davis Digital Studio</div>
+
+    <div class="card" id="intakeForm">
+      <div class="eyebrow">Before our call</div>
+      <h1>A few quick questions</h1>
+      <p class="sub">Thanks for booking. If you fill these out before we talk, I'll show up already understanding your business, so we spend our call on solutions, not background. All optional except your name and email, but the more you share, the more useful our call.</p>
+
+      <div class="fg">
+        <label class="label" for="name">Your name <span class="req">*</span></label>
+        <input id="name" placeholder="Jane Smith">
+      </div>
+      <div class="fg">
+        <label class="label" for="email">Email <span class="req">*</span></label>
+        <input id="email" type="email" placeholder="jane@yourbusiness.com">
+      </div>
+      <div class="fg">
+        <label class="label" for="business">Business name &amp; what you do</label>
+        <input id="business" placeholder="e.g. Bacchus Kitchen — a wine bar in Pasadena">
+      </div>
+      <div class="fg">
+        <label class="label" for="website">Current website (if any)</label>
+        <input id="website" placeholder="yourbusiness.com — or 'none yet'">
+      </div>
+      <div class="fg">
+        <label class="label" for="goal">What are you hoping to fix or achieve?</label>
+        <textarea id="goal" rows="3" placeholder="e.g. We're hard to find on Google and the site looks dated. We want more reservations."></textarea>
+      </div>
+      <div class="fg">
+        <label class="label" for="customer">Who's your ideal customer?</label>
+        <input id="customer" placeholder="e.g. Locals 30–55, date nights, private events">
+      </div>
+      <div class="fg">
+        <label class="label" for="timeline">Timeline</label>
+        <select id="timeline">
+          <option value="">Select one</option>
+          <option>As soon as possible</option>
+          <option>Next 1–3 months</option>
+          <option>Just exploring for now</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="label" for="budget">Rough budget range (optional)</label>
+        <select id="budget">
+          <option value="">Prefer to discuss on the call</option>
+          <option>Around $1,500–$3,800</option>
+          <option>Around $3,800–$6,500</option>
+          <option>$6,500+</option>
+          <option>Custom platform / web app ($12k+)</option>
+          <option>Not sure yet</option>
+        </select>
+        <div class="hint">No wrong answer — this just helps me recommend the right fit.</div>
+      </div>
+      <div class="fg">
+        <label class="label" for="anything">Anything else I should know?</label>
+        <textarea id="anything" rows="3" placeholder="Competitors you admire, must-haves, deadlines, anything on your mind"></textarea>
+      </div>
+
+      <button class="btn" onclick="submitIntake()">Send it over →</button>
+    </div>
+
+    <div class="card hidden" id="done">
+      <div class="thanks">
+        <div class="big">✅</div>
+        <h1>Got it — thank you</h1>
+        <p class="sub">I'll review this before our call so we can hit the ground running. See you then. If you need to reach me in the meantime, just reply to your confirmation email.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  var SB_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+  var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+
+  async function submitIntake(){
+    var name = document.getElementById("name").value.trim();
+    var email = document.getElementById("email").value.trim();
+    if(!name || !email){ alert("Please add your name and email so I know who you are."); return; }
+
+    var payload = {
+      name: name,
+      email: email,
+      business: document.getElementById("business").value,
+      website: document.getElementById("website").value,
+      goal: document.getElementById("goal").value,
+      ideal_customer: document.getElementById("customer").value,
+      timeline: document.getElementById("timeline").value,
+      budget: document.getElementById("budget").value,
+      notes: document.getElementById("anything").value,
+      created_at: new Date().toISOString()
+    };
+
+    // Save to Supabase (table: discovery_intake). Fails quietly.
+    try {
+      await fetch(SB_URL + "/rest/v1/discovery_intake", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SB_KEY,
+          "Authorization": "Bearer " + SB_KEY,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch(e){ console.log("intake save err:", e); }
+
+    // Email Eric a heads-up via the existing Edge Function.
+    // Track whether the notify actually succeeded so we don't show a full
+    // success state on a silent failure.
+    var notifyOk = false;
+    try {
+      var resp = await fetch(SB_URL + "/functions/v1/clever-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+        body: JSON.stringify({
+          type: "discovery_intake",
+          clientName: name,
+          clientEmail: email,
+          subject: "New discovery intake: " + (payload.business || name),
+          message: "Business: " + payload.business + "\nWebsite: " + payload.website +
+                   "\nGoal: " + payload.goal + "\nIdeal customer: " + payload.ideal_customer +
+                   "\nTimeline: " + payload.timeline + "\nBudget: " + payload.budget +
+                   "\nNotes: " + payload.notes,
+          meta: payload
+        })
+      });
+      var jr = {}; try { jr = await resp.json(); } catch(e){}
+      // ok:true means handled; emailed reflects the Eric notify actually sending
+      notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
+    } catch(e){ console.log("notify err:", e); notifyOk = false; }
+
+    document.getElementById("intakeForm").classList.add("hidden");
+    var doneCard = document.getElementById("done");
+    if (!notifyOk) {
+      // Calm fallback: the details were saved, but the email path didn't confirm.
+      // Never a hard error to the visitor — just honest, with a direct way to reach Eric.
+      var sub = doneCard.querySelector(".sub");
+      if (sub) {
+        sub.innerHTML = "Your details are saved and I have them. If you don't get a confirmation email shortly, no worries at all — you can reach me directly at <a href=\"mailto:eric@davisdigitalstudio.com\">eric@davisdigitalstudio.com</a> and I'll follow up personally.";
+      }
+    }
+    doneCard.classList.remove("hidden");
+    window.scrollTo(0,0);
+  }
+</script>
+</body>
+</html>

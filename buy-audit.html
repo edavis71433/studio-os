@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Get Your Website Audit | Davis Digital Studio</title>
+<meta name="description" content="A complete, human-delivered audit of your website and local search presence, with the exact fixes ranked by impact.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..500&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --p:#5b3fa0; --ink:#1a1523; --muted:#7a6d8e; --cream:#faf8f4; --line:rgba(91,63,160,0.14); }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:20px; padding:44px 40px; max-width:520px; width:100%; }
+  .eyebrow { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--p); margin-bottom:10px; }
+  h1 { font-family:'Fraunces',serif; font-weight:400; font-size:30px; line-height:1.2; margin-bottom:10px; }
+  .sub { font-size:14.5px; line-height:1.6; color:var(--muted); margin-bottom:26px; }
+  .price { font-size:14.5px; color:var(--ink); margin-bottom:26px; }
+  .price strong { font-size:18px; }
+  label { display:block; font-size:12.5px; font-weight:600; margin:0 0 6px; }
+  input, textarea { width:100%; font-family:inherit; font-size:14px; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px; background:var(--cream); outline:none; margin-bottom:16px; }
+  input:focus, textarea:focus { border-color:var(--p); background:#fff; }
+  textarea { resize:vertical; min-height:70px; }
+  button { width:100%; background:var(--p); color:#fff; border:none; padding:14px; border-radius:100px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+  button:disabled { opacity:.6; cursor:default; }
+  .err { display:none; color:#c0392b; font-size:13px; margin-top:12px; text-align:center; }
+  .fine { font-size:11.5px; color:var(--muted); text-align:center; margin-top:14px; line-height:1.5; }
+  .hp { position:absolute; left:-9999px; opacity:0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">Davis Digital Studio</div>
+    <h1 id="a-title">Get your website audit</h1>
+    <p class="sub" id="a-desc">A complete review of your website and local search presence, done by a person, not a bot.</p>
+    <p class="price"><strong id="a-price">$99</strong> · <span id="a-delivery">delivered within 3 business days</span></p>
+    <label for="a-name">Your name or business name</label>
+    <input id="a-name" placeholder="e.g. Rosa's Bakery" maxlength="120">
+    <label for="a-email">Email</label>
+    <input id="a-email" type="email" placeholder="you@business.com" maxlength="200">
+    <label for="a-website">Your website <span style="font-weight:400;color:var(--muted);">(leave blank if you don't have one)</span></label>
+    <input id="a-website" placeholder="yourbusiness.com" maxlength="300">
+    <label for="a-notes">Anything specific you want looked at? <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+    <textarea id="a-notes" maxlength="1000" placeholder="e.g. we're not showing up on Google Maps"></textarea>
+    <input class="hp" id="a-company" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button id="a-go" onclick="startCheckout()">Continue to secure checkout &rarr;</button>
+    <div class="err" id="a-err"></div>
+    <p class="fine">Secure payment via Stripe. Card, bank, Apple Pay &amp; Google Pay accepted.<br>Davis Digital Studio · 3727 W. Magnolia Blvd #1061, Burbank, CA 91505</p>
+  </div>
+<script>
+var FN = "https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api";
+var ANON = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE"; // same anon key the portal uses
+
+// Tier catalog for display only — the SERVER sets the real price. These are
+// just labels; changing a number here does NOT change what someone is charged.
+var TIERS = {
+  starter:     { title: "Starter Audit",           price: "$99",  delivery: "delivered in 24 hours",       desc: "A real 1-page report you can act on, with your top 3 priority fixes." },
+  health:      { title: "Digital Health Check",     price: "$499", delivery: "delivered in 5 business days", desc: "The complete picture: a 6-page branded report covering everything, plus a walkthrough call." },
+  competitive: { title: "Competitive Intelligence", price: "$899", delivery: "delivered in 7 business days", desc: "Everything in the Health Check, plus 3 competitor sites analyzed and a 60-minute strategy call." }
+};
+var TIER = (new URLSearchParams(location.search).get("tier") || "starter").toLowerCase();
+if (!TIERS[TIER]) TIER = "starter";
+(function applyTier(){
+  var t = TIERS[TIER];
+  document.getElementById("a-title").textContent = t.title;
+  document.getElementById("a-desc").textContent = t.desc;
+  document.getElementById("a-price").textContent = t.price;
+  document.getElementById("a-delivery").textContent = t.delivery;
+  document.title = t.title + " | Davis Digital Studio";
+})();
+async function startCheckout() {
+  var err = document.getElementById("a-err");
+  err.style.display = "none";
+  var name = document.getElementById("a-name").value.trim();
+  var email = document.getElementById("a-email").value.trim();
+  if (!name) { err.textContent = "Please add your name or business name."; err.style.display = "block"; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "Please add a valid email — your audit is delivered there."; err.style.display = "block"; return; }
+  var btn = document.getElementById("a-go");
+  btn.disabled = true; btn.textContent = "Opening secure checkout\u2026";
+  try {
+    var r = await fetch(FN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ANON },
+      body: JSON.stringify({
+        type: "public_audit_checkout",
+        tier: TIER,
+        name: name, email: email,
+        website: document.getElementById("a-website").value.trim(),
+        notes: document.getElementById("a-notes").value.trim(),
+        company: document.getElementById("a-company").value
+      })
+    });
+    var j = await r.json();
+    if (j && j.ok && j.url) { window.location.href = j.url; return; }
+    err.textContent = "Checkout couldn't start" + (j && j.detail ? ": " + j.detail : ". Please try again in a moment.");
+    err.style.display = "block";
+  } catch (e) {
+    err.textContent = "Connection issue \u2014 please try again.";
+    err.style.display = "block";
+  }
+  btn.disabled = false; btn.textContent = "Continue to secure checkout \u2192";
+}
+</script>
+</body>
+</html>

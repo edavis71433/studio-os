@@ -1,0 +1,82 @@
+/* ============================================================
+   Davis Digital Studio — hero-grid.css
+   The "one quiet signature": a faint blueprint grid behind the
+   hero, the Vercel/Linear technical-grid aesthetic, done as a
+   single CSS background. No images, no JS.
+
+   The version in the screenshot (lavender lines at 6% on a light
+   background) is tuned for LIGHT heroes. Your main heroes are DARK
+   (#0f0820 / --pdark), so a 6% lavender line is invisible there.
+   This file ships BOTH, scoped correctly, plus a soft fade so the
+   grid never competes with your headline.
+
+   RESTRAINT: applies to .hero only. The grid is texture, not
+   decoration; it sits behind content and fades toward the edges.
+
+   HOW TO USE
+   Add after your inline <style> on hero pages:
+     <link rel="stylesheet" href="/hero-grid.css">
+
+   If a specific hero shouldn't have it, add class="no-grid" to that
+   .hero and it's excluded.
+   ============================================================ */
+
+/* ---- DARK heroes (default for this site) ----
+   Light hairlines on the dark canvas. 28px cell, ~4% white so it
+   reads as engineered paper, not a table. */
+.hero:not(.no-grid)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  /* Fade the grid out toward the bottom so it never fights the CTA */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
+
+/* Keep existing hero content above the grid layer. The hero already
+   uses position:relative + z-index on its inner columns; this makes
+   sure nothing slips behind. */
+.hero { position: relative; }
+.hero > * { position: relative; z-index: 1; }
+/* Your floating orbs should stay above the grid too */
+.hero-orb, .hero-orb2 { z-index: 0; }
+
+/* ---- LIGHT heroes (e.g. work.html uses --pxl lavender) ----
+   Matches the screenshot: lavender lines at 6%. Opt in by adding
+   class="hero-light" to that hero. */
+.hero.hero-light:not(.no-grid)::after {
+  background-image:
+    linear-gradient(rgba(196, 174, 232, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196, 174, 232, 0.18) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Respect reduced-motion users: nothing animates here, but if you
+   later animate the grid, this keeps it still. */
+@media (prefers-reduced-motion: reduce) {
+  .hero:not(.no-grid)::after { animation: none !important; }
+}
+
+/* ---- index.html homepage hero (.hero-v2, light cream→lavender) ----
+   Light background, so the screenshot's lavender grid is the right call. */
+.hero-v2 { position: relative; }
+.hero-v2 > * { position: relative; z-index: 1; }
+.hero-v2::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(196, 174, 232, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196, 174, 232, 0.16) 1px, transparent 1px);
+  background-size: 28px 28px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%);
+}

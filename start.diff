@@ -1,0 +1,42 @@
+--- /home/claude/work/dds/davis-digital-studio-main/start.html	2026-06-30 13:27:58.000000000 +0000
++++ start.html	2026-06-30 15:34:28.703285978 +0000
+@@ -147,9 +147,12 @@
+       });
+     } catch(e){ console.log("intake save err:", e); }
+ 
+-    // Email Eric a heads-up via the existing Edge Function
++    // Email Eric a heads-up via the existing Edge Function.
++    // Track whether the notify actually succeeded so we don't show a full
++    // success state on a silent failure.
++    var notifyOk = false;
+     try {
+-      await fetch(SB_URL + "/functions/v1/clever-api", {
++      var resp = await fetch(SB_URL + "/functions/v1/clever-api", {
+         method: "POST",
+         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+         body: JSON.stringify({
+@@ -164,10 +167,22 @@
+           meta: payload
+         })
+       });
+-    } catch(e){ console.log("notify err:", e); }
++      var jr = {}; try { jr = await resp.json(); } catch(e){}
++      // ok:true means handled; emailed reflects the Eric notify actually sending
++      notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
++    } catch(e){ console.log("notify err:", e); notifyOk = false; }
+ 
+     document.getElementById("intakeForm").classList.add("hidden");
+-    document.getElementById("done").classList.remove("hidden");
++    var doneCard = document.getElementById("done");
++    if (!notifyOk) {
++      // Calm fallback: the details were saved, but the email path didn't confirm.
++      // Never a hard error to the visitor — just honest, with a direct way to reach Eric.
++      var sub = doneCard.querySelector(".sub");
++      if (sub) {
++        sub.innerHTML = "Your details are saved and I have them. If you don't get a confirmation email shortly, no worries at all — you can reach me directly at <a href=\"mailto:eric@davisdigitalstudio.com\">eric@davisdigitalstudio.com</a> and I'll follow up personally.";
++      }
++    }
++    doneCard.classList.remove("hidden");
+     window.scrollTo(0,0);
+   }
+ </script>
