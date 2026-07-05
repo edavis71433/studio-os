@@ -4113,8 +4113,9 @@ interface Principal {
   userId: string | null;
   tenantId: string | null;
   role: string | null;      // owner|admin|staff|readonly for staff; 'client'; else null
+  email: string | null;     // for the audit actor label
   jwt: string | null;       // the caller's token, for future RLS-scoped reads
-  requestId: string;        // minted here; threads into logs + (later) audit_log
+  requestId: string;        // minted here; threads into logs + audit_log
 }
 
 // Decode the iat (issued-at) claim from a JWT payload WITHOUT signature
@@ -4132,9 +4133,40 @@ function jwtIatMs(jwt: string): number | null {
   }
 }
 
+// ── AUDIT (pipeline stage; append-only trail via the audit_write RPC) ──
+// Writes one row through the SECURITY DEFINER audit_write() function. Best-effort
+// by contract (Brief §12 + Eric rule 10): a logging failure NEVER breaks the
+// request path. Awaited so the row lands before the response returns (edge
+// runtimes may drop background work after the response), but wrapped so it can
+// never throw. actor_label prefers the email, else a coarse kind label.
+async function auditWrite(
+  p: Principal | null,
+  eventType: 'action' | 'auth_failure' | 'permission_denied' | 'revoked' | 'rate_limited',
+  opts: { route?: string | null; target?: string | null; detail?: Record<string, unknown> } = {},
+): Promise<void> {
+  try {
+    if (!SB_SERVICE) return;
+    const label = (p && p.email) ? p.email : (p && p.kind === 'system' ? 'system' : (p && p.userId ? p.userId : 'anon'));
+    await fetch(`${SB_URL}/rest/v1/rpc/audit_write`, {
+      method: 'POST',
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        p_request_id: (p && p.requestId) || 'unknown',
+        p_event_type: eventType,
+        p_tenant_id: (p && p.tenantId) || null,
+        p_actor_user_id: (p && p.userId) || null,
+        p_actor_label: label,
+        p_route: opts.route ?? null,
+        p_target: opts.target ?? null,
+        p_detail: opts.detail || {},
+      }),
+    });
+  } catch (_) { /* audit is best-effort; never breaks the request path */ }
+}
+
 async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
   const requestId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
-  const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, jwt: null, requestId };
+  const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, email: null, jwt: null, requestId };
   try {
     // system: a valid scheduler/webhook shared secret in the body (run_scheduled_jobs, gsc_ingest, pi_weekly)
     if (body && typeof body.secret === 'string' && body.secret && SCHEDULER_SECRET && body.secret === SCHEDULER_SECRET) {
@@ -4145,7 +4177,7 @@ async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
 
     // staff first — reuse the existing fail-closed membership check
     const staff = await verifyStaff(req);
-    if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, jwt, requestId };
+    if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, email: staff.email || null, jwt, requestId };
 
     // otherwise validate the token and see if it belongs to a client (portal user)
     let user: any = null;
@@ -4175,12 +4207,12 @@ async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
         if (Array.isArray(cls) && cls.length) { tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : TENANT_ID; }
       }
       if (tenantId !== null) {
-        return { kind: 'client', userId: uid, tenantId, role: 'client', jwt, requestId };
+        return { kind: 'client', userId: uid, tenantId, role: 'client', email: email || null, jwt, requestId };
       }
     } catch (_) { /* fall through */ }
 
     // valid token but neither staff nor a known client — authenticated but unscoped
-    return { ...pub, userId: uid, jwt };
+    return { ...pub, userId: uid, email: email || null, jwt };
   } catch (_) {
     return pub; // NEVER throw from the resolver
   }
@@ -4227,14 +4259,19 @@ serve(async (req) => {
       const minRole = ROUTE_MIN_ROLE[type as string];
       if (minRole) {
         const staff = await verifyStaff(req);
-        if (!staff) return json({ error: 'unauthorized' }, 401, reqCors);
-        if (!atLeast(staff.role, minRole)) return json({ error: 'forbidden' }, 403, reqCors);
+        if (!staff) { await auditWrite(principal, 'auth_failure', { route: String(type || '') }); return json({ error: 'unauthorized' }, 401, reqCors); }
+        if (!atLeast(staff.role, minRole)) { await auditWrite(principal, 'permission_denied', { route: String(type || ''), detail: { required: minRole, has: staff.role } }); return json({ error: 'forbidden' }, 403, reqCors); }
         // REVOCATION: reject a valid staff session when the tenant is
         // suspended/closed/purge_scheduled, or the membership changed after the
         // token was issued. Immediate, fail-closed. Only affects staff-gated
         // routes (public/client routes fall through unchanged).
         const revoked = await staffRevocation(staff.userId, req.headers.get('x-dds-user-jwt') || '');
-        if (revoked) return json({ error: revoked.code }, revoked.status, reqCors);
+        if (revoked) { await auditWrite(principal, 'revoked', { route: String(type || ''), detail: { code: revoked.code } }); return json({ error: revoked.code }, revoked.status, reqCors); }
+        // AUDIT the authorized privileged action here — EXCEPT for rate-limited
+        // types, which log their 'action' only after passing the rate-limit
+        // check below (so a request that gets 429'd logs 'rate_limited', not
+        // 'action'). Exactly one row per executed privileged action.
+        if (!RATE_LIMITED_TYPES.has(String(type))) { await auditWrite(principal, 'action', { route: String(type || '') }); }
       } else if (!PUBLIC_ROUTES.has(String(type)) && !NOTIFY_RELAY_TYPES.has(String(type))) {
         // Deny-by-default. Previously this branch accepted ANY unregistered
         // type as long as the body looked like a notification (clientName /
@@ -4578,8 +4615,12 @@ serve(async (req) => {
       const durable = await durableRateCheck(rateBucketKey(principal, req));
       const limited = durable === 'limited' ? true : durable === 'error' ? isRateLimited(req) : false;
       if (limited) {
+        await auditWrite(principal, 'rate_limited', { route: String(type || '') });
         return json({ error: 'rate_limited', message: 'Too many requests. Please wait a minute and try again.' }, 429, reqCors);
       }
+      // passed the limit: log the deferred 'action' row for privileged
+      // (staff-gated) rate-limited routes (public ones are not privileged actions).
+      if (ROUTE_MIN_ROLE[type as string]) { await auditWrite(principal, 'action', { route: String(type || '') }); }
     }
 
     // ── PSI PROXY ──

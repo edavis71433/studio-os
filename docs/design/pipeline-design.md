@@ -340,3 +340,18 @@ decision, not a gap.
   staff route → t:<tenant> bucket (not ip); direct RPC proved independent per-tenant counters
   (A=2, B=1); durable (counters live in the DB table); smoke 6/6; deno check 0 new. PROD
   untouched (v249). Next: audit_log — pending Eric's go.
+
+- **0009 audit_log — APPLIED + DEPLOYED TO STAGING 2026-07-05.** Append-only audit_log
+  (id, created_at, request_id, tenant_id, actor_user_id, actor_label, event_type, route,
+  target, detail) + audit_write() SECURITY DEFINER RPC (service-role only). RLS on, no
+  policies → default-deny for anon/authenticated. Pipeline hook: one 'action' row per
+  executed privileged request (deferred past the rate-limit check so a 429'd request logs
+  'rate_limited' not 'action'); one row per gate rejection (auth_failure / permission_denied
+  / revoked / rate_limited). Every row carries the resolver's request_id. auditWrite is
+  best-effort (never breaks the request path). Added Principal.email for the actor label.
+  Verified staging: anon/client cannot read (RLS []), anon INSERT 401, anon DELETE cannot
+  remove rows (blocked; row survived); SECURITY DEFINER insert works; each of the 4 rejection
+  types wrote exactly one row with correct route/actor/uuid request_id; one privileged action
+  wrote exactly one 'action' row; rate-limited still 429; smoke 6/6; deno check 0 new. PROD
+  untouched (v249; audit_log absent there — 404). Synthetic test rows cleaned. Ledger 0009
+  applied; 0003-0005 held.
