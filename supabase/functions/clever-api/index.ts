@@ -4781,7 +4781,7 @@ serve(async (req) => {
         contactId ? read(`approvals?contact_id=eq.${contactId}&select=id,title,status&order=created_at.desc&limit=10`) : Promise.resolve([]),
         clientId ? read(`invoices?client_id=eq.${encodeURIComponent(clientId)}&select=id,amount,status&order=created_at.desc&limit=10`) : Promise.resolve([]),
         contactId ? read(`files?contact_id=eq.${contactId}&select=id,name,created_at,uploaded_by&order=created_at.desc&limit=20`) : Promise.resolve([]),
-        contactId ? read(`messages?contact_id=eq.${contactId}&select=id,from_who,created_at&order=created_at.desc&limit=20`) : Promise.resolve([]),
+        clientId ? read(`messages?client_id=eq.${encodeURIComponent(clientId)}&deleted_at=is.null&select=id,from_who,created_at&order=created_at.desc&limit=20`) : Promise.resolve([]),
       ]);
 
       // ── ask the ONE brain ──
@@ -4867,7 +4867,7 @@ serve(async (req) => {
       if (contactId) { const pp = await dDb(`partnerships?contact_id=eq.${contactId}&deleted_at=is.null&select=client_id&limit=1`); if (pp?.length) clientId = String(pp[0].client_id || ''); }
       // approvals are keyed by client_id in this schema
       const approvals = clientId ? await dDb(`approvals?client_id=eq.${encodeURIComponent(clientId)}&deleted_at=is.null&select=id,title,description,status,created_at&order=created_at.asc&limit=20`) : [];
-      const messages = contactId ? await dDb(`messages?contact_id=eq.${contactId}&select=id,from_who,text,body,created_at&order=created_at.desc&limit=30`) : [];
+      const messages = clientId ? await dDb(`messages?client_id=eq.${encodeURIComponent(clientId)}&deleted_at=is.null&select=id,from_who,text,body,created_at&order=created_at.desc&limit=30`) : [];
 
       // THIN: hand the literal rows to the brain; it interprets the situation only.
       const brief = decisionsFor({
