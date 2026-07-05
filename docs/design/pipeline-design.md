@@ -368,3 +368,18 @@ decision, not a gap.
   could block the request path (catch stops throws, not hangs). FIX: AbortSignal.
   timeout(2500) on both. deno check 0 new. PROD untouched (v249). Ledger 0010
   applied; 0003-0005 held.
+
+---
+
+## Service-role → caller-JWT cutover (module-by-module, suite-gated)
+
+- **Module 1: `lead_list` — DONE on STAGING 2026-07-05.** Lowest-risk first module:
+  a single read-only, staff-gated handler reading `leads` (one clean tenant-scoped
+  policy `leads_staff`). Converted its read from the service-role `leadDb` helper to
+  a caller-JWT/anon RLS-scoped fetch; the shared `leadDb` stays service-role for the
+  other lead_* routes (later increments). Pipeline unchanged (gate authz + revocation
+  + rate limit + 'action' audit still run). Behavior preserved: DDS staff still see
+  all tenant-1 leads (verified: seeded lead FOUND, needsYou=1). Isolation suite
+  extended with [H] (lead_list tenant-scoped both directions) → 26/26 green. Smoke
+  3/3; deno check 0 new; audit + rate still work (suite [E][F][G]); PROD untouched
+  (v249); 0003-0005 held; no other handler touched.

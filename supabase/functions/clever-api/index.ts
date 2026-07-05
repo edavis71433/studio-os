@@ -7175,16 +7175,30 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
       }
 
       // ── LEAD LIST (admin) ──
+      // SERVICE-ROLE → CALLER-JWT CUTOVER (first module, read-only). This read
+      // now runs under the caller's JWT (anon key + token) so Postgres RLS
+      // enforces tenant scope via the leads_staff policy
+      // (tenant_id IN current_tenant_ids()). For the single-tenant DDS staff this
+      // returns the same rows as the old service-role read, and it is now
+      // tenant-safe (isolation suite proves cross-tenant reads return nothing).
+      // The pipeline is unchanged: the gate already authorized this staff route,
+      // ran revocation, applied rate limiting, and wrote the 'action' audit row.
+      // Other lead_* routes still use the service-role leadDb helper (later
+      // increments). No system operation here needs the service role.
       if (type === 'lead_list') {
-        if (!(await verifyAdminJwt(req))) return json({ error: 'unauthorized' }, 401, reqCors);
-        if (!SB_SERVICE) return json({ error: 'no service key' }, 500, reqCors);
+        const jwt = req.headers.get('x-dds-user-jwt') || (principal && principal.jwt) || '';
+        if (!SB_ANON || !jwt) return json({ error: 'no anon key or token' }, 500, reqCors);
         const lstatus = ['new','replied','won','lost'].includes(body.status) ? body.status : null;
         const filter = lstatus ? `&status=eq.${lstatus}` : '';
-        const r = await leadDb(`leads?select=id,name,email,source,subject,tag,status,value_note,unread,last_message,last_actor,created_at,updated_at${filter}&order=updated_at.desc&limit=100`);
-        if (!r.ok) return json({ error: 'lead_list_failed', detail: r.detail }, 200, reqCors);
-        const leadsArr = Array.isArray(r.data) ? r.data : [];
-        const needsYou = leadsArr.filter((l: any) => l.status === 'new').length;
-        return json({ data: leadsArr, needsYou }, 200, reqCors);
+        const rr = await fetch(
+          `${SB_URL}/rest/v1/leads?select=id,name,email,source,subject,tag,status,value_note,unread,last_message,last_actor,created_at,updated_at${filter}&order=updated_at.desc&limit=100`,
+          { headers: { apikey: SB_ANON, Authorization: `Bearer ${jwt}` } },
+        );
+        if (!rr.ok) return json({ error: 'lead_list_failed', detail: await rr.text().catch(() => '') }, 200, reqCors);
+        const leadsArr = await rr.json().catch(() => []);
+        const arr = Array.isArray(leadsArr) ? leadsArr : [];
+        const needsYou = arr.filter((l: any) => l.status === 'new').length;
+        return json({ data: arr, needsYou }, 200, reqCors);
       }
 
       // ── LEAD DETAIL (admin) ──

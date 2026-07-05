@@ -73,6 +73,13 @@ async function callFn(jwt: string | null, body: unknown): Promise<number> {
   const r = await fetch(fn, { method: 'POST', headers: h, body: JSON.stringify(body) });
   return r.status;
 }
+async function callFnJson(jwt: string | null, body: unknown): Promise<{ status: number; json: any }> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (jwt) h['x-dds-user-jwt'] = jwt;
+  const r = await fetch(fn, { method: 'POST', headers: h, body: JSON.stringify(body) });
+  const json = await r.json().catch(() => null);
+  return { status: r.status, json };
+}
 
 // ── fixture handles (filled in setup, removed in teardown) ──
 const ids = { aStaff: '', aClient: '', bStaff: '', bClient: '' };
@@ -104,12 +111,16 @@ async function setup() {
   // client-scoped owned rows (invoices) so my_client_ids isolation is testable
   if (aClientRowId) await svcPost('invoices', { client_id: aClientRowId, name: `ISO-A-INV-${RUN}`, amount: '$100', status: 'pending', tenant_id: TENANT_A }, 'return=minimal');
   if (bClientRowId) await svcPost('invoices', { client_id: bClientRowId, name: `ISO-B-INV-${RUN}`, amount: '$200', status: 'pending', tenant_id: TENANT_B }, 'return=minimal');
+  // one lead per tenant — regression guard for the lead_list service-role→RLS cutover
+  await svcPost('leads', { name: `ISO-A-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_A }, 'return=minimal');
+  await svcPost('leads', { name: `ISO-B-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_B }, 'return=minimal');
 }
 
 async function teardown() {
   console.log('[teardown] removing fixtures...');
   // rows first (FKs), by marker
   await svcDelete(`invoices?name=like.ISO-*-INV-${RUN}`);
+  await svcDelete(`leads?name=like.ISO-*-LEAD-${RUN}`);
   await svcDelete(`clients?name=like.ISO-*-CLIENT-${RUN}`);
   await svcDelete(`memberships?user_id=in.(${[ids.aStaff, ids.bStaff].filter(Boolean).map((x) => `"${x}"`).join(',') || '""'})`);
   await deleteUser(ids.aStaff); await deleteUser(ids.aClient); await deleteUser(ids.bStaff); await deleteUser(ids.bClient);
@@ -161,6 +172,16 @@ async function run() {
   console.log('\n[D] role: clients cannot hit staff routes (edge function)');
   check('A-client -> lead_list (staff) rejected', [401, 403].includes(await callFn(aClientJwt, { type: 'lead_list' })));
   check('B-client -> lead_list (staff) rejected', [401, 403].includes(await callFn(bClientJwt, { type: 'lead_list' })));
+
+  console.log('\n[H] lead_list cutover (service-role → caller-JWT RLS): tenant-scoped via the function');
+  const aLeads = await callFnJson(aStaffJwt, { type: 'lead_list' });
+  const aNames = Array.isArray(aLeads.json?.data) ? aLeads.json.data.map((l: any) => l.name) : [];
+  check('A-staff lead_list returns its own tenant lead', aNames.includes(`ISO-A-LEAD-${RUN}`));
+  check('A-staff lead_list does NOT return tenant B lead', !aNames.includes(`ISO-B-LEAD-${RUN}`));
+  const bLeads = await callFnJson(bStaffJwt, { type: 'lead_list' });
+  const bNames = Array.isArray(bLeads.json?.data) ? bLeads.json.data.map((l: any) => l.name) : [];
+  check('B-staff lead_list returns its own tenant lead', bNames.includes(`ISO-B-LEAD-${RUN}`));
+  check('B-staff lead_list does NOT return tenant A lead', !bNames.includes(`ISO-A-LEAD-${RUN}`));
 
   console.log('\n[E] pipeline contract (edge function)');
   check('missing token -> 401', (await callFn(null, { type: 'lead_list' })) === 401);
