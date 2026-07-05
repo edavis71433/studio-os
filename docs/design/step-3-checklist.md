@@ -95,3 +95,14 @@ applies them. This is expected and safe — the three are independent of 0006.
 - 0006 prepared but NOT run pending review.
 - Paired email-relay fix stays staging-only until Eric approves prod deploy
   (deploy order: admin panel to Netlify BEFORE the function).
+
+## Isolation test suite — GREEN 2026-07-05 (staging)
+tests/isolation/isolation_test.ts + README. Self-contained: seeds tenant B +
+staff/client users in A and B with owned rows, asserts via real JWTs, tears down.
+22/22 passed: staff cross-tenant read/insert/update/delete blocked both
+directions; client-scoped invoice isolation; clients rejected from staff routes;
+pipeline contract (401 / 403 / 403 tenant_suspended / 401 membership_revoked /
+429); audit row per rejection with valid uuid request_id; rate buckets tenant vs
+IP scoped. Teardown clean; smoke green; PROD untouched (v249); 0003-0005 held; no
+handler cutover; no app code changed. This is the acceptance gate for the
+service-role -> caller-JWT cutover.
