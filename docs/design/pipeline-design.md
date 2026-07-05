@@ -281,3 +281,13 @@ downstream effort this all enables.
 
 Execution constraints reaffirmed: staging only; production untouched; 0003–0005
 held; service-role cutover not started.
+
+---
+
+## Build log
+
+- **0007_memberships_revocation — APPLIED TO STAGING 2026-07-05.** memberships.updated_at
+  added, backfilled to created_at (verified identical: 19:02:01.903521 both), touch
+  trigger advances on UPDATE (→ 20:57:32 on PATCH). Ledger 0007 applied; 0003–0005
+  pending. Function unregressed. Production untouched.
+  Next: tenant resolver (additive seam) — pending Eric's go.
