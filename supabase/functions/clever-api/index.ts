@@ -536,6 +536,36 @@ function isRateLimited(req: Request): boolean {
   return rec.count > RATE_MAX;
 }
 
+// ── DURABLE RATE LIMITER (pipeline stage; table-backed via rate_hit RPC) ──
+// Replaces the in-memory counter with a durable, cross-instance one. Bucket is
+// per-TENANT for authenticated staff, per-IP for everything else (public tools).
+// Ceilings stay the current numbers (RATE_MAX / 60s) until entitlements (step 4).
+//
+// FAIL-SAFE: returns a tri-state so the caller can degrade gracefully. If the DB
+// call errors (limiter outage must never take down the public tools), we return
+// 'error' and the caller falls back to the in-memory per-IP limiter — so
+// throttling is always on, and a limiter hiccup never blocks legitimate traffic.
+function rateBucketKey(principal: Principal | null, req: Request): string {
+  if (principal && principal.kind === 'staff' && principal.tenantId) return `t:${principal.tenantId}`;
+  return `ip:${clientIp(req)}`;
+}
+async function durableRateCheck(bucketKey: string): Promise<'allowed' | 'limited' | 'error'> {
+  try {
+    if (!SB_SERVICE) return 'error';
+    const windowStart = new Date(Math.floor(Date.now() / RATE_WINDOW_MS) * RATE_WINDOW_MS).toISOString();
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/rate_hit`, {
+      method: 'POST',
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_bucket: bucketKey, p_window: windowStart, p_max: RATE_MAX }),
+    });
+    if (!r.ok) return 'error';
+    const allowed = await r.json(); // rate_hit returns boolean: true = allowed
+    return allowed === true ? 'allowed' : allowed === false ? 'limited' : 'error';
+  } catch (_) {
+    return 'error';
+  }
+}
+
 function json(payload: unknown, status = 200, corsHeaders: Record<string, string> = cors) {
   return new Response(JSON.stringify(payload), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -4541,8 +4571,15 @@ serve(async (req) => {
     //  END EVENT SPINE ROUTES
     // ═══════════════════════════════════════════════════════════════════════
 
-    if (RATE_LIMITED_TYPES.has(type) && isRateLimited(req)) {
-      return json({ error: 'rate_limited', message: 'Too many requests. Please wait a minute and try again.' }, 429, reqCors);
+    if (RATE_LIMITED_TYPES.has(type)) {
+      // Durable, tenant/IP-keyed limiter; fall back to the in-memory per-IP
+      // limiter if the durable check errors (fail-safe: never break public tools
+      // on a limiter outage, but stay throttled).
+      const durable = await durableRateCheck(rateBucketKey(principal, req));
+      const limited = durable === 'limited' ? true : durable === 'error' ? isRateLimited(req) : false;
+      if (limited) {
+        return json({ error: 'rate_limited', message: 'Too many requests. Please wait a minute and try again.' }, 429, reqCors);
+      }
     }
 
     // ── PSI PROXY ──

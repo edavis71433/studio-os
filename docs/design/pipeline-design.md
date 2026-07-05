@@ -330,3 +330,13 @@ instruction. When that lands: resolve the client principal's tenantId, check
 tenants.state the same way staffRevocation does, reject clients of
 suspended/closed tenants with a clear message. Tracked here so it is a conscious
 decision, not a gap.
+
+- **0008 durable rate limiter — APPLIED + DEPLOYED TO STAGING 2026-07-05.** rate_limit_state
+  table + atomic rate_hit() RPC (SECURITY DEFINER, service-role only, RLS default-deny).
+  Wired at the existing rate-limit point: bucket = t:<tenantId> for authenticated staff,
+  ip:<addr> otherwise; ceilings unchanged (RATE_MAX 12/60s). FAIL-SAFE: durable check errors
+  → fall back to the in-memory per-IP limiter (never breaks public tools on a limiter outage,
+  stays throttled). Verified staging: public psi_fetch = 12×400 then 429 (per-IP limit);
+  staff route → t:<tenant> bucket (not ip); direct RPC proved independent per-tenant counters
+  (A=2, B=1); durable (counters live in the DB table); smoke 6/6; deno check 0 new. PROD
+  untouched (v249). Next: audit_log — pending Eric's go.
