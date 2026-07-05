@@ -80,6 +80,31 @@ Then apply the baseline to STAGING to prove the runner end-to-end:
 - No dashboard-only schema changes, ever again. (The 79-relation live schema
   accumulated entirely via dashboard — the baseline freezes that history.)
 
+## D-bis. Production deploy ORDER for coupled frontend+backend changes
+
+When a change gates a route that a frontend calls (e.g. the 2026-07-05
+`invoice_reminder`/`approval_needed` staff-gating), deploy order matters:
+
+- **Frontend (Netlify) FIRST, then the function.** The updated admin panel
+  sends `x-dds-user-jwt`; the OLD function ignores the extra header, so the
+  frontend-first window has zero regression. If the FUNCTION went first, the
+  live (old) admin panel would call the now-staff-gated route without a JWT
+  and its reminder emails would silently 401 until the panel caught up.
+- General rule: widen what the frontend sends before the backend starts
+  requiring it. Never the reverse.
+
+## D-ter. Staging seed state (2026-07-05)
+
+Created to test staff-gated routes end-to-end (reused by the step-3 isolation
+suite):
+- `tenants`: one row, id `00000000-0000-0000-0000-000000000001` ("Davis Digital
+  Studio", slug `dds`) — REQUIRED: `memberships.tenant_id` FKs to `tenants`, so
+  nothing membership-based works until tenant #1 exists. Production already has
+  this row; staging (schema-only baseline) needed it seeded.
+- One auth user `staging-staff@studio-os.test` + a `memberships` row at role
+  `staff`. Test-only; password held outside the repo. Fine on staging (demo
+  data only). Rotate/remove before staging is ever exposed publicly.
+
 ## E. Deploys
 
 - Edge Functions: `.github/workflows/deploy.yml`. Push to `staging` branch →

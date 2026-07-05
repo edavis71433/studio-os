@@ -7483,9 +7483,13 @@ async function createClient() {
 async function notify(type, message, subject, client, meta) {
   if (!client) return;
   try {
+    // Send the staff JWT so staff-gated notices (invoice_reminder,
+    // approval_needed) authenticate at the function's central gate. Public
+    // notices (welcome) ignore the extra header, so this is safe for every type.
+    var jwt = await adminJwt();
     await fetch(SB_URL+"/functions/v1/clever-api",{
       method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY},
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY,"x-dds-user-jwt":jwt},
       body:JSON.stringify({type:type,clientName:client.name,clientEmail:client.contact_email||"",message:message||"",subject:subject||"",meta:meta||{}})
     });
   } catch(e) { console.log("notify err:",e); }

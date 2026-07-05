@@ -150,6 +150,14 @@ function atLeast(role: string, min: keyof typeof ROLE_RANK): boolean {
 // (client_project, client_feed, ai_project_help), or are secret-gated
 // (run_scheduled_jobs). Destructive ops sit at a higher bar.
 const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
+  // Admin-originated client email notices. Previously PUBLIC (in PUBLIC_ROUTES),
+  // which let anyone drive a branded email to a caller-supplied address via the
+  // notify relay — the same phishing shape as the catch-all bypass. Now staff:
+  // only an authenticated team member may send them. The admin panel's notify()
+  // sends x-dds-user-jwt so these authenticate; nothing client-side or public
+  // sends them (approval_needed has zero senders; invoice_reminder is admin-only).
+  approval_needed:  'staff',
+  invoice_reminder: 'staff',
   // ported production routes (own inline auth kept; registered for deny-by-default)
   billing_overview: 'staff',
   practice_pulse: 'staff',
@@ -398,13 +406,13 @@ const ADMIN_READ_TABLES = new Set([
 // Anything NOT in this set and NOT in ROUTE_MIN_ROLE returns 403. Adding a new
 // route now requires an explicit decision about who may call it.
 const PUBLIC_ROUTES = new Set([
-  'ai_critique', 'ai_critique_email', 'ai_project_help', 'approval_needed',
+  'ai_critique', 'ai_critique_email', 'ai_project_help',
   'audit_lead', 'client_billing', 'client_conversation', 'client_decisions',
   'client_deliveries', 'client_feed', 'client_hq', 'client_progress',
   'client_project', 'concierge', 'contact_reply', 'deep_audit',
   'discovery_intake', 'gp_client_task_done', 'gp_rec_action', 'gp_rec_messages',
   'gp_rec_respond', 'gp_submit_request', 'gp_workspace', 'integration_callback',
-  'invoice_reminder', 'lead_intake', 'pi_weekly', 'project_complete', 'psi_fetch',
+  'lead_intake', 'pi_weekly', 'project_complete', 'psi_fetch',
   'report_card', 'reset_password', 'run_scheduled_jobs', 'survey_response',
   'text', 'version', 'welcome', 'whoami',
   'bug', 'outage', 'security',   // ops alert family (double-quoted dispatch; missed by the first enumeration)
@@ -428,12 +436,18 @@ const PUBLIC_ROUTES = new Set([
 //   • the ops-alert family (also email ERIC)
 //   • the two admin→client notices, which already require being in PUBLIC_ROUTES
 // Any other unregistered type now fails closed at the gate with 403.
+// A type may appear here AND in ROUTE_MIN_ROLE: the gate enforces the role
+// first, then the relay handler processes the send. The client-emailing types
+// (approval_needed, invoice_reminder) are staff-gated in ROUTE_MIN_ROLE, so
+// they can no longer be driven publicly; the Eric-only types below carry no
+// caller-supplied recipient and stay public via PUBLIC_ROUTES.
 const NOTIFY_RELAY_TYPES = new Set([
-  // portal -> Eric (no dedicated handler; ride the generic relay)
+  // portal client-activity notices -> Eric (no dedicated handler; ride the relay)
   'approval_action', 'brief_submitted', 'client_message', 'contract_acked', 'file_uploaded',
   // ops alerts -> Eric (also present in PUBLIC_ROUTES)
   'bug', 'outage', 'security',
-  // admin -> client notices (also present in PUBLIC_ROUTES; see RESIDUAL note at the handler)
+  // admin -> client notices: STAFF-GATED in ROUTE_MIN_ROLE (not public). Kept
+  // here so the relay handler still performs the send once the gate passes.
   'approval_needed', 'invoice_reminder',
 ]);
 
@@ -9381,9 +9395,11 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
     // Defense in depth: the gate already restricts unregistered types to
     // NOTIFY_RELAY_TYPES, but this handler re-checks so it can never be driven
     // by an arbitrary type even if the gate logic changes. Only the two
-    // admin->client notices may email a caller-supplied address; everything
-    // else emails ERIC only. The old `startsWith('eric_')` client-email branch
-    // (attacker-controlled recipient) is deleted.
+    // admin->client notices may email a caller-supplied address, and those are
+    // now STAFF-GATED at the gate (ROUTE_MIN_ROLE) — so a caller reaching this
+    // client-email branch is an authenticated team member, not the public.
+    // Everything else emails ERIC only. The old `startsWith('eric_')`
+    // client-email branch (attacker-controlled recipient) is deleted.
     if (type && NOTIFY_RELAY_TYPES.has(String(type))) {
       const name = body.clientName || (body.client && body.client.name) || 'A client';
       const subject = body.subject || '';

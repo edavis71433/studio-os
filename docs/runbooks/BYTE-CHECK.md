@@ -46,14 +46,14 @@ Fresh `supabase functions download stripe-webhook` compared against the repo
 copy (which came from `stripe-webhook.zip`): **BYTE-IDENTICAL**. The repo copy
 is confirmed deployed reality.
 
-## 3. portal.html + admin panel + contact page  (DONE 2026-07-05 — record)
+## 3. portal.html + admin panel + contact page  (2026-07-05 — record)
 
-Verified by SHA-256 against the live site:
+Verified by SHA-256 against the live site at repo creation:
 
 | File | Result |
 |---|---|
-| portal.html | MATCH (byte-identical, 334,709 B) |
-| dds-studio-manage-9k2p.html | MATCH (byte-identical, 1,325,089 B) |
+| portal.html | MATCH (byte-identical, 334,709 B) — repo == live |
+| dds-studio-manage-9k2p.html | **INTENTIONALLY AHEAD of live** as of the step-2 paired fix: `notify()` now sends `x-dds-user-jwt` (see commit for the invoice_reminder/approval_needed gating). Repo is authoritative; deploy to Netlify per ENVIRONMENTS §D-bis (frontend BEFORE the function). Until deployed, live is one change behind — expected. |
 | contact.html | Differs ONLY by Netlify Pretty URLs link rewriting; no content drift |
 
 Re-check command (any file):
