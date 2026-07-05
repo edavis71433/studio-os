@@ -383,3 +383,13 @@ decision, not a gap.
   extended with [H] (lead_list tenant-scoped both directions) → 26/26 green. Smoke
   3/3; deno check 0 new; audit + rate still work (suite [E][F][G]); PROD untouched
   (v249); 0003-0005 held; no other handler touched.
+
+- **Module 2: `visibility_list` — DONE on STAGING 2026-07-05.** Purely read-only
+  (unlike lead_detail which writes unread=false), staff-gated, reads monitored_sites
+  + site_checks (each one clean tenant-scoped `_staff` policy). Converted both reads
+  to caller-JWT/anon RLS; the shared service-role visDb helper stays for the write
+  routes in the block (visibility_check/add/remove/sync_clients). Behavior preserved
+  (staff sees tenant-1 sites; seeded site FOUND). Isolation suite extended with [I]
+  (tenant-scoped both directions) → 30/30 green. Smoke 3/3; deno check 0 new; audit +
+  rate still work ([E][F][G]); PROD untouched (v249); 0003-0005 held; no shared helper
+  or write route touched.

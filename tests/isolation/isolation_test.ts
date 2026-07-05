@@ -114,6 +114,9 @@ async function setup() {
   // one lead per tenant — regression guard for the lead_list service-role→RLS cutover
   await svcPost('leads', { name: `ISO-A-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_A }, 'return=minimal');
   await svcPost('leads', { name: `ISO-B-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_B }, 'return=minimal');
+  // one monitored_site per tenant — regression guard for the visibility_list cutover
+  await svcPost('monitored_sites', { label: `ISO-A-SITE-${RUN}`, url: `https://iso-a-${RUN}.test`, tenant_id: TENANT_A }, 'return=minimal');
+  await svcPost('monitored_sites', { label: `ISO-B-SITE-${RUN}`, url: `https://iso-b-${RUN}.test`, tenant_id: TENANT_B }, 'return=minimal');
 }
 
 async function teardown() {
@@ -121,6 +124,7 @@ async function teardown() {
   // rows first (FKs), by marker
   await svcDelete(`invoices?name=like.ISO-*-INV-${RUN}`);
   await svcDelete(`leads?name=like.ISO-*-LEAD-${RUN}`);
+  await svcDelete(`monitored_sites?label=like.ISO-*-SITE-${RUN}`);
   await svcDelete(`clients?name=like.ISO-*-CLIENT-${RUN}`);
   await svcDelete(`memberships?user_id=in.(${[ids.aStaff, ids.bStaff].filter(Boolean).map((x) => `"${x}"`).join(',') || '""'})`);
   await deleteUser(ids.aStaff); await deleteUser(ids.aClient); await deleteUser(ids.bStaff); await deleteUser(ids.bClient);
@@ -182,6 +186,16 @@ async function run() {
   const bNames = Array.isArray(bLeads.json?.data) ? bLeads.json.data.map((l: any) => l.name) : [];
   check('B-staff lead_list returns its own tenant lead', bNames.includes(`ISO-B-LEAD-${RUN}`));
   check('B-staff lead_list does NOT return tenant A lead', !bNames.includes(`ISO-A-LEAD-${RUN}`));
+
+  console.log('\n[I] visibility_list cutover (service-role → caller-JWT RLS): tenant-scoped via the function');
+  const aVis = await callFnJson(aStaffJwt, { type: 'visibility_list' });
+  const aSites = Array.isArray(aVis.json?.data) ? aVis.json.data.map((x: any) => x.site?.label) : [];
+  check('A-staff visibility_list returns its own tenant site', aSites.includes(`ISO-A-SITE-${RUN}`));
+  check('A-staff visibility_list does NOT return tenant B site', !aSites.includes(`ISO-B-SITE-${RUN}`));
+  const bVis = await callFnJson(bStaffJwt, { type: 'visibility_list' });
+  const bSites = Array.isArray(bVis.json?.data) ? bVis.json.data.map((x: any) => x.site?.label) : [];
+  check('B-staff visibility_list returns its own tenant site', bSites.includes(`ISO-B-SITE-${RUN}`));
+  check('B-staff visibility_list does NOT return tenant A site', !bSites.includes(`ISO-A-SITE-${RUN}`));
 
   console.log('\n[E] pipeline contract (edge function)');
   check('missing token -> 401', (await callFn(null, { type: 'lead_list' })) === 401);

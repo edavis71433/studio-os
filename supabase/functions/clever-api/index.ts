@@ -9233,12 +9233,27 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
 
       // ── LIST: every monitored site with its latest two checks (for trend) ──
       if (type === 'visibility_list') {
-        const sr = await visDb(`monitored_sites?select=*&order=created_at.asc`);
+        // SERVICE-ROLE → CALLER-JWT CUTOVER (module 2, read-only). Both reads run
+        // under the caller's JWT so RLS enforces tenant scope via
+        // monitored_sites_staff and site_checks_staff (tenant_id IN
+        // current_tenant_ids()). Same rows for the single-tenant DDS staff, now
+        // tenant-safe. The shared service-role visDb helper is unchanged for the
+        // WRITE routes in this block (visibility_check/add/remove/sync_clients),
+        // which are later increments. Pipeline (gate authz + revocation + rate
+        // limit + 'action' audit) is unchanged.
+        const jwt = req.headers.get('x-dds-user-jwt') || (principal && principal.jwt) || '';
+        if (!SB_ANON || !jwt) return json({ error: 'no anon key or token' }, 500, reqCors);
+        const asUser = { apikey: SB_ANON, Authorization: `Bearer ${jwt}` };
+        const readAs = async (path: string) => {
+          const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: asUser });
+          return { ok: r.ok, data: r.ok ? await r.json().catch(() => []) : [], detail: r.ok ? null : await r.text().catch(() => '') };
+        };
+        const sr = await readAs(`monitored_sites?select=*&order=created_at.asc`);
         if (!sr.ok) return json({ error: 'sites_read_failed', detail: sr.detail }, 200, reqCors);
         const sites = Array.isArray(sr.data) ? sr.data : [];
         const out: any[] = [];
         for (const s of sites) {
-          const cr = await visDb(`site_checks?site_id=eq.${s.id}&select=overall,performance,mobile,visibility,local,https,ok,error,checked_at&order=checked_at.desc&limit=2`);
+          const cr = await readAs(`site_checks?site_id=eq.${s.id}&select=overall,performance,mobile,visibility,local,https,ok,error,checked_at&order=checked_at.desc&limit=2`);
           const checks = (cr.ok && Array.isArray(cr.data)) ? cr.data : [];
           out.push({ site: s, latest: checks[0] || null, previous: checks[1] || null });
         }
