@@ -14,3 +14,6 @@ supabase/.branches/
 .DS_Store
 Thumbs.db
 node_modules/
+
+# Machine-local Claude Code settings
+.claude/settings.local.json
