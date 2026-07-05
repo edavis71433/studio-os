@@ -303,3 +303,16 @@ held; service-role cutover not started.
   404/403s there). Note: system+valid-secret positive path not directly harness-tested (staging
   SCHEDULER_SECRET not held by the test harness); it uses the identical comparison run_scheduled_jobs
   already relies on. Next: revocation stage — pending Eric's go.
+
+- **Revocation — DEPLOYED TO STAGING 2026-07-05 (staff-only enforcement).** Two checks
+  at the gate after the staff role check, consuming the resolved staff principal:
+  tenant state ∈ {suspended, closed, purge_scheduled} → 403 (tenant_suspended /
+  tenant_closed / tenant_purge_scheduled); memberships.updated_at > JWT iat → 401
+  membership_revoked. One combined query (membership + embedded tenants(state));
+  jwtIatMs() reads the already-validated token's iat. Fail-closed (lookup error /
+  unreadable iat → reject). Verified on staging: active+fresh→200; suspended→403
+  tenant_suspended; closed→403 tenant_closed; restore active→200; stale token→401
+  membership_revoked; fresh token after update→200; public (version)→200; client
+  (client_hq)→200; smoke 7/7; resolver unaffected. deno check 0 new errors. PROD
+  untouched (v249). Public/client routes unaffected (revocation only fires on
+  ROUTE_MIN_ROLE staff routes). Next: durable rate limiter — pending Eric's go.

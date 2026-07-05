@@ -137,6 +137,43 @@ async function verifyAdminJwt(req: Request): Promise<string | null> {
   return staff ? (staff.email || staff.userId) : null;
 }
 
+// ── REVOCATION (pipeline stage; Brief §12, decided 2026-07-05: immediate, no grace) ──
+// For an authenticated STAFF request, decide whether it must be rejected despite
+// a valid session, because either:
+//   (a) the tenant's lifecycle state is suspended/closed/purge_scheduled, or
+//   (b) the membership row was modified AFTER the token was issued
+//       (updated_at > JWT iat) — a role change or removal that must bite within
+//       minutes, not at token expiry.
+// Returns null when the request may proceed, or an error code string to reject
+// with. Fails CLOSED: any lookup error or unreadable iat => reject. One combined
+// query (membership + embedded tenant state via the FK).
+const REVOKED_STATES = new Set(['suspended', 'closed', 'purge_scheduled']);
+async function staffRevocation(userId: string, jwt: string): Promise<null | { code: string; status: number }> {
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/memberships?user_id=eq.${encodeURIComponent(userId)}` +
+        `&select=updated_at,tenant_id,tenants(state)&limit=1`,
+      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } },
+    );
+    if (!r.ok) return { code: 'revocation_check_failed', status: 401 };
+    const rows = await r.json();
+    if (!Array.isArray(rows) || rows.length === 0) return { code: 'membership_revoked', status: 401 }; // row gone since resolve
+    const row = rows[0];
+    const state = row.tenants && (Array.isArray(row.tenants) ? row.tenants[0]?.state : row.tenants.state);
+    if (state && REVOKED_STATES.has(String(state))) {
+      return { code: state === 'closed' ? 'tenant_closed' : state === 'purge_scheduled' ? 'tenant_purge_scheduled' : 'tenant_suspended', status: 403 };
+    }
+    // membership-changed-after-issued check
+    const iat = jwtIatMs(jwt);
+    if (iat === null) return { code: 'membership_revoked', status: 401 }; // can't compare => fail closed
+    const upd = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+    if (upd > iat) return { code: 'membership_revoked', status: 401 };
+    return null;
+  } catch (_) {
+    return { code: 'revocation_check_failed', status: 401 }; // fail closed
+  }
+}
+
 // Role ranking + per-route minimums (the real enforcement, applied at the gate).
 const ROLE_RANK: Record<string, number> = { owner: 4, admin: 3, staff: 2, readonly: 1 };
 function atLeast(role: string, min: keyof typeof ROLE_RANK): boolean {
@@ -4050,6 +4087,21 @@ interface Principal {
   requestId: string;        // minted here; threads into logs + (later) audit_log
 }
 
+// Decode the iat (issued-at) claim from a JWT payload WITHOUT signature
+// verification — the token was already validated against the auth server by the
+// resolver; this only reads the timestamp for the revocation comparison.
+// Returns milliseconds, or null if unreadable (callers fail closed on null).
+function jwtIatMs(jwt: string): number | null {
+  try {
+    const part = jwt.split('.')[1] || '';
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)));
+    return typeof payload.iat === 'number' ? payload.iat * 1000 : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
   const requestId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
   const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, jwt: null, requestId };
@@ -4132,7 +4184,9 @@ serve(async (req) => {
     } catch (_) { /* resolver is additive; never blocks a request */ }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  SINGLE FAIL-CLOSED AUTHORIZATION GATE (Part 2a)
+    //  PIPELINE STAGE: REVOCATION (ENFORCED — staff principals only)
+    //  Decisions locked by Eric 2026-07-05: immediate reject, no grace period.
+    //  Two checks, one combined query
     //  Runs once, up front. Privileged routes (ROUTE_MIN_ROLE) require a real
     //  membership row AND sufficient role. Everything else falls through to its
     //  own handling (public routes, client-portal routes, secret-gated jobs).
@@ -4145,6 +4199,12 @@ serve(async (req) => {
         const staff = await verifyStaff(req);
         if (!staff) return json({ error: 'unauthorized' }, 401, reqCors);
         if (!atLeast(staff.role, minRole)) return json({ error: 'forbidden' }, 403, reqCors);
+        // REVOCATION: reject a valid staff session when the tenant is
+        // suspended/closed/purge_scheduled, or the membership changed after the
+        // token was issued. Immediate, fail-closed. Only affects staff-gated
+        // routes (public/client routes fall through unchanged).
+        const revoked = await staffRevocation(staff.userId, req.headers.get('x-dds-user-jwt') || '');
+        if (revoked) return json({ error: revoked.code }, revoked.status, reqCors);
       } else if (!PUBLIC_ROUTES.has(String(type)) && !NOTIFY_RELAY_TYPES.has(String(type))) {
         // Deny-by-default. Previously this branch accepted ANY unregistered
         // type as long as the body looked like a notification (clientName /
