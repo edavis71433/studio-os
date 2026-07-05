@@ -269,3 +269,15 @@ downstream effort this all enables.
   with the cutover.
 - Everything is staging-only until you approve a production promotion, exactly
   like the last one.
+
+---
+
+## Decisions — locked by Eric, 2026-07-05
+
+1. Revocation: immediate reject on stale membership. No grace period.
+2. Interim rate ceilings: reuse the current per-IP numbers until entitlements (step 4).
+3. audit_log: one row per privileged request accepted at current scale; retention later.
+4. Resolver lands additive-first as a seam; NO handler cutover in this phase.
+
+Execution constraints reaffirmed: staging only; production untouched; 0003–0005
+held; service-role cutover not started.
