@@ -17,35 +17,34 @@ Then authenticate once:
 
 Project ref (production): `qksstlqzbhesadrrofgn`
 
-## 1. clever-api  (REQUIRED — canonical file does not exist until this runs)
+## 1. clever-api  (DONE 2026-07-05 — record)
 
-    cd C:\Users\edavi\Documents\app
+Captured mechanically via `supabase functions download clever-api
+--project-ref qksstlqzbhesadrrofgn` (CLI v2.109.0). Verification, all passed:
+
+- 11,322 lines; `DDS_BUILD = '2026-07-04.11'` (matches the dashboard source)
+- All 33 deployed-build markers present (`PUBLIC_ROUTES`, `AI_MODEL`,
+  `pi_weekly`, `lifecycle_board`, ...)
+- Strict superset of `_stale/notify-client-2026-07-05.ts`: 161 route-dispatch
+  types vs 127, zero missing
+- SHA-256 (first 20 hex): `7f2cac09bc1e826b7006`
+
+The deployed entrypoint was named `notify-client.ts`; renamed to `index.ts`
+(content hash unchanged) so CLI deploys use the default entrypoint. Note for
+re-verification: a future `functions download` may again produce
+`notify-client.ts` until the first deploy FROM this repo standardizes the
+name — compare content hashes, not filenames.
+
+To re-check for drift at any time:
+
     supabase functions download clever-api --project-ref qksstlqzbhesadrrofgn
+    # then hash-compare against supabase/functions/clever-api/index.ts
 
-This writes the deployed source into `supabase/functions/clever-api/`. If the
-downloaded entrypoint is not named `index.ts`, rename it to `index.ts`.
+## 2. stripe-webhook  (DONE 2026-07-05 — record)
 
-Then tell Claude "clever-api downloaded" — verification is: line count vs the
-pasted dashboard source, the 34-marker sweep (`DDS_BUILD`, `PUBLIC_ROUTES`,
-`AI_MODEL`, `pi_weekly`, ...), and a full diff against
-`_stale/notify-client-2026-07-05.ts` confirming the known superset
-relationship. Then it gets committed.
-
-Fallback if the CLI download fails: Dashboard → Edge Functions → clever-api →
-open the source → select all → paste into a new file saved as
-`supabase/functions/clever-api/index.ts` with UTF-8 encoding and LF line
-endings. (The CLI path is strongly preferred — a paste can silently normalize
-whitespace.)
-
-## 2. stripe-webhook  (confirm the copy already in the repo)
-
-The repo copy came from `stripe-webhook.zip` (a dashboard download dated
-2026-07-05 08:44). To confirm it still matches production:
-
-    supabase functions download stripe-webhook --project-ref qksstlqzbhesadrrofgn
-    git diff --no-index supabase/functions/stripe-webhook/index.ts <downloaded-file>
-
-Empty diff = confirmed. Any diff = the download wins; replace the repo copy.
+Fresh `supabase functions download stripe-webhook` compared against the repo
+copy (which came from `stripe-webhook.zip`): **BYTE-IDENTICAL**. The repo copy
+is confirmed deployed reality.
 
 ## 3. portal.html + admin panel + contact page  (DONE 2026-07-05 — record)
 

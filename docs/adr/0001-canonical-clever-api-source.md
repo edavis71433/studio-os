@@ -53,9 +53,11 @@ removed live routes from production.
   **SHA-256 identical** to the live site (2026-07-05).
 - `contact.html` differs from live only by Netlify "Pretty URLs" link
   rewriting (build-time transform, not content drift).
-- `supabase/functions/stripe-webhook/index.ts` is a byte-copy of the
-  `stripe-webhook.zip` dashboard download; final confirmation against the
-  currently-deployed function is pending (BYTE-CHECK.md, item 2).
-- `supabase/functions/clever-api/index.ts` is pending the mechanical download
-  (BYTE-CHECK.md, item 1). Until it lands, there is deliberately NO file at
-  that path — a placeholder could be mistaken for the real thing.
+- `supabase/functions/stripe-webhook/index.ts` **CONFIRMED byte-identical**
+  to the deployed function via fresh CLI download (2026-07-05).
+- `supabase/functions/clever-api/index.ts` **LANDED 2026-07-05** via
+  mechanical CLI download: 11,322 lines, build `2026-07-04.11`, all 33
+  markers present, strict superset of every quarantined copy (161 vs 127
+  route types), SHA-256 prefix `7f2cac09bc1e826b7006`. The deployed
+  entrypoint filename was `notify-client.ts`; renamed to `index.ts` with
+  content hash unchanged.
