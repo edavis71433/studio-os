@@ -8,7 +8,7 @@ forward-only, reversible, staging-first.
 | File | Purpose | Staging | Production | Gate |
 |---|---|---|---|---|
 | `0001_tenants_enrich` | add lifecycle `state` enum + plan/brand/owner_email/updated_at/deleted_at + touch trigger | ✅ applied 2026-07-05 | ⛔ hold | — |
-| `0002_agency_attr_backfill` | copy agencies.{plan,brand,owner_email} → tenants | ⏸ pending (awaiting review) | ⛔ hold | — |
+| `0002_agency_attr_backfill` | copy agencies.{plan,brand,owner_email} → tenants | ✅ applied 2026-07-05 | ⛔ hold | — |
 | `0003_org_scope_converge` | drop organizations.agency_id, keep tenant_id | ⏸ pending | ⛔ hold | per-row agency_id=tenant_id |
 | `0004_drop_agency_columns` | drop agency_id from 18 tables | ⏸ pending | ⛔ hold | per-table agency_id=tenant_id |
 | `0005_drop_agencies_table` | drop agencies | ⏸ pending | ⛔ hold | **Eric: `select id,slug,name,plan from agencies;` on prod + confirm no external readers** + row-count ≤ 1 |
@@ -26,6 +26,26 @@ Verified: `state` enum defaults to `active`; `updated_at` trigger advances on
 UPDATE (PATCH test: 19:17:50 → 19:20:42); migration ledger shows
 `0000, 0001` applied, `0002–0006` pending; function unregressed
 (`{"type":"version"}` → build 2026-07-04.11, staff `whoami` → 200).
+
+## 0002 staging result (applied 2026-07-05)
+
+Staging `agencies` was empty (schema-only baseline), so a representative row was
+seeded to exercise the copy (mirrors the prod DDS agency). Result:
+```
+BEFORE: tenants.plan=null   brand={}   owner_email=null
+AFTER:  tenants.plan=founder brand={"name":"Davis Digital Studio","primary":"#5b3fa0"}
+        owner_email=eric@davisdigitalstudio.com
+```
+Idempotency proven empirically: hand-set `plan='MANUALLY_SET_professional'`, re-ran
+the 0002 body via a throwaway probe migration → value UNCHANGED (`coalesce`
+preserves existing; `brand` only fills when `= '{}'`). Probe removed from the
+ledger (`migration repair --status reverted`) and deleted. Ledger: `0000,0001,0002`
+applied; `0003–0006` pending. Function unregressed (build 2026-07-04.11, staff
+whoami 200).
+
+Staging seed note: a test `agencies` row now exists on staging (id = DDS uuid).
+Harmless — 0005's row-count≤1 gate still passes; it will be dropped by 0005 when
+that runs on staging.
 
 ## Pipeline stages (after migrations, on staging)
 
