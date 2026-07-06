@@ -16,6 +16,7 @@ import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { canTransition, allowedTransitions, isLifecycleState, PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
 import { runPipeline, handlePublish, CALM } from './publish.ts';
 import { runEvidence } from '../evidence/engine.ts';
+import { runJudgment } from '../judgment/engine.ts';
 import {
   netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
   setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
@@ -459,6 +460,26 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   if (sub === '/evidence/runs' && method === 'GET') {
     const runs = await svc(`presence_evidence_runs?site_id=eq.${site.id}&select=id,started_at,finished_at,trigger,item_count,providers,input,error_text&order=started_at.desc&limit=20`);
     return json({ data: runs.json ?? [] }, 200, cors);
+  }
+
+  // ── M9.1: the Judgment Engine (deterministic; consumes evidence only) ──
+  if (sub === '/judge' && method === 'POST') {
+    const summary = await runJudgment(site);
+    return json({ data: summary }, summary.ok ? 200 : summary.error === 'no_evidence_run' ? 409 : 502, cors);
+  }
+  if (sub === '/judgments' && method === 'GET') {
+    const url = new URL(req.url);
+    const status = url.searchParams.get('status'); // active | suppressed | all (default active)
+    const batch = url.searchParams.get('batch_id');
+    let batchFilter = batch && /^[0-9a-f-]{36}$/.test(batch) ? batch : null;
+    if (!batchFilter) {
+      const latest = await svc(`presence_judgments?site_id=eq.${site.id}&select=batch_id&order=created_at.desc&limit=1`);
+      batchFilter = latest.json?.[0]?.batch_id ?? null;
+      if (!batchFilter) return json({ data: { batch_id: null, judgments: [] } }, 200, cors);
+    }
+    const statusFilter = status === 'all' ? '' : status === 'suppressed' ? '&status=eq.suppressed' : '&status=eq.active';
+    const rows = await svc(`presence_judgments?batch_id=eq.${batchFilter}${statusFilter}&select=judgment_hash,judgment_key,rule,category,priority,severity,confidence,reasoning,business_impact,customer_impact,timing,audience,status,suppression_reason,evidence_ids,evidence_count,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
+    return json({ data: { batch_id: batchFilter, judgments: rows.json ?? [] } }, 200, cors);
   }
 
   return null;
