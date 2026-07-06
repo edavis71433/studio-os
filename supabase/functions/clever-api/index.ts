@@ -1,4 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+// M1 _shared extraction: identity, CORS, and the json helper now live in
+// _shared so the future presence function imports the same primitives.
+// Behavior is byte-identical; route logic, gates, and tables stay here.
+import { corsFor, cors } from '../_shared/cors.ts';
+import { json } from '../_shared/http.ts';
+import {
+  verifyStaff, verifyAdminJwt, staffRevocation, atLeast, jwtIatMs,
+  resolvePrincipal, ROLE_RANK, TENANT_ID, type Principal,
+} from '../_shared/auth.ts';
 
 const RESEND_KEY = Deno.env.get('RESEND_KEY') || '';
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_KEY') || ''; // matches the ANTHROPIC_KEY secret in Supabase
@@ -19,40 +28,7 @@ const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SE
 // that should only ever return the caller's own data.
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || '';
 
-// ── CORS: allowlist real origins instead of '*' ──
-// Config-only variance (Build Brief 2.8): the allowlist comes from the
-// ALLOWED_ORIGINS env var (comma-separated) so staging can add its Netlify
-// preview/staging origin WITHOUT a code edit. If the var is unset we fall back
-// to the two production origins, so production behavior is byte-identical to
-// before this change. Example staging value:
-//   ALLOWED_ORIGINS=https://staging--studio-os.netlify.app,https://davisdigitalstudio.com
-const DEFAULT_ORIGINS = [
-  'https://davisdigitalstudio.com',
-  'https://www.davisdigitalstudio.com',
-];
-const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') || '')
-  .split(',').map((o) => o.trim()).filter(Boolean);
-const CORS_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
-
-function corsFor(req: Request) {
-  const origin = req.headers.get('origin') || '';
-  const allow = CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Vary': 'Origin',
-  };
-}
-
-// Kept for the email/notification helpers below that reference `cors` directly.
-// Uses the canonical origin; per-request CORS is applied at the response layer.
-const cors = {
-  'Access-Control-Allow-Origin': CORS_ORIGINS[0],
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Vary': 'Origin',
-};
+// CORS (corsFor + static cors) moved to ../_shared/cors.ts — M1 extraction.
 
 // ============================================================================
 //  PART 2a — FAIL-CLOSED STAFF VERIFICATION (replaces the old admin checks)
@@ -75,7 +51,7 @@ const cors = {
 //  but harmless, and can be deleted route-by-route over time.
 // ============================================================================
 
-const TENANT_ID = '00000000-0000-0000-0000-000000000001'; // DDS = tenant #1
+// TENANT_ID moved to ../_shared/auth.ts — M1 extraction.
 
 // best-effort ops logger (ported with gsc_ingest; never throws)
 async function opsLog(kind: string, detail: string) {
@@ -89,96 +65,9 @@ async function opsLog(kind: string, detail: string) {
   } catch (_) { /* never throw from the logger */ }
 }
 
-async function verifyStaff(req: Request): Promise<
-  { userId: string; email: string; tenantId: string; role: string } | null
-> {
-  const jwt = req.headers.get('x-dds-user-jwt') || '';
-  if (!jwt) return null;
-
-  // 1) Validate the session and resolve the user. Bad/expired JWT => deny.
-  let user: any;
-  try {
-    const uRes = await fetch(`${SB_URL}/auth/v1/user`, {
-      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` },
-    });
-    if (!uRes.ok) return null;
-    user = await uRes.json();
-  } catch (_) {
-    return null; // network error talking to auth => deny, never guess
-  }
-  if (!user || !user.id) return null;
-
-  // 2) Confirm membership. NO row, query error, or anything unexpected => deny.
-  //    This closes the old hole: a validated session is NOT sufficient.
-  try {
-    const r = await fetch(
-      `${SB_URL}/rest/v1/memberships?user_id=eq.${encodeURIComponent(String(user.id))}` +
-        `&select=tenant_id,role&limit=1`,
-      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } },
-    );
-    if (!r.ok) return null;                                       // lookup failed => deny
-    const rows = await r.json();
-    if (!Array.isArray(rows) || rows.length === 0) return null;   // not staff => deny
-    return {
-      userId: String(user.id),
-      email: (user.email ? String(user.email) : '').toLowerCase(),
-      tenantId: String(rows[0].tenant_id),
-      role: String(rows[0].role),
-    };
-  } catch (_) {
-    return null; // any exception => deny
-  }
-}
-
-// Compatibility shim so existing inline `const admin = await verifyAdminJwt(req)`
-// checks keep compiling and behaving (now fail-closed). Returns email or null.
-async function verifyAdminJwt(req: Request): Promise<string | null> {
-  const staff = await verifyStaff(req);
-  return staff ? (staff.email || staff.userId) : null;
-}
-
-// ── REVOCATION (pipeline stage; Brief §12, decided 2026-07-05: immediate, no grace) ──
-// For an authenticated STAFF request, decide whether it must be rejected despite
-// a valid session, because either:
-//   (a) the tenant's lifecycle state is suspended/closed/purge_scheduled, or
-//   (b) the membership row was modified AFTER the token was issued
-//       (updated_at > JWT iat) — a role change or removal that must bite within
-//       minutes, not at token expiry.
-// Returns null when the request may proceed, or an error code string to reject
-// with. Fails CLOSED: any lookup error or unreadable iat => reject. One combined
-// query (membership + embedded tenant state via the FK).
-const REVOKED_STATES = new Set(['suspended', 'closed', 'purge_scheduled']);
-async function staffRevocation(userId: string, jwt: string): Promise<null | { code: string; status: number }> {
-  try {
-    const r = await fetch(
-      `${SB_URL}/rest/v1/memberships?user_id=eq.${encodeURIComponent(userId)}` +
-        `&select=updated_at,tenant_id,tenants(state)&limit=1`,
-      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } },
-    );
-    if (!r.ok) return { code: 'revocation_check_failed', status: 401 };
-    const rows = await r.json();
-    if (!Array.isArray(rows) || rows.length === 0) return { code: 'membership_revoked', status: 401 }; // row gone since resolve
-    const row = rows[0];
-    const state = row.tenants && (Array.isArray(row.tenants) ? row.tenants[0]?.state : row.tenants.state);
-    if (state && REVOKED_STATES.has(String(state))) {
-      return { code: state === 'closed' ? 'tenant_closed' : state === 'purge_scheduled' ? 'tenant_purge_scheduled' : 'tenant_suspended', status: 403 };
-    }
-    // membership-changed-after-issued check
-    const iat = jwtIatMs(jwt);
-    if (iat === null) return { code: 'membership_revoked', status: 401 }; // can't compare => fail closed
-    const upd = row.updated_at ? new Date(row.updated_at).getTime() : 0;
-    if (upd > iat) return { code: 'membership_revoked', status: 401 };
-    return null;
-  } catch (_) {
-    return { code: 'revocation_check_failed', status: 401 }; // fail closed
-  }
-}
-
-// Role ranking + per-route minimums (the real enforcement, applied at the gate).
-const ROLE_RANK: Record<string, number> = { owner: 4, admin: 3, staff: 2, readonly: 1 };
-function atLeast(role: string, min: keyof typeof ROLE_RANK): boolean {
-  return (ROLE_RANK[role] || 0) >= ROLE_RANK[min];
-}
+// verifyStaff, verifyAdminJwt, staffRevocation, ROLE_RANK, atLeast moved to
+// ../_shared/auth.ts — M1 extraction. Per-route minimums (ROUTE_MIN_ROLE,
+// below) and the gate that applies them stay here: they are route logic.
 
 // Minimum role each privileged route requires. Routes NOT listed are either
 // public (lead_intake, psi_fetch, deep_audit, ai_critique, concierge,
@@ -734,12 +623,7 @@ async function durableRateCheck(bucketKey: string): Promise<'allowed' | 'limited
   }
 }
 
-function json(payload: unknown, status = 200, corsHeaders: Record<string, string> = cors) {
-  return new Response(JSON.stringify(payload), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    status,
-  });
-}
+// json() moved to ../_shared/http.ts — M1 extraction.
 
 // Loud startup guard: SUPABASE_URL is auto-injected; if it is ever empty the
 // function cannot reach the database or auth at all. Fail loud in the logs
@@ -4466,31 +4350,7 @@ function progressFor(s: ClientSnapshot): ProgressBrief {
 //  single resolution when the gate is cut over to consume the Principal in a
 //  later increment.
 // ════════════════════════════════════════════════════════════════════════════
-type PrincipalKind = 'staff' | 'client' | 'public' | 'system';
-interface Principal {
-  kind: PrincipalKind;
-  userId: string | null;
-  tenantId: string | null;
-  role: string | null;      // owner|admin|staff|readonly for staff; 'client'; else null
-  email: string | null;     // for the audit actor label
-  jwt: string | null;       // the caller's token, for future RLS-scoped reads
-  requestId: string;        // minted here; threads into logs + audit_log
-}
-
-// Decode the iat (issued-at) claim from a JWT payload WITHOUT signature
-// verification — the token was already validated against the auth server by the
-// resolver; this only reads the timestamp for the revocation comparison.
-// Returns milliseconds, or null if unreadable (callers fail closed on null).
-function jwtIatMs(jwt: string): number | null {
-  try {
-    const part = jwt.split('.')[1] || '';
-    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)));
-    return typeof payload.iat === 'number' ? payload.iat * 1000 : null;
-  } catch (_) {
-    return null;
-  }
-}
+// Principal type + jwtIatMs moved to ../_shared/auth.ts — M1 extraction.
 
 // ── AUDIT (pipeline stage; append-only trail via the audit_write RPC) ──
 // Writes one row through the SECURITY DEFINER audit_write() function. Best-effort
@@ -4526,59 +4386,7 @@ async function auditWrite(
   } catch (_) { /* audit is best-effort; never breaks the request path */ }
 }
 
-async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
-  const requestId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
-  const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, email: null, jwt: null, requestId };
-  try {
-    // system: a valid scheduler/webhook shared secret in the body (run_scheduled_jobs, gsc_ingest, pi_weekly)
-    if (body && typeof body.secret === 'string' && body.secret && SCHEDULER_SECRET && body.secret === SCHEDULER_SECRET) {
-      return { ...pub, kind: 'system' };
-    }
-    const jwt = req.headers.get('x-dds-user-jwt') || '';
-    if (!jwt) return pub; // no token => public, zero I/O
-
-    // staff first — reuse the existing fail-closed membership check
-    const staff = await verifyStaff(req);
-    if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, email: staff.email || null, jwt, requestId };
-
-    // otherwise validate the token and see if it belongs to a client (portal user)
-    let user: any = null;
-    try {
-      const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
-      if (uRes.ok) user = await uRes.json();
-    } catch (_) { /* fall through to public */ }
-    if (!user || !user.id) return { ...pub, jwt };
-
-    const uid = String(user.id);
-    const email = (user.email ? String(user.email) : '').toLowerCase();
-    const svc = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` };
-    try {
-      // client linkage: a contact carrying this auth_user_id, or a client row by email.
-      // tenantId comes from the owning client record (falls back to DDS #1).
-      let tenantId: string | null = null;
-      const cr = await fetch(`${SB_URL}/rest/v1/contacts?auth_user_id=eq.${encodeURIComponent(uid)}&select=id&limit=1`, { headers: svc });
-      const contacts = cr.ok ? await cr.json() : [];
-      if (Array.isArray(contacts) && contacts.length) {
-        const clr = await fetch(`${SB_URL}/rest/v1/clients?contact_id=eq.${encodeURIComponent(contacts[0].id)}&select=tenant_id&limit=1`, { headers: svc });
-        const cls = clr.ok ? await clr.json() : [];
-        if (Array.isArray(cls) && cls.length) tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : null;
-      }
-      if (tenantId === null && email) {
-        const clr = await fetch(`${SB_URL}/rest/v1/clients?or=(email.eq.${encodeURIComponent(email)},contact_email.eq.${encodeURIComponent(email)})&select=tenant_id&limit=1`, { headers: svc });
-        const cls = clr.ok ? await clr.json() : [];
-        if (Array.isArray(cls) && cls.length) { tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : TENANT_ID; }
-      }
-      if (tenantId !== null) {
-        return { kind: 'client', userId: uid, tenantId, role: 'client', email: email || null, jwt, requestId };
-      }
-    } catch (_) { /* fall through */ }
-
-    // valid token but neither staff nor a known client — authenticated but unscoped
-    return { ...pub, userId: uid, email: email || null, jwt };
-  } catch (_) {
-    return pub; // NEVER throw from the resolver
-  }
-}
+// resolvePrincipal moved to ../_shared/auth.ts — M1 extraction.
 
 serve(async (req) => {
   const reqCors = corsFor(req);
