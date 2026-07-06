@@ -2584,9 +2584,8 @@ async function loadMessages() {
   try { var r = await gpApi('client_conversation', { lastVisit: lastVisitValue() }); payload = (r && r.data) ? r.data : null; }
   catch(e){ console.error('client_conversation:', e); }
   if (!payload) { renderError("msgThread", "loadMessages()"); return; }
-  allMessages = payload.messages || [];
   window._convOrient = payload.orient || null;
-  renderMessages();
+  applyServerThread(payload.messages || []);   // reconciles optimistic pendings, no duplicates
 
   // Dashboard preview: an orientation line, not a truncated message (we never
   // excerpt Eric's words out of context).
@@ -2694,6 +2693,18 @@ function renderMessages(msgs) {
     }
   }
 
+  // ── optimistic pending sends: shown instantly, beneath the confirmed thread ──
+  for (var pi = 0; pi < pendingSends.length; pi++) {
+    var pp = pendingSends[pi];
+    var failed = pp._state === 'failed';
+    html += '<div class="cv-msg cv-me cv-pending'+(failed?' cv-failed':'')+'">'
+      + '<div class="cv-body">'+cEsc(pp.text)+'</div>'
+      + (failed
+          ? '<div class="cv-pstate cv-pfail">Didn’t send · <button type="button" class="cv-retry" onclick="retrySend(\''+pp._localId+'\')">Retry</button></div>'
+          : '<div class="cv-pstate">Sending…</div>')
+      + '</div>';
+  }
+
   thread.innerHTML = html;
   var t2 = document.getElementById("msgThread");
   if (t2) t2.scrollTop = t2.scrollHeight;
@@ -2736,43 +2747,90 @@ function cvHelpWrite(){
   });
 }
 
-var _sendingMsg = false;var _sendingMsg = false;
+// ── OPTIMISTIC MESSAGING ──────────────────────────────────────────────────
+// The client's message appears the instant they hit send. It is held in
+// `pendingSends` (state: sending | failed) and rendered beneath the confirmed
+// server thread. When a refetch (loadMessages or the poll) returns the row the
+// server now holds, reconcileServer() drops the matching pending so nothing is
+// ever shown twice. A failed send stays as a "Retry" affordance and is never
+// silently lost. Security is unchanged: the client can only ever send
+// from_who="client" for their own client_id (the RLS enforces this server-side).
+var pendingSends = [];
+var _pendSeq = 0;
+
+// PURE: given the confirmed server messages, return the pending sends that are
+// NOT yet represented on the server. Confirmed (sending) pendings are dropped;
+// failed pendings are always kept (they need the retry UI). Matching is a
+// multiset on from_who + exact text, so a genuine duplicate server row clears
+// exactly one pending. This is the anti-duplicate guarantee.
+function reconcilePendingSends(pending, serverMsgs) {
+  var counts = Object.create(null);
+  for (var i = 0; i < serverMsgs.length; i++) {
+    var k = serverMsgs[i].from_who + " " + (serverMsgs[i].text || "");
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  var out = [];
+  for (var j = 0; j < pending.length; j++) {
+    var p = pending[j];
+    var pk = p.from_who + " " + (p.text || "");
+    if (p._state !== "failed" && counts[pk] > 0) { counts[pk]--; continue; } // confirmed → drop
+    out.push(p);
+  }
+  return out;
+}
+
+// Apply a fresh server thread: set the confirmed list, reconcile pendings, render.
+function applyServerThread(serverMsgs) {
+  allMessages = Array.isArray(serverMsgs) ? serverMsgs : [];
+  pendingSends = reconcilePendingSends(pendingSends, allMessages);
+  renderMessages();
+}
+
+var _sendingMsg = false;
 async function sendMsg() {
-  if (_sendingMsg) return;                 // guard against double-click / Enter-spam
+  if (_sendingMsg) return;                 // guard against double-fire (click + Enter)
   var input = document.getElementById("msgInput");
   var text = input.value.trim();
-  if (!text) return;
+  if (!text || !CLIENT) return;
 
+  // OPTIMISTIC: show it now, clear the box now. The text lives in the pending
+  // record, so a failed send can be retried without the client retyping.
+  var localId = "p" + (++_pendSeq);
+  pendingSends.push({ _localId: localId, _state: "sending", from_who: "client", sender_name: CLIENT.name, text: text, created_at: new Date().toISOString() });
+  input.value = "";
+  renderMessages();
+  await _deliverPending(localId);
+}
+
+// Insert one pending send to the DB. On success, refetch (reconcile drops it);
+// on failure, flip it to "failed" so the Retry button appears.
+async function _deliverPending(localId) {
+  var p = pendingSends.find(function(x){ return x._localId === localId; });
+  if (!p) return;
+  p._state = "sending"; renderMessages();
   _sendingMsg = true;
-  var sendBtn = document.getElementById("msgSend");
-  if (sendBtn) sendBtn.disabled = true;
-
-  // Do NOT clear the input until the DB confirms the insert. If the write fails
-  // (offline, RLS, server error) the client keeps their text and we tell them.
   var ok = false;
   try {
-    var { error } = await sb.from("messages").insert({
-      client_id: CLIENT.id,
-      from_who: "client",
-      sender_name: CLIENT.name,
-      text: text
-    });
-    if (error) {
-      showToast("Message didn't send. Check your connection and try again.");
-    } else {
-      ok = true; window._cvJustSent = Date.now();
-    }
-  } catch (e) {
-    showToast("Message didn't send. Check your connection and try again.");
-  } finally {
-    _sendingMsg = false;
-    if (sendBtn) sendBtn.disabled = false;
+    var res = await sb.from("messages").insert({ client_id: CLIENT.id, from_who: "client", sender_name: CLIENT.name, text: p.text });
+    if (!res || !res.error) ok = true;
+  } catch (e) { ok = false; }
+  _sendingMsg = false;
+  if (ok) {
+    window._cvJustSent = Date.now();
+    _lastMsgCount = 0;                      // force the poll/refetch to re-read fresh
+    await loadMessages();                   // brings the server row; reconcile drops the pending
+    try { await sendNotification("client_message", p.text); } catch (e) {}
+  } else {
+    p._state = "failed";
+    renderMessages();
+    showToast("Message didn't send. Tap Retry.");
   }
+}
 
-  if (!ok) return;                         // leave the text in the box for a retry
-  input.value = "";
-  await loadMessages();
-  try { await sendNotification("client_message", text); } catch (e) {}
+function retrySend(localId) {
+  var p = pendingSends.find(function(x){ return x._localId === localId; });
+  if (!p) return;
+  _deliverPending(localId);
 }
 
 // ── INVOICES ──
@@ -3193,7 +3251,7 @@ async function _pollMessagesOnce() {
       setBadge("badge-messages", fromEric.length);
       showToast("💬 New message from Eric");
     }
-    renderMessages(data);
+    applyServerThread(data);               // reconcile pendings; never duplicates
   }
   _lastMsgCount = data.length;
 }
@@ -5191,6 +5249,13 @@ button:focus-visible, a:focus-visible, .nav-item:focus-visible{ outline:2px soli
 .cv-fn{ font-size:12.5px; font-weight:560; color:var(--ink); }
 
 .cv-sent{ font-family:var(--mono,'Geist Mono',monospace); font-size:10px; color:#a49ab5; margin-top:8px; letter-spacing:.04em; text-align:right; }
+.cv-pending{ opacity:.72; }
+.cv-pending.cv-failed{ opacity:1; }
+.cv-pstate{ font-family:var(--mono,'Geist Mono',monospace); font-size:10px; color:#a49ab5; margin-top:6px; letter-spacing:.04em; text-align:right; }
+.cv-pstate.cv-pfail{ color:#c0564f; }
+.cv-retry{ font:inherit; color:#5b3fa0; background:none; border:none; padding:0; cursor:pointer; text-decoration:underline; }
+.cv-retry:focus-visible{ outline:2px solid #5b3fa0; outline-offset:2px; border-radius:3px; }
+@media (prefers-reduced-motion: no-preference){ .cv-pending{ transition:opacity .18s ease; } }
 
 .cv-composer{ position:sticky; bottom:0; background:linear-gradient(transparent, var(--cream,#faf8f5) 26%); padding:18px 0 14px; margin-top:10px; }
 .cv-cbox{ border:1px solid var(--hair,#ece7f2); background:#fff; border-radius:18px; box-shadow:var(--e2); padding:9px 9px 9px 15px; display:flex; align-items:flex-end; gap:10px; }

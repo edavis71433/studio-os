@@ -14454,6 +14454,11 @@ function anEngineNote(eng){
 .msx-bub{background:#f6f4fa;border-radius:14px;padding:10px 14px;font-size:13px;color:var(--ink);line-height:1.55;}
 .msx-msg.me .msx-bub{background:var(--p);color:#fff;}
 .msx-mm{font-size:10px;color:var(--muted);margin-top:3px;}
+.msx-pending{opacity:.7;}
+.msx-pending.msx-failed{opacity:1;}
+.msx-pending.msx-failed .msx-bub{border:1px solid #e3b3ae;}
+.msx-retry{font:inherit;color:var(--p,#5b3fa0);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;}
+.msx-retry:focus-visible{outline:2px solid var(--p,#5b3fa0);outline-offset:2px;border-radius:3px;}
 .msx-msg.me .msx-mm{text-align:right;}
 .msx-qr{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
 .msx-box{margin-top:12px;border-top:1px solid rgba(41,25,66,.06);padding-top:12px;}
@@ -14466,7 +14471,82 @@ function anEngineNote(eng){
 // uses), internal notes save to the client's Timeline. Legacy per-client page
 // dormant beneath. ═══
 (function(){
-  var MSX={cid:null, clients:[], last:{}, unreadish:{}, thread:[], tab:'all', q:'', mode:'reply', loaded:false};
+  var MSX={cid:null, clients:[], last:{}, unreadish:{}, thread:[], pending:[], tab:'all', q:'', mode:'reply', loaded:false};
+  var _msxPendSeq=0, _msxPollTimer=null, _msxPollBound=false;
+
+  // PURE reconcile (same guarantee as the portal): drop optimistic sends the
+  // server now holds (multiset match on from_who+text), keep failed for retry.
+  function msxReconcile(pending, serverMsgs){
+    var counts=Object.create(null);
+    for(var i=0;i<serverMsgs.length;i++){ var k=serverMsgs[i].from_who+' '+(serverMsgs[i].text||''); counts[k]=(counts[k]||0)+1; }
+    var out=[];
+    for(var j=0;j<pending.length;j++){ var p=pending[j], pk=p.from_who+' '+(p.text||'');
+      if(p._state!=='failed'&&counts[pk]>0){ counts[pk]--; continue; } out.push(p); }
+    return out;
+  }
+  // Build the stream (confirmed thread + optimistic pendings) for one client.
+  function msxStreamHTML(c){
+    var th=MSX.thread||[], stream='', lastDay='';
+    th.forEach(function(m){
+      var dt=new Date(m.created_at);
+      var day=dt.toDateString()===new Date().toDateString()?'Today':dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      if(day!==lastDay){ stream+='<div class="msx-day">'+esc(day)+'</div>'; lastDay=day; }
+      var me=m.from_who==='eric';
+      stream+='<div class="msx-msg'+(me?' me':'')+'">'
+        +(!me?'<div class="ibx-av" style="width:30px;height:30px;font-size:12px;">'+esc((c.name||'?').charAt(0).toUpperCase())+'</div>':'')
+        +'<div><div class="msx-bub">'+esc(String(m.text||''))+'</div><div class="msx-mm">'+(me?'You':esc(c.name||'Client'))+' · '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+'</div></div>'
+      +'</div>';
+    });
+    (MSX.pending||[]).forEach(function(p){
+      var failed=p._state==='failed';
+      stream+='<div class="msx-msg me msx-pending'+(failed?' msx-failed':'')+'">'
+        +'<div><div class="msx-bub">'+esc(String(p.text||''))+'</div>'
+        +'<div class="msx-mm">'+(failed?('Didn’t send · <button type="button" class="msx-retry" onclick="msxRetry(\''+p._localId+'\')">Retry</button>'):'Sending…')+'</div></div>'
+      +'</div>';
+    });
+    return stream;
+  }
+  // Update ONLY the stream node (never the whole component), so the composer
+  // and whatever Eric is typing are preserved during polls and optimistic sends.
+  function msxUpdateStream(){
+    var el=document.getElementById('msxStream'); if(!el) return;
+    var c=MSX.clients.find(function(x){ return String(x.id)===MSX.cid; }); if(!c) return;
+    el.innerHTML=msxStreamHTML(c)||'<div class="grx-empty">The thread starts with your first message.</div>';
+    el.scrollTop=el.scrollHeight;
+  }
+  // Lightweight poll: when a thread is open and the tab is visible, refetch it
+  // so Eric sees a new client message without reopening Messages.
+  async function msxPollOnce(){
+    if(!MSX.cid || document.visibilityState!=='visible') return;
+    if(!document.getElementById('msxStream')) return; // not viewing a thread → skip the fetch
+    var fresh=null; try{ fresh=await api('messages?select=*&client_id=eq.'+encodeURIComponent(MSX.cid)+'&order=created_at.asc&limit=200'); }catch(e){}
+    if(!Array.isArray(fresh)) return;
+    var prevLen=MSX.thread.length, prevLast=prevLen?String(MSX.thread[prevLen-1].id):'';
+    var newLast=fresh.length?String(fresh[fresh.length-1].id):'';
+    if(fresh.length!==prevLen || newLast!==prevLast){
+      var grewFromClient = fresh.length>prevLen && fresh[fresh.length-1].from_who==='client';
+      MSX.thread=fresh; MSX.pending=msxReconcile(MSX.pending, fresh); msxUpdateStream();
+      if(grewFromClient) toast('💬 New message from '+((MSX.clients.find(function(x){return String(x.id)===MSX.cid;})||{}).name||'a client'));
+    }
+  }
+  function msxStartPoll(){
+    if(_msxPollTimer) clearInterval(_msxPollTimer);
+    if(document.visibilityState==='visible') _msxPollTimer=setInterval(msxPollOnce, 12000);
+    if(!_msxPollBound){ document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState==='visible'){ msxPollOnce(); if(!_msxPollTimer) _msxPollTimer=setInterval(msxPollOnce,12000); }
+      else if(_msxPollTimer){ clearInterval(_msxPollTimer); _msxPollTimer=null; }
+    }); _msxPollBound=true; }
+  }
+  async function msxDeliver(localId){
+    var p=(MSX.pending||[]).find(function(x){ return x._localId===localId; }); if(!p) return;
+    p._state='sending'; msxUpdateStream();
+    var r=await api('messages','POST',{client_id:MSX.cid, from_who:'eric', sender_name:'Eric', text:p.text});
+    if(r===null){ p._state='failed'; msxUpdateStream(); toast('Couldn’t send — tap Retry'); return; }
+    try{ await api('notifications','POST',{client_id:MSX.cid, type:'message', title:'New message from Eric', body:p.text.slice(0,90), link_tab:'messages'}); }catch(e){}
+    MSX.last[MSX.cid]={client_id:MSX.cid, from_who:'eric', text:p.text, created_at:new Date().toISOString()};
+    await msxThread(MSX.cid); MSX.pending=msxReconcile(MSX.pending, MSX.thread); msxUpdateStream();
+  }
+  window.msxRetry=function(localId){ msxDeliver(localId); };
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function att(s){ return esc(s).replace(/'/g,'&#39;'); }
   function agoS(d){ try{ return oppxAgo(d)||''; }catch(e){ return ''; } }
@@ -14540,7 +14620,8 @@ function anEngineNote(eng){
     }catch(e){ out.innerHTML='<span style="color:#9a2d2d;">Could not summarize right now.</span>'; }
   };
 
-  window.msxOpen=async function(cid){ MSX.cid=String(cid); await msxThread(cid); MSX.mode='reply'; msxRender();
+  window.msxOpen=async function(cid){ MSX.cid=String(cid); MSX.pending=[]; await msxThread(cid); MSX.mode='reply'; msxRender();
+    msxStartPoll();
     setTimeout(function(){ var t=document.getElementById('msxStream'); if(t) t.scrollTop=t.scrollHeight; },50); };
   window.msxTab=function(t){ MSX.tab=t; msxRender(); };
   window.msxQ=function(v){ MSX.q=v; msxRender(); };
@@ -14608,17 +14689,7 @@ function anEngineNote(eng){
         : (lastAny.from_who==='client'
           ? esc(c.name||'They')+' spoke last, '+esc(agoS(lastAny.created_at))+': \u201c'+esc(String(lastAny.text||'').slice(0,140))+'\u201d \u2014 the ball is with you.'
           : 'You spoke last, '+esc(agoS(lastAny.created_at))+'. '+(lastC?('Their last word: \u201c'+esc(String(lastC.text||'').slice(0,110))+'\u201d'):'Waiting on their first reply.'));
-      var stream=''; var lastDay='';
-      th.forEach(function(m){
-        var dt=new Date(m.created_at);
-        var day=dt.toDateString()===new Date().toDateString()?'Today':dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-        if(day!==lastDay){ stream+='<div class="msx-day">'+esc(day)+'</div>'; lastDay=day; }
-        var me=m.from_who==='eric';
-        stream+='<div class="msx-msg'+(me?' me':'')+'">'
-          +(!me?'<div class="ibx-av" style="width:30px;height:30px;font-size:12px;">'+esc((c.name||'?').charAt(0).toUpperCase())+'</div>':'')
-          +'<div><div class="msx-bub">'+esc(String(m.text||''))+'</div><div class="msx-mm">'+(me?'You':esc(c.name||'Client'))+' \u00b7 '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+'</div></div>'
-        +'</div>';
-      });
+      var stream=msxStreamHTML(c);
       var quick=['Sounds good \u2014 on it.','Will do \u2014 I\u2019ll update you by end of day.','Great question \u2014 let me check and get right back to you.'];
       threadHtml='<div class="msx-thread">'
         +'<div style="display:flex;align-items:center;gap:12px;">'
@@ -14633,7 +14704,7 @@ function anEngineNote(eng){
         +'<div class="msx-qr">'+quick.map(function(t2){ return '<button class="ibx-pill" onclick="msxQuick(\''+att(t2)+'\')">'+esc(t2.split(' \u2014')[0])+'</button>'; }).join('')+'</div>'
         +'<div class="msx-box">'
           +'<div class="msx-tabs2"><button class="grx-tab'+(MSX.mode==='reply'?' on':'')+'" onclick="msxMode(\'reply\')">Reply</button><button class="grx-tab'+(MSX.mode==='note'?' on':'')+'" onclick="msxMode(\'note\')">Internal note</button></div>'
-          +'<textarea id="msxTa" placeholder="'+(MSX.mode==='note'?'Private note \u2014 saves to '+att(c.name||'their')+'\u2019s timeline, never sent':'Type your message \u2014 sends to '+att(c.name||'their')+'\u2019s portal')+'"></textarea>'
+          +'<textarea id="msxTa" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();msxSend();}" placeholder="'+(MSX.mode==='note'?'Private note \u2014 saves to '+att(c.name||'their')+'\u2019s timeline, never sent':'Type your message \u2014 sends to '+att(c.name||'their')+'\u2019s portal, or press Enter')+'"></textarea>'
           +'<div style="display:flex;align-items:center;gap:10px;margin-top:10px;"><span style="font-size:11.5px;color:var(--muted);">'+(MSX.mode==='note'?'\u270E Private \u2014 timeline only':'Sends to '+esc(c.name||'the client')+'\u2019s portal + notifies them')+'</span><span style="flex:1;"></span>'
           +'<button class="bf-act primary" onclick="msxSend()">'+(MSX.mode==='note'?'Save note':'Send')+'</button></div>'
         +'</div>'
@@ -14686,13 +14757,14 @@ function anEngineNote(eng){
       if(r===null){ toast('Couldn\u2019t save \u2014 is the timeline table created?'); return; }
       toast('\u270E Saved to their timeline \u2014 never sent'); ta.value=''; return;
     }
-    var r2=await api('messages','POST',{client_id:MSX.cid, from_who:'eric', sender_name:'Eric', text:text});
-    if(r2===null){ toast('Couldn\u2019t send \u2014 try again'); return; }
-    try{ await api('notifications','POST',{client_id:MSX.cid, type:'message', title:'New message from Eric', body:text.slice(0,90), link_tab:'messages'}); }catch(e){}
-    toast('\u2713 Sent to '+(c.name||'the client')+'\u2019s portal');
-    MSX.last[MSX.cid]={client_id:MSX.cid, from_who:'eric', text:text, created_at:new Date().toISOString()};
-    await msxThread(MSX.cid); msxRender();
-    setTimeout(function(){ var t=document.getElementById('msxStream'); if(t) t.scrollTop=t.scrollHeight; },50);
+    // OPTIMISTIC: the message shows in the stream immediately, textarea clears
+    // now, and delivery happens in the background (retry on failure). Only the
+    // stream node updates, so nothing Eric is doing is disturbed. Sender rule
+    // unchanged: always from_who='eric' for the studio side.
+    var localId='m'+(++_msxPendSeq);
+    (MSX.pending=MSX.pending||[]).push({ _localId:localId, _state:'sending', from_who:'eric', sender_name:'Eric', text:text, created_at:new Date().toISOString() });
+    ta.value=''; msxUpdateStream();
+    await msxDeliver(localId);
   };
   window.msxDraft=function(){
     var c=MSX.clients.find(function(x){ return String(x.id)===MSX.cid; }); if(!c) return;
