@@ -26,6 +26,7 @@ const ev = (await (await rest(`presence_change_events`, { method: "POST", header
 ok("seed: change event (service)", !!ev?.id);
 const snap = (await (await rest(`presence_snapshots`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ site_id: site.id, content: { probe: true }, template_slug: "restaurant-classic", template_version: "1.0.0", created_by_kind: "system" }) })).json())[0];
 ok("seed: snapshot (service)", !!snap?.id);
+await rest(`presence_publishes?site_id=eq.${site.id}&status=in.(queued,deploying)`, { method: "PATCH", body: JSON.stringify({ status: "live", completed_at: new Date().toISOString() }) }); // drain in-flight from prior runs (the one-in-flight index is doing its job)
 const pub = (await (await rest(`presence_publishes`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ site_id: site.id, snapshot_id: snap.id, actor_kind: "system", change_summary: "probe publish" }) })).json())[0];
 ok("seed: publish (service)", !!pub?.id);
 await rest(`presence_entitlements`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ client_id: cA.id, product: "presence", status: "active" }) });
