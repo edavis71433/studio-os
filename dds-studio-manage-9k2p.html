@@ -7609,7 +7609,9 @@ async function saveAndShareQuote(){
 }
 async function loadSentQuotes(){
   var host=document.getElementById('q-sent-list'); if(!host) return;
-  host.innerHTML='<p style="font-size:12.5px;color:var(--muted);">Loading…</p>';
+  host.innerHTML='<div class="skel" style="height:56px;margin-bottom:10px;"></div>'
+    +'<div class="skel" style="height:56px;margin-bottom:10px;"></div>'
+    +'<div class="skel" style="height:56px;"></div>';
   try{
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'quote_list'})});
@@ -11568,7 +11570,12 @@ function anExportCsv(){
 
 async function refreshAnalytics(){
   var body = document.getElementById('anBody');
-  if(body) body.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;">Loading…</div>';
+  if(body) body.innerHTML='<div style="padding:4px 2px;">'
+    +'<div class="skel" style="height:26px;width:44%;margin-bottom:16px;"></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;">'
+    +'<div class="skel" style="height:74px;"></div><div class="skel" style="height:74px;"></div>'
+    +'<div class="skel" style="height:74px;"></div><div class="skel" style="height:74px;"></div></div>'
+    +'<div class="skel" style="height:180px;"></div></div>';
   // Analytics keeps its own trend-interpretation brief (admin_analytics) — that
   // reasons over time-series metrics, which the engine deliberately doesn't do.
   // We ALSO ask the reasoning engine for this client's cross-module context
