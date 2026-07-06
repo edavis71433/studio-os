@@ -16,6 +16,9 @@
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-V4WF04NX7F");</script>
 <style>
+/* a11y: global keyboard focus ring (specificity 0 so component styles still win) */
+:where(a,button,input,textarea,select,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--accent, #5b3fa0);outline-offset:2px;}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 /* foundation tokens loaded via dds-foundation.css */
 body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-font-smoothing:antialiased;}

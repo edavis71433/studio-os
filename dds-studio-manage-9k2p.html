@@ -11,6 +11,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="dds-foundation.css">
 <style>
+/* a11y: global keyboard focus ring (specificity 0 so component styles still win) */
+:where(a,button,input,textarea,select,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--p, #5b3fa0);outline-offset:2px;}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 /* foundation tokens loaded via dds-foundation.css */
 html{overflow-x:hidden;}
