@@ -3503,6 +3503,13 @@ async function submitBrief() {
   if (!fields.goal) { showToast("Please enter at least the primary goal."); return; }
   
   var summary = Object.entries(fields).map(function([k,v]) { return k.toUpperCase() + ": " + (v||"—"); }).join("\n");
+
+  // The Logins field promises "these stay private in the portal" — so the
+  // emailed copy must never carry raw credentials. Full detail stays in the
+  // portal only (intake_forms + the message thread); the email just says
+  // where to look.
+  var emailFields = Object.assign({}, fields, { logins: fields.logins ? "Provided — view in the portal (kept private)" : "" });
+  var emailSummary = Object.entries(emailFields).map(function([k,v]) { return k.toUpperCase() + ": " + (v||"—"); }).join("\n");
   
   // Save structured intake to its own table (upsert: one per client)
   try {
@@ -3540,8 +3547,9 @@ async function submitBrief() {
     await sb.from("activity_log").insert({ client_id: CLIENT.id, action: "submitted_intake", detail: "Project brief submitted" });
   } catch (e) {}
 
-  // Notify Eric via Edge Function
-  await sendNotification("brief_submitted", summary, "", {clientId: CLIENT.id, brief: fields});
+  // Notify Eric via Edge Function — emailSummary/emailFields, never the raw
+  // logins (the relay puts `message` straight into the email body).
+  await sendNotification("brief_submitted", emailSummary, "", {clientId: CLIENT.id, brief: emailFields});
   
   document.getElementById("briefFormCard").style.display = "none";
   document.getElementById("briefSubmitted").style.display = "block";
