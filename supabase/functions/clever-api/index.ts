@@ -754,20 +754,34 @@ if (!RESEND_KEY) {
   console.error('[email] RESEND_KEY is not set — all Resend emails will fail. Set it as an Edge Function secret.');
 }
 
+// Sender identities (deliverability audit, 2026-07-06):
+//  - FROM (noreply@) is the SYSTEM sender: internal ops alerts to Eric, where
+//    replies are meaningless and deliverability to his own inbox is a non-issue.
+//  - CLIENT_OPTS routes CLIENT-FACING relationship/transactional mail from Eric
+//    himself, with a real Reply-To, because replies are both a strong inbox
+//    signal and on-brand for a studio whose whole promise is a real person who
+//    answers. Cold outreach already sends from eric@ separately (unchanged).
+// Pass CLIENT_OPTS as the optional 4th arg at a client-facing call site; omit it
+// and the send stays exactly as before (system FROM, no Reply-To).
+const CLIENT_FROM = `Eric Davis <${ERIC}>`;
+const CLIENT_OPTS: { from: string; replyTo: string } = { from: CLIENT_FROM, replyTo: ERIC };
+
 // Core sender. Returns the raw Resend Response so the ~30 existing call sites
 // that ignore the return value keep working unchanged. New code should prefer
 // emailOk() below, which returns a clean boolean. Failures are always logged
 // with the exact Resend status + body so they're visible in dev/prod logs.
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string }) {
   if (!RESEND_KEY) {
     console.error('[email] skipped send to', to, '— RESEND_KEY not configured. Subject:', subject);
     return new Response(JSON.stringify({ error: 'resend_not_configured' }), { status: 500 });
   }
   try {
+    const payload: Record<string, unknown> = { from: (opts && opts.from) || FROM, to: [to], subject, html };
+    if (opts && opts.replyTo) payload.reply_to = opts.replyTo;
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+      body: JSON.stringify(payload),
     });
     if (!r.ok) {
       let detail = '';
@@ -785,9 +799,9 @@ async function sendEmail(to: string, subject: string, html: string) {
 
 // Boolean wrapper for new code paths that want a truthful emailed flag without
 // inspecting a Response object. Never throws.
-async function emailOk(to: string, subject: string, html: string): Promise<boolean> {
+async function emailOk(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string }): Promise<boolean> {
   try {
-    const r = await sendEmail(to, subject, html);
+    const r = await sendEmail(to, subject, html, opts);
     return !!(r && (r as Response).ok);
   } catch (_) {
     return false;
@@ -4791,7 +4805,7 @@ serve(async (req) => {
           heading = `Congratulations, ${name}!`;
           lines = [ `Your site just launched. It’s been a genuine pleasure building this with you.` ];
         }
-        const sent = await emailOk(c.email, subject, notifyShell(heading, lines, cta));
+        const sent = await emailOk(c.email, subject, notifyShell(heading, lines, cta), CLIENT_OPTS);
         return { emailed: sent, reason: sent ? undefined : 'resend_send_failed' };
       } catch (e) {
         console.error('[email] notifyClientOfEvent threw', String(e));
@@ -7396,7 +7410,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
       `);
       const ericEmailed = await emailOk(ERIC, `New Audit Lead: ${clientName} (${url}) — ${score}/100`, ericHtml);
       let leadEmailed = false;
-      if (clientEmail && userConfirmHtml) leadEmailed = await emailOk(clientEmail, `Your free site score for ${clientName}`, userConfirmHtml);
+      if (clientEmail && userConfirmHtml) leadEmailed = await emailOk(clientEmail, `Your free site score for ${clientName}`, userConfirmHtml, CLIENT_OPTS);
       return json({ ok: true, emailed: ericEmailed, lead_emailed: leadEmailed });
     }
 
@@ -7415,7 +7429,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         ],
         { label: 'Share your feedback →', href: surveyUrl }
       );
-      const clientEmailed = await emailOk(email, `Your project is live 🎉 — one quick favor`, html);
+      const clientEmailed = await emailOk(email, `Your project is live 🎉 — one quick favor`, html, CLIENT_OPTS);
       const ericEmailed = await emailOk(ERIC, `Project complete: ${name}`, notifyShell(`Project marked complete`, [`${name} (${email}) was marked complete and sent the satisfaction survey.`]));
       return json({ ok: true, emailed: clientEmailed, admin_emailed: ericEmailed });
     }
@@ -7434,7 +7448,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         ],
         { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }
       );
-      const clientEmailed = await emailOk(email, `Your Davis Digital Studio portal is ready`, html);
+      const clientEmailed = await emailOk(email, `Your Davis Digital Studio portal is ready`, html, CLIENT_OPTS);
       const ericEmailed = await emailOk(ERIC, `Portal created: ${name}`, notifyShell(`New client portal created`, [`${name} (${email}) now has a portal.`]));
       return json({ ok: true, emailed: clientEmailed, admin_emailed: ericEmailed });
     }
@@ -7454,7 +7468,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         ],
         { label: 'See my work →', href: 'https://davisdigitalstudio.com/work' }
       );
-      await sendEmail(to, `Thanks for reaching out to Davis Digital Studio`, html);
+      await sendEmail(to, `Thanks for reaching out to Davis Digital Studio`, html, CLIENT_OPTS);
       return json({ ok: true });
     }
 
@@ -7589,7 +7603,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         if (cur.email) {
           try {
             await sendEmail(cur.email, `Re: your message to Davis Digital Studio`,
-              notifyShell(`A reply from Davis Digital Studio`, [text.replace(/\n/g, '<br>')]));
+              notifyShell(`A reply from Davis Digital Studio`, [text.replace(/\n/g, '<br>')]), CLIENT_OPTS);
           } catch (_) { /* never block on email */ }
         }
 
@@ -10150,7 +10164,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       const cta = toClient
         ? { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }
         : { label: 'Open admin →', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' };
-      await sendEmail(recipient, toClient ? `Update on your project` : `${pretty} — ${name}`, notifyShell(heading, lines.length ? lines : ['(no details)'], cta));
+      await sendEmail(recipient, toClient ? `Update on your project` : `${pretty} — ${name}`, notifyShell(heading, lines.length ? lines : ['(no details)'], cta), toClient ? CLIENT_OPTS : undefined);
       return json({ ok: true });
     }
 
@@ -10189,7 +10203,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       if (!email || !result) return json({ error: 'email and result required' }, 400);
       const domain = (result && result.domain) ? result.domain : (url || 'your site');
       try {
-        const visitorEmailed = await emailOk(email, `Your free website review for ${domain}`, critiqueEmailHtml(domain, result));
+        const visitorEmailed = await emailOk(email, `Your free website review for ${domain}`, critiqueEmailHtml(domain, result), CLIENT_OPTS);
         const ericEmailed = await emailOk(ERIC, `New AI review run: ${domain}`, notifyShell(
           'Someone just ran a free AI review',
           [
@@ -10532,7 +10546,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
               await sendEmail(
                 to,
                 `One quick favor, ${name}`,
-                notifyShell(`How did it go, ${name}?`, lines, { label: 'Share your feedback →', href: surveyUrl }),
+                notifyShell(`How did it go, ${name}?`, lines, { label: 'Share your feedback →', href: surveyUrl }), CLIENT_OPTS,
               );
               await stampClient(c.id, { survey_sent_at: new Date().toISOString() });
               result.surveys_sent++;
@@ -10561,7 +10575,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
               await sendEmail(
                 to,
                 overdue ? `Still here whenever you're ready, ${name}` : `Quick reminder on your project content`,
-                notifyShell(overdue ? `Picking up where we left off` : `Your content checklist`, lines, { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }),
+                notifyShell(overdue ? `Picking up where we left off` : `Your content checklist`, lines, { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS,
               );
               await stampClient(c.id, { last_content_nudge_at: new Date().toISOString() });
               result.nudges_sent++;
@@ -10649,7 +10663,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
               to,
               `Friendly reminder: invoice${amt ? ` for ${amt}` : ''} from Davis Digital Studio`,
               notifyShell(`A quick invoice reminder, ${cname}`, lines,
-                inv.stripe_url ? { label: 'Pay this invoice →', href: String(inv.stripe_url) } : undefined),
+                inv.stripe_url ? { label: 'Pay this invoice →', href: String(inv.stripe_url) } : undefined), CLIENT_OPTS,
             );
             await fetch(`${SB_URL}/rest/v1/invoices?id=eq.${encodeURIComponent(inv.id)}`, {
               method: 'PATCH',
@@ -10687,7 +10701,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
             if (GOOGLE_REVIEW_LINK) {
               lines.push(`And if you have one spare minute, a short Google review helps a small studio like mine more than you would guess: ${GOOGLE_REVIEW_LINK}`);
             }
-            await sendEmail(to, `Thank you, ${cname}`, notifyShell(`Payment received, with thanks`, lines));
+            await sendEmail(to, `Thank you, ${cname}`, notifyShell(`Payment received, with thanks`, lines), CLIENT_OPTS);
             await fetch(`${SB_URL}/rest/v1/invoices?id=eq.${encodeURIComponent(inv.id)}`, {
               method: 'PATCH',
               headers: { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
@@ -10781,7 +10795,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
               notifyShell(`Waiting on your review`, [
                 `Hi ${c.name || 'there'} — "${a.title || 'an item'}" is sitting in your portal waiting for a decision.`,
                 `A quick approve (or a note on what to change) keeps your project moving. It takes under a minute.`,
-              ], { label: 'Review it now', href: PORTAL_URL }),
+              ], { label: 'Review it now', href: PORTAL_URL }), CLIENT_OPTS,
             );
             await fetch(`${SB_URL}/rest/v1/approvals?id=eq.${encodeURIComponent(a.id)}`, {
               method: 'PATCH',
@@ -11244,7 +11258,7 @@ if (type === 'rec_decide') {
         await sendEmail(to, `A recommendation from Eric`,
           notifyShell(`I spotted something worth doing`,
             [rec.title, rec.detail || '', rec.why ? `Why it matters: ${rec.why}` : ''].filter(Boolean),
-            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }));
+            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
       }
     } catch (_) { /* never block on email */ }
   }
@@ -11540,7 +11554,7 @@ if (type === 'review_publish') {
       `;
       await sendEmail(to, review.headline || `Your monthly review from Davis Digital Studio`,
         notifyShell(review.headline || `Your month with Davis Digital Studio`, [body],
-          { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }));
+          { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
     }
   } catch (_) { /* never block on email */ }
   return json({ ok: true }, 200, reqCors);
@@ -11983,8 +11997,8 @@ if (type === 'gp_quote_respond') {
       if (to) {
         await sendEmail(to, `Your quote from Davis Digital Studio`,
           notifyShell('Here is your quote',
-            [patch.amount ? `Price: $${patch.amount}` : '', patch.eric_note || ''].filter(Boolean),
-            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }));
+            [patch.amount ? `Price: ${patch.amount}` : '', patch.eric_note || ''].filter(Boolean),
+            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
       }
     }
   } catch (_) {}
