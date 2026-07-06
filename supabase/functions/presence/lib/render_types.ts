@@ -20,6 +20,13 @@ export interface HoursInterval { open: string; close: string }
 export interface HoursDay { day: string; closed: boolean; intervals: HoursInterval[] }
 export interface HolidayException { date: string; label: string; closed: boolean; intervals?: HoursInterval[] }
 
+export interface LocationContent {
+  address_line1: string; address_line2?: string; city: string; region: string;
+  postal_code: string; country: string; phone?: string; timezone: string;
+  hours: HoursDay[]; holiday_exceptions?: HolidayException[];
+  temporarily_closed?: boolean; temporarily_closed_note?: string;
+}
+
 export interface SnapshotContent {
   identity: {
     business_name: string; description: string; phone: string; email: string;
@@ -28,18 +35,43 @@ export interface SnapshotContent {
     social?: Record<string, string>;
     seo_title?: string; seo_description?: string;
   };
-  location: {
-    address_line1: string; address_line2?: string; city: string; region: string;
-    postal_code: string; country: string; phone?: string; timezone: string;
-    hours: HoursDay[]; holiday_exceptions?: HolidayException[];
-    temporarily_closed?: boolean; temporarily_closed_note?: string;
-  } | null;
-  offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number }>;
+  /** M7 (reconciliation §9): locations is a LIST — v1 carries exactly one.
+   *  Multi-location becomes an additive change, not a contract major. */
+  locations: LocationContent[];
+  /** M7: presentation settings — offering section (category) display order. */
+  settings?: { category_order?: string[] };
+  offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
   faqs: Array<{ id: string; question: string; answer: string; sort_order?: number }>;
   posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string }>;
   redirects: Array<{ from_path: string; to_path: string }>;
   // voice is present in the snapshot but marked private — the renderer MUST NOT read it.
+}
+
+/** Upgrade any pre-M7 snapshot content in place: `location` scalar → `locations` list.
+ *  Deterministic and idempotent; lets retained staging-era snapshots stay viewable.
+ *  Also guarantees every section exists (degenerate pre-contract snapshots are
+ *  retained forever in history — reading one must never crash the room). */
+export function normalizeSnapshotContent(c: any): SnapshotContent {
+  if (c && !Array.isArray(c.locations)) {
+    c.locations = c.location ? [c.location] : [];
+    delete c.location;
+  }
+  if (c) {
+    if (!c.settings) c.settings = {};
+    if (!c.identity || typeof c.identity !== 'object') c.identity = {};
+    for (const k of ['offerings', 'testimonials', 'faqs', 'posts', 'redirects']) {
+      if (!Array.isArray(c[k])) c[k] = [];
+    }
+  }
+  return c as SnapshotContent;
+}
+
+/** True when a retained snapshot carries real contract-shaped content — the
+ *  minimum to view or restore it. Pre-contract probe/degenerate snapshots fail. */
+export function snapshotContentUsable(c: any): boolean {
+  return !!(c && typeof c === 'object' && c.identity && typeof c.identity === 'object'
+    && typeof c.identity.business_name === 'string' && c.identity.business_name.trim());
 }
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */

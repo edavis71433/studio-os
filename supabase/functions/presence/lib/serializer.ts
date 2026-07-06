@@ -38,15 +38,16 @@ function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | 
 
 export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
-  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects] = await Promise.all([
+  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr] = await Promise.all([
     q(`presence_identity?site_id=eq.${siteId}&limit=1`),
-    q(`presence_locations?site_id=eq.${siteId}&limit=1`),
+    q(`presence_locations?site_id=eq.${siteId}&order=created_at.asc`),
     q(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_testimonials?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_posts?site_id=eq.${siteId}&deleted_at=is.null&status=eq.published&order=published_at.desc`),
     q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,width,height`),
     q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
+    q(`presence_settings?site_id=eq.${siteId}&limit=1`),
   ]);
 
   const mediaById = new Map<string, MediaRow>((media as MediaRow[]).map((m) => [m.id, m]));
@@ -59,7 +60,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
   };
 
   const ident = identArr[0] || {};
-  const loc = locArr[0] || null;
+  const settings = settingsArr[0] || {};
 
   const content: SnapshotContent = {
     identity: {
@@ -69,13 +70,15 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       booking_url: ident.booking_url || '', ordering_url: ident.ordering_url || '',
       social: ident.social || {}, seo_title: ident.seo_title || '', seo_description: ident.seo_description || '',
     },
-    location: loc ? {
+    // locations is a LIST by contract (reconciliation §9) — v1 carries one
+    locations: (locArr as any[]).map((loc) => ({
       address_line1: loc.address_line1 || '', address_line2: loc.address_line2 || '',
       city: loc.city || '', region: loc.region || '', postal_code: loc.postal_code || '',
       country: loc.country || 'US', phone: loc.phone || '', timezone: loc.timezone || 'America/Los_Angeles',
       hours: loc.hours || [], holiday_exceptions: loc.holiday_exceptions || [],
       temporarily_closed: !!loc.temporarily_closed, temporarily_closed_note: loc.temporarily_closed_note || '',
-    } : null,
+    })),
+    settings: { category_order: Array.isArray(settings.category_order) ? settings.category_order : [] },
     offerings: offerings.map((o: any) => ({ id: o.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media: ref(o.media_id), sort_order: o.sort_order })),
     testimonials: testimonials.map((t: any) => ({ id: t.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || undefined, sort_order: t.sort_order })),
     faqs: faqs.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer, sort_order: f.sort_order })),

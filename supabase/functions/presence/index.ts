@@ -23,6 +23,8 @@ import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory } from './routes/publish.ts';
 import { handleMediaUpload, handleMediaDelete } from './routes/media.ts';
 import { handleAdmin } from './routes/admin.ts';
+import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
+import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -84,6 +86,24 @@ serve(async (req) => {
   {
     const m = route.match(/^\/media\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleMediaDelete(site, principal, m[1], cors);
+  }
+
+  // ── M7: the Client Room (all additive to frozen v1) ──
+  if (route === '/health' && method === 'GET') return handleHealth(site, cors);
+  if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
+  if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
+  {
+    const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);
+    if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
+  }
+  if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
+  if (route === '/media' && method === 'GET') return handleMediaList(site, cors);
+  if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, jwt, site, principal, cors); if (r) return r; }
+  if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, jwt, site, principal, cors); if (r) return r; }
+  if (route === '/settings' && (method === 'GET' || method === 'PUT')) { const r = await handleSettings(req, jwt, site, principal, cors); if (r) return r; }
+  {
+    const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);
+    if (m && m[1] in SPECS) { const r = await handleCollection(req, jwt, site, principal, m[1], m[2] ?? null, cors); if (r) return r; }
   }
 
   return json({ error: 'not_found', message: `No route for ${method} ${route}.` }, 404, cors);

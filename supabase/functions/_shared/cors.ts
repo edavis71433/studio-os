@@ -20,7 +20,10 @@ export function corsFor(req: Request) {
   return {
     'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    // PUT/PATCH/DELETE are not CORS-safelisted; the presence REST routes (M7)
+    // need them listed or every browser preflight fails. Additive for the
+    // POST-only monolith (extra names in this header grant nothing by themselves).
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Vary': 'Origin',
   };
 }

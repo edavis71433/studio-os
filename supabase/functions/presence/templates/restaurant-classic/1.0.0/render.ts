@@ -4,7 +4,26 @@
 // this file — never author responsibilities. Every interpolation is escaped;
 // markdown passes through the sanitizer; URLs pass through safeHref.
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
-import type { FileMap, HolidayException, HoursDay, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest } from '../../../lib/render_types.ts';
+import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
+import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest } from '../../../lib/render_types.ts';
+
+// v1 renders the first (only) location; the contract carries a list (M7).
+const loc0 = (c: SnapshotContent): LocationContent | null => c.locations?.[0] ?? null;
+
+/** Region marker (reconciliation R3): stable data attribute mapping rendered
+ *  regions to content entities so future preview overlays can outline changes.
+ *  Deterministic, invisible, and part of this template's manifest interface. */
+const pr = (region: string): string => ` data-pr="${attr(region)}"`;
+/** Entity region marker: kind + row id, e.g. data-pr="offering" data-pr-id="…". */
+const prE = (kind: string, id: string): string => ` data-pr="${attr(kind)}" data-pr-id="${attr(id)}"`;
+
+/** Order category names by the site's chosen section order, then encounter order. */
+function orderedCats(c: SnapshotContent): string[] {
+  const encounter: string[] = [];
+  for (const o of bySort(c.offerings)) if (!encounter.includes(o.category)) encounter.push(o.category);
+  const chosen = (c.settings?.category_order || []).filter((x) => encounter.includes(x));
+  return [...chosen, ...encounter.filter((x) => !chosen.includes(x))];
+}
 
 // deterministic content hash (fnv1a-64) for asset fingerprinting — sync + stable
 function fnv(s: string): string {
@@ -117,7 +136,7 @@ const OPEN_NOW_JS = `(function(){var el=document.getElementById('open-now');var 
 // ═════════ partials ═════════
 
 function hoursData(c: SnapshotContent): string {
-  const loc = c.location!;
+  const loc = loc0(c)!;
   const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
   const days: Record<string, { closed: boolean; iv: number[][] }> = {};
   for (const d of loc.hours) days[d.day] = { closed: !!d.closed, iv: (d.intervals || []).map((i) => [toMin(i.open), toMin(i.close)]) };
@@ -127,7 +146,7 @@ function hoursData(c: SnapshotContent): string {
 }
 
 function hoursTable(c: SnapshotContent, caption: string): string {
-  const loc = c.location!;
+  const loc = loc0(c)!;
   const byDay = new Map(loc.hours.map((d) => [d.day, d]));
   const rows = ORDER.map((k) => {
     const d = byDay.get(k) as HoursDay | undefined;
@@ -140,12 +159,12 @@ function hoursTable(c: SnapshotContent, caption: string): string {
     const val = e.closed ? 'Closed' : (e.intervals || []).map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
     return `<li>${esc(e.label)} (${esc(e.date)}): ${esc(val)}</li>`;
   }).join('');
-  return `<table class="hours"><caption>${esc(caption)}</caption><tbody>${rows}</tbody></table>` +
+  return `<table class="hours"${pr("location.hours")}><caption>${esc(caption)}</caption><tbody>${rows}</tbody></table>` +
     (holidays ? `<div class="holiday"><strong>Holiday hours</strong><ul>${holidays}</ul></div>` : '');
 }
 
 function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: string } {
-  const l = c.location; const i = c.identity;
+  const l = loc0(c); const i = c.identity;
   const addr = l ? [l.address_line1, l.address_line2, `${l.city}, ${l.region} ${l.postal_code}`].filter(Boolean).map(esc).join('<br>') : '';
   const phone = (l?.phone || i.phone || '').trim();
   const tel = phone ? `<a href="tel:${attr(phone.replace(/[^\d+]/g, ''))}">${esc(phone)}</a>` : '';
@@ -154,7 +173,7 @@ function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: str
 }
 
 function mapsHref(c: SnapshotContent): string | null {
-  const l = c.location; if (!l) return null;
+  const l = loc0(c); if (!l) return null;
   const q = encodeURIComponent(`${c.identity.business_name}, ${l.address_line1}, ${l.city}, ${l.region} ${l.postal_code}`);
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
@@ -162,8 +181,8 @@ function mapsHref(c: SnapshotContent): string | null {
 // ═════════ JSON-LD builders (schema.org — honest scope, no aggregateRating) ═════════
 
 function ldRestaurant(c: SnapshotContent, site: SiteConfig): object {
-  const l = c.location!;
-  const spec = (c.location!.hours || []).filter((d) => !d.closed && d.intervals?.length).flatMap((d) =>
+  const l = loc0(c)!;
+  const spec = (l.hours || []).filter((d) => !d.closed && d.intervals?.length).flatMap((d) =>
     d.intervals.map((i) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: DAY_SCHEMA[d.day], opens: i.open, closes: i.close })));
   const special = (l.holiday_exceptions || []).map((e) => e.closed
     ? { '@type': 'OpeningHoursSpecification', validFrom: e.date, validThrough: e.date, opens: '00:00', closes: '00:00' }
@@ -182,7 +201,7 @@ function ldRestaurant(c: SnapshotContent, site: SiteConfig): object {
 }
 const ldMenu = (c: SnapshotContent, site: SiteConfig) => ({
   '@context': 'https://schema.org', '@type': 'Menu', name: `${c.identity.business_name} Menu`, url: `${site.baseUrl}/menu/`,
-  hasMenuSection: [...new Set(bySort(c.offerings).map((o) => o.category))].map((cat) => ({
+  hasMenuSection: orderedCats(c).map((cat) => ({
     '@type': 'MenuSection', name: cat,
     hasMenuItem: bySort(c.offerings).filter((o) => o.category === cat).map((o) => ({ '@type': 'MenuItem', name: o.name, description: o.description || undefined, offers: o.price_text ? { '@type': 'Offer', price: o.price_text, priceCurrency: 'USD' } : undefined })),
   })),
@@ -214,8 +233,8 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
     return `<a href="${attr(href)}" rel="noopener">${esc(label)}</a>`;
   }).filter(Boolean).join(' · ');
   const canonical = `${site.baseUrl}${o.path}`;
-  const closedNotice = c.location?.temporarily_closed
-    ? `<div class="notice" role="status">${esc(c.location.temporarily_closed_note || 'We are temporarily closed. See you soon.')}</div>` : '';
+  const closedNotice = loc0(c)?.temporarily_closed
+    ? `<div class="notice" role="status">${esc(loc0(c)!.temporarily_closed_note || 'We are temporarily closed. See you soon.')}</div>` : '';
   const credit = site.brand?.credit ? `<span>${esc(site.brand.credit)}</span>` : '';
 
   return `<!DOCTYPE html>
@@ -254,11 +273,11 @@ ${o.body}
 <footer class="site"><div class="wrap">
   <div class="cols">
     <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${social ? `<p>${social}</p>` : ''}</div>
-    <div>${c.location ? hoursTable(c, 'Hours') : ''}</div>
+    <div>${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span>${credit}</div>
 </div></footer>
-<script id="hours-data" type="application/json">${c.location ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
+<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
 <script>${OPEN_NOW_JS}</script>
 </body>
 </html>`;
@@ -278,8 +297,8 @@ function homeBody(c: SnapshotContent, site: SiteConfig): string {
   const order = safeHref(i.ordering_url || '');
   return `
 <section class="hero wrap">
-  <h1>${esc(i.business_name)}</h1>
-  ${i.tagline ? `<p class="tagline">${esc(i.tagline)}</p>` : ''}
+  <h1${pr('identity.business_name')}>${esc(i.business_name)}</h1>
+  ${i.tagline ? `<p class="tagline"${pr('identity.tagline')}>${esc(i.tagline)}</p>` : ''}
   <div class="cta-row">
     ${book ? `<a class="btn" href="${attr(book)}" rel="noopener">Reserve a table</a>` : ''}
     ${order ? `<a class="btn${book ? ' ghost' : ''}" href="${attr(order)}" rel="noopener">Order online</a>` : ''}
@@ -289,28 +308,27 @@ function homeBody(c: SnapshotContent, site: SiteConfig): string {
 </section>
 <div class="strip"><div class="wrap">
   <span id="open-now" class="open-now" aria-live="polite"></span>
-  ${c.location ? `<span>${esc(c.location.address_line1)}, ${esc(c.location.city)}</span>` : ''}
+  ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
 </div></div>
-<section class="block wrap"><h2>About us</h2><p>${esc(i.description)}</p></section>
+<section class="block wrap"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>
 ${featured.length ? `<section class="block alt"><div class="wrap"><h2>From the menu</h2><ul class="items">${featured.map((o) => `
-  <li class="item"><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
+  <li class="item"${prE('offering', o.id)}><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
 </ul><p style="margin-top:18px"><a class="btn ghost" href="/menu/">Full menu</a></p></div></section>` : ''}
 ${tst.length ? `<section class="block wrap"><h2>What guests say</h2><div class="cards">${tst.map((t) => `
-  <div class="card"><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
+  <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
 </div></section>` : ''}
 ${faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
-  `<dt>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
+  `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : ''}`;
 }
 
 function menuBody(c: SnapshotContent): string {
-  const cats: string[] = [];
-  for (const o of bySort(c.offerings)) if (!cats.includes(o.category)) cats.push(o.category);
+  const cats = orderedCats(c);
   return `<section class="block wrap"><h1>Menu</h1>
 ${cats.map((cat) => `<div class="menu-cat"><h3>${esc(cat)}</h3><ul class="items">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
-  <li class="item"><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.media ? img(o.media, '(max-width:560px) 100vw, 400px') : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
+  <li class="item"${prE('offering', o.id)}><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.media ? img(o.media, '(max-width:560px) 100vw, 400px') : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
 </ul></div>`).join('')}
 ${cats.length === 0 ? '<p>Our menu is being updated — check back soon.</p>' : ''}</section>`;
 }
@@ -325,7 +343,7 @@ ${i.service_area ? `<h2>Where to find us</h2><p>${esc(i.service_area)}</p>` : ''
 
 function faqBody(c: SnapshotContent): string {
   return `<section class="block wrap"><h1>Frequently asked questions</h1><dl class="faq">${bySort(c.faqs).map((f) =>
-    `<dt>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}</dl>
+    `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}</dl>
 ${c.faqs.length === 0 ? '<p>Questions? Get in touch — we answer fast.</p>' : ''}</section>`;
 }
 
@@ -345,7 +363,7 @@ function contactBody(c: SnapshotContent, site: SiteConfig): string {
   return `<section class="block wrap"><h1>Contact &amp; hours</h1>
 <div class="cards">
   <div class="card"><h2>Visit or call</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${maps ? `<p><a href="${attr(maps)}" rel="noopener">Get directions</a></p>` : ''}</div>
-  <div class="card">${c.location ? hoursTable(c, 'Hours') : ''}</div>
+  <div class="card">${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
 </div>${form}</section>`;
 }
 
@@ -357,7 +375,7 @@ function postDate(iso: string): string {
 function postIndexBody(c: SnapshotContent): string {
   const posts = [...c.posts].sort((a, b) => b.published_at.localeCompare(a.published_at));
   return `<section class="block wrap"><h1>Updates</h1><div class="post-list">${posts.map((p) => `
-<article><h2><a href="/updates/${attr(p.slug)}/">${esc(p.title)}</a></h2>
+<article${prE('post', p.id)}><h2><a href="/updates/${attr(p.slug)}/">${esc(p.title)}</a></h2>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
 ${p.excerpt ? `<p>${esc(p.excerpt)}</p>` : ''}</article>`).join('')}
 ${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''}</div></section>`;
@@ -376,7 +394,7 @@ ${renderMarkdown(p.body_md)}
 // ═════════ the render function (the contract) ═════════
 
 export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest, site: SiteConfig): FileMap => {
-  const c = snapshot.content;
+  const c = normalizeSnapshotContent(snapshot.content);
   const i = c.identity;
   const files: FileMap = {};
 

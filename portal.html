@@ -1190,6 +1190,8 @@ input:focus, textarea:focus, select:focus{ border-color:var(--p); box-shadow:0 0
         <button class="nav-item" onclick="nav('messages')" id="nav-messages"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Conversation<span class="nav-badge" id="badge-messages" style="display:none"></span></button>
         <button class="nav-item" onclick="nav('invoices')" id="nav-invoices"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>Billing</button>
         <button class="nav-item growth-only" style="display:none" onclick="nav('gp_priorities')" id="nav-gp_priorities"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>Growth<span class="nav-badge" id="badge-gp" style="display:none"></span></button>
+        <!-- Presence room link — shown only for clients with a Presence site (M7) -->
+        <a class="nav-item" href="presence.html" id="nav-presence" style="display:none;text-decoration:none;"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg></span>Your website</a>
 
         <!-- QUIET REFERENCE — documents & account, rarely needed -->
         <div class="sidebar-divider"></div>
@@ -1608,6 +1610,12 @@ function enterPortal(clientData) {
   if (document.getElementById("mobileNav")) document.getElementById("mobileNav").style.display = "flex";
   try { initPortal(); startMsgPoll(); updateLastSeen(); }
   catch (e) { console.error("initPortal error:", e); }
+  // Presence room link (M7): RLS returns a row only if this client has a site
+  try {
+    sb.from("presence_sites").select("id").limit(1).then(function (r) {
+      if (r && r.data && r.data.length) document.getElementById("nav-presence").style.display = "";
+    });
+  } catch (e) { /* link stays hidden */ }
 }
 
 // Fetch the client row for a signed-in email. Never hangs: races a 6s timeout.

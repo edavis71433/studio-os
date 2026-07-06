@@ -62,7 +62,7 @@ let previewHtml = "";
   previewHtml = r.text;
   ok("preview: 200 HTML document with draft content", r.status === 200 && previewHtml.startsWith("<!DOCTYPE html>") && previewHtml.includes("RCAT Test Bistro"), String(r.status));
   ok("preview: no-store + blocker headers present", r.headers.get("cache-control") === "no-store" && r.headers.get("x-presence-draft-blockers") !== null, `blockers=${r.headers.get("x-presence-draft-blockers")}`);
-  ok("preview: renderer artifacts present (skip link, JSON-LD, hours table)", previewHtml.includes('class="skip"') && previewHtml.includes("application/ld+json") && previewHtml.includes('<table class="hours">'));
+  ok("preview: renderer artifacts present (skip link, JSON-LD, hours table)", previewHtml.includes('class="skip"') && previewHtml.includes("application/ld+json") && previewHtml.includes('<table class="hours"')); // prefix match: M7 region markers add data-pr attrs
   ok("preview: stylesheet inlined (self-contained page)", previewHtml.includes("<style>:root{--ink") && !previewHtml.includes('rel="stylesheet"'));
   console.log(`      preview latency: ${ms.toFixed(0)}ms`);
 }
@@ -79,13 +79,26 @@ let previewHtml = "";
   await rest(`presence_identity?site_id=eq.${site.id}`, { method: "PATCH", body: JSON.stringify({ business_name: "RCAT Test Bistro" }) });
 }
 
-// ═══ 3. PUBLISH (deploy-boundary behavior without Netlify config) ═══
-{ const r = await call("POST", "/publish", jwtA);
+// ═══ 3. PUBLISH — designed behavior in BOTH worlds: with hosting configured
+//        (post-M6 token setup) the pipeline succeeds; without it, it fails CALMLY.
+{ const hosted = !!(await j(await rest(`presence_sites?id=eq.${site.id}&select=netlify_site_id`)))[0]?.netlify_site_id;
+  const r = await call("POST", "/publish", jwtA);
   const body = jc(r.text);
-  // designed behavior with no netlify_site_id/token: calm 502, failed record, operator detail internal
-  ok("publish: valid draft reaches pipeline; unconfigured hosting fails CALMLY", r.status === 502 && body?.error === "publish_failed" && String(body?.message || "").includes("nothing changed on your live site"), String(r.status));
-  const rec = (await j(await rest(`presence_publishes?site_id=eq.${site.id}&order=created_at.desc&limit=1&select=status,error_text,kind,snapshot_id,change_summary`)))[0];
-  ok("publish: failed record written w/ operator-only error_text + snapshot persisted", rec?.status === "failed" && /netlify_site_id|NETLIFY_AUTH_TOKEN/.test(rec?.error_text || "") && !!rec?.snapshot_id, rec?.error_text?.slice(0, 60));
+  let rec;
+  if (hosted) {
+    ok("publish: valid draft publishes through the pipeline (hosting configured)", r.status === 200 && ["live", "publishing"].includes(body?.data?.status), String(r.status));
+    for (let i = 0; i < 30; i++) { // wait for terminal state
+      rec = (await j(await rest(`presence_publishes?site_id=eq.${site.id}&order=created_at.desc&limit=1&select=status,error_text,kind,snapshot_id,change_summary`)))[0];
+      if (rec && !["queued", "deploying"].includes(rec.status)) break;
+      await new Promise((res) => setTimeout(res, 3000));
+    }
+    ok("publish: record reaches LIVE with snapshot + summary persisted", rec?.status === "live" && !!rec?.snapshot_id && !!rec?.change_summary, `${rec?.status} ${rec?.error_text || ""}`);
+  } else {
+    // designed behavior with no netlify_site_id/token: calm 502, failed record, operator detail internal
+    ok("publish: valid draft reaches pipeline; unconfigured hosting fails CALMLY", r.status === 502 && body?.error === "publish_failed" && String(body?.message || "").includes("nothing changed on your live site"), String(r.status));
+    rec = (await j(await rest(`presence_publishes?site_id=eq.${site.id}&order=created_at.desc&limit=1&select=status,error_text,kind,snapshot_id,change_summary`)))[0];
+    ok("publish: failed record written w/ operator-only error_text + snapshot persisted", rec?.status === "failed" && /netlify_site_id|NETLIFY_AUTH_TOKEN/.test(rec?.error_text || "") && !!rec?.snapshot_id, rec?.error_text?.slice(0, 60));
+  }
   ok("publish: client message NEVER contains the internal detail", !String(body?.message || "").toLowerCase().includes("netlify"));
   // snapshot immutable + stamped
   const snap = (await j(await rest(`presence_snapshots?id=eq.${rec.snapshot_id}&select=content_contract_version,template_slug,template_version,created_by_kind`)))[0];

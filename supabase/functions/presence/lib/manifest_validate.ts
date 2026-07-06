@@ -2,6 +2,7 @@
 // BLOCKERS refuse the publish with plain-language, field-anchored errors.
 // WARNINGS ride along in the publish confirmation. Render never sees an
 // invalid snapshot: this runs first, always.
+import { normalizeSnapshotContent } from './render_types.ts';
 import type { Snapshot, TemplateManifest } from './render_types.ts';
 
 export interface ValidationResult {
@@ -16,7 +17,7 @@ const TIME_RE = /^([01]\d|2[0-4]):[0-5]\d$/;
 export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest): ValidationResult {
   const b: ValidationResult['blockers'] = [];
   const w: ValidationResult['warnings'] = [];
-  const c = snapshot.content;
+  const c = normalizeSnapshotContent(snapshot.content);
   const i = c.identity;
 
   // identity
@@ -26,8 +27,10 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
   if (!i?.seo_title?.trim() || !i?.seo_description?.trim()) w.push({ field: 'identity.seo_title', message: 'Search title/description are empty — using your name and description instead.' });
   if (!i?.booking_url?.trim()) w.push({ field: 'identity.booking_url', message: 'No reservation link — the site will point people to your menu instead.' });
 
-  // location + hours
-  const l = c.location;
+  // locations + hours (a LIST by contract; v1 requires exactly one)
+  const locMax = manifest.entities['locations']?.max ?? 1;
+  if ((c.locations?.length ?? 0) > locMax) b.push({ field: 'locations', message: `This template supports up to ${locMax} location${locMax > 1 ? 's' : ''}.` });
+  const l = c.locations?.[0] ?? null;
   if (!l) b.push({ field: 'location', message: 'Your address and hours are required before publishing.' });
   else {
     for (const [f, label] of [['address_line1', 'street address'], ['city', 'city'], ['region', 'state'], ['postal_code', 'ZIP code'], ['timezone', 'timezone']] as const) {

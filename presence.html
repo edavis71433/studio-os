@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Your Presence — Davis Digital Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* ── The Client Room (M7) — built entirely on tokens.css ──────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink);background:var(--bg)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--ink)}
+a{color:var(--p);text-decoration:none}
+::placeholder{color:var(--muted)}
+:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:var(--r-sm)}
+
+/* ── shell ── */
+.shell{display:flex;min-height:100vh}
+.side{width:var(--sidebar-w);flex:none;background:var(--surface);border-right:1px solid var(--line);padding:var(--s5) var(--s4);display:flex;flex-direction:column;gap:var(--s5);position:sticky;top:0;height:100vh}
+.brand{font-family:var(--serif);font-size:var(--t-h2);color:var(--ink)}
+.brand small{display:block;font-family:var(--sans);font-size:var(--t-xs);color:var(--muted);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-top:var(--s1)}
+nav.rooms{display:flex;flex-direction:column;gap:2px}
+.navitem{display:flex;align-items:center;gap:var(--s3);padding:var(--s2) var(--s3);border-radius:var(--r-sm);color:var(--ink-2);font-weight:500;font-size:var(--t-sm);text-align:left;transition:background var(--dur-fast) var(--ease)}
+.navitem:hover{background:var(--surface-3)}
+.navitem.on{background:var(--p-soft);color:var(--p-700);font-weight:550}
+.navsep{height:1px;background:var(--line);margin:var(--s3) 0}
+.side .foot{margin-top:auto;font-size:var(--t-xs);color:var(--muted)}
+.side .foot a{color:var(--ink-2)}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:var(--topbar-h);flex:none;display:flex;align-items:center;gap:var(--s4);padding:0 var(--s5);background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+.topbar .who{font-family:var(--serif);font-size:var(--t-h3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .grow{flex:1}
+.pill{display:inline-flex;align-items:center;gap:var(--s2);padding:6px var(--s3);border-radius:var(--pill);font-size:var(--t-sm);font-weight:550;border:1px solid var(--line-strong);background:var(--surface);transition:background var(--dur-fast) var(--ease)}
+.pill:hover{background:var(--surface-3)}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.changes .dot{background:var(--amber)}
+.pill.clean .dot{background:var(--green)}
+.btn{display:inline-flex;align-items:center;gap:var(--s2);padding:8px var(--s4);border-radius:var(--r-sm);font-weight:550;font-size:var(--t-sm);border:1px solid var(--line-strong);background:var(--surface);transition:all var(--dur-fast) var(--ease);white-space:nowrap}
+.btn:hover{background:var(--surface-3)}
+.btn.primary{background:var(--p);border-color:var(--p);color:#fff}
+.btn.primary:hover{background:var(--p-600)}
+.btn.quiet{border-color:transparent;color:var(--ink-2)}
+.btn.quiet:hover{background:var(--surface-3);color:var(--ink)}
+.btn.danger{color:var(--red)}
+.btn:disabled{opacity:.55;cursor:default}
+
+.content{flex:1;padding:var(--s6) var(--s5) 120px;max-width:860px;width:100%;margin:0 auto}
+.view{display:none}
+.view.on{display:block}
+h1.pagetitle{font-family:var(--serif);font-weight:500;font-size:var(--t-h1);margin-bottom:var(--s2)}
+.pagesub{color:var(--ink-2);font-size:var(--t-sm);margin-bottom:var(--s5);max-width:56ch}
+.whisper{font-size:var(--t-xs);color:var(--muted);transition:opacity var(--dur) var(--ease)}
+.whisper.saved{color:var(--green)}
+
+/* ── cards / forms ── */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--sh-1)}
+.card + .card{margin-top:var(--s4)}
+.cardhead{display:flex;align-items:baseline;gap:var(--s3);margin-bottom:var(--s4)}
+.cardhead h2{font-family:var(--serif);font-weight:500;font-size:var(--t-h2)}
+.cardhead .whisper{margin-left:auto}
+.frow{display:flex;flex-direction:column;gap:var(--s1);margin-bottom:var(--s4)}
+.frow:last-child{margin-bottom:0}
+.frow label{font-size:var(--t-xs);font-weight:550;color:var(--ink-2);letter-spacing:.02em}
+.frow .hint{font-size:var(--t-xs);color:var(--muted)}
+.frow input[type=text],.frow input[type=url],.frow input[type=email],.frow input[type=tel],.frow textarea,.frow select{
+  padding:9px var(--s3);border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);font-size:var(--t-body);transition:border-color var(--dur-fast) var(--ease)}
+.frow textarea{min-height:88px;resize:vertical;line-height:var(--lh-snug)}
+.frow input:focus,.frow textarea:focus{border-color:var(--p);outline:none;box-shadow:0 0 0 3px var(--p-ring)}
+.frow .err{font-size:var(--t-xs);color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 var(--s4)}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+
+/* ── today ── */
+.health{display:flex;align-items:flex-start;gap:var(--s4);padding:var(--s5);border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1)}
+.health .lamp{width:12px;height:12px;border-radius:50%;flex:none;margin-top:9px}
+.health.healthy .lamp{background:var(--green)}
+.health.needs_attention .lamp{background:var(--amber)}
+.health.outdated .lamp{background:var(--muted)}
+.health .sentence{font-family:var(--serif);font-size:var(--t-h1);font-weight:500;line-height:var(--lh-tight)}
+.health .detail{color:var(--ink-2);font-size:var(--t-sm);margin-top:var(--s2)}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s3);margin-top:var(--s4)}
+@media(max-width:760px){.facts{grid-template-columns:1fr 1fr}}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:var(--s4)}
+.fact .k{font-size:var(--t-xs);font-weight:550;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fact .v{font-weight:550;margin-top:var(--s1)}
+.fact .d{font-size:var(--t-xs);color:var(--ink-2);margin-top:2px;word-break:break-word}
+.fact.live .v{color:var(--green)}
+.fact.attention .v{color:var(--amber)}
+
+.notes{margin-top:var(--s6)}
+.notes h2,.recent h2{font-family:var(--serif);font-weight:500;font-size:var(--t-h2);margin-bottom:var(--s3)}
+.note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line-strong);border-radius:var(--r);padding:var(--s4);display:flex;gap:var(--s4);align-items:flex-start}
+.note + .note{margin-top:var(--s3)}
+.note.caution{border-left-color:var(--amber)}
+.note.suggestion{border-left-color:var(--p)}
+.note.celebration{border-left-color:var(--green)}
+.note .t{font-weight:550}
+.note .r{color:var(--ink-2);font-size:var(--t-sm);margin-top:2px}
+.note .acts{margin-top:var(--s3);display:flex;gap:var(--s3);align-items:center}
+.recent{margin-top:var(--s6)}
+.chg{display:flex;gap:var(--s3);padding:var(--s3) 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.chg:last-child{border-bottom:none}
+.chg .sec{flex:none;width:92px;color:var(--muted);font-size:var(--t-xs);font-weight:550;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+
+/* first-run */
+.welcome{background:linear-gradient(135deg,var(--p-deep),var(--p-700));color:#fff;border-radius:var(--r-xl);padding:var(--s6);box-shadow:var(--sh-2)}
+.welcome h2{font-family:var(--serif);font-weight:500;font-size:var(--t-display);line-height:var(--lh-tight)}
+.welcome p{opacity:.85;margin-top:var(--s3);max-width:52ch}
+.steps{display:flex;flex-direction:column;gap:var(--s3);margin-top:var(--s5)}
+.step{display:flex;align-items:center;gap:var(--s4);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:var(--r);padding:var(--s4);text-align:left;color:#fff;transition:background var(--dur-fast) var(--ease)}
+.step:hover{background:rgba(255,255,255,.14)}
+.step .n{width:28px;height:28px;flex:none;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);display:grid;place-items:center;font-size:var(--t-sm);font-weight:550}
+.step.done .n{background:var(--green);border-color:var(--green)}
+.step .s{font-weight:550}
+.step .d{font-size:var(--t-sm);opacity:.8}
+
+/* ── collections ── */
+.itemlist{display:flex;flex-direction:column}
+.item{border-bottom:1px solid var(--line);padding:var(--s4) 0}
+.item:last-child{border-bottom:none}
+.itemrow{display:flex;align-items:center;gap:var(--s3)}
+.item .name{font-weight:550;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .meta{color:var(--ink-2);font-size:var(--t-sm);white-space:nowrap}
+.item .spacer{flex:1}
+.item.hidden-item .name,.item.hidden-item .meta{color:var(--muted)}
+.offthumb{width:44px;height:44px;flex:none;border-radius:var(--r-sm);object-fit:cover;background:var(--surface-3);border:1px solid var(--line)}
+.offthumb.empty{display:grid;place-items:center;color:var(--muted);font-size:18px}
+.tag{font-size:var(--t-xs);font-weight:550;padding:2px var(--s2);border-radius:var(--pill);background:var(--surface-3);color:var(--ink-2);white-space:nowrap}
+.tag.off{background:var(--amber-soft);color:var(--amber)}
+.editor{margin-top:var(--s4);padding:var(--s4);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r)}
+.cathead{display:flex;align-items:center;gap:var(--s3);margin:var(--s5) 0 var(--s2)}
+.cathead:first-child{margin-top:0}
+.cathead h3{font-family:var(--serif);font-weight:500;font-size:var(--t-h3)}
+.cathead .ctl{display:flex;gap:2px;margin-left:auto}
+.cathead .ctl button{padding:2px var(--s2);color:var(--muted);border-radius:var(--r-sm)}
+.cathead .ctl button:hover{background:var(--surface-3);color:var(--ink)}
+.addrow{margin-top:var(--s4)}
+.switch{position:relative;width:34px;height:20px;flex:none;border-radius:var(--pill);background:var(--line-strong);transition:background var(--dur-fast) var(--ease)}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--sh-1);transition:transform var(--dur-fast) var(--ease)}
+.switch.on{background:var(--green)}
+.switch.on::after{transform:translateX(14px)}
+
+/* hours */
+.hoursgrid{display:flex;flex-direction:column;gap:var(--s2)}
+.hrow{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.hrow .day{width:88px;flex:none;font-weight:550;font-size:var(--t-sm)}
+.hrow input[type=time]{padding:5px var(--s2);border:1px solid var(--line-strong);border-radius:var(--r-sm);font-family:var(--mono);font-size:var(--t-sm)}
+.hrow .to{color:var(--muted);font-size:var(--t-sm)}
+.hrow .closedlab{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);color:var(--ink-2);margin-left:auto}
+
+/* media */
+.mediagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s3)}
+.mcell{position:relative;border-radius:var(--r);overflow:hidden;background:var(--surface-3);border:1px solid var(--line);aspect-ratio:1}
+.mcell img{width:100%;height:100%;object-fit:cover;display:block}
+.mcell .badge{position:absolute;left:var(--s2);top:var(--s2);background:rgba(23,18,33,.75);color:#fff;font-size:var(--t-xs);font-weight:550;padding:2px var(--s2);border-radius:var(--pill)}
+.mcell .del{position:absolute;right:var(--s2);top:var(--s2);background:rgba(23,18,33,.6);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur-fast) var(--ease)}
+.mcell:hover .del,.mcell:focus-within .del{opacity:1}
+.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--s2);font-size:var(--t-xs);color:#fff;background:linear-gradient(transparent,rgba(23,18,33,.7))}
+
+/* history */
+.pub{display:flex;align-items:center;gap:var(--s4);padding:var(--s4) 0;border-bottom:1px solid var(--line)}
+.pub:last-child{border-bottom:none}
+.pub .st{width:10px;height:10px;border-radius:50%;flex:none}
+.pub .st.live{background:var(--green)}
+.pub .st.failed{background:var(--red)}
+.pub .st.publishing{background:var(--amber)}
+.pub .sum{font-weight:500;min-width:0}
+.pub .when{color:var(--muted);font-size:var(--t-xs);font-family:var(--mono)}
+.pub .acts{margin-left:auto;display:flex;gap:var(--s2);flex:none}
+
+/* ── overlays ── */
+.scrim{position:fixed;inset:0;background:rgba(23,18,33,.45);z-index:80;display:none;align-items:flex-end;justify-content:center}
+.scrim.on{display:flex}
+@media(min-width:761px){.scrim{align-items:center}}
+.sheet{background:var(--surface);border-radius:var(--r-xl) var(--r-xl) 0 0;width:100%;max-width:560px;max-height:88vh;overflow:auto;padding:var(--s6);box-shadow:var(--sh-pop)}
+@media(min-width:761px){.sheet{border-radius:var(--r-xl)}}
+.sheet h2{font-family:var(--serif);font-weight:500;font-size:var(--t-h1)}
+.sheet .sub{color:var(--ink-2);font-size:var(--t-sm);margin-top:var(--s2)}
+.sheet .body{margin:var(--s5) 0}
+.sheet .foot{display:flex;gap:var(--s3);justify-content:flex-end;align-items:center}
+.blockerbox{background:var(--amber-soft);border-radius:var(--r);padding:var(--s4);font-size:var(--t-sm);margin-bottom:var(--s4)}
+.blockerbox ul{margin:var(--s2) 0 0 var(--s4)}
+
+/* preview stage */
+.stage{position:fixed;inset:0;background:var(--p-deep);z-index:90;display:none;flex-direction:column}
+.stage.on{display:flex}
+.stagebar{height:52px;flex:none;display:flex;align-items:center;gap:var(--s3);padding:0 var(--s4);color:#fff}
+.stagebar .seg{display:flex;background:rgba(255,255,255,.12);border-radius:var(--pill);padding:2px}
+.stagebar .seg button{padding:4px var(--s3);border-radius:var(--pill);color:rgba(255,255,255,.75);font-size:var(--t-sm);font-weight:550}
+.stagebar .seg button.on{background:#fff;color:var(--ink)}
+.stagebar select{background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:var(--r-sm);padding:5px var(--s2);font-size:var(--t-sm)}
+.stagebar select option{color:var(--ink)}
+.stagebar .grow{flex:1}
+.stagewrap{flex:1;display:grid;place-items:center;overflow:auto;padding:0 var(--s4) var(--s4)}
+.stageframe{background:#fff;border-radius:var(--r);box-shadow:var(--sh-3);width:100%;height:100%;transition:width var(--dur-slow) var(--ease)}
+.stageframe.mobile{width:390px;max-width:100%}
+.stageframe iframe{width:100%;height:100%;border:none;border-radius:var(--r)}
+.stagenote{color:rgba(255,255,255,.8);font-size:var(--t-sm);text-align:center;padding:var(--s6)}
+
+/* toasts */
+.toasts{position:fixed;bottom:calc(64px + var(--s4));left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:var(--s2);align-items:center;pointer-events:none}
+@media(min-width:761px){.toasts{bottom:var(--s5)}}
+.toast{background:var(--ink);color:#fff;padding:var(--s3) var(--s4);border-radius:var(--r);font-size:var(--t-sm);box-shadow:var(--sh-3);max-width:88vw}
+.toast.bad{background:var(--red)}
+
+/* gate */
+.gate{min-height:100vh;display:grid;place-items:center;padding:var(--s5)}
+.gate .card{max-width:420px;text-align:center;padding:var(--s7) var(--s6)}
+.gate h1{font-family:var(--serif);font-weight:500;font-size:var(--t-h1);margin-bottom:var(--s3)}
+.gate p{color:var(--ink-2);margin-bottom:var(--s5)}
+
+/* mobile tab bar */
+.tabbar{display:none;position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:60;padding-bottom:env(safe-area-inset-bottom)}
+.tabbar button{flex:1;padding:var(--s2) 0 var(--s3);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:var(--t-xs);font-weight:550;color:var(--muted)}
+.tabbar button.on{color:var(--p)}
+.tabbar svg{width:22px;height:22px}
+@media(max-width:760px){
+  .side{display:none}
+  .tabbar{display:flex}
+  .content{padding:var(--s5) var(--s4) 140px}
+  .topbar{padding:0 var(--s4)}
+  .topbar .who{font-size:var(--t-sm)}
+  /* the tab bar carries Preview, and the pill opens the publish sheet */
+  #btnPreview,#btnPublish{display:none}
+}
+.sectionsheet .navitem{padding:var(--s3)}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- signed-out / no-site gate -->
+<div class="gate" id="gate" hidden>
+  <div class="card">
+    <h1 id="gateTitle">One moment…</h1>
+    <p id="gateMsg">Checking your session.</p>
+    <a class="btn primary" id="gateBtn" href="portal.html" hidden>Go to your portal</a>
+  </div>
+</div>
+
+<div class="shell" id="app" hidden>
+  <aside class="side">
+    <div class="brand">Presence<small>Davis Digital Studio</small></div>
+    <nav class="rooms" id="nav">
+      <button class="navitem on" data-view="today">Today</button>
+      <div class="navsep"></div>
+      <button class="navitem" data-view="business">Business</button>
+      <button class="navitem" data-view="offerings">Offerings</button>
+      <button class="navitem" data-view="faqs">FAQs</button>
+      <button class="navitem" data-view="testimonials">Testimonials</button>
+      <button class="navitem" data-view="updates">Updates</button>
+      <button class="navitem" data-view="media">Photos</button>
+      <div class="navsep"></div>
+      <button class="navitem" data-view="history">History</button>
+    </nav>
+    <div class="foot"><a href="portal.html">← Back to portal</a></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="who" id="whoName">Your business</div>
+      <div class="grow"></div>
+      <button class="pill" id="draftPill" title="What's changed since your last publish"><span class="dot"></span><span id="draftPillText">…</span></button>
+      <button class="btn" id="btnPreview">Preview</button>
+      <button class="btn primary" id="btnPublish">Publish</button>
+    </header>
+    <main class="content">
+
+      <!-- TODAY -->
+      <section class="view on" id="view-today">
+        <div id="welcomeWrap" hidden></div>
+        <div id="healthWrap"></div>
+        <div class="facts" id="factsWrap"></div>
+        <div class="notes" id="notesWrap" hidden>
+          <h2>From your concierge</h2>
+          <div id="notesList"></div>
+        </div>
+        <div class="recent" id="recentWrap" hidden>
+          <h2>Waiting to publish</h2>
+          <div id="recentList"></div>
+        </div>
+      </section>
+
+      <!-- BUSINESS -->
+      <section class="view" id="view-business">
+        <h1 class="pagetitle">Business</h1>
+        <p class="pagesub">The facts customers rely on. Everything here saves as you type — nothing reaches your website until you publish.</p>
+        <div class="card">
+          <div class="cardhead"><h2>About your business</h2><span class="whisper" id="save-identity"></span></div>
+          <div class="frow"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
+          <div class="frow"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><span class="hint">One short line under your name.</span></div>
+          <div class="frow"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
+          <div class="grid2">
+            <div class="frow"><label for="f-phone">Phone</label><input type="tel" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
+            <div class="frow"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
+          </div>
+          <div class="frow"><label for="f-story">Your story <span class="hint">(shown on your About page)</span></label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea></div>
+          <div class="grid2">
+            <div class="frow"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
+            <div class="frow"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="cardhead"><h2>Address</h2><span class="whisper" id="save-location"></span></div>
+          <div class="frow"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
+          <div class="grid2">
+            <div class="frow"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
+            <div class="frow"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
+          </div>
+          <div class="grid2">
+            <div class="frow"><label for="f-postal_code">ZIP</label><input type="text" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
+            <div class="frow"><label for="f-locphone">Location phone <span class="hint">(if different)</span></label><input type="tel" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="cardhead"><h2>Hours</h2><span class="whisper" id="save-hours"></span></div>
+          <div class="hoursgrid" id="hoursGrid"></div>
+          <div class="frow" style="margin-top:var(--s4)">
+            <label style="display:flex;align-items:center;gap:var(--s3);cursor:pointer">
+              <span class="switch" id="closedSwitch" role="switch" aria-checked="false" tabindex="0"></span>
+              Temporarily closed right now
+            </label>
+            <input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden>
+          </div>
+        </div>
+      </section>
+
+      <!-- OFFERINGS -->
+      <section class="view" id="view-offerings">
+        <h1 class="pagetitle">Offerings</h1>
+        <p class="pagesub">What you sell, section by section. Hidden items stay saved here but come off your website.</p>
+        <div id="offeringsWrap"></div>
+        <div class="card addrow">
+          <div class="cardhead"><h2>Add an item</h2></div>
+          <div class="grid2">
+            <div class="frow"><label for="new-off-name">Name</label><input type="text" id="new-off-name" maxlength="120"></div>
+            <div class="frow"><label for="new-off-cat">Section <span class="hint">(e.g. Mains, Starters)</span></label><input type="text" id="new-off-cat" maxlength="60" list="catlist"><datalist id="catlist"></datalist></div>
+          </div>
+          <div class="grid2">
+            <div class="frow"><label for="new-off-price">Price <span class="hint">(as text — “$18”, “Market”)</span></label><input type="text" id="new-off-price" maxlength="40"></div>
+            <div class="frow"><label>&nbsp;</label><button class="btn primary" id="btnAddOffering">Add item</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQS -->
+      <section class="view" id="view-faqs">
+        <h1 class="pagetitle">FAQs</h1>
+        <p class="pagesub">The questions customers actually ask, answered once, in your words.</p>
+        <div class="card"><div class="itemlist" id="faqList"></div></div>
+        <div class="card addrow">
+          <div class="cardhead"><h2>Add a question</h2></div>
+          <div class="frow"><label for="new-faq-q">Question</label><input type="text" id="new-faq-q" maxlength="200"></div>
+          <div class="frow"><label for="new-faq-a">Answer</label><textarea id="new-faq-a" maxlength="2000"></textarea></div>
+          <button class="btn primary" id="btnAddFaq">Add question</button>
+        </div>
+      </section>
+
+      <!-- TESTIMONIALS -->
+      <section class="view" id="view-testimonials">
+        <h1 class="pagetitle">Testimonials</h1>
+        <p class="pagesub">Kind words from real customers, in their words.</p>
+        <div class="card"><div class="itemlist" id="tesList"></div></div>
+        <div class="card addrow">
+          <div class="cardhead"><h2>Add a testimonial</h2></div>
+          <div class="frow"><label for="new-tes-quote">Quote</label><textarea id="new-tes-quote" maxlength="600"></textarea></div>
+          <div class="grid2">
+            <div class="frow"><label for="new-tes-author">From</label><input type="text" id="new-tes-author" maxlength="120" placeholder="Maria G."></div>
+            <div class="frow"><label for="new-tes-source">Where <span class="hint">(optional — Google, Yelp…)</span></label><input type="text" id="new-tes-source" maxlength="80"></div>
+          </div>
+          <button class="btn primary" id="btnAddTes">Add testimonial</button>
+        </div>
+      </section>
+
+      <!-- UPDATES -->
+      <section class="view" id="view-updates">
+        <h1 class="pagetitle">Updates</h1>
+        <p class="pagesub">News, seasonal notes, announcements. Drafts stay private; shown updates appear on your Updates page when you publish.</p>
+        <div class="card"><div class="itemlist" id="postList"></div></div>
+        <div class="card addrow">
+          <div class="cardhead"><h2>Write an update</h2></div>
+          <div class="frow"><label for="new-post-title">Title</label><input type="text" id="new-post-title" maxlength="160"></div>
+          <div class="frow"><label for="new-post-body">Body</label><textarea id="new-post-body" maxlength="20000" style="min-height:140px"></textarea></div>
+          <button class="btn primary" id="btnAddPost">Save as draft</button>
+        </div>
+      </section>
+
+      <!-- MEDIA -->
+      <section class="view" id="view-media">
+        <h1 class="pagetitle">Photos</h1>
+        <p class="pagesub">Your photo library. Photos marked “On your site” are in use — the rest are saved here, ready when you are.</p>
+        <div class="card">
+          <div class="cardhead"><h2>Library</h2>
+            <span class="whisper" id="save-media"></span>
+            <button class="btn" id="btnUpload" style="margin-left:auto">Add a photo</button>
+            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+          </div>
+          <div id="uploadPrep" hidden>
+            <div class="frow"><label for="upload-alt">Describe this photo <span class="hint">(required — helps customers and search engines)</span></label>
+              <input type="text" id="upload-alt" maxlength="200" placeholder="e.g. Fresh pasta with basil on a white plate">
+            </div>
+            <div style="display:flex;gap:var(--s3)"><button class="btn primary" id="btnUploadGo">Upload</button><button class="btn quiet" id="btnUploadCancel">Cancel</button></div>
+          </div>
+          <div class="mediagrid" id="mediaGrid" style="margin-top:var(--s4)"></div>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="view" id="view-history">
+        <h1 class="pagetitle">History</h1>
+        <p class="pagesub">Every version of your site, kept. You can look at any version, and bring one back into your draft — your live site never changes until you publish.</p>
+        <div class="card"><div id="pubList"></div></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- mobile tabs -->
+<nav class="tabbar" id="tabbar">
+  <button data-tab="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9"/></svg>Today</button>
+  <button data-tab="sections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Sections</button>
+  <button data-tab="preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/></svg>Preview</button>
+</nav>
+
+<!-- publish sheet -->
+<div class="scrim" id="publishScrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pubSheetTitle">
+    <h2 id="pubSheetTitle">Publish</h2>
+    <p class="sub" id="pubSheetSub"></p>
+    <div class="body" id="pubSheetBody"></div>
+    <div class="foot">
+      <button class="btn quiet" data-close>Not yet</button>
+      <button class="btn primary" id="btnPublishGo">Publish</button>
+    </div>
+  </div>
+</div>
+
+<!-- restore sheet -->
+<div class="scrim" id="restoreScrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
+    <h2 id="resSheetTitle">Bring this version back?</h2>
+    <p class="sub" id="resSheetSub"></p>
+    <div class="body"><p style="font-size:var(--t-sm);color:var(--ink-2)">This loads that version into your <strong>draft</strong> so you can look it over. Your current draft is set aside as a safety copy — nothing is lost, and your live site doesn’t change until you publish.</p></div>
+    <div class="foot">
+      <button class="btn quiet" data-close>Cancel</button>
+      <button class="btn primary" id="btnRestoreGo">Bring it into my draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- media picker -->
+<div class="scrim" id="pickerScrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <h2 id="pickTitle">Choose a photo</h2>
+    <div class="body"><div class="mediagrid" id="pickerGrid"></div></div>
+    <div class="foot">
+      <button class="btn quiet" id="btnPickNone">No photo</button>
+      <button class="btn quiet" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- mobile sections sheet -->
+<div class="scrim" id="sectionsScrim">
+  <div class="sheet sectionsheet" role="dialog" aria-modal="true">
+    <h2>Sections</h2>
+    <div class="body" id="sectionsNav"></div>
+    <div class="foot"><button class="btn quiet" data-close>Close</button></div>
+  </div>
+</div>
+
+<!-- preview stage -->
+<div class="stage" id="stage">
+  <div class="stagebar">
+    <button class="btn quiet" id="btnStageClose" style="color:#fff;background:transparent;border-color:transparent">← Back</button>
+    <div class="seg" id="verSeg">
+      <button data-ver="draft" class="on">Draft</button>
+      <button data-ver="live">Live</button>
+    </div>
+    <select id="pageSel" aria-label="Page">
+      <option value="/">Home</option>
+      <option value="/menu/">Menu</option>
+      <option value="/about/">About</option>
+      <option value="/faq/">FAQ</option>
+      <option value="/updates/">Updates</option>
+      <option value="/contact/">Contact</option>
+    </select>
+    <div class="grow"></div>
+    <div class="seg" id="devSeg">
+      <button data-dev="desktop" class="on">Desktop</button>
+      <button data-dev="mobile">Phone</button>
+    </div>
+  </div>
+  <div class="stagewrap"><div class="stageframe" id="stageFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ════ The Client Room — M7. One API, one vocabulary, calm by default. ════ */
+"use strict";
+
+/* ── environment: production by default; ?env=staging for acceptance runs ── */
+const ENVS = {
+  prod: { url: "https://qksstlqzbhesadrrofgn.supabase.co",
+          anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo" },
+  staging: { url: "https://wjlpursnwbmlcdwbeowv.supabase.co",
+          anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqbHB1cnNud2JtbGNkd2Jlb3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNzExMzUsImV4cCI6MjA5ODg0NzEzNX0.XAWyxx-7WsDC6Eg4nc2dlcFmHRe6NUKYEVBkjRvkGXQ" },
+};
+const ENV = new URLSearchParams(location.search).get("env") === "staging" ? ENVS.staging : ENVS.prod;
+const FN = ENV.url + "/functions/v1/presence";
+
+/* same isolated storage key as the portal: one sign-in covers both pages */
+const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
+
+/* ── tiny DOM + toast helpers ── */
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+function toast(msg, bad) {
+  const t = el("div", "toast" + (bad ? " bad" : ""), msg);
+  $("toasts").appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
+}
+
+/* ── API: every call carries the caller's JWT; errors come back calm ── */
+async function api(method, route, body) {
+  const { data } = await sb.auth.getSession();
+  const jwt = data?.session?.access_token;
+  if (!jwt) { showGate("Please sign in", "Your session ended. Sign in through your portal and come back.", true); throw new Error("no-session"); }
+  const r = await fetch(FN + route, {
+    method,
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await r.text();
+  let j = null; try { j = JSON.parse(text); } catch { /* html previews handled by apiRaw */ }
+  if (!r.ok) { const e = new Error((j && j.message) || "Something didn’t work — nothing was changed."); e.status = r.status; e.body = j; throw e; }
+  return j;
+}
+async function apiHtml(route) {
+  const { data } = await sb.auth.getSession();
+  const jwt = data?.session?.access_token;
+  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt } });
+  const text = await r.text();
+  if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t load that."); e.status = r.status; throw e; }
+  return text;
+}
+
+/* ── state ── */
+const S = { site: null, identity: null, location: null, settings: null,
+  offerings: [], faqs: [], testimonials: [], posts: [], media: [],
+  changes: null, health: null, publishes: [],
+  pickerTarget: null, restoreTarget: null, pendingFile: null };
+
+const DAYS = [["mon","Monday"],["tue","Tuesday"],["wed","Wednesday"],["thu","Thursday"],["fri","Friday"],["sat","Saturday"],["sun","Sunday"]];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+/* ── gate ── */
+function showGate(title, msg, showBtn) {
+  $("app").hidden = true; $("tabbar").style.display = "none";
+  $("gate").hidden = false;
+  $("gateTitle").textContent = title; $("gateMsg").textContent = msg;
+  $("gateBtn").hidden = !showBtn;
+}
+
+/* ── navigation ── */
+function go(view) {
+  document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
+  const target = $("view-" + view); if (!target) return;
+  target.classList.add("on");
+  document.querySelectorAll("#nav .navitem").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
+  document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today")));
+  window.scrollTo({ top: 0 });
+  if (view === "today") loadToday();
+  if (view === "history") loadHistory();
+  if (view === "media") loadMedia();
+}
+$("nav").addEventListener("click", (e) => { const b = e.target.closest(".navitem"); if (b) go(b.dataset.view); });
+$("tabbar").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.tab === "today") go("today");
+  else if (b.dataset.tab === "preview") openPreview();
+  else openSheet("sectionsScrim");
+});
+(function buildSectionsSheet() {
+  const wrap = $("sectionsNav");
+  [["business","Business"],["offerings","Offerings"],["faqs","FAQs"],["testimonials","Testimonials"],["updates","Updates"],["media","Photos"],["history","History"]].forEach(([v, label]) => {
+    const b = el("button", "navitem", label); b.style.width = "100%";
+    b.addEventListener("click", () => { closeSheet("sectionsScrim"); go(v); });
+    wrap.appendChild(b);
+  });
+})();
+
+/* ── sheets ── */
+function openSheet(id) { $(id).classList.add("on"); }
+function closeSheet(id) { $(id).classList.remove("on"); }
+document.querySelectorAll(".scrim").forEach((s) => {
+  s.addEventListener("click", (e) => { if (e.target === s || e.target.closest("[data-close]")) s.classList.remove("on"); });
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  document.querySelectorAll(".scrim.on").forEach((s) => s.classList.remove("on"));
+  if ($("stage").classList.contains("on")) closePreview();
+});
+
+/* ── autosave: singleton fields (identity + location) ── */
+const debounces = {};
+function debounce(key, fn, ms) { clearTimeout(debounces[key]); debounces[key] = setTimeout(fn, ms); }
+function whisper(id, state) {
+  const w = $(id); if (!w) return;
+  w.classList.toggle("saved", state === "saved");
+  w.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state || "";
+  if (state === "saved") setTimeout(() => { if (w.textContent === "Saved") w.textContent = ""; }, 2500);
+}
+document.querySelectorAll("[data-sing]").forEach((inp) => {
+  inp.addEventListener("input", () => {
+    const sing = inp.dataset.sing, field = inp.dataset.field;
+    const wid = sing === "identity" ? "save-identity" : "save-location";
+    whisper(wid, "saving");
+    debounce(sing + ":" + field, async () => {
+      try {
+        await api("PUT", sing === "identity" ? "/identity" : "/location", { [field]: inp.value });
+        whisper(wid, "saved");
+        if (field === "business_name") $("whoName").textContent = inp.value || "Your business";
+        scheduleChangesRefresh();
+      } catch (err) { whisper(wid, ""); toast(err.message, true); }
+    }, 700);
+  });
+});
+
+/* ── hours editor ── */
+function hoursFromState() {
+  const loc = S.location || {};
+  const map = new Map((loc.hours || []).map((d) => [d.day, d]));
+  return DAYS.map(([d]) => map.get(d) || { day: d, closed: true, intervals: [] });
+}
+function renderHours() {
+  const grid = $("hoursGrid"); grid.innerHTML = "";
+  hoursFromState().forEach((day) => {
+    const row = el("div", "hrow");
+    row.appendChild(el("span", "day", DAYS.find(([k]) => k === day.day)[1]));
+    const iv = day.intervals && day.intervals[0] ? day.intervals[0] : { open: "09:00", close: "17:00" };
+    const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed;
+    const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed;
+    const lab = el("label", "closedlab"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!day.closed;
+    lab.append(cb, document.createTextNode("Closed"));
+    row.append(open, el("span", "to", "to"), close, lab);
+    const save = () => {
+      const hours = hoursFromState().map((d) => d.day === day.day
+        ? { day: d.day, closed: cb.checked, intervals: cb.checked ? [] : [{ open: open.value || "09:00", close: close.value || "17:00" }] }
+        : d);
+      S.location = { ...(S.location || {}), hours };
+      whisper("save-hours", "saving");
+      debounce("hours", async () => {
+        try { await api("PUT", "/location", { hours: S.location.hours }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
+        catch (err) { whisper("save-hours", ""); toast(err.message, true); }
+      }, 600);
+    };
+    cb.addEventListener("change", () => { open.disabled = close.disabled = cb.checked; save(); });
+    open.addEventListener("change", save); close.addEventListener("change", save);
+    grid.appendChild(row);
+  });
+  const sw = $("closedSwitch"), note = $("f-closednote");
+  const closed = !!(S.location && S.location.temporarily_closed);
+  sw.classList.toggle("on", closed); sw.setAttribute("aria-checked", String(closed));
+  note.hidden = !closed; note.value = (S.location && S.location.temporarily_closed_note) || "";
+}
+$("closedSwitch").addEventListener("click", toggleClosed);
+$("closedSwitch").addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleClosed(); } });
+async function toggleClosed() {
+  const now = !(S.location && S.location.temporarily_closed);
+  S.location = { ...(S.location || {}), temporarily_closed: now };
+  renderHours();
+  try { await api("PUT", "/location", { temporarily_closed: now }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
+  catch (err) { toast(err.message, true); }
+}
+$("f-closednote").addEventListener("input", () => {
+  debounce("closednote", async () => {
+    try { await api("PUT", "/location", { temporarily_closed_note: $("f-closednote").value }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  }, 700);
+});
+
+/* ── offerings ── */
+function categoriesInOrder() {
+  const declared = (S.settings && S.settings.category_order) || [];
+  const seen = new Set(declared);
+  const encounter = [];
+  for (const o of S.offerings) { const c = o.category || "Menu"; if (!seen.has(c)) { seen.add(c); encounter.push(c); } }
+  return [...declared.filter((c) => S.offerings.some((o) => (o.category || "Menu") === c)), ...encounter];
+}
+function renderOfferings() {
+  const wrap = $("offeringsWrap"); wrap.innerHTML = "";
+  const cats = categoriesInOrder();
+  $("catlist").innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join("");
+  if (!S.offerings.length) {
+    const c = el("div", "card"); c.appendChild(el("p", "pagesub", "Nothing here yet — add your first item below."));
+    wrap.appendChild(c); return;
+  }
+  cats.forEach((cat, ci) => {
+    const card = el("div", "card");
+    const head = el("div", "cathead");
+    head.appendChild(el("h3", null, cat));
+    const ctl = el("div", "ctl");
+    const up = el("button", null, "↑"); up.title = "Move this section up"; up.setAttribute("aria-label", `Move ${cat} up`);
+    const dn = el("button", null, "↓"); dn.title = "Move this section down"; dn.setAttribute("aria-label", `Move ${cat} down`);
+    up.disabled = ci === 0; dn.disabled = ci === cats.length - 1;
+    up.addEventListener("click", () => moveCategory(cat, -1));
+    dn.addEventListener("click", () => moveCategory(cat, +1));
+    ctl.append(up, dn); head.appendChild(ctl); card.appendChild(head);
+    const list = el("div", "itemlist");
+    S.offerings.filter((o) => (o.category || "Menu") === cat).forEach((o) => list.appendChild(offeringRow(o)));
+    card.appendChild(list);
+    wrap.appendChild(card);
+  });
+}
+async function moveCategory(cat, dir) {
+  const cats = categoriesInOrder();
+  const i = cats.indexOf(cat), j = i + dir;
+  if (j < 0 || j >= cats.length) return;
+  [cats[i], cats[j]] = [cats[j], cats[i]];
+  S.settings = { ...(S.settings || {}), category_order: cats };
+  renderOfferings();
+  try { await api("PUT", "/settings", { category_order: cats }); scheduleChangesRefresh(); }
+  catch (err) { toast(err.message, true); }
+}
+function offeringRow(o) {
+  const item = el("div", "item" + (o.is_visible === false ? " hidden-item" : ""));
+  const row = el("div", "itemrow");
+  const media = S.media.find((m) => m.id === o.media_id);
+  if (media && media.thumb) { const img = el("img", "offthumb"); img.src = media.thumb; img.alt = ""; row.appendChild(img); }
+  else { row.appendChild(el("div", "offthumb empty", "🍽")); }
+  row.appendChild(el("span", "name", o.name));
+  if (o.price_text) row.appendChild(el("span", "meta", o.price_text));
+  row.appendChild(el("span", "spacer"));
+  if (o.is_visible === false) row.appendChild(el("span", "tag off", "Hidden"));
+  const vis = el("button", "switch" + (o.is_visible !== false ? " on" : "")); vis.role = "switch";
+  vis.title = o.is_visible !== false ? "Shown on your site — click to hide" : "Hidden — click to show";
+  vis.setAttribute("aria-checked", String(o.is_visible !== false));
+  vis.setAttribute("aria-label", `${o.name}: shown on your site`);
+  vis.addEventListener("click", async () => {
+    try { const r = await api("PATCH", `/offerings/${o.id}`, { is_visible: o.is_visible === false });
+      Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  const edit = el("button", "btn quiet", "Edit");
+  edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(offeringEditor(o)); });
+  row.append(vis, edit);
+  item.appendChild(row);
+  return item;
+}
+function offeringEditor(o) {
+  const ed = el("div", "editor");
+  ed.innerHTML = `
+    <div class="grid2">
+      <div class="frow"><label>Name</label><input type="text" data-k="name" value="${esc(o.name)}" maxlength="120"></div>
+      <div class="frow"><label>Section</label><input type="text" data-k="category" value="${esc(o.category)}" maxlength="60"></div>
+    </div>
+    <div class="grid2">
+      <div class="frow"><label>Price</label><input type="text" data-k="price_text" value="${esc(o.price_text || "")}" maxlength="40"></div>
+      <div class="frow"><label>Photo</label><div style="display:flex;gap:var(--s2)"><button class="btn" data-act="photo">${o.media_id ? "Change photo" : "Choose photo"}</button></div></div>
+    </div>
+    <div class="frow"><label>Description</label><textarea data-k="description" maxlength="500">${esc(o.description || "")}</textarea></div>
+    <div style="display:flex;gap:var(--s3);justify-content:space-between">
+      <button class="btn danger" data-act="del">Remove</button>
+      <button class="btn primary" data-act="save">Save</button>
+    </div>`;
+  ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
+    try { const r = await api("PATCH", `/offerings/${o.id}`, { media_id: mediaId }); Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  }));
+  ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
+    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
+    try { const r = await api("PATCH", `/offerings/${o.id}`, body); Object.assign(o, r.data); renderOfferings(); toast("Saved"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  armDelete(ed.querySelector('[data-act="del"]'), async () => {
+    try { await api("DELETE", `/offerings/${o.id}`); S.offerings = S.offerings.filter((x) => x.id !== o.id); renderOfferings(); toast("Removed"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  return ed;
+}
+$("btnAddOffering").addEventListener("click", async () => {
+  const name = $("new-off-name").value.trim(), cat = $("new-off-cat").value.trim(), price = $("new-off-price").value.trim();
+  if (!name || !cat) { toast("A name and a section are needed.", true); return; }
+  try {
+    const r = await api("POST", "/offerings", { name, category: cat, price_text: price });
+    S.offerings.push(r.data);
+    $("new-off-name").value = ""; $("new-off-price").value = "";
+    renderOfferings(); toast("Added"); scheduleChangesRefresh();
+  } catch (err) { toast(err.message, true); }
+});
+
+/* two-tap destructive confirm — no browser dialogs */
+function armDelete(btn, fn) {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.armed) { fn(); return; }
+    btn.dataset.armed = "1"; const was = btn.textContent; btn.textContent = "Remove — are you sure?";
+    setTimeout(() => { delete btn.dataset.armed; btn.textContent = was; }, 3200);
+  });
+}
+
+/* ── faqs / testimonials / updates (shared simple list pattern) ── */
+function renderFaqs() {
+  const list = $("faqList"); list.innerHTML = "";
+  if (!S.faqs.length) { list.appendChild(el("p", "pagesub", "No questions yet — add the first one below.")); return; }
+  S.faqs.forEach((f) => {
+    const item = el("div", "item" + (f.is_visible === false ? " hidden-item" : ""));
+    const row = el("div", "itemrow");
+    row.appendChild(el("span", "name", f.question));
+    row.appendChild(el("span", "spacer"));
+    if (f.is_visible === false) row.appendChild(el("span", "tag off", "Hidden"));
+    row.appendChild(visSwitch(f, "faqs", renderFaqs));
+    const edit = el("button", "btn quiet", "Edit");
+    edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(simpleEditor(f, "faqs", [["question","Question","text",200],["answer","Answer","textarea",2000]], renderFaqs)); });
+    row.appendChild(edit);
+    item.appendChild(row); list.appendChild(item);
+  });
+}
+function renderTes() {
+  const list = $("tesList"); list.innerHTML = "";
+  if (!S.testimonials.length) { list.appendChild(el("p", "pagesub", "No testimonials yet — add one below.")); return; }
+  S.testimonials.forEach((t) => {
+    const item = el("div", "item" + (t.is_visible === false ? " hidden-item" : ""));
+    const row = el("div", "itemrow");
+    row.appendChild(el("span", "name", `“${t.quote.length > 60 ? t.quote.slice(0, 59) + "…" : t.quote}”`));
+    row.appendChild(el("span", "meta", "— " + t.author));
+    row.appendChild(el("span", "spacer"));
+    if (t.is_visible === false) row.appendChild(el("span", "tag off", "Hidden"));
+    row.appendChild(visSwitch(t, "testimonials", renderTes));
+    const edit = el("button", "btn quiet", "Edit");
+    edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(simpleEditor(t, "testimonials", [["quote","Quote","textarea",600],["author","From","text",120],["source","Where","text",80]], renderTes)); });
+    row.appendChild(edit);
+    item.appendChild(row); list.appendChild(item);
+  });
+}
+function renderPosts() {
+  const list = $("postList"); list.innerHTML = "";
+  if (!S.posts.length) { list.appendChild(el("p", "pagesub", "No updates yet — write your first one below.")); return; }
+  S.posts.forEach((p) => {
+    const item = el("div", "item" + (p.status !== "published" ? " hidden-item" : ""));
+    const row = el("div", "itemrow");
+    row.appendChild(el("span", "name", p.title));
+    row.appendChild(el("span", "meta", p.status === "published" ? (p.published_at ? fmtDate(p.published_at) : "Shown") : "Draft"));
+    row.appendChild(el("span", "spacer"));
+    if (p.status !== "published") row.appendChild(el("span", "tag off", "Draft"));
+    const vis = el("button", "switch" + (p.status === "published" ? " on" : "")); vis.role = "switch";
+    vis.setAttribute("aria-checked", String(p.status === "published"));
+    vis.setAttribute("aria-label", `${p.title}: shown on your Updates page`);
+    vis.title = p.status === "published" ? "Shown — click to make it a draft" : "Draft — click to show it";
+    vis.addEventListener("click", async () => {
+      try { const r = await api("PATCH", `/posts/${p.id}`, { status: p.status === "published" ? "draft" : "published" });
+        Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
+      catch (err) { toast(err.message, true); }
+    });
+    const edit = el("button", "btn quiet", "Edit");
+    edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(postEditor(p)); });
+    row.append(vis, edit);
+    item.appendChild(row); list.appendChild(item);
+  });
+}
+function postEditor(p) {
+  const ed = el("div", "editor");
+  ed.innerHTML = `
+    <div class="frow"><label>Title</label><input type="text" data-k="title" value="${esc(p.title)}" maxlength="160"></div>
+    <div class="frow"><label>Body</label><textarea data-k="body_md" maxlength="20000" style="min-height:140px">${esc(p.body_md || "")}</textarea></div>
+    <div class="frow"><label>Photo</label><button class="btn" data-act="photo" style="align-self:flex-start">${p.hero_media_id ? "Change photo" : "Choose photo"}</button></div>
+    <div style="display:flex;gap:var(--s3);justify-content:space-between">
+      <button class="btn danger" data-act="del">Remove</button>
+      <button class="btn primary" data-act="save">Save</button>
+    </div>`;
+  ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
+    try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  }));
+  ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
+    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
+    try { const r = await api("PATCH", `/posts/${p.id}`, body); Object.assign(p, r.data); renderPosts(); toast("Saved"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  armDelete(ed.querySelector('[data-act="del"]'), async () => {
+    try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); renderPosts(); toast("Removed"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  return ed;
+}
+function visSwitch(entity, collection, rerender) {
+  const on = entity.is_visible !== false;
+  const vis = el("button", "switch" + (on ? " on" : "")); vis.role = "switch";
+  vis.setAttribute("aria-checked", String(on));
+  vis.setAttribute("aria-label", "Shown on your site");
+  vis.title = on ? "Shown on your site — click to hide" : "Hidden — click to show";
+  vis.addEventListener("click", async () => {
+    try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: !on });
+      Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  return vis;
+}
+function simpleEditor(entity, collection, fields, rerender) {
+  const ed = el("div", "editor");
+  ed.innerHTML = fields.map(([k, label, kind, max]) => `
+    <div class="frow"><label>${label}</label>${kind === "textarea"
+      ? `<textarea data-k="${k}" maxlength="${max}">${esc(entity[k] || "")}</textarea>`
+      : `<input type="text" data-k="${k}" value="${esc(entity[k] || "")}" maxlength="${max}">`}</div>`).join("") + `
+    <div style="display:flex;gap:var(--s3);justify-content:space-between">
+      <button class="btn danger" data-act="del">Remove</button>
+      <button class="btn primary" data-act="save">Save</button>
+    </div>`;
+  ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
+    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
+    try { const r = await api("PATCH", `/${collection}/${entity.id}`, body); Object.assign(entity, r.data); rerender(); toast("Saved"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  armDelete(ed.querySelector('[data-act="del"]'), async () => {
+    try { await api("DELETE", `/${collection}/${entity.id}`);
+      S[collection] = S[collection].filter((x) => x.id !== entity.id); rerender(); toast("Removed"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  return ed;
+}
+$("btnAddFaq").addEventListener("click", async () => {
+  const q = $("new-faq-q").value.trim(), a = $("new-faq-a").value.trim();
+  if (!q || !a) { toast("Both the question and the answer are needed.", true); return; }
+  try { const r = await api("POST", "/faqs", { question: q, answer: a });
+    S.faqs.push(r.data); $("new-faq-q").value = ""; $("new-faq-a").value = ""; renderFaqs(); toast("Added"); scheduleChangesRefresh(); }
+  catch (err) { toast(err.message, true); }
+});
+$("btnAddTes").addEventListener("click", async () => {
+  const quote = $("new-tes-quote").value.trim(), author = $("new-tes-author").value.trim();
+  if (!quote || !author) { toast("The quote and who it’s from are needed.", true); return; }
+  try { const r = await api("POST", "/testimonials", { quote, author, source: $("new-tes-source").value.trim() });
+    S.testimonials.push(r.data); $("new-tes-quote").value = ""; $("new-tes-author").value = ""; $("new-tes-source").value = "";
+    renderTes(); toast("Added"); scheduleChangesRefresh(); }
+  catch (err) { toast(err.message, true); }
+});
+$("btnAddPost").addEventListener("click", async () => {
+  const title = $("new-post-title").value.trim(), body = $("new-post-body").value;
+  if (!title) { toast("A title is needed.", true); return; }
+  try { const r = await api("POST", "/posts", { title, body_md: body, status: "draft" });
+    S.posts.unshift(r.data); $("new-post-title").value = ""; $("new-post-body").value = "";
+    renderPosts(); toast("Saved as a draft — show it when you’re ready"); scheduleChangesRefresh(); }
+  catch (err) { toast(err.message, true); }
+});
+
+/* ── media library + picker + upload ── */
+async function loadMedia() {
+  try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); }
+  catch (err) { toast(err.message, true); }
+}
+function renderMediaGrid(grid, manage, onPick) {
+  grid.innerHTML = "";
+  if (!S.media.length) { grid.appendChild(el("p", "pagesub", "No photos yet.")); return; }
+  S.media.forEach((m) => {
+    const cell = el(onPick ? "button" : "div", "mcell");
+    if (m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.loading = "lazy"; cell.appendChild(img); }
+    if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "Used by " + m.used_by.join(", "); cell.appendChild(b); }
+    if (m.alt_text) cell.appendChild(el("span", "alt", m.alt_text));
+    if (onPick) cell.addEventListener("click", () => onPick(m.id));
+    if (manage) {
+      const del = el("button", "del", "✕"); del.title = "Remove this photo"; del.setAttribute("aria-label", "Remove photo: " + (m.alt_text || ""));
+      del.addEventListener("click", async () => {
+        if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); return; }
+        try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
+        catch (err) { toast(err.message, true); }
+      });
+      cell.appendChild(del);
+    }
+    grid.appendChild(cell);
+  });
+}
+$("btnUpload").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", () => {
+  const f = $("fileInput").files[0]; if (!f) return;
+  S.pendingFile = f;
+  $("uploadPrep").hidden = false; $("upload-alt").value = ""; $("upload-alt").focus();
+});
+$("btnUploadCancel").addEventListener("click", () => { S.pendingFile = null; $("uploadPrep").hidden = true; $("fileInput").value = ""; });
+$("btnUploadGo").addEventListener("click", async () => {
+  const f = S.pendingFile, alt = $("upload-alt").value.trim();
+  if (!f) return;
+  if (alt.length < 3) { toast("Please describe the photo first.", true); return; }
+  whisper("save-media", "Uploading…");
+  try {
+    const dims = await new Promise((res) => { const img = new Image(); img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight }); img.onerror = () => res({}); img.src = URL.createObjectURL(f); });
+    const r = await api("POST", "/media/upload-url", { mime: f.type, bytes: f.size, alt_text: alt, width: dims.w, height: dims.h });
+    const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": f.type }, body: f });
+    if (!put.ok) throw new Error("The upload didn’t finish — please try again.");
+    whisper("save-media", "saved");
+    $("uploadPrep").hidden = true; $("fileInput").value = ""; S.pendingFile = null;
+    await loadMedia(); toast("Photo added");
+  } catch (err) { whisper("save-media", ""); toast(err.message, true); }
+});
+function openPicker(onPick) {
+  S.pickerTarget = onPick;
+  renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); });
+  openSheet("pickerScrim");
+}
+$("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if (S.pickerTarget) S.pickerTarget(null); });
+
+/* ── today: health + facts + notes + changes ── */
+async function loadToday() {
+  try {
+    const [h, c, n] = await Promise.all([api("GET", "/health"), api("GET", "/changes"), api("GET", "/notes")]);
+    S.health = h.data; S.changes = c.data;
+    renderHealth(); renderFacts(); renderNotes(n.data || []); renderRecent(); renderPill(); renderWelcome();
+  } catch (err) { toast(err.message, true); }
+}
+function renderHealth() {
+  const w = $("healthWrap"); const h = S.health; if (!h) return;
+  w.innerHTML = "";
+  if (h.first_run) { w.hidden = true; return; }
+  w.hidden = false;
+  const box = el("div", "health " + h.state);
+  box.appendChild(el("span", "lamp"));
+  const t = el("div");
+  t.appendChild(el("div", "sentence", h.sentence));
+  if (h.detail) t.appendChild(el("div", "detail", h.detail));
+  box.appendChild(t);
+  w.appendChild(box);
+}
+function renderFacts() {
+  const w = $("factsWrap"); const f = S.health && S.health.facts; if (!f) { w.innerHTML = ""; return; }
+  w.innerHTML = "";
+  const mk = (k, v, d, cls) => {
+    const c = el("div", "fact" + (cls ? " " + cls : ""));
+    c.appendChild(el("div", "k", k)); c.appendChild(el("div", "v", v)); if (d) c.appendChild(el("div", "d", d));
+    return c;
+  };
+  w.appendChild(mk("Website", f.website.label, f.website.detail, f.website.state === "live" ? "live" : f.website.state === "attention" ? "attention" : ""));
+  w.appendChild(mk("Draft", f.draft.label, f.draft.detail, f.draft.state === "changes" ? "attention" : ""));
+  w.appendChild(mk("Last publish", f.last_publish.label, f.last_publish.detail));
+  w.appendChild(mk("Domain", f.domain.label, f.domain.detail, f.domain.state === "attention" ? "attention" : ""));
+}
+function renderNotes(notes) {
+  $("notesWrap").hidden = !notes.length;
+  const list = $("notesList"); list.innerHTML = "";
+  notes.forEach((n) => {
+    const card = el("div", "note " + n.kind);
+    const b = el("div"); b.style.flex = "1";
+    b.appendChild(el("div", "t", n.title));
+    b.appendChild(el("div", "r", n.reason));
+    const acts = el("div", "acts");
+    if (n.action && n.action.label) {
+      const act = el("button", "btn", n.action.label);
+      act.addEventListener("click", async () => {
+        try { await api("POST", `/notes/${n.id}/accept`); } catch { /* outcome recording is best-effort */ }
+        const sec = n.action.section;
+        if (sec === "publish") openPublishSheet();
+        else if (sec === "preview") openPreview("live");
+        else if (sec) go(sec);
+        loadToday();
+      });
+      acts.appendChild(act);
+    }
+    const dis = el("button", "btn quiet", "Dismiss");
+    dis.addEventListener("click", async () => {
+      try { await api("POST", `/notes/${n.id}/dismiss`); card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }
+      catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(dis);
+    b.appendChild(acts);
+    card.appendChild(b);
+    list.appendChild(card);
+  });
+}
+function renderRecent() {
+  const c = S.changes;
+  $("recentWrap").hidden = !c || !c.changes.length;
+  const list = $("recentList"); list.innerHTML = "";
+  (c ? c.changes.slice(0, 8) : []).forEach((ch) => {
+    const row = el("div", "chg");
+    row.appendChild(el("span", "sec", ch.section));
+    row.appendChild(el("span", null, ch.sentence));
+    list.appendChild(row);
+  });
+  if (c && c.changes.length > 8) list.appendChild(el("p", "pagesub", `…and ${c.changes.length - 8} more — the publish button shows everything.`));
+}
+function renderPill() {
+  const c = S.changes; const pill = $("draftPill");
+  if (!c) return;
+  pill.classList.toggle("changes", c.count > 0);
+  pill.classList.toggle("clean", c.count === 0);
+  $("draftPillText").textContent = c.count === 0 ? "Up to date" : `${c.count} change${c.count > 1 ? "s" : ""}`;
+}
+function scheduleChangesRefresh() {
+  debounce("changes", async () => {
+    try { const c = await api("GET", "/changes"); S.changes = c.data; renderPill();
+      if ($("view-today").classList.contains("on")) renderRecent(); }
+    catch { /* pill refresh is quiet */ }
+  }, 1200);
+}
+function renderWelcome() {
+  const w = $("welcomeWrap"); const h = S.health;
+  if (!h || !h.first_run) { w.hidden = true; w.innerHTML = ""; return; }
+  w.hidden = false;
+  const name = (S.identity && S.identity.business_name) || "your business";
+  const step1done = !!(S.identity && S.identity.business_name && S.identity.description);
+  const step2done = localStorage.getItem("presence-previewed") === "1";
+  w.innerHTML = "";
+  const box = el("div", "welcome");
+  box.appendChild(el("h2", null, `Let’s introduce ${name} to the internet.`));
+  box.appendChild(el("p", null, "Three steps, at your pace. Nothing goes public until you say so."));
+  const steps = el("div", "steps");
+  const mk = (n, done, s, d, fn) => {
+    const b = el("button", "step" + (done ? " done" : ""));
+    b.appendChild(el("span", "n", done ? "✓" : String(n)));
+    const t = el("span"); t.appendChild(el("span", "s", s)); t.appendChild(document.createElement("br")); t.appendChild(el("span", "d", d));
+    b.appendChild(t);
+    b.addEventListener("click", fn);
+    return b;
+  };
+  steps.appendChild(mk(1, step1done, "Check your business facts", "Name, hours, address — the things customers look up.", () => go("business")));
+  steps.appendChild(mk(2, step2done, "Look at your website", "See exactly what customers will see. It’s a draft — nothing is public.", () => openPreview()));
+  steps.appendChild(mk(3, false, "Publish when you’re ready", "One button. We’ll show you exactly what goes up first.", () => openPublishSheet()));
+  box.appendChild(steps);
+  w.appendChild(box);
+}
+
+/* ── preview stage ── */
+const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null };
+async function openPreview(ver) {
+  if (ver) PV.ver = ver;
+  PV.publishId = null;
+  $("verSeg").style.display = "";
+  syncStageChrome();
+  openStage();
+  localStorage.setItem("presence-previewed", "1");
+  await loadPreview();
+}
+async function openPublishPreview(publishId) {
+  PV.publishId = publishId;
+  $("verSeg").style.display = "none";
+  openStage();
+  await loadPreview();
+}
+function openStage() { $("stage").classList.add("on"); document.body.style.overflow = "hidden"; }
+function closePreview() { $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; }
+$("btnStageClose").addEventListener("click", closePreview);
+$("btnPreview").addEventListener("click", () => openPreview("draft"));
+function syncStageChrome() {
+  document.querySelectorAll("#verSeg button").forEach((b) => b.classList.toggle("on", b.dataset.ver === PV.ver));
+  document.querySelectorAll("#devSeg button").forEach((b) => b.classList.toggle("on", b.dataset.dev === PV.dev));
+  $("stageFrame").classList.toggle("mobile", PV.dev === "mobile");
+  $("pageSel").value = PV.page;
+}
+$("verSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.ver = b.dataset.ver; syncStageChrome(); loadPreview(); });
+$("devSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.dev = b.dataset.dev; syncStageChrome(); });
+$("pageSel").addEventListener("change", () => { PV.page = $("pageSel").value; loadPreview(); });
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
+});
+async function loadPreview() {
+  const frame = $("previewFrame");
+  frame.srcdoc = `<div style="font-family:sans-serif;color:#8b8098;padding:40px;text-align:center">Loading your ${PV.publishId ? "" : PV.ver + " "}site…</div>`;
+  try {
+    const q = PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`;
+    let html = await apiHtml(`/preview?${q}`);
+    /* in-stage navigation: internal links post back to the room instead of navigating the iframe */
+    html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
+    frame.srcdoc = html;
+  } catch (err) {
+    frame.srcdoc = `<div style="font-family:sans-serif;color:#574d68;padding:48px;text-align:center;max-width:420px;margin:0 auto"><p style="font-size:18px">${esc(err.message)}</p></div>`;
+  }
+}
+
+/* ── publish sheet ── */
+async function openPublishSheet() {
+  openSheet("publishScrim");
+  $("pubSheetBody").innerHTML = `<p class="pagesub">Checking what’s changed…</p>`;
+  $("btnPublishGo").disabled = true; $("btnPublishGo").dataset.mode = "";
+  try {
+    const c = (await api("GET", "/changes")).data;
+    S.changes = c; renderPill();
+    const body = $("pubSheetBody"); body.innerHTML = "";
+    if (c.first_publish) {
+      $("pubSheetTitle").textContent = "Publish your site";
+      $("pubSheetSub").textContent = "This is the moment your website goes live. Here’s what goes up:";
+    } else if (c.count === 0) {
+      $("pubSheetTitle").textContent = "You’re up to date";
+      $("pubSheetSub").textContent = "Everything you’ve written is already on your website.";
+    } else {
+      $("pubSheetTitle").textContent = "Publish";
+      $("pubSheetSub").textContent = "Here’s exactly what changes on your website:";
+    }
+    if (c.blockers > 0) {
+      const bb = el("div", "blockerbox");
+      bb.appendChild(el("strong", null, `${c.blockers} thing${c.blockers > 1 ? "s" : ""} need${c.blockers > 1 ? "" : "s"} fixing first.`));
+      bb.appendChild(el("p", null, "Usually a missing business fact — check the Business section. Your draft is safe; publishing just waits until it’s complete."));
+      body.appendChild(bb);
+    }
+    c.changes.forEach((ch) => {
+      const row = el("div", "chg");
+      row.appendChild(el("span", "sec", ch.section));
+      row.appendChild(el("span", null, ch.sentence));
+      body.appendChild(row);
+    });
+    const btn = $("btnPublishGo");
+    btn.textContent = c.first_publish ? "Publish my site" : c.count > 0 ? `Publish ${c.count} change${c.count > 1 ? "s" : ""}` : "Publish";
+    btn.disabled = c.count === 0 && !c.first_publish || c.blockers > 0;
+  } catch (err) {
+    $("pubSheetBody").innerHTML = `<p class="pagesub">${esc(err.message)}</p>`;
+  }
+}
+$("btnPublish").addEventListener("click", openPublishSheet);
+$("draftPill").addEventListener("click", openPublishSheet);
+$("btnPublishGo").addEventListener("click", async () => {
+  const btn = $("btnPublishGo");
+  if (btn.dataset.mode === "done") {
+    btn.dataset.mode = ""; btn.textContent = "Publish";
+    closeSheet("publishScrim"); loadToday();
+    return;
+  }
+  btn.disabled = true; btn.textContent = "Publishing…";
+  try {
+    const r = await api("POST", "/publish");
+    if (r.data.status === "live") finishPublish(r.data.message);
+    else {
+      $("pubSheetSub").textContent = r.data.message;
+      $("pubSheetBody").innerHTML = `<p class="pagesub">Your site is on its way up — this usually takes under a minute.</p>`;
+      pollPublish(0);
+    }
+  } catch (err) {
+    btn.disabled = false; btn.textContent = "Try again";
+    if (err.body && err.body.fields) {
+      $("pubSheetBody").innerHTML = "";
+      const bb = el("div", "blockerbox");
+      bb.appendChild(el("strong", null, err.message));
+      const ul = el("ul"); (err.body.fields || []).forEach((f) => ul.appendChild(el("li", null, typeof f === "string" ? f : f.message || "")));
+      bb.appendChild(ul);
+      $("pubSheetBody").appendChild(bb);
+    } else toast(err.message, true);
+  }
+});
+async function pollPublish(n) {
+  if (n > 30) { $("pubSheetSub").textContent = "This is taking longer than usual — it’s still working. You can close this; History will show the result."; return; }
+  await new Promise((r) => setTimeout(r, 4000));
+  try {
+    const pubs = (await api("GET", "/publishes")).data;
+    const top = pubs[0];
+    if (top && top.status === "live") return finishPublish("Your site is live. Every change you made is now published.");
+    if (top && top.status === "failed") {
+      $("pubSheetSub").textContent = "That publish didn’t go through — your live site is unchanged and nothing was lost. We’ve been notified; try again in a minute.";
+      $("btnPublishGo").disabled = false; $("btnPublishGo").textContent = "Try again";
+      return;
+    }
+  } catch { /* keep polling */ }
+  pollPublish(n + 1);
+}
+function finishPublish(msg) {
+  $("pubSheetTitle").textContent = "Published";
+  $("pubSheetSub").textContent = msg;
+  $("pubSheetBody").innerHTML = "";
+  const btn = $("btnPublishGo");
+  btn.disabled = false; btn.textContent = "Done"; btn.dataset.mode = "done";
+  scheduleChangesRefresh();
+}
+
+/* ── history + restore ── */
+async function loadHistory() {
+  const list = $("pubList");
+  list.innerHTML = `<p class="pagesub">Loading…</p>`;
+  try {
+    const pubs = (await api("GET", "/publishes")).data;
+    S.publishes = pubs;
+    list.innerHTML = "";
+    if (!pubs.length) { list.appendChild(el("p", "pagesub", "No publishes yet. When you publish, every version appears here.")); return; }
+    pubs.forEach((p) => {
+      const row = el("div", "pub");
+      row.appendChild(el("span", "st " + p.status));
+      const mid = el("div"); mid.style.minWidth = "0";
+      mid.appendChild(el("div", "sum", p.summary));
+      mid.appendChild(el("div", "when", fmtDate(p.at) + (p.status === "failed" ? " · didn’t go through (your site was unchanged)" : p.status === "publishing" ? " · in progress" : "")));
+      row.appendChild(mid);
+      const acts = el("div", "acts");
+      if (p.status === "live" && p.restorable) {
+        const view = el("button", "btn quiet", "View");
+        view.addEventListener("click", () => openPublishPreview(p.id));
+        acts.appendChild(view);
+        const res = el("button", "btn", "Bring back");
+        res.addEventListener("click", () => {
+          S.restoreTarget = p;
+          $("resSheetSub").textContent = `“${p.summary}” — published ${fmtDate(p.at)}.`;
+          openSheet("restoreScrim");
+        });
+        acts.appendChild(res);
+      } else if (p.status === "live" && !p.restorable) {
+        acts.appendChild(el("span", "tag", "Kept for the record"));
+      }
+      row.appendChild(acts);
+      list.appendChild(row);
+    });
+  } catch (err) { list.innerHTML = `<p class="pagesub">${esc(err.message)}</p>`; }
+}
+$("btnRestoreGo").addEventListener("click", async () => {
+  const p = S.restoreTarget; if (!p) return;
+  const btn = $("btnRestoreGo");
+  btn.disabled = true; btn.textContent = "Bringing it back…";
+  try {
+    const r = await api("POST", "/restore-to-draft", { publish_id: p.id });
+    closeSheet("restoreScrim");
+    toast(r.data.message);
+    btn.disabled = false; btn.textContent = "Bring it into my draft";
+    await refreshAll();
+    go("today");
+  } catch (err) {
+    btn.disabled = false; btn.textContent = "Bring it into my draft";
+    toast(err.message, true);
+  }
+});
+
+/* ── initial load ── */
+function fillSingles() {
+  const i = S.identity || {};
+  [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"]]
+    .forEach(([id, k]) => { $(id).value = i[k] || ""; });
+  const l = S.location || {};
+  [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
+    .forEach(([id, k]) => { $(id).value = l[k] || ""; });
+  $("whoName").textContent = i.business_name || "Your business";
+  renderHours();
+}
+async function refreshAll() {
+  const [siteR, off, faq, tes, pos, med, set] = await Promise.all([
+    api("GET", "/site"),
+    api("GET", "/offerings"), api("GET", "/faqs"), api("GET", "/testimonials"), api("GET", "/posts"),
+    api("GET", "/media"), api("GET", "/settings"),
+  ]);
+  S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
+  S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
+  S.media = med.data || []; S.settings = set.data || {};
+  fillSingles(); renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
+  await loadToday();
+}
+(async function boot() {
+  try {
+    const { data } = await sb.auth.getSession();
+    if (!data || !data.session) {
+      showGate("Sign in to see your Presence", "Your Presence room uses the same sign-in as your portal. Sign in there, then come back — you’ll land right here.", true);
+      return;
+    }
+    $("gate").hidden = true; $("app").hidden = false;
+    await refreshAll();
+    // deep links: presence.html?view=business|offerings|…|preview|publish
+    const v = new URLSearchParams(location.search).get("view");
+    if (v === "preview") openPreview("draft");
+    else if (v === "publish") openPublishSheet();
+    else if (v && $("view-" + v)) go(v);
+  } catch (err) {
+    if (err.status === 404) showGate("Almost there", "Your Presence site isn’t set up yet — your studio is on it. Check back soon, or send us a message from your portal.", true);
+    else if (err.status === 403) showGate("Paused", err.message, true);
+    else if (err.message !== "no-session") showGate("Something didn’t load", "Your content is safe. Refresh to try again, or reach us from your portal.", true);
+  }
+})();
+</script>
+</body>
+</html>

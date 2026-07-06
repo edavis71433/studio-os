@@ -4,27 +4,105 @@
   "version": "1.0.0",
   "content_contract_version": 1,
   "pages": [
-    { "path": "/", "kind": "home" },
-    { "path": "/menu/", "kind": "menu" },
-    { "path": "/about/", "kind": "about" },
-    { "path": "/faq/", "kind": "faq" },
-    { "path": "/contact/", "kind": "contact" },
-    { "path": "/updates/", "kind": "post_index" },
-    { "path": "/updates/:slug/", "kind": "post" }
+    {
+      "path": "/",
+      "kind": "home"
+    },
+    {
+      "path": "/menu/",
+      "kind": "menu"
+    },
+    {
+      "path": "/about/",
+      "kind": "about"
+    },
+    {
+      "path": "/faq/",
+      "kind": "faq"
+    },
+    {
+      "path": "/contact/",
+      "kind": "contact"
+    },
+    {
+      "path": "/updates/",
+      "kind": "post_index"
+    },
+    {
+      "path": "/updates/:slug/",
+      "kind": "post"
+    }
   ],
   "entities": {
-    "identity": { "required": ["business_name", "description"], "required_any": [["phone", "email"]] },
-    "location": { "required": ["address_line1", "city", "region", "postal_code", "timezone", "hours"], "max": 1 },
-    "offerings": { "required": ["name", "category"], "max": 80 },
-    "testimonials": { "required": ["quote", "author"], "max": 12 },
-    "faqs": { "required": ["question", "answer"], "max": 20 },
-    "posts": { "required": ["title", "slug", "body_md"], "max": 50 },
-    "media": { "max": 100 }
+    "identity": {
+      "required": [
+        "business_name",
+        "description"
+      ],
+      "required_any": [
+        [
+          "phone",
+          "email"
+        ]
+      ]
+    },
+    "offerings": {
+      "required": [
+        "name",
+        "category"
+      ],
+      "max": 80
+    },
+    "testimonials": {
+      "required": [
+        "quote",
+        "author"
+      ],
+      "max": 12
+    },
+    "faqs": {
+      "required": [
+        "question",
+        "answer"
+      ],
+      "max": 20
+    },
+    "posts": {
+      "required": [
+        "title",
+        "slug",
+        "body_md"
+      ],
+      "max": 50
+    },
+    "media": {
+      "max": 100
+    },
+    "locations": {
+      "required": [
+        "address_line1",
+        "city",
+        "region",
+        "postal_code",
+        "timezone",
+        "hours"
+      ],
+      "max": 1
+    }
   },
   "image_variants": {
-    "w400": { "width": 400, "format": "webp" },
-    "w800": { "width": 800, "format": "webp" },
-    "w1600": { "width": 1600, "format": "webp" }
+    "w400": {
+      "width": 400,
+      "format": "webp"
+    },
+    "w800": {
+      "width": 800,
+      "format": "webp"
+    },
+    "w1600": {
+      "width": 1600,
+      "format": "webp"
+    }
   },
   "validation": {
     "blockers": [
@@ -47,5 +125,16 @@
       "no media"
     ]
   },
-  "preview_fixture": "./fixture.json"
+  "preview_fixture": "./fixture.json",
+  "regions": {
+    "identity.business_name": "home hero",
+    "identity.tagline": "home hero",
+    "identity.description": "home about",
+    "location.address": "info strip",
+    "location.hours": "hours tables",
+    "offering": "menu + featured items (data-pr-id)",
+    "testimonial": "guest cards (data-pr-id)",
+    "faq": "question terms (data-pr-id)",
+    "post": "updates index (data-pr-id)"
+  }
 }
