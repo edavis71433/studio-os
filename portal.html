@@ -3138,15 +3138,27 @@ async function requestRevision(id, title) {
   document.getElementById("revisionModal").style.display = "flex";
 }
 
+var _revisionBusy = false;
 async function submitRevision() {
   var note = document.getElementById("revisionNote").value.trim();
   if (!note) { showToast("Please describe what you'd like changed."); return; }
-  closeRevisionModal();
-  await sb.from("approvals").update({status: "changes_requested", client_feedback: note, responded_at: new Date().toISOString()}).eq("id", _revisionId);
-  try { await sb.from("activity_log").insert({ client_id: CLIENT.id, action: "requested_changes", detail: "Requested changes: " + note.slice(0,120) }); } catch(e){}
-  showToast("Revision request sent to Eric.");
-  await loadApprovals();
-  await sendNotification("approval_action", _revisionTitleText, "", {action: "revision", note: note, clientId: CLIENT.id});
+  if (_revisionBusy) return;   // one submit at a time
+  _revisionBusy = true;
+  try {
+    // Write FIRST, close the modal only on confirmed success — a failed send
+    // keeps the modal open with the note intact so nothing the client typed
+    // is lost. .select('id') catches hard errors and silent zero-row updates.
+    var res = await sb.from("approvals").update({status: "changes_requested", client_feedback: note, responded_at: new Date().toISOString()}).eq("id", _revisionId).select("id");
+    if (res.error || !res.data || res.data.length === 0) {
+      showToast("That didn't send — your note is still here. Please try again.");
+      return;
+    }
+    closeRevisionModal();
+    try { await sb.from("activity_log").insert({ client_id: CLIENT.id, action: "requested_changes", detail: "Requested changes: " + note.slice(0,120) }); } catch(e){}
+    showToast("Revision request sent to Eric.");
+    await loadApprovals();
+    await sendNotification("approval_action", _revisionTitleText, "", {action: "revision", note: note, clientId: CLIENT.id});
+  } finally { _revisionBusy = false; }
 }
 
 function closeRevisionModal() {
