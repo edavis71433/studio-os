@@ -429,7 +429,14 @@ async function askAI(opts: AskAIOpts): Promise<AskAIResult> {
 
   if (!ANTHROPIC_KEY) return fail('no_anthropic_key', 0);
 
-  // system as cacheable block(s): hardening + the static prefix marked ephemeral
+  // system as cacheable block(s): hardening + the static prefix marked ephemeral.
+  // PROVEN (staging sweep 2026-07-05): caching works correctly here — a cached
+  // prefix >= ~4096 tokens produces cache_creation then cache_read on repeat.
+  // The catch: claude-haiku-4-5's MINIMUM cacheable prefix is ~4096 tokens, so
+  // 'fast'-tier prompts under that (concierge ~1.9k, drafting ~2.4k) legitimately
+  // do NOT cache — expected, not a bug. Caching pays off for large 'fast' prompts
+  // (>4096) or any 'deep'/Sonnet prompt (its floor is ~1024). Design agents that
+  // want caching accordingly; do not inflate prompts just to cross the floor.
   const sysText = (harden ? AI_INJECTION_HARDENING + '\n\n' : '') + opts.system;
   const system: any = cacheSystem
     ? [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }]

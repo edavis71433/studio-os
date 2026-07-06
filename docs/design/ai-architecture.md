@@ -255,3 +255,34 @@ next starts.
 Recommended first build: **the AI Gateway**, because every other item is cheaper,
 safer, and measurable once it exists — and it's the one thing that turns 19
 scattered calls into a workforce you can actually manage.
+
+---
+
+## Addendum — prompt caching, PROVEN (2026-07-05, staging)
+
+A controlled probe (padded system prompt, write-then-read pairs) settled the
+caching question definitively:
+
+| Cached prefix size | 1st call (write) | 2nd call (read) |
+|---|---|---|
+| ~2,382 tok (drafting today) | 0 | 0 |
+| ~4,578 tok | 4,578 | 4,578 |
+| ~6,778 tok | 6,778 | 6,778 |
+| ~11,178 tok | 11,178 | 11,178 |
+
+**Conclusion:** the gateway's caching is wired correctly (version `2023-06-01` +
+`anthropic-beta: prompt-caching-2024-07-31` + `cache_control: ephemeral` on the
+system block). It activates cleanly once the cached prefix clears the model's
+minimum. **Claude Haiku 4.5's minimum cacheable prefix is ~4096 tokens** — higher
+than the 2048 of older Haiku, and above both the concierge (~1.9k) and drafting
+(~2.4k) prompts. So those legitimately do not cache; that is expected, not a bug.
+
+**Design implication (drives future agents):**
+- Caching helps on the `fast` (Haiku) tier only when the shared system prefix is
+  genuinely large (>4096 tok) — e.g. the Website Analysis Agent's full audit
+  rubric, or a rich reporting brief.
+- On the `deep` (Sonnet) tier the floor is ~1024 tok, so deep-tier agents cache
+  readily. Route caching-sensitive, large-context work through `deep` when the
+  quality/caching tradeoff fits.
+- Do NOT inflate a prompt just to cross the floor. Let caching follow from
+  prompts that are large because they need to be.
