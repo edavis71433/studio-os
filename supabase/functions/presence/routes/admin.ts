@@ -18,6 +18,7 @@ import { runPipeline, handlePublish, CALM } from './publish.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
 import { runRecommendation } from '../recommendation/engine.ts';
+import { runMoments } from '../moments/engine.ts';
 import {
   netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
   setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
@@ -501,6 +502,20 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     const statusFilter = status === 'all' ? '' : status === 'suppressed' ? '&status=eq.suppressed' : '&status=eq.active';
     const rows = await svc(`presence_recommendations?batch_id=eq.${batchFilter}${statusFilter}&select=recommendation_hash,recommendation_key,rule,category,priority,action,title,description,reason,expected_benefit,value_dimensions,estimated_effort,estimated_risk,undoability,timing,audience,affected_resources,requires_ai,manual_available,approval_required,status,suppression_reason,supporting_judgment_ids,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
     return json({ data: { batch_id: batchFilter, recommendations: rows.json ?? [] } }, 200, cors);
+  }
+
+  // ── M9.3: the Business Moments Engine (deterministic; consumes recommendations only) ──
+  if (sub === '/moments-generate' && method === 'POST') {
+    const summary = await runMoments(site);
+    return json({ data: summary }, summary.ok ? 200 : summary.error === 'no_recommendation_batch' ? 409 : 502, cors);
+  }
+  if (sub === '/moments' && method === 'GET') {
+    // operator view: full internal fields, latest batch (or all statuses)
+    const url = new URL(req.url);
+    const status = url.searchParams.get('status');
+    const filter = status === 'all' ? '' : `&status=eq.${/^[a-z_]+$/.test(status || '') ? status : 'active'}`;
+    const rows = await svc(`presence_moments?site_id=eq.${site.id}${filter}&select=*&order=created_at.desc&limit=60`);
+    return json({ data: rows.json ?? [] }, 200, cors);
   }
 
   return null;

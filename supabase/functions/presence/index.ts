@@ -25,6 +25,7 @@ import { handleMediaUpload, handleMediaDelete } from './routes/media.ts';
 import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
+import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -97,6 +98,12 @@ serve(async (req) => {
     if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
   }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
+  // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
+  if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);
+  {
+    const m = route.match(/^\/moments\/([0-9a-f-]{36})\/dismiss$/);
+    if (m && method === 'POST') return handleMomentDismiss(site, m[1], cors);
+  }
   if (route === '/media' && method === 'GET') return handleMediaList(site, cors);
   if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, jwt, site, principal, cors); if (r) return r; }
   if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, jwt, site, principal, cors); if (r) return r; }
