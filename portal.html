@@ -4684,7 +4684,7 @@ function renderHQ(b){
   function door(src, extra){
     if(!src||!src.kind) return '';
     var lbl=fEsc(src.label||'Open');
-    return '<button class="lg-door" onclick="hqSourceNav(\''+fAtt(String(src.kind))+'\')">'+lbl+' \u2192</button>'+(extra||'');
+    return '<button class="lg-door" onclick="hqSourceNav(\''+fAttr(String(src.kind))+'\')">'+lbl+' \u2192</button>'+(extra||'');
   }
   function entry(margin, bodyHtml, cls){
     return '<div class="lg-entry hq-anim'+(cls?' '+cls:'')+'"><div class="lg-date">'+margin+'</div><div class="lg-body">'+bodyHtml+'</div></div>';
@@ -4713,7 +4713,7 @@ function renderHQ(b){
   if(hasNeed){
     var t0=todo[0];
     var cta = t0.source && t0.source.kind
-      ? '<button class="lg-cta" onclick="hqSourceNav(\''+fAtt(String(t0.source.kind))+'\')">'+fEsc((t0.source.label||'Review and decide'))+' \u2192</button>'
+      ? '<button class="lg-cta" onclick="hqSourceNav(\''+fAttr(String(t0.source.kind))+'\')">'+fEsc((t0.source.label||'Review and decide'))+' \u2192</button>'
       : '<button class="lg-cta" onclick="nav(\'work\')">Review and decide \u2192</button>';
     html+=entry('Today',
       '<div class="lg-t">'+fEsc(t0.text)+'</div>'
