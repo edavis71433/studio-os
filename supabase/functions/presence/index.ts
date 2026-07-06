@@ -22,9 +22,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory } from './routes/publish.ts';
 import { handleMediaUpload, handleMediaDelete } from './routes/media.ts';
-import { restoreDeploy } from './lib/netlify.ts';
-import { svc } from './lib/db.ts';
-import { writeChangeEvent } from './lib/provenance.ts';
+import { handleAdmin } from './routes/admin.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -48,21 +46,14 @@ serve(async (req) => {
   }
   const jwt = principal.jwt || '';
 
-  // ── ADMIN routes: staff-only, operate on any site by id, sit BEFORE the
-  //    caller-site resolution (staff own no site). Entitlement never applies
-  //    to admin (bypass), auth/role already proven by the principal.
-  if (route === '/admin/restore-deploy' && method === 'POST') {
+  // ── ADMIN routes (M6): staff-only, operate on any site by id, sit BEFORE
+  //    the caller-site resolution (staff own no site). Entitlement never
+  //    applies to admin (bypass); role proven by the principal, fail-closed.
+  if (route === '/admin' || route.startsWith('/admin/')) {
     if (principal.kind !== 'staff') return json({ error: 'forbidden', message: 'Staff only.' }, 403, cors);
-    let body: any = null; try { body = await req.json(); } catch { /* */ }
-    const siteId = body?.site_id; const deployId = body?.deploy_id;
-    if (!siteId || !deployId) return json({ error: 'bad_request', message: 'site_id and deploy_id are required.' }, 400, cors);
-    const s = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=id,netlify_site_id&limit=1`);
-    const row = s.json?.[0];
-    if (!row?.netlify_site_id) return json({ error: 'not_found', message: 'Site not found or not connected to hosting.' }, 404, cors);
-    const r = await restoreDeploy(row.netlify_site_id, String(deployId));
-    if (!r.ok) return json({ error: 'restore_failed', message: r.error }, 502, cors);
-    await writeChangeEvent({ siteId: row.id, entityType: 'restore', entityId: null, action: 'restore', summary: 'Instant restore of a previous deploy (operator)', principal, provenance: 'human' });
-    return json({ data: { ok: true } }, 200, cors);
+    const resp = await handleAdmin(req, route, method, principal, cors);
+    if (resp) return resp;
+    return json({ error: 'not_found', message: `No admin route for ${method} ${route}.` }, 404, cors);
   }
 
   // 3. resolve the caller's site (RLS-scoped; staff/no-site => null)

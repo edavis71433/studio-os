@@ -65,12 +65,21 @@ export async function deployFileMap(netlifySiteId: string, fileMap: Record<strin
   let uploaded = 0;
   for (const [path, digest] of Object.entries(digests)) {
     if (!need.has(digest)) continue;
-    const up = await fetch(`${API}/deploys/${deployId}/files${path.split('/').map(encodeURIComponent).join('/')}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${NETLIFY_TOKEN}`, 'Content-Type': 'application/octet-stream' },
-      body: bytes[path] as unknown as BodyInit,
-    });
-    if (!up.ok) return { ok: false, deployId, error: `upload failed for ${path}: ${up.status}` };
+    // one transient-failure retry per file (M6 §7); a second failure aborts the
+    // deploy — Netlify only flips the live site on completion, so nothing is
+    // ever partially updated
+    let up: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      up = await fetch(`${API}/deploys/${deployId}/files${path.split('/').map(encodeURIComponent).join('/')}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${NETLIFY_TOKEN}`, 'Content-Type': 'application/octet-stream' },
+        body: bytes[path] as unknown as BodyInit,
+      });
+      if (up.ok) break;
+      await up.text();
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+    }
+    if (!up || !up.ok) return { ok: false, deployId, error: `upload failed for ${path}: ${up?.status ?? 'network'} (after retry)` };
     uploaded++;
     need.delete(digest); // identical files share a digest; one upload satisfies all
   }
@@ -93,6 +102,90 @@ export async function deployState(deployId: string): Promise<string | null> {
   if (!NETLIFY_TOKEN) return null;
   const d = await nf(`/deploys/${deployId}`);
   return d.ok ? String(d.json?.state || 'unknown') : null;
+}
+
+// ── M6: site provisioning + domain operations (admin-only callers) ──────────
+// Same client, same token boundary. Raw Netlify responses NEVER leave the
+// presence function — routes translate to plain language.
+
+export interface NetlifySiteInfo {
+  id: string;
+  name: string;
+  default_domain: string;       // <name>.netlify.app
+  custom_domain: string | null;
+  state: string;
+  ssl_url: string | null;
+}
+
+function toSiteInfo(j: any): NetlifySiteInfo {
+  return {
+    id: String(j.id), name: String(j.name || ''),
+    default_domain: String(j.default_domain || `${j.name}.netlify.app`),
+    custom_domain: j.custom_domain ? String(j.custom_domain) : null,
+    state: String(j.state || 'unknown'), ssl_url: j.ssl_url ? String(j.ssl_url) : null,
+  };
+}
+
+/** Create a Netlify site with an exact name. 422 = name already taken. */
+export async function createSite(name: string): Promise<{ ok: boolean; status: number; site?: NetlifySiteInfo; error?: string }> {
+  if (!NETLIFY_TOKEN) return { ok: false, status: 0, error: 'NETLIFY_AUTH_TOKEN not configured' };
+  const r = await nf('/sites', { method: 'POST', body: JSON.stringify({ name }) });
+  if (!r.ok) return { ok: false, status: r.status, error: `site create failed: ${r.status} ${r.text.slice(0, 200)}` };
+  return { ok: true, status: r.status, site: toSiteInfo(r.json) };
+}
+
+/** Look up a site by Netlify site id OR by domain (e.g. "name.netlify.app"). */
+export async function getSite(idOrDomain: string): Promise<{ ok: boolean; status: number; site?: NetlifySiteInfo }> {
+  if (!NETLIFY_TOKEN) return { ok: false, status: 0 };
+  const r = await nf(`/sites/${encodeURIComponent(idOrDomain)}`);
+  return r.ok ? { ok: true, status: r.status, site: toSiteInfo(r.json) } : { ok: false, status: r.status };
+}
+
+/** Permanently delete a Netlify site (lifecycle 'deleting'; DB data is retained). */
+export async function deleteSite(netlifySiteId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!NETLIFY_TOKEN) return { ok: false, error: 'NETLIFY_AUTH_TOKEN not configured' };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}`, { method: 'DELETE' });
+  // 404 counts as done: the site is already gone
+  return r.ok || r.status === 404 ? { ok: true } : { ok: false, error: `site delete failed: ${r.status} ${r.text.slice(0, 200)}` };
+}
+
+/** Deploy history (operator view — deploy ids are allowed for staff). */
+export async function listDeploys(netlifySiteId: string, limit = 20): Promise<{ ok: boolean; deploys: Array<{ id: string; state: string; created_at: string; published_at: string | null; title: string }> }> {
+  if (!NETLIFY_TOKEN) return { ok: false, deploys: [] };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}/deploys?per_page=${limit}`);
+  if (!r.ok || !Array.isArray(r.json)) return { ok: false, deploys: [] };
+  return {
+    ok: true,
+    deploys: r.json.map((d: any) => ({
+      id: String(d.id), state: String(d.state || 'unknown'),
+      created_at: String(d.created_at || ''), published_at: d.published_at ? String(d.published_at) : null,
+      title: String(d.title || ''),
+    })),
+  };
+}
+
+/** Attach (or with null: detach) a custom domain. */
+export async function setCustomDomain(netlifySiteId: string, domain: string | null): Promise<{ ok: boolean; site?: NetlifySiteInfo; error?: string }> {
+  if (!NETLIFY_TOKEN) return { ok: false, error: 'NETLIFY_AUTH_TOKEN not configured' };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}`, { method: 'PATCH', body: JSON.stringify({ custom_domain: domain }) });
+  if (!r.ok) return { ok: false, error: `domain update failed: ${r.status} ${r.text.slice(0, 200)}` };
+  return { ok: true, site: toSiteInfo(r.json) };
+}
+
+/** Certificate state. 200 with empty body = no cert yet (valid pre-DNS state). */
+export async function sslStatus(netlifySiteId: string): Promise<{ ok: boolean; state: string; expires_at: string | null }> {
+  if (!NETLIFY_TOKEN) return { ok: false, state: 'unknown', expires_at: null };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}/ssl`);
+  if (!r.ok) return { ok: false, state: 'unknown', expires_at: null };
+  if (!r.json) return { ok: true, state: 'none', expires_at: null };
+  return { ok: true, state: String(r.json.state || 'unknown'), expires_at: r.json.expires_at ? String(r.json.expires_at) : null };
+}
+
+/** Ask Netlify to (re)provision the certificate — safe to call repeatedly. */
+export async function provisionSsl(netlifySiteId: string): Promise<{ ok: boolean }> {
+  if (!NETLIFY_TOKEN) return { ok: false };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}/ssl`, { method: 'POST' });
+  return { ok: r.ok };
 }
 
 /** Instant restore: re-publish a previous deploy (operational recovery). */

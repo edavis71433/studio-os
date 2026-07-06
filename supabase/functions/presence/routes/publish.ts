@@ -13,12 +13,13 @@ import { fetchVariants } from '../lib/media.ts';
 import { deployFileMap, deployState, netlifyConfigured } from '../lib/netlify.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
+import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
-const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
+export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
 
-async function changeSummary(siteId: string): Promise<string> {
+export async function changeSummary(siteId: string): Promise<string> {
   const lastLive = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=created_at&order=created_at.desc&limit=1`);
   const since = lastLive.json?.[0]?.created_at;
   const ev = await svc(`presence_change_events?site_id=eq.${siteId}${since ? `&created_at=gt.${encodeURIComponent(since)}` : ''}&select=entity_type,action&limit=200`);
@@ -32,8 +33,10 @@ async function changeSummary(siteId: string): Promise<string> {
   return parts.join(', ') + (deletions ? ` (including ${deletions} deletion${deletions > 1 ? 's' : ''})` : '');
 }
 
-/** Core pipeline shared by publish and restore — ONE path, ever. */
-async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>) {
+/** Core pipeline shared by publish and restore — ONE path, ever.
+ *  Exported for the admin operations (force publish / retry / restore-snapshot),
+ *  which are the SAME pipeline with a staff actor — never a second path. */
+export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>) {
   const actorKind = principal.kind === 'staff' ? 'staff' : 'client';
   let snapshotId = snapshotArg.snapshotId;
 
@@ -101,6 +104,14 @@ async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' 
 }
 
 export async function handlePublish(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  // lifecycle guard (M6 §4): archived/deleting sites never publish; a site the
+  // studio paused publishes only via an operator (staff), not the client
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) {
+    return json({ error: 'lifecycle_blocked', message: 'This site is archived and can’t be published. Contact your studio to reactivate it.' }, 409, cors);
+  }
+  if (site.status === 'paused' && principal.kind !== 'staff') {
+    return json({ error: 'site_paused', message: 'Your site is currently paused. Contact your studio to resume publishing.' }, 409, cors);
+  }
   const t = getTemplate(site.template_slug, site.template_version);
   if (!t) return json({ error: 'template_missing', message: CALM }, 500, cors);
 

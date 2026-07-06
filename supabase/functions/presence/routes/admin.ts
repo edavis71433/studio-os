@@ -1,0 +1,439 @@
+// ── /admin/* — operator surface (M6) ─────────────────────────────────────────
+// Staff-only (enforced in index.ts before dispatch). Operates on ANY site by
+// id. Deploy ids and error_text ARE allowed here — this is the operator view;
+// raw Netlify responses still never pass through untranslated.
+//
+// Every mutating action writes exactly one provenance event (M6 §5).
+// Publishing actions run the ONE pipeline exported by routes/publish.ts —
+// force publish, retry and snapshot-restore are the same path with a staff
+// actor, never a second renderer or deploy route.
+import { json } from '../../_shared/http.ts';
+import { svc } from '../lib/db.ts';
+import { writeChangeEvent } from '../lib/provenance.ts';
+import { getTemplate } from '../lib/render.ts';
+import { serializeDraft } from '../lib/serializer.ts';
+import { validateSnapshot } from '../lib/manifest_validate.ts';
+import { canTransition, allowedTransitions, isLifecycleState, PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
+import { runPipeline, handlePublish, CALM } from './publish.ts';
+import {
+  netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
+  setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
+} from '../lib/netlify.ts';
+import type { SiteRow } from '../lib/site.ts';
+import type { Principal } from '../../_shared/auth.ts';
+import type { Snapshot } from '../lib/render_types.ts';
+
+const SB_URL = Deno.env.get('SUPABASE_URL') || '';
+const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
+
+const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,created_at,updated_at';
+
+async function loadSite(siteId: string): Promise<SiteRow & { created_at: string; updated_at: string } | null> {
+  if (!UUID_RE.test(siteId)) return null;
+  const r = await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
+  return r.json?.[0] ?? null;
+}
+
+async function readBody(req: Request): Promise<any> {
+  try { return await req.json(); } catch { return null; }
+}
+
+// ═══ 1. PROVISIONING — POST /admin/sites ════════════════════════════════════
+// Idempotent end to end: rerunning repairs a partial run and never duplicates.
+//   client exists → entitlement upsert → site row get-or-create →
+//   Netlify site create-or-adopt (deterministic name) → verify → initial
+//   draft (identity seeded from the client) → status 'ready' → provenance.
+async function handleProvision(req: Request, principal: Principal, cors: Record<string, string>) {
+  const body = await readBody(req);
+  const clientId = String(body?.client_id || '');
+  if (!UUID_RE.test(clientId)) return json({ error: 'bad_request', message: 'client_id (uuid) is required.' }, 400, cors);
+  const templateSlug = String(body?.template_slug || 'restaurant-classic');
+  const templateVersion = String(body?.template_version || '1.0.0');
+  if (!getTemplate(templateSlug, templateVersion)) {
+    return json({ error: 'bad_request', message: `Unknown template ${templateSlug}@${templateVersion}.` }, 400, cors);
+  }
+  const entStatus = String(body?.entitlement_status || 'active');
+  if (!['active', 'paused'].includes(entStatus)) return json({ error: 'bad_request', message: 'entitlement_status must be active or paused.' }, 400, cors);
+  if (!netlifyConfigured()) return json({ error: 'hosting_unconfigured', message: 'Hosting is not configured on this environment (NETLIFY_AUTH_TOKEN missing).' }, 502, cors);
+
+  // client must exist
+  const cl = await svc(`clients?id=eq.${clientId}&select=id,name&limit=1`);
+  const client = cl.json?.[0];
+  if (!client) return json({ error: 'not_found', message: 'No client with that id.' }, 404, cors);
+
+  // entitlement upsert (unique client_id+product)
+  const ent = await svc('presence_entitlements?on_conflict=client_id,product', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({ client_id: clientId, product: 'presence', status: entStatus, actor: principal.userId }),
+  });
+  if (!ent.ok) return json({ error: 'provision_failed', message: 'Could not set up the Presence entitlement.' }, 502, cors);
+
+  // site row get-or-create (unique client_id = the duplicate guard)
+  let site = (await svc(`presence_sites?client_id=eq.${clientId}&select=${SITE_COLS}&limit=1`)).json?.[0];
+  let created = false;
+  if (site && site.status === 'deleting') {
+    return json({ error: 'conflict', message: 'This client’s previous site is being deleted. Wait for deletion to finish before provisioning again.' }, 409, cors);
+  }
+  if (!site) {
+    const ins = await svc('presence_sites', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ client_id: clientId, template_slug: templateSlug, template_version: templateVersion, status: 'provisioning' }),
+    });
+    if (ins.status === 409) { // lost a race with a concurrent provision — adopt
+      site = (await svc(`presence_sites?client_id=eq.${clientId}&select=${SITE_COLS}&limit=1`)).json?.[0];
+    } else if (!ins.ok || !ins.json?.[0]) {
+      return json({ error: 'provision_failed', message: 'Could not create the site record.' }, 502, cors);
+    } else { site = ins.json[0]; created = true; }
+  }
+
+  // Netlify site: adopt existing, repair a dangling id, or create fresh —
+  // the deterministic name makes reruns converge instead of duplicating
+  const desiredName = `presence-${site.id.replace(/-/g, '').slice(0, 12)}`;
+  let netlifyId = site.netlify_site_id as string | null;
+  if (netlifyId) {
+    const found = await getSite(netlifyId);
+    if (!found.ok && found.status === 404) netlifyId = null; // deleted on Netlify's side → recreate
+    else if (!found.ok) return json({ error: 'provision_failed', message: 'Hosting provider lookup failed — try again in a minute.' }, 502, cors);
+  }
+  if (!netlifyId) {
+    // only a first-time provision walks draft → provisioning; repairing the
+    // hosting of an already-ready/live/paused site must never disturb its
+    // lifecycle state (the repair is transient, the site's state is not)
+    if (site.status === 'draft') {
+      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'provisioning' }) });
+      site.status = 'provisioning';
+    }
+    const made = await createSite(desiredName);
+    if (made.ok && made.site) netlifyId = made.site.id;
+    else if (made.status === 422) {
+      // name taken — by our own previous partial run, ideally
+      const adopt = await getSite(`${desiredName}.netlify.app`);
+      if (adopt.ok && adopt.site) netlifyId = adopt.site.id;
+      else return json({ error: 'provision_failed', message: 'The hosting name is taken by another account — contact support.' }, 502, cors);
+    } else {
+      if (site.status === 'provisioning') { // roll a FIRST-TIME provision back cleanly; repairs keep their state
+        await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'draft' }) });
+      }
+      return json({ error: 'provision_failed', message: 'Hosting site creation failed — nothing was left half-made; rerun provisioning.' }, 502, cors);
+    }
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ netlify_site_id: netlifyId }) });
+  }
+
+  // verify it exists (the provisioning postcondition)
+  const verify = await getSite(netlifyId!);
+  if (!verify.ok || !verify.site) return json({ error: 'provision_failed', message: 'Hosting site did not verify after creation — rerun provisioning.' }, 502, cors);
+
+  // initial draft: identity singleton seeded from the client (create-only)
+  const haveIdentity = await svc(`presence_identity?site_id=eq.${site.id}&select=site_id&limit=1`);
+  if (!Array.isArray(haveIdentity.json) || haveIdentity.json.length === 0) {
+    await svc('presence_identity', { method: 'POST', body: JSON.stringify({ site_id: site.id, business_name: String(client.name || '').slice(0, 120) }) });
+  }
+
+  // draft/provisioning → ready (never touch live/paused/archived on rerun)
+  if (site.status === 'draft' || site.status === 'provisioning') {
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'ready' }) });
+    site.status = 'ready';
+  }
+
+  if (created || !site.netlify_site_id) {
+    await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: site.id, action: 'create', summary: 'Provisioned website hosting', principal, provenance: 'human' });
+  }
+
+  return json({
+    data: {
+      site_id: site.id, status: site.status, template: `${site.template_slug}@${site.template_version}`,
+      netlify_site_id: netlifyId, netlify_url: `https://${verify.site.default_domain}`,
+      already_existed: !created,
+    },
+  }, created ? 201 : 200, cors);
+}
+
+// ═══ 2. LIST / DETAIL ════════════════════════════════════════════════════════
+async function handleList(cors: Record<string, string>) {
+  const r = await svc(`presence_sites?select=${SITE_COLS},clients(name,email)&order=created_at.desc&limit=200`);
+  const rows = Array.isArray(r.json) ? r.json : [];
+  return json({
+    data: rows.map((s: any) => ({
+      id: s.id, client: s.clients?.name ?? null, client_email: s.clients?.email ?? null,
+      status: s.status, template: `${s.template_slug}@${s.template_version}`,
+      custom_domain: s.custom_domain, netlify_site_id: s.netlify_site_id,
+      last_published_at: s.last_published_at, created_at: s.created_at,
+    })),
+  }, 200, cors);
+}
+
+// ═══ 3. DOMAIN OPERATIONS ═════════════════════════════════════════════════════
+// DNS is checked via DNS-over-HTTPS (Google resolver): a CNAME to the site's
+// netlify.app hostname, or the Netlify apex load-balancer A record.
+const NETLIFY_APEX_IPS = new Set(['75.2.60.5']);
+
+async function dnsLookup(name: string, type: 'A' | 'CNAME'): Promise<string[]> {
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`, { headers: { Accept: 'application/json' } });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j.Answer) ? j.Answer.map((a: any) => String(a.data || '').replace(/\.$/, '').toLowerCase()) : [];
+  } catch { return []; }
+}
+
+async function domainStatus(site: { custom_domain: string | null; netlify_site_id: string | null }) {
+  if (!site.custom_domain) {
+    const nf = site.netlify_site_id ? await getSite(site.netlify_site_id) : { ok: false as const, site: undefined };
+    return {
+      custom_domain: null, health: 'no_domain',
+      message: 'No custom domain attached — the site serves from its netlify.app address.',
+      netlify_subdomain: nf.ok && nf.site ? nf.site.default_domain : null,
+      dns: null, ssl: null,
+    };
+  }
+  const nf = site.netlify_site_id ? await getSite(site.netlify_site_id) : { ok: false as const, site: undefined };
+  const target = nf.ok && nf.site ? nf.site.default_domain.toLowerCase() : null;
+  const cnames = await dnsLookup(site.custom_domain, 'CNAME');
+  const aRecords = await dnsLookup(site.custom_domain, 'A');
+  const dnsOk = (target !== null && cnames.includes(target)) || aRecords.some((ip) => NETLIFY_APEX_IPS.has(ip));
+  const ssl = site.netlify_site_id ? await sslStatus(site.netlify_site_id) : { ok: false, state: 'unknown', expires_at: null };
+  const sslOk = ssl.state === 'issued' || ssl.state === 'renewed';
+  const health = !dnsOk ? 'dns_pending' : !sslOk ? 'ssl_pending' : 'ok';
+  const message =
+    health === 'ok' ? 'Domain is healthy: DNS points at the site and the certificate is active.'
+    : health === 'ssl_pending' ? 'DNS is correct; the HTTPS certificate is still being issued (usually minutes, up to an hour).'
+    : `DNS does not point at the site yet. Set a CNAME for ${site.custom_domain} to ${target ?? '<site>.netlify.app'}${aRecords.length ? ` (currently resolves to ${aRecords.join(', ')})` : ' (currently no record found)'}.`;
+  return {
+    custom_domain: site.custom_domain, health, message,
+    netlify_subdomain: target,
+    dns: { ok: dnsOk, cname: cnames, a: aRecords, expected_cname: target, expected_apex_ip: [...NETLIFY_APEX_IPS] },
+    ssl: { state: ssl.state, expires_at: ssl.expires_at },
+  };
+}
+
+async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (method === 'GET') return json({ data: await domainStatus(site) }, 200, cors);
+  if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
+
+  if (method === 'POST') {
+    const body = await readBody(req);
+    const domain = String(body?.domain || '').trim().toLowerCase();
+    if (!HOSTNAME_RE.test(domain)) return json({ error: 'bad_request', message: 'That doesn’t look like a valid domain name (e.g. www.restaurant.com).' }, 400, cors);
+    const set = await setCustomDomain(site.netlify_site_id, domain);
+    if (!set.ok) return json({ error: 'domain_failed', message: 'The hosting provider rejected that domain — it may be attached to another account. Detail (operator): ' + (set.error || 'unknown') }, 502, cors);
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ custom_domain: domain }) });
+    await provisionSsl(site.netlify_site_id); // kick cert issuance; DNS may still be pending — safe to repeat
+    await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'create', summary: `Attached domain ${domain}`, principal, provenance: 'human' });
+    return json({ data: await domainStatus({ custom_domain: domain, netlify_site_id: site.netlify_site_id }) }, 200, cors);
+  }
+
+  if (method === 'DELETE') {
+    if (!site.custom_domain) return json({ error: 'not_found', message: 'This site has no custom domain to remove.' }, 404, cors);
+    const removed = await setCustomDomain(site.netlify_site_id, null);
+    if (!removed.ok) return json({ error: 'domain_failed', message: 'Could not detach the domain — try again. Detail (operator): ' + (removed.error || 'unknown') }, 502, cors);
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ custom_domain: null }) });
+    await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'delete', summary: `Removed domain ${site.custom_domain}`, principal, provenance: 'human' });
+    return json({ data: { ok: true, message: 'Domain removed — the site still serves from its netlify.app address.' } }, 200, cors);
+  }
+  return null;
+}
+
+// ═══ 4. LIFECYCLE — POST /admin/sites/:id/lifecycle ══════════════════════════
+async function handleLifecycle(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const body = await readBody(req);
+  const to = String(body?.to || '');
+  if (!isLifecycleState(to)) return json({ error: 'bad_request', message: `Unknown state "${to}".` }, 400, cors);
+  if (!canTransition(site.status, to)) {
+    return json({
+      error: 'invalid_transition',
+      message: `A site can’t go from "${site.status}" to "${to}".`,
+      allowed: allowedTransitions(site.status),
+    }, 409, cors);
+  }
+
+  // side effect: entering 'deleting' removes the hosting site NOW; content,
+  // snapshots and history stay in the database (business recovery per PDR)
+  if (to === 'deleting' && site.netlify_site_id) {
+    const del = await deleteSite(site.netlify_site_id);
+    if (!del.ok) return json({ error: 'delete_failed', message: 'Hosting teardown failed — the site was NOT transitioned. Retry. Detail (operator): ' + (del.error || 'unknown') }, 502, cors);
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ netlify_site_id: null, custom_domain: null }) });
+  }
+
+  const upd = await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: to }) });
+  if (!upd.ok) return json({ error: 'update_failed', message: 'Could not update the site state.' }, 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: site.id, action: 'update', summary: `Site status: ${site.status} → ${to}`, principal, provenance: 'human', fields: ['status'] });
+  return json({ data: { status: to, previous: site.status } }, 200, cors);
+}
+
+// ═══ 5. PUBLISH OPERATIONS ════════════════════════════════════════════════════
+async function handleAdminPublishes(site: SiteRow, cors: Record<string, string>) {
+  // operator view: full records including error_text + deploy ids
+  const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,error_text,netlify_deploy_id,snapshot_id,actor_kind,created_at,completed_at&order=created_at.desc&limit=50`);
+  const rows = Array.isArray(r.json) ? r.json : [];
+  return json({
+    data: rows.map((p: any) => ({
+      ...p,
+      duration_seconds: p.completed_at ? Math.round((new Date(p.completed_at).getTime() - new Date(p.created_at).getTime()) / 1000) : null,
+    })),
+  }, 200, cors);
+}
+
+async function handleRetry(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: `The site is ${site.status}; reactivate it before publishing.` }, 409, cors);
+  const body = await readBody(req);
+  let q = `presence_publishes?site_id=eq.${site.id}&status=eq.failed&select=id,kind,snapshot_id,change_summary&order=created_at.desc&limit=1`;
+  if (body?.publish_id) {
+    if (!UUID_RE.test(String(body.publish_id))) return json({ error: 'bad_request', message: 'publish_id must be a uuid.' }, 400, cors);
+    q = `presence_publishes?id=eq.${body.publish_id}&site_id=eq.${site.id}&status=eq.failed&select=id,kind,snapshot_id,change_summary&limit=1`;
+  }
+  const rec = (await svc(q)).json?.[0];
+  if (!rec) return json({ error: 'not_found', message: 'No failed publish to retry for this site.' }, 404, cors);
+  if (!rec.snapshot_id) return json({ error: 'not_restorable', message: 'That publish’s snapshot is no longer retained — run a fresh publish instead.' }, 410, cors);
+  const s = (await svc(`presence_snapshots?id=eq.${rec.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at`)).json?.[0];
+  if (!s) return json({ error: 'not_restorable', message: 'That publish’s snapshot is no longer retained — run a fresh publish instead.' }, 410, cors);
+  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at };
+  return runPipeline(site, principal, rec.kind === 'restore' ? 'restore' : 'publish',
+    { snapshot, snapshotId: rec.snapshot_id, mediaManifest: s.media_manifest || [] },
+    `Retry: ${rec.change_summary || 'previous publish'}`, cors);
+}
+
+async function handleCancel(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  // only QUEUED publishes cancel — a deploying one is already at the host and
+  // will complete or fail atomically (never a partial live site)
+  const upd = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.queued`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status: 'canceled', error_text: `canceled by operator ${principal.email || principal.userId || ''}`.trim(), completed_at: new Date().toISOString() }),
+  });
+  const rows = Array.isArray(upd.json) ? upd.json : [];
+  if (!rows.length) return json({ error: 'nothing_queued', message: 'No queued publish to cancel (a deploy already in progress can’t be canceled — it completes or fails atomically).' }, 409, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'publish', entityId: rows[0].id, action: 'update', summary: 'Canceled a queued publish (operator)', principal, provenance: 'human', fields: ['status'] });
+  return json({ data: { ok: true, canceled: rows.length } }, 200, cors);
+}
+
+async function handleRestoreSnapshot(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: `The site is ${site.status}; reactivate it before restoring.` }, 409, cors);
+  const body = await readBody(req);
+  const snapId = String(body?.snapshot_id || '');
+  if (!UUID_RE.test(snapId)) return json({ error: 'bad_request', message: 'snapshot_id (uuid) is required.' }, 400, cors);
+  const s = (await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at`)).json?.[0];
+  if (!s) return json({ error: 'not_found', message: 'No retained snapshot with that id for this site.' }, 404, cors);
+  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at };
+  const when = new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return runPipeline(site, principal, 'restore', { snapshot, snapshotId: snapId, mediaManifest: s.media_manifest || [] }, `Operator restored the snapshot from ${when}`, cors);
+}
+
+// ═══ 6. MONITORING — GET /admin/sites/:id/health ═════════════════════════════
+async function handleHealth(site: SiteRow, cors: Record<string, string>) {
+  // hosting: connected = the Netlify site actually answers
+  let hosting: any = { connected: false, message: 'No hosting attached — run provisioning.' };
+  if (site.netlify_site_id) {
+    const nf = await getSite(site.netlify_site_id);
+    hosting = nf.ok && nf.site
+      ? { connected: true, netlify_site_id: site.netlify_site_id, url: `https://${nf.site.default_domain}`, state: nf.site.state }
+      : nf.status === 404
+        ? { connected: false, netlify_site_id: site.netlify_site_id, message: 'HOSTING DISCONNECTED: the Netlify site no longer exists. Rerun provisioning to repair.' }
+        : { connected: false, netlify_site_id: site.netlify_site_id, message: 'Hosting lookup failed (provider or token issue).' };
+  }
+
+  // publishing: last record, last success, in-flight, durations — operator detail
+  const pubs = (await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,error_text,netlify_deploy_id,created_at,completed_at&order=created_at.desc&limit=20`)).json ?? [];
+  const last = pubs[0] ?? null;
+  const lastSuccess = pubs.find((p: any) => p.status === 'live') ?? null;
+  const inFlight = pubs.some((p: any) => p.status === 'queued' || p.status === 'deploying');
+  const lastFailed = pubs.find((p: any) => p.status === 'failed') ?? null;
+  const dur = (p: any) => (p && p.completed_at ? Math.round((new Date(p.completed_at).getTime() - new Date(p.created_at).getTime()) / 1000) : null);
+  let currentDeployState: string | null = null;
+  if (lastSuccess?.netlify_deploy_id) currentDeployState = await deployState(lastSuccess.netlify_deploy_id);
+
+  // content: template + contract versions and live draft validation
+  const t = getTemplate(site.template_slug, site.template_version);
+  let draft: any = { blockers: null, warnings: null };
+  if (t) {
+    try {
+      const { snapshot } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
+      const v = validateSnapshot(snapshot, t.manifest);
+      draft = { blockers: v.blockers.length, warnings: v.warnings.length };
+    } catch { draft = { blockers: null, warnings: null, note: 'draft validation unavailable' }; }
+  }
+  const lastSnap = (await svc(`presence_snapshots?site_id=eq.${site.id}&select=content_contract_version,template_slug,template_version&order=created_at.desc&limit=1`)).json?.[0] ?? null;
+
+  // media: count + MISSING detection (manifest paths whose object is gone)
+  const media = (await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path&limit=200`)).json ?? [];
+  const missing: string[] = [];
+  for (const m of media.slice(0, 25)) { // bounded: health stays fast
+    const head = await fetch(`${SB_URL}/storage/v1/object/authenticated/presence-media/${m.storage_path}`, {
+      method: 'HEAD', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+    });
+    if (head.status === 400 || head.status === 404) missing.push(m.storage_path);
+  }
+
+  return json({
+    data: {
+      site: { id: site.id, status: site.status, created_at: (site as any).created_at, updated_at: (site as any).updated_at },
+      hosting,
+      domain: await domainStatus(site),
+      publishing: {
+        in_flight: inFlight,
+        last_publish: last ? { id: last.id, kind: last.kind, status: last.status, at: last.created_at, duration_seconds: dur(last), deploy_id: last.netlify_deploy_id } : null,
+        last_successful_publish: lastSuccess ? { id: lastSuccess.id, at: lastSuccess.created_at, duration_seconds: dur(lastSuccess), deploy_id: lastSuccess.netlify_deploy_id, current_deploy_state: currentDeployState } : null,
+        last_error: lastFailed ? { id: lastFailed.id, at: lastFailed.created_at, error_text: lastFailed.error_text } : null,
+        last_published_at: site.last_published_at,
+      },
+      content: {
+        template: `${site.template_slug}@${site.template_version}`,
+        content_contract_version: lastSnap?.content_contract_version ?? 1,
+        last_snapshot_template: lastSnap ? `${lastSnap.template_slug}@${lastSnap.template_version}` : null,
+        draft,
+      },
+      media: { count: media.length, checked: Math.min(media.length, 25), missing },
+    },
+  }, 200, cors);
+}
+
+// ═══ ROUTER ═══════════════════════════════════════════════════════════════════
+/** Dispatch /admin/* routes. Returns null when no admin route matches.
+ *  Caller (index.ts) has already proven principal.kind === 'staff'. */
+export async function handleAdmin(req: Request, route: string, method: string, principal: Principal, cors: Record<string, string>): Promise<Response | null> {
+  if (route === '/admin/sites' && method === 'POST') return handleProvision(req, principal, cors);
+  if (route === '/admin/sites' && method === 'GET') return handleList(cors);
+
+  // legacy M5 shape: POST /admin/restore-deploy {site_id, deploy_id}
+  if (route === '/admin/restore-deploy' && method === 'POST') {
+    const body = await readBody(req);
+    const siteId = String(body?.site_id || ''); const deployId = String(body?.deploy_id || '');
+    if (!siteId || !deployId) return json({ error: 'bad_request', message: 'site_id and deploy_id are required.' }, 400, cors);
+    const site = await loadSite(siteId);
+    if (!site?.netlify_site_id) return json({ error: 'not_found', message: 'Site not found or not connected to hosting.' }, 404, cors);
+    const r = await restoreDeploy(site.netlify_site_id, deployId);
+    if (!r.ok) return json({ error: 'restore_failed', message: CALM + ' Detail (operator): ' + (r.error || 'unknown') }, 502, cors);
+    await writeChangeEvent({ siteId: site.id, entityType: 'restore', entityId: null, action: 'restore', summary: 'Instant restore of a previous deploy (operator)', principal, provenance: 'human' });
+    return json({ data: { ok: true } }, 200, cors);
+  }
+
+  const m = route.match(/^\/admin\/sites\/([0-9a-f-]{36})(\/[a-z-]+)?$/);
+  if (!m) return null;
+  const site = await loadSite(m[1]);
+  if (!site) return json({ error: 'not_found', message: 'No site with that id.' }, 404, cors);
+  const sub = m[2] || '';
+
+  if (sub === '' && method === 'GET') return json({ data: site }, 200, cors);
+  if (sub === '/health' && method === 'GET') return handleHealth(site, cors);
+  if (sub === '/domain') { const r = await handleDomain(req, method, site, principal, cors); if (r) return r; }
+  if (sub === '/lifecycle' && method === 'POST') return handleLifecycle(req, site, principal, cors);
+  if (sub === '/deploys' && method === 'GET') {
+    if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'This site has no hosting attached.' }, 409, cors);
+    const d = await listDeploys(site.netlify_site_id, 25);
+    if (!d.ok) return json({ error: 'lookup_failed', message: 'Could not read deploy history from the hosting provider.' }, 502, cors);
+    return json({ data: d.deploys }, 200, cors);
+  }
+  if (sub === '/publishes' && method === 'GET') return handleAdminPublishes(site, cors);
+  if (sub === '/publish' && method === 'POST') {
+    // FORCE PUBLISH: staff actor, the same ONE pipeline (validation included) —
+    // works even when the client's entitlement is paused (operator judgment)
+    if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: `The site is ${site.status}; reactivate it before publishing.` }, 409, cors);
+    return handlePublish(site, principal, cors);
+  }
+  if (sub === '/retry' && method === 'POST') return handleRetry(req, site, principal, cors);
+  if (sub === '/cancel' && method === 'POST') return handleCancel(site, principal, cors);
+  if (sub === '/restore-snapshot' && method === 'POST') return handleRestoreSnapshot(req, site, principal, cors);
+
+  return null;
+}
