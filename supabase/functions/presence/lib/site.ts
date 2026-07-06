@@ -10,10 +10,12 @@ export interface SiteRow {
   last_published_at: string | null;
   template_slug: string;
   template_version: string;
+  custom_domain: string | null;
+  netlify_site_id: string | null;
 }
 
 export async function resolveSite(jwt: string): Promise<SiteRow | null> {
-  const r = await asUser(jwt, 'presence_sites?select=id,client_id,status,last_published_at,template_slug,template_version&limit=1');
+  const r = await asUser(jwt, 'presence_sites?select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id&limit=1');
   if (!r.ok || !Array.isArray(r.json) || r.json.length === 0) return null;
   return r.json[0] as SiteRow;
 }

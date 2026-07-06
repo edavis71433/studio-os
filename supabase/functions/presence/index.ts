@@ -19,6 +19,12 @@ import { resolveSite } from './lib/site.ts';
 import { checkEntitlement } from './middleware/entitlement.ts';
 import { handleGetSite } from './routes/site.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
+import { handlePreview } from './routes/preview.ts';
+import { handlePublish, handleRestore, handlePublishHistory } from './routes/publish.ts';
+import { handleMediaUpload, handleMediaDelete } from './routes/media.ts';
+import { restoreDeploy } from './lib/netlify.ts';
+import { svc } from './lib/db.ts';
+import { writeChangeEvent } from './lib/provenance.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -42,6 +48,23 @@ serve(async (req) => {
   }
   const jwt = principal.jwt || '';
 
+  // ── ADMIN routes: staff-only, operate on any site by id, sit BEFORE the
+  //    caller-site resolution (staff own no site). Entitlement never applies
+  //    to admin (bypass), auth/role already proven by the principal.
+  if (route === '/admin/restore-deploy' && method === 'POST') {
+    if (principal.kind !== 'staff') return json({ error: 'forbidden', message: 'Staff only.' }, 403, cors);
+    let body: any = null; try { body = await req.json(); } catch { /* */ }
+    const siteId = body?.site_id; const deployId = body?.deploy_id;
+    if (!siteId || !deployId) return json({ error: 'bad_request', message: 'site_id and deploy_id are required.' }, 400, cors);
+    const s = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=id,netlify_site_id&limit=1`);
+    const row = s.json?.[0];
+    if (!row?.netlify_site_id) return json({ error: 'not_found', message: 'Site not found or not connected to hosting.' }, 404, cors);
+    const r = await restoreDeploy(row.netlify_site_id, String(deployId));
+    if (!r.ok) return json({ error: 'restore_failed', message: r.error }, 502, cors);
+    await writeChangeEvent({ siteId: row.id, entityType: 'restore', entityId: null, action: 'restore', summary: 'Instant restore of a previous deploy (operator)', principal, provenance: 'human' });
+    return json({ data: { ok: true } }, 200, cors);
+  }
+
   // 3. resolve the caller's site (RLS-scoped; staff/no-site => null)
   const site = await resolveSite(jwt);
   if (!site) {
@@ -62,6 +85,15 @@ serve(async (req) => {
   if (route === '/site' && method === 'GET') return handleGetSite(jwt, site, cors);
   if (route === '/identity' && method === 'GET') return handleGetIdentity(jwt, site, cors);
   if (route === '/identity' && method === 'PUT') return handlePutIdentity(req, jwt, site, principal, cors);
+  if (route === '/preview' && method === 'GET') return handlePreview(req, site, cors);
+  if (route === '/publish' && method === 'POST') return handlePublish(site, principal, cors);
+  if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
+  if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
+  if (route === '/media/upload-url' && method === 'POST') return handleMediaUpload(req, site, principal, cors);
+  {
+    const m = route.match(/^\/media\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleMediaDelete(site, principal, m[1], cors);
+  }
 
   return json({ error: 'not_found', message: `No route for ${method} ${route}.` }, 404, cors);
 });

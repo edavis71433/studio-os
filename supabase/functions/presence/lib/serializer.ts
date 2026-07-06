@@ -1,0 +1,102 @@
+// ── Snapshot serializer — the ONE way draft state becomes render input ──────
+// Preview serializes in memory; publish persists the same object to
+// presence_snapshots. There is no second serialization path, ever.
+//
+// Reads canonical draft rows (service role — full view incl. hidden rows it
+// must EXCLUDE), builds the exact SnapshotContent shape the renderer contract
+// consumes, computes the media manifest (deterministic output paths per
+// variant), and stamps contract/template versions + timestamp.
+import { svc } from './db.ts';
+import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest } from './render_types.ts';
+
+export const CONTENT_CONTRACT_VERSION = 1;
+
+interface MediaRow { id: string; storage_path: string; alt_text: string; width: number | null; height: number | null }
+
+// deterministic variant output path: /img/<fnv(storage_path)>-<width>.webp
+function fnv(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h = (h ^ s.charCodeAt(i)) >>> 0; h = (h * 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0');
+}
+export function variantPath(storagePath: string, width: number): string {
+  return `/img/${fnv(storagePath)}-${width}.webp`;
+}
+
+export interface MediaManifestEntry {
+  media_id: string;
+  storage_path: string;
+  variants: Array<{ name: string; width: number; output_path: string }>;
+}
+
+function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | null {
+  if (!m) return null;
+  const variants: Record<string, string> = {};
+  for (const [name, v] of Object.entries(manifest.image_variants)) variants[name] = variantPath(m.storage_path, v.width);
+  return { alt: m.alt_text, variants, width: m.width ?? undefined, height: m.height ?? undefined };
+}
+
+export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
+  const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
+  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects] = await Promise.all([
+    q(`presence_identity?site_id=eq.${siteId}&limit=1`),
+    q(`presence_locations?site_id=eq.${siteId}&limit=1`),
+    q(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
+    q(`presence_testimonials?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
+    q(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
+    q(`presence_posts?site_id=eq.${siteId}&deleted_at=is.null&status=eq.published&order=published_at.desc`),
+    q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,width,height`),
+    q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
+  ]);
+
+  const mediaById = new Map<string, MediaRow>((media as MediaRow[]).map((m) => [m.id, m]));
+  const usedMedia = new Set<string>();
+  const ref = (id: string | null | undefined): MediaRef | null => {
+    if (!id) return null;
+    const m = mediaById.get(id);
+    if (m) usedMedia.add(m.id);
+    return toRef(m, manifest);
+  };
+
+  const ident = identArr[0] || {};
+  const loc = locArr[0] || null;
+
+  const content: SnapshotContent = {
+    identity: {
+      business_name: ident.business_name || '', description: ident.description || '',
+      phone: ident.phone || '', email: ident.email || '', tagline: ident.tagline || '',
+      story: ident.story || '', service_area: ident.service_area || '',
+      booking_url: ident.booking_url || '', ordering_url: ident.ordering_url || '',
+      social: ident.social || {}, seo_title: ident.seo_title || '', seo_description: ident.seo_description || '',
+    },
+    location: loc ? {
+      address_line1: loc.address_line1 || '', address_line2: loc.address_line2 || '',
+      city: loc.city || '', region: loc.region || '', postal_code: loc.postal_code || '',
+      country: loc.country || 'US', phone: loc.phone || '', timezone: loc.timezone || 'America/Los_Angeles',
+      hours: loc.hours || [], holiday_exceptions: loc.holiday_exceptions || [],
+      temporarily_closed: !!loc.temporarily_closed, temporarily_closed_note: loc.temporarily_closed_note || '',
+    } : null,
+    offerings: offerings.map((o: any) => ({ id: o.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media: ref(o.media_id), sort_order: o.sort_order })),
+    testimonials: testimonials.map((t: any) => ({ id: t.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || undefined, sort_order: t.sort_order })),
+    faqs: faqs.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer, sort_order: f.sort_order })),
+    posts: posts.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at })),
+    redirects: redirects.map((r: any) => ({ from_path: r.from_path, to_path: r.to_path })),
+  };
+
+  const mediaManifest: MediaManifestEntry[] = [...usedMedia].sort().map((id) => {
+    const m = mediaById.get(id)!;
+    return {
+      media_id: m.id, storage_path: m.storage_path,
+      variants: Object.entries(manifest.image_variants).map(([name, v]) => ({ name, width: v.width, output_path: variantPath(m.storage_path, v.width) })),
+    };
+  });
+
+  const snapshot: Snapshot = {
+    content,
+    content_contract_version: CONTENT_CONTRACT_VERSION,
+    template_slug: opts.templateSlug,
+    template_version: opts.templateVersion,
+    created_at: opts.now,
+  };
+  return { snapshot, mediaManifest };
+}
