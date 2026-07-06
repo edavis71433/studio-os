@@ -16,6 +16,9 @@
 <!-- No third-party analytics in the private client portal (RC P0-1): paying
      clients' behavior is not tracked here, matching the trust footer's promise. -->
 <style>
+/* a11y: global keyboard focus ring (specificity 0 so component styles still win) */
+:where(a,button,input,textarea,select,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--accent, #5b3fa0);outline-offset:2px;}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 /* foundation tokens loaded via dds-foundation.css */
 body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-font-smoothing:antialiased;}
@@ -1538,6 +1541,26 @@ input:focus, textarea:focus, select:focus{ border-color:var(--p); box-shadow:0 0
           </div>
         </div>
       </div>
+
+      <!-- Trust / compliance footer — links the existing legal pages so clients
+           always have privacy, terms, and accessibility one tap away. -->
+      <style>
+        .portal-trust a{transition:color .15s ease;}
+        .portal-trust a:hover{color:#7b57c9;text-decoration:underline;}
+        .portal-trust a:focus-visible{outline:2px solid #5b3fa0;outline-offset:2px;border-radius:3px;}
+      </style>
+      <footer class="portal-trust" style="max-width:900px;margin:44px auto 10px;padding:22px 20px 6px;border-top:1px solid rgba(91,63,160,.12);text-align:center;">
+        <div style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#857c98;line-height:1.5;margin-bottom:11px;max-width:52ch;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          Your information is private. We use it only to run your project, and never sell or share it.
+        </div>
+        <nav aria-label="Legal and trust" style="display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:center;font-size:12.5px;font-weight:500;margin-bottom:12px;">
+          <a href="/privacy" target="_blank" rel="noopener" style="color:#5b3fa0;text-decoration:none;">Privacy</a>
+          <a href="/portal-terms" target="_blank" rel="noopener" style="color:#5b3fa0;text-decoration:none;">Portal terms</a>
+          <a href="/accessibility" target="_blank" rel="noopener" style="color:#5b3fa0;text-decoration:none;">Accessibility</a>
+        </nav>
+        <div style="font-size:11.5px;color:#a89fb8;">Davis Digital Studio · Los Angeles · <a href="mailto:eric@davisdigitalstudio.com" style="color:inherit;text-decoration:none;">eric@davisdigitalstudio.com</a></div>
+      </footer>
 
     </div>
   </div>

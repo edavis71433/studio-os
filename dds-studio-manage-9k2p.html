@@ -11,6 +11,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="dds-foundation.css">
 <style>
+/* a11y: global keyboard focus ring (specificity 0 so component styles still win) */
+:where(a,button,input,textarea,select,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--p, #5b3fa0);outline-offset:2px;}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 /* foundation tokens loaded via dds-foundation.css */
 html{overflow-x:hidden;}
@@ -44,6 +47,8 @@ body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-fo
 .sidebar{background:#fff;border-right:1px solid rgba(91,63,160,0.08);padding:12px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
 .sl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px;}
 .sn{display:flex;align-items:center;gap:9px;padding:9px 16px;font-size:13px;font-weight:500;color:var(--muted);width:100%;border:none;background:none;font-family:var(--sans);text-align:left;cursor:pointer;transition:background 0.15s;}
+.nav-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:100px;background:#c0392b;color:#fff;font-size:10.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;flex:none;}
+.sn.active .nav-badge{background:#fff;color:var(--p);}
 .sn:hover,.sn.active{background:var(--pxxxl);color:var(--p);font-weight:600;}
 .sdiv{height:1px;background:rgba(91,63,160,0.06);margin:6px 0;}
 
@@ -2190,7 +2195,47 @@ function go(page) {
 
   // run registered navigation hooks (replaces 12 window.go monkey-patches)
   (window.DDS_NAV_HOOKS||[]).forEach(function(h){ try{ h(page); }catch(e){} });
+  // after handling messages/leads, the counts likely changed — refresh soon
+  if (page === 'messages' || page === 'leads') setTimeout(refreshNavBadges, 1500);
 }
+
+// ── FOUNDER NOTIFICATION BADGES ────────────────────────────────────────────
+// Passive awareness on the nav: how many leads and client messages are waiting,
+// visible from any page so Eric never has to go looking. Source is the same
+// universal_inbox the inbox uses (deterministic 'needs a reply' logic). Silent:
+// no login prompt, never throws, updates on a light poll + tab-focus.
+function setNavBadge(btnId, n){
+  var btn = document.getElementById(btnId); if(!btn) return;
+  var b = btn.querySelector('.nav-badge');
+  if(!n || n < 1){ if(b) b.remove(); return; }
+  if(!b){ b = document.createElement('span'); b.className = 'nav-badge'; btn.appendChild(b); }
+  b.textContent = n > 99 ? '99+' : String(n);
+  b.setAttribute('aria-label', n + ' waiting');
+}
+async function refreshNavBadges(){
+  try{
+    var jwt = await adminJwt(); if(!jwt) return;              // silent when signed out
+    var r = await fetch(SB_URL+'/functions/v1/clever-api',{ method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},
+      body: JSON.stringify({ type:'universal_inbox' }) });
+    var j = await r.json(); var d = (j && j.data) || null;
+    if(!d || !Array.isArray(d.items)) return;
+    var leads = 0, msgs = 0;
+    d.items.forEach(function(it){ var k = it.kind;
+      if(k === 'lead' || k === 'audit') leads++;
+      else if(k === 'message' || k === 'growth') msgs++; });
+    setNavBadge('sn-leads', leads);
+    setNavBadge('sn-messages', msgs);
+  }catch(e){ /* never disturb the app for a badge */ }
+}
+var _navBadgeTimer = null;
+function startNavBadges(){
+  if(_navBadgeTimer) return;
+  refreshNavBadges();
+  _navBadgeTimer = setInterval(function(){ if(document.visibilityState === 'visible') refreshNavBadges(); }, 90000);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') refreshNavBadges(); });
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(startNavBadges, 1200); });
 
 // ── LEADS ──
 var allLeads = [];
@@ -2491,7 +2536,7 @@ async function loadUniversalInbox(){
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'universal_inbox'})});
     var j=await r.json(); d=(j&&j.data)||null;
-    if(!d && j && j.error){ host.innerHTML='<div style="font-size:12.5px;color:#9a2d2d;padding:10px 14px;background:#fbecea;border-radius:12px;margin-bottom:16px;">Inbox could not load: '+escHtml(String(j.error))+' <button class="tdx-pill tdx-pill-sm" onclick="loadUniversalInbox()">Retry</button></div>'; return; }
+    if(!d && j && j.error){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
   }catch(e){ host.innerHTML=''; return; }
   if(!d){ host.innerHTML=''; return; }
   var items=d.items||[];
@@ -4383,7 +4428,7 @@ async function loadTodayVitals(){
         +'</div>';
     }
     wrap.innerHTML=html || '';
-  }catch(e){ wrap.innerHTML=''; }
+  }catch(e){ wrap.innerHTML = adminError('Couldn’t load your daily vitals', 'loadTodayVitals()'); }
 }
 
 // Suppress an opted-out prospect: server refuses all future sends to them.
@@ -7525,6 +7570,14 @@ function fmtDate(iso) { if(!iso) return ""; return new Date(iso).toLocaleDateStr
 // malicious message can't execute script inside the admin session. Top-level so
 // every render function can use it.
 function escHtml(s) { return String(s==null?"":s).replace(/[&<>"']/g, function(m){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]; }); }
+// Shared admin empty/error states. retryCall is a hardcoded function-call string
+// like 'loadProspects()'. Error copy is calm and honest: nothing was lost, retry.
+function adminEmpty(icon, title, msg){
+  return '<div class="astate"><div class="ai">'+(icon||'○')+'</div><h4>'+escHtml(title||'Nothing here yet')+'</h4>'+(msg?'<p>'+escHtml(msg)+'</p>':'')+'</div>';
+}
+function adminError(title, retryCall, detail){
+  return '<div class="astate astate-err"><div class="ai">⚠</div><h4>'+escHtml(title||'Couldn’t load this')+'</h4><p>'+escHtml(detail||'Nothing was changed. Check your connection and try again.')+'</p>'+(retryCall?'<button class="abtn" type="button" onclick="'+retryCall+'">Try again</button>':'')+'</div>';
+}
 function cap(s) { return s?s[0].toUpperCase()+s.slice(1):""; }
 function toast(msg) { var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),3000); }
 
@@ -7808,7 +7861,7 @@ async function loadProspects() {
   listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);">Loading prospects...</p>';
   var r = await api('prospects?select=*&order=created_at.desc&limit=500');
   if (r === null) {
-    listEl.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:10px;line-height:1.6;">Couldn\'t load prospects right now. Refresh the page, or check your connection and try again.</div>';
+    listEl.innerHTML = adminError('Couldn’t load your prospects', 'loadProspects()');
     return;
   }
   allProspects = r || [];
@@ -8014,7 +8067,7 @@ function renderProspects() {
   }
   rows.sort(function(a,b){ return attentionScore(b) - attentionScore(a); });
   if (rows.length === 0) {
-    listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:8px 0;">No prospects here yet. Add one above to get started.</p>';
+    listEl.innerHTML = adminEmpty('🔍', 'No prospects yet', 'Add one above, or use Discover to find local businesses that fit your studio.');
     return;
   }
   var statusColors = { New:'var(--muted)', Emailed:'var(--p)', Replied:'var(--green)', Client:'var(--green)', Dead:'var(--red)' };
@@ -13600,6 +13653,15 @@ function anEngineNote(eng){
 
 .grx-card+.grx-card, .grx-grid .grx-card{margin-top:0;}
 .grx-empty{font-size:12.5px;color:var(--muted);padding:14px 0;line-height:1.6;}
+/* Shared admin state component (empty / error) — one consistent, calm look. */
+.astate{text-align:center;padding:28px 20px;border:1px solid rgba(91,63,160,.1);border-radius:14px;background:rgba(91,63,160,.02);}
+.astate .ai{font-size:24px;line-height:1;margin-bottom:9px;opacity:.75;}
+.astate h4{font-size:14.5px;font-weight:700;color:var(--ink);margin:0 0 5px;}
+.astate p{font-size:12.5px;color:var(--muted);margin:0 auto;max-width:46ch;line-height:1.6;}
+.astate.astate-err{border-color:rgba(192,57,43,.2);background:rgba(192,57,43,.03);}
+.astate .abtn{margin-top:14px;font:inherit;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--p);color:#fff;cursor:pointer;}
+.astate .abtn:hover{filter:brightness(1.08);}
+.astate .abtn:focus-visible{outline:2px solid var(--p);outline-offset:2px;}
 .grx-band{padding:18px 24px;gap:0;}
 .grx-band>div{padding:0 22px;border-left:1px solid rgba(41,25,66,.07);}
 .grx-band>div:first-child, .grx-band>div:nth-child(2){border-left:none;padding-left:0;}
