@@ -129,6 +129,18 @@ for (const p of ['/portal.html', '/dds-studio-manage-9k2p.html']) {
   record(`deploy: ${p} reachable`, '200', String(r.status), r.status === 200, true);
 }
 
+// 11. presence function is up + its auth gate fails closed (M3)
+{
+  const r = await fetch(`${URL_}/functions/v1/presence/site`, { method: 'GET', headers: { 'Authorization': `Bearer ${ANON}` } });
+  const j = await r.json().catch(() => null);
+  record('presence: GET /site unauthenticated → 401', '401 unauthorized', `${r.status} ${j?.error ?? ''}`,
+    r.status === 401 && j?.error === 'unauthorized', true);
+}
+{
+  const r = await fetch(`${URL_}/functions/v1/presence/nope`, { method: 'GET', headers: { 'Authorization': `Bearer ${ANON}` } });
+  record('presence: unknown route → 401 (gate before router)', '401', String(r.status), r.status === 401, true);
+}
+
 // ═════════ AUTH TIER (SR_KEY required — local/staging only) ═════════
 
 if (!SR) {
