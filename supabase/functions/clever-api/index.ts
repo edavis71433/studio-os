@@ -253,6 +253,7 @@ const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
   lead_ai_draft:      'staff',
   prospect_email_draft: 'staff', // Pipeline: AI-or-template outreach draft
   prospect_email_send:  'staff', // Pipeline: send outreach via Resend (eric@, reply-to eric@)
+  lead_brief:           'staff', // Lead Intelligence Agent: one prospect -> full brief + draft
   home_snapshot:      'staff',
   home_brief:         'staff',
   revenue_vitals:     'staff',
@@ -1254,6 +1255,69 @@ async function analyzeWebsite(opts: {
   });
   if (!r.ok) return { ok: false, error: r.error || 'analysis_failed' };
   return { ok: true, data: _stripEmDashesDeep(r.data) };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  LEAD INTELLIGENCE — deterministic scoring (ai-architecture.md, roster).
+//  Scoring is DETERMINISTIC and explainable (never AI): every point is tied to a
+//  real driver with cited evidence, following the platform's core pattern
+//  (business logic deterministic + auditable; AI only explains/drafts). Inputs
+//  are the prospect record + the Website Analysis Agent's evidence-cited
+//  findings. No invented facts, no invented value — the $ estimate is anchored
+//  to Eric's real paid-invoice history, exactly like prospect_insights.
+// ════════════════════════════════════════════════════════════════════════════
+interface LeadScoreDriver { factor: 'opportunity' | 'fit' | 'urgency'; points: number; note: string; evidence: string; }
+function scoreLead(prospect: any, analysis: any | null, medProject: number, medRetainer: number): {
+  score: number; tier: 'high' | 'medium' | 'low'; drivers: LeadScoreDriver[];
+  value_estimate: { low: number; high: number; basis: string };
+} {
+  const drivers: LeadScoreDriver[] = [];
+  let score = 0;
+  const siteStatus = String(prospect.site_status || '').toLowerCase();
+  const blocks: any[] = (analysis && Array.isArray(analysis.blocks)) ? analysis.blocks : [];
+  const fixes = blocks.filter((b) => b.type === 'fix');
+
+  // ── OPPORTUNITY: real, measured problems there is work to fix ──
+  if (fixes.length) {
+    const pts = Math.min(fixes.length * 8, 40);
+    score += pts;
+    drivers.push({ factor: 'opportunity', points: pts, note: `${fixes.length} concrete problem${fixes.length > 1 ? 's' : ''} found on their site to fix`, evidence: fixes[0].evidence || fixes[0].title });
+  } else if (siteStatus.includes('no website') || siteStatus.includes('facebook')) {
+    score += 40;
+    drivers.push({ factor: 'opportunity', points: 40, note: 'No real website yet, so this is a full build opportunity', evidence: `Prospect record: site_status = "${prospect.site_status}"` });
+  } else if (!analysis) {
+    drivers.push({ factor: 'opportunity', points: 0, note: 'No website analyzed yet, so the opportunity size is unknown', evidence: 'No website on the prospect record to analyze' });
+  } else {
+    drivers.push({ factor: 'opportunity', points: 0, note: 'Their site looks solid, so the play is ongoing care or SEO, not a rebuild', evidence: 'Website analysis found no major fixes' });
+  }
+
+  // ── FIT: can Eric actually reach and win them (ICP = reachable local SMB) ──
+  if (prospect.email) { score += 20; drivers.push({ factor: 'fit', points: 20, note: 'You have a direct email, so this is actionable now', evidence: 'Prospect record: email present' }); }
+  else if (prospect.phone) { score += 10; drivers.push({ factor: 'fit', points: 10, note: 'You have a phone number but no email, so a call is the path in', evidence: 'Prospect record: phone present, email missing' }); }
+  else { drivers.push({ factor: 'fit', points: 0, note: 'No contact info on file, so find an email or phone before pursuing', evidence: 'Prospect record: no email or phone' }); }
+  if (prospect.industry || prospect.location) { score += 8; drivers.push({ factor: 'fit', points: 8, note: `A ${prospect.industry || 'local'} business${prospect.location ? ' in ' + prospect.location : ''} is squarely in your market`, evidence: `Prospect record: industry = "${prospect.industry || ''}", location = "${prospect.location || ''}"` }); }
+
+  // ── URGENCY: warmth (status/cadence) + customer-losing problems right now ──
+  const status = String(prospect.status || 'New');
+  if (status === 'Replied') { score += 25; drivers.push({ factor: 'urgency', points: 25, note: 'They replied, which is the warmest a lead gets. Move now', evidence: 'Prospect record: status = Replied' }); }
+  else if (status === 'New' && prospect.email) { score += 12; drivers.push({ factor: 'urgency', points: 12, note: 'New and not yet contacted, with a channel to reach them', evidence: 'Prospect record: status = New, email present' }); }
+  // measured problems that lose customers today raise urgency
+  const severe = blocks.find((b) => b.type === 'fix' && /https|not secure|no phone|no way to (order|contact|buy)|contact/i.test((b.title || '') + ' ' + (b.evidence || '')));
+  if (severe) { score += 10; drivers.push({ factor: 'urgency', points: 10, note: 'A problem that is costing them customers right now gives you a real reason to reach out today', evidence: severe.evidence || severe.title }); }
+
+  score = Math.max(0, Math.min(100, score));
+  const tier: 'high' | 'medium' | 'low' = score >= 65 ? 'high' : score >= 40 ? 'medium' : 'low';
+
+  // ── VALUE ESTIMATE: anchored to real revenue history, never invented ──
+  const rnd = (n: number) => Math.round(n / 50) * 50;
+  let low = 0, high = 0, basis = '';
+  if (medProject > 0) {
+    if (siteStatus.includes('no website') || siteStatus.includes('facebook')) { low = rnd(medProject * 0.9); high = rnd(medProject * 1.4); basis = `New build, anchored to your median paid project ($${Math.round(medProject).toLocaleString()})`; }
+    else if (fixes.length >= 3 || siteStatus.includes('outdated')) { low = rnd(medProject * 0.6); high = rnd(medProject * 1.1); basis = `Redesign, anchored to your median paid project ($${Math.round(medProject).toLocaleString()})`; }
+    else { basis = medRetainer > 0 ? `Site is solid, so the play is a care/SEO plan around your median retainer ($${Math.round(medRetainer).toLocaleString()}/mo)` : 'Site is solid, so the play is a monthly care/SEO plan'; }
+  } else { basis = 'No paid invoice history yet to anchor an estimate'; }
+
+  return { score, tier, drivers, value_estimate: { low, high, basis } };
 }
 
 const GOOGLE_REVIEW_LINK = Deno.env.get('GOOGLE_REVIEW_LINK') || '';
@@ -8138,6 +8202,118 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         value_low: valueLow, value_high: valueHigh, value_basis: valueBasis,
         followup,
         last_touch_days: daysSinceTouch,
+      } }, 200, reqCors);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  LEAD INTELLIGENCE AGENT — one prospect -> full lead brief + outreach draft
+    //  (gate: staff). Composes the three roster agents end to end, smallest
+    //  useful version:
+    //    1. LOAD the existing prospect (manual-add source; no discovery here).
+    //    2. ENRICH from ONLY their own public website (deepAudit fetches the
+    //       public page — no platform scraping, no data behind logins).
+    //    3. ANALYZE via the Website Analysis Agent (evidence-cited findings).
+    //    4. SCORE deterministically (scoreLead) — fit/urgency/opportunity, every
+    //       point tied to cited evidence; value anchored to real revenue.
+    //    5. NEXT BEST ACTION (deterministic, from status/cadence).
+    //    6. DRAFT outreach via the Drafting Agent, grounded in a TRUE observation
+    //       from the findings. Never sends. Human approves and sends manually.
+    //  Never invents contact info, pricing, guarantees, or claims. Read-only:
+    //  does not change the prospect's status or send anything.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (type === 'lead_brief') {
+      if (!SB_SERVICE) return json({ error: 'no service key' }, 500, reqCors);
+      const pid = String(body.id || body.prospectId || '');
+      if (!pid) return json({ error: 'id required' }, 400, reqCors);
+      const svcH = { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` };
+      const rd = async (path: string) => { try { const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcH }); if (!r.ok) return []; const d = await r.json(); return Array.isArray(d) ? d : []; } catch { return []; } };
+
+      // 1. LOAD prospect + revenue anchors (deterministic)
+      const [pRows, invRows, partRows] = await Promise.all([
+        rd(`prospects?id=eq.${encodeURIComponent(pid)}&select=*&limit=1`),
+        svcReadAll(`invoices?deleted_at=is.null&status=eq.paid&select=amount`),
+        rd(`partnerships?deleted_at=is.null&select=monthly_amount&limit=200`),
+      ]);
+      const p = pRows.length ? pRows[0] : null;
+      if (!p) return json({ error: 'not_found' }, 404, reqCors);
+      const toN = (v: any) => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
+      const med = (a: number[]) => { const s = a.filter((n) => n > 0).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+      const medProject = med((invRows as any[]).map((i) => toN(i.amount)));
+      const medRetainer = med((partRows as any[]).map((x) => toN(x.monthly_amount)));
+
+      // 2 + 3. ENRICH from the prospect's own public website, then ANALYZE.
+      let analysis: any = null; let analyzed_url: string | null = null; let analysis_note = '';
+      const website = String(p.website || '').trim();
+      if (website) {
+        try {
+          const audit = await deepAudit(website);            // deterministic public-page measurement
+          analyzed_url = audit.url || website;
+          if (!audit.fetchedHtml) { analysis_note = 'Could not reach their website to analyze it.'; }
+          else {
+            const op = audit.onPage || {}, lc = audit.local || {}, sc = audit.schema || {}, dc = audit.discoverability || {};
+            const facts = [
+              `Domain: ${audit.domain}`, `HTTPS (secure): ${audit.https ? 'yes' : 'NO, not secure'}`,
+              `Page title: ${op.title ? `"${op.title}" (${op.titleLength} chars)` : 'MISSING'}`,
+              `Meta description: ${op.metaDescription ? `present (${op.metaDescriptionLength} chars)` : 'MISSING'}`,
+              `Main headline H1: ${op.h1Text ? `"${op.h1Text}"` : 'MISSING'} (count ${op.h1Count})`,
+              `Visible word count: ${op.wordCount}`, `Images: ${op.imageCount} total, ${op.imagesWithAlt} with alt text`,
+              `Internal links: ${op.internalLinks}`, `Open Graph share preview: title ${op.ogTitle ? 'yes' : 'no'}, image ${op.ogImage ? 'yes' : 'no'}`,
+              `Phone on page: ${lc.phoneOnPage ? 'yes' : 'NO'}`, `Address/ZIP on page: ${lc.zipOnPage ? 'yes' : 'no'}`, `Google Map embedded: ${lc.googleMapsEmbed ? 'yes' : 'no'}`, `Hours listed: ${lc.hoursMentioned ? 'yes' : 'no'}`,
+              `Structured data: ${sc.blocks} block(s); LocalBusiness ${sc.hasLocalBusiness ? 'yes' : 'no'}`,
+              `robots.txt: ${dc.robotsTxt ? (dc.robotsTxtBlocksAll ? 'present but BLOCKS Google' : 'present') : 'missing'}`, `Sitemap: ${dc.sitemapXml ? 'yes' : 'not found'}`,
+            ].join('\n');
+            const ctx = `This is a prospect Eric is evaluating, not a client. Business type: ${p.industry || 'small business'}${p.location ? ' in ' + p.location : ''}. Assume their goal is getting more customers from their site. Write the analysis as JSON only.`;
+            const ar = await analyzeWebsite({ task: 'lead_audit', evidenceFacts: facts, context: ctx, maxTokens: 2000 });
+            if (ar.ok) analysis = ar.data; else analysis_note = 'Website analysis was unavailable just now.';
+          }
+        } catch (_) { analysis_note = 'Could not analyze their website.'; }
+      } else {
+        analysis_note = 'No website on file for this prospect.';
+      }
+
+      // 4. SCORE (deterministic + explainable)
+      const scored = scoreLead(p, analysis, medProject, medRetainer);
+
+      // 5. NEXT BEST ACTION (deterministic, from status/contactability)
+      const status = String(p.status || 'New');
+      let next_action = '';
+      if (!p.email && !p.phone) next_action = 'Find a contact (email or phone) before anything else. There is no way to reach them yet.';
+      else if (status === 'Replied') next_action = 'They replied. Respond within 24 hours while it is warm.';
+      else if (status === 'Emailed') next_action = 'Already emailed. Send one polite follow-up if it has been 4 to 7 days, then leave it.';
+      else if (p.email) next_action = 'Send the outreach draft below (after your review). Email is the fastest path in.';
+      else next_action = 'Call them, since you have a phone number but no email.';
+
+      // 6. DRAFT outreach via the Drafting Agent, grounded in a TRUE observation.
+      // Only draft when there is a channel and it is a first-touch situation.
+      let outreach: any = null;
+      const canDraft = !!p.email && (status === 'New' || status === '' || status === 'Emailed');
+      if (canDraft) {
+        const topFix = (analysis && Array.isArray(analysis.blocks)) ? analysis.blocks.find((b: any) => b.type === 'fix') : null;
+        const observation = topFix ? `${topFix.title} (${topFix.evidence})` : (website ? 'their website could do more to turn visitors into customers' : 'you could not find a website for them');
+        const dctx = [
+          `Recipient: ${p.contact_name || p.business_name || 'the owner'} at ${p.business_name || 'their business'}${p.location ? ' in ' + p.location : ''}.`,
+          `Business type: ${p.industry || 'small local business'}.`,
+          `One TRUE observation about their site to open with (use ONLY this, do not add other specifics): ${observation}.`,
+          analysis && analysis.blocks ? `Other measured findings you may reference honestly: ${analysis.blocks.filter((b: any) => b.type === 'fix').slice(0, 3).map((b: any) => b.title).join('; ')}.` : '',
+        ].filter(Boolean).join('\n');
+        const instruction = `Draft a short, warm cold-outreach email from Eric to this prospect. Open with the one true observation about their website. Then say in a sentence that Eric helps small businesses get found and turn more visitors into calls or customers. Offer a free, honest short list of what he would improve first. Keep it low pressure and genuinely helpful, not a hard sell. Do not quote any price. Do not promise or guarantee any result or ranking. Do not invent any detail not given. Sign as Eric.`;
+        const dr = await draftInVoice({ task: 'lead_outreach', instruction, context: dctx, maxTokens: 500 });
+        outreach = dr.ok
+          ? { channel: 'email', to: p.email, subject: null, body: dr.text, is_ai: true, approved: false, note: 'Draft only. Review and send manually. Nothing was sent.' }
+          : { error: 'draft_unavailable', note: 'Outreach draft could not be generated right now.' };
+      }
+
+      // ASSEMBLE the brief (read-only; status unchanged, nothing sent)
+      return json({ data: {
+        prospect: { id: p.id, business_name: p.business_name, contact_name: p.contact_name || null, email: p.email || null, phone: p.phone || null, website: website || null, industry: p.industry || null, location: p.location || null, status },
+        analysis: analysis ? { headline: analysis.headline, blocks: analysis.blocks, next_steps: analysis.next_steps || [], analyzed_url } : null,
+        analysis_note: analysis_note || null,
+        score: { value: scored.score, tier: scored.tier, drivers: scored.drivers },
+        value_estimate: scored.value_estimate,
+        why_pursue: scored.drivers.filter((d) => d.points > 0).map((d) => d.note),
+        next_action,
+        outreach,        // null when no email / not a first-touch situation; never auto-sent
+        human_approval_required: true,
       } }, 200, reqCors);
     }
 
