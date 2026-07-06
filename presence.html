@@ -7,230 +7,294 @@
 <title>Your Presence — Davis Digital Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css">
 <style>
-/* ── The Client Room (M7) — built entirely on tokens.css ──────────────────── */
+/* ═══ The Client Room · Direction A — paper, ink, one plum accent (M7.5) ═══
+   Room-scoped tokens; the portal's tokens.css is deliberately not loaded.   */
+:root{
+  --paper:#faf7f0; --sheet:#fffdf8; --ink:#211d19; --ink-2:#6e6659; --hair:#e9e2d4; --hair-2:#ddd3bf;
+  --plum:#533a7d; --plum-soft:#efe9f6; --sage:#3d7a50; --sage-soft:#e9f2ec; --amber:#b4770a; --clay:#a8523f;
+  --serif:'Fraunces',Georgia,serif; --sans:'Inter',-apple-system,'Segoe UI',sans-serif; --mono:'Geist Mono',ui-monospace,Consolas,monospace;
+  --dur:200ms; --ease:cubic-bezier(.32,.72,0,1);
+}
+@media (prefers-reduced-motion: reduce){ :root{--dur:0ms} *{animation-duration:.001ms !important;transition-duration:.001ms !important} }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
-body{font-family:var(--sans);font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink);background:var(--bg)}
+body{font-family:var(--sans);font-size:14px;line-height:1.65;color:var(--ink);background:var(--paper)}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 input,textarea,select{font:inherit;color:var(--ink)}
-a{color:var(--p);text-decoration:none}
-::placeholder{color:var(--muted)}
-:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:var(--r-sm)}
+a{color:var(--plum);text-decoration:none}
+::placeholder{color:#b3a892}
+:focus-visible{outline:2px solid var(--plum);outline-offset:3px;border-radius:2px}
+[hidden]{display:none !important}
 
-/* ── shell ── */
+/* ── shell: quiet word rail + one point of gravity ── */
 .shell{display:flex;min-height:100vh}
-.side{width:var(--sidebar-w);flex:none;background:var(--surface);border-right:1px solid var(--line);padding:var(--s5) var(--s4);display:flex;flex-direction:column;gap:var(--s5);position:sticky;top:0;height:100vh}
-.brand{font-family:var(--serif);font-size:var(--t-h2);color:var(--ink)}
-.brand small{display:block;font-family:var(--sans);font-size:var(--t-xs);color:var(--muted);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-top:var(--s1)}
-nav.rooms{display:flex;flex-direction:column;gap:2px}
-.navitem{display:flex;align-items:center;gap:var(--s3);padding:var(--s2) var(--s3);border-radius:var(--r-sm);color:var(--ink-2);font-weight:500;font-size:var(--t-sm);text-align:left;transition:background var(--dur-fast) var(--ease)}
-.navitem:hover{background:var(--surface-3)}
-.navitem.on{background:var(--p-soft);color:var(--p-700);font-weight:550}
-.navsep{height:1px;background:var(--line);margin:var(--s3) 0}
-.side .foot{margin-top:auto;font-size:var(--t-xs);color:var(--muted)}
-.side .foot a{color:var(--ink-2)}
+.rail{width:208px;flex:none;padding:34px 0 30px 36px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.wordmark{font-family:var(--serif);font-weight:500;font-size:20px;margin-bottom:34px}
+.wordmark small{display:block;font-family:var(--sans);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);font-weight:550;margin-top:4px}
+nav.rooms{display:flex;flex-direction:column}
+.navitem{position:relative;text-align:left;padding:6px 0;font-size:13.5px;color:var(--ink-2);transition:color var(--dur) var(--ease)}
+.navitem:hover{color:var(--ink)}
+.navitem.on{color:var(--ink);font-weight:600}
+.navitem.on::before{content:"";position:absolute;left:-20px;top:50%;width:9px;height:2px;background:var(--plum)}
+.railsep{height:26px}
+.rail .foot{margin-top:auto;font-size:12.5px}
+.rail .foot a{color:var(--ink-2)}
+.rail .foot a:hover{color:var(--ink)}
 
-.main{flex:1;min-width:0;display:flex;flex-direction:column}
-.topbar{height:var(--topbar-h);flex:none;display:flex;align-items:center;gap:var(--s4);padding:0 var(--s5);background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
-.topbar .who{font-family:var(--serif);font-size:var(--t-h3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.topbar .grow{flex:1}
-.pill{display:inline-flex;align-items:center;gap:var(--s2);padding:6px var(--s3);border-radius:var(--pill);font-size:var(--t-sm);font-weight:550;border:1px solid var(--line-strong);background:var(--surface);transition:background var(--dur-fast) var(--ease)}
-.pill:hover{background:var(--surface-3)}
-.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.pill.changes .dot{background:var(--amber)}
-.pill.clean .dot{background:var(--green)}
-.btn{display:inline-flex;align-items:center;gap:var(--s2);padding:8px var(--s4);border-radius:var(--r-sm);font-weight:550;font-size:var(--t-sm);border:1px solid var(--line-strong);background:var(--surface);transition:all var(--dur-fast) var(--ease);white-space:nowrap}
-.btn:hover{background:var(--surface-3)}
-.btn.primary{background:var(--p);border-color:var(--p);color:#fff}
-.btn.primary:hover{background:var(--p-600)}
-.btn.quiet{border-color:transparent;color:var(--ink-2)}
-.btn.quiet:hover{background:var(--surface-3);color:var(--ink)}
-.btn.danger{color:var(--red)}
-.btn:disabled{opacity:.55;cursor:default}
-
-.content{flex:1;padding:var(--s6) var(--s5) 120px;max-width:860px;width:100%;margin:0 auto}
+.main{flex:1;min-width:0}
+.topbar{display:flex;align-items:center;gap:16px;padding:26px 56px 0;max-width:860px}
+.topbar .whisper{margin-left:auto;font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2);transition:opacity var(--dur) var(--ease)}
+.topbar .whisper.ok{color:var(--sage)}
+.pillbtn{font-size:13px;font-weight:600;padding:8px 18px;border-radius:100px;border:1px solid var(--hair-2);background:var(--sheet);white-space:nowrap;transition:background var(--dur) var(--ease)}
+.pillbtn:hover{background:var(--plum-soft)}
+.pillbtn.inked{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.pillbtn.inked:hover{background:#3a332c}
+.content{padding:34px 56px 140px;max-width:860px}
 .view{display:none}
 .view.on{display:block}
-h1.pagetitle{font-family:var(--serif);font-weight:500;font-size:var(--t-h1);margin-bottom:var(--s2)}
-.pagesub{color:var(--ink-2);font-size:var(--t-sm);margin-bottom:var(--s5);max-width:56ch}
-.whisper{font-size:var(--t-xs);color:var(--muted);transition:opacity var(--dur) var(--ease)}
-.whisper.saved{color:var(--green)}
 
-/* ── cards / forms ── */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--sh-1)}
-.card + .card{margin-top:var(--s4)}
-.cardhead{display:flex;align-items:baseline;gap:var(--s3);margin-bottom:var(--s4)}
-.cardhead h2{font-family:var(--serif);font-weight:500;font-size:var(--t-h2)}
-.cardhead .whisper{margin-left:auto}
-.frow{display:flex;flex-direction:column;gap:var(--s1);margin-bottom:var(--s4)}
-.frow:last-child{margin-bottom:0}
-.frow label{font-size:var(--t-xs);font-weight:550;color:var(--ink-2);letter-spacing:.02em}
-.frow .hint{font-size:var(--t-xs);color:var(--muted)}
-.frow input[type=text],.frow input[type=url],.frow input[type=email],.frow input[type=tel],.frow textarea,.frow select{
-  padding:9px var(--s3);border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);font-size:var(--t-body);transition:border-color var(--dur-fast) var(--ease)}
-.frow textarea{min-height:88px;resize:vertical;line-height:var(--lh-snug)}
-.frow input:focus,.frow textarea:focus{border-color:var(--p);outline:none;box-shadow:0 0 0 3px var(--p-ring)}
-.frow .err{font-size:var(--t-xs);color:var(--red)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 var(--s4)}
-@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+/* ── editorial primitives ── */
+h1.doc{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin-bottom:6px}
+.docsub{color:var(--ink-2);font-size:13.5px;max-width:54ch;margin-bottom:38px}
+h5.rune{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:48px 0 18px;display:flex;align-items:center;gap:14px}
+h5.rune::after{content:"";flex:1;height:1px;background:var(--hair)}
+h5.rune .whisper{font-family:var(--serif);font-style:italic;font-size:12px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--ink-2)}
+h5.rune .whisper.ok{color:var(--sage)}
+.textact{font-size:13px;font-weight:600;color:var(--plum);border-bottom:1px solid var(--plum-soft);padding-bottom:1px}
+.textact:hover{border-bottom-color:var(--plum)}
+.quietact{font-size:12.5px;color:var(--ink-2)}
+.quietact:hover{color:var(--ink)}
+.smalltag{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);font-weight:600}
 
 /* ── today ── */
-.health{display:flex;align-items:flex-start;gap:var(--s4);padding:var(--s5);border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1)}
-.health .lamp{width:12px;height:12px;border-radius:50%;flex:none;margin-top:9px}
-.health.healthy .lamp{background:var(--green)}
-.health.needs_attention .lamp{background:var(--amber)}
-.health.outdated .lamp{background:var(--muted)}
-.health .sentence{font-family:var(--serif);font-size:var(--t-h1);font-weight:500;line-height:var(--lh-tight)}
-.health .detail{color:var(--ink-2);font-size:var(--t-sm);margin-top:var(--s2)}
-.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s3);margin-top:var(--s4)}
-@media(max-width:760px){.facts{grid-template-columns:1fr 1fr}}
-.fact{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:var(--s4)}
-.fact .k{font-size:var(--t-xs);font-weight:550;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.fact .v{font-weight:550;margin-top:var(--s1)}
-.fact .d{font-size:var(--t-xs);color:var(--ink-2);margin-top:2px;word-break:break-word}
-.fact.live .v{color:var(--green)}
-.fact.attention .v{color:var(--amber)}
+.statement{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1.16;letter-spacing:-.012em;max-width:18ch;text-wrap:balance}
+.statement .lamp{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:15px;vertical-align:13px}
+.statement .lamp.healthy{background:var(--sage)}
+.statement .lamp.needs_attention{background:var(--amber)}
+.statement .lamp.outdated{background:#9a9080}
+.statedetail{color:var(--ink-2);font-size:14px;margin-top:12px;max-width:52ch}
+.factsprose{margin-top:20px;font-size:14.5px;color:var(--ink-2);line-height:2;max-width:56ch}
+.factsprose b{color:var(--ink);font-weight:600}
+.factsprose .ok{color:var(--sage);font-weight:600}
+.factsprose .care{color:var(--amber);font-weight:600}
+.factsprose .dotsep{margin:0 9px;color:var(--hair-2)}
+.letter{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:22px 26px 18px;box-shadow:0 1px 0 rgba(60,45,20,.05);position:relative;margin-bottom:14px;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.letter.away{opacity:0;transform:translateX(24px)}
+.letter .wax{position:absolute;left:26px;top:-6px;width:12px;height:12px;border-radius:50%}
+.letter .wax.suggestion{background:var(--plum)}
+.letter .wax.celebration{background:var(--sage)}
+.letter .wax.caution{background:var(--amber)}
+.letter .lt{font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.35}
+.letter .lr{color:var(--ink-2);font-size:13.5px;margin-top:5px;max-width:56ch}
+.letter .la{margin-top:14px;display:flex;gap:20px;align-items:baseline}
+.journal .jrow{display:flex;gap:18px;padding:10px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
+.journal .jrow:last-child{border-bottom:0}
+.journal .jsec{flex:none;width:92px;font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-2);font-weight:600;padding-top:4px}
+.journal .more{padding:12px 0 0;font-size:12.5px;color:var(--ink-2);font-style:italic;font-family:var(--serif)}
 
-.notes{margin-top:var(--s6)}
-.notes h2,.recent h2{font-family:var(--serif);font-weight:500;font-size:var(--t-h2);margin-bottom:var(--s3)}
-.note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line-strong);border-radius:var(--r);padding:var(--s4);display:flex;gap:var(--s4);align-items:flex-start}
-.note + .note{margin-top:var(--s3)}
-.note.caution{border-left-color:var(--amber)}
-.note.suggestion{border-left-color:var(--p)}
-.note.celebration{border-left-color:var(--green)}
-.note .t{font-weight:550}
-.note .r{color:var(--ink-2);font-size:var(--t-sm);margin-top:2px}
-.note .acts{margin-top:var(--s3);display:flex;gap:var(--s3);align-items:center}
-.recent{margin-top:var(--s6)}
-.chg{display:flex;gap:var(--s3);padding:var(--s3) 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
-.chg:last-child{border-bottom:none}
-.chg .sec{flex:none;width:92px;color:var(--muted);font-size:var(--t-xs);font-weight:550;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+/* first-run envelope */
+.envelope{max-width:520px;margin:14px 0}
+.envelope h2{font-family:var(--serif);font-weight:500;font-size:31px;line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
+.envelope p{color:var(--ink-2);margin-top:12px;font-size:14.5px;max-width:46ch}
+.steps3{margin-top:32px;display:flex;flex-direction:column;gap:10px}
+.step3{display:flex;gap:18px;align-items:center;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 22px;text-align:left;width:100%;box-shadow:0 1px 0 rgba(60,45,20,.05);transition:border-color var(--dur) var(--ease)}
+.step3:hover{border-color:var(--hair-2)}
+.step3 .sn{width:30px;height:30px;flex:none;border-radius:50%;border:1.5px solid var(--ink);display:grid;place-items:center;font-family:var(--serif);font-size:14px}
+.step3.done .sn{background:var(--sage);border-color:var(--sage);color:var(--paper)}
+.step3 .st{font-weight:600;font-size:14px}
+.step3 .sd{font-size:12.5px;color:var(--ink-2);margin-top:1px}
 
-/* first-run */
-.welcome{background:linear-gradient(135deg,var(--p-deep),var(--p-700));color:#fff;border-radius:var(--r-xl);padding:var(--s6);box-shadow:var(--sh-2)}
-.welcome h2{font-family:var(--serif);font-weight:500;font-size:var(--t-display);line-height:var(--lh-tight)}
-.welcome p{opacity:.85;margin-top:var(--s3);max-width:52ch}
-.steps{display:flex;flex-direction:column;gap:var(--s3);margin-top:var(--s5)}
-.step{display:flex;align-items:center;gap:var(--s4);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:var(--r);padding:var(--s4);text-align:left;color:#fff;transition:background var(--dur-fast) var(--ease)}
-.step:hover{background:rgba(255,255,255,.14)}
-.step .n{width:28px;height:28px;flex:none;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);display:grid;place-items:center;font-size:var(--t-sm);font-weight:550}
-.step.done .n{background:var(--green);border-color:var(--green)}
-.step .s{font-weight:550}
-.step .d{font-size:var(--t-sm);opacity:.8}
-
-/* ── collections ── */
-.itemlist{display:flex;flex-direction:column}
-.item{border-bottom:1px solid var(--line);padding:var(--s4) 0}
-.item:last-child{border-bottom:none}
-.itemrow{display:flex;align-items:center;gap:var(--s3)}
-.item .name{font-weight:550;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item .meta{color:var(--ink-2);font-size:var(--t-sm);white-space:nowrap}
-.item .spacer{flex:1}
-.item.hidden-item .name,.item.hidden-item .meta{color:var(--muted)}
-.offthumb{width:44px;height:44px;flex:none;border-radius:var(--r-sm);object-fit:cover;background:var(--surface-3);border:1px solid var(--line)}
-.offthumb.empty{display:grid;place-items:center;color:var(--muted);font-size:18px}
-.tag{font-size:var(--t-xs);font-weight:550;padding:2px var(--s2);border-radius:var(--pill);background:var(--surface-3);color:var(--ink-2);white-space:nowrap}
-.tag.off{background:var(--amber-soft);color:var(--amber)}
-.editor{margin-top:var(--s4);padding:var(--s4);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r)}
-.cathead{display:flex;align-items:center;gap:var(--s3);margin:var(--s5) 0 var(--s2)}
-.cathead:first-child{margin-top:0}
-.cathead h3{font-family:var(--serif);font-weight:500;font-size:var(--t-h3)}
-.cathead .ctl{display:flex;gap:2px;margin-left:auto}
-.cathead .ctl button{padding:2px var(--s2);color:var(--muted);border-radius:var(--r-sm)}
-.cathead .ctl button:hover{background:var(--surface-3);color:var(--ink)}
-.addrow{margin-top:var(--s4)}
-.switch{position:relative;width:34px;height:20px;flex:none;border-radius:var(--pill);background:var(--line-strong);transition:background var(--dur-fast) var(--ease)}
-.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--sh-1);transition:transform var(--dur-fast) var(--ease)}
-.switch.on{background:var(--green)}
-.switch.on::after{transform:translateX(14px)}
+/* ── document fields (business) ── */
+.field{margin-bottom:30px;max-width:560px}
+.field label{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:8px}
+.field input[type=text],.field input[type=url],.field input[type=email],.field input[type=tel]{
+  width:100%;font-family:var(--serif);font-size:19px;background:transparent;border:none;border-bottom:1px solid var(--hair);
+  padding:0 0 8px;caret-color:var(--plum);border-radius:0;transition:border-color var(--dur) var(--ease)}
+.field textarea{width:100%;font-family:var(--sans);font-size:14.5px;line-height:1.75;background:transparent;border:none;border-bottom:1px solid var(--hair);padding:0 0 8px;min-height:76px;resize:vertical;caret-color:var(--plum);border-radius:0}
+.field input:focus,.field textarea:focus{outline:none;border-bottom-color:var(--plum)}
+.field .hint{font-size:12px;color:var(--ink-2);margin-top:6px}
+.consequence{font-size:13px;color:var(--amber);margin-top:6px;font-style:italic;font-family:var(--serif);max-width:56ch}
+.field input.mono{font-family:var(--mono);font-size:15px}
 
 /* hours */
-.hoursgrid{display:flex;flex-direction:column;gap:var(--s2)}
-.hrow{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
-.hrow .day{width:88px;flex:none;font-weight:550;font-size:var(--t-sm)}
-.hrow input[type=time]{padding:5px var(--s2);border:1px solid var(--line-strong);border-radius:var(--r-sm);font-family:var(--mono);font-size:var(--t-sm)}
-.hrow .to{color:var(--muted);font-size:var(--t-sm)}
-.hrow .closedlab{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);color:var(--ink-2);margin-left:auto}
+.hoursgrid{display:flex;flex-direction:column;max-width:560px}
+.hrow{display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid var(--hair)}
+.hrow:last-child{border-bottom:0}
+.hrow .day{width:96px;flex:none;font-family:var(--serif);font-size:15px}
+.hrow input[type=time]{border:none;background:transparent;font-family:var(--mono);font-size:13px;color:var(--ink);padding:2px 4px;caret-color:var(--plum)}
+.hrow input[type=time]:disabled{color:#b3a892}
+.hrow .to{color:var(--ink-2);font-size:12px}
+.hrow .closedlab{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);margin-left:auto;cursor:pointer}
+.hrow input[type=checkbox]{accent-color:var(--plum)}
+.closedrow{display:flex;align-items:center;gap:12px;margin-top:26px;font-size:13.5px;color:var(--ink-2);cursor:pointer;max-width:560px}
+.closedrow input[type=checkbox]{accent-color:var(--plum)}
+#f-closednote{margin-top:10px}
 
-/* media */
-.mediagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s3)}
-.mcell{position:relative;border-radius:var(--r);overflow:hidden;background:var(--surface-3);border:1px solid var(--line);aspect-ratio:1}
+/* ── menu-as-menu ── */
+.menuhead{display:flex;align-items:baseline;gap:16px;margin:40px 0 4px}
+.menuhead:first-of-type{margin-top:8px}
+.menuhead h6{font-family:var(--serif);font-style:italic;font-weight:500;font-size:20px}
+.menuhead .mv{font-size:11px;color:var(--ink-2)}
+.menuhead .ctl{margin-left:auto;display:flex;gap:2px}
+.menuhead .ctl button{padding:1px 8px;color:var(--ink-2);border-radius:4px;font-size:13px}
+.menuhead .ctl button:hover:not(:disabled){background:var(--plum-soft);color:var(--ink)}
+.menuhead .ctl button:disabled{opacity:.3;cursor:default}
+.dish{display:flex;align-items:baseline;padding:11px 8px;border-radius:4px;width:100%;text-align:left;transition:background var(--dur) var(--ease)}
+.dish:hover{background:var(--plum-soft)}
+.dish.washed{background:var(--plum-soft)}
+.dish .dn{font-weight:600;font-size:14.5px}
+.dish .dd{color:var(--ink-2);font-size:12.5px;margin-top:1px;max-width:48ch}
+.dish .lead{flex:1;border-bottom:1.5px dotted var(--hair-2);margin:0 12px;transform:translateY(-4px);min-width:24px}
+.dish .dp{font-family:var(--serif);font-size:15.5px;white-space:nowrap}
+.dish.offmenu .dn,.dish.offmenu .dp{color:var(--ink-2);text-decoration:line-through 1px}
+.dish.offmenu .dd{text-decoration:none}
+.dish .offtag{margin-left:10px}
+.addline{display:block;width:100%;text-align:left;font-size:13.5px;color:var(--plum);font-weight:600;padding:13px 8px;border-top:1px solid var(--hair);margin-top:4px}
+.addline:hover{background:var(--plum-soft);border-radius:4px}
+
+/* inline editor (all collections) */
+.editor{margin:6px 0 14px;padding:20px 22px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+.editor .erow{display:flex;gap:18px;flex-wrap:wrap}
+.editor .erow .field{flex:1;min-width:180px;margin-bottom:18px}
+.editor .field input[type=text]{font-size:16px}
+.editor .eacts{display:flex;align-items:baseline;gap:22px;margin-top:2px}
+.editor .eacts .spacer{flex:1}
+.editor .danger{font-size:12.5px;color:var(--ink-2)}
+.editor .danger.armed{color:var(--clay);font-weight:600}
+
+/* ── artifact lists (questions / kind words / updates) ── */
+.artifact{padding:18px 8px;border-bottom:1px solid var(--hair)}
+.artifact:last-child{border-bottom:0}
+.artifact .arow{display:flex;align-items:baseline;gap:14px}
+.artifact .aq{font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.4;flex:1}
+.artifact .aa{color:var(--ink-2);font-size:13.5px;margin-top:4px;max-width:58ch}
+.artifact .quote{font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.5}
+.artifact .attrib{font-size:13px;color:var(--ink-2);margin-top:5px}
+.artifact .meta{font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+.artifact.dimmed .aq,.artifact.dimmed .quote{color:var(--ink-2)}
+.artifact .washed-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--plum);margin-right:8px;vertical-align:1px}
+.aacts{display:flex;gap:18px;align-items:baseline;flex:none}
+
+/* ── photographs ── */
+.mediagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:22px}
+.mcell{position:relative;border-radius:4px;overflow:hidden;background:var(--sheet);border:1px solid var(--hair);aspect-ratio:1}
 .mcell img{width:100%;height:100%;object-fit:cover;display:block}
-.mcell .badge{position:absolute;left:var(--s2);top:var(--s2);background:rgba(23,18,33,.75);color:#fff;font-size:var(--t-xs);font-weight:550;padding:2px var(--s2);border-radius:var(--pill)}
-.mcell .del{position:absolute;right:var(--s2);top:var(--s2);background:rgba(23,18,33,.6);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur-fast) var(--ease)}
+.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:var(--paper);font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:3px 8px;border-radius:100px}
+.mcell .del{position:absolute;right:8px;top:8px;background:rgba(33,29,25,.65);color:var(--paper);border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur) var(--ease);font-size:12px}
 .mcell:hover .del,.mcell:focus-within .del{opacity:1}
-.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--s2);font-size:var(--t-xs);color:#fff;background:linear-gradient(transparent,rgba(23,18,33,.7))}
+.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 8px;font-size:11px;color:var(--paper);background:linear-gradient(transparent,rgba(33,29,25,.75))}
+.mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
+.uploadprep{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:20px 24px;margin-top:18px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
 
-/* history */
-.pub{display:flex;align-items:center;gap:var(--s4);padding:var(--s4) 0;border-bottom:1px solid var(--line)}
-.pub:last-child{border-bottom:none}
-.pub .st{width:10px;height:10px;border-radius:50%;flex:none}
-.pub .st.live{background:var(--green)}
-.pub .st.failed{background:var(--red)}
-.pub .st.publishing{background:var(--amber)}
-.pub .sum{font-weight:500;min-width:0}
-.pub .when{color:var(--muted);font-size:var(--t-xs);font-family:var(--mono)}
-.pub .acts{margin-left:auto;display:flex;gap:var(--s2);flex:none}
+/* ── history journal ── */
+.hentry{display:flex;gap:22px;padding:18px 0;border-bottom:1px solid var(--hair)}
+.hentry:last-child{border-bottom:0}
+.hdate{flex:none;width:110px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--ink-2);padding-top:5px;text-transform:uppercase}
+.hbody{flex:1;min-width:0}
+.hsum{font-family:var(--serif);font-weight:500;font-size:15.5px;line-height:1.4}
+.hmeta{font-size:12px;color:var(--ink-2);margin-top:3px}
+.hacts{flex:none;display:flex;gap:18px;align-items:baseline;padding-top:3px}
+.hghost{font-size:12px;color:var(--ink-2);font-style:italic;font-family:var(--serif)}
+.hfail .hsum{color:var(--ink-2);font-weight:400}
+.hfail .hollow{color:var(--clay);margin-right:8px}
 
-/* ── overlays ── */
-.scrim{position:fixed;inset:0;background:rgba(23,18,33,.45);z-index:80;display:none;align-items:flex-end;justify-content:center}
+/* ── the publish ritual (full page overlay) ── */
+.ritualwrap{position:fixed;inset:0;background:var(--paper);z-index:90;display:none;overflow:auto}
+.ritualwrap.on{display:block}
+.ritual{max-width:560px;margin:0 auto;padding:72px 28px 80px}
+.ritual .backline{margin-bottom:44px}
+.ritual h1{font-family:var(--serif);font-weight:500;font-size:31px;letter-spacing:-.01em;margin-bottom:10px}
+.ritual .rsub{color:var(--ink-2);font-size:14px;margin-bottom:32px;max-width:48ch}
+.ritual .blockprose{font-family:var(--serif);font-style:italic;font-size:14.5px;color:var(--amber);margin:24px 0 0;line-height:1.7}
+.ritual .blockprose a{font-style:normal}
+.pubbtn{width:100%;padding:16px;border-radius:100px;background:var(--ink);color:var(--paper);font-size:15px;font-weight:600;border:none;margin-top:34px;transition:background var(--dur) var(--ease)}
+.pubbtn:hover{background:#3a332c}
+.notyet{display:block;text-align:center;margin-top:18px;font-size:13px;color:var(--ink-2)}
+.notyet:hover{color:var(--ink)}
+.pipe{margin-top:30px;display:flex;flex-direction:column;gap:9px}
+.pipe .pstep{display:flex;gap:12px;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.pipe .pstep i{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;font-size:9px;flex:none;font-style:normal}
+.pipe .done{color:var(--ink)}
+.pipe .done i{background:var(--sage-soft);color:var(--sage)}
+.pipe .run i{border:2px solid var(--plum);border-right-color:transparent;animation:spin 1s linear infinite}
+.pipe .wait i{border:1.5px solid var(--hair-2)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.receipt{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:36px 32px;max-width:400px;margin:48px auto 0;text-align:center;box-shadow:0 2px 0 rgba(60,45,20,.06)}
+.receipt .stamp{width:46px;height:46px;border-radius:50%;border:2px solid var(--sage);color:var(--sage);display:grid;place-items:center;margin:0 auto;font-size:20px}
+.receipt .stamp.hollow{border-color:var(--clay);color:var(--clay)}
+.receipt .rp{font-family:var(--serif);font-weight:500;font-size:23px;margin:14px 0 6px}
+.receipt .rd{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-2);text-transform:uppercase}
+.receipt .rl{font-size:13.5px;color:var(--ink-2);margin-top:16px;font-style:italic;font-family:var(--serif);line-height:1.7}
+
+/* ── the proofing desk ── */
+.stage{position:fixed;inset:0;background:#2a2118;z-index:95;display:none;flex-direction:column}
+.stage.on{display:flex}
+.stagebar{flex:none;display:flex;align-items:flex-end;gap:22px;padding:16px 26px 0;color:rgba(255,253,248,.7)}
+.stagebar .back{font-size:13px;color:rgba(255,253,248,.75);padding-bottom:10px}
+.stagebar .back:hover{color:#fffdf8}
+.papertabs{display:flex;gap:4px}
+.papertabs button{padding:8px 20px 10px;border-radius:6px 6px 0 0;background:rgba(255,253,248,.13);color:rgba(255,253,248,.7);font-size:13px;font-weight:600}
+.papertabs button.on{background:#fffdf8;color:var(--ink)}
+.pagewords{display:flex;gap:16px;font-size:12.5px;padding-bottom:10px;flex-wrap:wrap}
+.pagewords button{color:rgba(255,253,248,.55)}
+.pagewords button.on{color:#fffdf8;font-weight:600;border-bottom:1px solid rgba(255,253,248,.5)}
+.stagebar .grow{flex:1}
+.deskseg{display:flex;gap:12px;font-size:12.5px;padding-bottom:10px}
+.deskseg button{color:rgba(255,253,248,.55)}
+.deskseg button.on{color:#fffdf8;font-weight:600}
+.stagewrap{flex:1;display:grid;place-items:center;overflow:auto;padding:0 26px 26px;min-height:0}
+.proof{background:#fff;border-radius:0 6px 6px 6px;box-shadow:0 30px 80px rgba(0,0,0,.5);width:100%;height:100%;transition:width var(--dur) var(--ease)}
+.proof.phone{width:390px;max-width:100%}
+.proof iframe{width:100%;height:100%;border:none;border-radius:0 6px 6px 6px}
+
+/* ── overlays as letters ── */
+.scrim{position:fixed;inset:0;background:rgba(33,29,25,.42);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
 @media(min-width:761px){.scrim{align-items:center}}
-.sheet{background:var(--surface);border-radius:var(--r-xl) var(--r-xl) 0 0;width:100%;max-width:560px;max-height:88vh;overflow:auto;padding:var(--s6);box-shadow:var(--sh-pop)}
-@media(min-width:761px){.sheet{border-radius:var(--r-xl)}}
-.sheet h2{font-family:var(--serif);font-weight:500;font-size:var(--t-h1)}
-.sheet .sub{color:var(--ink-2);font-size:var(--t-sm);margin-top:var(--s2)}
-.sheet .body{margin:var(--s5) 0}
-.sheet .foot{display:flex;gap:var(--s3);justify-content:flex-end;align-items:center}
-.blockerbox{background:var(--amber-soft);border-radius:var(--r);padding:var(--s4);font-size:var(--t-sm);margin-bottom:var(--s4)}
-.blockerbox ul{margin:var(--s2) 0 0 var(--s4)}
-
-/* preview stage */
-.stage{position:fixed;inset:0;background:var(--p-deep);z-index:90;display:none;flex-direction:column}
-.stage.on{display:flex}
-.stagebar{height:52px;flex:none;display:flex;align-items:center;gap:var(--s3);padding:0 var(--s4);color:#fff}
-.stagebar .seg{display:flex;background:rgba(255,255,255,.12);border-radius:var(--pill);padding:2px}
-.stagebar .seg button{padding:4px var(--s3);border-radius:var(--pill);color:rgba(255,255,255,.75);font-size:var(--t-sm);font-weight:550}
-.stagebar .seg button.on{background:#fff;color:var(--ink)}
-.stagebar select{background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:var(--r-sm);padding:5px var(--s2);font-size:var(--t-sm)}
-.stagebar select option{color:var(--ink)}
-.stagebar .grow{flex:1}
-.stagewrap{flex:1;display:grid;place-items:center;overflow:auto;padding:0 var(--s4) var(--s4)}
-.stageframe{background:#fff;border-radius:var(--r);box-shadow:var(--sh-3);width:100%;height:100%;transition:width var(--dur-slow) var(--ease)}
-.stageframe.mobile{width:390px;max-width:100%}
-.stageframe iframe{width:100%;height:100%;border:none;border-radius:var(--r)}
-.stagenote{color:rgba(255,255,255,.8);font-size:var(--t-sm);text-align:center;padding:var(--s6)}
+.sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:4px 4px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:34px 36px 28px;box-shadow:0 24px 70px rgba(33,29,25,.35)}
+@media(min-width:761px){.sheetcard{border-radius:4px}}
+.sheetcard h2{font-family:var(--serif);font-weight:500;font-size:23px;margin-bottom:8px}
+.sheetcard .sub{color:var(--ink-2);font-size:13.5px}
+.sheetcard .body{margin:22px 0}
+.sheetcard .foot{display:flex;gap:24px;justify-content:flex-end;align-items:baseline}
 
 /* toasts */
-.toasts{position:fixed;bottom:calc(64px + var(--s4));left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:var(--s2);align-items:center;pointer-events:none}
-@media(min-width:761px){.toasts{bottom:var(--s5)}}
-.toast{background:var(--ink);color:#fff;padding:var(--s3) var(--s4);border-radius:var(--r);font-size:var(--t-sm);box-shadow:var(--sh-3);max-width:88vw}
-.toast.bad{background:var(--red)}
+.toasts{position:fixed;bottom:calc(84px + 16px);left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+@media(min-width:761px){.toasts{bottom:28px}}
+.toast{background:var(--ink);color:var(--paper);padding:11px 20px;border-radius:100px;font-size:13px;box-shadow:0 14px 44px rgba(33,29,25,.3);max-width:88vw}
+.toast.bad{background:var(--clay)}
 
-/* gate */
-.gate{min-height:100vh;display:grid;place-items:center;padding:var(--s5)}
-.gate .card{max-width:420px;text-align:center;padding:var(--s7) var(--s6)}
-.gate h1{font-family:var(--serif);font-weight:500;font-size:var(--t-h1);margin-bottom:var(--s3)}
-.gate p{color:var(--ink-2);margin-bottom:var(--s5)}
+/* empty / loading / gate */
+.estate{padding:44px 8px;max-width:560px}
+.estate .eq{font-family:var(--serif);font-size:20px;font-style:italic;line-height:1.5;max-width:30ch}
+.estate .eh{font-size:13px;color:var(--ink-2);margin-top:10px;max-width:46ch}
+.estate .ea{margin-top:20px}
+.loadline{padding:44px 8px}
+.loadline .lq{font-family:var(--serif);font-size:17px;font-style:italic;color:var(--ink-2)}
+.shimmer{height:1.5px;background:linear-gradient(90deg,var(--hair),var(--plum),var(--hair));background-size:200% 100%;animation:sh 1.6s linear infinite;max-width:260px;margin-top:14px}
+@keyframes sh{to{background-position:-200% 0}}
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+.gate .card{max-width:430px;text-align:center;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:52px 44px;box-shadow:0 2px 0 rgba(60,45,20,.06)}
+.gate h1{font-family:var(--serif);font-weight:500;font-size:25px;line-height:1.25;margin-bottom:12px}
+.gate p{color:var(--ink-2);margin-bottom:26px;font-size:14px}
 
-/* mobile tab bar */
-.tabbar{display:none;position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:60;padding-bottom:env(safe-area-inset-bottom)}
-.tabbar button{flex:1;padding:var(--s2) 0 var(--s3);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:var(--t-xs);font-weight:550;color:var(--muted)}
-.tabbar button.on{color:var(--p)}
-.tabbar svg{width:22px;height:22px}
+/* ── mobile: the dock ── */
+.dock{display:none;position:fixed;left:16px;right:16px;bottom:16px;background:rgba(33,29,25,.95);border-radius:100px;padding:6px;z-index:60;box-shadow:0 14px 44px rgba(33,29,25,.35)}
+.dock button{flex:1;text-align:center;font-size:12px;font-weight:600;padding:10px 0;border-radius:100px;color:#cfc7b8;white-space:nowrap}
+.dock button.on{background:var(--paper);color:var(--ink)}
 @media(max-width:760px){
-  .side{display:none}
-  .tabbar{display:flex}
-  .content{padding:var(--s5) var(--s4) 140px}
-  .topbar{padding:0 var(--s4)}
-  .topbar .who{font-size:var(--t-sm)}
-  /* the tab bar carries Preview, and the pill opens the publish sheet */
-  #btnPreview,#btnPublish{display:none}
+  .rail{display:none}
+  .dock{display:flex}
+  .topbar{padding:22px 22px 0}
+  .topbar .pillbtn{display:none}
+  .content{padding:26px 22px 160px}
+  .statement{font-size:25px}
+  h1.doc{font-size:24px}
+  .hdate{width:84px}
+  .hentry{flex-wrap:wrap}
+  .hacts{padding-left:106px}
 }
-.sectionsheet .navitem{padding:var(--s3)}
-[hidden]{display:none !important}
 </style>
 </head>
 <body>
@@ -239,36 +303,34 @@ h1.pagetitle{font-family:var(--serif);font-weight:500;font-size:var(--t-h1);marg
 <div class="gate" id="gate" hidden>
   <div class="card">
     <h1 id="gateTitle">One moment…</h1>
-    <p id="gateMsg">Checking your session.</p>
-    <a class="btn primary" id="gateBtn" href="portal.html" hidden>Go to your portal</a>
+    <p id="gateMsg">Finding your room.</p>
+    <a class="pillbtn inked" id="gateBtn" href="portal.html" hidden style="display:inline-block;text-decoration:none">Go to your portal</a>
   </div>
 </div>
 
 <div class="shell" id="app" hidden>
-  <aside class="side">
-    <div class="brand">Presence<small>Davis Digital Studio</small></div>
+  <aside class="rail">
+    <div class="wordmark">Presence<small>Davis Digital Studio</small></div>
     <nav class="rooms" id="nav">
       <button class="navitem on" data-view="today">Today</button>
-      <div class="navsep"></div>
+      <div class="railsep"></div>
       <button class="navitem" data-view="business">Business</button>
-      <button class="navitem" data-view="offerings">Offerings</button>
-      <button class="navitem" data-view="faqs">FAQs</button>
-      <button class="navitem" data-view="testimonials">Testimonials</button>
+      <button class="navitem" data-view="offerings">Menu</button>
+      <button class="navitem" data-view="faqs">Questions</button>
+      <button class="navitem" data-view="testimonials">Kind words</button>
       <button class="navitem" data-view="updates">Updates</button>
-      <button class="navitem" data-view="media">Photos</button>
-      <div class="navsep"></div>
+      <button class="navitem" data-view="media">Photographs</button>
+      <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
     </nav>
-    <div class="foot"><a href="portal.html">← Back to portal</a></div>
+    <div class="foot"><a href="portal.html">← Back to your portal</a></div>
   </aside>
 
   <div class="main">
     <header class="topbar">
-      <div class="who" id="whoName">Your business</div>
-      <div class="grow"></div>
-      <button class="pill" id="draftPill" title="What's changed since your last publish"><span class="dot"></span><span id="draftPillText">…</span></button>
-      <button class="btn" id="btnPreview">Preview</button>
-      <button class="btn primary" id="btnPublish">Publish</button>
+      <span class="whisper" id="topWhisper">everything saved</span>
+      <button class="pillbtn" id="btnPreview">See your site</button>
+      <button class="pillbtn inked" id="btnPublish">Publish</button>
     </header>
     <main class="content">
 
@@ -276,236 +338,197 @@ h1.pagetitle{font-family:var(--serif);font-weight:500;font-size:var(--t-h1);marg
       <section class="view on" id="view-today">
         <div id="welcomeWrap" hidden></div>
         <div id="healthWrap"></div>
-        <div class="facts" id="factsWrap"></div>
-        <div class="notes" id="notesWrap" hidden>
-          <h2>From your concierge</h2>
+        <p class="factsprose" id="factsWrap"></p>
+        <div id="notesWrap" hidden>
+          <h5 class="rune">From your concierge</h5>
           <div id="notesList"></div>
         </div>
-        <div class="recent" id="recentWrap" hidden>
-          <h2>Waiting to publish</h2>
-          <div id="recentList"></div>
+        <div id="recentWrap" hidden>
+          <h5 class="rune">Waiting to publish</h5>
+          <div class="journal" id="recentList"></div>
         </div>
       </section>
 
       <!-- BUSINESS -->
       <section class="view" id="view-business">
-        <h1 class="pagetitle">Business</h1>
-        <p class="pagesub">The facts customers rely on. Everything here saves as you type — nothing reaches your website until you publish.</p>
-        <div class="card">
-          <div class="cardhead"><h2>About your business</h2><span class="whisper" id="save-identity"></span></div>
-          <div class="frow"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
-          <div class="frow"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><span class="hint">One short line under your name.</span></div>
-          <div class="frow"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
-          <div class="grid2">
-            <div class="frow"><label for="f-phone">Phone</label><input type="tel" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
-            <div class="frow"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
-          </div>
-          <div class="frow"><label for="f-story">Your story <span class="hint">(shown on your About page)</span></label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea></div>
-          <div class="grid2">
-            <div class="frow"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
-            <div class="frow"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="cardhead"><h2>Address</h2><span class="whisper" id="save-location"></span></div>
-          <div class="frow"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
-          <div class="grid2">
-            <div class="frow"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
-            <div class="frow"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
-          </div>
-          <div class="grid2">
-            <div class="frow"><label for="f-postal_code">ZIP</label><input type="text" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
-            <div class="frow"><label for="f-locphone">Location phone <span class="hint">(if different)</span></label><input type="tel" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="cardhead"><h2>Hours</h2><span class="whisper" id="save-hours"></span></div>
-          <div class="hoursgrid" id="hoursGrid"></div>
-          <div class="frow" style="margin-top:var(--s4)">
-            <label style="display:flex;align-items:center;gap:var(--s3);cursor:pointer">
-              <span class="switch" id="closedSwitch" role="switch" aria-checked="false" tabindex="0"></span>
-              Temporarily closed right now
-            </label>
-            <input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden>
-          </div>
-        </div>
+        <h1 class="doc">Business</h1>
+        <p class="docsub">The facts customers rely on. Everything here keeps itself saved as you write — nothing reaches your website until you publish.</p>
+        <div id="bizWaiting"></div>
+
+        <h5 class="rune">About your business <span class="whisper" id="save-identity"></span></h5>
+        <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
+        <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
+        <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
+        <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
+        <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
+        <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Told on your About page, in your words.</div></div>
+        <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
+        <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
+
+        <h5 class="rune">Where to find you <span class="whisper" id="save-location"></span></h5>
+        <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
+        <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
+        <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
+        <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
+        <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
+
+        <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
+        <div class="hoursgrid" id="hoursGrid"></div>
+        <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
+        <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
       </section>
 
-      <!-- OFFERINGS -->
+      <!-- MENU -->
       <section class="view" id="view-offerings">
-        <h1 class="pagetitle">Offerings</h1>
-        <p class="pagesub">What you sell, section by section. Hidden items stay saved here but come off your website.</p>
+        <h1 class="doc">Menu</h1>
+        <p class="docsub">This page reads the way your menu reads. Choose any line to change it; anything you take off the menu stays kept here, never lost.</p>
         <div id="offeringsWrap"></div>
-        <div class="card addrow">
-          <div class="cardhead"><h2>Add an item</h2></div>
-          <div class="grid2">
-            <div class="frow"><label for="new-off-name">Name</label><input type="text" id="new-off-name" maxlength="120"></div>
-            <div class="frow"><label for="new-off-cat">Section <span class="hint">(e.g. Mains, Starters)</span></label><input type="text" id="new-off-cat" maxlength="60" list="catlist"><datalist id="catlist"></datalist></div>
-          </div>
-          <div class="grid2">
-            <div class="frow"><label for="new-off-price">Price <span class="hint">(as text — “$18”, “Market”)</span></label><input type="text" id="new-off-price" maxlength="40"></div>
-            <div class="frow"><label>&nbsp;</label><button class="btn primary" id="btnAddOffering">Add item</button></div>
-          </div>
-        </div>
+        <div id="newSectionWrap"></div>
       </section>
 
-      <!-- FAQS -->
+      <!-- QUESTIONS -->
       <section class="view" id="view-faqs">
-        <h1 class="pagetitle">FAQs</h1>
-        <p class="pagesub">The questions customers actually ask, answered once, in your words.</p>
-        <div class="card"><div class="itemlist" id="faqList"></div></div>
-        <div class="card addrow">
-          <div class="cardhead"><h2>Add a question</h2></div>
-          <div class="frow"><label for="new-faq-q">Question</label><input type="text" id="new-faq-q" maxlength="200"></div>
-          <div class="frow"><label for="new-faq-a">Answer</label><textarea id="new-faq-a" maxlength="2000"></textarea></div>
-          <button class="btn primary" id="btnAddFaq">Add question</button>
-        </div>
+        <h1 class="doc">Questions</h1>
+        <p class="docsub">The questions customers actually ask, answered once, in your words.</p>
+        <div id="faqList"></div>
+        <button class="addline" id="btnAddFaq">＋ Answer a new question</button>
+        <div id="faqAddWrap"></div>
       </section>
 
-      <!-- TESTIMONIALS -->
+      <!-- KIND WORDS -->
       <section class="view" id="view-testimonials">
-        <h1 class="pagetitle">Testimonials</h1>
-        <p class="pagesub">Kind words from real customers, in their words.</p>
-        <div class="card"><div class="itemlist" id="tesList"></div></div>
-        <div class="card addrow">
-          <div class="cardhead"><h2>Add a testimonial</h2></div>
-          <div class="frow"><label for="new-tes-quote">Quote</label><textarea id="new-tes-quote" maxlength="600"></textarea></div>
-          <div class="grid2">
-            <div class="frow"><label for="new-tes-author">From</label><input type="text" id="new-tes-author" maxlength="120" placeholder="Maria G."></div>
-            <div class="frow"><label for="new-tes-source">Where <span class="hint">(optional — Google, Yelp…)</span></label><input type="text" id="new-tes-source" maxlength="80"></div>
-          </div>
-          <button class="btn primary" id="btnAddTes">Add testimonial</button>
-        </div>
+        <h1 class="doc">Kind words</h1>
+        <p class="docsub">What customers have said about you, kept in their words.</p>
+        <div id="tesList"></div>
+        <button class="addline" id="btnAddTes">＋ Keep a kind word</button>
+        <div id="tesAddWrap"></div>
       </section>
 
       <!-- UPDATES -->
       <section class="view" id="view-updates">
-        <h1 class="pagetitle">Updates</h1>
-        <p class="pagesub">News, seasonal notes, announcements. Drafts stay private; shown updates appear on your Updates page when you publish.</p>
-        <div class="card"><div class="itemlist" id="postList"></div></div>
-        <div class="card addrow">
-          <div class="cardhead"><h2>Write an update</h2></div>
-          <div class="frow"><label for="new-post-title">Title</label><input type="text" id="new-post-title" maxlength="160"></div>
-          <div class="frow"><label for="new-post-body">Body</label><textarea id="new-post-body" maxlength="20000" style="min-height:140px"></textarea></div>
-          <button class="btn primary" id="btnAddPost">Save as draft</button>
-        </div>
+        <h1 class="doc">Updates</h1>
+        <p class="docsub">News, seasonal notes, announcements. Drafts stay private; what you choose to show appears on your Updates page when you publish.</p>
+        <div id="postList"></div>
+        <button class="addline" id="btnAddPost">＋ Write an update</button>
+        <div id="postAddWrap"></div>
       </section>
 
-      <!-- MEDIA -->
+      <!-- PHOTOGRAPHS -->
       <section class="view" id="view-media">
-        <h1 class="pagetitle">Photos</h1>
-        <p class="pagesub">Your photo library. Photos marked “On your site” are in use — the rest are saved here, ready when you are.</p>
-        <div class="card">
-          <div class="cardhead"><h2>Library</h2>
-            <span class="whisper" id="save-media"></span>
-            <button class="btn" id="btnUpload" style="margin-left:auto">Add a photo</button>
-            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
-          </div>
-          <div id="uploadPrep" hidden>
-            <div class="frow"><label for="upload-alt">Describe this photo <span class="hint">(required — helps customers and search engines)</span></label>
-              <input type="text" id="upload-alt" maxlength="200" placeholder="e.g. Fresh pasta with basil on a white plate">
-            </div>
-            <div style="display:flex;gap:var(--s3)"><button class="btn primary" id="btnUploadGo">Upload</button><button class="btn quiet" id="btnUploadCancel">Cancel</button></div>
-          </div>
-          <div class="mediagrid" id="mediaGrid" style="margin-top:var(--s4)"></div>
+        <h1 class="doc">Photographs</h1>
+        <p class="docsub">Your collection. Photographs marked “on your site” are at work; the rest wait here, ready when you are.</p>
+        <div style="display:flex;align-items:baseline;gap:20px">
+          <button class="textact" id="btnUpload">＋ Add a photograph</button>
+          <span class="whisper" id="save-media" style="font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2)"></span>
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
         </div>
+        <div class="uploadprep" id="uploadPrep" hidden>
+          <div class="field" style="margin-bottom:16px"><label for="upload-alt">Describe this photograph</label>
+            <input type="text" id="upload-alt" maxlength="200" placeholder="Fresh pasta with basil on a white plate">
+            <div class="hint">A sentence helps customers who can’t see it — and the people searching for you.</div>
+          </div>
+          <div style="display:flex;gap:22px;align-items:baseline"><button class="pillbtn inked" id="btnUploadGo">Add it to the collection</button><button class="quietact" id="btnUploadCancel">Never mind</button></div>
+        </div>
+        <div class="mediagrid" id="mediaGrid"></div>
       </section>
 
       <!-- HISTORY -->
       <section class="view" id="view-history">
-        <h1 class="pagetitle">History</h1>
-        <p class="pagesub">Every version of your site, kept. You can look at any version, and bring one back into your draft — your live site never changes until you publish.</p>
-        <div class="card"><div id="pubList"></div></div>
+        <h1 class="doc">History</h1>
+        <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
+        <div id="pubList"></div>
       </section>
 
     </main>
   </div>
 </div>
 
-<!-- mobile tabs -->
-<nav class="tabbar" id="tabbar">
-  <button data-tab="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9"/></svg>Today</button>
-  <button data-tab="sections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Sections</button>
-  <button data-tab="preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/></svg>Preview</button>
+<!-- mobile dock -->
+<nav class="dock" id="dock">
+  <button data-tab="today" class="on">Today</button>
+  <button data-tab="sections">Sections</button>
+  <button data-tab="preview">Proof</button>
+  <button data-tab="publish" id="dockPublish">Publish</button>
 </nav>
 
-<!-- publish sheet -->
-<div class="scrim" id="publishScrim">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pubSheetTitle">
-    <h2 id="pubSheetTitle">Publish</h2>
-    <p class="sub" id="pubSheetSub"></p>
-    <div class="body" id="pubSheetBody"></div>
-    <div class="foot">
-      <button class="btn quiet" data-close>Not yet</button>
-      <button class="btn primary" id="btnPublishGo">Publish</button>
-    </div>
+<!-- publish ritual (full page) -->
+<div class="ritualwrap" id="ritualWrap">
+  <div class="ritual">
+    <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your room</button></div>
+    <h1 id="ritTitle">Here’s what changes.</h1>
+    <p class="rsub" id="ritSub"></p>
+    <div id="ritBody"></div>
+    <div id="ritBlockers"></div>
+    <div id="ritActions"></div>
   </div>
 </div>
 
-<!-- restore sheet -->
+<!-- restore letter -->
 <div class="scrim" id="restoreScrim">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
+  <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
     <h2 id="resSheetTitle">Bring this version back?</h2>
     <p class="sub" id="resSheetSub"></p>
-    <div class="body"><p style="font-size:var(--t-sm);color:var(--ink-2)">This loads that version into your <strong>draft</strong> so you can look it over. Your current draft is set aside as a safety copy — nothing is lost, and your live site doesn’t change until you publish.</p></div>
+    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version will be laid into your draft so you can look it over. Today’s draft is set aside as a safety copy — nothing is lost, and your live site doesn’t change until you publish.</p></div>
     <div class="foot">
-      <button class="btn quiet" data-close>Cancel</button>
-      <button class="btn primary" id="btnRestoreGo">Bring it into my draft</button>
+      <button class="quietact" data-close>Never mind</button>
+      <button class="pillbtn inked" id="btnRestoreGo">Bring it into my draft</button>
     </div>
   </div>
 </div>
 
-<!-- media picker -->
+<!-- photograph picker -->
 <div class="scrim" id="pickerScrim">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
-    <h2 id="pickTitle">Choose a photo</h2>
-    <div class="body"><div class="mediagrid" id="pickerGrid"></div></div>
+  <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <h2 id="pickTitle">Choose a photograph</h2>
+    <div class="body"><div class="mediagrid" id="pickerGrid" style="margin-top:0"></div></div>
     <div class="foot">
-      <button class="btn quiet" id="btnPickNone">No photo</button>
-      <button class="btn quiet" data-close>Cancel</button>
+      <button class="quietact" id="btnPickNone">No photograph</button>
+      <button class="quietact" data-close>Never mind</button>
     </div>
   </div>
 </div>
 
 <!-- mobile sections sheet -->
 <div class="scrim" id="sectionsScrim">
-  <div class="sheet sectionsheet" role="dialog" aria-modal="true">
+  <div class="sheetcard" role="dialog" aria-modal="true">
     <h2>Sections</h2>
-    <div class="body" id="sectionsNav"></div>
-    <div class="foot"><button class="btn quiet" data-close>Close</button></div>
+    <div class="body" id="sectionsNav" style="display:flex;flex-direction:column"></div>
+    <div class="foot"><button class="quietact" data-close>Close</button></div>
   </div>
 </div>
 
-<!-- preview stage -->
+<!-- proofing desk -->
 <div class="stage" id="stage">
   <div class="stagebar">
-    <button class="btn quiet" id="btnStageClose" style="color:#fff;background:transparent;border-color:transparent">← Back</button>
-    <div class="seg" id="verSeg">
+    <button class="back" id="btnStageClose">← Back</button>
+    <div class="papertabs" id="verSeg">
       <button data-ver="draft" class="on">Draft</button>
       <button data-ver="live">Live</button>
     </div>
-    <select id="pageSel" aria-label="Page">
-      <option value="/">Home</option>
-      <option value="/menu/">Menu</option>
-      <option value="/about/">About</option>
-      <option value="/faq/">FAQ</option>
-      <option value="/updates/">Updates</option>
-      <option value="/contact/">Contact</option>
-    </select>
+    <div class="pagewords" id="pageWords">
+      <button data-page="/" class="on">Home</button>
+      <button data-page="/menu/">Menu</button>
+      <button data-page="/about/">About</button>
+      <button data-page="/faq/">Questions</button>
+      <button data-page="/updates/">Updates</button>
+      <button data-page="/contact/">Contact</button>
+    </div>
     <div class="grow"></div>
-    <div class="seg" id="devSeg">
-      <button data-dev="desktop" class="on">Desktop</button>
+    <div class="deskseg" id="devSeg">
+      <button data-dev="desktop" class="on">Desk</button>
       <button data-dev="mobile">Phone</button>
     </div>
   </div>
-  <div class="stagewrap"><div class="stageframe" id="stageFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
+  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="A proof of your website"></iframe></div></div>
 </div>
 
 <div class="toasts" id="toasts"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/* ════ The Client Room — M7. One API, one vocabulary, calm by default. ════ */
+/* ════ The Client Room · Direction A dress over the frozen M7 movement ════
+   Every API call, route, and contract is byte-identical to M7. Only the
+   presentation, vocabulary, and interaction dress changed (M7.5).        */
 "use strict";
 
 /* ── environment: production by default; ?env=staging for acceptance runs ── */
@@ -517,32 +540,33 @@ const ENVS = {
 };
 const ENV = new URLSearchParams(location.search).get("env") === "staging" ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
-
-/* same isolated storage key as the portal: one sign-in covers both pages */
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
 
-/* ── tiny DOM + toast helpers ── */
+/* ── helpers ── */
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 function toast(msg, bad) {
   const t = el("div", "toast" + (bad ? " bad" : ""), msg);
   $("toasts").appendChild(t);
   setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
 }
 
-/* ── API: every call carries the caller's JWT; errors come back calm ── */
+/* ── API: identical calls to M7 ── */
 async function api(method, route, body) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  if (!jwt) { showGate("Please sign in", "Your session ended. Sign in through your portal and come back.", true); throw new Error("no-session"); }
+  if (!jwt) { showGate("Please sign in", "Your room uses the same sign-in as your portal. Sign in there and come straight back.", true); throw new Error("no-session"); }
   const r = await fetch(FN + route, {
     method,
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await r.text();
-  let j = null; try { j = JSON.parse(text); } catch { /* html previews handled by apiRaw */ }
-  if (!r.ok) { const e = new Error((j && j.message) || "Something didn’t work — nothing was changed."); e.status = r.status; e.body = j; throw e; }
+  let j = null; try { j = JSON.parse(text); } catch {}
+  if (!r.ok) { const e = new Error((j && j.message) || "Nothing was lost — that just didn’t go through. Try once more."); e.status = r.status; e.body = j; throw e; }
   return j;
 }
 async function apiHtml(route) {
@@ -550,23 +574,20 @@ async function apiHtml(route) {
   const jwt = data?.session?.access_token;
   const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt } });
   const text = await r.text();
-  if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t load that."); e.status = r.status; throw e; }
+  if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t draw that page just now."); e.status = r.status; throw e; }
   return text;
 }
 
 /* ── state ── */
 const S = { site: null, identity: null, location: null, settings: null,
   offerings: [], faqs: [], testimonials: [], posts: [], media: [],
-  changes: null, health: null, publishes: [],
-  pickerTarget: null, restoreTarget: null, pendingFile: null };
-
+  changes: null, health: null, publishes: [], restoreTarget: null, pendingFile: null };
 const DAYS = [["mon","Monday"],["tue","Tuesday"],["wed","Wednesday"],["thu","Thursday"],["fri","Friday"],["sat","Saturday"],["sun","Sunday"]];
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const changedIds = () => new Set((S.changes?.changes || []).map((c) => c.entity_id).filter(Boolean));
 
 /* ── gate ── */
 function showGate(title, msg, showBtn) {
-  $("app").hidden = true; $("tabbar").style.display = "none";
+  $("app").hidden = true; $("dock").style.display = "none";
   $("gate").hidden = false;
   $("gateTitle").textContent = title; $("gateMsg").textContent = msg;
   $("gateBtn").hidden = !showBtn;
@@ -578,23 +599,24 @@ function go(view) {
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
   document.querySelectorAll("#nav .navitem").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
-  document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today")));
+  document.querySelectorAll("#dock button").forEach((b) => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today")));
   window.scrollTo({ top: 0 });
   if (view === "today") loadToday();
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
 }
 $("nav").addEventListener("click", (e) => { const b = e.target.closest(".navitem"); if (b) go(b.dataset.view); });
-$("tabbar").addEventListener("click", (e) => {
+$("dock").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.tab === "today") go("today");
-  else if (b.dataset.tab === "preview") openPreview();
+  else if (b.dataset.tab === "preview") openPreview("draft");
+  else if (b.dataset.tab === "publish") openRitual();
   else openSheet("sectionsScrim");
 });
 (function buildSectionsSheet() {
   const wrap = $("sectionsNav");
-  [["business","Business"],["offerings","Offerings"],["faqs","FAQs"],["testimonials","Testimonials"],["updates","Updates"],["media","Photos"],["history","History"]].forEach(([v, label]) => {
-    const b = el("button", "navitem", label); b.style.width = "100%";
+  [["business","Business"],["offerings","Menu"],["faqs","Questions"],["testimonials","Kind words"],["updates","Updates"],["media","Photographs"],["history","History"]].forEach(([v, label]) => {
+    const b = el("button", "navitem", label); b.style.padding = "10px 0"; b.style.fontSize = "15px";
     b.addEventListener("click", () => { closeSheet("sectionsScrim"); go(v); });
     wrap.appendChild(b);
   });
@@ -609,35 +631,36 @@ document.querySelectorAll(".scrim").forEach((s) => {
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   document.querySelectorAll(".scrim.on").forEach((s) => s.classList.remove("on"));
+  document.querySelectorAll(".editor").forEach((n) => n.remove()); // Esc closes inline editors, untouched
   if ($("stage").classList.contains("on")) closePreview();
+  if ($("ritualWrap").classList.contains("on")) closeRitual();
 });
 
-/* ── autosave: singleton fields (identity + location) ── */
+/* ── whispers & autosave (identical PUTs) ── */
 const debounces = {};
 function debounce(key, fn, ms) { clearTimeout(debounces[key]); debounces[key] = setTimeout(fn, ms); }
 function whisper(id, state) {
   const w = $(id); if (!w) return;
-  w.classList.toggle("saved", state === "saved");
-  w.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state || "";
-  if (state === "saved") setTimeout(() => { if (w.textContent === "Saved") w.textContent = ""; }, 2500);
+  w.classList.toggle("ok", state === "saved");
+  w.textContent = state === "saving" ? "saving…" : state === "saved" ? "saved just now" : state || "";
+  if (state === "saved") setTimeout(() => { if (w.textContent === "saved just now") w.textContent = ""; }, 2600);
 }
 document.querySelectorAll("[data-sing]").forEach((inp) => {
   inp.addEventListener("input", () => {
     const sing = inp.dataset.sing, field = inp.dataset.field;
     const wid = sing === "identity" ? "save-identity" : "save-location";
-    whisper(wid, "saving");
+    whisper(wid, "saving"); whisper("topWhisper", "saving");
     debounce(sing + ":" + field, async () => {
       try {
         await api("PUT", sing === "identity" ? "/identity" : "/location", { [field]: inp.value });
-        whisper(wid, "saved");
-        if (field === "business_name") $("whoName").textContent = inp.value || "Your business";
+        whisper(wid, "saved"); whisper("topWhisper", "saved");
         scheduleChangesRefresh();
       } catch (err) { whisper(wid, ""); toast(err.message, true); }
     }, 700);
   });
 });
 
-/* ── hours editor ── */
+/* ── hours (identical PUT /location) ── */
 function hoursFromState() {
   const loc = S.location || {};
   const map = new Map((loc.hours || []).map((d) => [d.day, d]));
@@ -659,9 +682,9 @@ function renderHours() {
         ? { day: d.day, closed: cb.checked, intervals: cb.checked ? [] : [{ open: open.value || "09:00", close: close.value || "17:00" }] }
         : d);
       S.location = { ...(S.location || {}), hours };
-      whisper("save-hours", "saving");
+      whisper("save-hours", "saving"); whisper("topWhisper", "saving");
       debounce("hours", async () => {
-        try { await api("PUT", "/location", { hours: S.location.hours }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
+        try { await api("PUT", "/location", { hours: S.location.hours }); whisper("save-hours", "saved"); whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
         catch (err) { whisper("save-hours", ""); toast(err.message, true); }
       }, 600);
     };
@@ -670,19 +693,16 @@ function renderHours() {
     grid.appendChild(row);
   });
   const sw = $("closedSwitch"), note = $("f-closednote");
-  const closed = !!(S.location && S.location.temporarily_closed);
-  sw.classList.toggle("on", closed); sw.setAttribute("aria-checked", String(closed));
-  note.hidden = !closed; note.value = (S.location && S.location.temporarily_closed_note) || "";
+  sw.checked = !!(S.location && S.location.temporarily_closed);
+  note.hidden = !sw.checked; note.value = (S.location && S.location.temporarily_closed_note) || "";
 }
-$("closedSwitch").addEventListener("click", toggleClosed);
-$("closedSwitch").addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleClosed(); } });
-async function toggleClosed() {
-  const now = !(S.location && S.location.temporarily_closed);
+$("closedSwitch").addEventListener("change", async () => {
+  const now = $("closedSwitch").checked;
   S.location = { ...(S.location || {}), temporarily_closed: now };
-  renderHours();
+  $("f-closednote").hidden = !now;
   try { await api("PUT", "/location", { temporarily_closed: now }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
   catch (err) { toast(err.message, true); }
-}
+});
 $("f-closednote").addEventListener("input", () => {
   debounce("closednote", async () => {
     try { await api("PUT", "/location", { temporarily_closed_note: $("f-closednote").value }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
@@ -690,7 +710,7 @@ $("f-closednote").addEventListener("input", () => {
   }, 700);
 });
 
-/* ── offerings ── */
+/* ── the menu that edits itself (identical CRUD) ── */
 function categoriesInOrder() {
   const declared = (S.settings && S.settings.category_order) || [];
   const seen = new Set(declared);
@@ -701,83 +721,85 @@ function categoriesInOrder() {
 function renderOfferings() {
   const wrap = $("offeringsWrap"); wrap.innerHTML = "";
   const cats = categoriesInOrder();
-  $("catlist").innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join("");
+  const wash = changedIds();
   if (!S.offerings.length) {
-    const c = el("div", "card"); c.appendChild(el("p", "pagesub", "Nothing here yet — add your first item below."));
-    wrap.appendChild(c); return;
+    const e = el("div", "estate");
+    e.innerHTML = `<div class="eq">Burrata &amp; Peaches …… $16</div><div class="eh">Your menu is waiting for its first line. Add a dish and it reads just like this.</div>`;
+    const a = el("div", "ea"); const b = el("button", "pillbtn inked", "Add the first dish");
+    b.addEventListener("click", () => addDishLine(wrap, "Mains"));
+    a.appendChild(b); e.appendChild(a); wrap.appendChild(e);
   }
   cats.forEach((cat, ci) => {
-    const card = el("div", "card");
-    const head = el("div", "cathead");
-    head.appendChild(el("h3", null, cat));
+    const head = el("div", "menuhead");
+    head.appendChild(el("h6", null, cat));
+    const n = S.offerings.filter((o) => (o.category || "Menu") === cat).length;
+    head.appendChild(el("span", "mv", `${n} dish${n === 1 ? "" : "es"}`));
     const ctl = el("div", "ctl");
-    const up = el("button", null, "↑"); up.title = "Move this section up"; up.setAttribute("aria-label", `Move ${cat} up`);
-    const dn = el("button", null, "↓"); dn.title = "Move this section down"; dn.setAttribute("aria-label", `Move ${cat} down`);
+    const up = el("button", null, "↑"); up.title = `Move ${cat} earlier`; up.setAttribute("aria-label", `Move ${cat} earlier in the menu`);
+    const dn = el("button", null, "↓"); dn.title = `Move ${cat} later`; dn.setAttribute("aria-label", `Move ${cat} later in the menu`);
     up.disabled = ci === 0; dn.disabled = ci === cats.length - 1;
     up.addEventListener("click", () => moveCategory(cat, -1));
     dn.addEventListener("click", () => moveCategory(cat, +1));
-    ctl.append(up, dn); head.appendChild(ctl); card.appendChild(head);
-    const list = el("div", "itemlist");
-    S.offerings.filter((o) => (o.category || "Menu") === cat).forEach((o) => list.appendChild(offeringRow(o)));
-    card.appendChild(list);
-    wrap.appendChild(card);
+    ctl.append(up, dn); head.appendChild(ctl);
+    wrap.appendChild(head);
+    S.offerings.filter((o) => (o.category || "Menu") === cat).forEach((o) => wrap.appendChild(dishLine(o, wash)));
+    const add = el("button", "addline", `＋ Add a dish to ${cat}`);
+    add.addEventListener("click", () => addDishLine(add, cat));
+    wrap.appendChild(add);
   });
+  const ns = $("newSectionWrap"); ns.innerHTML = "";
+  if (S.offerings.length) {
+    const b = el("button", "addline", "＋ Start a new section of the menu");
+    b.style.borderTop = "none"; b.style.marginTop = "18px";
+    b.addEventListener("click", () => addDishLine(ns, ""));
+    ns.appendChild(b);
+  }
 }
-async function moveCategory(cat, dir) {
-  const cats = categoriesInOrder();
-  const i = cats.indexOf(cat), j = i + dir;
-  if (j < 0 || j >= cats.length) return;
-  [cats[i], cats[j]] = [cats[j], cats[i]];
-  S.settings = { ...(S.settings || {}), category_order: cats };
-  renderOfferings();
-  try { await api("PUT", "/settings", { category_order: cats }); scheduleChangesRefresh(); }
-  catch (err) { toast(err.message, true); }
-}
-function offeringRow(o) {
-  const item = el("div", "item" + (o.is_visible === false ? " hidden-item" : ""));
-  const row = el("div", "itemrow");
-  const media = S.media.find((m) => m.id === o.media_id);
-  if (media && media.thumb) { const img = el("img", "offthumb"); img.src = media.thumb; img.alt = ""; row.appendChild(img); }
-  else { row.appendChild(el("div", "offthumb empty", "🍽")); }
-  row.appendChild(el("span", "name", o.name));
-  if (o.price_text) row.appendChild(el("span", "meta", o.price_text));
-  row.appendChild(el("span", "spacer"));
-  if (o.is_visible === false) row.appendChild(el("span", "tag off", "Hidden"));
-  const vis = el("button", "switch" + (o.is_visible !== false ? " on" : "")); vis.role = "switch";
-  vis.title = o.is_visible !== false ? "Shown on your site — click to hide" : "Hidden — click to show";
-  vis.setAttribute("aria-checked", String(o.is_visible !== false));
-  vis.setAttribute("aria-label", `${o.name}: shown on your site`);
-  vis.addEventListener("click", async () => {
-    try { const r = await api("PATCH", `/offerings/${o.id}`, { is_visible: o.is_visible === false });
-      Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+function dishLine(o, wash) {
+  const holder = el("div");
+  const row = el("button", "dish" + (o.is_visible === false ? " offmenu" : "") + (wash.has(o.id) && o.is_visible !== false ? " washed" : ""));
+  row.setAttribute("aria-label", `Edit ${o.name}`);
+  const left = el("span");
+  const nm = el("span", "dn", o.name);
+  if (o.is_visible === false) nm.appendChild(Object.assign(el("span", "smalltag", "off the menu"), { style: "margin-left:10px;text-decoration:none;display:inline-block" }));
+  left.appendChild(nm);
+  if (o.description) left.appendChild(el("div", "dd", o.description));
+  row.append(left, el("span", "lead"), el("span", "dp", o.price_text || "—"));
+  row.addEventListener("click", () => {
+    const open = holder.querySelector(".editor");
+    if (open) { open.remove(); return; }
+    holder.appendChild(dishEditor(o));
   });
-  const edit = el("button", "btn quiet", "Edit");
-  edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(offeringEditor(o)); });
-  row.append(vis, edit);
-  item.appendChild(row);
-  return item;
+  holder.appendChild(row);
+  return holder;
 }
-function offeringEditor(o) {
+function dishEditor(o) {
   const ed = el("div", "editor");
   ed.innerHTML = `
-    <div class="grid2">
-      <div class="frow"><label>Name</label><input type="text" data-k="name" value="${esc(o.name)}" maxlength="120"></div>
-      <div class="frow"><label>Section</label><input type="text" data-k="category" value="${esc(o.category)}" maxlength="60"></div>
+    <div class="erow">
+      <div class="field"><label>Dish</label><input type="text" data-k="name" value="${esc(o.name)}" maxlength="120"></div>
+      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" value="${esc(o.price_text || "")}" maxlength="40" placeholder="$18 · MP"></div>
     </div>
-    <div class="grid2">
-      <div class="frow"><label>Price</label><input type="text" data-k="price_text" value="${esc(o.price_text || "")}" maxlength="40"></div>
-      <div class="frow"><label>Photo</label><div style="display:flex;gap:var(--s2)"><button class="btn" data-act="photo">${o.media_id ? "Change photo" : "Choose photo"}</button></div></div>
+    <div class="field"><label>Description</label><textarea data-k="description" maxlength="500" style="min-height:52px">${esc(o.description || "")}</textarea></div>
+    <div class="erow">
+      <div class="field"><label>Section</label><input type="text" data-k="category" value="${esc(o.category)}" maxlength="60"></div>
+      <div class="field" style="max-width:200px"><label>Photograph</label><button class="textact" data-act="photo" style="background:none">${o.media_id ? "Change photograph" : "Choose one"}</button></div>
     </div>
-    <div class="frow"><label>Description</label><textarea data-k="description" maxlength="500">${esc(o.description || "")}</textarea></div>
-    <div style="display:flex;gap:var(--s3);justify-content:space-between">
-      <button class="btn danger" data-act="del">Remove</button>
-      <button class="btn primary" data-act="save">Save</button>
+    <div class="eacts">
+      <button class="pillbtn inked" data-act="save">Save</button>
+      <button class="textact" data-act="vis" style="background:none">${o.is_visible === false ? "Put it back on the menu" : "Take it off the menu"}</button>
+      <span class="spacer"></span>
+      <button class="danger" data-act="del">Remove for good</button>
     </div>`;
   ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
     try { const r = await api("PATCH", `/offerings/${o.id}`, { media_id: mediaId }); Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
     catch (err) { toast(err.message, true); }
   }));
+  ed.querySelector('[data-act="vis"]').addEventListener("click", async () => {
+    try { const r = await api("PATCH", `/offerings/${o.id}`, { is_visible: o.is_visible === false });
+      Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
     const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
     try { const r = await api("PATCH", `/offerings/${o.id}`, body); Object.assign(o, r.data); renderOfferings(); toast("Saved"); scheduleChangesRefresh(); }
@@ -789,94 +811,185 @@ function offeringEditor(o) {
   });
   return ed;
 }
-$("btnAddOffering").addEventListener("click", async () => {
-  const name = $("new-off-name").value.trim(), cat = $("new-off-cat").value.trim(), price = $("new-off-price").value.trim();
-  if (!name || !cat) { toast("A name and a section are needed.", true); return; }
-  try {
-    const r = await api("POST", "/offerings", { name, category: cat, price_text: price });
-    S.offerings.push(r.data);
-    $("new-off-name").value = ""; $("new-off-price").value = "";
-    renderOfferings(); toast("Added"); scheduleChangesRefresh();
-  } catch (err) { toast(err.message, true); }
-});
+function addDishLine(afterNode, cat) {
+  document.querySelectorAll(".editor.adding").forEach((n) => n.remove());
+  const ed = el("div", "editor adding");
+  ed.innerHTML = `
+    <div class="erow">
+      <div class="field"><label>Dish</label><input type="text" data-k="name" maxlength="120"></div>
+      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" maxlength="40" placeholder="$18 · MP"></div>
+    </div>
+    ${cat === "" ? `<div class="field"><label>Section</label><input type="text" data-k="category" maxlength="60" placeholder="Desserts, Drinks, Specials…"></div>` : ""}
+    <div class="eacts"><button class="pillbtn inked" data-act="add">Add to the menu</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
+  ed.querySelector('[data-act="cancel"]').addEventListener("click", () => ed.remove());
+  ed.querySelector('[data-act="add"]').addEventListener("click", async () => {
+    const name = ed.querySelector('[data-k="name"]').value.trim();
+    const price = ed.querySelector('[data-k="price_text"]').value.trim();
+    const category = cat || (ed.querySelector('[data-k="category"]')?.value.trim() || "");
+    if (!name || !category) { toast("A dish needs a name and a section.", true); return; }
+    try { const r = await api("POST", "/offerings", { name, category, price_text: price });
+      S.offerings.push(r.data); renderOfferings(); toast("On the draft menu"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  afterNode.parentNode ? afterNode.parentNode.insertBefore(ed, afterNode.nextSibling) : afterNode.appendChild(ed);
+  ed.querySelector("input").focus();
+}
+async function moveCategory(cat, dir) {
+  const cats = categoriesInOrder();
+  const i = cats.indexOf(cat), j = i + dir;
+  if (j < 0 || j >= cats.length) return;
+  [cats[i], cats[j]] = [cats[j], cats[i]];
+  S.settings = { ...(S.settings || {}), category_order: cats };
+  renderOfferings();
+  try { await api("PUT", "/settings", { category_order: cats }); scheduleChangesRefresh(); }
+  catch (err) { toast(err.message, true); }
+}
 
-/* two-tap destructive confirm — no browser dialogs */
+/* two-tap destructive confirm, in words */
 function armDelete(btn, fn) {
   btn.addEventListener("click", () => {
     if (btn.dataset.armed) { fn(); return; }
-    btn.dataset.armed = "1"; const was = btn.textContent; btn.textContent = "Remove — are you sure?";
-    setTimeout(() => { delete btn.dataset.armed; btn.textContent = was; }, 3200);
+    btn.dataset.armed = "1"; btn.classList.add("armed");
+    const was = btn.textContent; btn.textContent = "Are you sure? This one really goes.";
+    setTimeout(() => { delete btn.dataset.armed; btn.classList.remove("armed"); btn.textContent = was; }, 3400);
   });
 }
 
-/* ── faqs / testimonials / updates (shared simple list pattern) ── */
+/* ── questions / kind words / updates as artifacts (identical CRUD) ── */
+function artifactActs(entity, collection, rerender, words) {
+  const acts = el("span", "aacts");
+  const edit = el("button", "quietact", "edit");
+  edit.addEventListener("click", (e) => { e.stopPropagation(); const h = acts.closest(".artifact"); const open = h.querySelector(".editor"); if (open) open.remove(); else h.appendChild(simpleEditor(entity, collection, words.fields, rerender, words)); });
+  acts.appendChild(edit);
+  return acts;
+}
+function stateWord(entity, collection, rerender, onWord, offWord) {
+  const on = entity.is_visible !== false;
+  const b = el("button", "quietact", on ? "" : offWord);
+  if (!on) b.classList.add("smalltag"), b.style.borderBottom = "none";
+  if (on) return null;
+  b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: true }); Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  return b;
+}
+function simpleEditor(entity, collection, fields, rerender, words) {
+  const ed = el("div", "editor");
+  ed.innerHTML = fields.map(([k, label, kind, max]) => `
+    <div class="field">${label ? `<label>${label}</label>` : ""}${kind === "textarea"
+      ? `<textarea data-k="${k}" maxlength="${max}">${esc(entity[k] || "")}</textarea>`
+      : `<input type="text" data-k="${k}" value="${esc(entity[k] || "")}" maxlength="${max}">`}</div>`).join("") + `
+    <div class="eacts">
+      <button class="pillbtn inked" data-act="save">Save</button>
+      <button class="textact" data-act="vis" style="background:none">${entity.is_visible === false ? words.show : words.hide}</button>
+      <span class="spacer"></span>
+      <button class="danger" data-act="del">Remove for good</button>
+    </div>`;
+  ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
+    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
+    try { const r = await api("PATCH", `/${collection}/${entity.id}`, body); Object.assign(entity, r.data); rerender(); toast("Saved"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  ed.querySelector('[data-act="vis"]').addEventListener("click", async () => {
+    try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: entity.is_visible === false });
+      Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  armDelete(ed.querySelector('[data-act="del"]'), async () => {
+    try { await api("DELETE", `/${collection}/${entity.id}`);
+      S[collection] = S[collection].filter((x) => x.id !== entity.id); rerender(); toast("Removed"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  return ed;
+}
 function renderFaqs() {
   const list = $("faqList"); list.innerHTML = "";
-  if (!S.faqs.length) { list.appendChild(el("p", "pagesub", "No questions yet — add the first one below.")); return; }
+  const wash = changedIds();
+  if (!S.faqs.length) {
+    list.innerHTML = `<div class="estate"><div class="eq">“Do you take walk-ins?”</div><div class="eh">The first question customers ask is usually the easiest to answer. Keep it here once and it answers itself forever.</div></div>`;
+    return;
+  }
   S.faqs.forEach((f) => {
-    const item = el("div", "item" + (f.is_visible === false ? " hidden-item" : ""));
-    const row = el("div", "itemrow");
-    row.appendChild(el("span", "name", f.question));
-    row.appendChild(el("span", "spacer"));
-    if (f.is_visible === false) row.appendChild(el("span", "tag off", "Hidden"));
-    row.appendChild(visSwitch(f, "faqs", renderFaqs));
-    const edit = el("button", "btn quiet", "Edit");
-    edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(simpleEditor(f, "faqs", [["question","Question","text",200],["answer","Answer","textarea",2000]], renderFaqs)); });
-    row.appendChild(edit);
-    item.appendChild(row); list.appendChild(item);
+    const a = el("div", "artifact" + (f.is_visible === false ? " dimmed" : ""));
+    const row = el("div", "arow");
+    const q = el("span", "aq");
+    if (wash.has(f.id) && f.is_visible !== false) q.appendChild(el("span", "washed-dot"));
+    q.appendChild(document.createTextNode(f.question));
+    if (f.is_visible === false) q.appendChild(Object.assign(el("span", "smalltag", "not shown"), { style: "margin-left:10px" }));
+    row.appendChild(q);
+    row.appendChild(artifactActs(f, "faqs", renderFaqs, { fields: [["question","Question","text",200],["answer","Answer","textarea",2000]], hide: "Take it off the page", show: "Put it back on the page" }));
+    a.appendChild(row);
+    a.appendChild(el("div", "aa", f.answer));
+    list.appendChild(a);
   });
 }
 function renderTes() {
   const list = $("tesList"); list.innerHTML = "";
-  if (!S.testimonials.length) { list.appendChild(el("p", "pagesub", "No testimonials yet — add one below.")); return; }
+  const wash = changedIds();
+  if (!S.testimonials.length) {
+    list.innerHTML = `<div class="estate"><div class="eq">“The gnocchi alone is worth the drive.”</div><div class="eh">Someone has said something kind about your business. Keep it here, and it appears on your site in their words.</div></div>`;
+    return;
+  }
   S.testimonials.forEach((t) => {
-    const item = el("div", "item" + (t.is_visible === false ? " hidden-item" : ""));
-    const row = el("div", "itemrow");
-    row.appendChild(el("span", "name", `“${t.quote.length > 60 ? t.quote.slice(0, 59) + "…" : t.quote}”`));
-    row.appendChild(el("span", "meta", "— " + t.author));
-    row.appendChild(el("span", "spacer"));
-    if (t.is_visible === false) row.appendChild(el("span", "tag off", "Hidden"));
-    row.appendChild(visSwitch(t, "testimonials", renderTes));
-    const edit = el("button", "btn quiet", "Edit");
-    edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(simpleEditor(t, "testimonials", [["quote","Quote","textarea",600],["author","From","text",120],["source","Where","text",80]], renderTes)); });
-    row.appendChild(edit);
-    item.appendChild(row); list.appendChild(item);
+    const a = el("div", "artifact" + (t.is_visible === false ? " dimmed" : ""));
+    const row = el("div", "arow");
+    const q = el("span", "aq quote");
+    if (wash.has(t.id) && t.is_visible !== false) q.appendChild(el("span", "washed-dot"));
+    q.appendChild(document.createTextNode(`“${t.quote}”`));
+    if (t.is_visible === false) q.appendChild(Object.assign(el("span", "smalltag", "not shown"), { style: "margin-left:10px;font-style:normal" }));
+    row.appendChild(q);
+    row.appendChild(artifactActs(t, "testimonials", renderTes, { fields: [["quote","Their words","textarea",600],["author","From","text",120],["source","Where they said it","text",80]], hide: "Take it off the page", show: "Put it back on the page" }));
+    a.appendChild(row);
+    a.appendChild(el("div", "attrib", "— " + t.author + (t.source ? ", on " + t.source : "")));
+    list.appendChild(a);
   });
 }
 function renderPosts() {
   const list = $("postList"); list.innerHTML = "";
-  if (!S.posts.length) { list.appendChild(el("p", "pagesub", "No updates yet — write your first one below.")); return; }
+  const wash = changedIds();
+  if (!S.posts.length) {
+    list.innerHTML = `<div class="estate"><div class="eq">Summer patio is open.</div><div class="eh">Your first update can be one sentence. Write it as a draft; show it when it’s ready.</div></div>`;
+    return;
+  }
   S.posts.forEach((p) => {
-    const item = el("div", "item" + (p.status !== "published" ? " hidden-item" : ""));
-    const row = el("div", "itemrow");
-    row.appendChild(el("span", "name", p.title));
-    row.appendChild(el("span", "meta", p.status === "published" ? (p.published_at ? fmtDate(p.published_at) : "Shown") : "Draft"));
-    row.appendChild(el("span", "spacer"));
-    if (p.status !== "published") row.appendChild(el("span", "tag off", "Draft"));
-    const vis = el("button", "switch" + (p.status === "published" ? " on" : "")); vis.role = "switch";
-    vis.setAttribute("aria-checked", String(p.status === "published"));
-    vis.setAttribute("aria-label", `${p.title}: shown on your Updates page`);
-    vis.title = p.status === "published" ? "Shown — click to make it a draft" : "Draft — click to show it";
-    vis.addEventListener("click", async () => {
-      try { const r = await api("PATCH", `/posts/${p.id}`, { status: p.status === "published" ? "draft" : "published" });
+    const shown = p.status === "published";
+    const a = el("div", "artifact" + (!shown ? " dimmed" : ""));
+    const row = el("div", "arow");
+    const q = el("span", "aq");
+    if (wash.has(p.id) && shown) q.appendChild(el("span", "washed-dot"));
+    q.appendChild(document.createTextNode(p.title));
+    if (!shown) q.appendChild(Object.assign(el("span", "smalltag", "draft"), { style: "margin-left:10px" }));
+    row.appendChild(q);
+    const acts = el("span", "aacts");
+    const tog = el("button", "quietact", shown ? "make it a draft" : "show it");
+    tog.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try { const r = await api("PATCH", `/posts/${p.id}`, { status: shown ? "draft" : "published" });
         Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
       catch (err) { toast(err.message, true); }
     });
-    const edit = el("button", "btn quiet", "Edit");
-    edit.addEventListener("click", () => { item.querySelector(".editor") ? item.querySelector(".editor").remove() : item.appendChild(postEditor(p)); });
-    row.append(vis, edit);
-    item.appendChild(row); list.appendChild(item);
+    acts.appendChild(tog);
+    const edit = el("button", "quietact", "edit");
+    edit.addEventListener("click", () => { const open = a.querySelector(".editor"); if (open) open.remove(); else a.appendChild(postEditor(p)); });
+    acts.appendChild(edit);
+    row.appendChild(acts);
+    a.appendChild(row);
+    a.appendChild(el("div", "meta", shown && p.published_at ? fmtDate(p.published_at).toUpperCase() : "UNDATED UNTIL SHOWN"));
+    list.appendChild(a);
   });
 }
 function postEditor(p) {
   const ed = el("div", "editor");
   ed.innerHTML = `
-    <div class="frow"><label>Title</label><input type="text" data-k="title" value="${esc(p.title)}" maxlength="160"></div>
-    <div class="frow"><label>Body</label><textarea data-k="body_md" maxlength="20000" style="min-height:140px">${esc(p.body_md || "")}</textarea></div>
-    <div class="frow"><label>Photo</label><button class="btn" data-act="photo" style="align-self:flex-start">${p.hero_media_id ? "Change photo" : "Choose photo"}</button></div>
-    <div style="display:flex;gap:var(--s3);justify-content:space-between">
-      <button class="btn danger" data-act="del">Remove</button>
-      <button class="btn primary" data-act="save">Save</button>
+    <div class="field"><label>Title</label><input type="text" data-k="title" value="${esc(p.title)}" maxlength="160"></div>
+    <div class="field"><label>The update</label><textarea data-k="body_md" maxlength="20000" style="min-height:130px">${esc(p.body_md || "")}</textarea></div>
+    <div class="field" style="max-width:220px"><label>Photograph</label><button class="textact" data-act="photo" style="background:none">${p.hero_media_id ? "Change photograph" : "Choose one"}</button></div>
+    <div class="eacts">
+      <button class="pillbtn inked" data-act="save">Save</button>
+      <span class="spacer"></span>
+      <button class="danger" data-act="del">Remove for good</button>
     </div>`;
   ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
     try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
@@ -893,83 +1006,71 @@ function postEditor(p) {
   });
   return ed;
 }
-function visSwitch(entity, collection, rerender) {
-  const on = entity.is_visible !== false;
-  const vis = el("button", "switch" + (on ? " on" : "")); vis.role = "switch";
-  vis.setAttribute("aria-checked", String(on));
-  vis.setAttribute("aria-label", "Shown on your site");
-  vis.title = on ? "Shown on your site — click to hide" : "Hidden — click to show";
-  vis.addEventListener("click", async () => {
-    try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: !on });
-      Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
-  });
-  return vis;
-}
-function simpleEditor(entity, collection, fields, rerender) {
+/* add lines for the three collections */
+function inlineAdd(wrapId, fields, onAdd, addLabel) {
+  const wrap = $(wrapId);
+  if (wrap.querySelector(".editor")) { wrap.innerHTML = ""; return; }
+  wrap.innerHTML = "";
   const ed = el("div", "editor");
-  ed.innerHTML = fields.map(([k, label, kind, max]) => `
-    <div class="frow"><label>${label}</label>${kind === "textarea"
-      ? `<textarea data-k="${k}" maxlength="${max}">${esc(entity[k] || "")}</textarea>`
-      : `<input type="text" data-k="${k}" value="${esc(entity[k] || "")}" maxlength="${max}">`}</div>`).join("") + `
-    <div style="display:flex;gap:var(--s3);justify-content:space-between">
-      <button class="btn danger" data-act="del">Remove</button>
-      <button class="btn primary" data-act="save">Save</button>
-    </div>`;
-  ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
-    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
-    try { const r = await api("PATCH", `/${collection}/${entity.id}`, body); Object.assign(entity, r.data); rerender(); toast("Saved"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+  ed.innerHTML = fields.map(([k, label, kind, max, ph]) => `
+    <div class="field"><label>${label}</label>${kind === "textarea"
+      ? `<textarea data-k="${k}" maxlength="${max}" placeholder="${ph || ""}"></textarea>`
+      : `<input type="text" data-k="${k}" maxlength="${max}" placeholder="${ph || ""}">`}</div>`).join("") + `
+    <div class="eacts"><button class="pillbtn inked" data-act="add">${addLabel}</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
+  ed.querySelector('[data-act="cancel"]').addEventListener("click", () => wrap.innerHTML = "");
+  ed.querySelector('[data-act="add"]').addEventListener("click", async () => {
+    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value.trim());
+    await onAdd(body, () => (wrap.innerHTML = ""));
   });
-  armDelete(ed.querySelector('[data-act="del"]'), async () => {
-    try { await api("DELETE", `/${collection}/${entity.id}`);
-      S[collection] = S[collection].filter((x) => x.id !== entity.id); rerender(); toast("Removed"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
-  });
-  return ed;
+  wrap.appendChild(ed);
+  ed.querySelector("input,textarea").focus();
 }
-$("btnAddFaq").addEventListener("click", async () => {
-  const q = $("new-faq-q").value.trim(), a = $("new-faq-a").value.trim();
-  if (!q || !a) { toast("Both the question and the answer are needed.", true); return; }
-  try { const r = await api("POST", "/faqs", { question: q, answer: a });
-    S.faqs.push(r.data); $("new-faq-q").value = ""; $("new-faq-a").value = ""; renderFaqs(); toast("Added"); scheduleChangesRefresh(); }
-  catch (err) { toast(err.message, true); }
-});
-$("btnAddTes").addEventListener("click", async () => {
-  const quote = $("new-tes-quote").value.trim(), author = $("new-tes-author").value.trim();
-  if (!quote || !author) { toast("The quote and who it’s from are needed.", true); return; }
-  try { const r = await api("POST", "/testimonials", { quote, author, source: $("new-tes-source").value.trim() });
-    S.testimonials.push(r.data); $("new-tes-quote").value = ""; $("new-tes-author").value = ""; $("new-tes-source").value = "";
-    renderTes(); toast("Added"); scheduleChangesRefresh(); }
-  catch (err) { toast(err.message, true); }
-});
-$("btnAddPost").addEventListener("click", async () => {
-  const title = $("new-post-title").value.trim(), body = $("new-post-body").value;
-  if (!title) { toast("A title is needed.", true); return; }
-  try { const r = await api("POST", "/posts", { title, body_md: body, status: "draft" });
-    S.posts.unshift(r.data); $("new-post-title").value = ""; $("new-post-body").value = "";
-    renderPosts(); toast("Saved as a draft — show it when you’re ready"); scheduleChangesRefresh(); }
-  catch (err) { toast(err.message, true); }
-});
+$("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
+  [["question","The question","text",200,"Do you take walk-ins?"],["answer","Your answer","textarea",2000,""]],
+  async (b, done) => {
+    if (!b.question || !b.answer) { toast("Both the question and your answer are needed.", true); return; }
+    try { const r = await api("POST", "/faqs", b); S.faqs.push(r.data); done(); renderFaqs(); toast("Answered"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  }, "Keep this answer"));
+$("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
+  [["quote","Their words","textarea",600,""],["author","From","text",120,"Maria G."],["source","Where they said it (optional)","text",80,"Google · a note · in person"]],
+  async (b, done) => {
+    if (!b.quote || !b.author) { toast("The words and who said them are needed.", true); return; }
+    try { const r = await api("POST", "/testimonials", b); S.testimonials.push(r.data); done(); renderTes(); toast("Kept"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  }, "Keep this kind word"));
+$("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
+  [["title","Title","text",160,"Summer patio is open"],["body_md","The update","textarea",20000,""]],
+  async (b, done) => {
+    if (!b.title) { toast("An update needs a title.", true); return; }
+    try { const r = await api("POST", "/posts", { ...b, status: "draft" }); S.posts.unshift(r.data); done(); renderPosts(); toast("Saved as a draft — show it when it’s ready"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  }, "Save as a draft"));
 
-/* ── media library + picker + upload ── */
+/* ── photographs (identical media API) ── */
 async function loadMedia() {
   try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); }
   catch (err) { toast(err.message, true); }
 }
 function renderMediaGrid(grid, manage, onPick) {
   grid.innerHTML = "";
-  if (!S.media.length) { grid.appendChild(el("p", "pagesub", "No photos yet.")); return; }
+  if (!S.media.length) {
+    if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">A photograph is worth a paragraph you don’t have to write.</div><div class="eh">Add your best plate, your room, your storefront — they’ll be ready to place anywhere on your site.</div></div>`;
+    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No photographs in the collection yet.</p>`;
+    return;
+  }
   S.media.forEach((m) => {
     const cell = el(onPick ? "button" : "div", "mcell");
     if (m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.loading = "lazy"; cell.appendChild(img); }
-    if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "Used by " + m.used_by.join(", "); cell.appendChild(b); }
-    if (m.alt_text) cell.appendChild(el("span", "alt", m.alt_text));
+    if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "At work: " + m.used_by.join(", "); cell.appendChild(b); }
+    const alt = el("span", "alt", m.alt_text || "");
+    if (m.used_by && m.used_by.length) alt.appendChild(el("i", "usedline", "at work: " + m.used_by.join(", ")));
+    cell.appendChild(alt);
     if (onPick) cell.addEventListener("click", () => onPick(m.id));
     if (manage) {
-      const del = el("button", "del", "✕"); del.title = "Remove this photo"; del.setAttribute("aria-label", "Remove photo: " + (m.alt_text || ""));
+      const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
       del.addEventListener("click", async () => {
-        if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); return; }
+        if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
         try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
         catch (err) { toast(err.message, true); }
       });
@@ -988,116 +1089,131 @@ $("btnUploadCancel").addEventListener("click", () => { S.pendingFile = null; $("
 $("btnUploadGo").addEventListener("click", async () => {
   const f = S.pendingFile, alt = $("upload-alt").value.trim();
   if (!f) return;
-  if (alt.length < 3) { toast("Please describe the photo first.", true); return; }
-  whisper("save-media", "Uploading…");
+  if (alt.length < 3) { toast("A few words about the photograph first — it matters.", true); return; }
+  whisper("save-media", "bringing it in…");
   try {
     const dims = await new Promise((res) => { const img = new Image(); img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight }); img.onerror = () => res({}); img.src = URL.createObjectURL(f); });
     const r = await api("POST", "/media/upload-url", { mime: f.type, bytes: f.size, alt_text: alt, width: dims.w, height: dims.h });
     const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": f.type }, body: f });
-    if (!put.ok) throw new Error("The upload didn’t finish — please try again.");
+    if (!put.ok) throw new Error("The photograph didn’t finish arriving — nothing was lost, try once more.");
     whisper("save-media", "saved");
     $("uploadPrep").hidden = true; $("fileInput").value = ""; S.pendingFile = null;
-    await loadMedia(); toast("Photo added");
+    await loadMedia(); toast("In the collection");
   } catch (err) { whisper("save-media", ""); toast(err.message, true); }
 });
+let pickerCb = null;
 function openPicker(onPick) {
-  S.pickerTarget = onPick;
+  pickerCb = onPick;
   renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); });
   openSheet("pickerScrim");
 }
-$("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if (S.pickerTarget) S.pickerTarget(null); });
+$("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if (pickerCb) pickerCb(null); });
 
-/* ── today: health + facts + notes + changes ── */
+/* ── today: statement, prose facts, letters, journal ── */
 async function loadToday() {
   try {
     const [h, c, n] = await Promise.all([api("GET", "/health"), api("GET", "/changes"), api("GET", "/notes")]);
     S.health = h.data; S.changes = c.data;
-    renderHealth(); renderFacts(); renderNotes(n.data || []); renderRecent(); renderPill(); renderWelcome();
+    renderStatement(); renderFactsProse(); renderNotes(n.data || []); renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
   } catch (err) { toast(err.message, true); }
 }
-function renderHealth() {
+function renderStatement() {
   const w = $("healthWrap"); const h = S.health; if (!h) return;
   w.innerHTML = "";
   if (h.first_run) { w.hidden = true; return; }
   w.hidden = false;
-  const box = el("div", "health " + h.state);
-  box.appendChild(el("span", "lamp"));
-  const t = el("div");
-  t.appendChild(el("div", "sentence", h.sentence));
-  if (h.detail) t.appendChild(el("div", "detail", h.detail));
-  box.appendChild(t);
-  w.appendChild(box);
+  const st = el("div", "statement");
+  const lamp = el("span", "lamp " + h.state); st.appendChild(lamp);
+  st.appendChild(document.createTextNode(h.sentence));
+  w.appendChild(st);
+  if (h.detail) w.appendChild(el("p", "statedetail", h.detail));
 }
-function renderFacts() {
-  const w = $("factsWrap"); const f = S.health && S.health.facts; if (!f) { w.innerHTML = ""; return; }
-  w.innerHTML = "";
-  const mk = (k, v, d, cls) => {
-    const c = el("div", "fact" + (cls ? " " + cls : ""));
-    c.appendChild(el("div", "k", k)); c.appendChild(el("div", "v", v)); if (d) c.appendChild(el("div", "d", d));
-    return c;
-  };
-  w.appendChild(mk("Website", f.website.label, f.website.detail, f.website.state === "live" ? "live" : f.website.state === "attention" ? "attention" : ""));
-  w.appendChild(mk("Draft", f.draft.label, f.draft.detail, f.draft.state === "changes" ? "attention" : ""));
-  w.appendChild(mk("Last publish", f.last_publish.label, f.last_publish.detail));
-  w.appendChild(mk("Domain", f.domain.label, f.domain.detail, f.domain.state === "attention" ? "attention" : ""));
+function renderFactsProse() {
+  const w = $("factsWrap"); const f = S.health && S.health.facts;
+  if (!f || (S.health && S.health.first_run)) { w.innerHTML = ""; return; }
+  const sep = `<span class="dotsep">·</span>`;
+  const parts = [];
+  if (f.website.state === "live") parts.push(`<b class="ok">Live</b>${f.website.detail ? ` at <b>${esc(f.website.detail)}</b>` : ""}`);
+  else if (f.website.state === "attention") parts.push(`Your website is <b class="care">being looked at</b> — it keeps serving while we do`);
+  else parts.push(`Your website is <b>not live yet</b> — publish when you’re ready`);
+  if (f.draft.state === "changes") parts.push(`Draft holds <b>${esc(f.draft.label.replace(" changes", "").replace(" change", ""))} change${f.draft.label.startsWith("1 ") ? "" : "s"}</b>, ${esc(f.draft.detail)}`);
+  else parts.push(`Draft is <b>up to date</b>`);
+  if (f.last_publish.label !== "—") parts.push(`Last published <b>${esc(f.last_publish.label)}</b>, ${esc(f.last_publish.detail)}`);
+  if (f.domain.state === "none") parts.push(`No custom domain yet — <span style="font-style:italic">${esc(f.domain.detail)}</span>`);
+  else if (f.domain.state === "attention") parts.push(`Domain <b class="care">${esc(f.domain.detail)}</b>`);
+  else parts.push(`Domain <b class="ok">healthy</b>`);
+  w.innerHTML = parts.join(sep);
 }
 function renderNotes(notes) {
   $("notesWrap").hidden = !notes.length;
   const list = $("notesList"); list.innerHTML = "";
   notes.forEach((n) => {
-    const card = el("div", "note " + n.kind);
-    const b = el("div"); b.style.flex = "1";
-    b.appendChild(el("div", "t", n.title));
-    b.appendChild(el("div", "r", n.reason));
-    const acts = el("div", "acts");
+    const card = el("div", "letter");
+    card.appendChild(el("span", "wax " + n.kind));
+    card.appendChild(el("div", "lt", n.title));
+    card.appendChild(el("div", "lr", n.reason));
+    const la = el("div", "la");
     if (n.action && n.action.label) {
-      const act = el("button", "btn", n.action.label);
+      const act = el("button", "textact", n.action.label);
       act.addEventListener("click", async () => {
         try { await api("POST", `/notes/${n.id}/accept`); } catch { /* outcome recording is best-effort */ }
         const sec = n.action.section;
-        if (sec === "publish") openPublishSheet();
+        if (sec === "publish") openRitual();
         else if (sec === "preview") openPreview("live");
         else if (sec) go(sec);
         loadToday();
       });
-      acts.appendChild(act);
+      la.appendChild(act);
     }
-    const dis = el("button", "btn quiet", "Dismiss");
+    const dis = el("button", "quietact", "Dismiss");
     dis.addEventListener("click", async () => {
-      try { await api("POST", `/notes/${n.id}/dismiss`); card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }
-      catch (err) { toast(err.message, true); }
+      try {
+        await api("POST", `/notes/${n.id}/dismiss`);
+        card.classList.add("away");
+        setTimeout(() => { card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }, 260);
+      } catch (err) { toast(err.message, true); }
     });
-    acts.appendChild(dis);
-    b.appendChild(acts);
-    card.appendChild(b);
+    la.appendChild(dis);
+    card.appendChild(la);
     list.appendChild(card);
   });
 }
 function renderRecent() {
   const c = S.changes;
-  $("recentWrap").hidden = !c || !c.changes.length;
+  const hasAny = c && c.changes.length && !(S.health && S.health.first_run);
+  $("recentWrap").hidden = !hasAny;
   const list = $("recentList"); list.innerHTML = "";
-  (c ? c.changes.slice(0, 8) : []).forEach((ch) => {
-    const row = el("div", "chg");
-    row.appendChild(el("span", "sec", ch.section));
+  if (!hasAny) return;
+  c.changes.slice(0, 8).forEach((ch) => {
+    const row = el("div", "jrow");
+    row.appendChild(el("span", "jsec", sectionWord(ch.section)));
     row.appendChild(el("span", null, ch.sentence));
     list.appendChild(row);
   });
-  if (c && c.changes.length > 8) list.appendChild(el("p", "pagesub", `…and ${c.changes.length - 8} more — the publish button shows everything.`));
+  if (c.changes.length > 8) list.appendChild(el("div", "more", `…and ${c.changes.length - 8} more — the publish page reads out everything.`));
 }
-function renderPill() {
-  const c = S.changes; const pill = $("draftPill");
-  if (!c) return;
-  pill.classList.toggle("changes", c.count > 0);
-  pill.classList.toggle("clean", c.count === 0);
-  $("draftPillText").textContent = c.count === 0 ? "Up to date" : `${c.count} change${c.count > 1 ? "s" : ""}`;
+const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "kind words", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
+function renderPublishButton() {
+  const c = S.changes;
+  const label = c && c.count > 0 ? `Publish · ${c.count}` : "Publish";
+  $("btnPublish").textContent = label;
+  $("dockPublish").textContent = c && c.count > 0 ? `Publish·${c.count}` : "Publish";
 }
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await api("GET", "/changes"); S.changes = c.data; renderPill();
+    try { const c = await api("GET", "/changes"); S.changes = c.data; renderPublishButton(); renderBizWaiting();
       if ($("view-today").classList.contains("on")) renderRecent(); }
-    catch { /* pill refresh is quiet */ }
+    catch { /* quiet */ }
   }, 1200);
+}
+/* the diff engine's own sentences, spoken where the edit happens (B-03) */
+function renderBizWaiting() {
+  const w = $("bizWaiting"); if (!w) return;
+  const rows = (S.changes?.changes || []).filter((ch) => ch.section === "business");
+  w.innerHTML = "";
+  if (!rows.length) return;
+  rows.forEach((ch) => w.appendChild(el("p", "consequence", "When you publish: " + ch.sentence.charAt(0).toLowerCase() + ch.sentence.slice(1))));
+  w.style.marginTop = "-22px"; w.style.marginBottom = "34px";
 }
 function renderWelcome() {
   const w = $("welcomeWrap"); const h = S.health;
@@ -1107,26 +1223,26 @@ function renderWelcome() {
   const step1done = !!(S.identity && S.identity.business_name && S.identity.description);
   const step2done = localStorage.getItem("presence-previewed") === "1";
   w.innerHTML = "";
-  const box = el("div", "welcome");
-  box.appendChild(el("h2", null, `Let’s introduce ${name} to the internet.`));
-  box.appendChild(el("p", null, "Three steps, at your pace. Nothing goes public until you say so."));
-  const steps = el("div", "steps");
+  const env = el("div", "envelope");
+  env.appendChild(el("h2", null, `Let’s introduce ${name} to the internet.`));
+  env.appendChild(el("p", null, "Three steps, at your pace. Nothing goes public until you say so."));
+  const steps = el("div", "steps3");
   const mk = (n, done, s, d, fn) => {
-    const b = el("button", "step" + (done ? " done" : ""));
-    b.appendChild(el("span", "n", done ? "✓" : String(n)));
-    const t = el("span"); t.appendChild(el("span", "s", s)); t.appendChild(document.createElement("br")); t.appendChild(el("span", "d", d));
+    const b = el("button", "step3" + (done ? " done" : ""));
+    b.appendChild(el("span", "sn", done ? "✓" : String(n)));
+    const t = el("span"); t.appendChild(el("span", "st", s)); t.appendChild(document.createElement("br")); t.appendChild(el("span", "sd", d));
     b.appendChild(t);
     b.addEventListener("click", fn);
     return b;
   };
-  steps.appendChild(mk(1, step1done, "Check your business facts", "Name, hours, address — the things customers look up.", () => go("business")));
-  steps.appendChild(mk(2, step2done, "Look at your website", "See exactly what customers will see. It’s a draft — nothing is public.", () => openPreview()));
-  steps.appendChild(mk(3, false, "Publish when you’re ready", "One button. We’ll show you exactly what goes up first.", () => openPublishSheet()));
-  box.appendChild(steps);
-  w.appendChild(box);
+  steps.appendChild(mk(1, step1done, "Look over your facts", "Name, hours, address — the things customers look up.", () => go("business")));
+  steps.appendChild(mk(2, step2done, "See your website", "A private proof, for your eyes only.", () => openPreview("draft")));
+  steps.appendChild(mk(3, false, "Publish when you’re ready", "One page shows you exactly what goes up. Then one button.", () => openRitual()));
+  env.appendChild(steps);
+  w.appendChild(env);
 }
 
-/* ── preview stage ── */
+/* ── the proofing desk (identical /preview calls) ── */
 const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null };
 async function openPreview(ver) {
   if (ver) PV.ver = ver;
@@ -1150,143 +1266,183 @@ $("btnPreview").addEventListener("click", () => openPreview("draft"));
 function syncStageChrome() {
   document.querySelectorAll("#verSeg button").forEach((b) => b.classList.toggle("on", b.dataset.ver === PV.ver));
   document.querySelectorAll("#devSeg button").forEach((b) => b.classList.toggle("on", b.dataset.dev === PV.dev));
-  $("stageFrame").classList.toggle("mobile", PV.dev === "mobile");
-  $("pageSel").value = PV.page;
+  document.querySelectorAll("#pageWords button").forEach((b) => b.classList.toggle("on", b.dataset.page === PV.page));
+  $("proofFrame").classList.toggle("phone", PV.dev === "mobile");
 }
 $("verSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.ver = b.dataset.ver; syncStageChrome(); loadPreview(); });
 $("devSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.dev = b.dataset.dev; syncStageChrome(); });
-$("pageSel").addEventListener("change", () => { PV.page = $("pageSel").value; loadPreview(); });
+$("pageWords").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.page = b.dataset.page; syncStageChrome(); loadPreview(); });
 window.addEventListener("message", (e) => {
   if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
 });
 async function loadPreview() {
   const frame = $("previewFrame");
-  frame.srcdoc = `<div style="font-family:sans-serif;color:#8b8098;padding:40px;text-align:center">Loading your ${PV.publishId ? "" : PV.ver + " "}site…</div>`;
+  frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Proofing your ${PV.publishId ? "kept version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
   try {
     const q = PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`;
     let html = await apiHtml(`/preview?${q}`);
-    /* in-stage navigation: internal links post back to the room instead of navigating the iframe */
     html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
     frame.srcdoc = html;
   } catch (err) {
-    frame.srcdoc = `<div style="font-family:sans-serif;color:#574d68;padding:48px;text-align:center;max-width:420px;margin:0 auto"><p style="font-size:18px">${esc(err.message)}</p></div>`;
+    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err.message)}</div>`;
   }
 }
 
-/* ── publish sheet ── */
-async function openPublishSheet() {
-  openSheet("publishScrim");
-  $("pubSheetBody").innerHTML = `<p class="pagesub">Checking what’s changed…</p>`;
-  $("btnPublishGo").disabled = true; $("btnPublishGo").dataset.mode = "";
+/* ── the publish ritual (identical /changes + /publish + /publishes) ── */
+function openRitual() {
+  $("ritualWrap").classList.add("on"); document.body.style.overflow = "hidden";
+  loadRitual();
+}
+function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; loadToday(); }
+$("btnRitualBack").addEventListener("click", closeRitual);
+$("btnPublish").addEventListener("click", openRitual);
+async function loadRitual() {
+  $("ritTitle").textContent = "One moment.";
+  $("ritSub").textContent = "Reading over your draft…";
+  $("ritBody").innerHTML = `<div class="shimmer"></div>`; $("ritBlockers").innerHTML = ""; $("ritActions").innerHTML = "";
   try {
     const c = (await api("GET", "/changes")).data;
-    S.changes = c; renderPill();
-    const body = $("pubSheetBody"); body.innerHTML = "";
+    S.changes = c; renderPublishButton();
+    const body = $("ritBody"); body.innerHTML = "";
     if (c.first_publish) {
-      $("pubSheetTitle").textContent = "Publish your site";
-      $("pubSheetSub").textContent = "This is the moment your website goes live. Here’s what goes up:";
+      $("ritTitle").textContent = "This is the moment your website goes live.";
+      $("ritSub").textContent = "Here’s what goes up — read it the way customers will:";
     } else if (c.count === 0) {
-      $("pubSheetTitle").textContent = "You’re up to date";
-      $("pubSheetSub").textContent = "Everything you’ve written is already on your website.";
+      $("ritTitle").textContent = "You’re up to date.";
+      $("ritSub").textContent = "Every word you’ve written is already on your website. There’s nothing waiting.";
     } else {
-      $("pubSheetTitle").textContent = "Publish";
-      $("pubSheetSub").textContent = "Here’s exactly what changes on your website:";
+      $("ritTitle").textContent = "Here’s what changes.";
+      $("ritSub").textContent = `${c.count === 1 ? "One change" : c.count + " changes"}, read exactly as customers will experience ${c.count === 1 ? "it" : "them"}. Your live site stays as it is until the moment you decide.`;
     }
+    if (c.count > 0 || c.first_publish) {
+      const j = el("div", "journal");
+      c.changes.forEach((ch) => {
+        const row = el("div", "jrow");
+        row.appendChild(el("span", "jsec", sectionWord(ch.section)));
+        row.appendChild(el("span", null, ch.sentence));
+        j.appendChild(row);
+      });
+      body.appendChild(j);
+    }
+    const acts = $("ritActions"); acts.innerHTML = "";
     if (c.blockers > 0) {
-      const bb = el("div", "blockerbox");
-      bb.appendChild(el("strong", null, `${c.blockers} thing${c.blockers > 1 ? "s" : ""} need${c.blockers > 1 ? "" : "s"} fixing first.`));
-      bb.appendChild(el("p", null, "Usually a missing business fact — check the Business section. Your draft is safe; publishing just waits until it’s complete."));
-      body.appendChild(bb);
+      $("ritBlockers").innerHTML = `<p class="blockprose">Publishing waits until ${c.blockers === 1 ? "one small thing is" : c.blockers + " small things are"} complete — usually a missing business fact. <a class="textact" href="#" id="ritFix">Look in Business</a> — your draft is safe, and this page will be ready when you are.</p>`;
+      $("ritFix").addEventListener("click", (e) => { e.preventDefault(); closeRitual(); go("business"); });
+    } else if (c.count > 0 || c.first_publish) {
+      $("ritBlockers").innerHTML = "";
+      const btn = el("button", "pubbtn", c.first_publish ? "Publish my site" : `Publish ${c.count === 1 ? "this change" : "these " + c.count + " changes"}`);
+      btn.addEventListener("click", () => runPublish(btn));
+      acts.appendChild(btn);
+      const ny = el("button", "notyet", "Not yet — keep them in the draft");
+      ny.addEventListener("click", closeRitual);
+      acts.appendChild(ny);
     }
-    c.changes.forEach((ch) => {
-      const row = el("div", "chg");
-      row.appendChild(el("span", "sec", ch.section));
-      row.appendChild(el("span", null, ch.sentence));
-      body.appendChild(row);
-    });
-    const btn = $("btnPublishGo");
-    btn.textContent = c.first_publish ? "Publish my site" : c.count > 0 ? `Publish ${c.count} change${c.count > 1 ? "s" : ""}` : "Publish";
-    btn.disabled = c.count === 0 && !c.first_publish || c.blockers > 0;
   } catch (err) {
-    $("pubSheetBody").innerHTML = `<p class="pagesub">${esc(err.message)}</p>`;
+    $("ritSub").textContent = err.message;
   }
 }
-$("btnPublish").addEventListener("click", openPublishSheet);
-$("draftPill").addEventListener("click", openPublishSheet);
-$("btnPublishGo").addEventListener("click", async () => {
-  const btn = $("btnPublishGo");
-  if (btn.dataset.mode === "done") {
-    btn.dataset.mode = ""; btn.textContent = "Publish";
-    closeSheet("publishScrim"); loadToday();
-    return;
-  }
+function pipeHtml(stage) { // stage: 0 sealing, 1 deploying, 2 live, -1 failed at deploy
+  const steps = [
+    ["Snapshot sealed — this exact version is kept forever", stage >= 1 ? "done" : "run"],
+    ["Rendered — every page drawn fresh from your words", stage >= 1 ? "done" : "wait"],
+    ["Carrying it to your website…", stage === 1 ? "run" : stage >= 2 ? "done" : "wait"],
+    ["Live", stage >= 2 ? "done" : "wait"],
+  ];
+  if (stage === -1) steps[2] = ["The carry didn’t complete — your live site is unchanged", "wait"];
+  return `<div class="pipe">` + steps.map(([t, k]) => `<div class="pstep ${k}"><i>${k === "done" ? "✓" : ""}</i>${t}</div>`).join("") + `</div>`;
+}
+async function runPublish(btn) {
   btn.disabled = true; btn.textContent = "Publishing…";
+  $("ritBody").innerHTML = pipeHtml(1);
+  $("ritSub").textContent = "Atomic and deterministic — your site is never partially updated.";
   try {
     const r = await api("POST", "/publish");
-    if (r.data.status === "live") finishPublish(r.data.message);
-    else {
-      $("pubSheetSub").textContent = r.data.message;
-      $("pubSheetBody").innerHTML = `<p class="pagesub">Your site is on its way up — this usually takes under a minute.</p>`;
-      pollPublish(0);
-    }
+    if (r.data.status === "live") return showReceipt(r.data.summary);
+    pollPublish(0);
   } catch (err) {
-    btn.disabled = false; btn.textContent = "Try again";
+    $("ritBody").innerHTML = pipeHtml(-1);
+    $("ritTitle").textContent = "That didn’t go through.";
+    $("ritSub").textContent = "Your live site is unchanged and nothing was lost. The version is kept — try again whenever you’re ready.";
     if (err.body && err.body.fields) {
-      $("pubSheetBody").innerHTML = "";
-      const bb = el("div", "blockerbox");
-      bb.appendChild(el("strong", null, err.message));
-      const ul = el("ul"); (err.body.fields || []).forEach((f) => ul.appendChild(el("li", null, typeof f === "string" ? f : f.message || "")));
-      bb.appendChild(ul);
-      $("pubSheetBody").appendChild(bb);
-    } else toast(err.message, true);
+      $("ritBlockers").innerHTML = `<p class="blockprose">${(err.body.fields || []).map((f) => esc(typeof f === "string" ? f : f.message || "")).join("<br>")}</p>`;
+    }
+    $("ritActions").innerHTML = "";
+    const retry = el("button", "pubbtn", "Try again");
+    retry.addEventListener("click", () => loadRitual());
+    $("ritActions").appendChild(retry);
+    const ny = el("button", "notyet", "Back to your room");
+    ny.addEventListener("click", closeRitual);
+    $("ritActions").appendChild(ny);
   }
-});
+}
 async function pollPublish(n) {
-  if (n > 30) { $("pubSheetSub").textContent = "This is taking longer than usual — it’s still working. You can close this; History will show the result."; return; }
+  if (n > 30) { $("ritSub").textContent = "This is taking longer than usual — it’s still working, and History will show how it ends. You can safely step away."; return; }
   await new Promise((r) => setTimeout(r, 4000));
   try {
     const pubs = (await api("GET", "/publishes")).data;
     const top = pubs[0];
-    if (top && top.status === "live") return finishPublish("Your site is live. Every change you made is now published.");
+    if (top && top.status === "live") return showReceipt(top.summary);
     if (top && top.status === "failed") {
-      $("pubSheetSub").textContent = "That publish didn’t go through — your live site is unchanged and nothing was lost. We’ve been notified; try again in a minute.";
-      $("btnPublishGo").disabled = false; $("btnPublishGo").textContent = "Try again";
+      $("ritBody").innerHTML = pipeHtml(-1);
+      $("ritTitle").textContent = "That didn’t go through.";
+      $("ritSub").textContent = "Your live site is unchanged and nothing was lost. We’ve been notified — try again in a minute.";
+      $("ritActions").innerHTML = "";
+      const retry = el("button", "pubbtn", "Try again");
+      retry.addEventListener("click", () => loadRitual());
+      $("ritActions").appendChild(retry);
       return;
     }
   } catch { /* keep polling */ }
   pollPublish(n + 1);
 }
-function finishPublish(msg) {
-  $("pubSheetTitle").textContent = "Published";
-  $("pubSheetSub").textContent = msg;
-  $("pubSheetBody").innerHTML = "";
-  const btn = $("btnPublishGo");
-  btn.disabled = false; btn.textContent = "Done"; btn.dataset.mode = "done";
+function showReceipt(summary) {
+  const count = S.changes ? S.changes.count : 0;
+  const now = new Date();
+  $("ritTitle").textContent = ""; $("ritSub").textContent = ""; $("ritBlockers").innerHTML = "";
+  $("ritBody").innerHTML = `
+    <div class="receipt">
+      <div class="stamp">✓</div>
+      <div class="rp">Published</div>
+      <div class="rd">${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${count ? ` · ${count} change${count > 1 ? "s" : ""}` : ""}</div>
+      <div class="rl">Every word on your site came from you.<br>This version is kept safe, always.</div>
+    </div>`;
+  $("ritActions").innerHTML = "";
+  const done = el("button", "notyet", "Back to your room");
+  done.style.marginTop = "26px";
+  done.addEventListener("click", closeRitual);
+  $("ritActions").appendChild(done);
   scheduleChangesRefresh();
 }
 
-/* ── history + restore ── */
+/* ── history journal (identical /publishes + /restore-to-draft) ── */
 async function loadHistory() {
   const list = $("pubList");
-  list.innerHTML = `<p class="pagesub">Loading…</p>`;
+  list.innerHTML = `<div class="loadline"><div class="lq">Opening the journal…</div><div class="shimmer"></div></div>`;
   try {
     const pubs = (await api("GET", "/publishes")).data;
     S.publishes = pubs;
     list.innerHTML = "";
-    if (!pubs.length) { list.appendChild(el("p", "pagesub", "No publishes yet. When you publish, every version appears here.")); return; }
+    if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">The journal is empty — for now.</div><div class="eh">When you publish, every version of your site is kept here, forever restorable.</div></div>`; return; }
     pubs.forEach((p) => {
-      const row = el("div", "pub");
-      row.appendChild(el("span", "st " + p.status));
-      const mid = el("div"); mid.style.minWidth = "0";
-      mid.appendChild(el("div", "sum", p.summary));
-      mid.appendChild(el("div", "when", fmtDate(p.at) + (p.status === "failed" ? " · didn’t go through (your site was unchanged)" : p.status === "publishing" ? " · in progress" : "")));
-      row.appendChild(mid);
-      const acts = el("div", "acts");
+      const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
+      const d = new Date(p.at);
+      row.appendChild(el("span", "hdate", d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")));
+      const body = el("div", "hbody");
+      const sum = el("div", "hsum");
+      if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
+      sum.appendChild(document.createTextNode(p.status === "failed" ? "A publish didn’t go through." : p.summary));
+      body.appendChild(sum);
+      body.appendChild(el("div", "hmeta",
+        p.status === "failed" ? "Your site was unchanged and nothing was lost."
+        : p.status === "publishing" ? "Still on its way up."
+        : (p.kind === "restore" ? "A restored version · " : "") + "published"));
+      row.appendChild(body);
+      const acts = el("div", "hacts");
       if (p.status === "live" && p.restorable) {
-        const view = el("button", "btn quiet", "View");
+        const view = el("button", "quietact", "Look");
         view.addEventListener("click", () => openPublishPreview(p.id));
         acts.appendChild(view);
-        const res = el("button", "btn", "Bring back");
+        const res = el("button", "textact", "Bring back");
         res.addEventListener("click", () => {
           S.restoreTarget = p;
           $("resSheetSub").textContent = `“${p.summary}” — published ${fmtDate(p.at)}.`;
@@ -1294,12 +1450,12 @@ async function loadHistory() {
         });
         acts.appendChild(res);
       } else if (p.status === "live" && !p.restorable) {
-        acts.appendChild(el("span", "tag", "Kept for the record"));
+        acts.appendChild(el("span", "hghost", "kept for the record"));
       }
       row.appendChild(acts);
       list.appendChild(row);
     });
-  } catch (err) { list.innerHTML = `<p class="pagesub">${esc(err.message)}</p>`; }
+  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">The journal wouldn’t open just now.</div><div class="eh">${esc(err.message)}</div></div>`; }
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
@@ -1318,7 +1474,7 @@ $("btnRestoreGo").addEventListener("click", async () => {
   }
 });
 
-/* ── initial load ── */
+/* ── initial load (identical fetches) ── */
 function fillSingles() {
   const i = S.identity || {};
   [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"]]
@@ -1326,7 +1482,6 @@ function fillSingles() {
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
-  $("whoName").textContent = i.business_name || "Your business";
   renderHours();
 }
 async function refreshAll() {
@@ -1338,14 +1493,14 @@ async function refreshAll() {
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
-  fillSingles(); renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
-  await loadToday();
+  fillSingles(); await loadToday();
+  renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
 }
 (async function boot() {
   try {
     const { data } = await sb.auth.getSession();
     if (!data || !data.session) {
-      showGate("Sign in to see your Presence", "Your Presence room uses the same sign-in as your portal. Sign in there, then come back — you’ll land right here.", true);
+      showGate("Your room is just past the front desk", "Presence uses the same sign-in as your portal. Sign in there, and you’ll land right back here.", true);
       return;
     }
     $("gate").hidden = true; $("app").hidden = false;
@@ -1353,12 +1508,12 @@ async function refreshAll() {
     // deep links: presence.html?view=business|offerings|…|preview|publish
     const v = new URLSearchParams(location.search).get("view");
     if (v === "preview") openPreview("draft");
-    else if (v === "publish") openPublishSheet();
+    else if (v === "publish") openRitual();
     else if (v && $("view-" + v)) go(v);
   } catch (err) {
-    if (err.status === 404) showGate("Almost there", "Your Presence site isn’t set up yet — your studio is on it. Check back soon, or send us a message from your portal.", true);
-    else if (err.status === 403) showGate("Paused", err.message, true);
-    else if (err.message !== "no-session") showGate("Something didn’t load", "Your content is safe. Refresh to try again, or reach us from your portal.", true);
+    if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or send a note from your portal.", true);
+    else if (err.status === 403) showGate("Paused for now", err.message, true);
+    else if (err.message !== "no-session") showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Refresh to try again, or reach us from your portal.", true);
   }
 })();
 </script>
