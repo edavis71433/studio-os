@@ -13,6 +13,7 @@
 :root{
   --paper:#faf7f0; --sheet:#fffdf8; --ink:#211d19; --ink-2:#6e6659; --hair:#e9e2d4; --hair-2:#ddd3bf;
   --plum:#533a7d; --plum-soft:#efe9f6; --sage:#3d7a50; --sage-soft:#e9f2ec; --amber:#b4770a; --clay:#a8523f;
+  --amber-text:#8a5c07; /* AA contrast for small amber text on paper */
   --serif:'Fraunces',Georgia,serif; --sans:'Inter',-apple-system,'Segoe UI',sans-serif; --mono:'Geist Mono',ui-monospace,Consolas,monospace;
   --dur:200ms; --ease:cubic-bezier(.32,.72,0,1);
 }
@@ -52,7 +53,9 @@ nav.rooms{display:flex;flex-direction:column}
 .pillbtn.inked:hover{background:#3a332c}
 .content{padding:34px 56px 140px;max-width:860px}
 .view{display:none}
-.view.on{display:block}
+.view.on{display:block;animation:viewin var(--dur) var(--ease)}
+@keyframes viewin{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+button:disabled{opacity:.55;cursor:default}
 
 /* ── editorial primitives ── */
 h1.doc{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin-bottom:6px}
@@ -65,7 +68,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .textact:hover{border-bottom-color:var(--plum)}
 .quietact{font-size:12.5px;color:var(--ink-2)}
 .quietact:hover{color:var(--ink)}
-.smalltag{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);font-weight:600}
+.smalltag{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-text);font-weight:600}
 
 /* ── today ── */
 .statement{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1.16;letter-spacing:-.012em;max-width:18ch;text-wrap:balance}
@@ -79,7 +82,8 @@ h5.rune .whisper.ok{color:var(--sage)}
 .factsprose .ok{color:var(--sage);font-weight:600}
 .factsprose .care{color:var(--amber);font-weight:600}
 .factsprose .dotsep{margin:0 9px;color:var(--hair-2)}
-.letter{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:22px 26px 18px;box-shadow:0 1px 0 rgba(60,45,20,.05);position:relative;margin-bottom:14px;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.letter{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:22px 26px 18px;box-shadow:0 1px 0 rgba(60,45,20,.05);position:relative;margin-bottom:14px;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.letter:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(60,45,20,.07)}
 .letter.away{opacity:0;transform:translateX(24px)}
 .letter .wax{position:absolute;left:26px;top:-6px;width:12px;height:12px;border-radius:50%}
 .letter .wax.suggestion{background:var(--plum)}
@@ -114,7 +118,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .field textarea{width:100%;font-family:var(--sans);font-size:14.5px;line-height:1.75;background:transparent;border:none;border-bottom:1px solid var(--hair);padding:0 0 8px;min-height:76px;resize:vertical;caret-color:var(--plum);border-radius:0}
 .field input:focus,.field textarea:focus{outline:none;border-bottom-color:var(--plum)}
 .field .hint{font-size:12px;color:var(--ink-2);margin-top:6px}
-.consequence{font-size:13px;color:var(--amber);margin-top:6px;font-style:italic;font-family:var(--serif);max-width:56ch}
+.consequence{font-size:13px;color:var(--amber-text);margin-top:6px;font-style:italic;font-family:var(--serif);max-width:56ch}
 .field input.mono{font-family:var(--mono);font-size:15px}
 
 /* hours */
@@ -221,6 +225,8 @@ h5.rune .whisper.ok{color:var(--sage)}
 .pipe .wait i{border:1.5px solid var(--hair-2)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .receipt{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:36px 32px;max-width:400px;margin:48px auto 0;text-align:center;box-shadow:0 2px 0 rgba(60,45,20,.06)}
+.receipt{animation:stampin 320ms var(--ease)}
+@keyframes stampin{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 .receipt .stamp{width:46px;height:46px;border-radius:50%;border:2px solid var(--sage);color:var(--sage);display:grid;place-items:center;margin:0 auto;font-size:20px}
 .receipt .stamp.hollow{border-color:var(--clay);color:var(--clay)}
 .receipt .rp{font-family:var(--serif);font-weight:500;font-size:23px;margin:14px 0 6px}
@@ -294,7 +300,24 @@ h5.rune .whisper.ok{color:var(--sage)}
   .hdate{width:84px}
   .hentry{flex-wrap:wrap}
   .hacts{padding-left:106px}
+  .deskprivacy{display:none}
+  .pagewords{display:none} /* pages travel by tapping links inside the proof */
 }
+/* small phones (SE-class): hours and journal rows breathe instead of squeezing */
+@media(max-width:400px){
+  .hrow{flex-wrap:wrap;row-gap:4px}
+  .hrow .closedlab{margin-left:0;width:100%}
+  .journal .jsec{width:76px}
+  .statement{font-size:22px}
+}
+/* touch devices: quiet text actions get honest tap targets */
+@media(pointer:coarse){
+  .quietact,.textact{padding:8px 4px;display:inline-block}
+  .menuhead .ctl button{padding:6px 12px}
+  .mcell .del{opacity:1}
+}
+/* keyboard focus on paper tabs & desk words stays visible against espresso */
+.papertabs button:focus-visible,.pagewords button:focus-visible,.deskseg button:focus-visible,.stagebar .back:focus-visible{outline-color:#fffdf8}
 </style>
 </head>
 <body>
@@ -328,7 +351,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
   <div class="main">
     <header class="topbar">
-      <span class="whisper" id="topWhisper">everything saved</span>
+      <span class="whisper" id="topWhisper" aria-live="polite">everything saved</span>
       <button class="pillbtn" id="btnPreview">See your site</button>
       <button class="pillbtn inked" id="btnPublish">Publish</button>
     </header>
@@ -337,7 +360,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <!-- TODAY -->
       <section class="view on" id="view-today">
         <div id="welcomeWrap" hidden></div>
-        <div id="healthWrap"></div>
+        <div id="healthWrap"><div class="loadline"><div class="lq">Setting the table…</div><div class="shimmer"></div></div></div>
         <p class="factsprose" id="factsWrap"></p>
         <div id="notesWrap" hidden>
           <h5 class="rune">From your concierge</h5>
@@ -452,7 +475,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 </nav>
 
 <!-- publish ritual (full page) -->
-<div class="ritualwrap" id="ritualWrap">
+<div class="ritualwrap" id="ritualWrap" role="dialog" aria-modal="true" aria-labelledby="ritTitle">
   <div class="ritual">
     <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your room</button></div>
     <h1 id="ritTitle">Here’s what changes.</h1>
@@ -498,7 +521,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 </div>
 
 <!-- proofing desk -->
-<div class="stage" id="stage">
+<div class="stage" id="stage" role="dialog" aria-modal="true" aria-label="A private proof of your website">
   <div class="stagebar">
     <button class="back" id="btnStageClose">← Back</button>
     <div class="papertabs" id="verSeg">
@@ -514,6 +537,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <button data-page="/contact/">Contact</button>
     </div>
     <div class="grow"></div>
+    <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(255,253,248,.55);padding-bottom:11px" class="deskprivacy">A private proof — only you can see it.</span>
     <div class="deskseg" id="devSeg">
       <button data-dev="desktop" class="on">Desk</button>
       <button data-dev="mobile">Phone</button>
@@ -522,7 +546,7 @@ h5.rune .whisper.ok{color:var(--sage)}
   <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="A proof of your website"></iframe></div></div>
 </div>
 
-<div class="toasts" id="toasts"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -556,6 +580,7 @@ function toast(msg, bad) {
 
 /* ── API: identical calls to M7 ── */
 async function api(method, route, body) {
+  if (!navigator.onLine) { const e = new Error("You look offline. Everything you saved is safe — it’ll be here when you’re back."); e.offline = true; throw e; }
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
   if (!jwt) { showGate("Please sign in", "Your room uses the same sign-in as your portal. Sign in there and come straight back.", true); throw new Error("no-session"); }
@@ -598,7 +623,11 @@ function go(view) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
-  document.querySelectorAll("#nav .navitem").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
+  document.querySelectorAll("#nav .navitem").forEach((b) => {
+    const on = b.dataset.view === view;
+    b.classList.toggle("on", on);
+    if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
   document.querySelectorAll("#dock button").forEach((b) => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today")));
   window.scrollTo({ top: 0 });
   if (view === "today") loadToday();
@@ -622,15 +651,24 @@ $("dock").addEventListener("click", (e) => {
   });
 })();
 
-/* ── sheets ── */
-function openSheet(id) { $(id).classList.add("on"); }
-function closeSheet(id) { $(id).classList.remove("on"); }
+/* ── sheets (focus returns to where you were — keyboard users never get lost) ── */
+let lastFocus = null;
+function openSheet(id) {
+  lastFocus = document.activeElement;
+  const s = $(id); s.classList.add("on");
+  const first = s.querySelector("button, input, textarea, [href]");
+  if (first) first.focus();
+}
+function closeSheet(id) {
+  $(id).classList.remove("on");
+  if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; }
+}
 document.querySelectorAll(".scrim").forEach((s) => {
-  s.addEventListener("click", (e) => { if (e.target === s || e.target.closest("[data-close]")) s.classList.remove("on"); });
+  s.addEventListener("click", (e) => { if (e.target === s || e.target.closest("[data-close]")) closeSheet(s.id); });
 });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  document.querySelectorAll(".scrim.on").forEach((s) => s.classList.remove("on"));
+  document.querySelectorAll(".scrim.on").forEach((s) => closeSheet(s.id));
   document.querySelectorAll(".editor").forEach((n) => n.remove()); // Esc closes inline editors, untouched
   if ($("stage").classList.contains("on")) closePreview();
   if ($("ritualWrap").classList.contains("on")) closeRitual();
@@ -904,11 +942,22 @@ function simpleEditor(entity, collection, fields, rerender, words) {
   });
   return ed;
 }
+function estateWithAction(quote, help, actionLabel, actionFn) {
+  const e = el("div", "estate");
+  e.appendChild(el("div", "eq", quote));
+  e.appendChild(el("div", "eh", help));
+  const a = el("div", "ea"); const b = el("button", "pillbtn inked", actionLabel);
+  b.addEventListener("click", actionFn);
+  a.appendChild(b); e.appendChild(a);
+  return e;
+}
 function renderFaqs() {
   const list = $("faqList"); list.innerHTML = "";
   const wash = changedIds();
   if (!S.faqs.length) {
-    list.innerHTML = `<div class="estate"><div class="eq">“Do you take walk-ins?”</div><div class="eh">The first question customers ask is usually the easiest to answer. Keep it here once and it answers itself forever.</div></div>`;
+    list.appendChild(estateWithAction("“Do you take walk-ins?”",
+      "The first question customers ask is usually the easiest to answer. Keep it here once and it answers itself forever — on your site’s Questions page.",
+      "Answer the first question", () => $("btnAddFaq").click()));
     return;
   }
   S.faqs.forEach((f) => {
@@ -929,7 +978,9 @@ function renderTes() {
   const list = $("tesList"); list.innerHTML = "";
   const wash = changedIds();
   if (!S.testimonials.length) {
-    list.innerHTML = `<div class="estate"><div class="eq">“The gnocchi alone is worth the drive.”</div><div class="eh">Someone has said something kind about your business. Keep it here, and it appears on your site in their words.</div></div>`;
+    list.appendChild(estateWithAction("“The gnocchi alone is worth the drive.”",
+      "Someone has said something kind about your business. Keep it here, and it appears on your site in their words — like this one would.",
+      "Keep the first kind word", () => $("btnAddTes").click()));
     return;
   }
   S.testimonials.forEach((t) => {
@@ -950,7 +1001,9 @@ function renderPosts() {
   const list = $("postList"); list.innerHTML = "";
   const wash = changedIds();
   if (!S.posts.length) {
-    list.innerHTML = `<div class="estate"><div class="eq">Summer patio is open.</div><div class="eh">Your first update can be one sentence. Write it as a draft; show it when it’s ready.</div></div>`;
+    list.appendChild(estateWithAction("Summer patio is open.",
+      "Your first update can be one sentence, like this. Write it as a draft; show it when it’s ready — customers see it on your Updates page.",
+      "Write the first update", () => $("btnAddPost").click()));
     return;
   }
   S.posts.forEach((p) => {
@@ -1131,6 +1184,14 @@ function renderStatement() {
 function renderFactsProse() {
   const w = $("factsWrap"); const f = S.health && S.health.facts;
   if (!f || (S.health && S.health.first_run)) { w.innerHTML = ""; return; }
+  // a quiet celebration the first time a custom domain appears (presentation-only; state remembered locally)
+  try {
+    const key = "presence-domain-" + ((S.site && S.site.id) || "x");
+    const had = localStorage.getItem(key);
+    const has = f.domain.state !== "none" && f.domain.state !== "attention" ? f.domain.label : "";
+    if (has && had === "none") toast(`${f.domain.label} is yours now — your own address on the internet.`);
+    localStorage.setItem(key, has || "none");
+  } catch { /* celebration is optional */ }
   const sep = `<span class="dotsep">·</span>`;
   const parts = [];
   if (f.website.state === "live") parts.push(`<b class="ok">Live</b>${f.website.detail ? ` at <b>${esc(f.website.detail)}</b>` : ""}`);
@@ -1259,14 +1320,15 @@ async function openPublishPreview(publishId) {
   openStage();
   await loadPreview();
 }
-function openStage() { $("stage").classList.add("on"); document.body.style.overflow = "hidden"; }
-function closePreview() { $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; }
+function openStage() { lastFocus = document.activeElement; $("stage").classList.add("on"); document.body.style.overflow = "hidden"; $("btnStageClose").focus(); }
+function closePreview() { $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } }
 $("btnStageClose").addEventListener("click", closePreview);
 $("btnPreview").addEventListener("click", () => openPreview("draft"));
 function syncStageChrome() {
-  document.querySelectorAll("#verSeg button").forEach((b) => b.classList.toggle("on", b.dataset.ver === PV.ver));
-  document.querySelectorAll("#devSeg button").forEach((b) => b.classList.toggle("on", b.dataset.dev === PV.dev));
-  document.querySelectorAll("#pageWords button").forEach((b) => b.classList.toggle("on", b.dataset.page === PV.page));
+  const press = (b, on) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); };
+  document.querySelectorAll("#verSeg button").forEach((b) => press(b, b.dataset.ver === PV.ver));
+  document.querySelectorAll("#devSeg button").forEach((b) => press(b, b.dataset.dev === PV.dev));
+  document.querySelectorAll("#pageWords button").forEach((b) => press(b, b.dataset.page === PV.page));
   $("proofFrame").classList.toggle("phone", PV.dev === "mobile");
 }
 $("verSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.ver = b.dataset.ver; syncStageChrome(); loadPreview(); });
@@ -1290,10 +1352,12 @@ async function loadPreview() {
 
 /* ── the publish ritual (identical /changes + /publish + /publishes) ── */
 function openRitual() {
+  lastFocus = document.activeElement;
   $("ritualWrap").classList.add("on"); document.body.style.overflow = "hidden";
+  $("btnRitualBack").focus();
   loadRitual();
 }
-function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; loadToday(); }
+function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);
 $("btnPublish").addEventListener("click", openRitual);
 async function loadRitual() {
@@ -1331,11 +1395,14 @@ async function loadRitual() {
     } else if (c.count > 0 || c.first_publish) {
       $("ritBlockers").innerHTML = "";
       const btn = el("button", "pubbtn", c.first_publish ? "Publish my site" : `Publish ${c.count === 1 ? "this change" : "these " + c.count + " changes"}`);
-      btn.addEventListener("click", () => runPublish(btn));
+      btn.addEventListener("click", () => runPublish(btn, c.first_publish));
       acts.appendChild(btn);
       const ny = el("button", "notyet", "Not yet — keep them in the draft");
       ny.addEventListener("click", closeRitual);
       acts.appendChild(ny);
+      const promise = el("p", null, "Publishing replaces your live site all at once — never partially, never halfway. Every version is kept, and any of them can come back.");
+      promise.style.cssText = "font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2);text-align:center;margin-top:22px;line-height:1.7";
+      acts.appendChild(promise);
     }
   } catch (err) {
     $("ritSub").textContent = err.message;
@@ -1351,14 +1418,14 @@ function pipeHtml(stage) { // stage: 0 sealing, 1 deploying, 2 live, -1 failed a
   if (stage === -1) steps[2] = ["The carry didn’t complete — your live site is unchanged", "wait"];
   return `<div class="pipe">` + steps.map(([t, k]) => `<div class="pstep ${k}"><i>${k === "done" ? "✓" : ""}</i>${t}</div>`).join("") + `</div>`;
 }
-async function runPublish(btn) {
+async function runPublish(btn, firstPublish) {
   btn.disabled = true; btn.textContent = "Publishing…";
   $("ritBody").innerHTML = pipeHtml(1);
-  $("ritSub").textContent = "Atomic and deterministic — your site is never partially updated.";
+  $("ritSub").textContent = "All at once, never halfway — your site is never partially updated.";
   try {
     const r = await api("POST", "/publish");
-    if (r.data.status === "live") return showReceipt(r.data.summary);
-    pollPublish(0);
+    if (r.data.status === "live") return showReceipt(firstPublish);
+    pollPublish(0, firstPublish);
   } catch (err) {
     $("ritBody").innerHTML = pipeHtml(-1);
     $("ritTitle").textContent = "That didn’t go through.";
@@ -1375,13 +1442,13 @@ async function runPublish(btn) {
     $("ritActions").appendChild(ny);
   }
 }
-async function pollPublish(n) {
+async function pollPublish(n, firstPublish) {
   if (n > 30) { $("ritSub").textContent = "This is taking longer than usual — it’s still working, and History will show how it ends. You can safely step away."; return; }
   await new Promise((r) => setTimeout(r, 4000));
   try {
     const pubs = (await api("GET", "/publishes")).data;
     const top = pubs[0];
-    if (top && top.status === "live") return showReceipt(top.summary);
+    if (top && top.status === "live") return showReceipt(firstPublish);
     if (top && top.status === "failed") {
       $("ritBody").innerHTML = pipeHtml(-1);
       $("ritTitle").textContent = "That didn’t go through.";
@@ -1393,18 +1460,21 @@ async function pollPublish(n) {
       return;
     }
   } catch { /* keep polling */ }
-  pollPublish(n + 1);
+  pollPublish(n + 1, firstPublish);
 }
-function showReceipt(summary) {
+function showReceipt(firstPublish) {
   const count = S.changes ? S.changes.count : 0;
   const now = new Date();
+  const name = (S.identity && S.identity.business_name) || "Your business";
   $("ritTitle").textContent = ""; $("ritSub").textContent = ""; $("ritBlockers").innerHTML = "";
   $("ritBody").innerHTML = `
     <div class="receipt">
       <div class="stamp">✓</div>
-      <div class="rp">Published</div>
-      <div class="rd">${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${count ? ` · ${count} change${count > 1 ? "s" : ""}` : ""}</div>
-      <div class="rl">Every word on your site came from you.<br>This version is kept safe, always.</div>
+      <div class="rp">${firstPublish ? "You’re on the internet." : "Published"}</div>
+      <div class="rd">${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${count && !firstPublish ? ` · ${count} change${count > 1 ? "s" : ""}` : ""}</div>
+      <div class="rl">${firstPublish
+        ? esc(name) + " has a home now — and every word of it came from you.<br>This first version is kept safe, always."
+        : "Every word on your site came from you.<br>This version is kept safe, always."}</div>
     </div>`;
   $("ritActions").innerHTML = "";
   const done = el("button", "notyet", "Back to your room");
