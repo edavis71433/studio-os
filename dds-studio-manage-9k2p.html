@@ -1338,7 +1338,7 @@ button:focus-visible, .ibx-pill:focus-visible, .ibx-tab:focus-visible, .bf-act:f
             <div class="ct">👥 Who has access</div>
             <button class="sbtn sec" onclick="tmLoad()" style="font-size:12px;padding:7px 14px;">↻ Refresh</button>
           </div>
-          <div class="cb" id="tm-list"><p style="font-size:13px;color:var(--muted);">Loading your team…</p></div>
+          <div class="cb" id="tm-list"><div class="skel" style="height:46px;border-radius:12px;margin-bottom:10px;"></div><div class="skel" style="height:46px;border-radius:12px;margin-bottom:10px;"></div><div class="skel" style="height:46px;border-radius:12px;margin-bottom:10px;"></div></div>
         </div>
       </div>
 
@@ -2344,7 +2344,7 @@ var _visSites = [];
 async function loadVisibility(){
   var list = document.getElementById('visList');
   if (!list) return;
-  list.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading your sites…</p>';
+  list.innerHTML = adminSkel(4);
   var j = await visEdge({ type:"visibility_list" });
   if (!j || j.error) { list.innerHTML = '<p style="font-size:13px;color:var(--red);padding:14px;">Could not load sites'+(j&&j.error?': '+escHtml(j.error):'')+'</p>'; return; }
   _visSites = (j.data) || [];
@@ -2470,12 +2470,14 @@ async function visCheckAll(){
 async function loadLeads() {
   var listEl = document.getElementById('leadsList');
   if (!listEl) return;
-  listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading leads...</p>';
+  listEl.innerHTML = adminSkel(4);
   document.getElementById('leadDetail').style.display = 'none';
 
   // Source 1: existing audit_leads (audit tool, report card, AI review)
   var auditLeads = await api('audit_leads?select=*&order=created_at.desc&limit=200');
-  auditLeads = auditLeads || [];
+  // api() returns null only on a real failure ([] means "no leads"); surface it
+  // as a retryable error instead of a misleading empty list.
+  if (auditLeads === null) { listEl.innerHTML = adminError('Couldn’t load your leads', 'loadLeads()'); return; }
 
   // Source 2: NEW Studio OS contact-form leads (the leads table), via the
   // lead_list route. Mapped onto the same shape the leads UI already expects,
@@ -2537,8 +2539,8 @@ async function loadUniversalInbox(){
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'universal_inbox'})});
     var j=await r.json(); d=(j&&j.data)||null;
     if(!d && j && j.error){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
-  }catch(e){ host.innerHTML=''; return; }
-  if(!d){ host.innerHTML=''; return; }
+  }catch(e){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
+  if(!d){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
   var items=d.items||[];
   if(!items.length){
     host.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:16px;background:rgba(26,126,73,0.06);border-radius:12px;font-size:14px;color:var(--ink);"><span style="color:#1a7e49;font-weight:700;">\u2713</span>Inbox zero. Nothing is waiting on a reply anywhere.</div>';
@@ -2786,7 +2788,7 @@ async function convertLeadToClient(id){
 
 // ── Studio OS form-lead detail: conversation + AI draft + reply ──
 async function showOsLeadDetail(lead, detail) {
-  detail.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading conversation...</p>';
+  detail.innerHTML = adminSkel(3);
   var d = null;
   try {
     var jwt = await adminJwt();
@@ -3284,13 +3286,16 @@ function hubPulsePanel(pu){
 async function loadHub() {
   var listEl = document.getElementById("hubList");
   if (!listEl) return;
-  listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading clients...</p>';
+  listEl.innerHTML = adminSkel(4);
   document.getElementById("hubDetail").style.display = "none";
   var res = await Promise.all([
     api("clients?select=*&order=created_at.desc"),
     api("audit_leads?select=*&order=created_at.desc&limit=300"),
     loadHubPulse().catch(function(){return null;})
   ]);
+  // Clients is the primary source; a null here is a real load failure, not "no
+  // clients". Show a retryable error rather than a misleading empty hub.
+  if (res[0] === null) { listEl.innerHTML = adminError('Couldn’t load your clients', 'loadHub()'); return; }
   hubClients = res[0] || [];
   hubLeads = res[1] || [];
   clients = hubClients; // keep the rest of the panel in sync
@@ -3369,7 +3374,7 @@ async function openHubClient(id) {
   if (!c) return;
   var detail = document.getElementById("hubDetail");
   detail.style.display = "block";
-  detail.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading record...</p>';
+  detail.innerHTML = adminSkel(3);
   detail.scrollIntoView({behavior:"smooth", block:"start"});
 
   // Pull everything for this client in parallel
@@ -6103,7 +6108,7 @@ async function loadMsgTriage(){
       body='<div style="font-size:13px;color:var(--ink-2,#574d68);padding:2px 2px 4px;">Inbox zero \u2014 nobody is waiting on you, and nothing you sent recently has gone quiet. When a client writes, they appear here with a one-click grounded reply.</div>';
     }
     host.innerHTML='<div class="invc-wrap" style="padding-top:14px;">'+body+'</div>';
-  }catch(e){ host.innerHTML=''; }
+  }catch(e){ host.innerHTML=adminError('Couldn’t load your message triage', 'loadMsgTriage()'); }
   finally{ MSGX.loading=false; }
 }
 
@@ -6380,7 +6385,7 @@ async function loadInvoiceHealth(){
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'invoice_health'})});
     var j=await r.json(); var d=(j&&j.data)||null;
-    if(!d){ host.innerHTML=''; return; }
+    if(!d){ host.innerHTML=adminError('Couldn’t load invoice health', 'loadInvoiceHealth()'); return; }
     var col=d.score>=90?'#1a7e49':d.score>=70?'#9a7a1a':'#c0392b';
     var bg=d.score>=90?'#e7f6ee':d.score>=70?'#fdf6e3':'#fbecea';
     var risks=(d.at_risk||[]).map(function(a){
@@ -6411,7 +6416,7 @@ async function loadInvoiceHealth(){
       +(fc?'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;"><div style="flex-basis:100%;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:-4px;">Cash flow, next 3 months</div>'+fc+'</div>':'')
       +(risks?'<div style="margin-top:12px;"><div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;">At risk</div>'+risks+'</div>':'')
     +'</div>';
-  }catch(e){ host.innerHTML=''; }
+  }catch(e){ host.innerHTML=adminError('Couldn’t load invoice health', 'loadInvoiceHealth()'); }
 }
 
 async function loadInvoiceCommand(){
@@ -6502,7 +6507,7 @@ async function loadInvoiceCommand(){
 
     host.innerHTML='<div class="invc-wrap">'+stats+body+'</div>';
   }catch(e){
-    host.innerHTML='';
+    host.innerHTML=adminError('Couldn’t load your invoices', 'loadInvoiceCommand()');
   }finally{
     INVC.loading=false;
   }
@@ -6554,7 +6559,7 @@ function invChase(id){
 async function loadBillingOverview() {
   var host = document.getElementById("billingOverview");
   if (!host) return;
-  host.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Loading payments…</div>';
+  host.innerHTML = adminSkel(2,30);
   try {
     var jwt = await adminJwt(); if (!jwt) { host.innerHTML=""; return; }
     var r = await fetch(SB_URL + "/functions/v1/clever-api", {
@@ -7578,6 +7583,14 @@ function adminEmpty(icon, title, msg){
 function adminError(title, retryCall, detail){
   return '<div class="astate astate-err"><div class="ai">⚠</div><h4>'+escHtml(title||'Couldn’t load this')+'</h4><p>'+escHtml(detail||'Nothing was changed. Check your connection and try again.')+'</p>'+(retryCall?'<button class="abtn" type="button" onclick="'+retryCall+'">Try again</button>':'')+'</div>';
 }
+// Generic loading skeleton: mirrors a list's shape while it loads, never a
+// blank spinner or bare "Loading…" text. rows = bars, h = each bar's height px.
+function adminSkel(rows, h){
+  rows = rows || 3; h = h || 46;
+  var s = '';
+  for(var i=0;i<rows;i++) s += '<div class="skel" style="height:'+h+'px;border-radius:12px;margin-bottom:10px;"></div>';
+  return s;
+}
 function cap(s) { return s?s[0].toUpperCase()+s.slice(1):""; }
 function toast(msg) { var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),3000); }
 
@@ -7858,7 +7871,7 @@ var PRIORITY_RANK = { High:0, Medium:1, Low:2 };
 async function loadProspects() {
   var listEl = document.getElementById('prospectsList');
   if (!listEl) return;
-  listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);">Loading prospects...</p>';
+  listEl.innerHTML = adminSkel(4);
   var r = await api('prospects?select=*&order=created_at.desc&limit=500');
   if (r === null) {
     listEl.innerHTML = adminError('Couldn’t load your prospects', 'loadProspects()');
@@ -9776,7 +9789,7 @@ function tmInitials(email) {
 async function tmLoad() {
   var list = document.getElementById('tm-list');
   if (!list) return;
-  list.innerHTML = '<p style="font-size:13px;color:var(--muted);">Loading your team…</p>';
+  list.innerHTML = adminSkel(3);
   var res = await tmCall({ type: 'team_list' });
   if (!res || res.error) {
     list.innerHTML = '<p style="font-size:13px;color:var(--red);">Could not load your team' + (res && res.error && res.error !== 'not_owner' ? ': ' + escHtml(res.error) : '') + '.</p>';
@@ -11002,7 +11015,7 @@ var INTEG = { clientId: null, clients: [], providers: [], history: [], historyPr
 async function loadIntegrations(){
   var host = document.getElementById('integrationsBody');
   if(!host) return;
-  host.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">Loading integrations…</div>';
+  host.innerHTML = adminSkel(3);
   // load client list once
   if(!INTEG.clients.length){
     try{ var r = await integApi('admin_query',{path:'clients?deleted_at=is.null&select=id,name&order=name.asc&limit=500'}); INTEG.clients = (r&&r.data)||[]; }catch(e){ INTEG.clients=[]; }
@@ -11034,7 +11047,7 @@ function integSelectClient(id){ INTEG.clientId = id; INTEG.historyProvider=null;
 async function refreshIntegrations(){
   if(!INTEG.clientId) return;
   var grid = document.getElementById('integGrid');
-  if(grid) grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;">Loading providers…</div>';
+  if(grid) grid.innerHTML = adminSkel(3);
   try{
     var r = await integApi('integrations_status',{clientId:INTEG.clientId});
     INTEG.providers = (r&&r.data&&r.data.providers)||[];
@@ -11292,7 +11305,7 @@ function reauthorize(provider){ connectProvider(provider); } // re-runs OAuth, r
 // ── property picker ──
 async function openPropertyPicker(provider){
   var host = document.getElementById('picker-'+provider); if(!host) return;
-  host.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">Loading available properties…</div>';
+  host.innerHTML = adminSkel(3,30);
   try{
     var r = await integApi('integration_list_properties',{clientId:INTEG.clientId,provider:provider});
     if(r&&r.error){ host.innerHTML='<div style="font-size:12px;color:#c0392b;background:#fdecea;border-radius:8px;padding:10px 12px;"><b>Could not list properties</b><br>error: '+escHtml(r.error)+(r.status?(' (HTTP '+r.status+')'):'')+(r.detail?('<br><span style="color:#7a3a33;">'+escHtml(String(r.detail).slice(0,260))+'</span>'):'')+'</div>'; return; }
@@ -11417,7 +11430,7 @@ async function anTalkingPoints(){
 
 async function loadAnalytics(){
   var host = document.getElementById('analyticsBody'); if(!host) return;
-  host.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">Loading analytics…</div>';
+  host.innerHTML = adminSkel(3);
   if(!ANALYTICS.clients.length){
     try{ var r = await integApi('admin_query',{path:'clients?deleted_at=is.null&select=id,name&order=name.asc&limit=500'}); ANALYTICS.clients=(r&&r.data)||[]; }catch(e){ ANALYTICS.clients=[]; }
   }
