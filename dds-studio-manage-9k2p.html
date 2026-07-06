@@ -47,7 +47,12 @@ body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-fo
 .sidebar{background:#fff;border-right:1px solid rgba(91,63,160,0.08);padding:12px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
 .sl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px;}
 .sn{display:flex;align-items:center;gap:9px;padding:9px 16px;font-size:13px;font-weight:500;color:var(--muted);width:100%;border:none;background:none;font-family:var(--sans);text-align:left;cursor:pointer;transition:background 0.15s;}
+/* Urgency-ranked nav badge: color reflects the MOST urgent item in that group
+   (data-sev). Default (today) = a client is waiting; soon = reply soon; normal
+   = new activity. The count is the number waiting. */
 .nav-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:100px;background:#c0392b;color:#fff;font-size:10.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;flex:none;}
+.nav-badge[data-sev="soon"]{background:#b7860f;}
+.nav-badge[data-sev="normal"]{background:#2c6fb7;}
 .sn.active .nav-badge{background:#fff;color:var(--p);}
 .sn:hover,.sn.active{background:var(--pxxxl);color:var(--p);font-weight:600;}
 .sdiv{height:1px;background:rgba(91,63,160,0.06);margin:6px 0;}
@@ -2204,13 +2209,19 @@ function go(page) {
 // visible from any page so Eric never has to go looking. Source is the same
 // universal_inbox the inbox uses (deterministic 'needs a reply' logic). Silent:
 // no login prompt, never throws, updates on a light poll + tab-focus.
-function setNavBadge(btnId, n){
+// sev is the most-urgent tier in the group: 'today' (red, client waiting),
+// 'soon' (amber), or 'normal' (blue, new activity). Color comes from CSS via
+// data-sev; the number is the count waiting.
+function setNavBadge(btnId, n, sev){
   var btn = document.getElementById(btnId); if(!btn) return;
   var b = btn.querySelector('.nav-badge');
   if(!n || n < 1){ if(b) b.remove(); return; }
   if(!b){ b = document.createElement('span'); b.className = 'nav-badge'; btn.appendChild(b); }
   b.textContent = n > 99 ? '99+' : String(n);
-  b.setAttribute('aria-label', n + ' waiting');
+  sev = sev || 'today';
+  b.setAttribute('data-sev', sev);
+  var word = { today:'needs response today', soon:'reply soon', normal:'new' }[sev] || '';
+  b.setAttribute('aria-label', n + ' waiting' + (word ? ', most urgent: ' + word : ''));
 }
 async function refreshNavBadges(){
   try{
@@ -2220,12 +2231,14 @@ async function refreshNavBadges(){
       body: JSON.stringify({ type:'universal_inbox' }) });
     var j = await r.json(); var d = (j && j.data) || null;
     if(!d || !Array.isArray(d.items)) return;
-    var leads = 0, msgs = 0;
-    d.items.forEach(function(it){ var k = it.kind;
-      if(k === 'lead' || k === 'audit') leads++;
-      else if(k === 'message' || k === 'growth') msgs++; });
-    setNavBadge('sn-leads', leads);
-    setNavBadge('sn-messages', msgs);
+    var rank = { today:3, soon:2, normal:1 };                 // reuse inbox urgency
+    var leads = 0, msgs = 0, leadSev = '', msgSev = '';
+    var bump = function(cur, u){ return (rank[u]||1) > (rank[cur]||0) ? u : cur; };
+    d.items.forEach(function(it){ var k = it.kind, u = it.urgency || 'normal';
+      if(k === 'lead' || k === 'audit'){ leads++; leadSev = bump(leadSev, u); }
+      else if(k === 'message' || k === 'growth'){ msgs++; msgSev = bump(msgSev, u); } });
+    setNavBadge('sn-leads', leads, leadSev);
+    setNavBadge('sn-messages', msgs, msgSev);
   }catch(e){ /* never disturb the app for a badge */ }
 }
 var _navBadgeTimer = null;
