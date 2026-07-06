@@ -59,9 +59,9 @@ const j = async (r) => { const t = await r.text(); try { return JSON.parse(t); }
 { const r = await as(jwtA, `presence_change_events?select=id&limit=5`); const d = await j(r); ok("A reads own change events", r.status === 200 && d.length >= 1); }
 
 // ── A: system tables are deny ──
-{ const r = await as(jwtA, `presence_snapshots?select=id`); const d = await j(r); ok("A CANNOT read snapshots (0 rows)", r.status === 200 && d.length === 0); }
-{ const r = await as(jwtA, `presence_publishes?select=id`); const d = await j(r); ok("A CANNOT read publishes (0 rows)", r.status === 200 && d.length === 0); }
-{ const r = await as(jwtA, `presence_entitlements?select=id`); const d = await j(r); ok("A CANNOT read entitlements (0 rows)", r.status === 200 && d.length === 0); }
+{ const r = await as(jwtA, `presence_snapshots?select=id`); const d = await j(r); ok("A CANNOT read snapshots", (r.status === 200 && Array.isArray(d) && d.length === 0) || r.status === 401 || r.status === 403, String(r.status)); }
+{ const r = await as(jwtA, `presence_publishes?select=id`); const d = await j(r); ok("A CANNOT read publishes", (r.status === 200 && Array.isArray(d) && d.length === 0) || r.status === 401 || r.status === 403, String(r.status)); }
+{ const r = await as(jwtA, `presence_entitlements?select=id`); const d = await j(r); ok("A CANNOT read entitlements", (r.status === 200 && Array.isArray(d) && d.length === 0) || r.status === 401 || r.status === 403, String(r.status)); }
 { const r = await as(jwtA, `presence_change_events`, { method: "POST", body: JSON.stringify({ site_id: site.id, entity_type: "offering", action: "create", summary: "forged" }) }); ok("A CANNOT insert change event", r.status === 401 || r.status === 403, String(r.status)); }
 { const r = await as(jwtA, `presence_snapshots`, { method: "POST", body: JSON.stringify({ site_id: site.id, content: {}, template_slug: "x", template_version: "1" }) }); ok("A CANNOT insert snapshot", r.status === 401 || r.status === 403, String(r.status)); }
 { const r = await as(jwtA, `presence_redirects`, { method: "POST", body: JSON.stringify({ site_id: site.id, from_path: "/old", to_path: "/new" }) }); ok("A CANNOT write redirects (read-only)", r.status === 401 || r.status === 403, String(r.status)); }
