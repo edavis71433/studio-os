@@ -15,6 +15,7 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { canTransition, allowedTransitions, isLifecycleState, PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
 import { runPipeline, handlePublish, CALM } from './publish.ts';
+import { runEvidence } from '../evidence/engine.ts';
 import {
   netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
   setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
@@ -408,7 +409,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     return json({ data: { ok: true } }, 200, cors);
   }
 
-  const m = route.match(/^\/admin\/sites\/([0-9a-f-]{36})(\/[a-z-]+)?$/);
+  const m = route.match(/^\/admin\/sites\/([0-9a-f-]{36})(\/[a-z-]+(?:\/[a-z-]+)?)?$/);
   if (!m) return null;
   const site = await loadSite(m[1]);
   if (!site) return json({ error: 'not_found', message: 'No site with that id.' }, 404, cors);
@@ -434,6 +435,31 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   if (sub === '/retry' && method === 'POST') return handleRetry(req, site, principal, cors);
   if (sub === '/cancel' && method === 'POST') return handleCancel(site, principal, cors);
   if (sub === '/restore-snapshot' && method === 'POST') return handleRestoreSnapshot(req, site, principal, cors);
+
+  // ── M9.0: the Evidence Engine (observation only; operator surface) ──
+  if (sub === '/observe' && method === 'POST') {
+    const summary = await runEvidence(site, 'operator');
+    return json({ data: summary }, summary.ok ? 200 : 502, cors);
+  }
+  if (sub === '/evidence' && method === 'GET') {
+    const url = new URL(req.url);
+    const runId = url.searchParams.get('run_id');
+    const category = url.searchParams.get('category');
+    let runFilter = runId && /^[0-9a-f-]{36}$/.test(runId) ? runId : null;
+    if (!runFilter) {
+      // default: the latest finished run — evidence reads as "current state"
+      const latest = await svc(`presence_evidence_runs?site_id=eq.${site.id}&finished_at=not.is.null&error_text=is.null&select=id&order=started_at.desc&limit=1`);
+      runFilter = latest.json?.[0]?.id ?? null;
+      if (!runFilter) return json({ data: { run_id: null, items: [] } }, 200, cors);
+    }
+    const cat = category && /^[a-z_]+$/.test(category) ? `&category=eq.${category}` : '';
+    const items = await svc(`presence_evidence?run_id=eq.${runFilter}${cat}&select=category,type,severity,confidence,source,resource,human,tech,next_action,facts,observed_at,fingerprint&order=severity.asc,category.asc,type.asc&limit=500`);
+    return json({ data: { run_id: runFilter, items: items.json ?? [] } }, 200, cors);
+  }
+  if (sub === '/evidence/runs' && method === 'GET') {
+    const runs = await svc(`presence_evidence_runs?site_id=eq.${site.id}&select=id,started_at,finished_at,trigger,item_count,providers,input,error_text&order=started_at.desc&limit=20`);
+    return json({ data: runs.json ?? [] }, 200, cors);
+  }
 
   return null;
 }
