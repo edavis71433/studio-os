@@ -1,0 +1,51 @@
+{
+  "name": "Restaurant Classic",
+  "slug": "restaurant-classic",
+  "version": "1.0.0",
+  "content_contract_version": 1,
+  "pages": [
+    { "path": "/", "kind": "home" },
+    { "path": "/menu/", "kind": "menu" },
+    { "path": "/about/", "kind": "about" },
+    { "path": "/faq/", "kind": "faq" },
+    { "path": "/contact/", "kind": "contact" },
+    { "path": "/updates/", "kind": "post_index" },
+    { "path": "/updates/:slug/", "kind": "post" }
+  ],
+  "entities": {
+    "identity": { "required": ["business_name", "description"], "required_any": [["phone", "email"]] },
+    "location": { "required": ["address_line1", "city", "region", "postal_code", "timezone", "hours"], "max": 1 },
+    "offerings": { "required": ["name", "category"], "max": 80 },
+    "testimonials": { "required": ["quote", "author"], "max": 12 },
+    "faqs": { "required": ["question", "answer"], "max": 20 },
+    "posts": { "required": ["title", "slug", "body_md"], "max": 50 },
+    "media": { "max": 100 }
+  },
+  "image_variants": {
+    "w400": { "width": 400, "format": "webp" },
+    "w800": { "width": 800, "format": "webp" },
+    "w1600": { "width": 1600, "format": "webp" }
+  },
+  "validation": {
+    "blockers": [
+      "identity.business_name required",
+      "identity.description required",
+      "identity.phone or identity.email required",
+      "location required with full address and timezone",
+      "location.hours must be 7 valid days",
+      "visible offerings require name and category",
+      "published posts require title, slug, body",
+      "entity caps must not be exceeded",
+      "redirect map must be single-hop and loop-free"
+    ],
+    "warnings": [
+      "no visible offerings (empty menu)",
+      "no faqs",
+      "seo_title or seo_description empty (falling back)",
+      "booking_url absent",
+      "all seven days closed",
+      "no media"
+    ]
+  },
+  "preview_fixture": "./fixture.json"
+}
