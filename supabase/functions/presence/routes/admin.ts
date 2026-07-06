@@ -17,6 +17,7 @@ import { canTransition, allowedTransitions, isLifecycleState, PUBLISH_BLOCKED_ST
 import { runPipeline, handlePublish, CALM } from './publish.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
+import { runRecommendation } from '../recommendation/engine.ts';
 import {
   netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
   setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
@@ -480,6 +481,26 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     const statusFilter = status === 'all' ? '' : status === 'suppressed' ? '&status=eq.suppressed' : '&status=eq.active';
     const rows = await svc(`presence_judgments?batch_id=eq.${batchFilter}${statusFilter}&select=judgment_hash,judgment_key,rule,category,priority,severity,confidence,reasoning,business_impact,customer_impact,timing,audience,status,suppression_reason,evidence_ids,evidence_count,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
     return json({ data: { batch_id: batchFilter, judgments: rows.json ?? [] } }, 200, cors);
+  }
+
+  // ── M9.2: the Recommendation Engine (deterministic; consumes judgments only) ──
+  if (sub === '/recommend' && method === 'POST') {
+    const summary = await runRecommendation(site);
+    return json({ data: summary }, summary.ok ? 200 : summary.error === 'no_judgment_batch' ? 409 : 502, cors);
+  }
+  if (sub === '/recommendations' && method === 'GET') {
+    const url = new URL(req.url);
+    const status = url.searchParams.get('status'); // active | suppressed | all (default active)
+    const batch = url.searchParams.get('batch_id');
+    let batchFilter = batch && /^[0-9a-f-]{36}$/.test(batch) ? batch : null;
+    if (!batchFilter) {
+      const latest = await svc(`presence_recommendations?site_id=eq.${site.id}&select=batch_id&order=created_at.desc&limit=1`);
+      batchFilter = latest.json?.[0]?.batch_id ?? null;
+      if (!batchFilter) return json({ data: { batch_id: null, recommendations: [] } }, 200, cors);
+    }
+    const statusFilter = status === 'all' ? '' : status === 'suppressed' ? '&status=eq.suppressed' : '&status=eq.active';
+    const rows = await svc(`presence_recommendations?batch_id=eq.${batchFilter}${statusFilter}&select=recommendation_hash,recommendation_key,rule,category,priority,action,title,description,reason,expected_benefit,value_dimensions,estimated_effort,estimated_risk,undoability,timing,audience,affected_resources,requires_ai,manual_available,approval_required,status,suppression_reason,supporting_judgment_ids,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
+    return json({ data: { batch_id: batchFilter, recommendations: rows.json ?? [] } }, 200, cors);
   }
 
   return null;
