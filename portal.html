@@ -3103,16 +3103,28 @@ function renderDecisions(brief){
   host.innerHTML = html + '</div>';
 }
 
+var _approveBusy = false;
 async function approve(id) {
-  await sb.from("approvals").update({status:"approved", responded_at: new Date().toISOString()}).eq("id", id);
-  try { await sb.from("activity_log").insert({ client_id: CLIENT.id, action: "approved", detail: "Approved a deliverable" }); } catch(e){}
-  // PROPAGATION: the client's decision is a story moment too. One timeline
-  // row makes it visible to Eric's relationship read and the changed-diff,
-  // from the same source of truth — no duplicated event.
-  try { await sb.from("timeline").insert({ client_id: CLIENT.id, kind: "approval", title: "Client approved a deliverable", body: "Approved from the portal." }); } catch(e){}
-  showToast("✓ Approved! Eric has been notified.");
-  await loadApprovals();
-  await sendNotification("approval_action", "Deliverable approved", "", {action: "approved", clientId: CLIENT.id});
+  if (_approveBusy) return;   // one click = one approval; blocks double-fire duplicates
+  _approveBusy = true;
+  try {
+    // .select("id") returns the updated rows, so this catches BOTH a hard
+    // error and a silent zero-row update — success is only claimed when the
+    // row really changed.
+    var res = await sb.from("approvals").update({status:"approved", responded_at: new Date().toISOString()}).eq("id", id).select("id");
+    if (res.error || !res.data || res.data.length === 0) {
+      showToast("That didn't go through — nothing was changed. Please try again.");
+      return;
+    }
+    try { await sb.from("activity_log").insert({ client_id: CLIENT.id, action: "approved", detail: "Approved a deliverable" }); } catch(e){}
+    // PROPAGATION: the client's decision is a story moment too. One timeline
+    // row makes it visible to Eric's relationship read and the changed-diff,
+    // from the same source of truth — no duplicated event.
+    try { await sb.from("timeline").insert({ client_id: CLIENT.id, kind: "approval", title: "Client approved a deliverable", body: "Approved from the portal." }); } catch(e){}
+    showToast("✓ Approved! Eric has been notified.");
+    await loadApprovals();
+    await sendNotification("approval_action", "Deliverable approved", "", {action: "approved", clientId: CLIENT.id});
+  } finally { _approveBusy = false; }
 }
 
 var _revisionId = null;
