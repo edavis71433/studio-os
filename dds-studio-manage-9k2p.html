@@ -44,6 +44,8 @@ body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-fo
 .sidebar{background:#fff;border-right:1px solid rgba(91,63,160,0.08);padding:12px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
 .sl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px;}
 .sn{display:flex;align-items:center;gap:9px;padding:9px 16px;font-size:13px;font-weight:500;color:var(--muted);width:100%;border:none;background:none;font-family:var(--sans);text-align:left;cursor:pointer;transition:background 0.15s;}
+.nav-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:100px;background:#c0392b;color:#fff;font-size:10.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;flex:none;}
+.sn.active .nav-badge{background:#fff;color:var(--p);}
 .sn:hover,.sn.active{background:var(--pxxxl);color:var(--p);font-weight:600;}
 .sdiv{height:1px;background:rgba(91,63,160,0.06);margin:6px 0;}
 
@@ -2190,7 +2192,47 @@ function go(page) {
 
   // run registered navigation hooks (replaces 12 window.go monkey-patches)
   (window.DDS_NAV_HOOKS||[]).forEach(function(h){ try{ h(page); }catch(e){} });
+  // after handling messages/leads, the counts likely changed — refresh soon
+  if (page === 'messages' || page === 'leads') setTimeout(refreshNavBadges, 1500);
 }
+
+// ── FOUNDER NOTIFICATION BADGES ────────────────────────────────────────────
+// Passive awareness on the nav: how many leads and client messages are waiting,
+// visible from any page so Eric never has to go looking. Source is the same
+// universal_inbox the inbox uses (deterministic 'needs a reply' logic). Silent:
+// no login prompt, never throws, updates on a light poll + tab-focus.
+function setNavBadge(btnId, n){
+  var btn = document.getElementById(btnId); if(!btn) return;
+  var b = btn.querySelector('.nav-badge');
+  if(!n || n < 1){ if(b) b.remove(); return; }
+  if(!b){ b = document.createElement('span'); b.className = 'nav-badge'; btn.appendChild(b); }
+  b.textContent = n > 99 ? '99+' : String(n);
+  b.setAttribute('aria-label', n + ' waiting');
+}
+async function refreshNavBadges(){
+  try{
+    var jwt = await adminJwt(); if(!jwt) return;              // silent when signed out
+    var r = await fetch(SB_URL+'/functions/v1/clever-api',{ method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},
+      body: JSON.stringify({ type:'universal_inbox' }) });
+    var j = await r.json(); var d = (j && j.data) || null;
+    if(!d || !Array.isArray(d.items)) return;
+    var leads = 0, msgs = 0;
+    d.items.forEach(function(it){ var k = it.kind;
+      if(k === 'lead' || k === 'audit') leads++;
+      else if(k === 'message' || k === 'growth') msgs++; });
+    setNavBadge('sn-leads', leads);
+    setNavBadge('sn-messages', msgs);
+  }catch(e){ /* never disturb the app for a badge */ }
+}
+var _navBadgeTimer = null;
+function startNavBadges(){
+  if(_navBadgeTimer) return;
+  refreshNavBadges();
+  _navBadgeTimer = setInterval(function(){ if(document.visibilityState === 'visible') refreshNavBadges(); }, 90000);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') refreshNavBadges(); });
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(startNavBadges, 1200); });
 
 // ── LEADS ──
 var allLeads = [];
