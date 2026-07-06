@@ -1,6 +1,6 @@
 # Presence Intelligence Constitution v1
 
-**Status: RATIFIED & FROZEN — 2026-07-06 — except §11's commercial placement (Amendment 2), which is PROPOSED and awaits the owner's word. See §15.**
+**Status: RATIFIED & FROZEN — 2026-07-06, in full.** §11's commercial placement was ratified the same day as **Amendment 2** (`06-amendment-2-presence-monitor-edition.md`): Presence Monitor is the entry edition of the one Presence line.
 Sits beside: `00`–`04` (all frozen). Nothing here modifies the render contract, the publish pipeline, the API, the schema, or any frozen law. This document is philosophy and boundaries only; it binds every later milestone (M9, M10, and beyond). No implementation exists yet, by design.
 
 ---
@@ -191,7 +191,7 @@ Reaffirmed verbatim in force: AI never invents facts (11) · every AI action has
 
 Checked against 00–04 line by line:
 
-1. **Presence Monitor as a standalone product ↔ frozen Edition Strategy (03 §2: "two surfaces, one product line," four editions) and Feature Matrix (02 Part 2).** *Genuine contradiction — cannot be ratified silently.* Smallest correction, proposed as **Amendment 2**: Monitor joins the SAME product line as its entry edition — *Presence Monitor → Presence → Presence Managed → Presence Agency → Presence Enterprise* — "one product line" survives with a doorway added; the Feature Matrix gains one column (observe/recommend ✓; edit/publish/host —). Terminology freeze extends: "Monitor" is the edition name; "connect your site" is the verb; "CMS" remains internal-only vocabulary even though this brief used it. **PROPOSED — awaiting the owner's word. Nothing else in this document depends on it.**
+1. **Presence Monitor as a standalone product ↔ frozen Edition Strategy (03 §2: "two surfaces, one product line," four editions) and Feature Matrix (02 Part 2).** *Genuine contradiction — was not ratified silently.* Smallest correction proposed as **Amendment 2**: Monitor joins the SAME product line as its entry edition — *Presence Monitor → Presence → Presence Managed → Presence Agency → Presence Enterprise* — "one product line" survives with a doorway added; the Feature Matrix gains one column (observe/recommend ✓; edit/publish/host —). Terminology freeze extends: "Monitor" is the edition name; "connect your site" is the verb; "CMS" remains internal-only vocabulary even though this brief used it. **RATIFIED by owner approval — see `06-amendment-2-presence-monitor-edition.md`, which also adds Law 34 (additive editions; upgrades preserve data, content, history, domains, and workflows).**
 2. **"AI never publishes automatically" ↔ frozen rung 4 (Auto-publish).** Reconciled in §14 without weakening either text: rung 4 is explicit, revocable, standing human consent — not automation past the customer. *No amendment needed.*
 3. **Industry pack list ↔ frozen vertical order (03 §5).** Reconciled in §13: packs define architecture; the frozen order governs shipping. *No amendment needed.*
 4. **"Blogs," "Presence CMS" vocabulary in the brief ↔ terminology freeze (03 §2).** Absorbed: the capabilities exist under house names (Updates; Presence). *No amendment needed.*
@@ -201,6 +201,6 @@ Checked against 00–04 line by line:
 
 ## Ratification
 
-With contradiction 1 explicitly carved out as **Amendment 2 (PROPOSED)**, the remainder introduces no conflict with the frozen constitutions and builds entirely on their seams.
+Contradiction 1 was carved out at first ratification and resolved the same day by owner approval of **Amendment 2** (`06`). With it, this document introduces no conflict with the frozen constitutions and builds entirely on their seams.
 
-**Presence Intelligence Constitution v1 is ratified and frozen**, excepting §11's commercial placement, which awaits the owner's decision on Amendment 2. M9 and later milestones are bound by this document. No implementation begins under this milestone.
+**Presence Intelligence Constitution v1 is ratified and frozen, in full.** M9 and later milestones are bound by this document. No implementation was produced under this milestone.
