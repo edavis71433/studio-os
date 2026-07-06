@@ -2491,7 +2491,7 @@ async function loadUniversalInbox(){
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'universal_inbox'})});
     var j=await r.json(); d=(j&&j.data)||null;
-    if(!d && j && j.error){ host.innerHTML='<div style="font-size:12.5px;color:#9a2d2d;padding:10px 14px;background:#fbecea;border-radius:12px;margin-bottom:16px;">Inbox could not load: '+escHtml(String(j.error))+' <button class="tdx-pill tdx-pill-sm" onclick="loadUniversalInbox()">Retry</button></div>'; return; }
+    if(!d && j && j.error){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
   }catch(e){ host.innerHTML=''; return; }
   if(!d){ host.innerHTML=''; return; }
   var items=d.items||[];
@@ -4383,7 +4383,7 @@ async function loadTodayVitals(){
         +'</div>';
     }
     wrap.innerHTML=html || '';
-  }catch(e){ wrap.innerHTML=''; }
+  }catch(e){ wrap.innerHTML = adminError('Couldn’t load your daily vitals', 'loadTodayVitals()'); }
 }
 
 // Suppress an opted-out prospect: server refuses all future sends to them.
@@ -7525,6 +7525,14 @@ function fmtDate(iso) { if(!iso) return ""; return new Date(iso).toLocaleDateStr
 // malicious message can't execute script inside the admin session. Top-level so
 // every render function can use it.
 function escHtml(s) { return String(s==null?"":s).replace(/[&<>"']/g, function(m){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]; }); }
+// Shared admin empty/error states. retryCall is a hardcoded function-call string
+// like 'loadProspects()'. Error copy is calm and honest: nothing was lost, retry.
+function adminEmpty(icon, title, msg){
+  return '<div class="astate"><div class="ai">'+(icon||'○')+'</div><h4>'+escHtml(title||'Nothing here yet')+'</h4>'+(msg?'<p>'+escHtml(msg)+'</p>':'')+'</div>';
+}
+function adminError(title, retryCall, detail){
+  return '<div class="astate astate-err"><div class="ai">⚠</div><h4>'+escHtml(title||'Couldn’t load this')+'</h4><p>'+escHtml(detail||'Nothing was changed. Check your connection and try again.')+'</p>'+(retryCall?'<button class="abtn" type="button" onclick="'+retryCall+'">Try again</button>':'')+'</div>';
+}
 function cap(s) { return s?s[0].toUpperCase()+s.slice(1):""; }
 function toast(msg) { var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),3000); }
 
@@ -7806,7 +7814,7 @@ async function loadProspects() {
   listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);">Loading prospects...</p>';
   var r = await api('prospects?select=*&order=created_at.desc&limit=500');
   if (r === null) {
-    listEl.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:10px;line-height:1.6;">Couldn\'t load prospects right now. Refresh the page, or check your connection and try again.</div>';
+    listEl.innerHTML = adminError('Couldn’t load your prospects', 'loadProspects()');
     return;
   }
   allProspects = r || [];
@@ -8012,7 +8020,7 @@ function renderProspects() {
   }
   rows.sort(function(a,b){ return attentionScore(b) - attentionScore(a); });
   if (rows.length === 0) {
-    listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:8px 0;">No prospects here yet. Add one above to get started.</p>';
+    listEl.innerHTML = adminEmpty('🔍', 'No prospects yet', 'Add one above, or use Discover to find local businesses that fit your studio.');
     return;
   }
   var statusColors = { New:'var(--muted)', Emailed:'var(--p)', Replied:'var(--green)', Client:'var(--green)', Dead:'var(--red)' };
@@ -13593,6 +13601,15 @@ function anEngineNote(eng){
 
 .grx-card+.grx-card, .grx-grid .grx-card{margin-top:0;}
 .grx-empty{font-size:12.5px;color:var(--muted);padding:14px 0;line-height:1.6;}
+/* Shared admin state component (empty / error) — one consistent, calm look. */
+.astate{text-align:center;padding:28px 20px;border:1px solid rgba(91,63,160,.1);border-radius:14px;background:rgba(91,63,160,.02);}
+.astate .ai{font-size:24px;line-height:1;margin-bottom:9px;opacity:.75;}
+.astate h4{font-size:14.5px;font-weight:700;color:var(--ink);margin:0 0 5px;}
+.astate p{font-size:12.5px;color:var(--muted);margin:0 auto;max-width:46ch;line-height:1.6;}
+.astate.astate-err{border-color:rgba(192,57,43,.2);background:rgba(192,57,43,.03);}
+.astate .abtn{margin-top:14px;font:inherit;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--p);color:#fff;cursor:pointer;}
+.astate .abtn:hover{filter:brightness(1.08);}
+.astate .abtn:focus-visible{outline:2px solid var(--p);outline-offset:2px;}
 .grx-band{padding:18px 24px;gap:0;}
 .grx-band>div{padding:0 22px;border-left:1px solid rgba(41,25,66,.07);}
 .grx-band>div:first-child, .grx-band>div:nth-child(2){border-left:none;padding-left:0;}
