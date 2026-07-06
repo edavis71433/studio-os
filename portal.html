@@ -3637,9 +3637,9 @@ function _renderContractText(plain) {
 }
 async function loadLiveContract() {
   try {
-    var r = await fetch(SB_URL + "/functions/v1/clever-api", {
+    var r = await fetch(SUPABASE_URL + "/functions/v1/clever-api", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_KEY },
       body: JSON.stringify({ type: "contract_get" })
     });
     var j = await r.json();
