@@ -8222,47 +8222,185 @@ async function toggleStar(id) {
   var p = allProspects.find(function(x){return x.id===id;}); var cf = caseFile(p);
   cf.starred = !cf.starred; await saveCase(id, cf); refreshOpenCard(id);
 }
-async function analyzeProspect(id) {
-  var p = allProspects.find(function(x){return x.id===id;}); if(!p) return;
-  var cf = caseFile(p);
-  var out = document.getElementById('pai-'+id);
-  var research = cf.research.map(function(r){return '• '+r.cat+': '+r.body;}).join('\n');
+// ── LEAD BRIEF ─────────────────────────────────────────────────────────────
+// The "Analyze prospect" button runs the Lead Intelligence Agent (lead_brief):
+// a live website analysis + explainable score + value + next action + a ready
+// outreach draft. Verdict first, act in under a minute. Outreach is ALWAYS
+// human-approved: copy or open-in-email only, nothing sends automatically.
+var _lbState = {};                 // per-id: 'loading' | 'done' — kills duplicate calls
+var _lbData  = {};                 // per-id cached payload, so re-expanding never refetches
 
-  // Loading state while the edge function writes the draft.
-  out.innerHTML = '<div style="background:rgba(91,63,160,0.05);border:1px solid rgba(91,63,160,0.15);border-radius:10px;padding:12px;margin-bottom:8px;font-size:12.5px;color:var(--muted);">Writing a draft from what you know about this prospect…</div>';
-
-  // Single source of truth: the same edge route the Send email modal uses
-  // (prospect_email_draft). The old local template here had drifted from the
-  // server copy — spam-trigger wording, a pluralization bug — so the browser
-  // no longer keeps its own copy of the outreach language.
-  var draft = '';
-  try {
-    var res = await outreachApi({
-      type: 'prospect_email_draft',
-      prospect: {
-        business: p.business_name || '',
-        website: p.website || '',
-        owner: cf.info.owner || p.contact_name || '',
-        industry: cf.info.industry || '',
-        location: cf.info.location || '',
-        research: Array.isArray(cf.research) ? cf.research.map(function(r){ return { body: r.body }; }) : []
-      }
-    });
-    if (res && res.data && typeof res.data.body === 'string' && res.data.body.trim()) {
-      draft = 'Subject: ' + (res.data.subject || '') + '\n\n' + res.data.body;
-    }
-  } catch (_) { /* fall through to minimal fallback */ }
-  if (!draft) {
-    // Offline/failed fallback: minimal and safe, never templated junk.
-    draft = 'Subject: Reaching out to ' + (p.business_name && p.business_name.length >= 3 ? p.business_name : 'your business') + '\n\nHi' + (cf.info.owner ? (' ' + cf.info.owner.split(' ')[0]) : '') + ',\n\n(The draft writer could not be reached. Write a short personal note here, or add details in Business overview and click Analyze prospect again.)\n\nEric\nDavis Digital Studio';
-  }
-  var esc = draft.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  out.innerHTML = '<div style="background:rgba(91,63,160,0.05);border:1px solid rgba(91,63,160,0.15);border-radius:10px;padding:12px;margin-bottom:8px;">'+
-    '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--p);margin-bottom:6px;">Suggested outreach draft</div>'+
-    '<textarea style="width:100%;min-height:150px;font-size:12.5px;padding:8px;border:1px solid rgba(91,63,160,0.15);border-radius:7px;font-family:inherit;">'+esc+'</textarea>'+
-    (research?'<div style="font-size:11px;color:var(--muted);margin-top:6px;">Built from your research:\n'+research+'</div>':'')+
-    '</div>';
+function _lbEnsureStyles(){
+  if(document.getElementById('lbf-styles')) return;
+  var css = ''
+   + '.lbf{--good:#1a7e49;--warn:#9a7a1a;--crit:#c0392b;margin:6px 0 4px;font-size:13px;color:var(--ink);}'
+   + '.lbf-verdict{display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;background:linear-gradient(180deg,rgba(91,63,160,0.06),rgba(91,63,160,0.02));border:1px solid rgba(91,63,160,0.16);border-radius:16px;padding:18px 20px;}'
+   + '.lbf-ring{position:relative;width:92px;height:92px;flex:none}'
+   + '.lbf-ring svg{transform:rotate(-90deg)}'
+   + '.lbf-ring .v{position:absolute;inset:0;display:grid;place-content:center;text-align:center}'
+   + '.lbf-ring .n{font-size:30px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}'
+   + '.lbf-ring .o{font-size:9px;letter-spacing:.1em;color:var(--muted);margin-top:2px}'
+   + '.lbf-tier{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:100px;}'
+   + '.lbf-tier.high{color:var(--good);background:rgba(26,126,73,.1)}.lbf-tier.medium{color:var(--warn);background:rgba(154,122,26,.12)}.lbf-tier.low{color:var(--muted);background:rgba(41,25,66,.06)}'
+   + '.lbf-h{font-size:20px;font-weight:700;line-height:1.2;margin:9px 0 4px;text-wrap:balance;color:var(--ink)}'
+   + '.lbf-sub{color:var(--muted);font-size:12.5px;max-width:56ch}'
+   + '.lbf-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}'
+   + '.lbf-chip{font-size:11px;color:var(--ink);background:#fff;border:1px solid rgba(91,63,160,0.14);border-radius:7px;padding:3px 9px}'
+   + '.lbf-money{text-align:right;min-width:130px}'
+   + '.lbf-money .l{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}'
+   + '.lbf-money .a{font-size:22px;font-weight:800;color:var(--p);margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap}'
+   + '.lbf-money .b{font-size:10.5px;color:var(--muted);margin-top:4px;max-width:20ch;margin-left:auto}'
+   + '.lbf-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px;align-items:start}'
+   + '.lbf-lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:2px 0 9px;display:flex;gap:8px;align-items:center}'
+   + '.lbf-lab .c{color:var(--p);letter-spacing:0}'
+   + '.lbf-find{background:#fff;border:1px solid rgba(91,63,160,0.12);border-left:3px solid var(--st,var(--muted));border-radius:11px;padding:12px 14px;margin-bottom:9px}'
+   + '.lbf-find.fix{--st:var(--crit)}.lbf-find.watch{--st:var(--warn)}.lbf-find.win{--st:var(--good)}'
+   + '.lbf-fh{display:flex;gap:8px;align-items:center;margin-bottom:5px}'
+   + '.lbf-sev{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:5px}'
+   + '.lbf-find.fix .lbf-sev{color:var(--crit);background:rgba(192,57,43,.1)}.lbf-find.watch .lbf-sev{color:var(--warn);background:rgba(154,122,26,.12)}.lbf-find.win .lbf-sev{color:var(--good);background:rgba(26,126,73,.1)}'
+   + '.lbf-cat{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}'
+   + '.lbf-find h4{font-size:14.5px;font-weight:700;margin:0 0 4px;line-height:1.25;color:var(--ink)}'
+   + '.lbf-find p{margin:0;color:var(--muted);font-size:12.5px}'
+   + '.lbf-why{margin-top:6px;color:var(--p);font-size:11.5px}'
+   + '.lbf-ev{margin-top:9px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--ink);background:rgba(91,63,160,0.05);border:1px solid rgba(91,63,160,0.1);border-radius:8px;padding:7px 10px;display:flex;gap:8px;align-items:baseline}'
+   + '.lbf-ev b{color:var(--p);font-weight:800;flex:none;letter-spacing:.03em}'
+   + '.lbf-drv{background:#fff;border:1px solid rgba(91,63,160,0.12);border-radius:12px;padding:2px 14px;margin-top:16px}'
+   + '.lbf-drow{display:grid;grid-template-columns:76px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(91,63,160,0.08)}'
+   + '.lbf-drow:last-child{border-bottom:0}'
+   + '.lbf-fac{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}'
+   + '.lbf-fac.opportunity{color:var(--p)}.lbf-fac.fit{color:var(--good)}.lbf-fac.urgency{color:var(--warn)}'
+   + '.lbf-dn{font-size:12.5px;color:var(--ink)}.lbf-dn em{color:var(--muted);font-style:normal;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;display:block;margin-top:1px}'
+   + '.lbf-pts{font-size:16px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}.lbf-pts::before{content:"+";color:var(--muted)}'
+   + '.lbf-act{position:sticky;top:12px;background:linear-gradient(180deg,rgba(91,63,160,0.05),#fff);border:1px solid rgba(91,63,160,0.2);border-radius:14px;overflow:hidden}'
+   + '.lbf-actt{padding:14px 16px;border-bottom:1px solid rgba(91,63,160,0.1)}'
+   + '.lbf-actt .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);font-weight:800}'
+   + '.lbf-actt .m{font-size:15px;font-weight:700;margin-top:6px;line-height:1.3;color:var(--ink)}'
+   + '.lbf-draft{padding:14px 16px}'
+   + '.lbf-to{font-size:11px;color:var(--muted);margin-bottom:8px}.lbf-to .ad{font-family:ui-monospace,Menlo,monospace;color:var(--ink);background:rgba(91,63,160,0.06);border:1px solid rgba(91,63,160,0.12);padding:2px 8px;border-radius:6px}'
+   + '.lbf-draft textarea{width:100%;min-height:180px;resize:vertical;background:#fff;color:var(--ink);border:1px solid rgba(91,63,160,0.15);border-radius:10px;padding:12px;font-family:inherit;font-size:12.5px;line-height:1.6}'
+   + '.lbf-draft textarea:focus-visible{outline:2px solid var(--p);outline-offset:1px;border-color:transparent}'
+   + '.lbf-ai{font-size:10px;color:var(--p);margin:8px 0 2px}'
+   + '.lbf-btns{display:flex;gap:8px;margin-top:12px}'
+   + '.lbf-btn{border:none;border-radius:9px;padding:10px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}'
+   + '.lbf-btn.pri{flex:1;background:var(--p);color:#fff}.lbf-btn.pri:hover{filter:brightness(1.08)}'
+   + '.lbf-btn.gh{background:#fff;color:var(--p);border:1px solid rgba(91,63,160,0.25)}.lbf-btn.gh:hover{border-color:var(--p)}'
+   + '.lbf-btn:focus-visible{outline:2px solid var(--p);outline-offset:2px}'
+   + '.lbf-safe{padding:11px 16px;border-top:1px solid rgba(91,63,160,0.1);font-size:11px;color:var(--muted)}.lbf-safe b{color:var(--ink)}'
+   + '.lbf-note{background:#fff;border:1px solid rgba(91,63,160,0.12);border-radius:11px;padding:14px;color:var(--muted);font-size:12.5px}'
+   + '.lbf-load{background:rgba(91,63,160,0.04);border:1px solid rgba(91,63,160,0.12);border-radius:12px;padding:22px;text-align:center;color:var(--muted);font-size:13px}'
+   + '.lbf-load .sk{height:10px;border-radius:6px;background:linear-gradient(90deg,rgba(91,63,160,0.08),rgba(91,63,160,0.16),rgba(91,63,160,0.08));background-size:200% 100%;animation:lbfsh 1.2s infinite;margin:0 auto 10px;max-width:320px}'
+   + '.lbf-err{background:rgba(192,57,43,0.05);border:1px solid rgba(192,57,43,0.25);border-radius:12px;padding:16px;font-size:13px;color:var(--ink)}'
+   + '@keyframes lbfsh{0%{background-position:200% 0}100%{background-position:-200% 0}}'
+   + '@media (max-width:760px){.lbf-verdict{grid-template-columns:auto 1fr}.lbf-money{grid-column:1/-1;text-align:left;border-top:1px solid rgba(91,63,160,0.12);padding-top:12px}.lbf-money .b{margin-left:0}.lbf-grid{grid-template-columns:1fr}.lbf-actcol{order:-1}.lbf-act{position:static}}'
+   + '@media (prefers-reduced-motion:reduce){.lbf-load .sk{animation:none}}';
+  var s=document.createElement('style'); s.id='lbf-styles'; s.textContent=css; document.head.appendChild(s);
 }
+
+function _lbNoDash(s){ return String(s==null?'':s).replace(/—/g, ', '); }
+function _lbMoney(n){ return '$'+(Number(n)||0).toLocaleString(); }
+
+async function analyzeProspect(id){
+  _lbEnsureStyles();
+  var out=document.getElementById('pai-'+id); if(!out) return;
+  if(_lbState[id]==='loading') return;                 // no duplicate API calls
+  if(_lbData[id]){ out.innerHTML=renderLeadBrief(id,_lbData[id]); return; } // cached
+  _lbState[id]='loading';
+  out.innerHTML='<div class="lbf"><div class="lbf-load"><div class="sk" style="width:60%"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:45%"></div>Analyzing their website and scoring the lead… this takes a few seconds.</div></div>';
+  var d=null, errMsg='';
+  try{
+    var jwt=await adminJwt(); if(!jwt){ _lbState[id]=null; showLogin&&showLogin(); return; }
+    var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'lead_brief',id:String(id)})});
+    var j=await r.json(); d=(j&&j.data)||null; if(!d) errMsg=(j&&j.error)||'The analysis did not come back.';
+  }catch(e){ errMsg='Could not reach the analyzer. Check your connection.'; }
+  _lbState[id]='done';
+  if(!d){
+    out.innerHTML='<div class="lbf"><div class="lbf-err"><b>Analysis did not complete.</b><div style="color:var(--muted);margin:6px 0 12px;">'+escHtml(errMsg)+' Nothing was changed.</div>'
+      +'<button class="lbf-btn pri" style="flex:none" onclick="retryAnalyze(\''+id+'\')">Try again</button></div></div>';
+    return;
+  }
+  _lbData[id]=d;
+  out.innerHTML=renderLeadBrief(id,d);
+}
+function retryAnalyze(id){ _lbState[id]=null; _lbData[id]=null; analyzeProspect(id); }
+
+function renderLeadBrief(id,d){
+  var sc=d.score||{value:0,tier:'low',drivers:[]};
+  var tier=(sc.tier==='high'||sc.tier==='medium')?sc.tier:'low';
+  var ringC={high:'#1a7e49',medium:'#9a7a1a',low:'#9184b3'}[tier];
+  var CIRC=2*Math.PI*40, off=CIRC*(1-Math.max(0,Math.min(100,Number(sc.value)||0))/100);
+  var pr=d.prospect||{}, an=d.analysis, ve=d.value_estimate||{};
+  var tierLab={high:'High-priority lead',medium:'Worth pursuing',low:'Long shot right now'}[tier];
+
+  // verdict
+  var verdict='<div class="lbf-verdict">'
+    +'<div class="lbf-ring" role="img" aria-label="Lead score '+(Number(sc.value)||0)+' out of 100"><svg width="92" height="92" viewBox="0 0 92 92">'
+      +'<circle cx="46" cy="46" r="40" fill="none" stroke="rgba(91,63,160,0.15)" stroke-width="8"/>'
+      +'<circle cx="46" cy="46" r="40" fill="none" stroke="'+ringC+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+CIRC.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'"/>'
+    +'</svg><div class="v"><div class="n">'+(Number(sc.value)||0)+'</div><div class="o">/ 100</div></div></div>'
+    +'<div><span class="lbf-tier '+tier+'">● '+tierLab+'</span>'
+      +'<div class="lbf-h">'+escHtml(_lbNoDash(an&&an.headline?an.headline:(pr.business_name||'This prospect')))+'</div>'
+      +(d.why_pursue&&d.why_pursue.length?'<div class="lbf-sub">'+escHtml(_lbNoDash(d.why_pursue.slice(0,2).join('. ')))+'.</div>':'')
+      +'<div class="lbf-chips">'
+        +(pr.industry||pr.location?'<span class="lbf-chip">'+escHtml((pr.industry||'Business')+(pr.location?' · '+pr.location:''))+'</span>':'')
+        +(pr.email?'<span class="lbf-chip">✉ '+escHtml(pr.email)+'</span>':'<span class="lbf-chip">No email on file</span>')
+        +'<span class="lbf-chip">'+escHtml(pr.status||'New')+'</span>'
+      +'</div></div>'
+    +'<div class="lbf-money"><div class="l">Est. project value</div>'
+      +((ve.high>0)?'<div class="a">'+_lbMoney(ve.low)+'–'+_lbMoney(ve.high)+'</div>':'<div class="a" style="font-size:15px;color:var(--muted)">Scope-based</div>')
+      +(ve.basis?'<div class="b">'+escHtml(_lbNoDash(ve.basis))+'</div>':'')
+    +'</div></div>';
+
+  // findings (left)
+  var findsHtml='';
+  if(an&&an.blocks&&an.blocks.length){
+    findsHtml=an.blocks.map(function(b){
+      var t=(b.type==='fix'||b.type==='watch'||b.type==='win')?b.type:'watch';
+      var sev={fix:'Fix first',watch:'Watch',win:'Working'}[t];
+      return '<article class="lbf-find '+t+'"><div class="lbf-fh"><span class="lbf-sev">'+sev+'</span><span class="lbf-cat">'+escHtml(b.category||'')+'</span></div>'
+        +'<h4>'+escHtml(_lbNoDash(b.title||''))+'</h4>'
+        +(b.detail?'<p>'+escHtml(_lbNoDash(b.detail))+'</p>':'')
+        +(b.why?'<div class="lbf-why">'+escHtml(_lbNoDash(b.why))+'</div>':'')
+        +(b.evidence?'<div class="lbf-ev"><b>Measured</b><span>'+escHtml(_lbNoDash(b.evidence))+'</span></div>':'')
+        +'</article>';
+    }).join('');
+    findsHtml='<div class="lbf-lab">The audit <span class="c">'+an.blocks.length+' findings · every one measured</span></div>'+findsHtml;
+  } else {
+    findsHtml='<div class="lbf-lab">The audit</div><div class="lbf-note">'+escHtml(_lbNoDash(d.analysis_note||'No website analysis available for this prospect.'))+'</div>';
+  }
+  // drivers
+  var drv=(sc.drivers||[]).filter(function(x){return x.points>0;}).sort(function(a,b){return b.points-a.points;});
+  if(drv.length){
+    findsHtml+='<div class="lbf-lab" style="margin-top:18px">Why it scores '+(Number(sc.value)||0)+' <span class="c">deterministic, not a guess</span></div><div class="lbf-drv">'
+      +drv.map(function(x){var f=(x.factor==='opportunity'||x.factor==='fit'||x.factor==='urgency')?x.factor:'fit';
+        return '<div class="lbf-drow"><span class="lbf-fac '+f+'">'+escHtml(x.factor||'')+'</span>'
+          +'<span class="lbf-dn">'+escHtml(_lbNoDash(x.note||''))+(x.evidence?'<em>'+escHtml(_lbNoDash(x.evidence))+'</em>':'')+'</span>'
+          +'<span class="lbf-pts">'+(Number(x.points)||0)+'</span></div>';}).join('')
+      +'</div>';
+  }
+
+  // action rail (right) — human-approved only
+  var o=d.outreach, actHtml;
+  if(o&&o.body){
+    actHtml='<div class="lbf-act"><div class="lbf-actt"><div class="k">Your move</div><div class="m">'+escHtml(_lbNoDash(d.next_action||'Send the outreach below.'))+'</div></div>'
+      +'<div class="lbf-draft">'+(o.to?'<div class="lbf-to">To <span class="ad">'+escHtml(o.to)+'</span></div>':'')
+      +'<textarea id="lbf-body-'+id+'" aria-label="Outreach draft">'+escHtml(_lbNoDash(o.body))+'</textarea>'
+      +'<div class="lbf-ai">✦ Drafted in your voice · grounded in the findings</div>'
+      +'<div class="lbf-btns"><button class="lbf-btn pri" onclick="lbfCopy(\''+id+'\')">Approve &amp; copy</button>'
+      +(o.to?'<button class="lbf-btn gh" onclick="lbfMail(\''+id+'\',\''+escAttr(o.to)+'\')">Open in email</button>':'')
+      +'<button class="lbf-btn gh" onclick="retryAnalyze(\''+id+'\')" title="Re-run the analysis">↻</button></div></div>'
+      +'<div class="lbf-safe">🔒 <b>Nothing sends automatically.</b> You approve every message.</div></div>';
+  } else {
+    actHtml='<div class="lbf-act"><div class="lbf-actt"><div class="k">Your move</div><div class="m">'+escHtml(_lbNoDash(d.next_action||'Find a contact before reaching out.'))+'</div></div>'
+      +'<div class="lbf-draft"><div class="lbf-note" style="border:0;padding:0">No outreach drafted yet. '+(pr.email?'':'Add an email to this prospect first, then re-analyze.')+'</div>'
+      +'<div class="lbf-btns"><button class="lbf-btn gh" onclick="retryAnalyze(\''+id+'\')">↻ Re-analyze</button></div></div>'
+      +'<div class="lbf-safe">🔒 <b>Nothing sends automatically.</b></div></div>';
+  }
+
+  return '<div class="lbf">'+verdict+'<div class="lbf-grid"><div class="lbf-findcol">'+findsHtml+'</div><div class="lbf-actcol">'+actHtml+'</div></div></div>';
+}
+window.lbfCopy=function(id){ var el=document.getElementById('lbf-body-'+id); if(!el)return; try{navigator.clipboard.writeText(el.value);}catch(e){} toast('Approved and copied. Paste it into your email.'); };
+window.lbfMail=function(id,to){ var el=document.getElementById('lbf-body-'+id); if(!el)return;
+  window.location.href='mailto:'+to+'?body='+encodeURIComponent(el.value); };
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  OUTREACH COMPOSE MODAL — premium send workflow
