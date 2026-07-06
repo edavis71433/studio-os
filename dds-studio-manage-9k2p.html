@@ -11,6 +11,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="dds-foundation.css">
 <style>
+/* a11y: global keyboard focus ring (specificity 0 so component styles still win) */
+:where(a,button,input,textarea,select,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--p, #5b3fa0);outline-offset:2px;}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 /* foundation tokens loaded via dds-foundation.css */
 html{overflow-x:hidden;}
@@ -44,6 +47,13 @@ body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-fo
 .sidebar{background:#fff;border-right:1px solid rgba(91,63,160,0.08);padding:12px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
 .sl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px;}
 .sn{display:flex;align-items:center;gap:9px;padding:9px 16px;font-size:13px;font-weight:500;color:var(--muted);width:100%;border:none;background:none;font-family:var(--sans);text-align:left;cursor:pointer;transition:background 0.15s;}
+/* Urgency-ranked nav badge: color reflects the MOST urgent item in that group
+   (data-sev). Default (today) = a client is waiting; soon = reply soon; normal
+   = new activity. The count is the number waiting. */
+.nav-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:100px;background:#c0392b;color:#fff;font-size:10.5px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;flex:none;}
+.nav-badge[data-sev="soon"]{background:#b7860f;}
+.nav-badge[data-sev="normal"]{background:#2c6fb7;}
+.sn.active .nav-badge{background:#fff;color:var(--p);}
 .sn:hover,.sn.active{background:var(--pxxxl);color:var(--p);font-weight:600;}
 .sdiv{height:1px;background:rgba(91,63,160,0.06);margin:6px 0;}
 
@@ -1333,7 +1343,7 @@ button:focus-visible, .ibx-pill:focus-visible, .ibx-tab:focus-visible, .bf-act:f
             <div class="ct">👥 Who has access</div>
             <button class="sbtn sec" onclick="tmLoad()" style="font-size:12px;padding:7px 14px;">↻ Refresh</button>
           </div>
-          <div class="cb" id="tm-list"><p style="font-size:13px;color:var(--muted);">Loading your team…</p></div>
+          <div class="cb" id="tm-list"><div class="skel" style="height:46px;border-radius:12px;margin-bottom:10px;"></div><div class="skel" style="height:46px;border-radius:12px;margin-bottom:10px;"></div><div class="skel" style="height:46px;border-radius:12px;margin-bottom:10px;"></div></div>
         </div>
       </div>
 
@@ -2190,7 +2200,55 @@ function go(page) {
 
   // run registered navigation hooks (replaces 12 window.go monkey-patches)
   (window.DDS_NAV_HOOKS||[]).forEach(function(h){ try{ h(page); }catch(e){} });
+  // after handling messages/leads, the counts likely changed — refresh soon
+  if (page === 'messages' || page === 'leads') setTimeout(refreshNavBadges, 1500);
 }
+
+// ── FOUNDER NOTIFICATION BADGES ────────────────────────────────────────────
+// Passive awareness on the nav: how many leads and client messages are waiting,
+// visible from any page so Eric never has to go looking. Source is the same
+// universal_inbox the inbox uses (deterministic 'needs a reply' logic). Silent:
+// no login prompt, never throws, updates on a light poll + tab-focus.
+// sev is the most-urgent tier in the group: 'today' (red, client waiting),
+// 'soon' (amber), or 'normal' (blue, new activity). Color comes from CSS via
+// data-sev; the number is the count waiting.
+function setNavBadge(btnId, n, sev){
+  var btn = document.getElementById(btnId); if(!btn) return;
+  var b = btn.querySelector('.nav-badge');
+  if(!n || n < 1){ if(b) b.remove(); return; }
+  if(!b){ b = document.createElement('span'); b.className = 'nav-badge'; btn.appendChild(b); }
+  b.textContent = n > 99 ? '99+' : String(n);
+  sev = sev || 'today';
+  b.setAttribute('data-sev', sev);
+  var word = { today:'needs response today', soon:'reply soon', normal:'new' }[sev] || '';
+  b.setAttribute('aria-label', n + ' waiting' + (word ? ', most urgent: ' + word : ''));
+}
+async function refreshNavBadges(){
+  try{
+    var jwt = await adminJwt(); if(!jwt) return;              // silent when signed out
+    var r = await fetch(SB_URL+'/functions/v1/clever-api',{ method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},
+      body: JSON.stringify({ type:'universal_inbox' }) });
+    var j = await r.json(); var d = (j && j.data) || null;
+    if(!d || !Array.isArray(d.items)) return;
+    var rank = { today:3, soon:2, normal:1 };                 // reuse inbox urgency
+    var leads = 0, msgs = 0, leadSev = '', msgSev = '';
+    var bump = function(cur, u){ return (rank[u]||1) > (rank[cur]||0) ? u : cur; };
+    d.items.forEach(function(it){ var k = it.kind, u = it.urgency || 'normal';
+      if(k === 'lead' || k === 'audit'){ leads++; leadSev = bump(leadSev, u); }
+      else if(k === 'message' || k === 'growth'){ msgs++; msgSev = bump(msgSev, u); } });
+    setNavBadge('sn-leads', leads, leadSev);
+    setNavBadge('sn-messages', msgs, msgSev);
+  }catch(e){ /* never disturb the app for a badge */ }
+}
+var _navBadgeTimer = null;
+function startNavBadges(){
+  if(_navBadgeTimer) return;
+  refreshNavBadges();
+  _navBadgeTimer = setInterval(function(){ if(document.visibilityState === 'visible') refreshNavBadges(); }, 90000);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') refreshNavBadges(); });
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(startNavBadges, 1200); });
 
 // ── LEADS ──
 var allLeads = [];
@@ -2299,7 +2357,7 @@ var _visSites = [];
 async function loadVisibility(){
   var list = document.getElementById('visList');
   if (!list) return;
-  list.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading your sites…</p>';
+  list.innerHTML = adminSkel(4);
   var j = await visEdge({ type:"visibility_list" });
   if (!j || j.error) { list.innerHTML = '<p style="font-size:13px;color:var(--red);padding:14px;">Could not load sites'+(j&&j.error?': '+escHtml(j.error):'')+'</p>'; return; }
   _visSites = (j.data) || [];
@@ -2425,12 +2483,14 @@ async function visCheckAll(){
 async function loadLeads() {
   var listEl = document.getElementById('leadsList');
   if (!listEl) return;
-  listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading leads...</p>';
+  listEl.innerHTML = adminSkel(4);
   document.getElementById('leadDetail').style.display = 'none';
 
   // Source 1: existing audit_leads (audit tool, report card, AI review)
   var auditLeads = await api('audit_leads?select=*&order=created_at.desc&limit=200');
-  auditLeads = auditLeads || [];
+  // api() returns null only on a real failure ([] means "no leads"); surface it
+  // as a retryable error instead of a misleading empty list.
+  if (auditLeads === null) { listEl.innerHTML = adminError('Couldn’t load your leads', 'loadLeads()'); return; }
 
   // Source 2: NEW Studio OS contact-form leads (the leads table), via the
   // lead_list route. Mapped onto the same shape the leads UI already expects,
@@ -2491,9 +2551,9 @@ async function loadUniversalInbox(){
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'universal_inbox'})});
     var j=await r.json(); d=(j&&j.data)||null;
-    if(!d && j && j.error){ host.innerHTML='<div style="font-size:12.5px;color:#9a2d2d;padding:10px 14px;background:#fbecea;border-radius:12px;margin-bottom:16px;">Inbox could not load: '+escHtml(String(j.error))+' <button class="tdx-pill tdx-pill-sm" onclick="loadUniversalInbox()">Retry</button></div>'; return; }
-  }catch(e){ host.innerHTML=''; return; }
-  if(!d){ host.innerHTML=''; return; }
+    if(!d && j && j.error){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
+  }catch(e){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
+  if(!d){ host.innerHTML=adminError('Couldn’t load your inbox', 'loadUniversalInbox()'); return; }
   var items=d.items||[];
   if(!items.length){
     host.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:16px;background:rgba(26,126,73,0.06);border-radius:12px;font-size:14px;color:var(--ink);"><span style="color:#1a7e49;font-weight:700;">\u2713</span>Inbox zero. Nothing is waiting on a reply anywhere.</div>';
@@ -2741,7 +2801,7 @@ async function convertLeadToClient(id){
 
 // ── Studio OS form-lead detail: conversation + AI draft + reply ──
 async function showOsLeadDetail(lead, detail) {
-  detail.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading conversation...</p>';
+  detail.innerHTML = adminSkel(3);
   var d = null;
   try {
     var jwt = await adminJwt();
@@ -3239,13 +3299,16 @@ function hubPulsePanel(pu){
 async function loadHub() {
   var listEl = document.getElementById("hubList");
   if (!listEl) return;
-  listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading clients...</p>';
+  listEl.innerHTML = adminSkel(4);
   document.getElementById("hubDetail").style.display = "none";
   var res = await Promise.all([
     api("clients?select=*&order=created_at.desc"),
     api("audit_leads?select=*&order=created_at.desc&limit=300"),
     loadHubPulse().catch(function(){return null;})
   ]);
+  // Clients is the primary source; a null here is a real load failure, not "no
+  // clients". Show a retryable error rather than a misleading empty hub.
+  if (res[0] === null) { listEl.innerHTML = adminError('Couldn’t load your clients', 'loadHub()'); return; }
   hubClients = res[0] || [];
   hubLeads = res[1] || [];
   clients = hubClients; // keep the rest of the panel in sync
@@ -3324,7 +3387,7 @@ async function openHubClient(id) {
   if (!c) return;
   var detail = document.getElementById("hubDetail");
   detail.style.display = "block";
-  detail.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:14px;">Loading record...</p>';
+  detail.innerHTML = adminSkel(3);
   detail.scrollIntoView({behavior:"smooth", block:"start"});
 
   // Pull everything for this client in parallel
@@ -4383,7 +4446,7 @@ async function loadTodayVitals(){
         +'</div>';
     }
     wrap.innerHTML=html || '';
-  }catch(e){ wrap.innerHTML=''; }
+  }catch(e){ wrap.innerHTML = adminError('Couldn’t load your daily vitals', 'loadTodayVitals()'); }
 }
 
 // Suppress an opted-out prospect: server refuses all future sends to them.
@@ -6058,7 +6121,7 @@ async function loadMsgTriage(){
       body='<div style="font-size:13px;color:var(--ink-2,#574d68);padding:2px 2px 4px;">Inbox zero \u2014 nobody is waiting on you, and nothing you sent recently has gone quiet. When a client writes, they appear here with a one-click grounded reply.</div>';
     }
     host.innerHTML='<div class="invc-wrap" style="padding-top:14px;">'+body+'</div>';
-  }catch(e){ host.innerHTML=''; }
+  }catch(e){ host.innerHTML=adminError('Couldn’t load your message triage', 'loadMsgTriage()'); }
   finally{ MSGX.loading=false; }
 }
 
@@ -6335,7 +6398,7 @@ async function loadInvoiceHealth(){
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'invoice_health'})});
     var j=await r.json(); var d=(j&&j.data)||null;
-    if(!d){ host.innerHTML=''; return; }
+    if(!d){ host.innerHTML=adminError('Couldn’t load invoice health', 'loadInvoiceHealth()'); return; }
     var col=d.score>=90?'#1a7e49':d.score>=70?'#9a7a1a':'#c0392b';
     var bg=d.score>=90?'#e7f6ee':d.score>=70?'#fdf6e3':'#fbecea';
     var risks=(d.at_risk||[]).map(function(a){
@@ -6366,7 +6429,7 @@ async function loadInvoiceHealth(){
       +(fc?'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;"><div style="flex-basis:100%;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:-4px;">Cash flow, next 3 months</div>'+fc+'</div>':'')
       +(risks?'<div style="margin-top:12px;"><div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;">At risk</div>'+risks+'</div>':'')
     +'</div>';
-  }catch(e){ host.innerHTML=''; }
+  }catch(e){ host.innerHTML=adminError('Couldn’t load invoice health', 'loadInvoiceHealth()'); }
 }
 
 async function loadInvoiceCommand(){
@@ -6457,7 +6520,7 @@ async function loadInvoiceCommand(){
 
     host.innerHTML='<div class="invc-wrap">'+stats+body+'</div>';
   }catch(e){
-    host.innerHTML='';
+    host.innerHTML=adminError('Couldn’t load your invoices', 'loadInvoiceCommand()');
   }finally{
     INVC.loading=false;
   }
@@ -6509,7 +6572,7 @@ function invChase(id){
 async function loadBillingOverview() {
   var host = document.getElementById("billingOverview");
   if (!host) return;
-  host.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Loading payments…</div>';
+  host.innerHTML = adminSkel(2,30);
   try {
     var jwt = await adminJwt(); if (!jwt) { host.innerHTML=""; return; }
     var r = await fetch(SB_URL + "/functions/v1/clever-api", {
@@ -7525,6 +7588,22 @@ function fmtDate(iso) { if(!iso) return ""; return new Date(iso).toLocaleDateStr
 // malicious message can't execute script inside the admin session. Top-level so
 // every render function can use it.
 function escHtml(s) { return String(s==null?"":s).replace(/[&<>"']/g, function(m){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]; }); }
+// Shared admin empty/error states. retryCall is a hardcoded function-call string
+// like 'loadProspects()'. Error copy is calm and honest: nothing was lost, retry.
+function adminEmpty(icon, title, msg){
+  return '<div class="astate"><div class="ai">'+(icon||'○')+'</div><h4>'+escHtml(title||'Nothing here yet')+'</h4>'+(msg?'<p>'+escHtml(msg)+'</p>':'')+'</div>';
+}
+function adminError(title, retryCall, detail){
+  return '<div class="astate astate-err"><div class="ai">⚠</div><h4>'+escHtml(title||'Couldn’t load this')+'</h4><p>'+escHtml(detail||'Nothing was changed. Check your connection and try again.')+'</p>'+(retryCall?'<button class="abtn" type="button" onclick="'+retryCall+'">Try again</button>':'')+'</div>';
+}
+// Generic loading skeleton: mirrors a list's shape while it loads, never a
+// blank spinner or bare "Loading…" text. rows = bars, h = each bar's height px.
+function adminSkel(rows, h){
+  rows = rows || 3; h = h || 46;
+  var s = '';
+  for(var i=0;i<rows;i++) s += '<div class="skel" style="height:'+h+'px;border-radius:12px;margin-bottom:10px;"></div>';
+  return s;
+}
 function cap(s) { return s?s[0].toUpperCase()+s.slice(1):""; }
 function toast(msg) { var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),3000); }
 
@@ -7609,7 +7688,9 @@ async function saveAndShareQuote(){
 }
 async function loadSentQuotes(){
   var host=document.getElementById('q-sent-list'); if(!host) return;
-  host.innerHTML='<p style="font-size:12.5px;color:var(--muted);">Loading…</p>';
+  host.innerHTML='<div class="skel" style="height:56px;margin-bottom:10px;"></div>'
+    +'<div class="skel" style="height:56px;margin-bottom:10px;"></div>'
+    +'<div class="skel" style="height:56px;"></div>';
   try{
     var jwt=await adminJwt(); if(!jwt){ host.innerHTML=''; return; }
     var r=await fetch(SB_URL+'/functions/v1/clever-api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-dds-user-jwt':jwt},body:JSON.stringify({type:'quote_list'})});
@@ -7803,10 +7884,10 @@ var PRIORITY_RANK = { High:0, Medium:1, Low:2 };
 async function loadProspects() {
   var listEl = document.getElementById('prospectsList');
   if (!listEl) return;
-  listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);">Loading prospects...</p>';
+  listEl.innerHTML = adminSkel(4);
   var r = await api('prospects?select=*&order=created_at.desc&limit=500');
   if (r === null) {
-    listEl.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:10px;line-height:1.6;">Couldn\'t load prospects right now. Refresh the page, or check your connection and try again.</div>';
+    listEl.innerHTML = adminError('Couldn’t load your prospects', 'loadProspects()');
     return;
   }
   allProspects = r || [];
@@ -8012,7 +8093,7 @@ function renderProspects() {
   }
   rows.sort(function(a,b){ return attentionScore(b) - attentionScore(a); });
   if (rows.length === 0) {
-    listEl.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:8px 0;">No prospects here yet. Add one above to get started.</p>';
+    listEl.innerHTML = adminEmpty('🔍', 'No prospects yet', 'Add one above, or use Discover to find local businesses that fit your studio.');
     return;
   }
   var statusColors = { New:'var(--muted)', Emailed:'var(--p)', Replied:'var(--green)', Client:'var(--green)', Dead:'var(--red)' };
@@ -9721,7 +9802,7 @@ function tmInitials(email) {
 async function tmLoad() {
   var list = document.getElementById('tm-list');
   if (!list) return;
-  list.innerHTML = '<p style="font-size:13px;color:var(--muted);">Loading your team…</p>';
+  list.innerHTML = adminSkel(3);
   var res = await tmCall({ type: 'team_list' });
   if (!res || res.error) {
     list.innerHTML = '<p style="font-size:13px;color:var(--red);">Could not load your team' + (res && res.error && res.error !== 'not_owner' ? ': ' + escHtml(res.error) : '') + '.</p>';
@@ -10947,7 +11028,7 @@ var INTEG = { clientId: null, clients: [], providers: [], history: [], historyPr
 async function loadIntegrations(){
   var host = document.getElementById('integrationsBody');
   if(!host) return;
-  host.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">Loading integrations…</div>';
+  host.innerHTML = adminSkel(3);
   // load client list once
   if(!INTEG.clients.length){
     try{ var r = await integApi('admin_query',{path:'clients?deleted_at=is.null&select=id,name&order=name.asc&limit=500'}); INTEG.clients = (r&&r.data)||[]; }catch(e){ INTEG.clients=[]; }
@@ -10979,7 +11060,7 @@ function integSelectClient(id){ INTEG.clientId = id; INTEG.historyProvider=null;
 async function refreshIntegrations(){
   if(!INTEG.clientId) return;
   var grid = document.getElementById('integGrid');
-  if(grid) grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;">Loading providers…</div>';
+  if(grid) grid.innerHTML = adminSkel(3);
   try{
     var r = await integApi('integrations_status',{clientId:INTEG.clientId});
     INTEG.providers = (r&&r.data&&r.data.providers)||[];
@@ -11237,7 +11318,7 @@ function reauthorize(provider){ connectProvider(provider); } // re-runs OAuth, r
 // ── property picker ──
 async function openPropertyPicker(provider){
   var host = document.getElementById('picker-'+provider); if(!host) return;
-  host.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">Loading available properties…</div>';
+  host.innerHTML = adminSkel(3,30);
   try{
     var r = await integApi('integration_list_properties',{clientId:INTEG.clientId,provider:provider});
     if(r&&r.error){ host.innerHTML='<div style="font-size:12px;color:#c0392b;background:#fdecea;border-radius:8px;padding:10px 12px;"><b>Could not list properties</b><br>error: '+escHtml(r.error)+(r.status?(' (HTTP '+r.status+')'):'')+(r.detail?('<br><span style="color:#7a3a33;">'+escHtml(String(r.detail).slice(0,260))+'</span>'):'')+'</div>'; return; }
@@ -11362,7 +11443,7 @@ async function anTalkingPoints(){
 
 async function loadAnalytics(){
   var host = document.getElementById('analyticsBody'); if(!host) return;
-  host.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">Loading analytics…</div>';
+  host.innerHTML = adminSkel(3);
   if(!ANALYTICS.clients.length){
     try{ var r = await integApi('admin_query',{path:'clients?deleted_at=is.null&select=id,name&order=name.asc&limit=500'}); ANALYTICS.clients=(r&&r.data)||[]; }catch(e){ ANALYTICS.clients=[]; }
   }
@@ -11568,7 +11649,12 @@ function anExportCsv(){
 
 async function refreshAnalytics(){
   var body = document.getElementById('anBody');
-  if(body) body.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;">Loading…</div>';
+  if(body) body.innerHTML='<div style="padding:4px 2px;">'
+    +'<div class="skel" style="height:26px;width:44%;margin-bottom:16px;"></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;">'
+    +'<div class="skel" style="height:74px;"></div><div class="skel" style="height:74px;"></div>'
+    +'<div class="skel" style="height:74px;"></div><div class="skel" style="height:74px;"></div></div>'
+    +'<div class="skel" style="height:180px;"></div></div>';
   // Analytics keeps its own trend-interpretation brief (admin_analytics) — that
   // reasons over time-series metrics, which the engine deliberately doesn't do.
   // We ALSO ask the reasoning engine for this client's cross-module context
@@ -13593,6 +13679,15 @@ function anEngineNote(eng){
 
 .grx-card+.grx-card, .grx-grid .grx-card{margin-top:0;}
 .grx-empty{font-size:12.5px;color:var(--muted);padding:14px 0;line-height:1.6;}
+/* Shared admin state component (empty / error) — one consistent, calm look. */
+.astate{text-align:center;padding:28px 20px;border:1px solid rgba(91,63,160,.1);border-radius:14px;background:rgba(91,63,160,.02);}
+.astate .ai{font-size:24px;line-height:1;margin-bottom:9px;opacity:.75;}
+.astate h4{font-size:14.5px;font-weight:700;color:var(--ink);margin:0 0 5px;}
+.astate p{font-size:12.5px;color:var(--muted);margin:0 auto;max-width:46ch;line-height:1.6;}
+.astate.astate-err{border-color:rgba(192,57,43,.2);background:rgba(192,57,43,.03);}
+.astate .abtn{margin-top:14px;font:inherit;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--p);color:#fff;cursor:pointer;}
+.astate .abtn:hover{filter:brightness(1.08);}
+.astate .abtn:focus-visible{outline:2px solid var(--p);outline-offset:2px;}
 .grx-band{padding:18px 24px;gap:0;}
 .grx-band>div{padding:0 22px;border-left:1px solid rgba(41,25,66,.07);}
 .grx-band>div:first-child, .grx-band>div:nth-child(2){border-left:none;padding-left:0;}
