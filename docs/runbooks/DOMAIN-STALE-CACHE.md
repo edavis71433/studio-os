@@ -42,24 +42,30 @@ content, not hash.
 
 ## 3. Fix steps (registrar / Netlify console — manual, Eric)
 
-1. **Identify what `159.198.67.66` is.** Log into the domain registrar for
-   `davisdigitalstudio.com` and read the DNS zone. Common culprits: an old
-   hosting A record left in place, registrar "web forwarding"/proxy feature,
-   or a third-party CDN/proxy (the APISIX header suggests exactly this).
-2. **Point the apex at Netlify**, either way works:
-   - *Recommended:* switch the domain's nameservers to **Netlify DNS**
-     (Netlify dashboard → Domain management → add `davisdigitalstudio.com`
-     → follow the nameserver instructions), or
-   - keep current DNS but set the apex **A record → `75.2.60.5`** (Netlify's
-     apex load balancer) and `www` **CNAME → `studio-os-dds.netlify.app`**,
-     removing the `159.198.67.66` record and any registrar proxy/forwarding.
-3. **Disable any registrar-side proxy/cache/forwarding feature** on the domain.
-4. In Netlify: Domain settings → verify `davisdigitalstudio.com` +
+**RESOLVED 2026-07-05: `159.198.67.66` is Namecheap web hosting**
+(`airport-suddenness.rdns.hosting.namecheap.net`; RDAP owner Namecheap, Inc.,
+range 159.198.64.0/20; answers for the domain with `Server: APISIX`, the
+front of Namecheap's hosting platform). The apex A record points at a
+Namecheap hosting/proxy product that mirrors and caches the Netlify site —
+that's what ignores `no-store` and swallows deploys.
+
+1. **Log into Namecheap** → Domain List → `davisdigitalstudio.com`.
+2. If a Namecheap **hosting package / EasyWP / SiteLock-CDN** is attached to
+   the domain, detach or disable it for this domain — that's the APISIX box.
+3. **Advanced DNS** → delete the `@ → A → 159.198.67.66` record (and any
+   URL-forwarding entries). Then either:
+   - *Recommended:* switch nameservers to **Netlify DNS** (Netlify dashboard
+     → Domain management → add `davisdigitalstudio.com` → follow the
+     nameserver instructions), or
+   - keep Namecheap DNS and add: apex **`@ A 75.2.60.5`** (Netlify's apex
+     load balancer) + **`www CNAME studio-os-dds.netlify.app`**.
+4. Set/keep the record TTL low (300s) until verified.
+5. In Netlify: Domain settings → verify `davisdigitalstudio.com` +
    `www` both show green/managed, and force HTTPS is on.
-5. **Purge:** Netlify dashboard → Deploys → "Clear cache and retry deploy"
-   (or `netlify api purgeCache` with the site id). If a third-party proxy was
-   involved, purge/disable it at that layer too.
-6. Wait out DNS TTL (check the zone's TTL; keep it low, e.g. 300s, during the
+6. **Purge:** Netlify dashboard → Deploys → "Clear cache and retry deploy"
+   (or `netlify api purgeCache` with the site id). If the Namecheap hosting
+   product had its own cache, disabling/detaching it (step 2) clears that layer.
+7. Wait out DNS TTL (check the zone's TTL; keep it low, e.g. 300s, during the
    change).
 
 ## 4. CLI verification (repeatable, from this repo)
