@@ -5325,7 +5325,12 @@ button:focus-visible, a:focus-visible, .nav-item:focus-visible{ outline:2px soli
   .cv-msg{ max-width:none; }
   .cv-msg.cv-me{ max-width:88%; }
   .cv-help{ display:none; } /* the FAB remains the mobile door to drafting */
-  .cv-composer{ padding-bottom:8px; }
+  /* Clear the fixed bottom nav (~56px) plus the iPhone home indicator so the
+     Send row is always visible and tappable; the composer's own cream
+     gradient fills the cleared strip, and the nav (z-index 200, opaque)
+     overlays it — no thread content shows through. 8px of that budget is
+     the original mobile breathing room. */
+  .cv-composer{ padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
 }
 
 /* ═══ THE INVESTMENT RECORD (Billing) ═══ */
