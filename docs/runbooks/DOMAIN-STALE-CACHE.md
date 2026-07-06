@@ -1,5 +1,29 @@
 # Runbook: Production Domain Serves a Stale Portal (RCAT B3)
 
+**RESOLVED 2026-07-06 — gate PASSED (byte-MATCH both files, Server: Netlify,
+fresh ETag, www 301→apex).** Root cause was TWO stacked layers, both now fixed:
+
+1. **Namecheap "HTTPS ON" record toggle** (Advanced DNS → HTTPS column): when ON,
+   Namecheap does NOT publish the record's real value — it answers with their own
+   SSL proxy (`159.198.67.66`, `Server: APISIX`, hosting.namecheap.net), which
+   proxies AND CACHES the origin, ignoring `no-store`. The panel showed
+   `A @ 75.2.60.5` while authoritative DNS served the proxy IP — panel and zone
+   disagree by design when the toggle is on. Fix: toggle OFF on `@` and `www`
+   (Netlify provides SSL; the Namecheap proxy is never wanted). Diagnostic that
+   cracked it: the zone's SOA serial is a Unix timestamp = last real change date.
+2. **Domain attached to the wrong Netlify project**: `davisdigitalstudio.com` was
+   owned by the old `dapper-empanada-3430e4` project (pinned to a weeks-old
+   deploy), not `studio-os-dds`. With layer 1 removed, the apex served Netlify —
+   but the OLD project's deploy (same-bytes marketing pages masked this; only
+   files changed since that old deploy differed). Fix: remove both hostnames from
+   the old project's Domain management, add them to `studio-os-dds`, Force HTTPS.
+   The old project is kept (domainless) — safe to delete later.
+
+**Standing lesson:** "serves Netlify headers" ≠ "serves OUR deploy." Only the
+byte-check below proves the domain path. Run it after every deploy.
+
+---
+
 **Status when written (2026-07-05):** `davisdigitalstudio.com/portal.html` serves an
 **11+ hour-old cached copy** that is missing code already deployed to the Netlify
 origin. This is infrastructure, not code — no repo change can fix it. The RC
