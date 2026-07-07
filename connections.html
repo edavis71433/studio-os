@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your connections — Presence</title>
+<meta name="description" content="Connect the services you already use — read-only, always with your approval, and yours to disconnect any time.">
+<style>
+  :root{
+    --bg:#f6f4ef;--card:#fffdf9;--ink:#221f1a;--soft:#6b6459;--line:#e7e1d6;
+    --accent:#7a5c3e;--accent-soft:#efe7db;--good:#3f6b52;--good-soft:#e7efe8;
+    --warn:#8a6d3b;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(40,32,20,.04),0 8px 24px rgba(40,32,20,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#1a1815;--card:#221f1b;--ink:#efe9df;--soft:#a49b8c;--line:#33302a;--accent:#c8a678;--accent-soft:#2c2620;--good:#8bbf9f;--good-soft:#222a24;--warn:#d3ac6e;--warn-soft:#2a2419;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#f6f4ef;--card:#fffdf9;--ink:#221f1a;--soft:#6b6459;--line:#e7e1d6;--accent:#7a5c3e;--accent-soft:#efe7db;--good:#3f6b52;--good-soft:#e7efe8;--warn:#8a6d3b;--warn-soft:#f3ead9}
+  :root[data-theme="dark"]{--bg:#1a1815;--card:#221f1b;--ink:#efe9df;--soft:#a49b8c;--line:#33302a;--accent:#c8a678;--accent-soft:#2c2620;--good:#8bbf9f;--good-soft:#222a24;--warn:#d3ac6e;--warn-soft:#2a2419}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:700px;margin:0 auto;padding:44px 22px 96px}
+  a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
+  header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
+  header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:52ch}
+  .group{margin-top:38px}
+  .group h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px}
+  .svc{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
+  .svc-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .svc h3{font-family:var(--serif);font-weight:500;font-size:18px;margin:0}
+  .svc .purpose{color:var(--soft);font-size:14px;margin:4px 0 0}
+  .badge{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+  .badge.ok{color:var(--good);background:var(--good-soft)} .badge.attn{color:var(--warn);background:var(--warn-soft)}
+  .badge.off{color:var(--soft);background:transparent;border-color:var(--line)} .badge.wait{color:var(--accent);background:var(--accent-soft)}
+  .data{margin-top:12px;font-size:15px;color:var(--ink);font-weight:500}
+  .data .asof{font-size:12px;color:var(--soft);font-weight:400;margin-left:8px}
+  .row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:var(--accent-soft);border-color:var(--accent)} button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button.primary:hover{filter:brightness(1.05)}
+  button.ghost{border-color:transparent;color:var(--soft)} button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .about{margin-top:6px} .about summary{cursor:pointer;font-size:13px;color:var(--accent);list-style:none;padding:8px 0}
+  .about summary::-webkit-details-marker{display:none}
+  .about summary::before{content:"About this connection · ";color:var(--soft)}
+  .about[open] summary::before{content:"About this connection"}
+  .about .body{font-size:13.5px;color:var(--soft);padding:4px 0 6px;border-top:1px solid var(--line)}
+  .about .body b{color:var(--ink);font-weight:600}
+  .about ul{margin:6px 0 10px;padding-left:18px} .about li{margin:2px 0}
+  .keybox{margin-top:12px;display:none;gap:9px;flex-wrap:wrap}
+  .keybox input{flex:1;min-width:180px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+  .note{font-size:13px;color:var(--soft);margin-top:8px}
+  .center{text-align:center;padding:56px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
+  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/today.html">← Today</a>
+  <header>
+    <h1>Your connections</h1>
+    <p class="sub" id="sub">Connect the services you already use. Everything is read-only, always with your approval, and yours to disconnect any time.</p>
+  </header>
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// Consumes the EXISTING Connected Platform only: GET /connections and
+// POST /connections/:key/{connect,refresh,disconnect}. The OAuth return is
+// handled by connections-callback.html. No backend/contract/approval change.
+// Calm language: never OAuth/API/tokens/scopes on screen.
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN = "";
+
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN });
+async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiPost(p, b){ const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; }
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
+
+// connection state → a simple, human status (never technical)
+function statusOf(e){
+  const c = e.connection || {}; const st = c.status, hl = c.health;
+  if(st==='connected' && hl!=='down' && hl!=='attention') return { label:'Connected', cls:'ok', connected:true };
+  if(st==='connected') return { label:'Needs attention', cls:'attn', connected:true };
+  if(st==='pending') return { label:'Waiting for your permission', cls:'wait', connected:false };
+  if(st==='expired'||st==='error'||hl==='attention'||hl==='down') return { label:'Needs a quick reconnect', cls:'attn', connected:false, reconnect:true };
+  if(e.availability && e.availability!=='Read-only' && e.availability!=='Read/Write') return { label:'Not available yet', cls:'off', unavailable:true };
+  return { label:'Not connected', cls:'off', connected:false };
+}
+
+// the customer's own numbers, in plain words (from the read cache)
+function dataLine(d){
+  if(!d) return '';
+  const bits=[];
+  if(d.rating!=null) bits.push(esc(d.rating)+'★');
+  if(d.review_count!=null) bits.push(esc(d.review_count)+' reviews');
+  if(d.new_reviews!=null) bits.push(esc(d.new_reviews)+' new');
+  if(d.visitors!=null) bits.push(esc(d.visitors)+' recent visitors');
+  if(d.pageviews!=null) bits.push(esc(d.pageviews)+' page views');
+  if(d.search_clicks!=null) bits.push(esc(d.search_clicks)+' from search');
+  if(d.followers!=null) bits.push(esc(d.followers)+' followers');
+  if(d.upcoming_appointments!=null) bits.push(esc(d.upcoming_appointments)+' upcoming');
+  if(d.contacts!=null) bits.push(esc(d.contacts)+' contacts');
+  if(d.subscribers!=null) bits.push(esc(d.subscribers)+' subscribers');
+  if(d.open_rate!=null) bits.push(esc(d.open_rate)+'% open rate');
+  if(d.payments!=null) bits.push(esc(d.payments)+' payments');
+  if(!bits.length) return '';
+  const asof = d.as_of ? `<span class="asof">as of ${esc(String(d.as_of).slice(0,10))}</span>` : '';
+  return `<div class="data">${bits.join(' · ')}${asof}</div>`;
+}
+
+function card(e){
+  const s = statusOf(e);
+  const reads = (e.reads||[]).map(r=>`<li>${esc(r)}</li>`).join('');
+  let actions = '';
+  if(s.connected){
+    actions = `<button data-refresh="${esc(e.key)}">Refresh</button><button class="ghost" data-disc="${esc(e.key)}" data-label="${esc(e.label)}">Disconnect</button>`;
+  } else if(s.unavailable){
+    actions = `<span class="note">This one’s coming soon.</span>`;
+  } else {
+    actions = `<button class="primary" data-connect="${esc(e.key)}" data-label="${esc(e.label)}">${s.reconnect?'Reconnect':'Connect'}</button>`;
+  }
+  return `<article class="svc" id="svc-${esc(e.key)}">
+    <div class="svc-top">
+      <div><h3>${esc(e.label)}</h3><p class="purpose">${esc(e.purpose)}</p></div>
+      <span class="badge ${s.cls}">${esc(s.label)}</span>
+    </div>
+    ${s.connected ? dataLine(e.data) : ''}
+    <div class="row">${actions}</div>
+    <div class="keybox" id="key-${esc(e.key)}">
+      <input type="password" placeholder="Paste your read-only key" aria-label="Read-only key" id="keyin-${esc(e.key)}">
+      <button class="primary" data-keygo="${esc(e.key)}" data-label="${esc(e.label)}">Connect</button>
+    </div>
+    <details class="about"><summary></summary><div class="body">
+      <p><b>What we read:</b></p><ul>${reads || '<li>your public details</li>'}</ul>
+      <p><b>What we never change:</b> nothing — this is read-only. We never post, edit, or remove anything on ${esc(e.label)}, and nothing on your own website changes.</p>
+      <p><b>Approval:</b> ${esc(e.approval || 'You approve access on the service’s own screen, and can revoke it any time.')}</p>
+      <p><b>Who owns it:</b> you do. It’s your account and your permission — Presence just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>
+      <p><b>If you don’t connect:</b> nothing changes. Presence keeps working with what it already sees — connecting simply lets it be more sure and more helpful. You can connect any time later.</p>
+    </div></details>
+  </article>`;
+}
+
+function render(surface){
+  const groups = (surface && surface.groups) || {};
+  const keys = Object.keys(groups);
+  if(surface && surface.note) $('sub').textContent = surface.note;
+  if(!keys.length){
+    $('main').innerHTML = `<div class="center"><h2>Nothing to connect just yet.</h2>
+      <p class="sub" style="margin:0 auto">As services become available for your plan, they’ll appear here — nothing to set up in advance.</p></div>`;
+    return;
+  }
+  let html = '';
+  for(const g of keys){
+    html += `<section class="group"><h2>${esc(g)}</h2>${(groups[g]||[]).map(card).join('')}</section>`;
+  }
+  // the existing Concierge — ask about connecting in your own words
+  html += `<section class="group" style="margin-top:40px">
+    <h2>Questions about connecting</h2>
+    <div class="svc">
+      <p class="purpose" style="margin-top:0">Ask anything — why connect a service, what it helps with, whether Presence can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
+      <div class="row"><input id="cq" type="text" placeholder="e.g. why would I connect my Google listing?" aria-label="Ask about connecting" style="flex:1;min-width:200px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="primary" id="cask">Ask</button></div>
+      <div class="answer" id="cans" style="display:none;margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap"></div>
+    </div></section>`;
+  $('main').innerHTML = html;
+  wire();
+}
+
+function wire(){
+  document.querySelectorAll('[data-connect]').forEach(b=>b.addEventListener('click', ()=>connect(b.getAttribute('data-connect'), b.getAttribute('data-label'), b)));
+  document.querySelectorAll('[data-keygo]').forEach(b=>b.addEventListener('click', ()=>connectKey(b.getAttribute('data-keygo'), b.getAttribute('data-label'))));
+  document.querySelectorAll('[data-disc]').forEach(b=>b.addEventListener('click', ()=>disconnect(b.getAttribute('data-disc'), b.getAttribute('data-label'), b)));
+  document.querySelectorAll('[data-refresh]').forEach(b=>b.addEventListener('click', ()=>refresh(b.getAttribute('data-refresh'), b)));
+  const cask=$('cask'), cq=$('cq');
+  if(cask){ cask.addEventListener('click', askConcierge); cq.addEventListener('keydown', e=>{ if(e.key==='Enter') askConcierge(); }); }
+}
+async function askConcierge(){
+  const cq=$('cq'), box=$('cans'), btn=$('cask');
+  const question=(cq.value||'').trim(); if(!question) return;
+  btn.disabled=true; btn.textContent='…'; box.style.display='block'; box.textContent='Thinking about your presence…';
+  const r = await apiPost('/concierge/ask', { question });
+  box.textContent = (r.ok && r.body && r.body.data && r.body.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess. The “About this connection” note above answers the essentials.';
+  btn.disabled=false; btn.textContent='Ask';
+}
+
+async function connect(key, label, btn){
+  btn.disabled = true; btn.textContent = 'One moment…';
+  const r = await apiPost('/connections/'+encodeURIComponent(key)+'/connect', {});
+  if(r.ok && r.body && r.body.data && r.body.data.mode === 'oauth' && r.body.data.authorize_url){
+    // remember which service, then hand off to the service's own approval screen
+    localStorage.setItem('dds-pending-connection', key);
+    localStorage.setItem('dds-pending-label', label);
+    location.href = r.body.data.authorize_url; return;
+  }
+  if(r.ok && r.body && r.body.data && r.body.data.connected){ toast('Connected ' + label + '.'); return reload(); }
+  // needs a pasted read-only key
+  if(r.status === 422 || (r.body && /key/i.test(r.body.message||''))){ $('key-'+key).style.display = 'flex'; btn.disabled=false; btn.textContent='Connect'; $('keyin-'+key).focus(); return; }
+  // honestly unavailable on this environment yet
+  if(r.status === 503){ toast('This one isn’t available yet.'); btn.disabled=false; btn.textContent='Connect'; return; }
+  toast('That didn’t start — nothing changed. Try again in a moment.'); btn.disabled=false; btn.textContent='Connect';
+}
+async function connectKey(key, label){
+  const val = ($('keyin-'+key).value||'').trim(); if(!val) return;
+  const r = await apiPost('/connections/'+encodeURIComponent(key)+'/connect', { api_key: val });
+  if(r.ok && r.body && r.body.data && r.body.data.connected){ toast('Connected ' + label + '.'); return reload(); }
+  toast('That key didn’t connect — nothing changed. Please check it and try again.');
+}
+async function disconnect(key, label, btn){
+  if(!confirm('Disconnect ' + label + '? Your account and everything in it stay exactly as they are — this only stops Presence reading it.')) return;
+  btn.disabled = true; btn.textContent = 'Disconnecting…';
+  const r = await apiPost('/connections/'+encodeURIComponent(key)+'/disconnect', {});
+  if(r.ok){ toast('Disconnected ' + label + '. Your account is untouched.'); return reload(); }
+  toast('That didn’t go through — try again in a moment.'); btn.disabled=false; btn.textContent='Disconnect';
+}
+async function refresh(key, btn){
+  btn.disabled = true; const old = btn.textContent; btn.textContent = 'Refreshing…';
+  const r = await apiPost('/connections/'+encodeURIComponent(key)+'/refresh', {});
+  if(r.ok){ toast('Up to date.'); return reload(); }
+  toast('Couldn’t refresh just now — it may need a quick reconnect.'); btn.disabled=false; btn.textContent=old;
+}
+
+function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub" style="margin:8px auto 0">Your connections live with your presence — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your connections just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your services — this is only this page. Please refresh in a moment.</p></div>`; }
+
+async function reload(){
+  try{ const s = await apiGet('/connections'); render(s && s.data); }
+  catch(_){ trouble(); }
+}
+(async function init(){
+  try{
+    const { data } = await sb.auth.getSession();
+    TOKEN = (data && data.session && data.session.access_token) || "";
+    if(!TOKEN){ signedOut(); return; }
+    await reload();
+  }catch(_){ trouble(); }
+})();
+</script>
+</body>
+</html>

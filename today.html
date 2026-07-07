@@ -130,6 +130,10 @@ function render(moments, features){
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
     <div class="answer" id="askAns" hidden></div></div>`;
+  // a quiet doorway to the Connected Platform — read-only, your approval, disconnect any time
+  html += `<div class="features" style="margin-top:36px">
+    <p class="lead">Connect the services you already use — your Google listing, reviews, analytics and more. Read-only, always with your approval, and yours to disconnect any time.</p>
+    <a class="link" href="/connections.html">Manage your connections →</a></div>`;
   $('main').innerHTML = html;
   wire();
 }

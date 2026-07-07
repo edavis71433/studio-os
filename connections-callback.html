@@ -40,7 +40,7 @@ const $ = (id) => document.getElementById(id);
 function show(icon, title, msg, showBtn){
   $('card').innerHTML = (icon === 'ok' ? '<div class="ok">✓</div>' : '<div class="spin" role="status"></div>')
     + `<h1 style="margin-top:18px">${title}</h1><p>${msg}</p>`
-    + (showBtn ? '<a class="btn" href="/portal.html">Back to your presence</a>' : '');
+    + (showBtn ? '<a class="btn" href="/connections.html">Back to your connections</a>' : '');
 }
 
 (async function(){
