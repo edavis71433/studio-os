@@ -35,6 +35,8 @@ import { handleCoachRun, handleCoachList, handleCoachDecide } from './routes/coa
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
+import { resolveAgencyMember } from './agency/auth.ts';
+import { handleAgency } from './agency/routes.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -53,6 +55,17 @@ serve(async (req) => {
 
   // 2. authentication (shared resolver; never throws)
   const principal = await resolvePrincipal(req, null);
+
+  // ── M13: /agency routes — a third, explicitly-scoped principal. Members
+  //    own no site; membership + role are resolved fail-closed and every
+  //    operation inside is fenced to the agency's own linked sites. Staff
+  //    and clients continue through the existing boundary untouched.
+  if (route === '/agency' || route.startsWith('/agency/')) {
+    const member = await resolveAgencyMember(req.headers.get('x-dds-user-jwt') || '');
+    if (!member) return json({ error: 'unauthorized', message: 'Please sign in with an agency account.' }, 401, cors);
+    return handleAgency(req, route, method, member, principal, cors);
+  }
+
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
     return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
   }

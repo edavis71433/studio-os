@@ -401,6 +401,28 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   if (route === '/admin/sites' && method === 'POST') return handleProvision(req, principal, cors);
   if (route === '/admin/sites' && method === 'GET') return handleList(cors);
 
+  // ── M13: agency provisioning (operator creates the agency + its owner seat) ──
+  if (route === '/admin/agencies' && method === 'POST') {
+    const b = await readBody(req);
+    const name = String(b?.name || '').trim().slice(0, 160);
+    const ownerEmail = String(b?.owner_email || '').toLowerCase().trim();
+    if (!name || !ownerEmail.includes('@')) return json({ error: 'bad_request', message: 'A name and an owner email are needed.' }, 400, cors);
+    const a = await svc('presence_agencies?select=id,name,seat_limit,client_limit,plan', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ name, seat_limit: Number(b?.seat_limit) || 5, client_limit: Number(b?.client_limit) || 25, plan: String(b?.plan || 'agency').slice(0, 40) }),
+    });
+    if (!a.ok || !a.json?.[0]) return json({ error: 'write_failed', message: 'The agency didn’t save.' }, 502, cors);
+    await svc('presence_agency_members', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ agency_id: a.json[0].id, email: ownerEmail, role: 'owner', status: 'active' }),
+    });
+    return json({ data: a.json[0] }, 200, cors);
+  }
+  if (route === '/admin/agencies' && method === 'GET') {
+    const r = await svc('presence_agencies?select=id,name,plan,status,seat_limit,client_limit,created_at&order=created_at.desc&limit=100');
+    return json({ data: r.json ?? [] }, 200, cors);
+  }
+
   // legacy M5 shape: POST /admin/restore-deploy {site_id, deploy_id}
   if (route === '/admin/restore-deploy' && method === 'POST') {
     const body = await readBody(req);
