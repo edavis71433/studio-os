@@ -48,6 +48,28 @@
 const SB_URL = Deno.env.get('SB_URL') || Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
+// L1: subscription lifecycle is delegated to the presence function's
+// secret-gated billing-sync route (where provisioning + all secrets live), so
+// this function stays the thin, single source of PAYMENT truth. Register these
+// added events in the Stripe endpoint: checkout.session.completed (already),
+// customer.subscription.created / updated / deleted.
+const BILLING_SYNC_SECRET = Deno.env.get('BILLING_SYNC_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
+
+// Forward a Stripe object to presence /commerce/billing-sync. Best-effort with
+// an honest failure: a non-2xx returns false so the caller can 500 → Stripe
+// retries (the sync is idempotent). Never throws.
+async function forwardBillingSync(type: string, object: unknown): Promise<boolean> {
+  if (!BILLING_SYNC_SECRET) { console.error('[stripe-webhook] BILLING_SYNC_SECRET unset — cannot sync subscription; set it on this function'); return false; }
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/presence/commerce/billing-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-commerce-secret': BILLING_SYNC_SECRET, apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+      body: JSON.stringify({ type, object }),
+    });
+    if (!r.ok) { console.error(`[stripe-webhook] billing-sync ${type} returned ${r.status}`); return false; }
+    return true;
+  } catch (e) { console.error(`[stripe-webhook] billing-sync ${type} threw: ${String(e)}`); return false; }
+}
 
 const enc = new TextEncoder();
 
@@ -182,6 +204,14 @@ Deno.serve(async (req: Request) => {
     if (type === 'checkout.session.completed') {
       const md = obj.metadata || {};
       await recordPayment(obj, md, String(obj.payment_status || 'paid') === 'paid' ? 'paid' : String(obj.payment_status || ''));
+      // L1: a self-serve subscription purchase → provision via billing-sync.
+      if (String(obj.mode || '') === 'subscription' || md.kind === 'subscription') {
+        const ok = await forwardBillingSync(type, obj);
+        if (!ok) { console.error(`[stripe-webhook] ${type} subscription sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+        console.log(`[stripe-webhook] ${type} → subscription provisioned (client ${md.client_id || '?'}, plan ${md.plan || '?'})`);
+        await recordEvent(eventId, type);
+        return new Response('ok', { status: 200 });
+      }
       if (md.invoice_id) {
         const res = await markInvoicePaid(String(md.invoice_id), 'checkout.session metadata');
         if (res.status === 200) await recordEvent(eventId, type);
@@ -215,6 +245,17 @@ Deno.serve(async (req: Request) => {
       const md = obj.metadata || {};
       await recordPayment(obj, md, 'failed');
       console.error(`[stripe-webhook] payment FAILED${md.invoice_id ? ` for invoice ${md.invoice_id}` : ''} (${obj.id || '?'}): ${obj.last_payment_error?.message || 'no detail'} — invoice state unchanged`);
+      await recordEvent(eventId, type);
+      return new Response('ok', { status: 200 });
+    }
+
+    // L1: subscription lifecycle → entitlement sync (renewal, past-due grace,
+    // voluntary pause, cancellation). Delegated to billing-sync; a failed sync
+    // returns 500 so Stripe retries the (idempotent) event.
+    if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+      const ok = await forwardBillingSync(type, obj);
+      if (!ok) { console.error(`[stripe-webhook] ${type} sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+      console.log(`[stripe-webhook] ${type} → entitlement synced (sub ${obj.id || '?'}, status ${obj.status || '?'})`);
       await recordEvent(eventId, type);
       return new Response('ok', { status: 200 });
     }

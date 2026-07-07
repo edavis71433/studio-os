@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — Studio OS Presence</title>
+<meta name="description" content="A website that stays correct — priced like a utility, governed like a trust. Monthly or annual. No metered fees, no surprises.">
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --p:#5b3fa0; --pdark:#3a2568; --ink:#1a1523; --muted:#6b6478; --line:#e7e1d6;
+    --cream:#faf8f5; --paper:#fff; --brass:#b08d57; --ok:#2e7d52;
+    --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
+    --shadow:0 18px 50px rgba(30,19,56,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--cream);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;}
+  a{color:inherit;}
+  .wrap{max-width:1080px;margin:0 auto;padding:38px 22px 90px;}
+  header.top{text-align:center;max-width:640px;margin:0 auto 10px;}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--p);margin-bottom:16px;}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-height:1.08;letter-spacing:-.01em;text-wrap:balance;margin-bottom:14px;}
+  header.top p{font-size:16.5px;color:var(--muted);}
+  .foundersband{max-width:560px;margin:22px auto 0;background:linear-gradient(180deg,#fff,#f6f1ff);border:1px solid #e4d8f7;border-radius:14px;padding:12px 18px;font-size:13.5px;color:var(--pdark);display:flex;gap:10px;align-items:center;justify-content:center;}
+  .foundersband b{font-weight:650;}
+  /* term toggle */
+  .toggle{display:flex;justify-content:center;margin:30px 0 6px;}
+  .seg{display:inline-flex;background:#fff;border:1px solid var(--line);border-radius:100px;padding:4px;box-shadow:var(--shadow);}
+  .seg button{border:none;background:none;font:inherit;font-size:14px;font-weight:550;color:var(--muted);padding:9px 20px;border-radius:100px;cursor:pointer;transition:.18s;}
+  .seg button.on{background:var(--p);color:#fff;}
+  .savehint{text-align:center;font-size:13px;color:var(--ok);font-weight:550;min-height:20px;margin-bottom:18px;}
+  /* grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:8px;}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:26px 22px;display:flex;flex-direction:column;box-shadow:var(--shadow);position:relative;}
+  .card.feature{border-color:#d5c3f2;box-shadow:0 22px 60px rgba(91,63,160,.16);}
+  .badge{position:absolute;top:-11px;left:22px;background:var(--p);color:#fff;font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;padding:4px 11px;border-radius:100px;}
+  .pname{font-family:var(--serif);font-size:22px;font-weight:500;margin-bottom:4px;}
+  .ptag{font-size:13.5px;color:var(--muted);min-height:38px;margin-bottom:16px;}
+  .price{display:flex;align-items:baseline;gap:4px;margin-bottom:2px;}
+  .price .amt{font-family:var(--serif);font-size:38px;font-weight:500;letter-spacing:-.01em;}
+  .price .per{font-size:14px;color:var(--muted);}
+  .price .list{font-size:14px;color:var(--muted);text-decoration:line-through;margin-left:6px;}
+  .contact-amt{font-family:var(--serif);font-size:26px;font-weight:500;margin-bottom:4px;}
+  .annualnote{font-size:12.5px;color:var(--muted);min-height:18px;margin-bottom:16px;}
+  ul.feats{list-style:none;margin:8px 0 22px;display:flex;flex-direction:column;gap:9px;flex:1;}
+  ul.feats li{font-size:13.5px;padding-left:24px;position:relative;color:#2c2637;}
+  ul.feats li::before{content:"";position:absolute;left:0;top:7px;width:13px;height:13px;border-radius:50%;background:#eee6fb;}
+  ul.feats li::after{content:"";position:absolute;left:4px;top:10px;width:5px;height:3px;border-left:1.6px solid var(--p);border-bottom:1.6px solid var(--p);transform:rotate(-45deg);}
+  .cta{display:block;text-align:center;text-decoration:none;font-weight:600;font-size:14.5px;padding:12px 18px;border-radius:100px;transition:.18s;cursor:pointer;border:none;width:100%;font-family:inherit;}
+  .cta.primary{background:var(--p);color:#fff;}
+  .cta.primary:hover{background:var(--pdark);}
+  .cta.ghost{background:#fff;color:var(--p);border:1.5px solid #ddd0f4;}
+  .cta.ghost:hover{border-color:var(--p);}
+  .trybar{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px;min-height:18px;}
+  .laws{max-width:720px;margin:56px auto 0;text-align:center;}
+  .laws h2{font-family:var(--serif);font-weight:400;font-size:22px;margin-bottom:18px;}
+  .lawgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;text-align:left;}
+  .law{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px 16px;}
+  .law b{display:block;font-size:13.5px;font-weight:600;margin-bottom:3px;}
+  .law span{font-size:12.5px;color:var(--muted);}
+  footer{text-align:center;margin-top:52px;font-size:13px;color:var(--muted);}
+  footer a{color:var(--p);text-decoration:none;}
+  .loading{text-align:center;padding:60px;color:var(--muted);}
+  @media(max-width:560px){.wrap{padding:26px 16px 70px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Studio OS · Presence</div>
+    <h1>A website that stays correct — without becoming your hobby.</h1>
+    <p>Priced like a utility, governed like a trust. Monthly or annual. No metered fees, no publishing charges, no surprise AI bills — you should never fear your own product.</p>
+    <div class="foundersband" id="foundersband" style="display:none">
+      <span>✦</span><span><b>Founders pricing is open.</b> Sign up now and your rate is locked for the life of your subscription.</span>
+    </div>
+  </header>
+
+  <div class="toggle">
+    <div class="seg">
+      <button id="segMonthly" class="on" onclick="setTerm('monthly')">Monthly</button>
+      <button id="segAnnual" onclick="setTerm('annual')">Annual</button>
+    </div>
+  </div>
+  <div class="savehint" id="savehint"></div>
+
+  <div id="cards" class="grid"><div class="loading">Loading plans…</div></div>
+
+  <section class="laws">
+    <h2>The same promises, on every plan</h2>
+    <div class="lawgrid">
+      <div class="law"><b>You own everything</b><span>Your content, media, domain, and history — export it all, any time, in any account state.</span></div>
+      <div class="law"><b>Leaving is easy</b><span>No lock-in and no hostage mechanics. If you go, your domain and site come with you.</span></div>
+      <div class="law"><b>The site never lies</b><span>Not in preview, not in failure, not if a payment lapses. Every version is restorable.</span></div>
+      <div class="law"><b>Calm by default</b><span>Plain language, no dashboards of vanity metrics, no gamified scores. Health is a sentence.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    Questions? <a href="/contact.html">Talk to us</a> · <a href="/portal.html">Already have an account? Sign in</a>
+  </footer>
+</div>
+
+<script>
+const ENVS = {
+  prod:    { url: "https://qksstlqzbhesadrrofgn.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo" },
+  staging: { url: "https://wjlpursnwbmlcdwbeowv.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqbHB1cnNud2JtbGNkd2Jlb3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNzExMzUsImV4cCI6MjA5ODg0NzEzNX0.XAWyxx-7WsDC6Eg4nc2dlcFmHRe6NUKYEVBkjRvkGXQ" },
+};
+const qs = new URLSearchParams(location.search);
+const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
+const FN = ENV.url + "/functions/v1/presence";
+const envSuffix = qs.get('env') === 'staging' ? '?env=staging' : '';
+let TERM = 'monthly';
+let PLANS = [];
+let TRIAL_DAYS = 14;
+
+async function load(){
+  try{
+    const r = await fetch(FN + "/commerce/plans", { headers: { apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } });
+    const j = await r.json();
+    PLANS = (j.data && j.data.plans) || [];
+    TRIAL_DAYS = (j.data && j.data.trial_days) || 14;
+    if (j.data && j.data.founders_open) document.getElementById('foundersband').style.display = 'flex';
+    render();
+  }catch(e){
+    document.getElementById('cards').innerHTML = '<div class="loading">We couldn’t load pricing just now. Please refresh, or <a href="/contact.html">reach out</a>.</div>';
+  }
+}
+function setTerm(t){
+  TERM = t;
+  document.getElementById('segMonthly').classList.toggle('on', t==='monthly');
+  document.getElementById('segAnnual').classList.toggle('on', t==='annual');
+  render();
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function render(){
+  document.getElementById('savehint').textContent = TERM==='annual' ? 'Annual saves you two months — and the calm of not thinking about it.' : '';
+  const cards = PLANS.map(p => {
+    const feature = p.key === 'presence';
+    let priceHtml, ctaHtml, tryHtml = '';
+    if (p.price) {
+      const amt = TERM==='annual' ? p.price.annual : p.price.monthly;
+      const list = TERM==='annual' ? p.price.list_annual : p.price.list_monthly;
+      const per = TERM==='annual' ? '/yr' : '/mo';
+      const listHtml = (p.price.founder && list && list !== amt) ? `<span class="list">$${list}${per}</span>` : '';
+      priceHtml = `<div class="price"><span class="amt">$${amt}</span><span class="per">${per}</span>${listHtml}</div>`
+        + `<div class="annualnote">${TERM==='annual' ? 'Billed yearly' : 'Billed monthly'}${p.price.founder ? ' · founders rate, locked' : ''}</div>`;
+      ctaHtml = `<a class="cta primary" href="/signup.html${envSuffix}${envSuffix?'&':'?'}plan=${p.key}&term=${TERM}">Get started</a>`;
+      if (p.trial_eligible) tryHtml = `<div class="trybar">or start a ${TRIAL_DAYS}-day trial — no card</div>`;
+    } else {
+      priceHtml = `<div class="contact-amt">Let’s talk</div><div class="annualnote">Set up with our team</div>`;
+      ctaHtml = `<a class="cta ghost" href="/contact.html?about=${p.key}">Contact us</a>`;
+    }
+    const feats = (p.features||[]).map(f=>`<li>${esc(f)}</li>`).join('');
+    return `<div class="card${feature?' feature':''}">`
+      + (feature?'<div class="badge">Most popular</div>':'')
+      + `<div class="pname">${esc(p.name)}</div><div class="ptag">${esc(p.tagline)}</div>`
+      + priceHtml + `<ul class="feats">${feats}</ul>` + ctaHtml + tryHtml + `</div>`;
+  }).join('');
+  document.getElementById('cards').innerHTML = cards;
+}
+load();
+</script>
+</body>
+</html>

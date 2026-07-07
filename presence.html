@@ -2219,6 +2219,49 @@ async function refreshAll() {
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
 }
+// ── L1: first-run welcome — a calm checklist, dismissible, nothing overwhelming ──
+async function renderFirstRun() {
+  const wrap = $("welcomeWrap");
+  if (!wrap) return;
+  let fr;
+  try { const r = await api("GET", "/commerce/first-run"); fr = r.data; }
+  catch (_) { return; }
+  if (!fr || fr.dismissed || fr.complete) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+  wrap.innerHTML = ""; wrap.hidden = false;
+
+  const card = el("div", "deskopt");
+  card.style.borderColor = "#d9cbf3";
+  const head = el("div", "dol", "Welcome — let’s get you set up");
+  card.appendChild(head);
+  card.appendChild(el("div", "dop", `A few calm steps. ${fr.done} of ${fr.total} done — do them in any order, or come back later.`));
+
+  const viewFor = { details: "business", brand: "business", domain: "history", publish: "today", connect: "today", observe: "today" };
+  for (const s of (fr.steps || [])) {
+    const row = el("div", "deskopt");
+    row.style.margin = "8px 0 0"; row.style.background = s.done ? "#f4fbf6" : "#fff";
+    row.style.cursor = s.done ? "default" : "pointer";
+    const t = el("div", "dop", (s.done ? "✓ " : "○ ") + s.title);
+    t.style.fontWeight = "550"; t.style.color = s.done ? "#2e7d52" : "#1a1523";
+    row.appendChild(t);
+    if (!s.done) {
+      row.appendChild(el("p", "aihint", s.hint));
+      const v = viewFor[s.key];
+      if (v) row.addEventListener("click", () => { if (typeof go === "function") go(v); });
+    }
+    card.appendChild(row);
+  }
+
+  const acts = el("div", "doa");
+  const dismiss = el("button", "quietact", "Dismiss");
+  dismiss.addEventListener("click", async () => {
+    try { await api("POST", "/commerce/first-run/dismiss"); } catch (_) {}
+    wrap.hidden = true; wrap.innerHTML = "";
+  });
+  acts.appendChild(dismiss);
+  card.appendChild(acts);
+  wrap.appendChild(card);
+}
+
 (async function boot() {
   try {
     const { data } = await sb.auth.getSession();
@@ -2230,6 +2273,7 @@ async function refreshAll() {
     await refreshAll();
     renderKnowledgeDocs();
     renderMonitorCard();
+    renderFirstRun();
     // deep links: presence.html?view=business|offerings|…|preview|publish
     const v = new URLSearchParams(location.search).get("view");
     if (v === "preview") openPreview("draft");

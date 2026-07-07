@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Welcome — Studio OS Presence</title>
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--p:#5b3fa0;--pdark:#3a2568;--ink:#1a1523;--muted:#6b6478;--cream:#faf8f5;--ok:#3f7d5b;--line:#e7e1d6;--serif:'Fraunces',Georgia,serif;--sans:'Inter',system-ui,sans-serif;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:var(--sans);background:var(--cream);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;line-height:1.6;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:48px 40px;max-width:520px;text-align:center;box-shadow:0 20px 60px rgba(30,19,56,.09);}
+  .mark{width:60px;height:60px;border-radius:18px;background:var(--ok);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 22px;}
+  .mark.wait{background:#eee6fb;color:var(--p);}
+  h1{font-family:var(--serif);font-weight:400;font-size:29px;margin-bottom:12px;line-height:1.15;}
+  p{font-size:15px;line-height:1.65;color:var(--muted);margin-bottom:12px;}
+  .btn{display:inline-block;margin-top:18px;background:var(--p);color:#fff;text-decoration:none;padding:13px 30px;border-radius:100px;font-size:15px;font-weight:600;transition:.18s;border:none;cursor:pointer;font-family:inherit;}
+  .btn:hover{background:var(--pdark);}
+  .plain{display:inline-block;margin-top:14px;color:var(--muted);font-size:13px;text-decoration:none;}
+  .verify{margin-top:20px;font-size:13px;color:var(--ok);min-height:18px;}
+  .spinner{width:22px;height:22px;border:2.5px solid #e0d4f5;border-top-color:var(--p);border-radius:50%;display:inline-block;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="mark wait" id="mark"><span class="spinner"></span></div>
+    <h1 id="title">Setting up your workspace…</h1>
+    <p id="body">Your payment went through securely. We’re getting everything ready — this only takes a moment.</p>
+    <div id="actions"></div>
+    <div class="verify" id="verify"></div>
+  </div>
+
+<script>
+const ENVS = {
+  prod:    { url: "https://qksstlqzbhesadrrofgn.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo" },
+  staging: { url: "https://wjlpursnwbmlcdwbeowv.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqbHB1cnNud2JtbGNkd2Jlb3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNzExMzUsImV4cCI6MjA5ODg0NzEzNX0.XAWyxx-7WsDC6Eg4nc2dlcFmHRe6NUKYEVBkjRvkGXQ" },
+};
+const qs = new URLSearchParams(location.search);
+const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
+const FN = ENV.url + "/functions/v1/presence";
+const roomHref = "/presence.html" + (qs.get('env')==='staging'?'?env=staging':'');
+const H = { apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json' };
+
+// Email verification (non-blocking) if a token is present.
+(async function verify(){
+  const token = qs.get('verify');
+  if (!token) return;
+  try {
+    const r = await fetch(FN + "/commerce/verify", { method:'POST', headers:H, body: JSON.stringify({ token }) });
+    if (r.ok) document.getElementById('verify').textContent = '✓ Email confirmed — thank you.';
+  } catch(_){}
+})();
+
+function ready(){
+  document.getElementById('mark').className = 'mark';
+  document.getElementById('mark').innerHTML = '✓';
+  document.getElementById('title').textContent = 'Welcome. Your workspace is ready.';
+  document.getElementById('body').innerHTML = 'Everything is set up. A receipt is on its way to your email. Next, we’ll help you add your business details and go live — one calm step at a time.';
+  document.getElementById('actions').innerHTML = `<a class="btn" href="${roomHref}">Enter your workspace →</a><div><a class="plain" href="/portal.html">Go to your portal instead</a></div>`;
+}
+function stillWorking(){
+  document.getElementById('title').textContent = 'Almost there…';
+  document.getElementById('body').innerHTML = 'Your payment is confirmed and your workspace is being finished. You can head in now — if anything isn’t ready yet, it will be in a moment.';
+  document.getElementById('mark').className = 'mark';
+  document.getElementById('mark').innerHTML = '✓';
+  document.getElementById('actions').innerHTML = `<a class="btn" href="${roomHref}">Enter your workspace →</a>`;
+}
+
+const sessionId = qs.get('session_id');
+if (!sessionId) {
+  // Arrived without a checkout session (e.g. a trial or a direct visit) — just welcome them in.
+  ready();
+} else {
+  let tries = 0;
+  const poll = async () => {
+    tries++;
+    try {
+      const r = await fetch(FN + "/commerce/checkout-status?session_id=" + encodeURIComponent(sessionId), { headers: H });
+      const j = await r.json();
+      if (j.data && j.data.ready) { ready(); return; }
+    } catch(_){}
+    if (tries >= 8) { stillWorking(); return; }
+    setTimeout(poll, 1800);
+  };
+  poll();
+}
+</script>
+</body>
+</html>

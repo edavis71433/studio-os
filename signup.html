@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Create your account — Studio OS Presence</title>
+<meta name="theme-color" content="#5b3fa0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600&family=Inter:wght@400;450;500;550;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<style>
+  :root{--p:#5b3fa0;--pdark:#3a2568;--ink:#1a1523;--muted:#6b6478;--line:#e7e1d6;--cream:#faf8f5;--bad:#b3261e;--ok:#2e7d52;--serif:'Fraunces',Georgia,serif;--sans:'Inter',system-ui,sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--cream);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;padding:34px 20px;}
+  .wrap{max-width:900px;margin:0 auto;display:grid;grid-template-columns:1.1fr .9fr;gap:26px;}
+  @media(max-width:720px){.wrap{grid-template-columns:1fr;}.aside{order:-1;}}
+  .brand{font-family:var(--serif);font-size:19px;margin-bottom:20px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:34px 30px;box-shadow:0 18px 50px rgba(30,19,56,.08);}
+  h1{font-family:var(--serif);font-weight:400;font-size:27px;line-height:1.14;margin-bottom:6px;}
+  .sub{font-size:14px;color:var(--muted);margin-bottom:24px;}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px;}
+  input{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 14px;font:15px var(--sans);background:#fff;transition:.15s;}
+  input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(91,63,160,.12);}
+  .hint{font-size:12px;color:var(--muted);margin-top:5px;}
+  .go{margin-top:24px;width:100%;background:var(--p);color:#fff;border:none;border-radius:100px;padding:14px;font:600 15px var(--sans);cursor:pointer;transition:.18s;}
+  .go:hover{background:var(--pdark);} .go:disabled{opacity:.6;cursor:default;}
+  .msg{margin-top:16px;font-size:13.5px;padding:11px 14px;border-radius:11px;display:none;}
+  .msg.err{display:block;background:#fdf3f2;border:1px solid rgba(179,38,30,.3);color:var(--bad);}
+  .msg.ok{display:block;background:#f0f8f3;border:1px solid rgba(46,125,82,.3);color:var(--ok);}
+  .aside .card{background:linear-gradient(180deg,#fff,#f7f2ff);}
+  .plan-name{font-family:var(--serif);font-size:22px;margin-bottom:3px;}
+  .plan-tag{font-size:13.5px;color:var(--muted);margin-bottom:18px;}
+  .plan-price{display:flex;align-items:baseline;gap:5px;margin-bottom:16px;}
+  .plan-price .amt{font-family:var(--serif);font-size:32px;}
+  .plan-price .per{font-size:13px;color:var(--muted);}
+  .switchline{font-size:12.5px;margin-top:14px;}
+  .switchline a{color:var(--p);}
+  ul.mini{list-style:none;margin:16px 0 0;display:flex;flex-direction:column;gap:8px;}
+  ul.mini li{font-size:13px;padding-left:22px;position:relative;color:#2c2637;}
+  ul.mini li::before{content:"✓";position:absolute;left:0;color:var(--p);font-weight:700;}
+  .trustline{font-size:12px;color:var(--muted);margin-top:18px;text-align:center;}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="brand">Studio OS</div>
+    <div class="card">
+      <h1 id="headline">Create your account</h1>
+      <div class="sub" id="subline">A calm place for your business to say the right things, everywhere customers look.</div>
+      <form id="form" onsubmit="return submitForm(event)">
+        <label for="business">Your business name</label>
+        <input id="business" autocomplete="organization" required placeholder="e.g. Marlow’s Kitchen">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" required placeholder="you@yourbusiness.com">
+        <label for="password">Choose a password</label>
+        <input id="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters">
+        <div class="hint">You’ll use this to sign in to your workspace.</div>
+        <button class="go" id="submitBtn" type="submit">Continue</button>
+        <div class="msg" id="msg"></div>
+      </form>
+      <div class="switchline">Already have an account? <a href="/portal.html">Sign in</a></div>
+    </div>
+  </div>
+  <div class="aside">
+    <div class="card" id="summary">
+      <div class="plan-name" id="planName">Choose a plan</div>
+      <div class="plan-tag" id="planTag">Pick a plan to continue.</div>
+      <div id="planPrice"></div>
+      <ul class="mini" id="planFeats"></ul>
+      <div class="switchline" style="margin-top:18px"><a id="changePlan" href="/pricing.html">← See all plans</a></div>
+      <div class="trustline">🔒 Payments are handled securely by Stripe. Cancel any time — you own everything you make.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ENVS = {
+  prod:    { url: "https://qksstlqzbhesadrrofgn.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo" },
+  staging: { url: "https://wjlpursnwbmlcdwbeowv.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqbHB1cnNud2JtbGNkd2Jlb3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNzExMzUsImV4cCI6MjA5ODg0NzEzNX0.XAWyxx-7WsDC6Eg4nc2dlcFmHRe6NUKYEVBkjRvkGXQ" },
+};
+const qs = new URLSearchParams(location.search);
+const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
+const FN = ENV.url + "/functions/v1/presence";
+const envSuffix = qs.get('env') === 'staging' ? '&env=staging' : '';
+const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
+
+const PLAN_KEY = qs.get('plan') || '';
+let TERM = qs.get('term') || 'monthly';
+let PLAN = null, TRIAL = qs.get('trial') === '1';
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showMsg(text, kind){ const m=document.getElementById('msg'); m.textContent=text; m.className='msg '+(kind||'err'); }
+
+async function loadPlan(){
+  try{
+    const r = await fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } });
+    const j = await r.json();
+    const plans = (j.data && j.data.plans) || [];
+    PLAN = plans.find(p => p.key === PLAN_KEY) || null;
+    if (!PLAN || !PLAN.self_serve){ location.href = "/pricing.html" + (qs.get('env')==='staging'?'?env=staging':''); return; }
+    document.getElementById('planName').textContent = PLAN.name;
+    document.getElementById('planTag').textContent = PLAN.tagline;
+    document.getElementById('changePlan').href = "/pricing.html" + (qs.get('env')==='staging'?'?env=staging':'');
+    if (PLAN.price){
+      const amt = TERM==='annual' ? PLAN.price.annual : PLAN.price.monthly;
+      const per = TERM==='annual' ? '/yr' : '/mo';
+      const note = TRIAL ? `${(j.data.trial_days||14)}-day trial, then $${amt}${per}` : (PLAN.price.founder ? 'Founders rate, locked' : (TERM==='annual'?'Billed yearly':'Billed monthly'));
+      document.getElementById('planPrice').innerHTML = `<div class="plan-price"><span class="amt">$${amt}</span><span class="per">${per}</span></div><div class="plan-tag">${note}</div>`;
+    }
+    document.getElementById('planFeats').innerHTML = (PLAN.features||[]).slice(0,4).map(f=>`<li>${esc(f)}</li>`).join('');
+    if (TRIAL) { document.getElementById('headline').textContent = 'Start your free trial'; document.getElementById('subline').textContent = 'No card required. Your workspace is ready in moments.'; document.getElementById('submitBtn').textContent = 'Start my trial'; }
+    else if (PLAN.key !== 'presence_managed') { document.getElementById('submitBtn').textContent = 'Continue to secure checkout'; }
+  }catch(e){ /* leave defaults */ }
+}
+
+async function submitForm(e){
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const business = document.getElementById('business').value.trim();
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const password = document.getElementById('password').value;
+  btn.disabled = true; const label = btn.textContent; btn.innerHTML = '<span class="spinner"></span>Setting things up…';
+  try{
+    const payload = { email, password, business_name: business, plan: PLAN_KEY };
+    if (TRIAL && PLAN.trial_eligible) payload.trial = true; else payload.term = TERM;
+    const r = await fetch(FN + "/commerce/signup", { method:'POST', headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+    const j = await r.json();
+    if (!r.ok){
+      if (j.error === 'account_exists'){ showMsg('An account with this email already exists. Please sign in instead.', 'err'); }
+      else showMsg(j.message || 'Something went wrong. Please try again.', 'err');
+      btn.disabled = false; btn.textContent = label; return false;
+    }
+    // Sign in now so the session persists through checkout and into the workspace.
+    try { await sb.auth.signInWithPassword({ email, password }); } catch(_){}
+    if (j.data.mode === 'trial'){
+      showMsg('Your workspace is ready. Taking you there…', 'ok');
+      location.href = "/presence.html" + (qs.get('env')==='staging'?'?env=staging':'');
+    } else if (j.data.mode === 'checkout' && j.data.url){
+      showMsg('Taking you to secure checkout…', 'ok');
+      location.href = j.data.url;
+    } else {
+      showMsg('Account created. Please sign in to continue.', 'ok');
+    }
+  }catch(err){
+    showMsg('We couldn’t reach the server. Please try again.', 'err');
+    btn.disabled = false; btn.textContent = label;
+  }
+  return false;
+}
+loadPlan();
+</script>
+</body>
+</html>

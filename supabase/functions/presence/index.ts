@@ -39,6 +39,7 @@ import { handleExport, handleLaunch, handleDnsGet, handleDnsPut, handleDnsRollba
 import { handleImportInventory } from './routes/monitor.ts';
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
+import { handleCommerce } from './routes/commerce.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -66,6 +67,14 @@ serve(async (req) => {
     const member = await resolveAgencyMember(req.headers.get('x-dds-user-jwt') || '');
     if (!member) return json({ error: 'unauthorized', message: 'Please sign in with an agency account.' }, 401, cors);
     return handleAgency(req, route, method, member, principal, cors);
+  }
+
+  // ── L1: /commerce routes — self-serve signup & commerce. Public-safe by
+  //    design (discover, price, buy with no operator). Handled BEFORE the
+  //    client/staff 401 so a stranger can sign up; the authed routes inside
+  //    (subscription, billing portal, first-run) enforce their own sign-in.
+  if (route === '/commerce' || route.startsWith('/commerce/')) {
+    return handleCommerce(req, route, method, principal, cors);
   }
 
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
