@@ -98,6 +98,9 @@ const FIX_PLACE: Record<string, { section: string; label: string; steps: string 
   rec_opt_menu_reconcile: { section: 'business', label: 'Open Business', steps: 'The prices, items, phone, and hours on your site are on the Business and Menu pages — a quick compare with your uploaded document tells us which to keep.' },
   rec_opt_photos: { section: 'media', label: 'Open Photographs', steps: 'The Photographs page is where a few real pictures of your business go — the kind that help a customer picture the place.' },
   rec_opt_story: { section: 'business', label: 'Open Business', steps: 'Your story lives on the Business page — a sentence about who’s behind the business is plenty.' },
+  // L4.2 — connected reputation: the reviews live on the connected account, and
+  // the reply happens there. We point to Connections and explain the rest.
+  rec_connected_reputation: { section: 'connections', label: 'Open Connections', steps: 'Your reviews live on your connected accounts — a short, genuine reply to the most recent ones, and to any unhappy one first, does the most good. Nothing on your own website changes.' },
 };
 
 // L3.2 — Guided Fix: Studio OS prepares the whole change; the customer only
@@ -162,11 +165,13 @@ export function answer(ask: Ask, g: Grounding): ConciergeAnswer {
   const intent = classifyIntent(ask.question || '');
   const topic = topicOf(ask, g);
 
-  // celebration topic: one warm voice, whatever was asked
-  if (topic && topic.moment_type === 'good_news') {
+  // celebration topic: one warm voice, whatever was asked. L4.2: a measured
+  // connected win ('celebration') is celebrated the same calm way as an all-well
+  // day ('good_news') — good news is intelligence too, and it flows the same pipe.
+  if (topic && (topic.moment_type === 'good_news' || topic.moment_type === 'celebration')) {
     return base('celebrate',
       `${topic.summary} Days like this are the point — enjoy it. If anything changes, it’ll appear here first, quietly.`,
-      topic, [], []);
+      topic, recsFor(topic, g), []);
   }
 
   // ── L3.3 cross-moment guidance — prioritization works with or without a topic ──

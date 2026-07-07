@@ -9,6 +9,7 @@
 // carries across runs deterministically.
 import type { EvidenceRow, Judgment, Priority, Timing, Audience, JudgmentCategory, ImpactDimension } from './contract.ts';
 import { judgmentHash, maxSeverity, minConfidence, buildReasoning, SEV_RANK } from './contract.ts';
+import { deriveConnectedIntelligence } from '../connected/intelligence.ts';
 
 export interface JudgeContext {
   siteId: string;
@@ -299,15 +300,36 @@ export const RULES: Rule[] = [
     dimensions: ['business_accuracy'], impactNote: 'integrations not shipped + low-value observations; emitted for completeness, surfaced to no one',
     customerImpact: 'none — nothing to act on, or too low-value to interrupt for', priority: () => 'informational' },
 
-  // ── L4.1: connected-provider reads enter the pipeline HERE (no bypass), judged
-  //    but SUPPRESSED for now — the customer sees this data directly on the
-  //    Connections surface ("your rating: 4.6"); turning connected observations
-  //    into Business Moments is a deliberate later step (L4.2), never a side
-  //    effect of connecting a service. Additive data only.
+  // ── L4.1/L4.2: connected-provider reads enter the pipeline HERE (no bypass).
+  //    Pure summaries stay observed-only (the customer sees these numbers
+  //    directly on the Connections surface — "your rating: 4.6"), so nobody is
+  //    interrupted just for connecting a service.
   { key: 'connected_observed', category: 'platform', audience: 'none', timing: 'none', ttlDays: 30,
-    types: ['reviews.connected_summary', 'reviews.connected_rating_low', 'reviews.connected_unreplied', 'seo.connected_search', 'analytics.connected_traffic'],
-    dimensions: ['business_accuracy'], impactNote: 'connected-provider observations; recorded, shown on the Connections surface, awaiting deliberate promotion (L4.2)',
+    types: ['reviews.connected_summary', 'seo.connected_search', 'analytics.connected_traffic'],
+    dimensions: ['business_accuracy'], impactNote: 'connected-provider snapshot; recorded, shown on the Connections surface, no interruption',
     customerImpact: 'the customer sees these directly on their Connections surface', priority: () => 'informational' },
+
+  // ── L4.2 CONNECTED REPUTATION — the one connected concern that earns a place
+  //    on the customer's list, and only because it satisfies the Optimization
+  //    Constitution: the reviews are the OWNER'S, the work (a reply, lifting a
+  //    low rating) is genuinely theirs, and it has no on-site equivalent to merge
+  //    into. Edition-aware (aud optimization): the customer owns it on self-serve;
+  //    the studio owns it on Managed and up — so work decreases as editions rise.
+  //    Mergeable downstream, so it folds into the improvements bundle rather than
+  //    adding a fresh interruption.
+  { key: 'connected_reputation', category: 'trust', audience: aud('optimization'), timing: 'whenever', ttlDays: 30,
+    types: ['reviews.connected_rating_low', 'reviews.connected_unreplied'],
+    dimensions: ['reputation', 'customer_trust'], impactNote: 'connected reviews the owner can act on — unreplied, or a rating worth lifting',
+    customerImpact: 'replying to reviews and lifting a low rating builds trust customers act on', priority: () => 'low' },
+
+  // ── L4.2 CONNECTED IMPROVEMENT — measured good news. Grouped so several
+  //    improvements become ONE calm celebration, never a per-metric ping. Always
+  //    the customer's to enjoy (a celebration is not work, so it isn't reduced by
+  //    edition). Flows the full pipeline → a celebration Business Moment.
+  { key: 'connected_improved', category: 'trust', audience: aud('knowledge'), timing: 'whenever', ttlDays: 14,
+    types: ['analytics.connected_traffic_up', 'seo.connected_search_up', 'reviews.connected_rating_up', 'reviews.connected_reviews_up'],
+    dimensions: ['reputation', 'search_visibility', 'conversion'], impactNote: 'measured improvement since the prior read — traffic, search, rating, or new reviews up',
+    customerImpact: 'the business is doing better on a channel it can see — worth acknowledging', priority: () => 'low' },
 ];
 
 /** Deterministic suppression — noise never reaches M9.2. Each check returns a
@@ -321,7 +343,9 @@ function suppressionReason(j: Judgment, active: Map<string, Judgment>, plan: str
   // customer judgments ("your basics are missing… clears the way to publishing")
   // are false for a site we don't host. Only the edition-aware optimization
   // (opt_*) rules speak to a Monitor site, as honest migration evidence.
-  if (plan === 'presence_monitor' && j.audience === 'customer' && !j.rule.startsWith('opt_')) return 'monitor_not_applicable';
+  // (connected_* rules are the customer's OWN external accounts — always
+  //  applicable on Monitor, so they are exempt alongside the opt_* rules.)
+  if (plan === 'presence_monitor' && j.audience === 'customer' && !j.rule.startsWith('opt_') && !j.rule.startsWith('connected_')) return 'monitor_not_applicable';
   // conflict: a site that was never published makes public-facing judgments moot
   const notLive = active.has('site_not_yet_live') || active.has('hosting_unprovisioned');
   if (notLive && ['public_freshness', 'broken_paths', 'search_snippets', 'security_headers', 'site_unreachable'].includes(j.rule)) {
@@ -374,10 +398,26 @@ export function judge(evidence: EvidenceRow[], ctx: JudgeContext): JudgeResult {
     });
   }
 
-  // suppression pass (deterministic; order-independent: computed against the full active map)
-  const activeMap = new Map(draft.map((j) => [j.rule, j]));
+  // ── L4.2 connected intelligence: connected evidence informs OTHER judgments
+  //    (never bypasses the pipeline). Corroboration nudges confidence up and
+  //    records why; contradiction marks a false on-site judgment for suppression.
+  //    Pure + deterministic; additive — connected-less runs are provably unchanged.
+  const intel = deriveConnectedIntelligence(evidence);
   for (const j of draft) {
-    const reason = suppressionReason(j, activeMap, ctx.plan || 'presence');
+    const boost = intel.boosts.get(j.rule);
+    if (boost) {
+      j.confidence = Math.round(Math.min(1, j.confidence + boost.bump) * 100) / 100;
+      j.reasoning += ' ' + boost.note;
+    }
+  }
+
+  // suppression pass (deterministic; order-independent: computed against the full
+  // active map). A contradicted judgment leaves the map, so its conflict cascade
+  // (e.g. "site not live" suppressing public-facing concerns) lifts too — connected
+  // data corrects the false positive AND everything that rode on it.
+  const activeMap = new Map(draft.filter((j) => !intel.contradicts.has(j.rule)).map((j) => [j.rule, j]));
+  for (const j of draft) {
+    const reason = intel.contradicts.has(j.rule) ? 'connected_contradicts' : suppressionReason(j, activeMap, ctx.plan || 'presence');
     if (reason) { j.status = 'suppressed'; j.suppression_reason = reason; j.timing = 'none'; }
   }
 

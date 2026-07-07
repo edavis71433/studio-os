@@ -195,6 +195,23 @@ export const REC_RULES: RecRule[] = [
     description: 'on our editions the studio holds these (foundations plans, approval-gated — M12/M14); on Monitor they are the customer’s own infrastructure, surfaced as migration value',
     expected_benefit: 'foundations stay sound so a site and its email are never quietly lost',
     value: ['trust', 'business_accuracy'], effort: 'minutes', risk: 'low', undoability: 'versioned', requires_ai: false, ttlDays: 30 },
+
+  // ── L4.2 connected intelligence recommendations ──
+  // Reputation: the reviews are the owner’s; the work (a reply, lifting a low
+  // rating) happens on the provider, so this is a look-and-act, no AI drafting.
+  { judgmentRule: 'connected_reputation', action: 'review',
+    title: 'respond to connected reviews and lift a low rating',
+    description: 'surface unreplied reviews and any low overall rating from a connected source; the owner replies and addresses them on the provider',
+    expected_benefit: 'replied-to reviews and a lifted rating build trust prospective customers act on',
+    value: ['reputation', 'trust'], effort: 'minutes', risk: 'none', undoability: 'not_applicable', requires_ai: false, ttlDays: 30 },
+
+  // Improvement: measured good news. Nothing to do — the recommended action is
+  // simply to acknowledge it, which becomes a calm celebration downstream.
+  { judgmentRule: 'connected_improved', action: 'monitor',
+    title: 'acknowledge measured improvement from connected data',
+    description: 'a connected source shows real improvement since the prior read (more visits, more search reach, a higher rating, or new reviews); acknowledge it — nothing to change',
+    expected_benefit: 'the business sees, in plain words, that a channel it can measure is doing better',
+    value: ['reputation', 'search_visibility'], effort: 'minutes', risk: 'none', undoability: 'not_applicable', requires_ai: false, ttlDays: 14 },
 ];
 
 export interface RecommendResult {

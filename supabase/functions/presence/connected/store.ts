@@ -59,9 +59,19 @@ export async function markStatus(siteId: string, providerKey: string, status: Co
 }
 
 export async function saveConnectedData(siteId: string, providerKey: string, data: unknown): Promise<void> {
+  // L4.2: roll the existing snapshot into `prev` before overwriting, so the
+  // Evidence Engine can observe MEANINGFUL CHANGE (traffic up, rating up, new
+  // reviews) between reads. One row per provider still — this is memory of the
+  // last observation, not history. On the very first read prev stays null.
+  const existing = await svc(`presence_connected_data?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}&select=data,fetched_at&limit=1`);
+  const prevRow = existing.json?.[0] || null;
+  const now = new Date().toISOString();
   await svc('presence_connected_data?on_conflict=site_id,provider_key', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ site_id: siteId, provider_key: providerKey, data, fetched_at: new Date().toISOString() }),
+    body: JSON.stringify({
+      site_id: siteId, provider_key: providerKey, data, fetched_at: now,
+      prev: prevRow?.data ?? null, prev_fetched_at: prevRow?.fetched_at ?? null,
+    }),
   });
   await svc(`presence_connections?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}`, {
     method: 'PATCH', body: JSON.stringify({ last_sync_at: new Date().toISOString() }),

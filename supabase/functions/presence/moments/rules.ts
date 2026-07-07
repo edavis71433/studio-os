@@ -125,6 +125,18 @@ export const TEMPLATES: MomentTemplate[] = [
   { recRule: 'rec_opt_foundations', key: 'foundations', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 21,
     headline: 'Worth a look at your website’s foundations.',
     summary: 'The behind-the-scenes pieces that keep your site and email working — your web address, its security, and its mail settings — could be steadier. We can take care of these for you.' },
+
+  // ── L4.2 connected intelligence moments ──
+  // Reputation: mergeable, so it folds into the improvements bundle — connected
+  // data enriches the customer's list, it doesn't add a fresh interruption.
+  { recRule: 'rec_connected_reputation', key: 'reviews_reply', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a reply to a review or two', ttlDays: 21,
+    headline: 'A few reviews are waiting for a reply.',
+    summary: 'Some recent reviews on your connected accounts haven’t been answered yet. A short, warm reply — even a simple thank-you — is one of the easiest ways to show customers you’re listening.' },
+
+  // Celebration: measured good news, one calm moment however many metrics improved.
+  { recRule: 'rec_connected_improved', key: 'connected_win', type: 'celebration', tone: 'celebratory', mergeable: false, bundleWord: '', ttlDays: 7,
+    headline: 'More people are finding you lately.',
+    summary: 'One of your connected accounts is showing real improvement — more visits, more interest from search, or kinder words from customers. Nothing to do here; it’s simply a good sign worth knowing.' },
 ];
 
 const ALL_WELL: Omit<MomentTemplate, 'recRule' | 'mergeable' | 'bundleWord'> = {

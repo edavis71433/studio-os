@@ -48,6 +48,7 @@ export interface ObservationInput {
   liveFetch: LiveFetch | null;      // null = no hosting to probe
   opt: OptInput | null;             // M10 optimization probes (additive; null = probes unavailable)
   connected: unknown[];             // L4.1 normalized read-only connected data (empty = no connections)
+  connectedPrior: unknown[];        // L4.2 the prior normalized snapshot per provider, for change detection
   /** M11: true when pages/liveFetch describe the customer's EXISTING EXTERNAL
    *  website (Monitor edition). Providers whose observations are only true of
    *  Presence-hosted sites (not-live, hosting-missing, hours-not-public) check
@@ -168,15 +169,19 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
 
   // L4.1: the read-only connected snapshot (normalized cache). Read-only + fenced;
   // absence is simply no connected evidence. Never writes to a provider.
+  // L4.2: also load the PRIOR snapshot per provider so change can be observed.
   let connected: unknown[] = [];
+  let connectedPrior: unknown[] = [];
   try {
-    const cd = await svc(`presence_connected_data?site_id=eq.${site.id}&select=data`);
-    connected = (cd.ok && Array.isArray(cd.json)) ? cd.json.map((r: any) => r.data).filter(Boolean) : [];
-  } catch { connected = []; }
+    const cd = await svc(`presence_connected_data?site_id=eq.${site.id}&select=data,prev`);
+    const rows = (cd.ok && Array.isArray(cd.json)) ? cd.json : [];
+    connected = rows.map((r: any) => r.data).filter(Boolean);
+    connectedPrior = rows.map((r: any) => r.prev).filter(Boolean);
+  } catch { connected = []; connectedPrior = []; }
 
   return {
     site, now,
-    connected,
+    connected, connectedPrior,
     draft: normalizeSnapshotContent(structuredClone(snapshot.content)),
     live: external ? null : live,
     lastLiveAt: external ? null : (lastLive?.created_at ?? null),
