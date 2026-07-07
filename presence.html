@@ -435,6 +435,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <button class="addline" id="btnAddKnowledge">Bring a menu or flyer I already have</button>
 
         <button class="addline" style="margin-top:38px" onclick="openStudioDesk()"><span class="aimark">✦</span> Look things over — review, plan, or polish</button>
+        <button class="addline" style="border-top:none" onclick="openFoundationsDesk()">The technical side — domain, email, security</button>
       </section>
 
       <!-- MENU -->
@@ -1431,6 +1432,96 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
     try { const r = await api("POST", "/faqs", b); S.faqs.push(r.data); done(); renderFaqs(); toast("Answered"); scheduleChangesRefresh(); }
     catch (err) { toast(err.message, true); }
   }, "Keep this answer"));
+// ── M12: Platform Services — the technical side, in plain words ──
+async function openFoundationsDesk() {
+  DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
+  $("deskTitle").textContent = "The technical side, handled";
+  $("deskSub").textContent = "Domain, DNS, security certificate, email protection, hosting — what’s true right now, in plain words. Any change arrives as a plan you approve first.";
+  $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading the foundations…</div><div class="shimmer"></div></div>`;
+  $("deskGo").hidden = true;
+  openSheet("deskScrim");
+  try {
+    const [f, plans] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans")]);
+    renderFoundations(f.data, plans.data || []);
+  } catch (err) {
+    $("deskResults").innerHTML = "";
+    toast(err.message, true);
+  }
+}
+function renderFoundations(f, plans) {
+  const wrap = $("deskResults"); wrap.innerHTML = "";
+  const section = (label, sentence) => {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", label));
+    const p = el("p", "aihint", sentence); p.style.marginTop = "6px";
+    card.appendChild(p);
+    wrap.appendChild(card);
+    return card;
+  };
+  section("your address", f.domain.sentence);
+  const dnsCard = section("the records", f.dns.sentence);
+  if (f.dns.records.length) {
+    const list = el("p", "aihint", f.dns.records.slice(0, 6).map((r) => `${r.type} — ${r.plain}`).join(" · "));
+    list.style.marginTop = "4px";
+    dnsCard.appendChild(list);
+  }
+  section("the lock in the browser", f.ssl.sentence);
+  const emailCard = section("email protection", f.email.sentence);
+  if (f.email.has_mail && !(f.email.spf && f.email.dmarc)) {
+    const acts = el("div", "doa");
+    const b = el("button", "textact", "Prepare the protection plan");
+    b.addEventListener("click", async () => {
+      try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Prepared — review it below."); openFoundationsDesk(); }
+      catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(b);
+    emailCard.appendChild(acts);
+  }
+  section("hosting", f.hosting.sentence);
+
+  const open = plans.filter((p) => p.status === "proposed" || p.status === "approved");
+  if (open.length) {
+    const h = el("h5", "rune", "Plans waiting on you");
+    h.style.marginTop = "26px";
+    wrap.appendChild(h);
+    open.forEach((p) => {
+      const card = el("div", "deskopt");
+      card.appendChild(el("div", "dol", p.status === "approved" ? "approved — being handled" : "your decision"));
+      card.appendChild(el("div", "dop", p.title));
+      const sum = el("p", "aihint", p.summary + " Risk: " + p.risk); sum.style.marginTop = "6px";
+      card.appendChild(sum);
+      (p.steps || []).forEach((s) => {
+        const st = el("p", "aihint", (s.automated ? "handled for you: " : "one small step for you: ") + s.what);
+        st.style.marginTop = "4px";
+        card.appendChild(st);
+        (s.records || []).forEach((r) => {
+          const rec = el("p", "aihint", `　${r.type} record · ${r.name} → ${r.value}`);
+          rec.style.marginTop = "2px";
+          card.appendChild(rec);
+        });
+      });
+      if (p.status === "proposed") {
+        const acts = el("div", "doa");
+        const ap = el("button", "textact", "Approve it");
+        ap.addEventListener("click", async () => {
+          try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "approve" }); toast("Approved — your studio takes it from here."); openFoundationsDesk(); }
+          catch (err) { toast(err.message, true); }
+        });
+        acts.appendChild(ap);
+        const ab = el("button", "quietact", "Not now");
+        ab.addEventListener("click", async () => {
+          try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "abandon" }); card.remove(); }
+          catch (err) { toast(err.message, true); }
+        });
+        acts.appendChild(ab);
+        card.appendChild(acts);
+      }
+      wrap.appendChild(card);
+    });
+  }
+}
+
 // ── M11: Presence Monitor — connect an existing website; observe only ──
 async function renderMonitorCard() {
   if (S.site?.edition !== "monitor") { $("monitorCard").hidden = true; return; }

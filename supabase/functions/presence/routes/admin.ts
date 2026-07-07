@@ -24,6 +24,7 @@ import {
   setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
+import { applyPlan } from './foundations.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { Snapshot } from '../lib/render_types.ts';
@@ -413,7 +414,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     return json({ data: { ok: true } }, 200, cors);
   }
 
-  const m = route.match(/^\/admin\/sites\/([0-9a-f-]{36})(\/[a-z-]+(?:\/[a-z-]+)?)?$/);
+  const m = route.match(/^\/admin\/sites\/([0-9a-f-]{36})(\/[a-z0-9-]+(?:\/[a-z0-9-]+){0,2})?$/);
   if (!m) return null;
   const site = await loadSite(m[1]);
   if (!site) return json({ error: 'not_found', message: 'No site with that id.' }, 404, cors);
@@ -436,6 +437,11 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'The edition change didn’t save.' }, 502, cors);
     await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: `Edition set to ${edition} (operator)`, principal, provenance: 'human', fields: ['edition'] });
     return json({ data: { id: site.id, edition } }, 200, cors);
+  }
+  // ── M12: apply an APPROVED Infrastructure Change Plan (approval law enforced inside)
+  {
+    const pm = sub.match(/^\/plans\/([0-9a-f-]{36})\/apply$/);
+    if (pm && method === 'POST') return applyPlan(site, pm[1], principal, cors);
   }
   // ── M11: Migration Readiness — the operator's full-detail view (the client
   //    route speaks sentences; this one carries the working data)

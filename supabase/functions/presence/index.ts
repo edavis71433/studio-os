@@ -34,6 +34,7 @@ import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, han
 import { handleCoachRun, handleCoachList, handleCoachDecide } from './routes/coach.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
+import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -137,6 +138,14 @@ serve(async (req) => {
     const m = route.match(/^\/brand\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);
     if (m && !m[2] && method === 'GET') return handleBrandReportGet(jwt, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
+  }
+  // ── M12: Platform Services — the technical foundation, in plain words; changes only as approved plans ──
+  if (route === '/foundations' && method === 'GET') return handleFoundationsGet(site, cors);
+  if (route === '/foundations/prepare' && method === 'POST') return handleFoundationsPrepare(req, site, principal, cors);
+  if (route === '/foundations/plans' && method === 'GET') return handleFoundationsPlans(jwt, site, cors);
+  {
+    const m = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/decide$/);
+    if (m && method === 'POST') return handleFoundationsDecide(req, site, m[1], principal, cors);
   }
   // ── M11: Presence Monitor connection (read-only observation of an existing website) ──
   if (route === '/monitor/connection' && method === 'GET') return handleMonitorGet(jwt, site, cors);
