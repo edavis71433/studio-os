@@ -17,7 +17,11 @@ import type { GrowthPack } from '../coach/packs.ts';
 import type { IndustryPack as WriterPack } from '../writer/pack.ts';
 
 // ── the taxonomy: the design space, named (not the pack contents) ────────────
-export type IndustryKey =
+// First-party industries are named for autocomplete + type-safety; but the key
+// is OPEN (L5.2 scaling): a marketplace/partner pack may register any string key
+// without editing the platform's type. `(string & {})` keeps IDE completion for
+// the known set while accepting arbitrary keys.
+export type KnownIndustryKey =
   | 'restaurant' | 'coffee_shop'
   | 'contractor' | 'electrician' | 'plumber' | 'hvac' | 'roofer' | 'landscaper'
   | 'medical' | 'dental'
@@ -26,6 +30,7 @@ export type IndustryKey =
   | 'retail' | 'ecommerce'
   | 'nonprofit' | 'professional_services'
   | 'generic';                       // the universal baseline — always resolvable
+export type IndustryKey = KnownIndustryKey | (string & {});
 
 export type IndustryFamily =
   | 'food' | 'home_services' | 'health' | 'professional' | 'creative' | 'commerce' | 'nonprofit' | 'universal';

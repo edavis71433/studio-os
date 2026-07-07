@@ -41,7 +41,7 @@ function pipeline(input, plan = 'presence') {
 // ═══ 1. the provider self-gates on industry ═══
 {
   const asRestaurant = restaurantEvidence(eatery({ industry: 'restaurant', menu: false, photos: false })).map((e) => e.type);
-  ok('provider: a restaurant with no menu/photos emits restaurant evidence', asRestaurant.includes('content.menu_absent') && asRestaurant.includes('media.food_photos_missing'));
+  ok('provider: a restaurant with no menu/photos emits restaurant evidence', asRestaurant.includes('content.restaurant_menu_absent') && asRestaurant.includes('media.restaurant_food_photos_missing'));
   const asOther = restaurantEvidence(eatery({ industry: 'generic', menu: false, photos: false }));
   ok('self-gating: the SAME site as a non-restaurant emits NOTHING (inert elsewhere)', asOther.length === 0);
   const asMissingIndustry = restaurantEvidence({ site: { id: SITE }, now: NOW, pages: [{ path: '/', html: '' }], mediaRows: [] });
@@ -50,7 +50,7 @@ function pipeline(input, plan = 'presence') {
 
 // ═══ 2. the pack's evidence is in the ONE catalog (spread wiring) ═══
 {
-  ok('wiring: restaurant evidence types live in the ONE frozen catalog', !!CATALOG['content.menu_absent'] && !!CATALOG['content.menu_prices_missing'] && !!CATALOG['media.food_photos_missing']);
+  ok('wiring: restaurant evidence types live in the ONE frozen catalog', !!CATALOG['content.restaurant_menu_absent'] && !!CATALOG['content.restaurant_menu_prices_missing'] && !!CATALOG['media.restaurant_food_photos_missing']);
 }
 
 // ═══ 3. full LIVE pipeline flow — evidence → judgment → recommendation → moment ═══
@@ -110,7 +110,7 @@ function pipeline(input, plan = 'presence') {
     /PACK_JUDGMENT_RULES/.test(src('judgment/rules.ts')) && !/packs\/restaurant/.test(src('judgment/rules.ts')) &&
     /PACK_REC_RULES/.test(src('recommendation/rules.ts')) && !/packs\/restaurant/.test(src('recommendation/rules.ts')) &&
     /PACK_MOMENT_TEMPLATES/.test(src('moments/rules.ts')) && !/packs\/restaurant/.test(src('moments/rules.ts')));
-  ok('no-fork: the restaurant provider self-gates (the only industry logic lives in the pack)', /i\.industry !== 'restaurant'/.test(src('industry/packs/restaurant.ts')));
+  ok('no-fork: the restaurant provider self-gates via the reusable packProvider wrapper (L5.2)', /packProvider\('restaurant'/.test(src('industry/packs/restaurant.ts')));
 }
 
 const passed = results.filter((r) => r.p).length;

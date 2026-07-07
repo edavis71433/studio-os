@@ -13,31 +13,37 @@ import type { RecRule } from '../../recommendation/rules.ts';
 import type { MomentTemplate } from '../../moments/rules.ts';
 import type { IndustryPack } from '../contract.ts';
 import { makePack } from '../registry.ts';
+import { packProvider, packType } from '../helpers.ts';
 import { growthPackFor } from '../../coach/packs.ts';
 import { packFor } from '../../writer/pack.ts';
 
 const s = (v: unknown) => String(v ?? '');
 type Facts = Record<string, string | number | boolean>;
 
-// ── evidence catalog (uses EXISTING categories; the frozen catalog convention
-//    requires a valid category prefix — self-gating comes from the PROVIDER, not
-//    the type name). Additive: merged into the ONE CATALOG via industry/compose. ──
+// L5.2 hardening: collision-safe, industry-namespaced type keys via packType —
+// `<category>.restaurant_<name>` (valid category prefix AND unique across packs).
+const T_MENU_ABSENT = packType('restaurant', 'content', 'menu_absent');            // content.restaurant_menu_absent
+const T_MENU_PRICES = packType('restaurant', 'content', 'menu_prices_missing');    // content.restaurant_menu_prices_missing
+const T_FOOD_PHOTOS = packType('restaurant', 'media', 'food_photos_missing');      // media.restaurant_food_photos_missing
+
+// ── evidence catalog (valid EXISTING categories; industry-namespaced type names).
+//    Additive: merged into the ONE CATALOG via industry/compose. ──
 export const RESTAURANT_CATALOG: Record<string, { category: string; severity: string; confidence: number; next_action: string; human: (f: Facts) => string; tech: (f: Facts) => string }> = {
-  'content.menu_absent': { category: 'content', severity: 'warning', confidence: 0.9,
+  [T_MENU_ABSENT]: { category: 'content', severity: 'warning', confidence: 0.9,
     next_action: 'Add a menu page or section with your dishes.',
     human: () => `There isn’t a menu on the site yet — the page diners look for first.`,
     tech: () => `no page/section matched a menu heading or path.` },
-  'content.menu_prices_missing': { category: 'content', severity: 'info', confidence: 0.8,
+  [T_MENU_PRICES]: { category: 'content', severity: 'info', confidence: 0.8,
     next_action: 'Add prices to the menu items.',
     human: () => `The menu is there, but it doesn’t show prices.`,
     tech: (f) => `menu present; ${s(f.prices)} price patterns detected.` },
-  'media.food_photos_missing': { category: 'media', severity: 'info', confidence: 0.85,
+  [T_FOOD_PHOTOS]: { category: 'media', severity: 'info', confidence: 0.85,
     next_action: 'Add a few real photographs of your food.',
     human: () => `There are no photographs of the food yet.`,
     tech: (f) => `media_count=${s(f.count)}.` },
 };
 
-// ── the pure provider — SELF-GATES on industry; reads only ObservationInput ──
+// ── the pure provider — SELF-GATES via packProvider (can't forget to gate) ──
 const hasMenu = (i: any): boolean => {
   const paths = (i.pages || []).map((p: any) => String(p.path || '').toLowerCase());
   if (paths.some((p: string) => /menu/.test(p))) return true;
@@ -49,28 +55,24 @@ const priceCount = (i: any): number => {
   return (html.match(/[$£€]\s?\d/g) || []).length;
 };
 
-export const restaurantProvider: Provider = {
-  name: 'restaurant',
-  provide(i: any, emit) {
-    if (i.industry !== 'restaurant') return;                 // self-gating: inert for every other industry
-    const menu = hasMenu(i);
-    if (!menu) emit('content.menu_absent', 'content', '/');
-    else if (priceCount(i) < 2) emit('content.menu_prices_missing', 'content', '/', { prices: priceCount(i) });
-    const mediaCount = Array.isArray(i.mediaRows) ? i.mediaRows.length : 0;
-    if (mediaCount === 0) emit('media.food_photos_missing', 'media', '', { count: mediaCount });
-  },
-};
+export const restaurantProvider: Provider = packProvider('restaurant', 'restaurant', (i, emit) => {
+  const menu = hasMenu(i);
+  if (!menu) emit(T_MENU_ABSENT, 'content', '/');
+  else if (priceCount(i) < 2) emit(T_MENU_PRICES, 'content', '/', { prices: priceCount(i) });
+  const mediaCount = Array.isArray(i.mediaRows) ? i.mediaRows.length : 0;
+  if (mediaCount === 0) emit(T_FOOD_PHOTOS, 'media', '', { count: mediaCount });
+});
 
 // ── judgment rules (consume ONLY this pack's evidence types → inert elsewhere) ──
 export const RESTAURANT_JUDGMENT_RULES: Rule[] = [
   { key: 'restaurant_menu', category: 'content', audience: 'customer', timing: 'soon', ttlDays: 30,
-    types: ['content.menu_absent', 'content.menu_prices_missing'],
+    types: [T_MENU_ABSENT, T_MENU_PRICES],
     dimensions: ['conversion', 'search_visibility'],
     impactNote: 'the menu is the page diners open before deciding',
     customerImpact: 'diners can’t see what’s served or what it costs',
-    priority: (ev): Priority => (ev.some((e) => e.type === 'content.menu_absent') ? 'medium' : 'low') },
+    priority: (ev): Priority => (ev.some((e) => e.type === T_MENU_ABSENT) ? 'medium' : 'low') },
   { key: 'restaurant_visuals', category: 'media', audience: 'customer', timing: 'whenever', ttlDays: 45,
-    types: ['media.food_photos_missing'],
+    types: [T_FOOD_PHOTOS],
     dimensions: ['conversion'],
     impactNote: 'food photography is the strongest conversion lever for restaurants',
     customerImpact: 'diners choose with their eyes; no photos is a harder sell',
@@ -111,7 +113,7 @@ export const RESTAURANT_PACK: IndustryPack = makePack({
     bookingPosture: 'reservation',
   },
   vocabulary: { offerings: 'menu', offering: 'dish', services: 'menu', gallery: 'food photos', book: 'reserve a table' },
-  evidence: { providerNames: ['restaurant'], catalogTypes: ['content.menu_absent', 'content.menu_prices_missing', 'media.food_photos_missing'] },
+  evidence: { providerNames: ['restaurant'], catalogTypes: [T_MENU_ABSENT, T_MENU_PRICES, T_FOOD_PHOTOS] },
   intelligence: {
     judgmentRules: ['restaurant_menu', 'restaurant_visuals'],
     recommendationRules: ['rec_restaurant_menu', 'rec_restaurant_visuals'],
