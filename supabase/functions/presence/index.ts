@@ -29,6 +29,7 @@ import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
+import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -113,6 +114,14 @@ serve(async (req) => {
   if (route === '/writer/generate' && method === 'POST') return handleWriterGenerate(req, site, cors);
   // ── M9.5B: the AI Editor (improve existing content; shares the Writer's proposal flow) ──
   if (route === '/editor/improve' && method === 'POST') return handleEditorImprove(req, site, cors);
+  // ── M9.5C: the AI Reviewer (critique only; no write path to content exists) ──
+  if (route === '/review/run' && method === 'POST') return handleReviewRun(req, site, cors);
+  if (route === '/review/reports' && method === 'GET') return handleReviewList(jwt, site, cors);
+  {
+    const m = route.match(/^\/review\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);
+    if (m && !m[2] && method === 'GET') return handleReviewGet(jwt, site, m[1], cors);
+    if (m && m[2] === '/dismiss' && method === 'POST') return handleReviewDismiss(req, site, m[1], cors);
+  }
   if (route === '/writer/drafts' && method === 'GET') return handleWriterList(jwt, site, cors);
   {
     const m = route.match(/^\/writer\/drafts\/([0-9a-f-]{36})(\/accept|\/discard)?$/);

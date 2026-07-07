@@ -421,6 +421,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
 
         <button class="addline" style="margin-top:38px" onclick="openEditDesk('site_polish','business',null,'readability')"><span class="aimark">✦</span> Polish my whole website’s writing</button>
+        <button class="addline" style="border-top:none" onclick="openReviewDesk()"><span class="aimark">✦</span> Look over my website’s writing</button>
       </section>
 
       <!-- MENU -->
@@ -1148,6 +1149,7 @@ function openDesk(kind, view) {
   DESK.mode = "write"; DESK.kind = kind; DESK.view = view; DESK.targetId = null;
   $("deskTitle").innerHTML = '<span class="aimark">✦</span> Draft it with help';
   $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
+  $("deskInstructions").parentElement.hidden = false;
   $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
   $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Write the drafts";
   openSheet("deskScrim");
@@ -1156,6 +1158,7 @@ function openEditDesk(kind, view, targetId, action) {
   DESK.mode = "edit"; DESK.kind = kind; DESK.view = view; DESK.targetId = targetId || null; DESK.action = action || "rewrite";
   $("deskTitle").innerHTML = '<span class="aimark">✦</span> Improve it with help';
   $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
+  $("deskInstructions").parentElement.hidden = false;
   $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
   $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Suggest improvements";
   openSheet("deskScrim");
@@ -1231,6 +1234,66 @@ function renderDeskOptions(draft) {
     closeSheet("deskScrim");
   });
   wrap.appendChild(none);
+}
+
+/* ── the review desk (M9.5C) — findings only; fixes go through the Editor ── */
+const EDIT_KIND_VIEW = { edit_identity: "business", edit_faq: "faqs", edit_offering: "offerings", edit_post: "updates", site_polish: "business" };
+const WRITE_KIND_VIEW = { faqs: "faqs", identity_copy: "business", post: "updates" };
+async function openReviewDesk() {
+  DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> A look over your writing';
+  $("deskSub").textContent = "A read-through of what’s written — description, answers, item descriptions, updates. Nothing changes; you get honest notes, and every note can be dismissed or handed to the editor.";
+  $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading it all over…</div><div class="shimmer"></div></div>`;
+  $("deskGo").hidden = true;
+  openSheet("deskScrim");
+  try {
+    const r = await api("POST", "/review/run", { scope: "site" });
+    const report = await api("GET", `/review/reports/${r.data.review_id}`);
+    renderReviewFindings(report.data);
+  } catch (err) {
+    $("deskResults").innerHTML = "";
+    toast(err.message, true);
+  }
+}
+function renderReviewFindings(report) {
+  const wrap = $("deskResults"); wrap.innerHTML = "";
+  const open = (report.findings || []).filter((f) => f.status === "open");
+  if (!open.length) {
+    wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">It reads well.</div><div class="eh">Nothing worth flagging — your words are doing their job.</div></div>`;
+    return;
+  }
+  open.forEach((f) => {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", f.category.replace(/_/g, " ")));
+    card.appendChild(el("div", "dop", f.finding));
+    const meta = el("p", "aihint", `Why it matters: ${f.reason} The gain: ${f.expected_benefit}. ${f.suggested_action}`);
+    meta.style.marginTop = "6px";
+    card.appendChild(meta);
+    if ((f.supporting_evidence || []).length) {
+      const q = el("p", "aihint", "From your page: “" + f.supporting_evidence[0] + "”");
+      q.style.marginTop = "4px";
+      card.appendChild(q);
+    }
+    const acts = el("div", "doa");
+    if (f.handoff && f.handoff.route === "editor") {
+      const fix = el("button", "textact", "✦ Fix with help");
+      fix.addEventListener("click", () => { closeSheet("deskScrim"); openEditDesk(f.handoff.kind, EDIT_KIND_VIEW[f.handoff.kind] || "business", f.handoff.target_id || null, f.handoff.action || "rewrite"); });
+      acts.appendChild(fix);
+    } else if (f.handoff && f.handoff.route === "writer") {
+      const write = el("button", "textact", "✦ Draft it with help");
+      write.addEventListener("click", () => { closeSheet("deskScrim"); openDesk(f.handoff.kind, WRITE_KIND_VIEW[f.handoff.kind] || "business"); });
+      acts.appendChild(write);
+    }
+    const dis = el("button", "quietact", "Dismiss");
+    dis.addEventListener("click", async () => {
+      try { await api("POST", `/review/reports/${report.id}/dismiss`, { finding_id: f.review_id }); card.remove(); }
+      catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(dis);
+    card.appendChild(acts);
+    wrap.appendChild(card);
+  });
 }
 
 $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
