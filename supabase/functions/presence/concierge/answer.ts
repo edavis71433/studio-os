@@ -9,7 +9,10 @@ import type { Grounding } from './grounding.ts';
 export type Verb = 'explain' | 'recommend' | 'teach' | 'guide' | 'celebrate';
 export type Intent =
   | 'what_means' | 'why_recommend' | 'why_important' | 'if_ignored'
-  | 'how_fix' | 'what_changes' | 'do_it' | 'overview' | 'unsupported';
+  | 'how_fix' | 'what_changes' | 'do_it' | 'overview' | 'unsupported'
+  // L3.3 optimization follow-ups (deterministic, grounded — never open-ended chat)
+  | 'can_wait' | 'will_break' | 'how_long' | 'need_technical'
+  | 'affects_email' | 'affects_site' | 'can_you_do' | 'what_first' | 'how_important_relative';
 
 export interface Ask {
   question: string;
@@ -31,6 +34,16 @@ export interface ConciergeAnswer {
 export function classifyIntent(q: string): Intent {
   const s = ' ' + q.toLowerCase().replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
   if (!s.trim()) return 'overview';
+  // ── L3.3 optimization follow-ups (specific first, so they win over generics) ──
+  if (/( email )/.test(s) && /( affect | change | break | touch | impact | mess | hurt | do to )/.test(s)) return 'affects_email';
+  if (/( affect (my )?(web ?site|site|pages?) | change (my )?(web ?site|site|live site|pages?) | touch (my )?(web ?site|site) | do to my (web ?site|site) | impact (my )?(web ?site|site) )/.test(s)) return 'affects_site';
+  if (/( will .* break | anything break | is it safe | risky | go wrong | will it hurt | damage | mess .* up | lose anything | break my )/.test(s)) return 'will_break';
+  if (/( can i wait | can this wait | does this have to | have to do this now | urgent | in a hurry | how soon | put it off | no rush )/.test(s)) return 'can_wait';
+  if (/( how long | how much time | take long | how quick | does it take | time .* take )/.test(s)) return 'how_long';
+  if (/( technical | need to know anything | complicated | on my own | by myself | over my head | too hard | am i able )/.test(s)) return 'need_technical';
+  if (/( can you (do|handle|set|take care|sort|fix) | can studio os | do you (do|handle) this | is this something you | you handle this | you do this for me | is that something you )/.test(s)) return 'can_you_do';
+  if (/( do first | where do i start | start with | first thing | which one first | what .* first | start here )/.test(s)) return 'what_first';
+  if (/( compared to | most important | matter most | vs everything | big picture | more important than | biggest | rank )/.test(s)) return 'how_important_relative';
   if (/( ignore | skip | don'?t do | do nothing | leave it | what happens if i don'?t | later )/.test(s)) return 'if_ignored';
   if (/( fix this | do it | go ahead | please do | handle it | take care of it | yes do )/.test(s)) return 'do_it';
   if (/( how do i | how can i | how to | where do i | what do i do | fix )/.test(s)) return 'how_fix';
@@ -115,6 +128,18 @@ function evidenceFor(recs: Grounding['recommendations'], g: Grounding) {
   const eIds = new Set(g.judgments.filter((j) => jh.has(j.hash)).flatMap((j) => j.evidence_ids));
   return g.evidence.filter((e) => eIds.has(e.id));
 }
+// L3.3 — which kind of ownership a moment's work is, so answers can reinforce
+// it: platform (ours, silent), guided (we prepare, you approve), customer (yours).
+type Ownership = 'platform' | 'guided' | 'customer' | 'unknown';
+function ownershipOf(recs: Grounding['recommendations']): Ownership {
+  if (recs.some((r) => PLATFORM_HANDLED.has(r.rule))) return 'platform';
+  if (recs.some((r) => GUIDED_FIX[r.rule])) return 'guided';
+  if (recs.some((r) => FIX_PLACE[r.rule])) return 'customer';
+  return 'unknown';
+}
+// Does this work touch email? Only the foundations task can (mail settings).
+const touchesEmail = (recs: Grounding['recommendations']) => recs.some((r) => r.rule === 'rec_opt_foundations');
+
 const lowConf = (ev: Grounding['evidence']) => ev.length > 0 && Math.min(...ev.map((e) => e.confidence)) < 0.8;
 const uniq = <T>(a: T[]) => [...new Set(a)];
 const listWords = (ws: string[]) => ws.length > 1 ? ws.slice(0, -1).join(', ') + ' and ' + ws[ws.length - 1] : (ws[0] || '');
@@ -145,8 +170,35 @@ export function answer(ask: Ask, g: Grounding): ConciergeAnswer {
       topic, [], []);
   }
 
+  // ── L3.3 cross-moment guidance — prioritization works with or without a topic ──
+  if (intent === 'what_first') {
+    if (!g.moments.length) return base('explain', `Nothing’s waiting for you to start on — when something’s worth your time, it’ll show up here.`, null, [], []);
+    const top = g.moments[0];
+    const topRecs = recsFor(top, g);
+    const dims = uniq(topRecs.flatMap((r) => r.value_dimensions)).map((d) => DIM_PHRASE[d]).filter(Boolean);
+    let text = `If you only do one thing, start with “${top.headline}”`;
+    text += dims.length ? ` — it’s the one that most touches ${listWords(dims.slice(0, 2))}.` : `.`;
+    if (g.moments.length > 1) text += ` The rest can follow in any order, and none is waiting on the others.`;
+    return base('guide', text, top, topRecs, []);
+  }
+  if (intent === 'how_important_relative') {
+    const t = topic || g.moments[0] || null;
+    if (!t) return base('explain', `There’s nothing on your list right now, so there’s nothing to weigh.`, null, [], []);
+    const rank = g.moments.findIndex((m) => m.id === t.id);
+    const text = rank <= 0
+      ? `Of what’s here, this is the one I’d look at first — but nothing on your list is an emergency; it’s all steady improvement, at your pace.`
+      : `A thing or two sits a little ahead of this one, but none of it is urgent — it’s about steady improvement, whenever it suits you.`;
+    return base('teach', text, t, recsFor(t, g), []);
+  }
+
   // no topic: overview or honest refusal
   if (!topic) {
+    if (intent === 'need_technical') {
+      return base('teach', `Not at all. Everything here is in plain words, and anything technical is ours to handle — you decide in business terms, and we take care of the rest.`, null, [], []);
+    }
+    if (intent === 'will_break') {
+      return base('teach', `Nothing here can break your live site. Anything you change waits in a private draft until you publish, publishing happens all at once (never halfway), and every version is kept so anything can come back.`, null, [], []);
+    }
     if (intent === 'overview' || intent === 'what_means') {
       if (!g.moments.length) {
         return base('explain', `There’s nothing waiting for you today. When something deserves your attention, it appears here — at most three things, never a flood.`, null, [], []);
@@ -231,6 +283,59 @@ export function answer(ask: Ask, g: Grounding): ConciergeAnswer {
       }
       const text = `The place for that is ready — ${places.map((p) => p.steps).join(' ')} ${APPROVAL_LINE}`;
       return base('guide', text, topic, recs, ev, places.map((p) => ({ label: p.label, section: p.section })));
+    }
+    case 'can_wait': {
+      const timing = recs[0] ? TIMING_PHRASE[recs[0].timing] : 'no rush at all';
+      const text = `You can. It’s ${timing} — waiting costs nothing. It stays here quietly without nagging, and if it ever becomes more serious you’ll hear about it, honestly and only then.`;
+      return base('teach', text, topic, recs, ev);
+    }
+    case 'will_break': {
+      const own = ownershipOf(recs);
+      const text = own === 'guided'
+        ? `Nothing breaks. This is a change we prepare and you approve — nothing to your web address, email, or security happens until you say yes, and it can be undone.`
+        : own === 'platform'
+          ? `Nothing for you to worry about — this one’s ours to handle, and it never touches anything you’d see or lose.`
+          : `Nothing on your live site can break. Anything you change waits in a private draft until you publish, publishing happens all at once — never halfway — and every version is kept, so it can always come back.`;
+      return base('guide', text, topic, recs, ev);
+    }
+    case 'how_long': {
+      const own = ownershipOf(recs);
+      if (own === 'platform') return base('teach', `No time from you at all — this one’s handled on our side.`, topic, recs, ev);
+      if (own === 'guided') return base('teach', `Just a moment to approve — we’ve done the preparing.`, topic, recs, ev);
+      return base('teach', `For your part, ${efforts[0] || 'just a few minutes'}.`, topic, recs, ev);
+    }
+    case 'need_technical': {
+      const own = ownershipOf(recs);
+      let text = `Not at all — everything here is in plain words.`;
+      if (own === 'platform') text += ` This one you don’t touch at all; it’s ours.`;
+      else if (own === 'guided') text += ` We prepare the technical part; you just approve it in plain language.`;
+      else text += ` It’s about your business, not the machinery — you decide, and I’ll point you to exactly the right spot.`;
+      return base('teach', text, topic, recs, ev);
+    }
+    case 'affects_email': {
+      const text = touchesEmail(recs)
+        ? `It can touch your email settings — that’s part of keeping your mail trusted and arriving. But it’s a change we prepare and you approve; nothing happens to your email until you say yes.`
+        : `No — your email is completely untouched by this. It’s only about your website.`;
+      return base('guide', text, topic, recs, ev);
+    }
+    case 'affects_site': {
+      const own = ownershipOf(recs);
+      const text = own === 'platform'
+        ? `Only for the better, and it’s handled for you — nothing you’d have to touch.`
+        : own === 'guided'
+          ? `Only the behind-the-scenes settings, and only after you approve — your pages and words stay exactly as they are.`
+          : `Only what you choose to change, and only once you publish — until then, your live site stays exactly as it is.`;
+      return base('guide', text, topic, recs, ev);
+    }
+    case 'can_you_do': {
+      const own = ownershipOf(recs);
+      const guided = recs.map((r) => GUIDED_FIX[r.rule]).filter(Boolean) as Array<{ section: string; label: string; steps: string }>;
+      if (own === 'platform') return base('guide', PLATFORM_HANDLED_LINE, topic, recs, ev);
+      if (own === 'guided' && guided.length) return base('guide', `Yes — ${guided[0].steps}`, topic, recs, ev, guided.map((g2) => ({ label: g2.label, section: g2.section })));
+      if (places.length) {
+        return base('guide', `This part is yours — it’s about your own business, which only you can speak to. But it’s ${efforts[0] || 'a few minutes'}, and I’ll take you right to the spot: ${places.map((p) => p.steps).join(' ')}`, topic, recs, ev, places.map((p) => ({ label: p.label, section: p.section })));
+      }
+      return base('explain', `${topic.summary} This one’s a look-and-confirm rather than something I can set up.`, topic, recs, ev);
     }
     default:
       return base('explain', `${HONEST_NO_EVIDENCE} On this note, what I can tell you: ${topic.summary}`, topic, recs, ev);
