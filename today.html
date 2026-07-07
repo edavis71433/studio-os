@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Today — Your Presence</title>
+<meta name="description" content="What needs you today — at most a few calm things, in plain words.">
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#fffdf9; --ink:#221f1a; --soft:#6b6459; --line:#e7e1d6;
+    --accent:#7a5c3e; --accent-soft:#efe7db; --good:#3f6b52; --good-soft:#e7efe8;
+    --warn:#8a6d3b; --warn-soft:#f3ead9; --shadow:0 1px 2px rgba(40,32,20,.04),0 8px 24px rgba(40,32,20,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#1a1815;--card:#221f1b;--ink:#efe9df;--soft:#a49b8c;--line:#33302a;
+      --accent:#c8a678;--accent-soft:#2c2620;--good:#8bbf9f;--good-soft:#222a24;--warn:#d3ac6e;--warn-soft:#2a2419;
+      --shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28);}
+  }
+  :root[data-theme="light"]{--bg:#f6f4ef;--card:#fffdf9;--ink:#221f1a;--soft:#6b6459;--line:#e7e1d6;--accent:#7a5c3e;--accent-soft:#efe7db;--good:#3f6b52;--good-soft:#e7efe8;--warn:#8a6d3b;--warn-soft:#f3ead9;}
+  :root[data-theme="dark"]{--bg:#1a1815;--card:#221f1b;--ink:#efe9df;--soft:#a49b8c;--line:#33302a;--accent:#c8a678;--accent-soft:#2c2620;--good:#8bbf9f;--good-soft:#222a24;--warn:#d3ac6e;--warn-soft:#2a2419;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:48px 22px 96px}
+  header .eyebrow{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600}
+  header h1{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1.12;margin:.35em 0 .1em;text-wrap:balance}
+  header .sub{color:var(--soft);font-size:15.5px;margin:0}
+  .stack{display:flex;flex-direction:column;gap:16px;margin-top:34px}
+  .moment{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 22px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .moment::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:.5}
+  .moment.good::before{background:var(--good)} .moment.attn::before{background:var(--warn)}
+  .moment h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 6px;line-height:1.2;text-wrap:balance}
+  .moment p{margin:0;color:var(--soft);font-size:15px}
+  .row{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:var(--accent-soft);border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.primary:hover{filter:brightness(1.05)}
+  button.ghost{border-color:transparent;color:var(--soft);padding-left:6px;padding-right:6px}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .answer{margin-top:14px;padding:14px 16px;background:var(--accent-soft);border-radius:12px;font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
+  .tag{display:inline-block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:8px}
+  .calm{background:var(--good-soft);border-color:transparent}
+  .calm h2{color:var(--good)}
+  .features{margin-top:40px;padding-top:26px;border-top:1px solid var(--line)}
+  .features .lead{font-size:13px;color:var(--soft);margin:0 0 12px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+  .ask{margin-top:44px;padding-top:28px;border-top:1px solid var(--line)}
+  .ask h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 4px}
+  .ask p{margin:0 0 14px;color:var(--soft);font-size:14px}
+  .askbox{display:flex;gap:10px}
+  .askbox input{flex:1;font-family:inherit;font-size:15px;padding:12px 15px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .askbox input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .muted{color:var(--soft);font-size:14px}
+  .center{text-align:center;padding:56px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  a.link{color:var(--accent);text-decoration:none;font-weight:600}
+  a.link:hover{text-decoration:underline}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow" id="eyebrow">Your presence</div>
+    <h1 id="greeting">Today</h1>
+    <p class="sub" id="sub">A calm look at what — if anything — needs you.</p>
+  </header>
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features.
+//    No engine, no new system. Calm, plain language; nothing technical.
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN = "";
+
+async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN } }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+
+function greet(){ const h = new Date().getHours(); return h < 12 ? 'Good morning.' : h < 18 ? 'Good afternoon.' : 'Good evening.'; }
+
+// tone → calm styling class (never a score, never a colour alarm)
+function toneClass(t){ if(t==='good_news'||t==='celebration'||t==='celebratory'||t==='reassuring') return 'good'; if(t==='needs_attention'||t==='attentive') return 'attn'; return ''; }
+
+function render(moments, features){
+  $('greeting').textContent = greet();
+  const items = (moments||[]).filter(Boolean);
+  let html = '';
+  if(!items.length){
+    $('sub').textContent = "Nothing needs your attention today.";
+    html += `<div class="moment calm"><span class="tag">All clear</span>
+      <h2>Everything customers can see is current.</h2>
+      <p>Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.</p></div>`;
+  } else {
+    $('sub').textContent = items.length === 1 ? "One thing worth a look — no rush." : `${items.length} small things worth a look — none of them urgent.`;
+    for(const m of items){
+      const cls = toneClass(m.moment_type || m.tone);
+      const celebrate = cls === 'good';
+      html += `<article class="moment ${cls}">
+        ${celebrate ? '<span class="tag">Good news</span>' : ''}
+        <h2>${esc(m.headline)}</h2>
+        <p>${esc(m.summary)}</p>
+        <div class="row">
+          ${celebrate ? '' : `<button class="primary" data-explain="${esc(m.id)}">Walk me through it</button>`}
+          ${m.dismissable ? `<button class="ghost" data-dismiss="${esc(m.id)}">Not now</button>` : ''}
+        </div>
+        <div class="answer" id="ans-${esc(m.id)}" hidden></div>
+      </article>`;
+    }
+  }
+  // "what comes with your business" — the Industry Pack, made invisible
+  const feats = (features && features.features) || [];
+  if(feats.length){
+    html += `<div class="features"><p class="lead">${esc((features && features.note) || 'These come with your kind of business — nothing to set up.')}</p>
+      <div class="chips">${feats.map(f=>`<span class="chip">${esc(f)}</span>`).join('')}</div></div>`;
+  }
+  // the Concierge — a knowledgeable partner, not a chatbot
+  html += `<div class="ask"><h3>Have a question about your presence?</h3>
+    <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
+    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
+    <div class="answer" id="askAns" hidden></div></div>`;
+  $('main').innerHTML = html;
+  wire();
+}
+
+function wire(){
+  document.querySelectorAll('[data-explain]').forEach(b => b.addEventListener('click', () => explain(b.getAttribute('data-explain'), b)));
+  document.querySelectorAll('[data-dismiss]').forEach(b => b.addEventListener('click', () => dismiss(b.getAttribute('data-dismiss'), b)));
+  const askBtn = $('askBtn'), q = $('q');
+  if(askBtn){ askBtn.addEventListener('click', ask); q.addEventListener('keydown', e => { if(e.key==='Enter') ask(); }); }
+}
+
+async function explain(id, btn){
+  const box = $('ans-'+id); if(!box) return;
+  btn.disabled = true; btn.textContent = 'One moment…';
+  try{ const r = await apiPost('/concierge/ask', { question: 'how do I fix this?', topic_id: id });
+    box.textContent = (r && r.data && r.data.text) || 'Open it when you have a minute — nothing changes until you decide.';
+  }catch(_){ box.textContent = 'I couldn’t load the details just now — nothing’s wrong, try again in a moment.'; }
+  box.hidden = false; btn.disabled = false; btn.textContent = 'Walk me through it';
+}
+async function dismiss(id, btn){
+  const card = btn.closest('.moment'); btn.disabled = true;
+  try{ await apiPost('/moments/'+id+'/dismiss', {}); if(card){ card.style.opacity = '.35'; btn.textContent = 'Set aside'; } }
+  catch(_){ btn.disabled = false; }
+}
+async function ask(){
+  const q = $('q'), box = $('askAns'), btn = $('askBtn');
+  const question = (q.value||'').trim(); if(!question) return;
+  btn.disabled = true; btn.textContent = '…'; box.hidden = false; box.textContent = 'Thinking about your presence…';
+  try{ const r = await apiPost('/concierge/ask', { question }); box.textContent = (r && r.data && r.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess.'; }
+  catch(_){ box.textContent = 'I couldn’t answer just now — nothing’s wrong, please try again in a moment.'; }
+  btn.disabled = false; btn.textContent = 'Ask';
+}
+
+function signedOut(){
+  $('sub').textContent = '';
+  $('main').innerHTML = `<div class="center"><h2>Welcome back.</h2>
+    <p class="muted">Sign in to see what — if anything — needs you today.</p>
+    <p style="margin-top:22px"><a class="link" href="/portal.html">Sign in to your presence →</a></p></div>`;
+}
+function trouble(){
+  $('main').innerHTML = `<div class="center"><h2>We couldn’t load your day just now.</h2>
+    <p class="muted">Nothing’s wrong on your site — this is only this page. Please refresh in a moment.</p>
+    <p style="margin-top:20px"><a class="link" href="/portal.html">Open your full workspace →</a></p></div>`;
+}
+
+(async function init(){
+  try{
+    const { data } = await sb.auth.getSession();
+    TOKEN = (data && data.session && data.session.access_token) || "";
+    if(!TOKEN){ signedOut(); return; }
+    const [moments, features] = await Promise.all([
+      apiGet('/moments').catch(()=>({data:[]})),
+      apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
+    ]);
+    const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
+    render(list, features?.data || {});
+  }catch(_){ trouble(); }
+})();
+</script>
+</body>
+</html>
