@@ -27,6 +27,7 @@ import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } 
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
+import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -107,6 +108,15 @@ serve(async (req) => {
   }
   // ── M9.4: the Concierge (one host; grounded answers; prepares, never performs) ──
   if (route === '/concierge/ask' && method === 'POST') return handleConciergeAsk(req, site, cors);
+  // ── M9.5A: the AI Writer (Draft verb, rung 2 — proposals only; never publishes) ──
+  if (route === '/writer/generate' && method === 'POST') return handleWriterGenerate(req, site, cors);
+  if (route === '/writer/drafts' && method === 'GET') return handleWriterList(jwt, site, cors);
+  {
+    const m = route.match(/^\/writer\/drafts\/([0-9a-f-]{36})(\/accept|\/discard)?$/);
+    if (m && !m[2] && method === 'GET') return handleWriterGet(jwt, site, m[1], cors);
+    if (m && m[2] === '/accept' && method === 'POST') return handleWriterAccept(req, site, m[1], principal, cors);
+    if (m && m[2] === '/discard' && method === 'POST') return handleWriterDiscard(site, m[1], cors);
+  }
   if (route === '/media' && method === 'GET') return handleMediaList(site, cors);
   if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, jwt, site, principal, cors); if (r) return r; }
   if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, jwt, site, principal, cors); if (r) return r; }

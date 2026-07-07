@@ -105,6 +105,13 @@ h5.rune .whisper.ok{color:var(--sage)}
 .askrow input{flex:1;font-family:var(--serif);font-size:14px;background:transparent;border:none;border-bottom:1px solid var(--hair);padding:2px 0 6px;caret-color:var(--plum)}
 .askrow input:focus{outline:none;border-bottom-color:var(--plum)}
 .askrow button{flex:none}
+/* the writing desk (M9.5A) — ✦ marks drafted words, per the AI language freeze */
+.deskopt{border:1px solid var(--hair);border-radius:4px;background:var(--paper);padding:16px 18px;margin-bottom:12px}
+.deskopt .dol{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--plum);font-weight:600;margin-bottom:8px}
+.deskopt .dop{font-family:var(--serif);font-size:14px;line-height:1.65;white-space:pre-line;max-height:220px;overflow:auto}
+.deskopt .doa{display:flex;gap:18px;margin-top:12px;align-items:baseline}
+.aihint{font-size:11.5px;color:var(--ink-2);font-style:italic;font-family:var(--serif)}
+.aimark{color:var(--plum);font-style:normal}
 .journal .jrow{display:flex;gap:18px;padding:10px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
 .journal .jrow:last-child{border-bottom:0}
 .journal .jsec{flex:none;width:92px;font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-2);font-weight:600;padding-top:4px}
@@ -391,7 +398,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <p class="docsub">The facts customers rely on. Everything here keeps itself saved as you write — nothing reaches your website until you publish.</p>
         <div id="bizWaiting"></div>
 
-        <h5 class="rune">About your business <span class="whisper" id="save-identity"></span></h5>
+        <h5 class="rune">About your business <span class="whisper" id="save-identity"></span><button class="quietact" style="letter-spacing:0;text-transform:none;font-weight:400" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> draft with help</button></h5>
         <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
         <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
         <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
@@ -428,6 +435,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <p class="docsub">The questions customers actually ask, answered once, in your words.</p>
         <div id="faqList"></div>
         <button class="addline" id="btnAddFaq">＋ Answer a new question</button>
+        <button class="addline" style="border-top:none" onclick="openDesk('faqs','faqs')"><span class="aimark">✦</span> Draft a few with help</button>
         <div id="faqAddWrap"></div>
       </section>
 
@@ -446,6 +454,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <p class="docsub">News, seasonal notes, announcements. Drafts stay private; what you choose to show appears on your Updates page when you publish.</p>
         <div id="postList"></div>
         <button class="addline" id="btnAddPost">＋ Write an update</button>
+        <button class="addline" style="border-top:none" onclick="openDesk('post','updates')"><span class="aimark">✦</span> Draft one with help</button>
         <div id="postAddWrap"></div>
       </section>
 
@@ -520,6 +529,26 @@ h5.rune .whisper.ok{color:var(--sage)}
     <div class="foot">
       <button class="quietact" id="btnPickNone">No photograph</button>
       <button class="quietact" data-close>Never mind</button>
+    </div>
+  </div>
+</div>
+
+<!-- the writing desk (M9.5A) -->
+<div class="scrim" id="deskScrim">
+  <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="deskTitle">
+    <h2 id="deskTitle"><span class="aimark">✦</span> Draft it with help</h2>
+    <p class="sub" id="deskSub"></p>
+    <div class="body">
+      <div class="field" style="margin-bottom:16px">
+        <label for="deskInstructions">Anything you want it to know?</label>
+        <input type="text" id="deskInstructions" maxlength="300" placeholder="optional — e.g. mention the new patio">
+      </div>
+      <div id="deskResults"></div>
+      <p class="aihint" id="deskFoot">Drafts are suggestions written from your own facts — nothing is invented, everything lands in your draft only if you keep it, and your live site never changes until you publish.</p>
+    </div>
+    <div class="foot">
+      <button class="quietact" data-close>Never mind</button>
+      <button class="pillbtn inked" id="deskGo">Write the drafts</button>
     </div>
   </div>
 </div>
@@ -1091,6 +1120,81 @@ function inlineAdd(wrapId, fields, onAdd, addLabel) {
   wrap.appendChild(ed);
   ed.querySelector("input,textarea").focus();
 }
+/* ── the writing desk (M9.5A) — the Draft verb: writes only when asked ── */
+const DESK = { kind: null, view: null };
+const DESK_KINDS = {
+  faqs: { sub: "A few answered questions, written from your facts — you keep only what reads right." },
+  post: { sub: "An update for your Updates page — seasonal note, announcement, news." },
+  identity_copy: { sub: "Your description, tagline, or story — in your voice, from your facts." },
+};
+function openDesk(kind, view) {
+  DESK.kind = kind; DESK.view = view;
+  $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
+  $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
+  $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Write the drafts";
+  openSheet("deskScrim");
+}
+$("deskGo").addEventListener("click", async () => {
+  const btn = $("deskGo");
+  btn.disabled = true; btn.textContent = "Writing…";
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Setting words to your facts…</div><div class="shimmer"></div></div>`;
+  try {
+    const r = await api("POST", "/writer/generate", { kind: DESK.kind, instructions: $("deskInstructions").value.trim() });
+    const d = await api("GET", `/writer/drafts/${r.data.draft_id}`);
+    renderDeskOptions(d.data);
+    btn.hidden = true;
+  } catch (err) {
+    $("deskResults").innerHTML = "";
+    btn.disabled = false; btn.textContent = "Try again";
+    toast(err.message, true);
+  }
+});
+function payloadPreview(p) {
+  const bits = [];
+  if (p.identity) for (const [k, v] of Object.entries(p.identity)) bits.push(`${k.replace(/_/g, " ")}: ${v}`);
+  if (p.faqs) for (const f of p.faqs) bits.push(`Q: ${f.question}\nA: ${f.answer}`);
+  if (p.post) bits.push(`${p.post.title}\n\n${p.post.body_md}`);
+  if (p.offering_descriptions) for (const o of p.offering_descriptions) bits.push(o.description);
+  if (p.document) bits.push(`${p.document.title}\n\n${p.document.body}`);
+  return bits.join("\n\n");
+}
+function renderDeskOptions(draft) {
+  const wrap = $("deskResults"); wrap.innerHTML = "";
+  if (draft.missing_facts && draft.missing_facts.length) {
+    const mf = el("p", "aihint", "It would help to know: " + draft.missing_facts.join(" · "));
+    mf.style.marginBottom = "12px";
+    wrap.appendChild(mf);
+  }
+  (draft.options || []).forEach((o, i) => {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", "✦ " + (o.label || o.tone)));
+    card.appendChild(el("div", "dop", payloadPreview(o.payload)));
+    const acts = el("div", "doa");
+    const keep = el("button", "pillbtn inked", "Keep this one");
+    keep.addEventListener("click", async () => {
+      keep.disabled = true; keep.textContent = "Placing it in your draft…";
+      try {
+        const r = await api("POST", `/writer/drafts/${draft.id}/accept`, { option: i });
+        closeSheet("deskScrim");
+        toast(r.data.note);
+        scheduleChangesRefresh();
+        if (DESK.view) go(DESK.view); else await refreshAll();
+        if (DESK.view === "faqs") { const f = await api("GET", "/faqs"); S.faqs = f.data || []; renderFaqs(); }
+        if (DESK.view === "updates") { const p = await api("GET", "/posts"); S.posts = p.data || []; renderPosts(); }
+        if (DESK.view === "business") { const s = await api("GET", "/site"); S.identity = s.data.identity; fillSingles(); }
+      } catch (err) { keep.disabled = false; keep.textContent = "Keep this one"; toast(err.message, true); }
+    });
+    acts.appendChild(keep);
+    wrap.appendChild(card);
+  });
+  const none = el("button", "quietact", "None of these — discard them all");
+  none.addEventListener("click", async () => {
+    try { await api("POST", `/writer/drafts/${draft.id}/discard`); } catch { /* already gone is fine */ }
+    closeSheet("deskScrim");
+  });
+  wrap.appendChild(none);
+}
+
 $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
   [["question","The question","text",200,"Do you take walk-ins?"],["answer","Your answer","textarea",2000,""]],
   async (b, done) => {
