@@ -26,6 +26,7 @@ import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
+import { handleConciergeAsk } from './routes/concierge.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -104,6 +105,8 @@ serve(async (req) => {
     const m = route.match(/^\/moments\/([0-9a-f-]{36})\/dismiss$/);
     if (m && method === 'POST') return handleMomentDismiss(site, m[1], cors);
   }
+  // ── M9.4: the Concierge (one host; grounded answers; prepares, never performs) ──
+  if (route === '/concierge/ask' && method === 'POST') return handleConciergeAsk(req, site, cors);
   if (route === '/media' && method === 'GET') return handleMediaList(site, cors);
   if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, jwt, site, principal, cors); if (r) return r; }
   if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, jwt, site, principal, cors); if (r) return r; }

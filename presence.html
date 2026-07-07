@@ -91,7 +91,20 @@ h5.rune .whisper.ok{color:var(--sage)}
 .letter .wax.caution{background:var(--amber)}
 .letter .lt{font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.35}
 .letter .lr{color:var(--ink-2);font-size:13.5px;margin-top:5px;max-width:56ch}
-.letter .la{margin-top:14px;display:flex;gap:20px;align-items:baseline}
+.letter .la{margin-top:14px;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap}
+/* the concierge thread inside a letter — a conversation with one host, not a chat app */
+.thread{margin-top:16px;border-top:1px solid var(--hair);padding-top:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.chip{font-size:12px;font-weight:550;padding:5px 12px;border-radius:100px;border:1px solid var(--hair-2);background:transparent;color:var(--ink-2);transition:all var(--dur) var(--ease)}
+.chip:hover{border-color:var(--plum);color:var(--plum)}
+.c-you{font-size:12.5px;color:var(--ink-2);margin-top:12px;font-weight:550}
+.c-host{font-family:var(--serif);font-size:14.5px;line-height:1.7;margin-top:6px;max-width:56ch;white-space:pre-line}
+.c-host .lowconf{display:block;font-size:12px;font-style:italic;color:var(--ink-2);margin-top:4px}
+.c-acts{display:flex;gap:18px;margin-top:8px}
+.askrow{display:flex;gap:10px;margin-top:12px;align-items:baseline}
+.askrow input{flex:1;font-family:var(--serif);font-size:14px;background:transparent;border:none;border-bottom:1px solid var(--hair);padding:2px 0 6px;caret-color:var(--plum)}
+.askrow input:focus{outline:none;border-bottom-color:var(--plum)}
+.askrow button{flex:none}
 .journal .jrow{display:flex;gap:18px;padding:10px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
 .journal .jrow:last-child{border-bottom:0}
 .journal .jsec{flex:none;width:92px;font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-2);font-weight:600;padding-top:4px}
@@ -1165,10 +1178,102 @@ $("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if
 /* ── today: statement, prose facts, letters, journal ── */
 async function loadToday() {
   try {
-    const [h, c, n] = await Promise.all([api("GET", "/health"), api("GET", "/changes"), api("GET", "/notes")]);
-    S.health = h.data; S.changes = c.data;
-    renderStatement(); renderFactsProse(); renderNotes(n.data || []); renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
+    const [h, c, n, mo] = await Promise.all([
+      api("GET", "/health"), api("GET", "/changes"), api("GET", "/notes"),
+      api("GET", "/moments").catch(() => ({ data: [] })),
+    ]);
+    S.health = h.data; S.changes = c.data; S.moments = mo.data || [];
+    renderStatement(); renderFactsProse();
+    if (S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
+    renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
   } catch (err) { toast(err.message, true); }
+}
+
+/* ── the concierge's letters: moments + in-letter conversation (M9.4) ──
+   One host, five questions, session memory only — the thread lives in this
+   page and dies with it. Every answer arrives grounded from the server. */
+const MOMENT_WAX = { good_news: "celebration", celebration: "celebration", needs_attention: "caution", reminder: "suggestion", opportunity: "suggestion", seasonal: "suggestion", business_health: "suggestion", learning: "suggestion" };
+const CHIPS = [
+  ["What does this mean?", "what does this mean"],
+  ["Why does it matter?", "why does this matter"],
+  ["What if I ignore it?", "what happens if I ignore it"],
+  ["How do I fix it?", "how do I fix it"],
+  ["What will change?", "what will change when it goes live"],
+];
+function renderMoments(moments) {
+  $("notesWrap").hidden = !moments.length;
+  const list = $("notesList"); list.innerHTML = "";
+  moments.forEach((m) => {
+    const card = el("div", "letter");
+    card.appendChild(el("span", "wax " + (MOMENT_WAX[m.moment_type] || "suggestion")));
+    card.appendChild(el("div", "lt", m.headline));
+    card.appendChild(el("div", "lr", m.summary));
+    const la = el("div", "la");
+    const more = el("button", "textact", "Tell me more");
+    more.addEventListener("click", () => {
+      const open = card.querySelector(".thread");
+      if (open) { open.remove(); return; }
+      card.appendChild(momentThread(m));
+    });
+    la.appendChild(more);
+    if (m.dismissable) {
+      const dis = el("button", "quietact", "Dismiss");
+      dis.addEventListener("click", async () => {
+        try {
+          await api("POST", `/moments/${m.id}/dismiss`);
+          card.classList.add("away");
+          setTimeout(() => { card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }, 260);
+        } catch (err) { toast(err.message, true); }
+      });
+      la.appendChild(dis);
+    }
+    card.appendChild(la);
+    list.appendChild(card);
+  });
+}
+function momentThread(m) {
+  const t = el("div", "thread");
+  const history = []; // current interaction only — never persisted
+  const chips = el("div", "chips");
+  CHIPS.forEach(([label, q]) => {
+    const c = el("button", "chip", label);
+    c.addEventListener("click", () => askInThread(t, m, q, label, history));
+    chips.appendChild(c);
+  });
+  t.appendChild(chips);
+  const row = el("div", "askrow");
+  const inp = el("input"); inp.type = "text"; inp.placeholder = "Ask about this…"; inp.maxLength = 300;
+  inp.setAttribute("aria-label", "Ask the concierge about this note");
+  const go = el("button", "quietact", "Ask");
+  const submit = () => { const q = inp.value.trim(); if (q) { askInThread(t, m, q, q, history); inp.value = ""; } };
+  go.addEventListener("click", submit);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+  row.append(inp, go);
+  t.appendChild(row);
+  return t;
+}
+async function askInThread(thread, moment, question, shown, history) {
+  const row = thread.querySelector(".askrow");
+  thread.insertBefore(el("div", "c-you", shown), row);
+  const holder = el("div", "c-host", "…");
+  thread.insertBefore(holder, row);
+  try {
+    const r = await api("POST", "/concierge/ask", { question, topic_id: moment.id, history });
+    history.push({ topic_id: moment.id });
+    holder.textContent = r.data.answer;
+    if (r.data.low_confidence) holder.appendChild(el("span", "lowconf", "Part of this is judgment rather than measurement."));
+    if (r.data.actions && r.data.actions.length) {
+      const acts = el("div", "c-acts");
+      r.data.actions.forEach((a) => {
+        const b = el("button", "textact", a.label);
+        b.addEventListener("click", () => { if (a.section === "publish") openRitual(); else if (a.section === "preview") openPreview("draft"); else go(a.section); });
+        acts.appendChild(b);
+      });
+      holder.appendChild(acts);
+    }
+  } catch (err) {
+    holder.textContent = "That didn’t come through — your note is safe, ask again in a moment.";
+  }
 }
 function renderStatement() {
   const w = $("healthWrap"); const h = S.health; if (!h) return;
