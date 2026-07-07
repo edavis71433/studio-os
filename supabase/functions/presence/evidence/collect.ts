@@ -8,6 +8,8 @@ import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { normalizeSnapshotContent } from '../lib/render_types.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
+import { collectOptimization } from '../optimization/collect.ts';
+import type { OptInput } from '../optimization/collect.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 
@@ -43,6 +45,7 @@ export interface ObservationInput {
   oldestUnpublishedChangeAt: string | null;
   unpublishedChangeEvents: number;
   liveFetch: LiveFetch | null;      // null = no hosting to probe
+  opt: OptInput | null;             // M10 optimization probes (additive; null = probes unavailable)
 }
 
 const pagePath = (key: string) =>
@@ -125,6 +128,11 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
   for (const p of postUse.json ?? []) used.add(p.hero_media_id);
   if (setUse.json?.[0]?.cover_media_id) used.add(setUse.json[0].cover_media_id);
 
+  // M10: optimization probes (additive; every probe individually fenced —
+  // a failed probe yields null fields and providers then observe nothing)
+  let opt: OptInput | null = null;
+  try { opt = await collectOptimization(site, liveFetch?.url || null); } catch { opt = null; }
+
   return {
     site, now,
     draft: normalizeSnapshotContent(structuredClone(snapshot.content)),
@@ -137,5 +145,6 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
     oldestUnpublishedChangeAt: evs[0]?.created_at ?? null,
     unpublishedChangeEvents: evs.length,
     liveFetch,
+    opt,
   };
 }

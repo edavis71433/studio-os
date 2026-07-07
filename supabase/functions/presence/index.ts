@@ -32,6 +32,7 @@ import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
 import { handleCoachRun, handleCoachList, handleCoachDecide } from './routes/coach.ts';
+import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -127,6 +128,13 @@ serve(async (req) => {
     const m = route.match(/^\/brand\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);
     if (m && !m[2] && method === 'GET') return handleBrandReportGet(jwt, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
+  }
+  // ── M10: Business Knowledge Import (knowledge in, evidence out) ──
+  if (route === '/knowledge/import' && method === 'POST') return handleKnowledgeImport(req, site, principal, cors);
+  if (route === '/knowledge/docs' && method === 'GET') return handleKnowledgeList(jwt, site, cors);
+  {
+    const m = route.match(/^\/knowledge\/docs\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleKnowledgeDelete(site, m[1], principal, cors);
   }
   // ── M9.5E: the Growth Coach (observes, plans, prepares; never executes) ──
   if (route === '/coach/run' && method === 'POST') return handleCoachRun(site, cors);

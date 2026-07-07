@@ -181,9 +181,24 @@ export const RULES: Rule[] = [
 
   { key: 'platform_roadmap', category: 'platform', audience: 'none', timing: 'none', ttlDays: 90,
     types: ['local_presence.profile_unconnected', 'reviews.source_unconnected',
-            'trust.policy_page_missing', 'local_presence.map_signal_missing', 'business_info.holiday_hours_missing'],
+            'trust.policy_page_missing', 'local_presence.map_signal_missing', 'business_info.holiday_hours_missing',
+            // M10 Optimization Engine types — consciously acknowledged here (the
+            // completeness law: every catalog type has a judging rule), recorded
+            // and ALWAYS suppressed, exactly like the entries above. Promoting
+            // any of these to a surfaced judgment is a deliberate future rules
+            // change, not a side effect of observing more. Additive data only.
+            'infrastructure.dns_apex_unresolved', 'infrastructure.dns_www_unresolved', 'infrastructure.domain_expiring',
+            'infrastructure.http_not_redirected', 'infrastructure.redirect_chain', 'infrastructure.spf_missing',
+            'infrastructure.dmarc_missing', 'seo.sitemap_page_missing', 'seo.robots_blocks_all', 'seo.orphan_page',
+            'seo.duplicate_page', 'aeo.faq_schema_missing', 'aeo.entity_links_missing', 'aeo.answers_thin',
+            'aeo.citation_facts_incomplete', 'aeo.location_terms_missing', 'accessibility.form_label_missing',
+            'accessibility.tabindex_positive', 'accessibility.aria_hidden_focusable', 'performance.compression_missing',
+            'performance.cache_headers_missing', 'performance.slow_response', 'local_presence.nap_inconsistent',
+            'reviews.velocity_slowing', 'analytics.not_connected', 'trust.team_info_missing', 'media.imagery_none',
+            'media.og_image_missing', 'media.duplicate_image', 'knowledge.item_unlisted', 'knowledge.price_mismatch',
+            'knowledge.phone_mismatch', 'knowledge.hours_available'],
     dimensions: ['business_accuracy'],
-    impactNote: 'capabilities the platform has not shipped yet (destinations M10, contract pages Class C)',
+    impactNote: 'capabilities the platform has not shipped yet (destinations, contract pages) plus M10 optimization observations awaiting deliberate judgment rules',
     customerImpact: 'none — there is nothing anyone can act on today',
     priority: () => 'informational' },
 ];

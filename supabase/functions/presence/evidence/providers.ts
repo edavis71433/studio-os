@@ -7,6 +7,7 @@
 import type { ObservationInput } from './collect.ts';
 import type { EvidenceItem } from './contract.ts';
 import { makeEmit } from './contract.ts';
+import { OPTIMIZATION_PROVIDERS } from '../optimization/providers.ts';
 
 export interface Provider {
   name: string;
@@ -296,6 +297,10 @@ export const PROVIDERS: Provider[] = [
     const noPrice = (i.draft.offerings || []).filter((o) => o.is_visible !== false && !String(o.price_text || '').trim()).length;
     if (noPrice > 0) emit('conversion.prices_missing', 'draft', '', { count: noPrice });
   } },
+
+  // M10: the twelve optimization providers, appended exactly as this
+  // registry's header prescribes ("adding a provider is appending here").
+  ...OPTIMIZATION_PROVIDERS,
 ];
 
 /** Run every provider purely; a provider failure never poisons the others. */

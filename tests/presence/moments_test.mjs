@@ -178,6 +178,12 @@ if (SB && SR && ANON) {
   const cA = (await j(await fetch(`${SB}/rest/v1/clients?email=eq.rcat-acceptance%40example.com&select=id`, { headers: H })))[0];
   const site = (await j(await fetch(`${SB}/rest/v1/presence_sites?client_id=eq.${cA.id}&select=id`, { headers: H })))[0];
 
+  // self-sufficient setup: past runs of this suite leave a dismissed moment
+  // behind, and dismissal memory CORRECTLY holds for 30 days when facts don't
+  // change — clear this site's stale dismissals so the chain assertion tests
+  // generation, not suite run order.
+  await fetch(`${SB}/rest/v1/presence_moments?site_id=eq.${site.id}&status=eq.dismissed`, { method: 'DELETE', headers: H });
+
   await call('POST', `/admin/sites/${site.id}/observe`, staffJwt);
   await call('POST', `/admin/sites/${site.id}/judge`, staffJwt);
   await call('POST', `/admin/sites/${site.id}/recommend`, staffJwt);

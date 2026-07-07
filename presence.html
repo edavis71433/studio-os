@@ -420,6 +420,12 @@ h5.rune .whisper.ok{color:var(--sage)}
         <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
         <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
 
+        <h5 class="rune">Papers you already have</h5>
+        <p class="docsub" style="margin-top:6px">A menu, a flyer, a price sheet — paste the text in and the site will quietly notice when they disagree. Nothing is rewritten or published.</p>
+        <div id="knowledgeList"></div>
+        <div id="knowledgeAddWrap"></div>
+        <button class="addline" id="btnAddKnowledge">Bring a menu or flyer I already have</button>
+
         <button class="addline" style="margin-top:38px" onclick="openStudioDesk()"><span class="aimark">✦</span> Look things over — review, plan, or polish</button>
       </section>
 
@@ -1417,6 +1423,38 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
     try { const r = await api("POST", "/faqs", b); S.faqs.push(r.data); done(); renderFaqs(); toast("Answered"); scheduleChangesRefresh(); }
     catch (err) { toast(err.message, true); }
   }, "Keep this answer"));
+// ── M10: Business Knowledge Import — papers in, quiet awareness out ──
+async function renderKnowledgeDocs() {
+  try {
+    const r = await api("GET", "/knowledge/docs");
+    const wrap = $("knowledgeList"); wrap.innerHTML = "";
+    (r.data || []).forEach((d) => {
+      const row = el("div", "deskopt");
+      row.appendChild(el("div", "dop", d.filename));
+      row.appendChild(el("p", "aihint", d.items ? `${d.items} item${d.items > 1 ? "s" : ""} noticed` : "kept"));
+      const acts = el("div", "doa");
+      const del = el("button", "quietact", "Remove");
+      del.addEventListener("click", async () => {
+        try { await api("DELETE", `/knowledge/docs/${d.id}`); row.remove(); toast("Removed"); }
+        catch (err) { toast(err.message, true); }
+      });
+      acts.appendChild(del);
+      row.appendChild(acts);
+      wrap.appendChild(row);
+    });
+  } catch { /* quiet — the list is a convenience */ }
+}
+$("btnAddKnowledge").addEventListener("click", () => inlineAdd("knowledgeAddWrap",
+  [["filename", "What is it?", "text", 120, "Spring menu · takeout flyer · price sheet"], ["content", "Paste its text here", "textarea", 50000, ""]],
+  async (b, done) => {
+    if (!b.filename || !b.content || b.content.trim().length < 20) { toast("A name and the document’s text are needed.", true); return; }
+    try {
+      const r = await api("POST", "/knowledge/import", b);
+      done(); renderKnowledgeDocs();
+      toast(r.data.items ? `Kept — ${r.data.items} item${r.data.items > 1 ? "s" : ""} noticed.` : "Kept.");
+    } catch (err) { toast(err.message, true); }
+  }, "Keep this document"));
+
 $("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
   [["quote","Their words","textarea",600,""],["author","From","text",120,"Maria G."],["source","Where they said it (optional)","text",80,"Google · a note · in person"]],
   async (b, done) => {
@@ -1999,6 +2037,7 @@ async function refreshAll() {
     }
     $("gate").hidden = true; $("app").hidden = false;
     await refreshAll();
+    renderKnowledgeDocs();
     // deep links: presence.html?view=business|offerings|…|preview|publish
     const v = new URLSearchParams(location.search).get("view");
     if (v === "preview") openPreview("draft");

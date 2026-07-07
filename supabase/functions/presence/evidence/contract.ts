@@ -13,12 +13,16 @@
 // fields = new columns/keys; existing keys never change meaning. No free-form
 // structures — `facts` keys are declared per type by the template functions.
 
+import { OPT_CATALOG } from '../optimization/catalog.ts';
+
 export type Severity = 'critical' | 'warning' | 'info';
 
 export type Category =
   | 'website' | 'seo' | 'accessibility' | 'performance' | 'structured_data'
   | 'metadata' | 'freshness' | 'business_info' | 'media' | 'links'
-  | 'local_presence' | 'reviews' | 'trust' | 'content' | 'conversion';
+  | 'local_presence' | 'reviews' | 'trust' | 'content' | 'conversion'
+  // M10 Optimization Engine (additive per the frozen rules below):
+  | 'infrastructure' | 'aeo' | 'analytics' | 'knowledge';
 
 export interface EvidenceItem {
   category: Category;
@@ -338,6 +342,10 @@ export const CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Add prices, or “MP” where the market decides.',
     human: (f) => `${s(f.count)} visible menu item${Number(f.count) === 1 ? ' has' : 's have'} no price.`,
     tech: (f) => `${s(f.count)} visible offerings with empty price_text.` },
+
+  // M10 Optimization Engine — new catalog entries, added exactly as the
+  // additivity rules above prescribe. Defined in optimization/catalog.ts.
+  ...OPT_CATALOG,
 };
 
 /** Stable fingerprint: identity of an observation across runs. */
