@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual Studio — Presence</title>
+<meta name="description" content="Make brand-aware images for your presence — you approve every one before it's saved. Your own photos always work too.">
+<style>
+  :root{
+    --bg:#f6f4ef;--card:#fffdf9;--ink:#221f1a;--soft:#6b6459;--line:#e7e1d6;
+    --accent:#7a5c3e;--accent-soft:#efe7db;--good:#3f6b52;--good-soft:#e7efe8;
+    --warn:#8a6d3b;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(40,32,20,.04),0 8px 24px rgba(40,32,20,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#1a1815;--card:#221f1b;--ink:#efe9df;--soft:#a49b8c;--line:#33302a;--accent:#c8a678;--accent-soft:#2c2620;--good:#8bbf9f;--good-soft:#222a24;--warn:#d3ac6e;--warn-soft:#2a2419;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#f6f4ef;--card:#fffdf9;--ink:#221f1a;--soft:#6b6459;--line:#e7e1d6;--accent:#7a5c3e;--accent-soft:#efe7db;--good:#3f6b52;--good-soft:#e7efe8;--warn:#8a6d3b;--warn-soft:#f3ead9}
+  :root[data-theme="dark"]{--bg:#1a1815;--card:#221f1b;--ink:#efe9df;--soft:#a49b8c;--line:#33302a;--accent:#c8a678;--accent-soft:#2c2620;--good:#8bbf9f;--good-soft:#222a24;--warn:#d3ac6e;--warn-soft:#2a2419}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:44px 22px 96px}
+  a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
+  header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
+  header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:56ch}
+  .promise{margin-top:18px;padding:14px 16px;background:var(--accent-soft);border-radius:12px;font-size:13.5px;color:var(--ink)}
+  .promise b{font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);margin-top:26px}
+  .label{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 10px}
+  .kinds{display:flex;flex-wrap:wrap;gap:8px}
+  .kind{font-size:13.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer}
+  .kind[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .kind small{display:block;font-size:11px;opacity:.7;font-weight:400}
+  textarea,input{font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:12px 14px;width:100%}
+  textarea:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .field{margin-top:16px}
+  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 16px;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:var(--accent-soft);border-color:var(--accent)} button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button.primary:hover{filter:brightness(1.05)}
+  button.ghost{border-color:transparent;color:var(--soft)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:18px}
+  .variant{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .variant img{display:block;width:100%;height:auto;background:var(--accent-soft)}
+  .variant .body{padding:12px}
+  .variant .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .plan{margin-top:26px}
+  .plan h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 4px}
+  .plan .meta{font-size:13px;color:var(--soft);margin:0}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--good);background:var(--good-soft);border-radius:999px;padding:3px 10px;font-weight:600}
+  .center{text-align:center;padding:52px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
+  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  .muted{color:var(--soft);font-size:14px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:34px auto}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
+  .toast.show{opacity:1}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/today.html">← Today</a>
+  <header>
+    <h1>Visual Studio</h1>
+    <p class="sub">Make images for your presence — a page banner, a social post, a link preview — shaped by your brand. You see a few options and approve the one you want. Nothing is saved until you do.</p>
+  </header>
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// Consumes the EXISTING Visual Studio backend only: /visual/kinds, /visual/generate,
+// /visual/plans, /visual/plans/:id/{vary,edit,decide}. No engine logic here.
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null;
+
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN });
+async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; }
+async function apiPost(p, b){ const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; }
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 3000); }
+
+function composer(available){
+  if(!available){
+    return `<div class="panel"><p class="label">Not switched on yet</p>
+      <p class="muted">Making images isn’t switched on for your studio yet. Your own photos still work exactly as always — <a class="link" href="/portal.html">upload from your workspace</a> any time.</p></div>`;
+  }
+  return `<div class="panel">
+    <p class="label">What do you need?</p>
+    <div class="kinds" id="kinds">${KINDS.map(k=>`<button class="kind" data-kind="${esc(k.kind)}" aria-pressed="false">${esc(k.label)}<small>${esc(k.aspect)} · ${esc(k.purpose)}</small></button>`).join('')}</div>
+    <div class="field"><textarea id="subject" rows="3" placeholder="Describe it in your own words — e.g. “our corner table by the window, warm evening light, a couple of coffees”"></textarea></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="primary" id="go">Make a few options</button>
+      <span class="muted">You’ll pick and approve one — nothing saves until then.</span>
+    </div>
+  </div>`;
+}
+
+function variantCard(v){
+  return `<div class="variant">
+    <img src="${esc(v.preview_url||'')}" alt="A generated option" loading="lazy">
+    <div class="body">
+      <div class="row">
+        <button class="primary" data-use="${esc(v.id)}">Use this one</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function planView(plan){
+  CURRENT = plan;
+  if(plan.status === 'stored'){
+    return `<div class="plan"><span class="tag">Saved</span>
+      <h2>${esc(plan.title)}</h2>
+      <p class="meta">This image is in your library now — it’s yours to use anywhere. Nothing goes live until you publish.</p>
+      <div style="margin-top:16px"><button class="primary" id="again">Make another</button></div></div>`;
+  }
+  const vars = (plan.variations||[]).filter(v=>v.preview_url);
+  return `<div class="plan">
+    <h2>${esc(plan.title)}</h2>
+    <p class="meta">${esc(plan.summary)}</p>
+    <div class="grid">${vars.map(variantCard).join('')}</div>
+    <div style="margin-top:18px;display:flex;gap:9px;flex-wrap:wrap">
+      <button data-vary>Make more like these</button>
+      <button data-editopen>Change something</button>
+      <button class="ghost" data-discard>Discard these</button>
+    </div>
+    <div id="editbox" style="display:none;margin-top:12px;gap:9px" >
+      <input id="editin" placeholder="What should change? e.g. “warmer light”, “less busy”, “more of the food”">
+      <div style="margin-top:9px"><button class="primary" data-editgo>Try that</button></div>
+    </div>
+  </div>`;
+}
+
+function render(){
+  let html = `<div class="promise">
+    <b>Yours, and only when you say so.</b> Every image is AI-made (we say so), shaped by your brand, and saved to your library only after you approve it. Your own photos always work too — this never replaces them.
+  </div>`;
+  html += `<div id="composer">${composer(window.__available)}</div>`;
+  html += `<div id="planhost"></div>`;
+  $('main').innerHTML = html;
+  wireComposer();
+}
+
+function wireComposer(){
+  document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click', ()=>{
+    CHOSEN = b.getAttribute('data-kind');
+    document.querySelectorAll('[data-kind]').forEach(x=>x.setAttribute('aria-pressed', x===b?'true':'false'));
+  }));
+  const go = $('go'); if(go) go.addEventListener('click', generate);
+}
+
+async function generate(){
+  const subject = ($('subject').value||'').trim();
+  if(!CHOSEN){ toast('Pick what you need first — a banner, a post, or a link preview.'); return; }
+  if(subject.length < 3){ toast('Tell us in a few words what the image should show.'); return; }
+  const go = $('go'); go.disabled = true; go.textContent = 'Making a few options…';
+  $('planhost').innerHTML = '<div class="spin" role="status" aria-label="Working"></div>';
+  const r = await apiPost('/visual/generate', { kind: CHOSEN, subject, count: 3 });
+  go.disabled = false; go.textContent = 'Make a few options';
+  if(r.status === 503){ $('planhost').innerHTML=''; toast('Making images isn’t switched on for your studio yet.'); return; }
+  if(!r.ok){ $('planhost').innerHTML=''; toast((r.body&&r.body.message) || 'That didn’t come through — nothing was saved.'); return; }
+  showPlan(r.body.data);
+}
+
+function showPlan(plan){ $('planhost').innerHTML = planView(plan); wirePlan(); }
+
+function wirePlan(){
+  document.querySelectorAll('[data-use]').forEach(b=>b.addEventListener('click', ()=>use(b.getAttribute('data-use'))));
+  const vary=document.querySelector('[data-vary]'); if(vary) vary.addEventListener('click', v/*makeMore*/=>doVary());
+  const eo=document.querySelector('[data-editopen]'); if(eo) eo.addEventListener('click', ()=>{ const box=$('editbox'); box.style.display = box.style.display==='none'?'block':'none'; });
+  const eg=document.querySelector('[data-editgo]'); if(eg) eg.addEventListener('click', doEdit);
+  const dc=document.querySelector('[data-discard]'); if(dc) dc.addEventListener('click', discard);
+  const ag=$('again'); if(ag) ag.addEventListener('click', ()=>{ $('planhost').innerHTML=''; CURRENT=null; window.scrollTo({top:0,behavior:'smooth'}); });
+}
+
+async function use(varId){
+  const alt = prompt('Describe this image in a few words (it helps customers and search engines):', '');
+  if(alt === null) return;
+  if((alt||'').trim().length < 3){ toast('A few words, please — it makes the image accessible.'); return; }
+  const r = await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'approve', variation_id:varId, alt_text:alt.trim() });
+  if(r.ok && r.body.data && r.body.data.status==='stored'){ toast('Saved to your library.'); showPlan({ ...CURRENT, status:'stored' }); return; }
+  toast((r.body&&r.body.message) || 'That didn’t save — nothing changed. Try again.');
+}
+async function doVary(){
+  const host=$('planhost'); host.innerHTML = '<div class="spin" role="status"></div>';
+  const r = await apiPost('/visual/plans/'+CURRENT.id+'/vary', { count: 2 });
+  if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t make more just now.'); }
+}
+async function doEdit(){
+  const instruction = ($('editin').value||'').trim();
+  if(instruction.length < 2){ toast('Tell us what to change.'); return; }
+  const host=$('planhost'); host.innerHTML = '<div class="spin" role="status"></div>';
+  const r = await apiPost('/visual/plans/'+CURRENT.id+'/edit', { instruction, count: 2 });
+  if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t apply that just now.'); }
+}
+async function discard(){
+  if(!confirm('Discard these options? Nothing was saved, so there’s nothing to lose.')) return;
+  await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'abandon' });
+  $('planhost').innerHTML=''; CURRENT=null; toast('Discarded.');
+}
+
+function signedOut(){ $('main').innerHTML = `<div class="center"><h2>Sign in to use the Visual Studio.</h2><p class="muted">Your images live with your presence.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t open the Visual Studio just now.</h2><p class="muted">Nothing’s wrong — please refresh in a moment.</p></div>`; }
+
+(async function init(){
+  try{
+    const { data } = await sb.auth.getSession();
+    TOKEN = (data && data.session && data.session.access_token) || "";
+    if(!TOKEN){ signedOut(); return; }
+    const r = await apiGet('/visual/kinds');
+    if(!r.ok){ trouble(); return; }
+    KINDS = (r.body.data && r.body.data.kinds) || [];
+    window.__available = !!(r.body.data && r.body.data.available);
+    render();
+  }catch(_){ trouble(); }
+})();
+</script>
+</body>
+</html>

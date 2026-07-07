@@ -22,6 +22,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory } from './routes/publish.ts';
 import { handleMediaUpload, handleMediaDelete } from './routes/media.ts';
+import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
@@ -181,6 +182,20 @@ serve(async (req) => {
   {
     const m = route.match(/^\/media\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleMediaDelete(site, principal, m[1], cors);
+  }
+
+  // ── AI Visual Studio (V1): brand-aware image generation, approval before use ──
+  if (route === '/visual/kinds' && method === 'GET') return handleVisualKinds(cors);
+  if (route === '/visual/generate' && method === 'POST') return handleVisualGenerate(req, site, principal, cors);
+  if (route === '/visual/plans' && method === 'GET') return handleVisualList(site, cors);
+  {
+    const m = route.match(/^\/visual\/plans\/([0-9a-f-]{36})(\/vary|\/edit|\/decide)?$/);
+    if (m) {
+      if (!m[2] && method === 'GET') return handleVisualGet(site, m[1], cors);
+      if (m[2] === '/vary' && method === 'POST') return handleVisualVary(req, site, m[1], cors);
+      if (m[2] === '/edit' && method === 'POST') return handleVisualEdit(req, site, m[1], cors);
+      if (m[2] === '/decide' && method === 'POST') return handleVisualDecide(req, site, m[1], principal, cors);
+    }
   }
 
   // ── M7: the Client Room (all additive to frozen v1) ──

@@ -118,8 +118,11 @@ There is **no long pole.** Nothing V1-scoped is blocked, complex, or risky.
 
 ## Version 1 Completion Board
 
+> **Owner correction (post-audit):** **AI Visual Studio IS in Version 1.** An earlier revision of this audit treated AI image generation as intentionally excluded ("photos are customer-supplied, generation forbidden by Product Law"). That was an over-reading — the constitution contains **no law forbidding generative graphics**; it requires manual parity (Amendment 1), approval-before-use (the ritual + Approved-Plan spine), provenance honesty (`ai_approved`, commercial constitution), and the fact law for *claims* (Law 11). AI Visual Studio is therefore in-scope V1 build work, listed below.
+
 ### 🔵 Build Next
-- **Connected connect-management UI** (`connections.html`) — *only if V1 includes self-serve connections.* Backend done; callback done; this is the single remaining V1 customer surface.
+- ~~**Connected connect-management UI** (`connections.html`)~~ — **BUILT (L5.9).** The customer can view/connect/disconnect/refresh services in plain words; consumes the existing backend; commit not pushed.
+- **AI Visual Studio** (`visual/` module + customer UI) — **remaining V1 build work.** AI image generation, editing, brand-aware graphics, hero/social/Open Graph assets, variations, storage in the media library, and approval before use. Built on the existing media library (`presence_media` + private bucket), brand profile (`presence_brand_profile`), the AI-model gating pattern (`writer/model.ts`), and the Approved-Plan spine (`lib/approved_plan.ts`). Live generation gated on an owner-set image-model key (honest "not available yet" until then, same pattern as connected writes / Stripe).
 
 ### 🟡 Build Soon *(V1 only if scope demands; otherwise V1.1)*
 - *(nothing else is V1-required)*
@@ -147,12 +150,12 @@ There is **no long pole.** Nothing V1-scoped is blocked, complex, or risky.
 
 ## Declaration
 
-Because there remains one already-planned customer capability whose UI is unbuilt (contingent on V1 scope):
-
 **Version 1 requires the following remaining build work:**
 
-> **1. Connected Platform — customer connect-management UI (`connections.html`)** — the only remaining V1-scoped customer surface; required *only if* Version 1 includes self-serve connections. Its backend and callback page are complete; live activation is owner setup, not build.
+> **1. Connected Platform — customer connect-management UI (`connections.html`)** — **BUILT (L5.9).** Its backend and callback page are complete; live activation is owner setup, not build.
+>
+> **2. AI Visual Studio (`visual/` module + customer UI)** — AI image generation, editing, brand-aware graphics, hero/social/Open Graph assets, variations, media-library storage, approval before use. In-scope V1 per owner correction. Live generation gated on an owner-set image-model key.
 
-**If Version 1 is scoped to the core product with connections operated on the customer's behalf (Managed edition), then: Version 1 Feature Complete.**
+**Version 1 is feature complete when both are built.** Item 1 is done; item 2 is the remaining V1 build (this is the next milestone).
 
-*All other unbuilt work is Version 1.1 (advanced-tier UIs, additional packs/providers) or owner activation (OAuth-app + Stripe registration) — none of it architecture, none of it invention.*
+*All other unbuilt work is Version 1.1 (advanced-tier UIs, additional packs/providers) or owner activation (OAuth-app + image-model key + Stripe registration) — none of it architecture, none of it invention.*
