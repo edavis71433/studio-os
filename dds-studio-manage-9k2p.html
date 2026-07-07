@@ -851,6 +851,10 @@ button:focus-visible, .ibx-pill:focus-visible, .ibx-tab:focus-visible, .bf-act:f
     <input aria-label="Admin password" class="login-input" id="ap" type="password" autocomplete="current-password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" onclick="doLogin()">Sign in →</button>
     <div class="login-err" id="le">Incorrect email or password.</div>
+    <div style="text-align:center;margin-top:14px;font-size:12.5px">
+      <a href="#" id="aforgot" onclick="forgotAdminPassword();return false;" style="color:#8b7aa8;text-decoration:none">Forgot your password?</a>
+    </div>
+    <div id="aresetMsg" style="display:none;margin-top:10px;font-size:12.5px;color:#2e7d52;text-align:center;line-height:1.5"></div>
   </div>
 </div>
 
@@ -2121,6 +2125,35 @@ function showLogin() {
   document.getElementById("adminWrap").style.display = "none";
   document.getElementById("loginWrap").style.display = "flex";
   var ap = document.getElementById("ap"); if (ap) ap.value = "";
+}
+
+// Self-serve reset (same flow as the client portal): sends the recovery email
+// with a code; set-password.html verifies it, sets the new password, and
+// routes team members straight back to this admin panel.
+async function forgotAdminPassword() {
+  var email = (document.getElementById("aem").value || "").trim();
+  var err = document.getElementById("le");
+  var msg = document.getElementById("aresetMsg");
+  err.style.display = "none"; msg.style.display = "none";
+  if (!email) {
+    err.textContent = "Enter your email above first, then tap “Forgot your password.”";
+    err.style.display = "block";
+    document.getElementById("aem").focus();
+    return;
+  }
+  var link = document.getElementById("aforgot");
+  link.textContent = "Sending…";
+  try {
+    await fetch(SB_URL + "/functions/v1/clever-api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
+      body: JSON.stringify({ type: "reset_password", email: email })
+    });
+  } catch (e) {}
+  // Always neutral — never reveal whether an account exists.
+  link.textContent = "Forgot your password?";
+  msg.innerHTML = "If that email has an account, a reset code is on its way. Open the email and follow it to <strong>set-password</strong> — you’ll be brought back here signed in.";
+  msg.style.display = "block";
 }
 
 async function doLogin() {
