@@ -79,7 +79,26 @@ const FIX_PLACE: Record<string, { section: string; label: string; steps: string 
   rec_media_quality: { section: 'media', label: 'Open Photographs', steps: 'Swap the heavy photographs for lighter ones, and give picture-less menu items a photo.' },
   rec_conversion_paths: { section: 'business', label: 'Open Business', steps: 'The reservation and ordering links live on the Business page.' },
   rec_content_depth: { section: 'faqs', label: 'Open Questions', steps: 'Start with the one question customers ask most — one honest answer is plenty.' },
+  // L3.2 — optimization tasks the customer owns (their knowledge / their content)
+  rec_opt_ai_search: { section: 'faqs', label: 'Open Questions', steps: 'Your answered questions are on the Questions page, and your description on the Business page — a sentence or two more helps AI assistants describe and suggest you.' },
+  rec_opt_details_everywhere: { section: 'business', label: 'Open Business', steps: 'Your name, address, phone, and hours all live on the Business page — getting them complete and agreeing with each other is all it takes.' },
+  rec_opt_menu_reconcile: { section: 'business', label: 'Open Business', steps: 'The prices, items, phone, and hours on your site are on the Business and Menu pages — a quick compare with your uploaded document tells us which to keep.' },
+  rec_opt_photos: { section: 'media', label: 'Open Photographs', steps: 'The Photographs page is where a few real pictures of your business go — the kind that help a customer picture the place.' },
+  rec_opt_reputation: { section: 'testimonials', label: 'Open Kind words', steps: 'When a happy customer shares a word, it goes on the Kind words page; a short note asking is usually all it takes.' },
+  rec_opt_story: { section: 'business', label: 'Open Business', steps: 'Your story lives on the Business page — a sentence about who’s behind the business is plenty.' },
 };
+
+// L3.2 — Guided Fix: Studio OS prepares the whole change; the customer only
+// approves. Nothing to their domain, email, or security happens until they say
+// yes (the frozen infrastructure-approval law, M12/M14).
+const GUIDED_FIX: Record<string, { section: string; label: string; steps: string }> = {
+  rec_opt_foundations: { section: 'foundations', label: 'Open Foundations', steps: 'This is one Studio OS sets up for you: we prepare the exact change as a plan you can read in plain words, and you just approve it. Nothing to your web address, email, or security happens until you say yes.' },
+};
+
+// L3.2 — Platform-owned work (Law 24): silent on our editions, we simply handle
+// it; on Monitor it reads as something a move here would take care of.
+const PLATFORM_HANDLED = new Set(['rec_opt_search_hygiene', 'rec_opt_technical_access', 'rec_opt_speed']);
+const PLATFORM_HANDLED_LINE = 'This is one of ours to handle — on a website built and hosted here, it’s taken care of for you, so there’s nothing on your list for it.';
 
 const APPROVAL_LINE = 'Nothing changes on your live site until you’ve looked it over and published it yourself.';
 
@@ -180,14 +199,19 @@ export function answer(ask: Ask, g: Grounding): ConciergeAnswer {
       return base('teach', text, topic, recs, ev);
     }
     case 'how_fix': {
-      if (!places.length) {
-        return base('guide', `${topic.summary} ${APPROVAL_LINE}`, topic, recs, ev);
-      }
-      const steps = places.map((p) => p.steps);
-      let text = steps.join(' ');
-      if (efforts.length) text += ` All told it’s ${efforts[0]}.`;
-      text += ` ${APPROVAL_LINE}`;
-      return base('guide', text, topic, recs, ev, places.map((p) => ({ label: p.label, section: p.section })));
+      const guided = uniq(recs.map((r) => GUIDED_FIX[r.rule]).filter(Boolean).map((p) => JSON.stringify(p))).map((s) => JSON.parse(s)) as Array<{ section: string; label: string; steps: string }>;
+      const platform = recs.some((r) => PLATFORM_HANDLED.has(r.rule));
+      const parts: string[] = [];
+      if (places.length) parts.push(places.map((p) => p.steps).join(' '));
+      for (const g2 of guided) parts.push(g2.steps);
+      if (platform && !places.length && !guided.length) parts.push(PLATFORM_HANDLED_LINE);
+      else if (platform) parts.push('Some of it is ours to handle — you don’t need to do anything for those parts.');
+      if (!parts.length) return base('guide', `${topic.summary} ${APPROVAL_LINE}`, topic, recs, ev);
+      let text = parts.join(' ');
+      if (places.length && efforts.length) text += ` For your part, it’s ${efforts[0]}.`;
+      if (places.length) text += ` ${APPROVAL_LINE}`;
+      const actions = [...places.map((p) => ({ label: p.label, section: p.section })), ...guided.map((g2) => ({ label: g2.label, section: g2.section }))];
+      return base('guide', text, topic, recs, ev, actions);
     }
     case 'what_changes': {
       const undo = recs[0] ? UNDO_PHRASE[recs[0].undoability] : UNDO_PHRASE.versioned;
@@ -195,6 +219,13 @@ export function answer(ask: Ask, g: Grounding): ConciergeAnswer {
       return base('guide', text, topic, recs, ev);
     }
     case 'do_it': {
+      const guided = recs.map((r) => GUIDED_FIX[r.rule]).filter(Boolean) as Array<{ section: string; label: string; steps: string }>;
+      if (guided.length) {
+        return base('guide', `Happy to. ${guided[0].steps}`, topic, recs, ev, guided.map((g2) => ({ label: g2.label, section: g2.section })));
+      }
+      if (!places.length && recs.some((r) => PLATFORM_HANDLED.has(r.rule))) {
+        return base('guide', PLATFORM_HANDLED_LINE, topic, recs, ev);
+      }
       if (!places.length) {
         return base('guide', `This one isn’t something I can set up — it’s a look-and-confirm. ${topic.summary}`, topic, recs, ev);
       }
