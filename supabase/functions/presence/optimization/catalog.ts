@@ -39,6 +39,11 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     human: (f) => `Reaching the site takes ${s(f.hops)} forwarding steps — each adds a delay.`,
     tech: (f) => `${s(f.hops)} redirect hops observed from ${s(f.from)} before a 200.` },
 
+  'infrastructure.caa_missing': { category: 'infrastructure', severity: 'info', confidence: 0.85,
+    next_action: 'Add a CAA record naming the certificate authority you use.',
+    human: (f) => `Any certificate authority can currently issue a certificate for ${s(f.domain)} — a CAA record locks that down.`,
+    tech: (f) => `No CAA record on ${s(f.domain)} (apex resolves).` },
+
   // ── email authentication (its own provider; infrastructure category) ──
   'infrastructure.spf_missing': { category: 'infrastructure', severity: 'warning', confidence: 0.85,
     next_action: 'Add an SPF TXT record for the mail domain.',
@@ -66,6 +71,14 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Differentiate the pages or canonicalize one to the other.',
     human: (f) => `Two pages (${s(f.a)}, ${s(f.b)}) read as the same content.`,
     tech: (f) => `Body text of ${s(f.a)} and ${s(f.b)} is identical after normalization.` },
+  'seo.noindex': { category: 'seo', severity: 'warning', confidence: 0.95,
+    next_action: 'Remove the noindex tag if the page should be found.',
+    human: (f) => `The page ${s(f.page)} tells search engines not to list it — it won’t appear in results.`,
+    tech: (f) => `${s(f.page)}: meta robots contains "noindex".` },
+  'seo.twitter_card_missing': { category: 'seo', severity: 'info', confidence: 0.9,
+    next_action: 'Add Twitter/X card tags so shared links show a rich preview.',
+    human: () => `Links shared on X show as plain text — the page has no card tags for a rich preview.`,
+    tech: (f) => `No <meta name="twitter:card"> on ${s(f.page)}.` },
 
   // ── AI search (AEO) ──
   'aeo.faq_schema_missing': { category: 'aeo', severity: 'info', confidence: 0.9,
@@ -102,6 +115,10 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Unhide the element or remove its focusable children.',
     human: (f) => `Something on ${s(f.page)} is hidden from screen readers but still keyboard-reachable.`,
     tech: (f) => `${s(f.page)}: aria-hidden="true" element contains a link or button.` },
+  'accessibility.table_structure': { category: 'accessibility', severity: 'warning', confidence: 0.8,
+    next_action: 'Give data tables header cells (<th>) a screen reader can announce.',
+    human: (f) => `A table on ${s(f.page)} has no header cells — screen readers can’t explain what each column means.`,
+    tech: (f) => `${s(f.page)}: <table> with <td> rows, no <th>, not role="presentation".` },
 
   // ── performance depth ──
   'performance.compression_missing': { category: 'performance', severity: 'warning', confidence: 0.9,
@@ -116,12 +133,24 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Investigate hosting latency.',
     human: (f) => `The site took ${s(f.ms)}ms to start answering — noticeably slow.`,
     tech: (f) => `TTFB ${s(f.ms)}ms against ${s(f.url)} (budget ${s(f.budget)}ms).` },
+  'performance.cdn_absent': { category: 'performance', severity: 'info', confidence: 0.7,
+    next_action: 'Serve the site through a CDN for faster loads worldwide.',
+    human: () => `The site appears to load from a single location — distant visitors wait longer than they need to.`,
+    tech: (f) => `No CDN edge headers and no CDN server token (server: ${s(f.server)}).` },
+  'performance.lazy_loading_missing': { category: 'performance', severity: 'info', confidence: 0.8,
+    next_action: 'Add loading="lazy" to below-the-fold images.',
+    human: (f) => `The page ${s(f.page)} loads all ${s(f.images)} images at once — off-screen ones could wait.`,
+    tech: (f) => `${s(f.page)}: ${s(f.images)} <img> elements, none with loading="lazy".` },
 
   // ── local presence depth ──
   'local_presence.nap_inconsistent': { category: 'local_presence', severity: 'warning', confidence: 0.9,
     next_action: 'Make name, address, and phone identical everywhere.',
     human: (f) => `The ${s(f.field)} differs between pages — directories and AI search punish disagreement.`,
     tech: (f) => `NAP field ${s(f.field)}: "${s(f.a)}" vs "${s(f.b)}" across rendered pages/draft.` },
+  'local_presence.apple_business_unconnected': { category: 'local_presence', severity: 'info', confidence: 1,
+    next_action: 'Claim the business on Apple Business Connect when available.',
+    human: () => `Apple Maps and Siri aren’t connected — people using Apple devices can’t find the business there yet.`,
+    tech: () => `No Apple Business Connect destination configured for this site.` },
 
   // ── reputation ──
   'reviews.velocity_slowing': { category: 'reviews', severity: 'info', confidence: 0.8,

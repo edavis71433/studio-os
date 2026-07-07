@@ -8,13 +8,15 @@ import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { ExtractedKnowledge } from './knowledge.ts';
 
-export interface OptDns { apex: boolean; www: boolean; mx: boolean; spf: boolean; dmarc: boolean }
+export interface OptDns { apex: boolean; www: boolean; mx: boolean; spf: boolean; dmarc: boolean; caa: boolean }
 export interface OptInput {
   domain: string | null;                       // the custom domain, if any
   dns: OptDns | null;                          // null = not probed (no custom domain / probe failed)
   domainExpires: string | null;                // RDAP expiration date, if learnable
   httpProbe: { status: number; redirectsToHttps: boolean; hops: number } | null;
-  homeProbe: { url: string; ms: number; contentEncoding: string; cacheControl: string; contentType: string } | null;
+  // L3: `server`/`cdnHint` capture the response headers a CDN leaves behind, so
+  // the performance provider can observe whether a CDN is fronting the site.
+  homeProbe: { url: string; ms: number; contentEncoding: string; cacheControl: string; contentType: string; server: string; cdnHint: string } | null;
   robotsTxt: string | null;                    // live robots.txt body
   sitemapXml: string | null;                   // live sitemap.xml body
   knowledgeDocs: Array<{ id: string; filename: string; extracted: ExtractedKnowledge }>;
@@ -32,9 +34,10 @@ async function doh(name: string, type: string): Promise<Array<{ type: number; da
 }
 
 async function probeDns(domain: string): Promise<OptDns | null> {
-  const [apex, www, mx, txt, dmarc] = await Promise.all([
+  const [apex, www, mx, txt, dmarc, caa] = await Promise.all([
     fence(doh(domain, 'A')), fence(doh(`www.${domain}`, 'A')),
     fence(doh(domain, 'MX')), fence(doh(domain, 'TXT')), fence(doh(`_dmarc.${domain}`, 'TXT')),
+    fence(doh(domain, 'CAA')),
   ]);
   if (apex === null && www === null) return null;          // resolver unreachable — observe nothing
   return {
@@ -43,6 +46,7 @@ async function probeDns(domain: string): Promise<OptDns | null> {
     mx: (mx ?? []).length > 0,
     spf: (txt ?? []).some((t) => /v=spf1/i.test(t.data)),
     dmarc: (dmarc ?? []).some((t) => /v=dmarc1/i.test(t.data)),
+    caa: (caa ?? []).length > 0,
   };
 }
 
@@ -76,11 +80,17 @@ async function probeHome(liveUrl: string): Promise<OptInput['homeProbe']> {
   const r = await fetch(liveUrl, { headers: { 'accept-encoding': 'gzip, br' }, signal: timed(8000) });
   const ms = Date.now() - t0;
   await r.body?.cancel();
+  // CDN fingerprint: the vendor-specific headers a CDN edge adds. Presence of ANY
+  // is a positive signal; absence is what the provider observes.
+  const cdnHeaders = ['cf-ray', 'x-vercel-id', 'x-nf-request-id', 'x-amz-cf-id', 'x-fastly-request-id', 'x-served-by', 'x-cache', 'fly-request-id'];
+  const cdnHint = cdnHeaders.filter((h) => r.headers.get(h)).join(',');
   return {
     url: liveUrl, ms,
     contentEncoding: r.headers.get('content-encoding') || '',
     cacheControl: r.headers.get('cache-control') || '',
     contentType: r.headers.get('content-type') || '',
+    server: r.headers.get('server') || '',
+    cdnHint,
   };
 }
 

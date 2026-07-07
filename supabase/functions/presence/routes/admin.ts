@@ -25,6 +25,7 @@ import {
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
+import { describeEngine } from '../optimization/engine.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { Snapshot } from '../lib/render_types.ts';
@@ -400,6 +401,12 @@ async function handleHealth(site: SiteRow, cors: Record<string, string>) {
 export async function handleAdmin(req: Request, route: string, method: string, principal: Principal, cors: Record<string, string>): Promise<Response | null> {
   if (route === '/admin/sites' && method === 'POST') return handleProvision(req, principal, cors);
   if (route === '/admin/sites' && method === 'GET') return handleList(cors);
+
+  // ── L3: Optimization Engine coverage — operator introspection. Shows every
+  //    optimization area, the providers serving it, and how many observations
+  //    it can make. Derived live from the registry + catalog, so it can never
+  //    drift from what actually runs.
+  if (route === '/admin/optimization' && method === 'GET') return json({ data: describeEngine() }, 200, cors);
 
   // ── M13: agency provisioning (operator creates the agency + its owner seat) ──
   if (route === '/admin/agencies' && method === 'POST') {

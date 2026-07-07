@@ -32,6 +32,9 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
       }
       if (o.httpProbe.hops >= 3) emit('infrastructure.redirect_chain', 'probe', o.domain, { from: `http://${o.domain}/`, hops: o.httpProbe.hops });
     }
+    // L3 — CAA: without a CAA record, any certificate authority may issue a
+    // certificate for the domain. Only meaningful once the domain resolves.
+    if (o.dns && o.dns.apex && !o.dns.caa) emit('infrastructure.caa_missing', 'dns', o.domain, { domain: o.domain });
   } },
 
   { name: 'email_auth', provide(i, emit) {
@@ -77,6 +80,16 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
       if (seen.has(key)) emit('seo.duplicate_page', 'render', `${seen.get(key)}≡${p.path}`, { a: seen.get(key)!, b: p.path });
       else seen.set(key, p.path);
     }
+    // L3 — indexability: a page telling search engines not to index it (meta
+    // robots noindex, or an X-Robots-Tag on the live home response)
+    for (const p of i.pages) {
+      const robots = (p.html.match(/<meta\s+name="robots"\s+content="([^"]*)"/i) || [])[1] || '';
+      if (/noindex/i.test(robots)) emit('seo.noindex', 'render', p.path, { page: p.path });
+    }
+    // L3 — Twitter/X cards: the home page lacks the tags that make a shared link
+    // render as a rich card on X (and several other readers that honor them)
+    const home = i.pages.find((p) => p.path === '/');
+    if (home && !/name="twitter:card"/i.test(home.html)) emit('seo.twitter_card_missing', 'render', '/', { page: '/' });
   } },
 
   { name: 'aeo', provide(i, emit) {
@@ -128,6 +141,13 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
         const rest = p.html.slice(m.index!, m.index! + 600);
         if (/<(a|button)\b/i.test(rest)) { emit('accessibility.aria_hidden_focusable', 'render', p.path, { page: p.path }); break; }
       }
+      // L3 — data tables need header cells a screen reader can announce. A table
+      // with data rows but no <th> and not marked presentational is unreadable.
+      for (const t of all(p.html, /<table\b[\s\S]*?<\/table>/gi)) {
+        const html = t[0];
+        if (/role=["']?presentation/i.test(html)) continue;   // layout table, explicitly not data
+        if (/<td\b/i.test(html) && !/<th\b/i.test(html)) { emit('accessibility.table_structure', 'render', p.path, { page: p.path }); break; }
+      }
     }
   } },
 
@@ -137,9 +157,28 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
     if (!h.cacheControl) emit('performance.cache_headers_missing', 'live', h.url);
     const BUDGET = 1800;
     if (h.ms > BUDGET) emit('performance.slow_response', 'live', h.url, { url: h.url, ms: h.ms, budget: BUDGET });
+    // L3 — CDN: no vendor edge headers and no CDN-ish server token means the site
+    // is likely served from a single origin (slower for distant visitors)
+    const cdnServer = /cloudflare|netlify|vercel|fastly|akamai|cloudfront|amazons3|fly\.io/i.test(h.server);
+    if (!h.cdnHint && !cdnServer) emit('performance.cdn_absent', 'live', h.url, { server: h.server || 'unknown' });
+  } },
+
+  { name: 'lazy_loading', provide(i, emit) {
+    // L3 — images should defer off-screen loading; flag pages with several images
+    // where none opt into lazy loading (the first image is legitimately eager).
+    for (const p of i.pages) {
+      const imgs = all(p.html, /<img\b[^>]*>/gi).map((m) => m[0]);
+      if (imgs.length < 4) continue;
+      const lazy = imgs.filter((t) => /loading=["']?lazy/i.test(t)).length;
+      if (lazy === 0) emit('performance.lazy_loading_missing', 'render', p.path, { page: p.path, images: imgs.length });
+    }
   } },
 
   { name: 'local_presence_deep', provide(i, emit) {
+    // L3 — Apple Business Connect: observation of absence, exactly like the GBP
+    // profile signal. No Apple integration exists yet; when one does, this
+    // provider grows listing observations under the same contract.
+    emit('local_presence.apple_business_unconnected', 'destinations', '');
     // NAP consistency: the phone rendered anywhere must be THE phone
     const draftPhone = digitsOnly(String(i.draft.identity?.phone || ''));
     if (!draftPhone) return;

@@ -72,7 +72,7 @@ const typesOf = (r) => new Set(r.items.map((x) => x.type));
 // ═══ 2. healthy fixture → no criticals; all providers ran ═══
 const healthy = runProviders(healthyInput());
 {
-  ok('healthy fixture: all 27 providers executed ok (15 M9.0 + 12 M10)', healthy.record.length === 27 && healthy.record.every((r) => r.ok));
+  ok('healthy fixture: all 28 providers executed ok (15 M9.0 + 13 M10)', healthy.record.length === 28 && healthy.record.every((r) => r.ok));
   const crit = healthy.items.filter((x) => x.severity === 'critical');
   ok('healthy fixture: zero critical observations', crit.length === 0, crit.map((c) => c.type).join(',') || `(${healthy.items.length} total items)`);
 }
@@ -183,7 +183,7 @@ const healthy = runProviders(healthyInput());
 {
   const fake = { name: 'future_provider', provide(_i, emit) { emit('seo.title_missing', 'test', '/x/', { page: '/x/' }); } };
   const r = runProviders(healthyInput(), [...PROVIDERS, fake]);
-  ok('composability: a 28th provider plugs into the same contract', r.record.length === 28 && r.record[27].ok && r.record[27].items === 1);
+  ok('composability: a 29th provider plugs into the same contract', r.record.length === 29 && r.record[28].ok && r.record[28].items === 1);
   const rogue = { name: 'rogue', provide(_i, emit) { emit('made.up_type', 'test', ''); } };
   const r2 = runProviders(healthyInput(), [rogue]);
   ok('catalog enforcement: emitting an unregistered type fails that provider (contained)', r2.record[0].ok === false && r2.items.length === 0);
@@ -225,7 +225,7 @@ if (SB && SR && ANON) {
 
   const run = await call('POST', `/admin/sites/${site.id}/observe`);
   ok('integration: POST /observe runs and stores', run.status === 200 && run.json?.data?.ok === true && run.json.data.item_count >= 0, `items=${run.json?.data?.item_count} ms=${run.json?.data?.ms}`);
-  ok('integration: all 27 providers executed on staging', (run.json?.data?.providers || []).length === 27 && run.json.data.providers.every((p) => p.ok), (run.json?.data?.providers || []).filter((p) => !p.ok).map((p) => p.name + ':' + p.error).join(';'));
+  ok('integration: all 28 providers executed on staging', (run.json?.data?.providers || []).length === 28 && run.json.data.providers.every((p) => p.ok), (run.json?.data?.providers || []).filter((p) => !p.ok).map((p) => p.name + ':' + p.error).join(';'));
 
   const ev = await call('GET', `/admin/sites/${site.id}/evidence`);
   ok('integration: GET /evidence returns the latest run’s items', ev.status === 200 && ev.json?.data?.run_id === run.json.data.run_id && Array.isArray(ev.json.data.items), `n=${ev.json?.data?.items?.length}`);

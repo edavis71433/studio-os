@@ -196,9 +196,16 @@ export const RULES: Rule[] = [
             'performance.cache_headers_missing', 'performance.slow_response', 'local_presence.nap_inconsistent',
             'reviews.velocity_slowing', 'analytics.not_connected', 'trust.team_info_missing', 'media.imagery_none',
             'media.og_image_missing', 'media.duplicate_image', 'knowledge.item_unlisted', 'knowledge.price_mismatch',
-            'knowledge.phone_mismatch', 'knowledge.hours_available'],
+            'knowledge.phone_mismatch', 'knowledge.hours_available',
+            // L3 Optimization Engine (Foundation) gap-fill types — same discipline:
+            // observed and recorded now, ALWAYS suppressed; promoting them into
+            // customer-facing recommendations is L3.1 (Optimization Judgment Depth),
+            // deliberately not this milestone. Additive data only.
+            'infrastructure.caa_missing', 'seo.noindex', 'seo.twitter_card_missing',
+            'performance.cdn_absent', 'performance.lazy_loading_missing', 'accessibility.table_structure',
+            'local_presence.apple_business_unconnected'],
     dimensions: ['business_accuracy'],
-    impactNote: 'capabilities the platform has not shipped yet (destinations, contract pages) plus M10 optimization observations awaiting deliberate judgment rules',
+    impactNote: 'capabilities the platform has not shipped yet (destinations, contract pages) plus M10/L3 optimization observations awaiting deliberate judgment rules (L3.1)',
     customerImpact: 'none — there is nothing anyone can act on today',
     priority: () => 'informational' },
 ];
