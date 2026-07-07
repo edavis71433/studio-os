@@ -2219,6 +2219,34 @@ async function refreshAll() {
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
 }
+// ── L2: the commercial capacity notice — one calm card, never a number ──
+async function renderPlanNotice() {
+  let notices = [];
+  try { const r = await api("GET", "/commerce/notices"); notices = (r.data && r.data.notices) || []; }
+  catch (_) { return; }
+  const n = notices.find((x) => x.kind === "capacity");
+  if (!n) return;
+  const host = $("welcomeWrap");
+  if (!host) return;
+  const card = el("div", "deskopt");
+  card.style.borderColor = "#d9cbf3";
+  card.style.background = "#faf7ff";
+  card.appendChild(el("div", "dol", n.headline));
+  card.appendChild(el("div", "dop", n.body));
+  const acts = el("div", "doa");
+  const up = el("a", "textact", "See plans");
+  up.href = "pricing.html"; up.style.textDecoration = "none";
+  const dismiss = el("button", "quietact", "Dismiss");
+  dismiss.addEventListener("click", async () => {
+    try { await api("POST", "/commerce/notices/dismiss"); } catch (_) {}
+    card.remove();
+  });
+  acts.appendChild(up); acts.appendChild(dismiss);
+  card.appendChild(acts);
+  host.hidden = false;
+  host.insertBefore(card, host.firstChild);
+}
+
 // ── L1: first-run welcome — a calm checklist, dismissible, nothing overwhelming ──
 async function renderFirstRun() {
   const wrap = $("welcomeWrap");
@@ -2274,6 +2302,7 @@ async function renderFirstRun() {
     renderKnowledgeDocs();
     renderMonitorCard();
     renderFirstRun();
+    renderPlanNotice();
     // deep links: presence.html?view=business|offerings|…|preview|publish
     const v = new URLSearchParams(location.search).get("view");
     if (v === "preview") openPreview("draft");

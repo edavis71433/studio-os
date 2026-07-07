@@ -14,11 +14,18 @@ import { anthropicModel } from '../writer/model.ts';
 import type { WriterRequest, WriterKind } from '../writer/contract.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { loadPlan, draftingDenial } from '../commerce/enforce.ts';
+import { meterModel, raiseCapacityNoticeIfNeeded } from '../commerce/metering.ts';
 
 const KINDS: WriterKind[] = ['identity_copy', 'faqs', 'offering_descriptions', 'post', 'testimonial_request', 'policy_doc', 'social_post', 'email_doc', 'page_copy', 'starter_site'];
 
 export async function handleWriterGenerate(req: Request, site: SiteRow, cors: Record<string, string>) {
-  const model = anthropicModel();
+  // Plan enforcement: drafting belongs to Presence-and-up (entitlement, not UI).
+  const plan = await loadPlan(site.client_id);
+  const denied = draftingDenial(plan, cors);
+  if (denied) return denied;
+
+  const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'writer' });
   if (!model) return json({ error: 'writer_unavailable', message: 'Drafting help isn’t switched on right now. Everything can still be written by hand — nothing about your site depends on it.' }, 503, cors);
   let body: Partial<WriterRequest> = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That request didn’t read right — nothing happened.' }, 400, cors); }
@@ -42,6 +49,8 @@ export async function handleWriterGenerate(req: Request, site: SiteRow, cors: Re
       : 'The drafting didn’t come through — nothing was changed. Try again in a moment.';
     return json({ error: 'generate_failed', message: msg, missing_facts: summary.missing_facts }, 502, cors);
   }
+  // A successful generative op may raise the calm capacity notice (never blocks).
+  raiseCapacityNoticeIfNeeded(site, plan).catch(() => {});
   return json({ data: summary }, 200, cors);
 }
 

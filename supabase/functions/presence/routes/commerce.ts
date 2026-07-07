@@ -243,6 +243,27 @@ async function handleFirstRun(jwt: string, cors: Record<string, string>) {
   } }, 200, cors);
 }
 
+// ── AUTHED: the commercial capacity notice (the calm "outgrown your plan" card) ──
+async function handleNotices(jwt: string, cors: Record<string, string>) {
+  const site = await resolveSite(jwt);
+  if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
+  const r = await asUser(jwt, `presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,headline,body,created_at&order=created_at.desc&limit=3`);
+  const notices = (r.ok && Array.isArray(r.json)) ? r.json.map((n: any) => ({
+    id: n.id, kind: n.kind, headline: n.headline, body: n.body,
+    actions: ['upgrade', 'learn_more', 'dismiss'], // the only three, ever
+  })) : [];
+  return json({ data: { notices } }, 200, cors);
+}
+
+async function handleNoticeDismiss(jwt: string, cors: Record<string, string>) {
+  const site = await resolveSite(jwt);
+  if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
+  await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&status=eq.active`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),
+  });
+  return json({ data: { dismissed: true } }, 200, cors);
+}
+
 async function handleFirstRunDismiss(jwt: string, cors: Record<string, string>) {
   const site = await resolveSite(jwt);
   if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
@@ -324,12 +345,28 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
       }
       if (!clientId) return json({ data: { ignored: true, reason: 'no_client' } }, 200, cors);
       const applied = await applyEntitlementPatch(clientId, patch);
-      if (!applied && patch.plan && isPlanKey(patch.plan)) {
-        // entitlement not there yet (event race) → provision to create it
-        const businessName = await businessNameFor(clientId);
-        await provisionForSignup({ clientId, businessName, plan: patch.plan, patch, actorEmail: null });
+      let reprovisioned = false;
+      if (patch.plan && isPlanKey(patch.plan)) {
+        if (!applied) {
+          // entitlement not there yet (event race) → provision to create it
+          const businessName = await businessNameFor(clientId);
+          await provisionForSignup({ clientId, businessName, plan: patch.plan, patch, actorEmail: null });
+          reprovisioned = true;
+        } else {
+          // Upgrade/downgrade that CHANGES edition → re-provision (idempotent):
+          // Monitor→Presence provisions hosting + flips edition; Presence→Monitor
+          // flips edition but PRESERVES data (nothing is torn down) — capability is
+          // removed by the edition gate, content and hosting stay.
+          const sr = await svc(`presence_sites?client_id=eq.${encodeURIComponent(clientId)}&select=edition&limit=1`);
+          const curEd = sr.json?.[0]?.edition;
+          if (curEd && curEd !== editionFor(patch.plan)) {
+            const businessName = await businessNameFor(clientId);
+            await provisionForSignup({ clientId, businessName, plan: patch.plan, patch, actorEmail: null });
+            reprovisioned = true;
+          }
+        }
       }
-      return json({ data: { synced: true, status: patch.status } }, 200, cors);
+      return json({ data: { synced: true, status: patch.status, reprovisioned } }, 200, cors);
     }
 
     return json({ data: { ignored: true } }, 200, cors);
@@ -366,6 +403,14 @@ export async function handleCommerce(req: Request, route: string, method: string
   if (route === '/commerce/first-run/dismiss' && method === 'POST') {
     if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
     return handleFirstRunDismiss(jwt, cors);
+  }
+  if (route === '/commerce/notices' && method === 'GET') {
+    if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    return handleNotices(jwt, cors);
+  }
+  if (route === '/commerce/notices/dismiss' && method === 'POST') {
+    if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    return handleNoticeDismiss(jwt, cors);
   }
   return json({ error: 'not_found', message: `No commerce route for ${method} ${route}.` }, 404, cors);
 }

@@ -11,11 +11,18 @@ import { anthropicModel } from '../writer/model.ts';
 import type { EditRequest } from '../writer/editor.ts';
 import type { EditorKind } from '../writer/contract.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { loadPlan, draftingDenial } from '../commerce/enforce.ts';
+import { meterModel } from '../commerce/metering.ts';
 
 const KINDS: EditorKind[] = ['edit_identity', 'edit_faq', 'edit_offering', 'edit_post', 'edit_document', 'site_polish'];
 
 export async function handleEditorImprove(req: Request, site: SiteRow, cors: Record<string, string>) {
-  const model = anthropicModel();
+  // Editing is a drafting workflow — Presence-and-up (entitlement, not UI).
+  const plan = await loadPlan(site.client_id);
+  const denied = draftingDenial(plan, cors);
+  if (denied) return denied;
+
+  const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'editor' });
   if (!model) return json({ error: 'editor_unavailable', message: 'Editing help isn’t switched on right now. Everything can still be edited by hand — it always can.' }, 503, cors);
   let body: Partial<EditRequest> = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That request didn’t read right — nothing happened.' }, 400, cors); }

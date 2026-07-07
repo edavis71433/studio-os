@@ -40,6 +40,7 @@ import { handleImportInventory } from './routes/monitor.ts';
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce } from './routes/commerce.ts';
+import { handleSystem } from './routes/system.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -55,6 +56,14 @@ serve(async (req) => {
 
   const route = routeOf(req.url);
   const method = req.method.toUpperCase();
+
+  // ── L2: /system/* — unattended operations (cron). Secret-gated, no session,
+  //    so it is handled BEFORE principal resolution and self-gates on
+  //    SCHEDULER_SECRET. This is how the platform keeps observing, retries
+  //    failures, and reports its own health while no operator is present.
+  if (route === '/system' || route.startsWith('/system/')) {
+    return handleSystem(req, route, method, cors);
+  }
 
   // 2. authentication (shared resolver; never throws)
   const principal = await resolvePrincipal(req, null);
