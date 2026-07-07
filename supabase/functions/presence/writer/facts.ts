@@ -20,6 +20,8 @@ export interface FactSheet {
   hours_text: string;          // compact truthful summary, or ''
   offerings: Array<{ id: string; name: string; category: string; price_text: string; description: string; visible: boolean }>;
   faq_questions: string[];
+  faqs_full: Array<{ id: string; question: string; answer: string; visible: boolean }>;   // M9.5B: the editor's before-text
+  posts_full: Array<{ id: string; title: string; body_md: string; excerpt: string; shown: boolean }>;
   post_titles: string[];
   testimonial_count: number;
   voice: { tone_notes: string; preferred_vocabulary: string; never_claim: string };
@@ -33,8 +35,8 @@ export async function buildFactSheet(site: SiteRow): Promise<FactSheet> {
     svc(`presence_locations?site_id=eq.${site.id}&select=address_line1,city,region,postal_code,hours&limit=1`),
     svc(`presence_voice?site_id=eq.${site.id}&select=tone_notes,preferred_vocabulary,never_claim&limit=1`),
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,category,price_text,description,is_visible&order=sort_order.asc&limit=100`),
-    svc(`presence_faqs?site_id=eq.${site.id}&deleted_at=is.null&select=question&limit=50`),
-    svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&select=title&limit=50`),
+    svc(`presence_faqs?site_id=eq.${site.id}&deleted_at=is.null&select=id,question,answer,is_visible&order=sort_order.asc&limit=30`),
+    svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body_md,excerpt,status&order=updated_at.desc&limit=10`),
     svc(`presence_testimonials?site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`),
   ]);
   const i = ident.json?.[0] ?? {};
@@ -56,6 +58,12 @@ export async function buildFactSheet(site: SiteRow): Promise<FactSheet> {
       description: o.description || '', visible: o.is_visible !== false,
     })),
     faq_questions: (faqs.json ?? []).map((f: { question: string }) => f.question),
+    faqs_full: (faqs.json ?? []).map((f: Record<string, unknown>) => ({
+      id: f.id, question: f.question, answer: f.answer || '', visible: f.is_visible !== false,
+    })) as FactSheet['faqs_full'],
+    posts_full: (posts.json ?? []).map((p: Record<string, unknown>) => ({
+      id: p.id, title: p.title, body_md: String(p.body_md || '').slice(0, 4000), excerpt: p.excerpt || '', shown: p.status === 'published',
+    })) as FactSheet['posts_full'],
     post_titles: (posts.json ?? []).map((p: { title: string }) => p.title),
     testimonial_count: (tes.json ?? []).length,
     voice: { tone_notes: v.tone_notes || '', preferred_vocabulary: v.preferred_vocabulary || '', never_claim: v.never_claim || '' },

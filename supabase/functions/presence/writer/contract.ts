@@ -35,6 +35,21 @@ export interface WriterPayload {
   post?: { title: string; body_md: string; excerpt?: string };
   offerings_new?: Array<{ name: string; category: string; description?: string; price_text?: string }>; // starter_site only; names/prices from customer input
   document?: { title: string; body: string };  // document-only kinds
+  // M9.5B editor fields — IN-PLACE improvements of existing entities (by id)
+  faqs_edit?: Array<{ id: string; question: string; answer: string }>;
+  posts_edit?: Array<{ id: string; title: string; body_md: string; excerpt?: string }>;
+}
+
+/** M9.5B editor kinds — improve existing content, never invent it. */
+export type EditorKind = 'edit_identity' | 'edit_faq' | 'edit_offering' | 'edit_post' | 'edit_document' | 'site_polish';
+export const EDITOR_CONTRACT_KINDS: EditorKind[] = ['edit_identity', 'edit_faq', 'edit_offering', 'edit_post', 'site_polish'];
+
+/** The compare pack every editing option carries — customers learn from edits. */
+export interface ComparePack {
+  before: Record<string, string>;   // field → current text
+  change_summary: string;           // deterministic: what changed, by field
+  why: string;                      // from the action taxonomy (+ recommendation reason if aware)
+  expected_benefit: string;         // from the action taxonomy
 }
 
 export interface WriterOption {

@@ -46,6 +46,13 @@ export function factGuard(payload: WriterPayload, facts: FactSheet, extraAllowed
   for (const m of clean.match(/\$\s?\d[\d.,]*/g) || []) {
     if (!allowed.includes(m.replace(/\s/g, ''))) violations.push(`invents a price: "${m}"`);
   }
+  // percentage/discount invention: any % or discount language not on the sheet
+  for (const m of clean.match(/\d{1,3}\s?%/g) || []) {
+    if (!allowed.includes(m.replace(/\s/g, ''))) violations.push(`invents a percentage: "${m}"`);
+  }
+  if (/\b(percent|% )?(off|discount)\b/i.test(clean) && !/\b(off|discount)\b/i.test(allowed)) {
+    violations.push('invents an offer/discount');
+  }
   // hour-like claims when the sheet has no hours
   if (!facts.hours_text && /\b(open (?:daily|from|until)|\d{1,2}\s?(?:am|pm)\s?[-–]\s?\d{1,2}\s?(?:am|pm))\b/i.test(clean)) {
     violations.push('states hours the business has not provided');

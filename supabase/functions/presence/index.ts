@@ -28,6 +28,7 @@ import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handle
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
+import { handleEditorImprove } from './routes/editor.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -110,6 +111,8 @@ serve(async (req) => {
   if (route === '/concierge/ask' && method === 'POST') return handleConciergeAsk(req, site, cors);
   // ── M9.5A: the AI Writer (Draft verb, rung 2 — proposals only; never publishes) ──
   if (route === '/writer/generate' && method === 'POST') return handleWriterGenerate(req, site, cors);
+  // ── M9.5B: the AI Editor (improve existing content; shares the Writer's proposal flow) ──
+  if (route === '/editor/improve' && method === 'POST') return handleEditorImprove(req, site, cors);
   if (route === '/writer/drafts' && method === 'GET') return handleWriterList(jwt, site, cors);
   {
     const m = route.match(/^\/writer\/drafts\/([0-9a-f-]{36})(\/accept|\/discard)?$/);

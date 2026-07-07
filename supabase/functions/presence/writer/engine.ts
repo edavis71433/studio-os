@@ -199,6 +199,15 @@ export function composeMerged(current: SnapshotContent, payload: WriterPayload, 
       body_md: p.post.body_md, excerpt: p.post.excerpt, published_at: new Date().toISOString(),
     }];
   }
+  // M9.5B — in-place edits: the same entities, improved (never appended)
+  if (p.faqs_edit?.length) {
+    const byId = new Map(p.faqs_edit.map((f) => [f.id, f]));
+    merged.faqs = (merged.faqs || []).map((f) => byId.has(f.id) ? { ...f, question: byId.get(f.id)!.question, answer: byId.get(f.id)!.answer } : f);
+  }
+  if (p.posts_edit?.length) {
+    const byId = new Map(p.posts_edit.map((x) => [x.id, x]));
+    merged.posts = (merged.posts || []).map((x) => byId.has(x.id) ? { ...x, title: byId.get(x.id)!.title, body_md: byId.get(x.id)!.body_md, excerpt: byId.get(x.id)!.excerpt ?? x.excerpt } : x);
+  }
   return merged;
 }
 
@@ -211,8 +220,9 @@ export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: n
   const opt = (row.options || [])[optionIndex];
   if (!opt) return { ok: false, applied_summary: '', error: 'bad_option' };
 
+  const EDIT_CONTRACT = ['edit_identity', 'edit_faq', 'edit_offering', 'edit_post', 'site_polish'];
   let summary = '';
-  if (CONTRACT_KINDS.includes(row.kind)) {
+  if (CONTRACT_KINDS.includes(row.kind) || EDIT_CONTRACT.includes(row.kind)) {
     const t = getTemplate(site.template_slug, site.template_version);
     if (!t) return { ok: false, applied_summary: '', error: 'template_missing' };
     const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
@@ -223,6 +233,8 @@ export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: n
     const nOff = (edits?.offering_descriptions || opt.payload.offering_descriptions || []).length; if (nOff) parts.push(`${nOff} item description${nOff > 1 ? 's' : ''}`);
     const nNew = (edits?.offerings_new || opt.payload.offerings_new || []).length; if (nNew) parts.push(`${nNew} menu item${nNew > 1 ? 's' : ''}`);
     if (edits?.post || opt.payload.post) parts.push('an update');
+    const nFqE = (edits?.faqs_edit || opt.payload.faqs_edit || []).length; if (nFqE) parts.push(`${nFqE} improved answer${nFqE > 1 ? 's' : ''}`);
+    const nPoE = (edits?.posts_edit || opt.payload.posts_edit || []).length; if (nPoE) parts.push(`${nPoE} improved update${nPoE > 1 ? 's' : ''}`);
     summary = `Accepted a drafted proposal: ${parts.join(', ') || row.prompt_summary}`;
     const applied = await applySnapshotToDraft(
       site,

@@ -419,6 +419,8 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div class="hoursgrid" id="hoursGrid"></div>
         <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
         <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
+
+        <button class="addline" style="margin-top:38px" onclick="openEditDesk('site_polish','business',null,'readability')"><span class="aimark">✦</span> Polish my whole website’s writing</button>
       </section>
 
       <!-- MENU -->
@@ -967,6 +969,12 @@ function simpleEditor(entity, collection, fields, rerender, words) {
       <span class="spacer"></span>
       <button class="danger" data-act="del">Remove for good</button>
     </div>`;
+  if (collection === "faqs") {
+    const improve = el("button", "quietact", "✦ improve with help");
+    improve.style.marginLeft = "18px";
+    improve.addEventListener("click", () => openEditDesk("edit_faq", "faqs", entity.id, "rewrite"));
+    ed.querySelector(".eacts").insertBefore(improve, ed.querySelector(".spacer"));
+  }
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
     const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
     try { const r = await api("PATCH", `/${collection}/${entity.id}`, body); Object.assign(entity, r.data); rerender(); toast("Saved"); scheduleChangesRefresh(); }
@@ -1090,6 +1098,12 @@ function postEditor(p) {
     try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
     catch (err) { toast(err.message, true); }
   }));
+  if (p.status === "published") {
+    const improve = el("button", "quietact", "✦ improve with help");
+    improve.style.marginLeft = "18px";
+    improve.addEventListener("click", () => openEditDesk("edit_post", "updates", p.id, "rewrite"));
+    ed.querySelector(".eacts").insertBefore(improve, ed.querySelector(".spacer"));
+  }
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
     const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
     try { const r = await api("PATCH", `/posts/${p.id}`, body); Object.assign(p, r.data); renderPosts(); toast("Saved"); scheduleChangesRefresh(); }
@@ -1120,26 +1134,40 @@ function inlineAdd(wrapId, fields, onAdd, addLabel) {
   wrap.appendChild(ed);
   ed.querySelector("input,textarea").focus();
 }
-/* ── the writing desk (M9.5A) — the Draft verb: writes only when asked ── */
-const DESK = { kind: null, view: null };
+/* ── the writing desk (M9.5A write · M9.5B improve) — only when asked ── */
+const DESK = { mode: "write", kind: null, view: null, targetId: null, action: "rewrite" };
 const DESK_KINDS = {
   faqs: { sub: "A few answered questions, written from your facts — you keep only what reads right." },
   post: { sub: "An update for your Updates page — seasonal note, announcement, news." },
   identity_copy: { sub: "Your description, tagline, or story — in your voice, from your facts." },
+  edit_faq: { sub: "The same question and answer, improved — every fact stays; you see before and after." },
+  edit_post: { sub: "The same update, improved — every fact stays; you see before and after." },
+  site_polish: { sub: "One pass over your written words — description, answers, item descriptions — improved in place. Nothing is added, nothing invented, and you review everything." },
 };
 function openDesk(kind, view) {
-  DESK.kind = kind; DESK.view = view;
+  DESK.mode = "write"; DESK.kind = kind; DESK.view = view; DESK.targetId = null;
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> Draft it with help';
   $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
   $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
   $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Write the drafts";
   openSheet("deskScrim");
 }
+function openEditDesk(kind, view, targetId, action) {
+  DESK.mode = "edit"; DESK.kind = kind; DESK.view = view; DESK.targetId = targetId || null; DESK.action = action || "rewrite";
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> Improve it with help';
+  $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
+  $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
+  $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Suggest improvements";
+  openSheet("deskScrim");
+}
 $("deskGo").addEventListener("click", async () => {
   const btn = $("deskGo");
-  btn.disabled = true; btn.textContent = "Writing…";
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Setting words to your facts…</div><div class="shimmer"></div></div>`;
+  btn.disabled = true; btn.textContent = DESK.mode === "edit" ? "Reading it over…" : "Writing…";
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">${DESK.mode === "edit" ? "Improving without inventing…" : "Setting words to your facts…"}</div><div class="shimmer"></div></div>`;
   try {
-    const r = await api("POST", "/writer/generate", { kind: DESK.kind, instructions: $("deskInstructions").value.trim() });
+    const r = DESK.mode === "edit"
+      ? await api("POST", "/editor/improve", { kind: DESK.kind, action: DESK.action, target_id: DESK.targetId || undefined, instructions: $("deskInstructions").value.trim() })
+      : await api("POST", "/writer/generate", { kind: DESK.kind, instructions: $("deskInstructions").value.trim() });
     const d = await api("GET", `/writer/drafts/${r.data.draft_id}`);
     renderDeskOptions(d.data);
     btn.hidden = true;
@@ -1168,7 +1196,20 @@ function renderDeskOptions(draft) {
   (draft.options || []).forEach((o, i) => {
     const card = el("div", "deskopt");
     card.appendChild(el("div", "dol", "✦ " + (o.label || o.tone)));
+    if (o.compare) {
+      // the compare view: before → after → what changed → why → benefit
+      const before = el("div", "dop");
+      before.style.cssText = "color:var(--ink-2);text-decoration:line-through 1px;max-height:110px;font-size:12.5px";
+      before.textContent = Object.values(o.compare.before || {}).join("\n\n").slice(0, 600);
+      card.appendChild(before);
+    }
     card.appendChild(el("div", "dop", payloadPreview(o.payload)));
+    if (o.compare) {
+      const meta = el("p", "aihint");
+      meta.textContent = `What changed: ${o.compare.change_summary}. Why: ${o.compare.why}. The gain: ${o.compare.expected_benefit}.`;
+      meta.style.marginTop = "8px";
+      card.appendChild(meta);
+    }
     const acts = el("div", "doa");
     const keep = el("button", "pillbtn inked", "Keep this one");
     keep.addEventListener("click", async () => {
@@ -1177,11 +1218,8 @@ function renderDeskOptions(draft) {
         const r = await api("POST", `/writer/drafts/${draft.id}/accept`, { option: i });
         closeSheet("deskScrim");
         toast(r.data.note);
-        scheduleChangesRefresh();
-        if (DESK.view) go(DESK.view); else await refreshAll();
-        if (DESK.view === "faqs") { const f = await api("GET", "/faqs"); S.faqs = f.data || []; renderFaqs(); }
-        if (DESK.view === "updates") { const p = await api("GET", "/posts"); S.posts = p.data || []; renderPosts(); }
-        if (DESK.view === "business") { const s = await api("GET", "/site"); S.identity = s.data.identity; fillSingles(); }
+        await refreshAll();                     // everything the acceptance touched, reloaded
+        if (DESK.view) go(DESK.view);
       } catch (err) { keep.disabled = false; keep.textContent = "Keep this one"; toast(err.message, true); }
     });
     acts.appendChild(keep);
