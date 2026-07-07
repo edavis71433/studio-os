@@ -8,7 +8,9 @@
 import { templateRecords, validateRecord, explainRecord } from './dns.ts';
 import type { DnsRecord } from './dns.ts';
 
-export type PlanKind = 'connect_domain' | 'email_auth' | 'registrar_care' | 'hosting_restore' | 'migration';
+export type PlanKind = 'connect_domain' | 'email_auth' | 'registrar_care' | 'hosting_restore' | 'migration'
+  // M14 (additive, matching the 0035 CHECK):
+  | 'domain_transfer_in' | 'domain_transfer_out' | 'dns_repair' | 'email_setup';
 
 export interface PlanStep {
   what: string;                 // the action, plain words

@@ -11,6 +11,7 @@ import { asUser, svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { verifyConnection, fetchExternalSite } from '../monitor/external.ts';
 import { assessMigrationReadiness } from '../monitor/readiness.ts';
+import { buildImportInventory } from '../platform/importer.ts';
 import type { ReadinessReport } from '../monitor/readiness.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -104,6 +105,20 @@ export async function handleMonitorReadiness(site: SiteRow, cors: Record<string,
     first_fixes: r.accessibility_first.map((a) => a.what),
     after_the_move: r.content_after,
   } }, 200, cors);
+}
+
+/** M14: the migration import inventory — what's on the external site, page by
+ *  page (text, images, meta), reviewable BEFORE anything moves. Read-only;
+ *  content arrives only through the existing CMS flows after plan approval. */
+export async function handleImportInventory(site: SiteRow, cors: Record<string, string>) {
+  if (site.edition !== 'monitor') return json({ error: 'not_monitor', message: 'The import inventory reads an external website.' }, 400, cors);
+  const connQ = await svc(`presence_monitor_connections?site_id=eq.${site.id}&status=eq.verified&select=url&limit=1`);
+  const conn = connQ.json?.[0];
+  if (!conn?.url) return json({ error: 'not_ready', message: 'Connect and verify the website first.' }, 409, cors);
+  const ext = await (async () => { try { return await fetchExternalSite(conn.url); } catch { return null; } })();
+  if (!ext?.pages.length) return json({ error: 'fetch_failed', message: 'The website didn’t answer — try again shortly.' }, 502, cors);
+  const inventory = buildImportInventory(ext.pages, conn.url);
+  return json({ data: { ...inventory, note: 'Nothing has been imported. This is the review — content moves only through the migration plan you approve, and every page arrives as a draft first.' } }, 200, cors);
 }
 
 export async function handleMonitorDisconnect(site: SiteRow, principal: Principal, cors: Record<string, string>) {

@@ -1442,15 +1442,29 @@ async function openFoundationsDesk() {
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
-    const [f, plans] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans")]);
-    renderFoundations(f.data, plans.data || []);
+    const [f, plans, launch] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans"), api("GET", "/launch")]);
+    renderFoundations(f.data, plans.data || [], launch.data);
   } catch (err) {
     $("deskResults").innerHTML = "";
     toast(err.message, true);
   }
 }
-function renderFoundations(f, plans) {
+function renderFoundations(f, plans, launch) {
   const wrap = $("deskResults"); wrap.innerHTML = "";
+
+  // ── M14: the Launch Assistant — the whole launch, one calm list ──
+  if (launch) {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", launch.launched ? "launched" : "getting launched"));
+    card.appendChild(el("div", "dop", launch.sentence));
+    launch.items.filter((it) => it.state !== "n/a").forEach((it) => {
+      const line = el("p", "aihint", (it.state === "done" ? "✓ " : "· ") + it.step + (it.state === "done" ? "" : " — " + it.how));
+      line.style.marginTop = "4px";
+      if (it.state === "done") line.style.opacity = "0.65";
+      card.appendChild(line);
+    });
+    wrap.appendChild(card);
+  }
   const section = (label, sentence) => {
     const card = el("div", "deskopt");
     card.appendChild(el("div", "dol", label));
@@ -1479,6 +1493,30 @@ function renderFoundations(f, plans) {
     emailCard.appendChild(acts);
   }
   section("hosting", f.hosting.sentence);
+
+  // ── M14: the right to leave, one button — everything they own, portable ──
+  {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", "yours to take"));
+    card.appendChild(el("p", "aihint", "Your words, media, brand, redirects, and the rendered website itself — one file, hostable anywhere, no strings. Having the door is the point."));
+    const acts = el("div", "doa");
+    const b = el("button", "quietact", "Download everything I own");
+    b.addEventListener("click", async () => {
+      try {
+        const r = await api("GET", "/export");
+        const blob = new Blob([JSON.stringify(r.data, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "my-website-export.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast("Exported. It's all in there — and it's all yours.");
+      } catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(b);
+    card.appendChild(acts);
+    wrap.appendChild(card);
+  }
 
   const open = plans.filter((p) => p.status === "proposed" || p.status === "approved");
   if (open.length) {

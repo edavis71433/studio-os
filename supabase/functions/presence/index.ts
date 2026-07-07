@@ -35,6 +35,8 @@ import { handleCoachRun, handleCoachList, handleCoachDecide } from './routes/coa
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
+import { handleExport, handleLaunch, handleDnsGet, handleDnsPut, handleDnsRollback, handleEmailHealth } from './routes/services.ts';
+import { handleImportInventory } from './routes/monitor.ts';
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 
@@ -152,6 +154,14 @@ serve(async (req) => {
     if (m && !m[2] && method === 'GET') return handleBrandReportGet(jwt, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
   }
+  // ── M14: Presence Platform Services — ownership, launch, DNS documents, email posture ──
+  if (route === '/export' && method === 'GET') return handleExport(site, principal, cors);
+  if (route === '/launch' && method === 'GET') return handleLaunch(site, cors);
+  if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(jwt, site, cors);
+  if (route === '/foundations/dns' && method === 'PUT') return handleDnsPut(req, site, principal, cors);
+  if (route === '/foundations/dns/rollback' && method === 'POST') return handleDnsRollback(req, site, principal, cors);
+  if (route === '/foundations/email' && method === 'GET') return handleEmailHealth(site, cors);
+  if (route === '/monitor/import-inventory' && method === 'GET') return handleImportInventory(site, cors);
   // ── M12: Platform Services — the technical foundation, in plain words; changes only as approved plans ──
   if (route === '/foundations' && method === 'GET') return handleFoundationsGet(site, cors);
   if (route === '/foundations/prepare' && method === 'POST') return handleFoundationsPrepare(req, site, principal, cors);

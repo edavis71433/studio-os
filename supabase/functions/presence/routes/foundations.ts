@@ -14,6 +14,9 @@ import { readZone } from '../platform/dns.ts';
 import { explainRecord } from '../platform/dns.ts';
 import { planConnectDomain, planEmailAuth, planRegistrarCare, planHostingRestore } from '../platform/plans.ts';
 import { planMigration } from '../platform/migration.ts';
+import { planTransferIn, planTransferOut } from '../platform/transfer.ts';
+import { planEmailSetup } from '../platform/email_providers.ts';
+import { diffZones, planDnsRepair } from '../platform/zone.ts';
 import { registrarFor, hostFor } from '../platform/contract.ts';
 import type { InfraPlan } from '../platform/plans.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -76,7 +79,7 @@ export async function handleFoundationsGet(site: SiteRow, cors: Record<string, s
 }
 
 export async function handleFoundationsPrepare(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  let body: { goal?: string; deploy_id?: string; deploy_title?: string } = {};
+  let body: { goal?: string; deploy_id?: string; deploy_title?: string; provider?: string } = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right.' }, 400, cors); }
   const domain = await siteDomain(site);
   const now = new Date().toISOString();
@@ -96,6 +99,21 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
     } else if (body.goal === 'hosting_restore') {
       if (!site.netlify_site_id || !body.deploy_id) return json({ error: 'bad_request', message: 'A previous version to restore is needed.' }, 400, cors);
       plan = planHostingRestore(body.deploy_id, body.deploy_title || 'a previous version');
+    } else if (body.goal === 'transfer_in' || body.goal === 'transfer_out') {
+      if (!domain) return json({ error: 'no_domain', message: 'A domain transfer needs a domain first.' }, 400, cors);
+      plan = body.goal === 'transfer_in' ? planTransferIn(domain) : planTransferOut(domain);
+    } else if (body.goal === 'email_setup') {
+      if (!domain) return json({ error: 'no_domain', message: 'Email setup needs a domain first.' }, 400, cors);
+      plan = planEmailSetup(domain, String(body.provider || 'other'));
+    } else if (body.goal === 'dns_repair') {
+      if (!domain) return json({ error: 'no_domain', message: 'DNS repair needs a domain first.' }, 400, cors);
+      const [zQ, observed] = await Promise.all([
+        svc(`presence_dns_zones?site_id=eq.${site.id}&select=records&limit=1`),
+        readZone(domain, now),
+      ]);
+      const drift = diffZones(zQ.json?.[0]?.records ?? [], observed.records);
+      if (!drift.missing.length) return json({ error: 'no_drift', message: 'Reality already matches what you decided — nothing to repair.' }, 409, cors);
+      plan = planDnsRepair(domain, drift);
     } else if (body.goal === 'migration') {
       const c = await svc(`presence_monitor_connections?site_id=eq.${site.id}&status=eq.verified&select=domain,readiness&limit=1`);
       const conn = c.json?.[0];
@@ -104,7 +122,7 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
       extra = { content_mapping: mp.content_mapping, redirects: mp.redirects, launch_checks: mp.launch_checks, post_launch_qa: mp.post_launch_qa };
       plan = mp;
     } else {
-      return json({ error: 'bad_goal', message: 'Plans exist for: connect_domain, email_auth, registrar_care, hosting_restore, migration.' }, 400, cors);
+      return json({ error: 'bad_goal', message: 'Plans exist for: connect_domain, email_auth, email_setup, registrar_care, hosting_restore, migration, transfer_in, transfer_out, dns_repair.' }, 400, cors);
     }
   } catch (e) {
     return json({ error: 'plan_failed', message: (e as Error)?.message?.slice(0, 200) || 'The plan couldn’t be prepared.' }, 502, cors);
