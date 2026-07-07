@@ -174,11 +174,11 @@ export async function handleWriteList(site: SiteRow, key: string, cors: Record<s
 /** Approve or abandon a proposed plan — the explicit, recorded decision. */
 export async function handleWriteDecide(req: Request, site: SiteRow, key: string, planId: string, principal: Principal, cors: Record<string, string>) {
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
-  const decision = body?.decision === 'approve' ? 'approved' : body?.decision === 'abandon' ? 'abandoned' : null;
-  if (!decision) return json({ error: 'bad_request', message: 'Decide with approve or abandon.' }, 400, cors);
-  const row = await decideWritePlan(site.id, planId, decision as 'approved' | 'abandoned');
+  const verb = String(body?.decision || '');
+  if (verb !== 'approve' && verb !== 'abandon') return json({ error: 'bad_request', message: 'Decide with approve or abandon.' }, 400, cors);
+  const row = await decideWritePlan(site.id, planId, verb);
   if (!row) return json({ error: 'not_found', message: 'That plan isn’t open for a decision.' }, 404, cors);
-  await auditWrite(site.id, key, decision === 'approved' ? 'write_approve' : 'write_abandon', `${decision}: ${row.title}`, actorOf(principal));
+  await auditWrite(site.id, key, verb === 'approve' ? 'write_approve' : 'write_abandon', `${row.status}: ${row.title}`, actorOf(principal));
   return json({ data: row }, 200, cors);
 }
 

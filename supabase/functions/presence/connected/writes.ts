@@ -18,26 +18,24 @@
 //                 an external write.
 import { providerByKey } from './providers.ts';
 import type { ConnectedProvider } from './contract.ts';
+import type { ApprovedPlanBase } from '../lib/approved_plan.ts';
 
 export type WriteKind = 'write' | 'handoff';
 export type WriteWorkflow =
   | 'gbp_post' | 'gbp_hours' | 'gsc_verify'          // real provider writes
   | 'calendar_hold' | 'email_draft' | 'social_draft'; // handoffs — never sent
 
-/** The plan the customer reviews — plain language, everything on the table. */
-export interface WritePlan {
+/** The plan the customer reviews — plain language, everything on the table.
+ *  Extends the shared ApprovedPlanBase (title/summary/risk/reversible/approval),
+ *  so a connected write reads the same way as an infrastructure plan. */
+export interface WritePlan extends ApprovedPlanBase {
   workflow: WriteWorkflow;
   provider_key: string;
   kind: WriteKind;
-  title: string;
-  summary: string;
   what_changes: string[];      // plain bullets — what this does
   what_stays: string[];        // what will NOT change (the reassurance that matters)
-  risk: string;                // honest, plain words
-  reversible: boolean;
   rollback: string;            // how to undo, or why undo is unneeded/impossible
   verify: string;              // how we confirm it worked, plain words
-  requires_approval: true;     // constitutional constant (schema CHECK re-enforces)
   payload: Record<string, unknown>;      // exact data to write (or the handoff content)
   prior_state: Record<string, unknown> | null; // snapshot for rollback
 }

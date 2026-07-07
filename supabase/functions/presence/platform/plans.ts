@@ -7,6 +7,7 @@
 // a human and marked done. Reality is never hidden: a guided step says so.
 import { templateRecords, validateRecord, explainRecord } from './dns.ts';
 import type { DnsRecord } from './dns.ts';
+import type { ApprovedPlanBase } from '../lib/approved_plan.ts';
 
 export type PlanKind = 'connect_domain' | 'email_auth' | 'registrar_care' | 'hosting_restore' | 'migration'
   // M14 (additive, matching the 0035 CHECK):
@@ -21,15 +22,12 @@ export interface PlanStep {
   done: boolean;
 }
 
-export interface InfraPlan {
+// Extends the shared ApprovedPlanBase (title/summary/risk/reversible/approval) —
+// the same lifecycle spine as a Connected Write Plan; only the executor differs.
+export interface InfraPlan extends ApprovedPlanBase {
   kind: PlanKind;
-  title: string;
-  summary: string;              // what changes and what does not, in sentences
   steps: PlanStep[];
-  risk: string;                 // honest, plain words
-  reversible: boolean;
   rollback_note: string;
-  requires_approval: true;
 }
 
 const step = (what: string, why: string, automated: boolean, records?: DnsRecord[]): PlanStep => ({

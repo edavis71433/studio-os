@@ -18,6 +18,7 @@ import { planTransferIn, planTransferOut } from '../platform/transfer.ts';
 import { planEmailSetup } from '../platform/email_providers.ts';
 import { diffZones, planDnsRepair } from '../platform/zone.ts';
 import { registrarFor, hostFor } from '../platform/contract.ts';
+import { decidePlan, claimApprovedPlan, releaseApprovedPlanClaim } from '../lib/approved_plan.ts';
 import type { InfraPlan } from '../platform/plans.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -152,7 +153,7 @@ export async function handleFoundationsPlans(jwt: string, site: SiteRow, cors: R
 export async function handleFoundationsDecide(req: Request, site: SiteRow, planId: string, principal: Principal, cors: Record<string, string>) {
   let body: { decision?: string } = {};
   try { body = await req.json(); } catch { /* below */ }
-  const decision = body?.decision === 'approve' ? 'approved' : body?.decision === 'abandon' ? 'abandoned' : null;
+  const decision = decidePlan(body?.decision || '');   // shared spine transition
   if (!decision) return json({ error: 'bad_request', message: 'Decide with approve or abandon.' }, 400, cors);
   const w = await svc(`presence_infra_plans?id=eq.${planId}&site_id=eq.${site.id}&status=eq.proposed&select=id,title`, {
     method: 'PATCH', headers: { Prefer: 'return=representation' },
@@ -174,6 +175,13 @@ export async function applyPlan(site: SiteRow, planId: string, principal: Princi
   if (plan.status !== 'approved') {
     return json({ error: 'not_approved', message: 'Plans apply only after explicit approval — that is a law, not a setting.' }, 409, cors);
   }
+  // L4.5: the SHARED atomic claim (lib/approved_plan.ts) — the same guarantee the
+  // connected write executor uses. Only one caller applies an approved plan; a
+  // concurrent apply is refused; an interrupted apply self-recovers after the
+  // staleness window. Released on every non-success exit so retry stays immediate.
+  const claimed = await claimApprovedPlan({ table: 'presence_infra_plans', id: planId, siteId: site.id, claimColumn: 'applied_at', select: 'id' });
+  if (!claimed) return json({ error: 'in_progress', message: 'This plan is already being applied — nothing is done twice.' }, 409, cors);
+  const release = () => releaseApprovedPlanClaim('presence_infra_plans', planId, 'applied_at');
   const host = hostFor('netlify');
   const steps = plan.steps as Array<{ what: string; automated: boolean; done: boolean }>;
   const notes: string[] = [];
@@ -182,9 +190,9 @@ export async function applyPlan(site: SiteRow, planId: string, principal: Princi
     if (plan.kind === 'hosting_restore' && /^Restore deploy/.test(s.what) && site.netlify_site_id) {
       const dep = s.what.match(/deploy ([a-z0-9]+)…/i)?.[1];
       const full = dep ? (await host.deploys(site.netlify_site_id)).deploys.find((d) => d.id.startsWith(dep)) : null;
-      if (!full) return json({ error: 'apply_failed', message: 'The deploy to restore wasn’t found in history.' }, 409, cors);
+      if (!full) { await release(); return json({ error: 'apply_failed', message: 'The deploy to restore wasn’t found in history.' }, 409, cors); }
       const r = await host.restore(site.netlify_site_id, full.id);
-      if (!r.ok) return json({ error: 'apply_failed', message: `Restore failed: ${r.error || 'unknown'} — the plan stays approved; nothing was half-done.` }, 502, cors);
+      if (!r.ok) { await release(); return json({ error: 'apply_failed', message: `Restore failed: ${r.error || 'unknown'} — the plan stays approved; nothing was half-done.` }, 502, cors); }
       s.done = true; notes.push('restored via hosting provider');
     } else {
       // verification-class automated steps: the evidence pipeline is the verifier
