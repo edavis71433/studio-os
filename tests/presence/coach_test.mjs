@@ -11,7 +11,7 @@
 //   deno run --allow-read --allow-net --allow-env tests/presence/coach_test.mjs
 import { holidaysFor, upcomingEvents, timingPhrase } from '../../supabase/functions/presence/coach/calendar.ts';
 import { growthPackFor, GROWTH_PACKS } from '../../supabase/functions/presence/coach/packs.ts';
-import { COACH_AREAS, coachOpportunities, applyMemory, sanitizeCoachIdeas, deriveCoachHandoff } from '../../supabase/functions/presence/coach/rules.ts';
+import { COACH_AREAS, coachOpportunities, applyMemory, sanitizeCoachIdeas, deriveCoachHandoff, momentSuppressedAreas, COACH_YIELDS_TO } from '../../supabase/functions/presence/coach/rules.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -134,6 +134,29 @@ const NOW_JAN = '2027-01-20T12:00:00Z';  // Valentine's (Feb 14) is 25 days out 
   const sleeping = applyMemory(a, [{ opp_key: target.opp_key, opp_hash: target.opp_hash, status: 'deferred', deferred_until: '2027-02-10' }], NOW_JAN);
   const matured = applyMemory(a, [{ opp_key: target.opp_key, opp_hash: target.opp_hash, status: 'deferred', deferred_until: '2027-01-15' }], NOW_JAN);
   ok('memory: deferred sleeps until its date, then may return', !sleeping.some((o) => o.opp_key === target.opp_key) && matured.some((o) => o.opp_key === target.opp_key));
+}
+
+// ═══ 6b. the explicit Coach ↔ Moments relationship (M9.5G) — one voice per concern ═══
+{
+  const NOW = NOW_JAN;
+  const freshnessEv = [{ type: 'freshness.updates_quiet', human: 'The Updates page has been quiet for 60 days.', resource: 'posts' }];
+  const evJan = upcomingEvents(NOW, null);
+  const activeMoment = [{ moment_key: 'freshness', status: 'active', dismissed_at: null }];
+  const sup = momentSuppressedAreas(activeMoment, NOW);
+  const withMoment = coachOpportunities({ facts: FACTS, pack: RESTAURANT, events: evJan, evidence: freshnessEv, nowIso: NOW, suppressed: sup });
+  ok('moments: an ACTIVE freshness moment silences the coach’s freshness card', !withMoment.some((o) => o.area === 'content_freshness'));
+  const dismissedFresh = [{ moment_key: 'freshness', status: 'dismissed', dismissed_at: '2027-01-10T00:00:00Z' }];
+  const supD = momentSuppressedAreas(dismissedFresh, NOW);
+  ok('moments: a RECENTLY DISMISSED moment also silences it — dismissing once means once', supD.has('content_freshness'));
+  const oldDismiss = [{ moment_key: 'freshness', status: 'dismissed', dismissed_at: '2026-11-01T00:00:00Z' }];
+  ok('moments: after the 30-day dismissal memory ages out, the coach may speak again', !momentSuppressedAreas(oldDismiss, NOW).has('content_freshness'));
+  const bundle = momentSuppressedAreas([{ moment_key: 'improvements_bundle', status: 'active', dismissed_at: null }], NOW);
+  ok('moments: the improvements bundle silences every area it absorbs', bundle.has('content_freshness') && bundle.has('faq_opportunity') && bundle.has('homepage_refresh'));
+  const withoutMoment = coachOpportunities({ facts: FACTS, pack: RESTAURANT, events: evJan, evidence: freshnessEv, nowIso: NOW, suppressed: momentSuppressedAreas([], NOW) });
+  ok('moments: no moment speaking → the coach speaks normally', withoutMoment.some((o) => o.area === 'content_freshness'));
+  ok('moments: calendar/industry areas NEVER yield — proactive is the coach’s own ground',
+    !('holiday' in COACH_YIELDS_TO) && !('seasonal' in COACH_YIELDS_TO) && !('promotion' in COACH_YIELDS_TO) &&
+    withMoment.some((o) => o.area === 'holiday'));
 }
 
 // ═══ 7. no automatic execution — structurally ═══

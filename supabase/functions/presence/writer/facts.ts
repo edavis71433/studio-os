@@ -33,7 +33,8 @@ export async function buildFactSheet(site: SiteRow): Promise<FactSheet> {
   const [ident, loc, voice, offs, faqs, posts, tes] = await Promise.all([
     svc(`presence_identity?site_id=eq.${site.id}&select=business_name,tagline,description,story,service_area,phone,email,booking_url,ordering_url&limit=1`),
     svc(`presence_locations?site_id=eq.${site.id}&select=address_line1,city,region,postal_code,hours&limit=1`),
-    svc(`presence_voice?site_id=eq.${site.id}&select=tone_notes,preferred_vocabulary,never_claim&limit=1`),
+    // M9.5G: the Brand Profile is the ONE canonical voice source (presence_voice retired)
+    svc(`presence_brand_profile?site_id=eq.${site.id}&select=voice_characteristics,personality,preferred_vocabulary,never_claims&limit=1`),
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,category,price_text,description,is_visible&order=sort_order.asc&limit=100`),
     svc(`presence_faqs?site_id=eq.${site.id}&deleted_at=is.null&select=id,question,answer,is_visible&order=sort_order.asc&limit=30`),
     svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body_md,excerpt,status&order=updated_at.desc&limit=10`),
@@ -66,6 +67,10 @@ export async function buildFactSheet(site: SiteRow): Promise<FactSheet> {
     })) as FactSheet['posts_full'],
     post_titles: (posts.json ?? []).map((p: { title: string }) => p.title),
     testimonial_count: (tes.json ?? []).length,
-    voice: { tone_notes: v.tone_notes || '', preferred_vocabulary: v.preferred_vocabulary || '', never_claim: v.never_claim || '' },
+    voice: {
+      tone_notes: v.voice_characteristics || v.personality || '',
+      preferred_vocabulary: v.preferred_vocabulary || '',
+      never_claim: v.never_claims || '',
+    },
   };
 }

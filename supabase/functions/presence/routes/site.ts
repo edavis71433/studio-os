@@ -21,7 +21,9 @@ export async function handleGetSite(jwt: string, site: SiteRow, cors: Record<str
   const [ident, loc, voice, nOff, nTes, nFaq, nPos, nMed, evR, pubR] = await Promise.all([
     asUser(jwt, `presence_identity?site_id=eq.${site.id}&select=business_name,tagline,description,phone,email,service_area,booking_url,ordering_url,social,seo_title,seo_description&limit=1`),
     asUser(jwt, `presence_locations?site_id=eq.${site.id}&select=address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note&limit=1`),
-    asUser(jwt, `presence_voice?site_id=eq.${site.id}&select=tone_notes,preferred_vocabulary,never_claim&limit=1`),
+    // M9.5G: voice now lives in the Brand Profile (one canonical source);
+    // the /site payload keeps its frozen shape via the mapping below
+    asUser(jwt, `presence_brand_profile?site_id=eq.${site.id}&select=voice_characteristics,preferred_vocabulary,never_claims&limit=1`),
     count('presence_offerings',    site.id, '&deleted_at=is.null&is_visible=is.true'),
     count('presence_testimonials', site.id, '&deleted_at=is.null&is_visible=is.true'),
     count('presence_faqs',         site.id, '&deleted_at=is.null&is_visible=is.true'),
@@ -42,7 +44,9 @@ export async function handleGetSite(jwt: string, site: SiteRow, cors: Record<str
       site: { id: site.id, status: site.status, template: `${site.template_slug} ${site.template_version}` },
       identity: (Array.isArray(ident.json) && ident.json[0]) || null,
       location: (Array.isArray(loc.json) && loc.json[0]) || null,
-      voice: (Array.isArray(voice.json) && voice.json[0]) || null,
+      voice: (Array.isArray(voice.json) && voice.json[0])
+        ? { tone_notes: voice.json[0].voice_characteristics || '', preferred_vocabulary: voice.json[0].preferred_vocabulary || '', never_claim: voice.json[0].never_claims || '' }
+        : null,
       counts,
       last_published_at: site.last_published_at,
       has_unpublished_changes: hasUnpublishedChanges,

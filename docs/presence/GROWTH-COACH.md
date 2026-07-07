@@ -50,9 +50,9 @@ Accept / dismiss / defer / ignore. Deciding is never executing — "accept" only
 
 The model may only **add** ideas in four idea areas (promotion, customer_education, social_campaign, email_campaign), and every idea must carry a `grounding_quote` verbatim from the customer's own content — no quote, no idea. Handoffs come from the fixed table regardless of model output; calendar areas are deterministic-only (the model cannot invent holidays). Capped at 3; deterministic opportunities win their `opp_key` slot.
 
-## Relationship to Business Moments
+## Relationship to Business Moments (explicit since M9.5G)
 
-Different rooms: Moments are the ambient "what needs attention now" surface (max three, judgment-driven); the Coach is the "what's worth planning for" surface the customer opens deliberately. The Coach reads the same Evidence Engine output Moments ultimately derives from but writes to its own table and never touches moments, judgments, or recommendations.
+Moments are **reactive** (the site needs attention now, max three, judgment-driven); the Coach is **proactive** (worth planning for, opened deliberately). When both would speak about the same underlying evidence, **Moments speak and the Coach yields**: `COACH_YIELDS_TO` maps each evidence-gap area to the moment keys covering the same concern, and the area stays silent while such a moment is active or was dismissed within the 30-day moments memory — the customer never hears one concern from two mouths, and dismissing once means once. `review_request` has no moment twin and never yields; calendar/industry areas are the Coach's own ground and never yield. The Coach still writes only to its own table and never touches moments, judgments, or recommendations.
 
 ## Tests
 

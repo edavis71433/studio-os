@@ -106,12 +106,45 @@ function opp(area: CoachArea, keySuffix: string, hashInput: string, text: {
   };
 }
 
+/* ── the explicit Coach ↔ Moments relationship (M9.5G) ──
+   Moments are REACTIVE (the site needs attention now); the Coach is PROACTIVE
+   (worth planning for). When both would speak about the same underlying
+   evidence, MOMENTS SPEAK AND THE COACH YIELDS: an evidence-gap area is
+   suppressed while a moment covering the same concern is active, or was
+   dismissed within the moments dismissal memory (30 days) — the customer
+   never hears the same thing twice from two mouths. review_request has no
+   moment twin (no reviews-driven moment rule exists) and never yields.
+   Calendar/industry areas are the Coach's own and never yield. */
+export const COACH_YIELDS_TO: Partial<Record<CoachArea, string[]>> = {
+  content_freshness: ['freshness', 'improvements_bundle'],
+  faq_opportunity: ['more_answers', 'improvements_bundle'],
+  homepage_refresh: ['more_answers', 'improvements_bundle'],
+  trust_building: ['missing_basics'],
+};
+export interface MomentLite { moment_key: string; status: string; dismissed_at: string | null }
+export function momentSuppressedAreas(moments: MomentLite[], nowIso: string, ttlDays = 30): Set<CoachArea> {
+  const speaking = new Set<string>();
+  for (const m of moments) {
+    if (m.status === 'active') speaking.add(m.moment_key);
+    if (m.status === 'dismissed' && m.dismissed_at &&
+        (new Date(nowIso).getTime() - new Date(m.dismissed_at).getTime()) / 86400000 < ttlDays) {
+      speaking.add(m.moment_key);
+    }
+  }
+  const out = new Set<CoachArea>();
+  for (const [area, keys] of Object.entries(COACH_YIELDS_TO)) {
+    if ((keys as string[]).some((k) => speaking.has(k))) out.add(area as CoachArea);
+  }
+  return out;
+}
+
 export interface CoachInput {
   facts: FactSheet;
   pack: GrowthPack;
   events: CalendarEvent[];         // from upcomingEvents(now, firstPublishedAt)
   evidence: EvidenceLite[];        // latest finished evidence run (read-only)
   nowIso: string;
+  suppressed?: Set<CoachArea>;     // areas yielding to Business Moments this run
 }
 
 const ev = (evidence: EvidenceLite[], type: string) => evidence.find((e) => e.type === type);
@@ -345,6 +378,10 @@ export function coachOpportunities(input: CoachInput): Opportunity[] {
     }));
   }
 
+  // yield to Business Moments: areas a moment already covers stay silent here
+  const yielded = input.suppressed ?? new Set<CoachArea>();
+  const kept = out.filter((o) => !yielded.has(o.area));
+
   // timed items first (they expire); untimed by priority — what the site is
   // SHOWING (evidence-backed gaps) outranks nice-to-have ideas; bounded
   const PRIORITY: Record<CoachArea, number> = {
@@ -353,9 +390,9 @@ export function coachOpportunities(input: CoachInput): Opportunity[] {
     faq_opportunity: 3, service_launch: 3,
     customer_education: 4, email_campaign: 5, social_campaign: 5, referral_campaign: 5,
   };
-  out.sort((a, b) => (a.timing_ends || '9999').localeCompare(b.timing_ends || '9999')
+  kept.sort((a, b) => (a.timing_ends || '9999').localeCompare(b.timing_ends || '9999')
     || PRIORITY[a.area] - PRIORITY[b.area] || a.area.localeCompare(b.area));
-  return out.slice(0, 8);
+  return kept.slice(0, 8);
 }
 
 /* ── customer memory: nothing resurfaces without new evidence ──

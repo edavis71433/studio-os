@@ -2,6 +2,8 @@
 
 The Reviewer **critiques**. The Editor improves. The Writer creates. The responsibilities never overlap — structurally: the Reviewer's module has no write path to content (it imports no serializer, no Draft Writer, no content routes), its findings carry no payloads, and its handoffs are derived from fixed tables the model cannot touch.
 
+> **M9.5G:** the customer now meets the Reviewer and the Brand Guardian as **one review surface** ("A look over your website" — sections *How it reads* / *Whether it sounds like you*). Brand-identity categories (`brand_voice`, `tone`, `consistency`) are **ceded to the Guardian**: the Reviewer's model tier may no longer emit them (`MODEL_CATEGORIES` = 21 − 3). The 21-category taxonomy stays frozen so historical reports render.
+
 ## Architecture
 
 ```

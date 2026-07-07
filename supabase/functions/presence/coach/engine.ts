@@ -14,7 +14,7 @@ import { buildFactSheet } from '../writer/facts.ts';
 import { anthropicModel } from '../writer/model.ts';
 import { growthPackFor } from './packs.ts';
 import { upcomingEvents } from './calendar.ts';
-import { coachOpportunities, sanitizeCoachIdeas, applyMemory } from './rules.ts';
+import { coachOpportunities, sanitizeCoachIdeas, applyMemory, momentSuppressedAreas } from './rules.ts';
 import type { Opportunity, MemoryRow, EvidenceLite } from './rules.ts';
 import type { SiteRow } from '../lib/site.ts';
 
@@ -34,11 +34,12 @@ export async function runGrowthCoach(site: SiteRow): Promise<CoachRunSummary> {
   const t0 = Date.now();
   try {
     const nowIso = new Date().toISOString();
-    const [facts, runQ, firstPubQ, memQ] = await Promise.all([
+    const [facts, runQ, firstPubQ, memQ, momQ] = await Promise.all([
       buildFactSheet(site),
       svc(`presence_evidence_runs?site_id=eq.${site.id}&finished_at=not.is.null&error_text=is.null&select=id&order=started_at.desc&limit=1`),
       svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.asc&limit=1`),
       svc(`presence_growth_opportunities?site_id=eq.${site.id}&select=opp_key,opp_hash,status,deferred_until&order=created_at.desc&limit=200`),
+      svc(`presence_moments?site_id=eq.${site.id}&status=in.(active,dismissed)&select=moment_key,status,dismissed_at&order=created_at.desc&limit=100`),
     ]);
     let evidence: EvidenceLite[] = [];
     if (runQ.json?.[0]?.id) {
@@ -49,7 +50,9 @@ export async function runGrowthCoach(site: SiteRow): Promise<CoachRunSummary> {
     const pack = growthPackFor(site.template_slug);
     const events = upcomingEvents(nowIso, firstPublishedAt);
 
-    const deterministic = coachOpportunities({ facts, pack, events, evidence, nowIso });
+    // moments speak, the coach yields — never two mouths for one concern
+    const suppressed = momentSuppressedAreas(momQ.json ?? [], nowIso);
+    const deterministic = coachOpportunities({ facts, pack, events, evidence, nowIso, suppressed });
 
     let ideas: Opportunity[] = [];
     let modelName = '';

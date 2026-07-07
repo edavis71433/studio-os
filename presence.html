@@ -420,10 +420,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
         <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
 
-        <button class="addline" style="margin-top:38px" onclick="openEditDesk('site_polish','business',null,'readability')"><span class="aimark">✦</span> Polish my whole website’s writing</button>
-        <button class="addline" style="border-top:none" onclick="openReviewDesk()"><span class="aimark">✦</span> Look over my website’s writing</button>
-        <button class="addline" style="border-top:none" onclick="openBrandDesk()"><span class="aimark">✦</span> Does it all sound like me?</button>
-        <button class="addline" style="border-top:none" onclick="openCoachDesk()"><span class="aimark">✦</span> What’s worth planning for?</button>
+        <button class="addline" style="margin-top:38px" onclick="openStudioDesk()"><span class="aimark">✦</span> Look things over — review, plan, or polish</button>
       </section>
 
       <!-- MENU -->
@@ -1241,40 +1238,69 @@ function renderDeskOptions(draft) {
 /* ── the review desk (M9.5C) — findings only; fixes go through the Editor ── */
 const EDIT_KIND_VIEW = { edit_identity: "business", edit_faq: "faqs", edit_offering: "offerings", edit_post: "updates", site_polish: "business" };
 const WRITE_KIND_VIEW = { faqs: "faqs", identity_copy: "business", post: "updates" };
-async function openFindingsDesk(cfg) {
+// ── M9.5G: ONE door into looking things over — tasks, not tools ──
+function openStudioDesk() {
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
-  $("deskTitle").innerHTML = '<span class="aimark">✦</span> ' + cfg.title;
-  $("deskSub").textContent = cfg.sub;
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> Look things over';
+  $("deskSub").textContent = "Pick what you’d like help with. Nothing changes without you.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">${cfg.loading}</div><div class="shimmer"></div></div>`;
+  $("deskGo").hidden = true;
+  const wrap = $("deskResults"); wrap.innerHTML = "";
+  [
+    ["Review", "A read-through of your writing and your brand — one honest report. Nothing changes.", openCombinedReviewDesk],
+    ["Plan", "What’s coming up — holidays, seasons, small openings worth preparing for.", openCoachDesk],
+    ["Polish", "One pass over all your written words, improved in place — you approve every change.", () => { closeSheet("deskScrim"); openEditDesk("site_polish", "business", null, "readability"); }],
+  ].forEach(([name, sub, go]) => {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", name));
+    const p = el("p", "aihint", sub); p.style.marginTop = "6px";
+    card.appendChild(p);
+    const acts = el("div", "doa");
+    const b = el("button", "textact", "✦ " + name);
+    b.addEventListener("click", go);
+    acts.appendChild(b);
+    card.appendChild(acts);
+    wrap.appendChild(card);
+  });
+  openSheet("deskScrim");
+}
+// ── the ONE review surface: writing quality + brand voice, one report ──
+// (two engines behind it — the Reviewer and the Guardian — but the customer
+//  meets a single read-through; brand concerns are the Guardian's alone)
+async function openCombinedReviewDesk() {
+  DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> A look over your website';
+  $("deskSub").textContent = "How it reads, and whether it sounds like you — one report. Nothing changes; every note can be dismissed or handed off for improving.";
+  $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading it all over…</div><div class="shimmer"></div></div>`;
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
-    const r = await api("POST", cfg.runPath, { scope: "site" });
-    const report = await api("GET", `${cfg.reportBase}/${r.data.review_id || r.data.report_id}`);
-    renderReviewFindings(report.data, cfg.reportBase);
+    const [rRun, bRun] = await Promise.all([
+      api("POST", "/review/run", { scope: "site" }),
+      api("POST", "/brand/review", { scope: "site" }),
+    ]);
+    const [rRep, bRep] = await Promise.all([
+      api("GET", `/review/reports/${rRun.data.review_id}`),
+      api("GET", `/brand/reports/${bRun.data.report_id}`),
+    ]);
+    const wrap = $("deskResults"); wrap.innerHTML = "";
+    const n1 = renderFindingsInto(wrap, rRep.data, "/review/reports", "How it reads");
+    const n2 = renderFindingsInto(wrap, bRep.data, "/brand/reports", "Whether it sounds like you");
+    if (!n1 && !n2) {
+      wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">It reads well — and it sounds like you.</div><div class="eh">Nothing worth flagging. Your words are doing their job.</div></div>`;
+    }
   } catch (err) {
     $("deskResults").innerHTML = "";
     toast(err.message, true);
   }
 }
-const openReviewDesk = () => openFindingsDesk({
-  title: "A look over your writing",
-  sub: "A read-through of what’s written — description, answers, item descriptions, updates. Nothing changes; you get honest notes, and every note can be dismissed or handed to the editor.",
-  loading: "Reading it all over…", runPath: "/review/run", reportBase: "/review/reports",
-});
-const openBrandDesk = () => openFindingsDesk({
-  title: "A look over your brand",
-  sub: "Does everything sound like the same business? Tone, wording, formatting, photographs — checked for consistency. Nothing changes; every note can be dismissed or handed to the editor.",
-  loading: "Listening for your voice…", runPath: "/brand/review", reportBase: "/brand/reports",
-});
-function renderReviewFindings(report, reportBase) {
-  const wrap = $("deskResults"); wrap.innerHTML = "";
+function renderFindingsInto(wrap, report, reportBase, heading) {
   const open = (report.findings || []).filter((f) => f.status === "open");
-  if (!open.length) {
-    wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">It reads well.</div><div class="eh">Nothing worth flagging — your words are doing their job.</div></div>`;
-    return;
-  }
+  if (!open.length) return 0;
+  const h = el("h5", "rune", heading);
+  h.style.marginTop = wrap.childNodes.length ? "26px" : "4px";
+  wrap.appendChild(h);
   open.forEach((f) => {
     const card = el("div", "deskopt");
     card.appendChild(el("div", "dol", f.category.replace(/_/g, " ")));
@@ -1306,6 +1332,7 @@ function renderReviewFindings(report, reportBase) {
     card.appendChild(acts);
     wrap.appendChild(card);
   });
+  return open.length;
 }
 
 // ── M9.5E: the Growth Coach — timed opportunities; every decision is the customer's ──

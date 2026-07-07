@@ -8,7 +8,7 @@ import { svc } from '../lib/db.ts';
 import { buildFactSheet } from '../writer/facts.ts';
 import { packFor } from '../writer/pack.ts';
 import { anthropicModel } from '../writer/model.ts';
-import { deterministicFindings, sanitizeModelFindings, mergeFindings, resetFindingSeq, CATEGORIES } from './rules.ts';
+import { deterministicFindings, sanitizeModelFindings, mergeFindings, resetFindingSeq, MODEL_CATEGORIES } from './rules.ts';
 import type { Finding } from './rules.ts';
 import type { SiteRow } from '../lib/site.ts';
 
@@ -52,7 +52,7 @@ export async function runReview(site: SiteRow, scope: ReviewScope): Promise<Revi
         posts: facts.posts_full.filter((p) => p.shown),
       };
       const user =
-        `CATEGORIES: ${CATEGORIES.join(', ')}\n` +
+        `CATEGORIES: ${MODEL_CATEGORIES.join(', ')}\n` +
         `VOICE PROFILE: ${JSON.stringify(facts.voice)}\nVERTICAL: ${pack.slug} — ${pack.voiceGuardrails}\n` +
         `OPEN CONCERNS (context only): ${JSON.stringify((recsQ.json ?? []).map((r: { title: string }) => r.title))}\n` +
         `RECENT PROPOSAL OUTCOMES (do not re-suggest discarded work): ${JSON.stringify(draftsQ.json ?? [])}\n` +

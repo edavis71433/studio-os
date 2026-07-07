@@ -243,12 +243,42 @@ export const handleLocation = (req: Request, jwt: string, site: SiteRow, princip
     conflict: 'site_id', summary: 'Updated hours & location',
   });
 
-export const handleVoice = (req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
-  singleton(req, jwt, site, principal, cors, {
-    table: 'presence_voice', entityType: 'voice', noun: 'voice profile', fields: VOICE_FIELDS,
-    select: 'site_id,tone_notes,preferred_vocabulary,never_claim,updated_at',
-    conflict: 'site_id', summary: 'Updated voice profile',
-  });
+// M9.5G: /voice keeps its route and shape, but the Brand Profile is now the
+// ONE canonical voice source — this handler maps tone_notes ↔
+// voice_characteristics and never_claim ↔ never_claims. presence_voice is
+// retired: nothing reads or writes it.
+export async function handleVoice(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const method = req.method.toUpperCase();
+  const SELECT = 'site_id,voice_characteristics,preferred_vocabulary,never_claims,updated_at';
+  const shape = (row: Record<string, unknown> | null) => row ? {
+    site_id: row.site_id, tone_notes: row.voice_characteristics || '',
+    preferred_vocabulary: row.preferred_vocabulary || '', never_claim: row.never_claims || '',
+    updated_at: row.updated_at,
+  } : null;
+  if (method === 'GET') {
+    const r = await asUser(jwt, `presence_brand_profile?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
+    if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open your voice profile just now.' }, 502, cors);
+    return json({ data: shape(r.json?.[0] ?? null) }, 200, cors);
+  }
+  if (method === 'PUT') {
+    let payload: Record<string, unknown> = {};
+    try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right — nothing changed.' }, 400, cors); }
+    const v = validateFields(payload, VOICE_FIELDS, false);
+    if (v.errors.length) return json({ error: 'validation', details: v.errors }, 400, cors);
+    if (!v.fields.length) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
+    const body: Record<string, unknown> = { site_id: site.id };
+    if ('tone_notes' in v.cleanBody) body.voice_characteristics = v.cleanBody.tone_notes;
+    if ('preferred_vocabulary' in v.cleanBody) body.preferred_vocabulary = v.cleanBody.preferred_vocabulary;
+    if ('never_claim' in v.cleanBody) body.never_claims = v.cleanBody.never_claim;
+    const w = await asUser(jwt, `presence_brand_profile?on_conflict=site_id&select=${SELECT}`, {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body),
+    });
+    if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
+    await writeChangeEvent({ siteId: site.id, entityType: 'voice', entityId: null, action: 'update', summary: 'Updated voice profile', principal, provenance: 'human', fields: v.fields });
+    return json({ data: shape(w.json[0]) }, 200, cors);
+  }
+  return null;
+}
 
 export const handleSettings = (req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, jwt, site, principal, cors, {

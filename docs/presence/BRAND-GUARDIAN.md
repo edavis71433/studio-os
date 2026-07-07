@@ -22,6 +22,8 @@ routes/brand.ts                    guardian/rules.ts (PURE)              guardia
 
 Sixteen fields, all edited by the customer through `PUT /brand/profile`: mission · vision · core_values · personality · voice_characteristics · preferred_vocabulary · words_prefer · words_avoid · never_claims · reading_level (everyday/relaxed/professional/technical) · industry_terminology · taglines · elevator_pitch · target_audience · brand_promise · selling_points.
 
+> **M9.5G:** the Brand Profile is now **the one canonical source of voice truth** platform-wide. `presence_voice` is retired (backfilled by migration 0029; nothing reads or writes it) — the Writer's fact sheet, `GET /site`, and the `/voice` route all map onto `voice_characteristics` / `preferred_vocabulary` / `never_claims` here. The Guardian and the Reviewer also now share **one review surface** in the room; brand-identity categories belong to the Guardian alone.
+
 A separate `learned` column holds observed guidance — which proposal kinds the customer accepts or discards, which tones they choose. It is written **only** by the review engine, is **not writable** through the profile route (tested: a `learned` key in the PUT payload is ignored), and is **never merged into the customer's fields**. The learning output deliberately shares zero keys with the 16 profile fields, so it *cannot* overwrite them even by accident. Learning informs; the customer decides.
 
 ## Category taxonomy (16)

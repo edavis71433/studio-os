@@ -7,7 +7,7 @@
 // content provably untouched, fix-this handoff drives the real Editor.
 //
 //   deno run --allow-read --allow-net --allow-env tests/presence/reviewer_test.mjs
-import { CATEGORIES, deterministicFindings, sanitizeModelFindings, mergeFindings, deriveHandoff, resetFindingSeq } from '../../supabase/functions/presence/reviewer/rules.ts';
+import { CATEGORIES, CEDED_TO_GUARDIAN, MODEL_CATEGORIES, deterministicFindings, sanitizeModelFindings, mergeFindings, deriveHandoff, resetFindingSeq } from '../../supabase/functions/presence/reviewer/rules.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -90,16 +90,19 @@ const SCOPE_SITE = { kind: 'site' };
 // ═══ 5. the sanitizer — the model does not get to lie ═══
 {
   const raw = [
-    { category: 'tone', severity: 'suggestion', confidence: 0.8, location: { kind: 'faq', id: 'f1' }, finding: 'The answer reads clipped.', reason: 'Short answers can feel brusque.', expected_benefit: 'warmer welcome', suggested_action: 'A friendlier sentence.', supporting_evidence: ['Yes, most nights.'] },
-    { category: 'tone', location: { kind: 'faq', id: 'GHOST' }, finding: 'x', reason: 'y' },                    // fake id
+    { category: 'readability', severity: 'suggestion', confidence: 0.8, location: { kind: 'faq', id: 'f1' }, finding: 'The answer reads clipped.', reason: 'Short answers can feel brusque.', expected_benefit: 'warmer welcome', suggested_action: 'A friendlier sentence.', supporting_evidence: ['Yes, most nights.'] },
+    { category: 'readability', location: { kind: 'faq', id: 'GHOST' }, finding: 'x', reason: 'y' },             // fake id
     { category: 'made_up_category', location: { kind: 'faq', id: 'f1' }, finding: 'x', reason: 'y' },           // fake category
+    { category: 'tone', location: { kind: 'faq', id: 'f1' }, finding: 'x', reason: 'y', supporting_evidence: ['Yes, most nights.'] },  // M9.5G: ceded to the Guardian → dies
     { category: 'seo', location: { kind: 'identity', field: 'admin_password' }, finding: 'x', reason: 'y' },    // fake field
     { category: 'trust', location: { kind: 'site' }, finding: 'Reviews say the food is amazing.', reason: 'z', supporting_evidence: ['this quote does not exist anywhere in the content'] },
   ];
   const clean = sanitizeModelFindings(raw, RICH);
-  ok('sanitize: real finding with verbatim quote survives', clean.some((x) => x.category === 'tone' && x.supporting_evidence.includes('Yes, most nights.')));
+  ok('sanitize: real finding with verbatim quote survives', clean.some((x) => x.category === 'readability' && x.supporting_evidence.includes('Yes, most nights.')));
   ok('sanitize: fake entity ids die', !clean.some((x) => x.location.id === 'GHOST'));
   ok('sanitize: unknown categories die', !clean.some((x) => x.category === 'made_up_category'));
+  ok('sanitize: brand categories (tone/brand_voice/consistency) are CEDED to the Guardian and die here (M9.5G)',
+    !clean.some((x) => CEDED_TO_GUARDIAN.includes(x.category)) && CEDED_TO_GUARDIAN.length === 3 && MODEL_CATEGORIES.length === 18);
   ok('sanitize: fake identity fields die', !clean.some((x) => x.location.field === 'admin_password'));
   const trustFinding = clean.find((x) => x.category === 'trust');
   ok('sanitize: unquotable “evidence” is stripped, not trusted', !trustFinding || trustFinding.supporting_evidence.length === 0);
@@ -122,11 +125,11 @@ const SCOPE_SITE = { kind: 'site' };
   const modelDupes = sanitizeModelFindings([
     { category: 'plain_language', location: { kind: 'identity', field: 'description' }, finding: 'dupe of deterministic', reason: 'r' },
     { category: 'flow', location: { kind: 'identity', field: 'description' }, finding: 'x', reason: 'y' }, // 'flow' not a review category → dies
-    { category: 'tone', location: { kind: 'identity', field: 'description' }, finding: 'new angle', reason: 'r' },
+    { category: 'scannability', location: { kind: 'identity', field: 'description' }, finding: 'new angle', reason: 'r' },
   ], MESSY);
   const merged = mergeFindings(det, modelDupes);
   ok('merge: deterministic findings win their slot; model adds only new angles',
-    merged.filter((x) => x.category === 'plain_language').length === 1 && merged.some((x) => x.category === 'tone'));
+    merged.filter((x) => x.category === 'plain_language').length === 1 && merged.some((x) => x.category === 'scannability'));
   ok('merge: report bounded at 20 findings', merged.length <= 20);
   ok('merge: attention outranks suggestion outranks note in order',
     merged.every((x, i, a) => i === 0 || ({ attention: 3, suggestion: 2, note: 1 })[a[i - 1].severity] >= ({ attention: 3, suggestion: 2, note: 1 })[x.severity]));

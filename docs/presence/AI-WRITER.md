@@ -29,7 +29,7 @@ Never invented, enforced by regex-class checks that run on every option regardle
 
 ## Voice system
 
-The prompt receives the client's voice profile (tone notes, preferred vocabulary, never-claims) plus the **industry pack** guardrails (restaurant v1: appetite-forward, concrete, no health/sourcing claims, no cuisine clichés). The self-check scores readability (Flesch ≥50), jargon, weak CTAs, duplicates against existing content, grammar smells, and search-snippet lengths — stored per option for the customer to see.
+The prompt receives the client's voice profile (tone notes, preferred vocabulary, never-claims) — **sourced since M9.5G from the Brand Profile, the one canonical voice source** (`voice_characteristics`/`personality`, `preferred_vocabulary`, `never_claims`; `presence_voice` is retired) — plus the **industry pack** guardrails (restaurant v1: appetite-forward, concrete, no health/sourcing claims, no cuisine clichés). The self-check scores readability (Flesch ≥50), jargon, weak CTAs, duplicates against existing content, grammar smells, and search-snippet lengths — stored per option for the customer to see.
 
 ## Supported content — the honest mapping
 

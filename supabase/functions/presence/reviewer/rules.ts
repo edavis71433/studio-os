@@ -24,6 +24,13 @@ export const CATEGORIES: ReviewCategory[] = [
   'scannability', 'freshness', 'missing_information', 'duplicate_content',
   'customer_questions', 'local_presence'];
 
+// M9.5G: brand-identity concerns are CEDED to the Brand Guardian — it reads
+// the Brand Profile and grounds these better. The taxonomy above stays frozen
+// (historical reports still render); the model tier simply may no longer emit
+// these three. The customer meets both engines as ONE review surface.
+export const CEDED_TO_GUARDIAN: ReviewCategory[] = ['brand_voice', 'tone', 'consistency'];
+export const MODEL_CATEGORIES: ReviewCategory[] = CATEGORIES.filter((c) => !CEDED_TO_GUARDIAN.includes(c));
+
 export type Severity = 'attention' | 'suggestion' | 'note';
 
 export interface FindingLocation {
@@ -212,7 +219,7 @@ export function sanitizeModelFindings(raw: unknown, facts: FactSheet): Finding[]
   const s = (v: unknown, cap: number) => typeof v === 'string' ? v.trim().slice(0, cap) : '';
 
   for (const f of (raw as RawModelFinding[]).slice(0, 20)) {
-    const category = CATEGORIES.includes(f?.category as ReviewCategory) ? f!.category as ReviewCategory : null;
+    const category = MODEL_CATEGORIES.includes(f?.category as ReviewCategory) ? f!.category as ReviewCategory : null;
     if (!category) continue;
     const locKind = ['identity', 'faq', 'offering', 'post', 'site'].includes(f?.location?.kind || '') ? f!.location!.kind as FindingLocation['kind'] : null;
     if (!locKind) continue;
