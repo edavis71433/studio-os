@@ -42,6 +42,7 @@ import { handleAgency } from './agency/routes.ts';
 import { handleCommerce } from './routes/commerce.ts';
 import { handleSystem } from './routes/system.ts';
 import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback } from './routes/connections.ts';
+import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -85,6 +86,25 @@ serve(async (req) => {
   //    (subscription, billing portal, first-run) enforce their own sign-in.
   if (route === '/commerce' || route.startsWith('/commerce/')) {
     return handleCommerce(req, route, method, principal, cors);
+  }
+
+  // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
+  //    not client-scoped: reachable by staff or system (service-role/cron), and
+  //    handled BEFORE the caller-site resolution (operators own no site). Every
+  //    state change is an Approved Plan (lib/approved_plan.ts).
+  if (route === '/marketplace' || route.startsWith('/marketplace/')) {
+    if (route !== '/marketplace/features') {   // /features is the customer view, handled later with a site
+      if (route === '/marketplace' && method === 'GET') return handleMarketplaceList(principal, cors);
+      if (route === '/marketplace/audit' && method === 'GET') return handleMarketplaceAudit(principal, cors);
+      const mo = route.match(/^\/marketplace\/operations\/([0-9a-f-]{36})\/(decide|execute|rollback)$/);
+      if (mo && method === 'POST') {
+        if (mo[2] === 'decide') return handleMarketplaceDecide(req, mo[1], principal, cors);
+        if (mo[2] === 'execute') return handleMarketplaceExecute(mo[1], principal, cors);
+        if (mo[2] === 'rollback') return handleMarketplaceRollback(mo[1], principal, cors);
+      }
+      const mp = route.match(/^\/marketplace\/([a-z0-9_]+)\/prepare$/);
+      if (mp && method === 'POST') return handleMarketplacePrepare(req, mp[1], principal, cors);
+    }
   }
 
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
@@ -202,6 +222,8 @@ serve(async (req) => {
     const m = route.match(/^\/knowledge\/docs\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleKnowledgeDelete(site, m[1], principal, cors);
   }
+  // ── L5.5: Industry Pack Marketplace — CUSTOMER features (per-site) ──
+  if (route === '/marketplace/features' && method === 'GET') return handleMarketplaceFeatures(site, cors);
   // ── L4.0/L4.1: Connected Platform reads (connect/refresh/disconnect) ──
   if (route === '/connections' && method === 'GET') return handleConnectionsList(site, cors);
   // ── L4.3: Connected Platform WRITES — every write is an approval-gated plan ──
