@@ -4,6 +4,11 @@
 // exists before any pack does. No storage, no UI, no packs: the contract only.
 import type { IndustryPack, PackStatus } from './contract.ts';
 
+// The Industry Platform's own version. Frozen contract at 5.0; the current
+// runtime is 5.4 (L5.4). A pack declares the minimum it needs; the platform
+// refuses to install a pack that needs a newer platform than is running.
+export const PLATFORM_VERSION = '5.4.0';
+
 export type MarketplaceAction = 'install' | 'enable' | 'disable' | 'update' | 'deprecate';
 
 // The lifecycle: planned/draft are author states; available is publishable;
@@ -57,3 +62,9 @@ export function exportPack(pack: IndustryPack): ExportedPack {
 /** A pack may be shared/exported only if its author marked it so (default true). */
 export const canExport = (pack: IndustryPack) => pack.marketplace.exportable;
 export const canShare = (pack: IndustryPack) => pack.marketplace.shareable;
+
+// ── platform compatibility — a pack must not require a newer platform ────────
+export function isCompatible(pack: IndustryPack, platformVersion: string = PLATFORM_VERSION): boolean {
+  return compareVersions(pack.marketplace.minPlatformVersion, platformVersion) <= 0;
+}
+

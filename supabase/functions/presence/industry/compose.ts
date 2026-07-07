@@ -18,6 +18,10 @@ import {
   HOME_SERVICES_PACK, HOME_SERVICES_CATALOG, homeServicesProvider,
   HOME_SERVICES_JUDGMENT_RULES, HOME_SERVICES_REC_RULES, HOME_SERVICES_MOMENT_TEMPLATES,
 } from './packs/home_services.ts';
+import {
+  PET_GROOMING_PACK, PET_GROOMING_CATALOG, petGroomingProvider,
+  PET_GROOMING_JUDGMENT_RULES, PET_GROOMING_REC_RULES, PET_GROOMING_MOMENT_TEMPLATES,
+} from './packs/pet_grooming.ts';
 import type { Provider } from '../evidence/providers.ts';
 import type { Rule } from '../judgment/rules.ts';
 import type { RecRule } from '../recommendation/rules.ts';
@@ -29,10 +33,11 @@ import type { MomentTemplate } from '../moments/rules.ts';
 registerPack(RESTAURANT_PACK);
 registerPack(COFFEE_SHOP_PACK);
 registerPack(HOME_SERVICES_PACK);
+registerPack(PET_GROOMING_PACK);   // L5.4: the third-party SDK sample (self-gating, dormant until a pet-grooming site exists)
 
 // the aggregated contributions the engines spread into their registries
-export const PACK_CATALOG: Record<string, any> = { ...RESTAURANT_CATALOG, ...COFFEE_SHOP_CATALOG, ...HOME_SERVICES_CATALOG };
-export const PACK_PROVIDERS: Provider[] = [restaurantProvider, coffeeShopProvider, homeServicesProvider];
-export const PACK_JUDGMENT_RULES: Rule[] = [...RESTAURANT_JUDGMENT_RULES, ...COFFEE_SHOP_JUDGMENT_RULES, ...HOME_SERVICES_JUDGMENT_RULES];
-export const PACK_REC_RULES: RecRule[] = [...RESTAURANT_REC_RULES, ...COFFEE_SHOP_REC_RULES, ...HOME_SERVICES_REC_RULES];
-export const PACK_MOMENT_TEMPLATES: MomentTemplate[] = [...RESTAURANT_MOMENT_TEMPLATES, ...COFFEE_SHOP_MOMENT_TEMPLATES, ...HOME_SERVICES_MOMENT_TEMPLATES];
+export const PACK_CATALOG: Record<string, any> = { ...RESTAURANT_CATALOG, ...COFFEE_SHOP_CATALOG, ...HOME_SERVICES_CATALOG, ...PET_GROOMING_CATALOG };
+export const PACK_PROVIDERS: Provider[] = [restaurantProvider, coffeeShopProvider, homeServicesProvider, petGroomingProvider];
+export const PACK_JUDGMENT_RULES: Rule[] = [...RESTAURANT_JUDGMENT_RULES, ...COFFEE_SHOP_JUDGMENT_RULES, ...HOME_SERVICES_JUDGMENT_RULES, ...PET_GROOMING_JUDGMENT_RULES];
+export const PACK_REC_RULES: RecRule[] = [...RESTAURANT_REC_RULES, ...COFFEE_SHOP_REC_RULES, ...HOME_SERVICES_REC_RULES, ...PET_GROOMING_REC_RULES];
+export const PACK_MOMENT_TEMPLATES: MomentTemplate[] = [...RESTAURANT_MOMENT_TEMPLATES, ...COFFEE_SHOP_MOMENT_TEMPLATES, ...HOME_SERVICES_MOMENT_TEMPLATES, ...PET_GROOMING_MOMENT_TEMPLATES];

@@ -27,6 +27,7 @@ export const INDUSTRIES: readonly IndustryEntry[] = [
   { key: 'financial', label: 'Financial Advisor', family: 'professional' },
   { key: 'insurance', label: 'Insurance Agency', family: 'professional' },
   { key: 'real_estate', label: 'Real Estate', family: 'professional' },
+  { key: 'pet_grooming', label: 'Pet Grooming', family: 'professional' },   // L5.4 third-party sample
   { key: 'photographer', label: 'Photographer', family: 'creative' },
   { key: 'creative_agency', label: 'Creative Agency', family: 'creative' },
   { key: 'consultant', label: 'Consultant', family: 'professional' },
@@ -50,7 +51,7 @@ export function makePack(partial: Partial<IndustryPack> & { key: IndustryKey; la
     vocabulary: {},
     evidence: EMPTY_EVIDENCE, intelligence: EMPTY_INTELLIGENCE, growth: EMPTY_GROWTH,
     creative: EMPTY_CREATIVE, connected: EMPTY_CONNECTED, cms: EMPTY_CMS, compliance: EMPTY_COMPLIANCE,
-    marketplace: { author: 'Studio OS', license: 'platform', exportable: true, shareable: true, changelog: [] },
+    marketplace: { author: 'Studio OS', license: 'platform', exportable: true, shareable: true, minPlatformVersion: '5.0.0', changelog: [] },
     ...partial,
   };
 }

@@ -121,6 +121,7 @@ export interface MarketplaceMeta {
   license: string;
   exportable: boolean;                // a pack is serializable data → always exportable
   shareable: boolean;
+  minPlatformVersion: string;         // the minimum Studio OS Industry Platform version this pack needs (semver)
   changelog: Array<{ version: string; note: string }>;
 }
 

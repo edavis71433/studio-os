@@ -154,9 +154,9 @@ const run1 = (names) => runProviders(BASE, OPTIMIZATION_PROVIDERS.filter((p) => 
 
 // ═══ 6. composability + failure isolation ═══
 {
-  ok('composability: the ONE registry now runs 32 providers (15 + 13 + connected + 3 industry packs)', PROVIDERS.length === 32, `providers=${PROVIDERS.length}`);
+  ok('composability: the ONE registry now runs 33 providers (15 + 13 + connected + 4 industry packs)', PROVIDERS.length === 33, `providers=${PROVIDERS.length}`);
   const full = runProviders(BASE, PROVIDERS);
-  ok('composability: M9.0 and M10 providers run together, all recorded', full.record.length === 32 && full.record.every((r) => r.ok));
+  ok('composability: M9.0 and M10 providers run together, all recorded', full.record.length === 33 && full.record.every((r) => r.ok));
   const bomb = { name: 'bomb', provide() { throw new Error('boom'); } };
   const mixed = runProviders(BASE, [OPTIMIZATION_PROVIDERS[0], bomb, OPTIMIZATION_PROVIDERS[10]]);
   ok('failure isolation: a throwing provider contributes nothing and poisons nothing',
@@ -203,7 +203,7 @@ if (SB && SR && ANON) {
   const siteQ = await call(jwtC, 'GET', '/site');
   const siteId = siteQ.json?.data?.site?.id;
   const run = await call(jwtS, 'POST', `/admin/sites/${siteId}/observe`);
-  ok('integration: the evidence run succeeds with all 32 providers', run.status === 200 && run.json?.data?.ok === true && (run.json?.data?.providers || []).length === 32, `items=${run.json?.data?.item_count}`);
+  ok('integration: the evidence run succeeds with all 33 providers', run.status === 200 && run.json?.data?.ok === true && (run.json?.data?.providers || []).length === 33, `items=${run.json?.data?.item_count}`);
   const rec = run.json?.data?.providers || [];
   ok('integration: every optimization provider executed without error', ['infrastructure', 'email_auth', 'technical_seo', 'aeo', 'accessibility_deep', 'performance_deep', 'local_presence_deep', 'reputation', 'analytics', 'trust_deep', 'visual_assets', 'knowledge'].every((n) => rec.some((r) => r.name === n && r.ok)));
   const ev = await call(jwtS, 'GET', `/admin/sites/${siteId}/evidence?run=${run.json.data.run_id}`);

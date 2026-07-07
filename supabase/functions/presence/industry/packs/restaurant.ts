@@ -135,5 +135,5 @@ export const RESTAURANT_PACK: IndustryPack = makePack({
     servicePages: false, landingPages: ['seasonal_menu', 'holiday_hours', 'private_events'], blogCategories: ['seasonal', 'events', 'behind_the_scenes'],
   },
   compliance: { requirements: ['allergen information where required', 'alcohol-service disclaimers where applicable'], notes: 'Low regulatory burden; allergen and alcohol notices vary by locality.' },
-  marketplace: { author: 'Studio OS', license: 'platform', exportable: true, shareable: true, changelog: [{ version: '1.0.0', note: 'Flagship restaurant pack.' }] },
+  marketplace: { author: 'Studio OS', license: 'platform', exportable: true, shareable: true, minPlatformVersion: '5.0.0', changelog: [{ version: '1.0.0', note: 'Flagship restaurant pack.' }] },
 });

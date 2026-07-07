@@ -20,7 +20,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 // ═══ 1. Taxonomy — every named industry is in the design space ═══
 {
   const NAMED = ['restaurant', 'coffee_shop', 'contractor', 'electrician', 'plumber', 'hvac', 'roofer', 'landscaper', 'medical', 'dental', 'legal', 'financial', 'insurance', 'real_estate', 'photographer', 'creative_agency', 'consultant', 'retail', 'ecommerce', 'nonprofit', 'professional_services'];
-  ok('taxonomy: all 21 supported industries + generic baseline + home_services base are named', NAMED.every((k) => isIndustryKey(k)) && isIndustryKey('generic') && isIndustryKey('home_services') && INDUSTRIES.length === 23);
+  ok('taxonomy: all 21 supported industries + generic baseline + home_services base are named', NAMED.every((k) => isIndustryKey(k)) && isIndustryKey('generic') && isIndustryKey('home_services') && isIndustryKey('pet_grooming') && INDUSTRIES.length === 24);
   ok('taxonomy: every industry has a family and label; keys are unique', INDUSTRIES.every((i) => i.family && i.label) && new Set(INDUSTRIES.map((i) => i.key)).size === INDUSTRIES.length);
 }
 

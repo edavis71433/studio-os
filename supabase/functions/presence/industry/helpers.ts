@@ -6,6 +6,7 @@
 import type { Provider } from '../evidence/providers.ts';
 import type { IndustryPack } from './contract.ts';
 import { industryIsA } from './registry.ts';
+import { compareVersions, isCompatible, PLATFORM_VERSION } from './marketplace.ts';
 
 // ── self-gating provider (was a hand-written `if (i.industry !== 'x') return`) ──
 // Guarantees a pack's provider is inert for every other industry — the author
@@ -49,22 +50,57 @@ export function typeCollisions(packs: IndustryPack[]): string[] {
 }
 
 // ── structural validation — a pack is well-formed before it ships ────────────
+// Every check fails EARLY with a clear, actionable message. A third-party dev
+// runs this before registering; the marketplace runs it as a submission gate.
 export interface PackValidation { ok: boolean; problems: string[]; }
 export function validatePack(pack: IndustryPack): PackValidation {
   const problems: string[] = [];
+  // required identity fields + naming
+  if (!/^[a-z][a-z0-9_]*$/.test(pack.key || '')) problems.push(`key "${pack.key}" must be lowercase snake_case (a-z, 0-9, _)`);
+  if (!pack.label) problems.push('label is required');
+  if (!pack.family) problems.push('family is required');
   // evidence types must be collision-safe: category-prefixed AND industry-namespaced
   for (const t of pack.evidence.catalogTypes) {
-    if (!t.includes('.')) problems.push(`evidence type "${t}" is not category-prefixed`);
-    else if (pack.key !== 'generic' && !isPackType(t, pack.key)) problems.push(`evidence type "${t}" is not namespaced by industry "${pack.key}"`);
+    if (!t.includes('.')) problems.push(`evidence type "${t}" is not category-prefixed — use packType(key, category, name)`);
+    else if (pack.key !== 'generic' && !isPackType(t, pack.key)) problems.push(`evidence type "${t}" is not namespaced by industry "${pack.key}" — use packType('${pack.key}', …)`);
   }
   // a provider must exist if the pack emits evidence
-  if (pack.evidence.catalogTypes.length > 0 && pack.evidence.providerNames.length === 0) problems.push('declares evidence types but no provider');
+  if (pack.evidence.catalogTypes.length > 0 && pack.evidence.providerNames.length === 0) problems.push('declares evidence types but no provider — add one via packProvider()');
   // one recommendation + one moment per interruptible judgment rule
   const jr = pack.intelligence.judgmentRules.length;
-  if (pack.intelligence.recommendationRules.length !== jr) problems.push('judgment rules and recommendation rules are not 1:1');
-  if (jr > 0 && pack.intelligence.momentTemplates.length !== jr) problems.push('judgment rules and moment templates are not 1:1');
-  // a versioned, exportable identity is required for the marketplace
-  if (!/^\d+\.\d+\.\d+$/.test(pack.version)) problems.push(`version "${pack.version}" is not semver`);
+  if (pack.intelligence.recommendationRules.length !== jr) problems.push(`judgment rules (${jr}) and recommendation rules (${pack.intelligence.recommendationRules.length}) must be 1:1`);
+  if (jr > 0 && pack.intelligence.momentTemplates.length !== jr) problems.push(`judgment rules (${jr}) and moment templates (${pack.intelligence.momentTemplates.length}) must be 1:1`);
+  // versioning + platform compatibility
+  if (!/^\d+\.\d+\.\d+$/.test(pack.version)) problems.push(`version "${pack.version}" is not semver (x.y.z)`);
+  if (!/^\d+\.\d+\.\d+$/.test(pack.marketplace.minPlatformVersion || '')) problems.push('marketplace.minPlatformVersion is not semver');
+  else if (!isCompatible(pack)) problems.push(`requires platform ${pack.marketplace.minPlatformVersion}, but this platform is ${PLATFORM_VERSION}`);
+  return { ok: problems.length === 0, problems };
+}
+
+// ── registry-aware validation — the marketplace-safety checks ────────────────
+// Cross-pack collisions, missing dependencies, and inheritance cycles can only be
+// seen against the other installed packs. Run at install/submission time.
+export function validatePackAgainstRegistry(pack: IndustryPack, others: IndustryPack[]): PackValidation {
+  const problems: string[] = [];
+  const byKey = new Map(others.map((p) => [p.key, p]));
+  // missing dependency: extends a pack that isn't installed
+  if (pack.extends && !byKey.has(pack.extends) && pack.extends !== pack.key) problems.push(`extends "${pack.extends}", which is not installed (missing dependency)`);
+  // inheritance cycle: walk the extends chain, including this pack
+  {
+    const chain = new Map(byKey); chain.set(pack.key, pack);
+    let cur: string | null = pack.key; const seen = new Set<string>();
+    while (cur) {
+      if (seen.has(cur)) { problems.push(`inheritance cycle detected through "${cur}"`); break; }
+      seen.add(cur);
+      cur = chain.get(cur)?.extends ?? null;
+    }
+  }
+  // evidence-type collisions with any OTHER installed pack
+  const mine = new Set(pack.evidence.catalogTypes);
+  for (const o of others) {
+    if (o.key === pack.key) continue;
+    for (const t of o.evidence.catalogTypes) if (mine.has(t)) problems.push(`evidence type "${t}" collides with installed pack "${o.key}"`);
+  }
   return { ok: problems.length === 0, problems };
 }
 
