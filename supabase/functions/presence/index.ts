@@ -43,6 +43,7 @@ import { handleCommerce } from './routes/commerce.ts';
 import { handleSystem } from './routes/system.ts';
 import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback } from './routes/connections.ts';
 import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
+import { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } from './routes/enterprise.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -105,6 +106,28 @@ serve(async (req) => {
       const mp = route.match(/^\/marketplace\/([a-z0-9_]+)\/prepare$/);
       if (mp && method === 'POST') return handleMarketplacePrepare(req, mp[1], principal, cors);
     }
+  }
+
+  // ── L5.6: Enterprise & Multi-Location — OPERATOR/agency management. Operators
+  //    own no site; handled BEFORE the caller-site gate. Every org-wide change is
+  //    an Approved Plan (lib/approved_plan.ts). One org, many locations.
+  if (route === '/enterprise' || route.startsWith('/enterprise/')) {
+    const eo = route.match(/^\/enterprise\/operations\/([0-9a-f-]{36})\/(decide|execute|rollback)$/);
+    if (eo && method === 'POST') {
+      if (eo[2] === 'decide') return handleEnterpriseDecide(req, eo[1], principal, cors);
+      if (eo[2] === 'execute') return handleEnterpriseExecute(eo[1], principal, cors);
+      if (eo[2] === 'rollback') return handleEnterpriseRollback(eo[1], principal, cors);
+    }
+    const cfg = route.match(/^\/enterprise\/([0-9a-f-]{36})\/locations\/([0-9a-f-]{36})\/config$/);
+    if (cfg && method === 'GET') return handleEnterpriseLocationConfig(cfg[1], cfg[2], principal, cors);
+    const locs = route.match(/^\/enterprise\/([0-9a-f-]{36})\/locations$/);
+    if (locs && method === 'GET') return handleEnterpriseLocations(locs[1], principal, cors);
+    const rp = route.match(/^\/enterprise\/([0-9a-f-]{36})\/rollout\/prepare$/);
+    if (rp && method === 'POST') return handleEnterpriseRolloutPrepare(req, rp[1], principal, cors);
+    const au = route.match(/^\/enterprise\/([0-9a-f-]{36})\/audit$/);
+    if (au && method === 'GET') return handleEnterpriseAudit(au[1], principal, cors);
+    const ov = route.match(/^\/enterprise\/([0-9a-f-]{36})$/);
+    if (ov && method === 'GET') return handleEnterpriseOverview(ov[1], principal, cors);
   }
 
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
