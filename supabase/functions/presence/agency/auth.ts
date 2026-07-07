@@ -31,15 +31,20 @@ export type Capability =
   | 'bulk_publish'    // dispatch the existing publish pipeline per site
   | 'manage_clients'  // onboard, tag, assign, archive/restore
   | 'manage_members'  // invite, change roles, revoke
-  | 'manage_branding';
+  | 'manage_branding'
+  // ── L5.7: orchestration of the existing platform (never new engines) ──
+  | 'manage_enterprise'   // create/manage organizations, regions, rollouts (via enterprise/*)
+  | 'manage_marketplace'  // install/enable/disable/update packs (via industry/marketplace_*)
+  | 'manage_connected'    // review/prepare connected write plans (via connected/*)
+  | 'approve_plans';      // approve any Approved Plan (the spine) — the sign-off role
 
 const CAPS: Record<AgencyRole, Capability[]> = {
-  owner: ['read', 'notes', 'bulk_observe', 'bulk_publish', 'manage_clients', 'manage_members', 'manage_branding'],
-  admin: ['read', 'notes', 'bulk_observe', 'bulk_publish', 'manage_clients', 'manage_members', 'manage_branding'],
-  account_manager: ['read', 'notes', 'bulk_observe', 'bulk_publish', 'manage_clients'],
-  content_strategist: ['read', 'notes', 'bulk_observe'],
+  owner: ['read', 'notes', 'bulk_observe', 'bulk_publish', 'manage_clients', 'manage_members', 'manage_branding', 'manage_enterprise', 'manage_marketplace', 'manage_connected', 'approve_plans'],
+  admin: ['read', 'notes', 'bulk_observe', 'bulk_publish', 'manage_clients', 'manage_members', 'manage_branding', 'manage_enterprise', 'manage_marketplace', 'manage_connected', 'approve_plans'],
+  account_manager: ['read', 'notes', 'bulk_observe', 'bulk_publish', 'manage_clients', 'manage_enterprise', 'manage_marketplace', 'manage_connected', 'approve_plans'],
+  content_strategist: ['read', 'notes', 'bulk_observe', 'manage_connected'],   // can prepare (not approve) connected write plans
   designer: ['read', 'notes', 'bulk_observe'],
-  developer: ['read', 'notes', 'bulk_observe'],
+  developer: ['read', 'notes', 'bulk_observe', 'manage_marketplace'],          // can prepare pack ops (approval still required)
   support: ['read', 'notes'],
   readonly: ['read'],
 };

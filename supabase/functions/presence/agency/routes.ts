@@ -21,6 +21,14 @@ import { computeReadiness } from '../routes/monitor.ts';
 import { handlePublish } from '../routes/publish.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+// ── L5.7: orchestrate Enterprise + the Approved-Plan tables (never duplicate) ──
+import { getOrganization, listLocations, saveOrgOperation, decideOrgOperation } from '../enterprise/store.ts';
+import { planOrgOperation } from '../enterprise/rollout.ts';
+import { ORG_OPS } from '../enterprise/contract.ts';
+import type { OrgOp } from '../enterprise/contract.ts';
+import { crossOrgRollup, approvalQueue, crossClientSummary } from './orchestrate.ts';
+import type { PendingPlan } from './orchestrate.ts';
+import { resolveIndustryKey } from '../industry/registry.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Your role doesn’t include this.' }, 403, cors);
@@ -288,6 +296,92 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       out.push({ job_id: j.id, results });
     }
     return json({ data: { ran: out.length, jobs: out } }, 200, cors);
+  }
+
+  // ══ L5.7 — orchestrate the full platform (Enterprise/Marketplace/Connected/
+  //    approvals) through ONE agency experience. Every handler: capability check
+  //    → fenced to the agency's own sites/orgs → calls the EXISTING store; every
+  //    state change is an Approved Plan (the spine). No new engine/table. ══
+  const sites = await agencySiteIds(member.agency_id);
+  const orgIdsOf = async (): Promise<string[]> => {
+    if (!sites.length) return [];
+    const r = await svc(`presence_sites?id=in.(${sites.join(',')})&org_id=not.is.null&select=org_id`);
+    return [...new Set((r.json ?? []).map((s: any) => s.org_id).filter(Boolean))];
+  };
+
+  // the organizations this agency manages (fenced: only orgs of its own sites)
+  if (route === '/agency/organizations' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const orgIds = await orgIdsOf();
+    const orgs = (await Promise.all(orgIds.map((id) => getOrganization(id)))).filter(Boolean);
+    return json({ data: { organizations: orgs.map((o: any) => ({ id: o.id, name: o.name })) } }, 200, cors);
+  }
+
+  // cross-client + cross-organization rollups (READ-side; consumes the pipeline)
+  if (route === '/agency/rollups' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const siteRows = await loadSites(sites);
+    const clients = siteRows.map((s) => ({ site_id: s.id, industry: resolveIndustryKey(s.template_slug), edition: s.edition }));
+    const momentsQ = sites.length ? await svc(`presence_moments?site_id=in.(${sites.join(',')})&status=eq.active&select=site_id,moment_type`) : { json: [] };
+    const byS = new Map<string, { a: number; n: number }>();
+    for (const m of (momentsQ.json ?? [])) { const e = byS.get(m.site_id) || { a: 0, n: 0 }; e.a++; if (m.moment_type === 'needs_attention') e.n++; byS.set(m.site_id, e); }
+    const orgIds = await orgIdsOf();
+    const perOrg = await Promise.all(orgIds.map(async (id) => {
+      const locs = await listLocations(id);
+      return { org_id: id, name: id.slice(0, 8), locations: locs.map((l: any) => ({ site_id: l.id, name: l.custom_domain || l.id.slice(0, 8), active_moments: byS.get(l.id)?.a || 0, needs_attention: byS.get(l.id)?.n || 0 })) };
+    }));
+    return json({ data: { cross_client: crossClientSummary(clients), cross_org: crossOrgRollup(perOrg) } }, 200, cors);
+  }
+
+  // the UNIFIED approval queue — every pending Approved Plan across the portfolio
+  if (route === '/agency/approvals' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const inSites = sites.length ? `in.(${sites.join(',')})` : 'in.()';
+    const orgIds = await orgIdsOf();
+    const inOrgs = orgIds.length ? `in.(${orgIds.join(',')})` : 'in.()';
+    const [cw, ip, oo] = await Promise.all([
+      svc(`presence_connection_writes?site_id=${inSites}&status=in.(proposed,approved)&select=id,title,status,site_id&limit=200`),
+      svc(`presence_infra_plans?site_id=${inSites}&status=in.(proposed,approved)&select=id,title,status,site_id&limit=200`),
+      orgIds.length ? svc(`presence_org_operations?org_id=${inOrgs}&status=in.(proposed,approved)&select=id,title,status,org_id&limit=200`) : Promise.resolve({ json: [] }),
+    ]);
+    const plans: PendingPlan[] = [
+      ...(cw.json ?? []).map((r: any) => ({ source: 'connected_write' as const, id: r.id, title: r.title, status: r.status, scope: r.site_id })),
+      ...(ip.json ?? []).map((r: any) => ({ source: 'infra_plan' as const, id: r.id, title: r.title, status: r.status, scope: r.site_id })),
+      ...((oo as any).json ?? []).map((r: any) => ({ source: 'org_operation' as const, id: r.id, title: r.title, status: r.status, scope: r.org_id })),
+    ];
+    return json({ data: approvalQueue(plans) }, 200, cors);
+  }
+
+  // orchestrate an Enterprise rollout — prepare (needs manage_enterprise + the org in the portfolio)
+  {
+    const m = route.match(/^\/agency\/organizations\/([0-9a-f-]{36})\/rollout\/prepare$/);
+    if (m && method === 'POST') {
+      if (!can(member.role, 'manage_enterprise')) return forbid(cors);
+      const orgIds = await orgIdsOf();
+      if (!orgIds.includes(m[1])) return json({ error: 'forbidden', message: 'That organization isn’t in your portfolio.' }, 403, cors);
+      let body: any = {}; try { body = await req.json(); } catch { /* */ }
+      const op = String(body?.op || '') as OrgOp;
+      if (!ORG_OPS.includes(op)) return json({ error: 'bad_op', message: `Operation must be one of: ${ORG_OPS.join(', ')}.` }, 400, cors);
+      const targets = (await listLocations(m[1])).map((l: any) => l.id);
+      const plan = planOrgOperation(op, m[1], targets);
+      const row = await saveOrgOperation(plan, body?.patch || {});
+      return json({ data: row }, 200, cors);
+    }
+  }
+  // orchestrate the approval (needs approve_plans) — the sign-off that runs the spine
+  {
+    const m = route.match(/^\/agency\/organizations\/([0-9a-f-]{36})\/rollout\/([0-9a-f-]{36})\/decide$/);
+    if (m && method === 'POST') {
+      if (!can(member.role, 'approve_plans')) return forbid(cors);
+      const orgIds = await orgIdsOf();
+      if (!orgIds.includes(m[1])) return json({ error: 'forbidden', message: 'That organization isn’t in your portfolio.' }, 403, cors);
+      let body: any = {}; try { body = await req.json(); } catch { /* */ }
+      const verb = body?.decision === 'approve' ? 'approve' : body?.decision === 'abandon' ? 'abandon' : null;
+      if (!verb) return json({ error: 'bad_request', message: 'Decide with approve or abandon.' }, 400, cors);
+      const row = await decideOrgOperation(m[2], verb);
+      if (!row) return json({ error: 'not_found', message: 'That rollout isn’t open for a decision.' }, 404, cors);
+      return json({ data: row }, 200, cors);
+    }
   }
 
   return json({ error: 'not_found', message: `No agency route for ${method} ${route}.` }, 404, cors);
