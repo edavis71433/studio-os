@@ -41,6 +41,7 @@ import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce } from './routes/commerce.ts';
 import { handleSystem } from './routes/system.ts';
+import { handleConnectionsList, handleConnectionProfile, handleConnectionDisconnect } from './routes/connections.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -200,6 +201,13 @@ serve(async (req) => {
   {
     const m = route.match(/^\/knowledge\/docs\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleKnowledgeDelete(site, m[1], principal, cors);
+  }
+  // ── L4.0: Connected Platform (read-only foundation — no live OAuth/sync/writes) ──
+  if (route === '/connections' && method === 'GET') return handleConnectionsList(site, cors);
+  {
+    const m = route.match(/^\/connections\/([a-z0-9_]+)(\/disconnect)?$/);
+    if (m && !m[2] && method === 'GET') return handleConnectionProfile(site, m[1], cors);
+    if (m && m[2] === '/disconnect' && method === 'POST') return handleConnectionDisconnect(site, m[1], principal, cors);
   }
   // ── M9.5E: the Growth Coach (observes, plans, prepares; never executes) ──
   if (route === '/coach/run' && method === 'POST') return handleCoachRun(site, cors);
