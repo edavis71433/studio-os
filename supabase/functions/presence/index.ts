@@ -41,7 +41,7 @@ import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce } from './routes/commerce.ts';
 import { handleSystem } from './routes/system.ts';
-import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect } from './routes/connections.ts';
+import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback } from './routes/connections.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -202,8 +202,20 @@ serve(async (req) => {
     const m = route.match(/^\/knowledge\/docs\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleKnowledgeDelete(site, m[1], principal, cors);
   }
-  // ── L4.0/L4.1: Connected Platform (READ-ONLY — no writes/publish/sync/jobs) ──
+  // ── L4.0/L4.1: Connected Platform reads (connect/refresh/disconnect) ──
   if (route === '/connections' && method === 'GET') return handleConnectionsList(site, cors);
+  // ── L4.3: Connected Platform WRITES — every write is an approval-gated plan ──
+  {
+    const m = route.match(/^\/connections\/([a-z0-9_]+)\/write(?:\/(prepare|[0-9a-f-]{36}))?(?:\/(decide|execute|rollback))?$/);
+    if (m) {
+      const key = m[1], seg = m[2], action = m[3];
+      if (!seg && method === 'GET') return handleWriteList(site, key, cors);
+      if (seg === 'prepare' && method === 'POST') return handleWritePrepare(req, site, key, principal, cors);
+      if (seg && seg !== 'prepare' && action === 'decide' && method === 'POST') return handleWriteDecide(req, site, key, seg, principal, cors);
+      if (seg && seg !== 'prepare' && action === 'execute' && method === 'POST') return handleWriteExecute(site, key, seg, principal, cors);
+      if (seg && seg !== 'prepare' && action === 'rollback' && method === 'POST') return handleWriteRollback(site, key, seg, principal, cors);
+    }
+  }
   {
     const m = route.match(/^\/connections\/([a-z0-9_]+)(\/connect|\/callback|\/refresh|\/disconnect)?$/);
     if (m) {

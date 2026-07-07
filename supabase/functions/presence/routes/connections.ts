@@ -22,6 +22,10 @@ import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken } fro
 import { saveTokens, loadTokens, disconnect as storeDisconnect } from '../connected/store.ts';
 import { readProvider } from '../connected/adapters.ts';
 import { encryptionConfigured } from '../connected/crypto.ts';
+import { buildWritePlan, writeSpec, writeWorkflowsForProvider } from '../connected/writes.ts';
+import type { WriteWorkflow } from '../connected/writes.ts';
+import { saveWritePlan, listWritePlans, getWritePlan, decideWritePlan, markWriteOutcome, auditWrite } from '../connected/writestore.ts';
+import { executeWrite, writeConfigured } from '../connected/execute.ts';
 
 const CATEGORY_LABEL: Record<string, string> = {
   search: 'Being found', local_listing: 'Your listings', analytics: 'Your numbers',
@@ -121,4 +125,109 @@ export async function handleConnectionDisconnect(site: SiteRow, key: string, pri
   if (tokens?.access_token) revokeToken(key, tokens.access_token).catch(() => {}); // best-effort revoke at the provider
   await storeDisconnect(site.id, key, principal.kind === 'staff' ? 'operator' : 'customer');
   return json({ data: { disconnected: true, message: `Disconnected ${p.customerLabel}. Your account and everything in it are untouched.` } }, 200, cors);
+}
+
+// ═══ L4.3 Write-Capable Adapters ════════════════════════════════════════════
+// Every external write is a PLAN the customer reviews and approves first. The
+// flow is identical for every provider: prepare → decide → execute → (rollback).
+// Nothing writes without an explicit recorded approval; handoffs never touch a
+// provider at all.
+const actorOf = (principal: Principal) => (principal.kind === 'staff' ? 'operator' : 'customer');
+
+/** Prepare a write plan (proposed). Traces to the recommendation it serves. */
+export async function handleWritePrepare(req: Request, site: SiteRow, key: string, principal: Principal, cors: Record<string, string>) {
+  const p = providerByKey(key);
+  if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const workflow = String(body?.workflow || '') as WriteWorkflow;
+  const spec = writeSpec(workflow);
+  if (!spec || spec.provider_key !== key) {
+    const available = writeWorkflowsForProvider(key).map((w) => w.workflow);
+    return json({ error: 'bad_workflow', message: available.length ? `${p.customerLabel} supports: ${available.join(', ')}.` : `${p.customerLabel} has no write actions — it stays read-only.` }, 400, cors);
+  }
+  // Capture the current state for reversible writes (e.g. hours) so rollback is real.
+  let priorHours: Record<string, string> | undefined;
+  if (workflow === 'gbp_hours') {
+    const d = await svc(`presence_connected_data?site_id=eq.${site.id}&provider_key=eq.${encodeURIComponent(key)}&select=data&limit=1`);
+    priorHours = d.json?.[0]?.data?.hours;
+  }
+  const plan = buildWritePlan(workflow, p, {
+    text: body?.text, subject: body?.subject, hours: body?.hours, priorHours,
+    siteUrl: body?.site_url || (site.custom_domain ? `https://${site.custom_domain}` : undefined), when: body?.when,
+  });
+  const row = await saveWritePlan(site.id, plan, body?.recommendation_hash || null);
+  if (!row) return json({ error: 'write_failed', message: 'The plan didn’t save — nothing was changed.' }, 502, cors);
+  await auditWrite(site.id, key, 'write_prepare', `prepared: ${plan.title}`, actorOf(principal));
+  return json({ data: row }, 200, cors);
+}
+
+export async function handleWriteList(site: SiteRow, key: string, cors: Record<string, string>) {
+  return json({ data: await listWritePlans(site.id, key) }, 200, cors);
+}
+
+/** Approve or abandon a proposed plan — the explicit, recorded decision. */
+export async function handleWriteDecide(req: Request, site: SiteRow, key: string, planId: string, principal: Principal, cors: Record<string, string>) {
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const decision = body?.decision === 'approve' ? 'approved' : body?.decision === 'abandon' ? 'abandoned' : null;
+  if (!decision) return json({ error: 'bad_request', message: 'Decide with approve or abandon.' }, 400, cors);
+  const row = await decideWritePlan(site.id, planId, decision as 'approved' | 'abandoned');
+  if (!row) return json({ error: 'not_found', message: 'That plan isn’t open for a decision.' }, 404, cors);
+  await auditWrite(site.id, key, decision === 'approved' ? 'write_approve' : 'write_abandon', `${decision}: ${row.title}`, actorOf(principal));
+  return json({ data: row }, 200, cors);
+}
+
+/** Execute an APPROVED plan. The approval law is enforced here AND in the executor. */
+export async function handleWriteExecute(site: SiteRow, key: string, planId: string, principal: Principal, cors: Record<string, string>) {
+  const p = providerByKey(key);
+  if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  const plan = await getWritePlan(site.id, planId);
+  if (!plan) return json({ error: 'not_found', message: 'No such plan.' }, 404, cors);
+  if (plan.status !== 'approved') {
+    return json({ error: 'not_approved', message: 'Writes happen only after you approve them — that’s a law, not a setting.' }, 409, cors);
+  }
+  const result = await executeWrite(site.id, plan, p.customerLabel);
+  if (!result.ok) {
+    if (result.reason === 'not_available') return json({ error: 'not_available', message: `Writing to ${p.customerLabel} isn’t switched on for this environment yet. Your approval is saved.` }, 503, cors);
+    if (result.reason === 'not_connected') return json({ error: 'not_connected', message: `${p.customerLabel} needs a quick reconnect before this can run.` }, 409, cors);
+    await markWriteOutcome(planId, 'failed', result.response ?? null, result.verification ?? null);
+    await auditWrite(site.id, key, 'write_fail', `failed: ${plan.title}`, actorOf(principal));
+    return json({ error: 'write_failed', message: `That didn’t go through, and nothing was half-done — your approval stands and it can be tried again.` }, 502, cors);
+  }
+  await markWriteOutcome(planId, 'executed', result.response ?? null, result.verification ?? null);
+  await auditWrite(site.id, key, 'write_execute', `executed (${result.kind}): ${plan.title}${result.verification ? ` — ${result.verification.note}` : ''}`, actorOf(principal));
+  return json({ data: { id: planId, status: 'executed', kind: result.kind, verification: result.verification, response: result.response } }, 200, cors);
+}
+
+/** Undo a reversible executed write, or explain honestly when undo is impossible.
+ *  Rollback is itself a reviewed write: it prepares the inverse as a new proposed plan. */
+export async function handleWriteRollback(site: SiteRow, key: string, planId: string, principal: Principal, cors: Record<string, string>) {
+  const p = providerByKey(key);
+  if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  const plan = await getWritePlan(site.id, planId);
+  if (!plan) return json({ error: 'not_found', message: 'No such plan.' }, 404, cors);
+  if (plan.status !== 'executed') return json({ error: 'bad_request', message: 'Only a completed write can be rolled back.' }, 409, cors);
+  if (!plan.reversible) {
+    return json({ data: { reversible: false, explanation: plan.rollback } }, 200, cors);
+  }
+  // Handoffs: nothing was ever sent — the "undo" is simply that.
+  if (plan.kind === 'handoff') {
+    await auditWrite(site.id, key, 'write_rollback', `rollback (handoff, nothing to undo): ${plan.title}`, actorOf(principal));
+    return json({ data: { reversible: true, done: true, explanation: plan.rollback } }, 200, cors);
+  }
+  // Real writes: prepare the INVERSE as a fresh proposed plan (rollback is reviewed too).
+  let inverse = null;
+  if (plan.workflow === 'gbp_hours' && plan.prior_state?.hours) {
+    inverse = buildWritePlan('gbp_hours', p, { hours: plan.prior_state.hours });
+  } else if (plan.workflow === 'gbp_post') {
+    // deleting a post is itself a write; prepare it as a reviewable plan
+    inverse = buildWritePlan('gbp_post', p, { text: '' });
+    inverse.title = 'Remove the post from your Google listing';
+    inverse.summary = 'Deletes the post this plan published. Your listing returns to exactly how it was before.';
+    inverse.what_changes = ['The post is removed from your Google listing.'];
+    (inverse.payload as any).delete_of = planId;
+  }
+  if (!inverse) return json({ data: { reversible: true, explanation: plan.rollback } }, 200, cors);
+  const row = await saveWritePlan(site.id, inverse, null);
+  await auditWrite(site.id, key, 'write_rollback', `prepared rollback plan for: ${plan.title}`, actorOf(principal));
+  return json({ data: { reversible: true, rollback_plan: row, note: 'Prepared the undo as a plan for you to approve — even undoing is reviewed first.' } }, 200, cors);
 }
