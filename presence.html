@@ -420,6 +420,14 @@ h5.rune .whisper.ok{color:var(--sage)}
         <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
         <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
 
+        <div id="monitorCard" hidden>
+          <h5 class="rune">Your website</h5>
+          <p class="docsub" style="margin-top:6px">Your website stays exactly where it is. Once it’s connected and verified, this room quietly watches over it — nothing on it is ever changed from here.</p>
+          <div id="monitorStatus"></div>
+          <div id="monitorAddWrap"></div>
+          <button class="addline" id="btnMonitorConnect" hidden>Connect my website</button>
+        </div>
+
         <h5 class="rune">Papers you already have</h5>
         <p class="docsub" style="margin-top:6px">A menu, a flyer, a price sheet — paste the text in and the site will quietly notice when they disagree. Nothing is rewritten or published.</p>
         <div id="knowledgeList"></div>
@@ -1423,6 +1431,60 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
     try { const r = await api("POST", "/faqs", b); S.faqs.push(r.data); done(); renderFaqs(); toast("Answered"); scheduleChangesRefresh(); }
     catch (err) { toast(err.message, true); }
   }, "Keep this answer"));
+// ── M11: Presence Monitor — connect an existing website; observe only ──
+async function renderMonitorCard() {
+  if (S.site?.edition !== "monitor") { $("monitorCard").hidden = true; return; }
+  $("monitorCard").hidden = false;
+  const wrap = $("monitorStatus"); wrap.innerHTML = "";
+  try {
+    const r = await api("GET", "/monitor/connection");
+    const c = r.data;
+    $("btnMonitorConnect").hidden = !!c;
+    if (!c) return;
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", c.status === "verified" ? "watching over it" : "waiting on verification"));
+    card.appendChild(el("div", "dop", c.url));
+    if (c.status !== "verified") {
+      const how = el("p", "aihint", c.instructions);
+      how.style.marginTop = "6px";
+      card.appendChild(how);
+      if (c.last_check_note) card.appendChild(el("p", "aihint", "Last check: " + c.last_check_note));
+    } else {
+      card.appendChild(el("p", "aihint", `Verified ${new Date(c.verified_at).toLocaleDateString()} · looks like ${c.platform === "custom" ? "a custom site" : c.platform}`));
+    }
+    const acts = el("div", "doa");
+    if (c.status !== "verified") {
+      const v = el("button", "textact", "I’ve placed it — check now");
+      v.addEventListener("click", async () => {
+        try {
+          const res = await api("POST", "/monitor/verify");
+          toast(res.data.verified ? "Verified — observation begins." : res.data.note, !res.data.verified);
+          renderMonitorCard();
+        } catch (err) { toast(err.message, true); }
+      });
+      acts.appendChild(v);
+    }
+    const d = el("button", "quietact", "Disconnect");
+    d.addEventListener("click", async () => {
+      try { await api("DELETE", "/monitor/connection"); toast("Disconnected."); renderMonitorCard(); }
+      catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(d);
+    card.appendChild(acts);
+    wrap.appendChild(card);
+  } catch { /* quiet */ }
+}
+$("btnMonitorConnect").addEventListener("click", () => inlineAdd("monitorAddWrap",
+  [["url", "Your website’s address", "text", 200, "https://yourbusiness.com"]],
+  async (b, done) => {
+    if (!b.url) { toast("The website address is needed.", true); return; }
+    try {
+      await api("POST", "/monitor/connect", { url: b.url, method: "meta" });
+      done(); renderMonitorCard();
+      toast("Connected — one small step proves it’s yours.");
+    } catch (err) { toast(err.message, true); }
+  }, "Connect it"));
+
 // ── M10: Business Knowledge Import — papers in, quiet awareness out ──
 async function renderKnowledgeDocs() {
   try {
@@ -2038,6 +2100,7 @@ async function refreshAll() {
     $("gate").hidden = true; $("app").hidden = false;
     await refreshAll();
     renderKnowledgeDocs();
+    renderMonitorCard();
     // deep links: presence.html?view=business|offerings|…|preview|publish
     const v = new URLSearchParams(location.search).get("view");
     if (v === "preview") openPreview("draft");

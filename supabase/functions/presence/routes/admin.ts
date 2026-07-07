@@ -23,6 +23,7 @@ import {
   netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
   setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
 } from '../lib/netlify.ts';
+import { computeReadiness } from './monitor.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { Snapshot } from '../lib/render_types.ts';
@@ -33,7 +34,7 @@ const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SE
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
 
-const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,created_at,updated_at';
+const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition,created_at,updated_at';
 
 async function loadSite(siteId: string): Promise<SiteRow & { created_at: string; updated_at: string } | null> {
   if (!UUID_RE.test(siteId)) return null;
@@ -422,6 +423,27 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   if (sub === '/health' && method === 'GET') return handleHealth(site, cors);
   if (sub === '/domain') { const r = await handleDomain(req, method, site, principal, cors); if (r) return r; }
   if (sub === '/lifecycle' && method === 'POST') return handleLifecycle(req, site, principal, cors);
+  // ── M11: the additive upgrade path — Monitor ⇄ Presence is ONE column flip.
+  //    Every site_id-keyed row (evidence, judgments, recommendations, moments,
+  //    brand profile, growth, knowledge, concierge) survives untouched.
+  if (sub === '/edition' && method === 'POST') {
+    const body = await readBody(req);
+    const edition = ['monitor', 'presence'].includes(body?.edition) ? body.edition : null;
+    if (!edition) return json({ error: 'bad_request', message: 'edition must be monitor or presence.' }, 400, cors);
+    const w = await svc(`presence_sites?id=eq.${site.id}&select=id,edition`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ edition }),
+    });
+    if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'The edition change didn’t save.' }, 502, cors);
+    await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: `Edition set to ${edition} (operator)`, principal, provenance: 'human', fields: ['edition'] });
+    return json({ data: { id: site.id, edition } }, 200, cors);
+  }
+  // ── M11: Migration Readiness — the operator's full-detail view (the client
+  //    route speaks sentences; this one carries the working data)
+  if (sub === '/migration-readiness' && method === 'GET') {
+    const report = await computeReadiness(site);
+    if (!report) return json({ error: 'not_ready', message: 'No verified monitor connection to assess.' }, 409, cors);
+    return json({ data: report }, 200, cors);
+  }
   if (sub === '/deploys' && method === 'GET') {
     if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'This site has no hosting attached.' }, 409, cors);
     const d = await listDeploys(site.netlify_site_id, 25);

@@ -41,7 +41,7 @@ export async function handleGetSite(jwt: string, site: SiteRow, cors: Record<str
 
   return json({
     data: {
-      site: { id: site.id, status: site.status, template: `${site.template_slug} ${site.template_version}` },
+      site: { id: site.id, status: site.status, template: `${site.template_slug} ${site.template_version}`, edition: site.edition },
       identity: (Array.isArray(ident.json) && ident.json[0]) || null,
       location: (Array.isArray(loc.json) && loc.json[0]) || null,
       voice: (Array.isArray(voice.json) && voice.json[0])

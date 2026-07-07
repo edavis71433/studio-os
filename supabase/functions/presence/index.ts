@@ -33,6 +33,7 @@ import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
 import { handleCoachRun, handleCoachList, handleCoachDecide } from './routes/coach.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
+import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -82,6 +83,14 @@ serve(async (req) => {
     return json({ error: 'entitlement_paused', message: ent.message }, 403, cors);
   }
 
+  // ── M11 boundary: Monitor sites observe an EXISTING external website.
+  //    Publishing concepts don't exist for them — the platform never writes
+  //    to a website it doesn't host. Everything else (profile, studio,
+  //    coach, concierge) prepares guidance and stays available.
+  if (site.edition === 'monitor' && (route === '/publish' || route === '/restore') && method === 'POST') {
+    return json({ error: 'edition_monitor', message: 'Your website stays exactly where it is — this plan observes and guides, it never publishes. Upgrading adds hosting and publishing whenever you’re ready.' }, 403, cors);
+  }
+
   // 5. router — exact routes only
   if (route === '/site' && method === 'GET') return handleGetSite(jwt, site, cors);
   if (route === '/identity' && method === 'GET') return handleGetIdentity(jwt, site, cors);
@@ -129,6 +138,12 @@ serve(async (req) => {
     if (m && !m[2] && method === 'GET') return handleBrandReportGet(jwt, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
   }
+  // ── M11: Presence Monitor connection (read-only observation of an existing website) ──
+  if (route === '/monitor/connection' && method === 'GET') return handleMonitorGet(jwt, site, cors);
+  if (route === '/monitor/connection' && method === 'DELETE') return handleMonitorDisconnect(site, principal, cors);
+  if (route === '/monitor/connect' && method === 'POST') return handleMonitorConnect(req, site, principal, cors);
+  if (route === '/monitor/verify' && method === 'POST') return handleMonitorVerify(site, principal, cors);
+  if (route === '/monitor/readiness' && method === 'GET') return handleMonitorReadiness(site, cors);
   // ── M10: Business Knowledge Import (knowledge in, evidence out) ──
   if (route === '/knowledge/import' && method === 'POST') return handleKnowledgeImport(req, site, principal, cors);
   if (route === '/knowledge/docs' && method === 'GET') return handleKnowledgeList(jwt, site, cors);

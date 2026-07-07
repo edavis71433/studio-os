@@ -9,6 +9,7 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { normalizeSnapshotContent } from '../lib/render_types.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
 import { collectOptimization } from '../optimization/collect.ts';
+import { fetchExternalSite } from '../monitor/external.ts';
 import type { OptInput } from '../optimization/collect.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -46,6 +47,12 @@ export interface ObservationInput {
   unpublishedChangeEvents: number;
   liveFetch: LiveFetch | null;      // null = no hosting to probe
   opt: OptInput | null;             // M10 optimization probes (additive; null = probes unavailable)
+  /** M11: true when pages/liveFetch describe the customer's EXISTING EXTERNAL
+   *  website (Monitor edition). Providers whose observations are only true of
+   *  Presence-hosted sites (not-live, hosting-missing, hours-not-public) check
+   *  this so they never emit false evidence about a site we don't host.
+   *  Always false for hosted sites — existing behavior provably unchanged. */
+  external: boolean;
 }
 
 const pagePath = (key: string) =>
@@ -128,23 +135,51 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
   for (const p of postUse.json ?? []) used.add(p.hero_media_id);
   if (setUse.json?.[0]?.cover_media_id) used.add(setUse.json[0].cover_media_id);
 
+  // ── M11: Monitor edition — observe the customer's EXISTING website ──
+  // Same providers, same contract, same pipeline; only the SOURCE of pages
+  // changes. Read-only structurally: monitor/external.ts contains only GET
+  // fetches and DNS lookups. Publish-ledger inputs are zeroed because publish
+  // concepts don't exist for a site we don't host — providers reading them
+  // then observe nothing, honestly.
+  let external = false;
+  let extDomain: string | null = null;
+  let extPages = pages;
+  let extLiveFetch = liveFetch;
+  if (site.edition === 'monitor') {
+    const connQ = await svc(`presence_monitor_connections?site_id=eq.${site.id}&status=eq.verified&select=url,domain&limit=1`);
+    const conn = connQ.json?.[0];
+    if (conn?.url) {
+      const ext = await (async () => { try { return await fetchExternalSite(conn.url); } catch { return null; } })();
+      if (ext) {
+        external = true;
+        extDomain = conn.domain;
+        extPages = ext.pages;
+        extLiveFetch = ext.liveFetch;
+        fileMap = {}; fileMapFrom = 'none';   // we don't know their full file map — link checks stay silent
+      }
+    }
+  }
+
   // M10: optimization probes (additive; every probe individually fenced —
   // a failed probe yields null fields and providers then observe nothing)
   let opt: OptInput | null = null;
-  try { opt = await collectOptimization(site, liveFetch?.url || null); } catch { opt = null; }
+  try { opt = await collectOptimization(site, extLiveFetch?.url || null, extDomain); } catch { opt = null; }
 
   return {
     site, now,
     draft: normalizeSnapshotContent(structuredClone(snapshot.content)),
-    live, lastLiveAt: lastLive?.created_at ?? null, everPublished: !!lastLive,
-    fileMap, fileMapFrom, pages,
+    live: external ? null : live,
+    lastLiveAt: external ? null : (lastLive?.created_at ?? null),
+    everPublished: external ? false : !!lastLive,
+    fileMap, fileMapFrom, pages: extPages,
     mediaRows: (media.json ?? []) as MediaRow[],
     usedMediaIds: [...used],
     lastOfferingChangeAt: offEvQ.json?.[0]?.created_at ?? null,
     lastLocationChangeAt: locEvQ.json?.[0]?.created_at ?? null,
-    oldestUnpublishedChangeAt: evs[0]?.created_at ?? null,
-    unpublishedChangeEvents: evs.length,
-    liveFetch,
+    oldestUnpublishedChangeAt: external ? null : (evs[0]?.created_at ?? null),
+    unpublishedChangeEvents: external ? 0 : evs.length,
+    liveFetch: extLiveFetch,
     opt,
+    external,
   };
 }

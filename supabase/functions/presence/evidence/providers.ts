@@ -37,8 +37,10 @@ function flesch(text: string): number {
 export const PROVIDERS: Provider[] = [
 
   { name: 'website', provide(i, emit) {
-    if (!i.everPublished) emit('website.not_live', 'ledger', '');
-    if (!i.site.netlify_site_id) emit('website.hosting_missing', 'site', '');
+    // M11 truthfulness guards: an external (Monitor) site IS live and HAS
+    // hosting — just not ours. Emitting these there would be false evidence.
+    if (!i.everPublished && !i.external) emit('website.not_live', 'ledger', '');
+    if (!i.site.netlify_site_id && !i.external) emit('website.hosting_missing', 'site', '');
     if (i.liveFetch?.attempted) {
       if (i.liveFetch.error) emit('website.live_fetch_failed', 'live', i.liveFetch.url, { url: i.liveFetch.url, error: i.liveFetch.error });
       else if (!i.liveFetch.ok) emit('website.http_status', 'live', i.liveFetch.url, { url: i.liveFetch.url, status: i.liveFetch.status });
@@ -259,7 +261,8 @@ export const PROVIDERS: Provider[] = [
     const id = i.draft.identity || ({} as Record<string, string>);
     if (!String(id.phone || '').trim() && !String(id.email || '').trim()) emit('trust.contact_missing', 'draft', 'contact');
     const draftHours = (i.draft.locations?.[0]?.hours || []).some((d) => !d.closed && (d.intervals || []).length);
-    if (draftHours && !i.everPublished) emit('trust.hours_not_public', 'ledger', '');
+    // M11: an external site may well show hours; we can't claim they're unpublished
+    if (draftHours && !i.everPublished && !i.external) emit('trust.hours_not_public', 'ledger', '');
     for (const page of ['privacy']) {
       emit('trust.policy_page_missing', 'contract', page, { page });
     }

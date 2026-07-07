@@ -90,8 +90,9 @@ async function fetchText(url: string, cap = 100_000): Promise<string | null> {
   return (await r.text()).slice(0, cap);
 }
 
-export async function collectOptimization(site: SiteRow, liveUrl: string | null): Promise<OptInput> {
-  const domain = site.custom_domain || null;
+export async function collectOptimization(site: SiteRow, liveUrl: string | null, domainOverride: string | null = null): Promise<OptInput> {
+  // M11: Monitor sites probe the customer's EXTERNAL domain (read-only)
+  const domain = domainOverride || site.custom_domain || null;
   const [dns, domainExpires, httpProbe, homeProbe, robotsTxt, sitemapXml, docsQ] = await Promise.all([
     domain ? fence(probeDns(domain)) : Promise.resolve(null),
     domain ? fence(probeRdap(domain)) : Promise.resolve(null),
