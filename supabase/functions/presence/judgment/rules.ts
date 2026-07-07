@@ -298,6 +298,16 @@ export const RULES: Rule[] = [
             'reviews.velocity_slowing', 'aeo.location_terms_missing', 'media.duplicate_image', 'seo.twitter_card_missing'],
     dimensions: ['business_accuracy'], impactNote: 'integrations not shipped + low-value observations; emitted for completeness, surfaced to no one',
     customerImpact: 'none — nothing to act on, or too low-value to interrupt for', priority: () => 'informational' },
+
+  // ── L4.1: connected-provider reads enter the pipeline HERE (no bypass), judged
+  //    but SUPPRESSED for now — the customer sees this data directly on the
+  //    Connections surface ("your rating: 4.6"); turning connected observations
+  //    into Business Moments is a deliberate later step (L4.2), never a side
+  //    effect of connecting a service. Additive data only.
+  { key: 'connected_observed', category: 'platform', audience: 'none', timing: 'none', ttlDays: 30,
+    types: ['reviews.connected_summary', 'reviews.connected_rating_low', 'reviews.connected_unreplied', 'seo.connected_search', 'analytics.connected_traffic'],
+    dimensions: ['business_accuracy'], impactNote: 'connected-provider observations; recorded, shown on the Connections surface, awaiting deliberate promotion (L4.2)',
+    customerImpact: 'the customer sees these directly on their Connections surface', priority: () => 'informational' },
 ];
 
 /** Deterministic suppression — noise never reaches M9.2. Each check returns a

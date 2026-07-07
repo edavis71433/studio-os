@@ -8,6 +8,7 @@ import type { ObservationInput } from './collect.ts';
 import type { EvidenceItem } from './contract.ts';
 import { makeEmit } from './contract.ts';
 import { OPTIMIZATION_PROVIDERS } from '../optimization/providers.ts';
+import { connectedProvider } from '../connected/evidence.ts';
 
 export interface Provider {
   name: string;
@@ -304,6 +305,11 @@ export const PROVIDERS: Provider[] = [
   // M10: the twelve optimization providers, appended exactly as this
   // registry's header prescribes ("adding a provider is appending here").
   ...OPTIMIZATION_PROVIDERS,
+
+  // L4.1: the connected-data bridge — reads input.connected (normalized read
+  // cache), emits evidence. Connected data enters the ONE pipeline here, never
+  // around it.
+  connectedProvider,
 ];
 
 /** Run every provider purely; a provider failure never poisons the others. */

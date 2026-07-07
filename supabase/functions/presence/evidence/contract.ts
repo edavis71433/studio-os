@@ -14,6 +14,7 @@
 // structures — `facts` keys are declared per type by the template functions.
 
 import { OPT_CATALOG } from '../optimization/catalog.ts';
+import { CONNECTED_CATALOG } from '../connected/evidence.ts';
 
 export type Severity = 'critical' | 'warning' | 'info';
 
@@ -346,6 +347,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   // M10 Optimization Engine — new catalog entries, added exactly as the
   // additivity rules above prescribe. Defined in optimization/catalog.ts.
   ...OPT_CATALOG,
+  ...CONNECTED_CATALOG,   // L4.1: connected-provider read observations
 };
 
 /** Stable fingerprint: identity of an observation across runs. */

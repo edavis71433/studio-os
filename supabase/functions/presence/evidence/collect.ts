@@ -47,6 +47,7 @@ export interface ObservationInput {
   unpublishedChangeEvents: number;
   liveFetch: LiveFetch | null;      // null = no hosting to probe
   opt: OptInput | null;             // M10 optimization probes (additive; null = probes unavailable)
+  connected: unknown[];             // L4.1 normalized read-only connected data (empty = no connections)
   /** M11: true when pages/liveFetch describe the customer's EXISTING EXTERNAL
    *  website (Monitor edition). Providers whose observations are only true of
    *  Presence-hosted sites (not-live, hosting-missing, hours-not-public) check
@@ -165,8 +166,17 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
   let opt: OptInput | null = null;
   try { opt = await collectOptimization(site, extLiveFetch?.url || null, extDomain); } catch { opt = null; }
 
+  // L4.1: the read-only connected snapshot (normalized cache). Read-only + fenced;
+  // absence is simply no connected evidence. Never writes to a provider.
+  let connected: unknown[] = [];
+  try {
+    const cd = await svc(`presence_connected_data?site_id=eq.${site.id}&select=data`);
+    connected = (cd.ok && Array.isArray(cd.json)) ? cd.json.map((r: any) => r.data).filter(Boolean) : [];
+  } catch { connected = []; }
+
   return {
     site, now,
+    connected,
     draft: normalizeSnapshotContent(structuredClone(snapshot.content)),
     live: external ? null : live,
     lastLiveAt: external ? null : (lastLive?.created_at ?? null),

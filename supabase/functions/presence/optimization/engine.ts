@@ -102,7 +102,7 @@ export function areaOf(providerName: string): OptimizationArea | null {
 // The core Presence providers — they feed the SAME Evidence Engine but observe
 // the room's content/accuracy, not the optimization lens. Listed explicitly so
 // an unmapped provider is a real onboarding gap, not one of these by design.
-export const CORE_PRESENCE_PROVIDERS: ReadonlySet<string> = new Set(['business_info', 'content', 'conversion', 'freshness']);
+export const CORE_PRESENCE_PROVIDERS: ReadonlySet<string> = new Set(['business_info', 'content', 'conversion', 'freshness', 'connected']);
 
 // Evidence types the catalog defines for an area's categories — the vocabulary
 // of observations that area can produce.
