@@ -13,7 +13,7 @@ import { TEMPLATES } from '../../supabase/functions/presence/moments/rules.ts';
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 
-const OPT_RULE_KEYS = ['opt_ai_search', 'opt_details_everywhere', 'opt_menu_reconcile', 'opt_photos', 'opt_reputation', 'opt_story', 'opt_search_hygiene', 'opt_technical_access', 'opt_speed', 'opt_foundations', 'opt_dormant'];
+const OPT_RULE_KEYS = ['opt_ai_search', 'opt_details_everywhere', 'opt_menu_reconcile', 'opt_photos', 'opt_story', 'opt_search_hygiene', 'opt_technical_access', 'opt_speed', 'opt_foundations', 'opt_dormant']; // opt_reputation removed in L3.4
 const ruleByKey = new Map(RULES.map((r) => [r.key, r]));
 const OPT_TYPES = OPT_RULE_KEYS.flatMap((k) => ruleByKey.get(k).types);
 
@@ -36,7 +36,7 @@ const EVIDENCE = [
   ev('local_presence.nap_inconsistent'),          // opt_details_everywhere (knowledge)
   ev('knowledge.price_mismatch'),                 // opt_menu_reconcile (knowledge)
   ev('media.imagery_none'),                       // opt_photos (knowledge)
-  ev('reviews.velocity_slowing', 'info'),         // opt_reputation (knowledge)
+  ev('reviews.velocity_slowing', 'info'),         // opt_dormant now (L3.4 cut — suppressed)
   ev('trust.team_info_missing', 'info'),          // opt_story (knowledge)
   ev('seo.noindex'),                              // opt_search_hygiene (platform)
   ev('accessibility.form_label_missing'),         // opt_technical_access (platform)
@@ -87,7 +87,7 @@ const aud = (m, key) => m.get(key)?.audience;
 // ═══ 4. no jargon, no scores in any customer-facing template ═══
 {
   const optTemplates = TEMPLATES.filter((t) => t.recRule.startsWith('rec_opt_'));
-  ok('coverage: every customer-capable optimization rule has a moment template (10)', optTemplates.length === 10, `${optTemplates.length}`);
+  ok('coverage: every customer-capable optimization rule has a moment template (9 after L3.4 cut)', optTemplates.length === 9, `${optTemplates.length}`);
   const denylist = /\b(SEO|schema|metadata|canonical|HTML|CSS|API|URL|DNS|CDN|DMARC|SPF|CAA|robots|sitemap|WCAG|ARIA|score|grade|percent|rating|ranking)\b|!|%|\d+\s*\/\s*\d+/i;
   const blame = /\b(you failed|you forgot|you should have|your fault|neglect)\b/i;
   const offenders = optTemplates.filter((t) => denylist.test(t.headline) || denylist.test(t.summary) || denylist.test(t.bundleWord) || blame.test(t.headline) || blame.test(t.summary));

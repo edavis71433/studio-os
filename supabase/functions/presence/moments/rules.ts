@@ -105,10 +105,6 @@ export const TEMPLATES: MomentTemplate[] = [
     headline: 'Your site could use some photographs.',
     summary: 'There are no photos yet, so words are doing all the work. A few real pictures of your business help customers picture it before they decide.' },
 
-  { recRule: 'rec_opt_reputation', key: 'fresh_words', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a fresh word from a customer', ttlDays: 45,
-    headline: 'Kind words have gone a little quiet.',
-    summary: 'It’s been a while since a new testimonial arrived. A note to a recent happy customer is often all it takes to keep them coming.' },
-
   { recRule: 'rec_opt_story', key: 'your_story', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a line about you', ttlDays: 45,
     headline: 'Tell people who’s behind the business.',
     summary: 'Your site doesn’t yet say who runs things. A sentence about you — in your own words — is one of the simplest ways to build trust.' },

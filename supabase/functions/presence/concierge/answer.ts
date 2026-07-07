@@ -97,7 +97,6 @@ const FIX_PLACE: Record<string, { section: string; label: string; steps: string 
   rec_opt_details_everywhere: { section: 'business', label: 'Open Business', steps: 'Your name, address, phone, and hours all live on the Business page — getting them complete and agreeing with each other is all it takes.' },
   rec_opt_menu_reconcile: { section: 'business', label: 'Open Business', steps: 'The prices, items, phone, and hours on your site are on the Business and Menu pages — a quick compare with your uploaded document tells us which to keep.' },
   rec_opt_photos: { section: 'media', label: 'Open Photographs', steps: 'The Photographs page is where a few real pictures of your business go — the kind that help a customer picture the place.' },
-  rec_opt_reputation: { section: 'testimonials', label: 'Open Kind words', steps: 'When a happy customer shares a word, it goes on the Kind words page; a short note asking is usually all it takes.' },
   rec_opt_story: { section: 'business', label: 'Open Business', steps: 'Your story lives on the Business page — a sentence about who’s behind the business is plenty.' },
 };
 

@@ -235,9 +235,9 @@ export const RULES: Rule[] = [
 
   // ── Customer-owned tasks (business knowledge / their own content) ──
   { key: 'opt_ai_search', category: 'discoverability', audience: aud('optimization'), timing: 'whenever', ttlDays: 45,
-    types: ['aeo.answers_thin', 'aeo.location_terms_missing'],
-    dimensions: ['search_visibility'], impactNote: 'AEO: answers/location terms the business owns, thin for AI answer engines',
-    customerImpact: 'AI assistants can’t quote or place the business well', priority: () => 'low' },
+    types: ['aeo.answers_thin'],
+    dimensions: ['search_visibility'], impactNote: 'AEO: answers the business owns, thin for AI answer engines',
+    customerImpact: 'AI assistants can’t quote the business well', priority: () => 'low' },
 
   { key: 'opt_details_everywhere', category: 'accuracy', audience: aud('knowledge'), timing: 'soon', ttlDays: 30,
     types: ['aeo.citation_facts_incomplete', 'local_presence.nap_inconsistent'],
@@ -254,10 +254,8 @@ export const RULES: Rule[] = [
     dimensions: ['conversion'], impactNote: 'no photographs — words doing all the work; only the owner can supply real ones',
     customerImpact: 'customers can’t picture the business before deciding', priority: () => 'low' },
 
-  { key: 'opt_reputation', category: 'trust', audience: aud('knowledge'), timing: 'seasonal', ttlDays: 60,
-    types: ['reviews.velocity_slowing'],
-    dimensions: ['reputation', 'customer_trust'], impactNote: 'kind words arriving more slowly — only the owner can ask a customer',
-    customerImpact: 'a quiet review stream reads as a quiet business', priority: () => 'low' },
+  // (opt_reputation removed in L3.4 — "you haven't added a testimonial lately" is
+  //  engagement-nudge, not business insight; reviews.velocity_slowing is now dormant.)
 
   { key: 'opt_story', category: 'trust', audience: aud('knowledge'), timing: 'whenever', ttlDays: 90,
     types: ['trust.team_info_missing'],
@@ -266,7 +264,7 @@ export const RULES: Rule[] = [
 
   // ── Platform-owned (Law 24: silent on our editions; migration evidence on Monitor) ──
   { key: 'opt_search_hygiene', category: 'discoverability', audience: aud('platform'), timing: 'whenever', ttlDays: 60,
-    types: ['seo.sitemap_page_missing', 'seo.orphan_page', 'seo.duplicate_page', 'seo.noindex', 'seo.twitter_card_missing',
+    types: ['seo.sitemap_page_missing', 'seo.orphan_page', 'seo.duplicate_page', 'seo.noindex',
             'aeo.faq_schema_missing', 'aeo.entity_links_missing', 'media.og_image_missing'],
     dimensions: ['search_visibility'], impactNote: 'search/AI hygiene the renderer + template own; on Monitor it is migration evidence',
     customerImpact: 'a site that’s harder for search and AI to read fully', priority: () => 'low' },
@@ -277,7 +275,7 @@ export const RULES: Rule[] = [
     customerImpact: 'assistive-technology users hit avoidable obstacles', priority: bySeverity('medium', 'low', 'low') },
 
   { key: 'opt_speed', category: 'operations', audience: aud('platform'), timing: 'whenever', ttlDays: 60,
-    types: ['performance.compression_missing', 'performance.cache_headers_missing', 'performance.slow_response', 'performance.cdn_absent', 'performance.lazy_loading_missing', 'media.duplicate_image'],
+    types: ['performance.compression_missing', 'performance.cache_headers_missing', 'performance.slow_response', 'performance.cdn_absent', 'performance.lazy_loading_missing'],
     dimensions: ['performance'], impactNote: 'hosting/render performance we own; on Monitor it is migration evidence',
     customerImpact: 'a slower site quietly loses impatient visitors', priority: bySeverity('medium', 'low', 'low') },
 
@@ -291,18 +289,29 @@ export const RULES: Rule[] = [
 
   // ── Dormant (a feature that doesn’t exist yet — nobody, ever, until it ships) ──
   { key: 'opt_dormant', category: 'platform', audience: 'none', timing: 'none', ttlDays: 90,
-    types: ['analytics.not_connected', 'local_presence.apple_business_unconnected'],
-    dimensions: ['business_accuracy'], impactNote: 'integrations not shipped; emitted for completeness, surfaced to no one',
-    customerImpact: 'none — there is nothing to act on until the feature exists', priority: () => 'informational' },
+    // Integrations not shipped + L3.4 low-value cuts (observed for migration
+    // readiness / future analytics, surfaced to no one): a slowing testimonial
+    // stream (engagement-nudge, not insight), a location term the heuristic often
+    // gets wrong, duplicate uploads (housekeeping), and Twitter/X cards (near-zero
+    // SMB value).
+    types: ['analytics.not_connected', 'local_presence.apple_business_unconnected',
+            'reviews.velocity_slowing', 'aeo.location_terms_missing', 'media.duplicate_image', 'seo.twitter_card_missing'],
+    dimensions: ['business_accuracy'], impactNote: 'integrations not shipped + low-value observations; emitted for completeness, surfaced to no one',
+    customerImpact: 'none — nothing to act on, or too low-value to interrupt for', priority: () => 'informational' },
 ];
 
 /** Deterministic suppression — noise never reaches M9.2. Each check returns a
  *  reason string; the judgment is kept, marked suppressed, and stays auditable. */
-function suppressionReason(j: Judgment, active: Map<string, Judgment>): string {
+function suppressionReason(j: Judgment, active: Map<string, Judgment>, plan: string): string {
   // roadmap state is recorded, never surfaced
   if (j.rule === 'platform_roadmap') return 'platform_roadmap';
   // audience 'none' is by definition not worth anyone's interruption
   if (j.audience === 'none') return 'no_audience';
+  // L3.4: on Monitor the room's draft/publish workflow doesn't exist — those base
+  // customer judgments ("your basics are missing… clears the way to publishing")
+  // are false for a site we don't host. Only the edition-aware optimization
+  // (opt_*) rules speak to a Monitor site, as honest migration evidence.
+  if (plan === 'presence_monitor' && j.audience === 'customer' && !j.rule.startsWith('opt_')) return 'monitor_not_applicable';
   // conflict: a site that was never published makes public-facing judgments moot
   const notLive = active.has('site_not_yet_live') || active.has('hosting_unprovisioned');
   if (notLive && ['public_freshness', 'broken_paths', 'search_snippets', 'security_headers', 'site_unreachable'].includes(j.rule)) {
@@ -358,7 +367,7 @@ export function judge(evidence: EvidenceRow[], ctx: JudgeContext): JudgeResult {
   // suppression pass (deterministic; order-independent: computed against the full active map)
   const activeMap = new Map(draft.map((j) => [j.rule, j]));
   for (const j of draft) {
-    const reason = suppressionReason(j, activeMap);
+    const reason = suppressionReason(j, activeMap, ctx.plan || 'presence');
     if (reason) { j.status = 'suppressed'; j.suppression_reason = reason; j.timing = 'none'; }
   }
 

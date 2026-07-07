@@ -166,12 +166,6 @@ export const REC_RULES: RecRule[] = [
     expected_benefit: 'customers can picture the business before they decide',
     value: ['customer_experience', 'conversion'], effort: 'hour', risk: 'none', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
 
-  { judgmentRule: 'opt_reputation', action: 'refresh',
-    title: 'invite a fresh word from a recent customer',
-    description: 'prompt the owner to ask a recent happy customer for a testimonial; add it to the draft when it arrives',
-    expected_benefit: 'a steady review stream reads as a living, trusted business',
-    value: ['reputation', 'trust'], effort: 'minutes', risk: 'none', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
-
   { judgmentRule: 'opt_story', action: 'create',
     title: 'add a sentence about who’s behind the business',
     description: 'draft a short human "about" line from the owner’s words — into the draft, for review',
