@@ -93,7 +93,12 @@ async function runIntegration({ SB_URL, SERVICE, ANON, BILLING_SECRET }) {
     // ── Capacity notice surface: read + dismiss ──
     await rest('presence_plan_notices', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: siteId, client_id: clientId, kind: 'capacity', period, headline: 'Test notice', body: 'You are getting a lot of value.', status: 'active' }) });
     const nGet = await (await fetch(`${FN}/commerce/notices`, { headers: jH })).json();
-    iok('notices: the customer sees the active capacity notice (3 actions, no numbers)', nGet?.data?.notices?.length === 1 && nGet.data.notices[0].actions.length === 3 && !JSON.stringify(nGet.data.notices[0]).match(/\b\d+\b/));
+    // Law 13 applies to the customer-VISIBLE copy — headline/body/actions — not the
+    // opaque id (a UUID can contain an all-digit segment between hyphens, which is
+    // not a number shown to anyone). Check the displayed fields only.
+    const n0 = nGet?.data?.notices?.[0];
+    const shownText = n0 ? JSON.stringify({ kind: n0.kind, headline: n0.headline, body: n0.body, actions: n0.actions }) : '';
+    iok('notices: the customer sees the active capacity notice (3 actions, no numbers)', nGet?.data?.notices?.length === 1 && n0.actions.length === 3 && !shownText.match(/\b\d+\b/));
     await fetch(`${FN}/commerce/notices/dismiss`, { method: 'POST', headers: jH });
     const nGet2 = await (await fetch(`${FN}/commerce/notices`, { headers: jH })).json();
     iok('notices: dismiss clears it', (nGet2?.data?.notices?.length || 0) === 0);

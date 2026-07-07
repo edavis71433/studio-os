@@ -314,6 +314,13 @@ export const PROVIDERS: Provider[] = [
   ...PACK_PROVIDERS,        // L5.1: Industry Pack providers (each self-gates on industry)
 ];
 
+/** Industry-pack provider names. Like the core Presence providers, packs observe
+ *  industry CONTENT/accuracy (e.g. a missing menu), which flows to the room/content
+ *  lens — not the optimization-area lens. Exported so the optimization engine can
+ *  recognize them as content providers without hardcoding pack names (a new pack
+ *  joins this set automatically). */
+export const PACK_PROVIDER_NAMES: ReadonlySet<string> = new Set(PACK_PROVIDERS.map((p) => p.name));
+
 /** Run every provider purely; a provider failure never poisons the others. */
 export function runProviders(input: ObservationInput, providers: Provider[] = PROVIDERS): {
   items: EvidenceItem[];

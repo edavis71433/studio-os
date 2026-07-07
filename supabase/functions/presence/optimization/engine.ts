@@ -35,7 +35,7 @@
 //   Any new probe I/O goes in a collector (evidence/collect.ts or optimization/
 //   collect.ts), never in a provider.
 
-import { PROVIDERS } from '../evidence/providers.ts';
+import { PROVIDERS, PACK_PROVIDER_NAMES } from '../evidence/providers.ts';
 import type { Provider } from '../evidence/providers.ts';
 import { CATALOG } from '../evidence/contract.ts';
 import type { Category } from '../evidence/contract.ts';
@@ -145,9 +145,11 @@ export function describeEngine(providers: Provider[] = PROVIDERS): {
     areas,
     optimization_providers: providers.filter((p) => areaOf(p.name)).length,
     total_providers: providers.length,
-    // a registry provider that is neither assigned an optimization area nor
-    // declared a core Presence provider — a real onboarding gap (someone added
-    // a provider and forgot to categorize it).
-    unmapped_optimization: providers.map((p) => p.name).filter((n) => !mapped.has(n) && !CORE_PRESENCE_PROVIDERS.has(n)).sort(),
+    // a registry provider that is neither assigned an optimization area, a core
+    // Presence provider, nor an industry-pack content provider — a real onboarding
+    // gap (someone added an optimization provider and forgot to categorize it).
+    // Pack providers observe industry content (room lens), so they are exempt like
+    // the core providers — and the exemption self-updates as packs are added.
+    unmapped_optimization: providers.map((p) => p.name).filter((n) => !mapped.has(n) && !CORE_PRESENCE_PROVIDERS.has(n) && !PACK_PROVIDER_NAMES.has(n)).sort(),
   };
 }
