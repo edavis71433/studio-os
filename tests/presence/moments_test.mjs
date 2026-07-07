@@ -8,7 +8,7 @@
 //   deno run --allow-read --allow-net --allow-env tests/presence/moments_test.mjs
 import { momentize, TEMPLATES, DISMISSAL_TTL_DAYS } from '../../supabase/functions/presence/moments/rules.ts';
 import { clientView } from '../../supabase/functions/presence/moments/contract.ts';
-import { RULES as JUDGMENT_RULES } from '../../supabase/functions/presence/judgment/rules.ts';
+import { RULES as JUDGMENT_RULES, resolveRuleAudience, LADDER_PLANS } from '../../supabase/functions/presence/judgment/rules.ts';
 import { REC_RULES } from '../../supabase/functions/presence/recommendation/rules.ts';
 
 const results = [];
@@ -25,14 +25,21 @@ const active = (r) => r.moments.filter((m) => m.status === 'active');
 
 // ═══ 1. template coverage: every customer-audience recommendation translates ═══
 {
-  const audience = new Map(JUDGMENT_RULES.map((j) => [j.key, j.audience]));
-  const customerRecs = REC_RULES.filter((r) => audience.get(r.judgmentRule) === 'customer');
+  // L3.1: audience can be edition-dependent — a rule "can be customer" if it is
+  // customer for ANY plan. Templates are required for those and forbidden for
+  // rules that are never customer on any edition.
+  const ruleByKey = new Map(JUDGMENT_RULES.map((j) => [j.key, j]));
+  const canBeCustomer = (key) => {
+    const r = ruleByKey.get(key);
+    return !!r && LADDER_PLANS.some((p) => resolveRuleAudience(r.audience, p) === 'customer');
+  };
+  const customerRecs = REC_RULES.filter((r) => canBeCustomer(r.judgmentRule));
   const covered = new Set(TEMPLATES.map((t) => t.recRule));
   const gaps = customerRecs.filter((r) => !covered.has('rec_' + r.judgmentRule));
-  ok('coverage: every customer recommendation rule has a moment template', gaps.length === 0,
+  ok('coverage: every customer-capable recommendation rule has a moment template', gaps.length === 0,
     gaps.map((g) => g.judgmentRule).join(',') || `${TEMPLATES.length} templates / ${customerRecs.length} customer rec rules`);
-  const operatorLeaks = TEMPLATES.filter((t) => audience.get(t.recRule.replace(/^rec_/, '')) !== 'customer');
-  ok('coverage: no template exists for operator concerns (they never reach customers)', operatorLeaks.length === 0);
+  const operatorLeaks = TEMPLATES.filter((t) => !canBeCustomer(t.recRule.replace(/^rec_/, '')));
+  ok('coverage: no template exists for rules that never reach customers on any edition', operatorLeaks.length === 0);
 }
 
 // ═══ 2. tone lint: merchant words only, calm, never blaming ═══

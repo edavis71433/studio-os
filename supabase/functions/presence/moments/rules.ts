@@ -87,6 +87,48 @@ export const TEMPLATES: MomentTemplate[] = [
   { recRule: 'rec_content_depth', key: 'more_answers', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a first answer or update', ttlDays: 28,
     headline: 'Your site can answer more questions.',
     summary: 'A first answered question or a short update gives customers a reason to stay — and gives the people searching for you more to find.' },
+
+  // ── L3.1 optimization moments — plain merchant words, calm, bundleable ──
+  { recRule: 'rec_opt_ai_search', key: 'ai_search', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a hand up in AI search', ttlDays: 30,
+    headline: 'Help AI assistants recommend you.',
+    summary: 'A couple of your answers are short, and your description doesn’t say where you are. A sentence or two more helps AI tools describe and suggest your business.' },
+
+  { recRule: 'rec_opt_details_everywhere', key: 'details_match', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 14,
+    headline: 'A few key details could line up better.',
+    summary: 'Your name, address, phone, or hours aren’t all together on your home page, or they differ from place to place. Getting them to agree helps customers — and the tools that recommend you — trust what they see.' },
+
+  { recRule: 'rec_opt_menu_reconcile', key: 'doc_disagrees', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 14,
+    headline: 'Your document and your website disagree.',
+    summary: 'Something you uploaded — a price, an item, a phone number, or your hours — doesn’t match what’s on your site. A quick look tells us which one is right.' },
+
+  { recRule: 'rec_opt_photos', key: 'add_photos', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'real photographs', ttlDays: 30,
+    headline: 'Your site could use some photographs.',
+    summary: 'There are no photos yet, so words are doing all the work. A few real pictures of your business help customers picture it before they decide.' },
+
+  { recRule: 'rec_opt_reputation', key: 'fresh_words', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a fresh word from a customer', ttlDays: 45,
+    headline: 'Kind words have gone a little quiet.',
+    summary: 'It’s been a while since a new testimonial arrived. A note to a recent happy customer is often all it takes to keep them coming.' },
+
+  { recRule: 'rec_opt_story', key: 'your_story', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a line about you', ttlDays: 45,
+    headline: 'Tell people who’s behind the business.',
+    summary: 'Your site doesn’t yet say who runs things. A sentence about you — in your own words — is one of the simplest ways to build trust.' },
+
+  // Monitor-only (these are silent on our editions; they surface as migration value on Monitor)
+  { recRule: 'rec_opt_search_hygiene', key: 'search_gaps', type: 'opportunity', tone: 'informative', mergeable: true, bundleWord: 'a few search gaps', ttlDays: 30,
+    headline: 'Your current website has a few search gaps.',
+    summary: 'A handful of things make your existing site a little harder for search engines and AI tools to read fully. Bringing your site here would set them right for you.' },
+
+  { recRule: 'rec_opt_technical_access', key: 'access_gaps', type: 'opportunity', tone: 'informative', mergeable: true, bundleWord: 'some access gaps', ttlDays: 30,
+    headline: 'Some visitors may find your current site hard to use.',
+    summary: 'A few parts of your existing site are tricky for people using assistive tools. On a site built here, these are handled for you from the start.' },
+
+  { recRule: 'rec_opt_speed', key: 'site_speed', type: 'opportunity', tone: 'informative', mergeable: true, bundleWord: 'a faster site', ttlDays: 30,
+    headline: 'Your current website could load faster.',
+    summary: 'Your existing site takes longer than it needs to, which can quietly cost you visitors. Hosting it here would speed it up without you lifting a finger.' },
+
+  { recRule: 'rec_opt_foundations', key: 'foundations', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 21,
+    headline: 'Worth a look at your website’s foundations.',
+    summary: 'The behind-the-scenes pieces that keep your site and email working — your web address, its security, and its mail settings — could be steadier. We can take care of these for you.' },
 ];
 
 const ALL_WELL: Omit<MomentTemplate, 'recRule' | 'mergeable' | 'bundleWord'> = {
@@ -181,7 +223,11 @@ export function momentize(recs: RecRow[], ctx: MomentContext): MomentizeResult {
   }));
   if (mergeable.length >= 2) {
     const words = mergeable.map((c) => c.t.bundleWord).filter(Boolean);
-    const list = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words[0];
+    // L3.1 calm: name at most three concerns so the bundle reads like a friend's
+    // shortlist, not an audit's inventory; the rest fold into "a few more".
+    const shown = words.slice(0, 3);
+    const joined = shown.length > 1 ? shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1] : shown[0];
+    const list = words.length > shown.length ? `${joined}, and a few more small things,` : joined;
     const summary = `Nothing is wrong — ${list} could each use a little care. Any one of them takes minutes, and none of them is waiting on the others.`;
     const supporting = mergeable.map((c) => c.r.recommendation_hash).sort();
     // breadth edge: a bundle carrying N concerns outranks a single concern of

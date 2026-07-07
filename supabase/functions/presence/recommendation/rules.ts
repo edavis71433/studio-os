@@ -139,6 +139,68 @@ export const REC_RULES: RecRule[] = [
     description: 'add the missing HSTS / content-type-options headers at the hosting edge configuration',
     expected_benefit: 'defense-in-depth for every visitor connection',
     value: ['trust'], effort: 'minutes', risk: 'low', undoability: 'fully_undoable', requires_ai: false, ttlDays: 60 },
+
+  // ── L3.1 optimization recommendations (one per interruptible optimization
+  //    judgment rule; customer copy lives in the moment templates, never here) ──
+  { judgmentRule: 'opt_ai_search', action: 'update',
+    title: 'strengthen answers and location language for AI search',
+    description: 'grow thin FAQ answers into two or three sentences; work the city/service area into the description — in the draft, for review',
+    expected_benefit: 'AI assistants and answer engines can quote and place the business',
+    value: ['search_visibility'], effort: 'minutes', risk: 'none', undoability: 'versioned', requires_ai: true, ttlDays: 45 },
+
+  { judgmentRule: 'opt_details_everywhere', action: 'verify',
+    title: 'make the core business details agree everywhere',
+    description: 'confirm name/address/phone/hours with the client; get them onto the home page and consistent across pages',
+    expected_benefit: 'directories and AI search trust a business whose details agree with themselves',
+    value: ['business_accuracy', 'search_visibility'], effort: 'minutes', risk: 'none', undoability: 'versioned', requires_ai: false, ttlDays: 30 },
+
+  { judgmentRule: 'opt_menu_reconcile', action: 'verify',
+    title: 'reconcile the uploaded document with the site',
+    description: 'confirm which is right — the document or the site — for the mismatched items/prices/phone/hours, then correct the draft',
+    expected_benefit: 'customers see prices, items, and hours that match reality',
+    value: ['business_accuracy', 'trust'], effort: 'minutes', risk: 'none', undoability: 'versioned', requires_ai: false, ttlDays: 21 },
+
+  { judgmentRule: 'opt_photos', action: 'create',
+    title: 'add real photographs of the business',
+    description: 'gather and add real photographs; the owner supplies them (never generated)',
+    expected_benefit: 'customers can picture the business before they decide',
+    value: ['customer_experience', 'conversion'], effort: 'hour', risk: 'none', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
+
+  { judgmentRule: 'opt_reputation', action: 'refresh',
+    title: 'invite a fresh word from a recent customer',
+    description: 'prompt the owner to ask a recent happy customer for a testimonial; add it to the draft when it arrives',
+    expected_benefit: 'a steady review stream reads as a living, trusted business',
+    value: ['reputation', 'trust'], effort: 'minutes', risk: 'none', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
+
+  { judgmentRule: 'opt_story', action: 'create',
+    title: 'add a sentence about who’s behind the business',
+    description: 'draft a short human "about" line from the owner’s words — into the draft, for review',
+    expected_benefit: 'a face and a name build trust a nameless site can’t',
+    value: ['trust'], effort: 'minutes', risk: 'none', undoability: 'versioned', requires_ai: true, ttlDays: 90 },
+
+  { judgmentRule: 'opt_search_hygiene', action: 'review',
+    title: 'search & AI hygiene (template/renderer — silent on our editions)',
+    description: 'on Presence this is fixed by the template/renderer and never surfaced (Law 24); on Monitor it is honest migration evidence that bringing the site here would resolve',
+    expected_benefit: 'the site is read fully by search engines and AI, handled by the platform',
+    value: ['search_visibility'], effort: 'hours', risk: 'low', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
+
+  { judgmentRule: 'opt_technical_access', action: 'review',
+    title: 'template accessibility (template — silent on our editions)',
+    description: 'on Presence this is fixed at the template layer and never surfaced; on Monitor it is migration evidence that a rebuilt site would resolve',
+    expected_benefit: 'assistive-technology users navigate without avoidable obstacles',
+    value: ['accessibility'], effort: 'hours', risk: 'low', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
+
+  { judgmentRule: 'opt_speed', action: 'review',
+    title: 'site speed (hosting/render — silent on our editions)',
+    description: 'on Presence this is our hosting/render responsibility and never surfaced; on Monitor it is migration evidence that our hosting would resolve',
+    expected_benefit: 'faster pages that keep impatient visitors',
+    value: ['performance'], effort: 'hours', risk: 'low', undoability: 'versioned', requires_ai: false, ttlDays: 60 },
+
+  { judgmentRule: 'opt_foundations', action: 'review',
+    title: 'domain / DNS / email / security foundations',
+    description: 'on our editions the studio holds these (foundations plans, approval-gated — M12/M14); on Monitor they are the customer’s own infrastructure, surfaced as migration value',
+    expected_benefit: 'foundations stay sound so a site and its email are never quietly lost',
+    value: ['trust', 'business_accuracy'], effort: 'minutes', risk: 'low', undoability: 'versioned', requires_ai: false, ttlDays: 30 },
 ];
 
 export interface RecommendResult {

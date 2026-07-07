@@ -36,9 +36,12 @@ export async function runJudgment(site: SiteRow): Promise<JudgeSummary> {
     const previous: Record<string, { first_seen_at: string }> = {};
     for (const p of (prevQ.json ?? [])) if (!previous[p.judgment_key]) previous[p.judgment_key] = { first_seen_at: p.first_seen_at };
 
-    // 3. the pure core
+    // 3. the pure core. L3.1: the plan (edition) shifts audience — load it once;
+    //    a Monitor site is presence_monitor, everything else reads its entitlement.
+    const planQ = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=plan&limit=1`);
+    const plan = (planQ.ok && Array.isArray(planQ.json) && planQ.json.length ? String(planQ.json[0].plan) : null) || (site.edition === 'monitor' ? 'presence_monitor' : 'presence');
     const now = new Date().toISOString();
-    const { judgments, unmatched_types } = judge(evidence, { siteId: site.id, now, previous });
+    const { judgments, unmatched_types } = judge(evidence, { siteId: site.id, now, previous, plan });
 
     // 4. store the batch (suppressed included — suppression is auditable)
     const batchId = crypto.randomUUID();

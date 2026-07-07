@@ -14,12 +14,15 @@ export interface JudgeContext {
   siteId: string;
   now: string;                                         // the pass's clock
   previous: Record<string, { first_seen_at: string }>; // judgment_key → prior state
+  plan?: string;                                       // L3.1: the commercial rung, for edition-aware audience
 }
 
 interface Rule {
   key: string;                       // judgment_key + dedupe_key (stable per site)
   category: JudgmentCategory;
-  audience: Audience;
+  // L3.1: audience may be edition-dependent — the SAME evidence reaches a
+  // different audience by plan, per the Optimization Promotion Constitution.
+  audience: Audience | ((ctx: JudgeContext) => Audience);
   timing: Timing;
   ttlDays: number;                   // expiration if no newer batch arrives
   types: string[];                   // evidence types this rule consumes
@@ -38,6 +41,39 @@ const bySeverity = (critical: Priority, warning: Priority, info: Priority) =>
   };
 const byCount = (floor: Priority, over: Priority, threshold: number) =>
   (ev: EvidenceRow[]): Priority => (ev.length >= threshold ? over : floor);
+
+// ── L3.1: edition-aware audience (the Optimization Promotion Constitution) ───
+// Ownership decides audience; the plan (edition) shifts it. The rule: customer
+// interruptions DECREASE as Studio OS owns more of the work. Monitor is the one
+// edition where evidence flips TOWARD the customer — it's their external site,
+// so everything is honest migration evidence.
+//   knowledge    — only the customer holds the fact → customer on every edition
+//   optimization — customer's own content work → they do it on self-serve
+//                  Presence/Monitor; the studio does it on Managed and up
+//   platform     — WE own the fix (template/renderer/hosting) → silent on our
+//                  editions (Law 24); customer migration evidence on Monitor
+//   infra        — a per-site operator action → operator on our editions;
+//                  customer (their own infrastructure) on Monitor
+//   dormant      — a feature that doesn't exist yet → nobody, ever
+export type AudienceMode = 'knowledge' | 'optimization' | 'platform' | 'infra' | 'dormant';
+export const LADDER_PLANS = ['presence_monitor', 'presence', 'presence_managed', 'agency', 'enterprise'] as const;
+export function audienceByMode(mode: AudienceMode, plan: string): Audience {
+  const monitor = plan === 'presence_monitor';
+  const managed = plan === 'presence_managed' || plan === 'agency' || plan === 'enterprise';
+  switch (mode) {
+    case 'knowledge': return 'customer';
+    case 'optimization': return monitor ? 'customer' : managed ? 'operator' : 'customer';
+    case 'platform': return monitor ? 'customer' : 'none';
+    case 'infra': return monitor ? 'customer' : 'operator';
+    case 'dormant': return 'none';
+  }
+}
+const aud = (mode: AudienceMode) => (ctx: JudgeContext): Audience => audienceByMode(mode, ctx.plan || 'presence');
+
+// Resolve a rule's audience for a given plan (used by judge() and integrity tests).
+export function resolveRuleAudience(audience: Audience | ((ctx: JudgeContext) => Audience), plan: string): Audience {
+  return typeof audience === 'function' ? audience({ siteId: '', now: '', previous: {}, plan }) : audience;
+}
 
 export const RULES: Rule[] = [
   { key: 'site_unreachable', category: 'availability', audience: 'operator', timing: 'immediate', ttlDays: 2,
@@ -180,34 +216,84 @@ export const RULES: Rule[] = [
     priority: () => 'low' },
 
   { key: 'platform_roadmap', category: 'platform', audience: 'none', timing: 'none', ttlDays: 90,
+    // Base capabilities not shipped yet — recorded, always suppressed. (The M10/L3
+    // optimization types formerly parked here are now classified into the business
+    // -task rules below, per the Optimization Promotion Constitution.)
     types: ['local_presence.profile_unconnected', 'reviews.source_unconnected',
-            'trust.policy_page_missing', 'local_presence.map_signal_missing', 'business_info.holiday_hours_missing',
-            // M10 Optimization Engine types — consciously acknowledged here (the
-            // completeness law: every catalog type has a judging rule), recorded
-            // and ALWAYS suppressed, exactly like the entries above. Promoting
-            // any of these to a surfaced judgment is a deliberate future rules
-            // change, not a side effect of observing more. Additive data only.
-            'infrastructure.dns_apex_unresolved', 'infrastructure.dns_www_unresolved', 'infrastructure.domain_expiring',
-            'infrastructure.http_not_redirected', 'infrastructure.redirect_chain', 'infrastructure.spf_missing',
-            'infrastructure.dmarc_missing', 'seo.sitemap_page_missing', 'seo.robots_blocks_all', 'seo.orphan_page',
-            'seo.duplicate_page', 'aeo.faq_schema_missing', 'aeo.entity_links_missing', 'aeo.answers_thin',
-            'aeo.citation_facts_incomplete', 'aeo.location_terms_missing', 'accessibility.form_label_missing',
-            'accessibility.tabindex_positive', 'accessibility.aria_hidden_focusable', 'performance.compression_missing',
-            'performance.cache_headers_missing', 'performance.slow_response', 'local_presence.nap_inconsistent',
-            'reviews.velocity_slowing', 'analytics.not_connected', 'trust.team_info_missing', 'media.imagery_none',
-            'media.og_image_missing', 'media.duplicate_image', 'knowledge.item_unlisted', 'knowledge.price_mismatch',
-            'knowledge.phone_mismatch', 'knowledge.hours_available',
-            // L3 Optimization Engine (Foundation) gap-fill types — same discipline:
-            // observed and recorded now, ALWAYS suppressed; promoting them into
-            // customer-facing recommendations is L3.1 (Optimization Judgment Depth),
-            // deliberately not this milestone. Additive data only.
-            'infrastructure.caa_missing', 'seo.noindex', 'seo.twitter_card_missing',
-            'performance.cdn_absent', 'performance.lazy_loading_missing', 'accessibility.table_structure',
-            'local_presence.apple_business_unconnected'],
+            'trust.policy_page_missing', 'local_presence.map_signal_missing', 'business_info.holiday_hours_missing'],
     dimensions: ['business_accuracy'],
-    impactNote: 'capabilities the platform has not shipped yet (destinations, contract pages) plus M10/L3 optimization observations awaiting deliberate judgment rules (L3.1)',
+    impactNote: 'capabilities the platform has not shipped yet (destinations, contract pages)',
     customerImpact: 'none — there is nothing anyone can act on today',
     priority: () => 'informational' },
+
+  // ═══ L3.1 — OPTIMIZATION JUDGMENT DEPTH ═════════════════════════════════════
+  // The suppressed optimization observations, now classified into BUSINESS TASKS
+  // (not technical findings), grouped so many observations become one calm issue,
+  // audience chosen by ownership + edition. Constitution 07 governs every choice.
+  // Customer copy lives downstream (recommendations/moments); these carry only
+  // the grouping, the audience, and the timing.
+
+  // ── Customer-owned tasks (business knowledge / their own content) ──
+  { key: 'opt_ai_search', category: 'discoverability', audience: aud('optimization'), timing: 'whenever', ttlDays: 45,
+    types: ['aeo.answers_thin', 'aeo.location_terms_missing'],
+    dimensions: ['search_visibility'], impactNote: 'AEO: answers/location terms the business owns, thin for AI answer engines',
+    customerImpact: 'AI assistants can’t quote or place the business well', priority: () => 'low' },
+
+  { key: 'opt_details_everywhere', category: 'accuracy', audience: aud('knowledge'), timing: 'soon', ttlDays: 30,
+    types: ['aeo.citation_facts_incomplete', 'local_presence.nap_inconsistent'],
+    dimensions: ['business_accuracy', 'search_visibility'], impactNote: 'core details incomplete/inconsistent across the site — only the owner knows the truth',
+    customerImpact: 'directories and AI search distrust a business whose details disagree', priority: bySeverity('high', 'medium', 'low') },
+
+  { key: 'opt_menu_reconcile', category: 'accuracy', audience: aud('knowledge'), timing: 'soon', ttlDays: 21,
+    types: ['knowledge.item_unlisted', 'knowledge.price_mismatch', 'knowledge.phone_mismatch', 'knowledge.hours_available'],
+    dimensions: ['business_accuracy'], impactNote: 'the owner’s uploaded document and the site disagree — only they can say which is right',
+    customerImpact: 'customers see prices/items/hours that don’t match reality', priority: bySeverity('high', 'medium', 'low') },
+
+  { key: 'opt_photos', category: 'media', audience: aud('knowledge'), timing: 'whenever', ttlDays: 60,
+    types: ['media.imagery_none'],
+    dimensions: ['conversion'], impactNote: 'no photographs — words doing all the work; only the owner can supply real ones',
+    customerImpact: 'customers can’t picture the business before deciding', priority: () => 'low' },
+
+  { key: 'opt_reputation', category: 'trust', audience: aud('knowledge'), timing: 'seasonal', ttlDays: 60,
+    types: ['reviews.velocity_slowing'],
+    dimensions: ['reputation', 'customer_trust'], impactNote: 'kind words arriving more slowly — only the owner can ask a customer',
+    customerImpact: 'a quiet review stream reads as a quiet business', priority: () => 'low' },
+
+  { key: 'opt_story', category: 'trust', audience: aud('knowledge'), timing: 'whenever', ttlDays: 90,
+    types: ['trust.team_info_missing'],
+    dimensions: ['customer_trust'], impactNote: 'no one behind the business is named — only the owner knows their story',
+    customerImpact: 'faces and names build the trust a nameless site can’t', priority: () => 'low' },
+
+  // ── Platform-owned (Law 24: silent on our editions; migration evidence on Monitor) ──
+  { key: 'opt_search_hygiene', category: 'discoverability', audience: aud('platform'), timing: 'whenever', ttlDays: 60,
+    types: ['seo.sitemap_page_missing', 'seo.orphan_page', 'seo.duplicate_page', 'seo.noindex', 'seo.twitter_card_missing',
+            'aeo.faq_schema_missing', 'aeo.entity_links_missing', 'media.og_image_missing'],
+    dimensions: ['search_visibility'], impactNote: 'search/AI hygiene the renderer + template own; on Monitor it is migration evidence',
+    customerImpact: 'a site that’s harder for search and AI to read fully', priority: () => 'low' },
+
+  { key: 'opt_technical_access', category: 'accessibility', audience: aud('platform'), timing: 'whenever', ttlDays: 60,
+    types: ['accessibility.form_label_missing', 'accessibility.tabindex_positive', 'accessibility.aria_hidden_focusable', 'accessibility.table_structure'],
+    dimensions: ['accessibility'], impactNote: 'template-level accessibility we own; on Monitor it is migration evidence',
+    customerImpact: 'assistive-technology users hit avoidable obstacles', priority: bySeverity('medium', 'low', 'low') },
+
+  { key: 'opt_speed', category: 'operations', audience: aud('platform'), timing: 'whenever', ttlDays: 60,
+    types: ['performance.compression_missing', 'performance.cache_headers_missing', 'performance.slow_response', 'performance.cdn_absent', 'performance.lazy_loading_missing', 'media.duplicate_image'],
+    dimensions: ['performance'], impactNote: 'hosting/render performance we own; on Monitor it is migration evidence',
+    customerImpact: 'a slower site quietly loses impatient visitors', priority: bySeverity('medium', 'low', 'low') },
+
+  // ── Operator/infra (per-site studio action; customer’s own infra on Monitor) ──
+  { key: 'opt_foundations', category: 'operations', audience: aud('infra'), timing: 'soon', ttlDays: 30,
+    types: ['infrastructure.dns_apex_unresolved', 'infrastructure.dns_www_unresolved', 'infrastructure.domain_expiring',
+            'infrastructure.http_not_redirected', 'infrastructure.redirect_chain', 'infrastructure.spf_missing',
+            'infrastructure.dmarc_missing', 'infrastructure.caa_missing', 'seo.robots_blocks_all'],
+    dimensions: ['business_accuracy', 'customer_trust'], impactNote: 'domain/DNS/email/security foundations; the studio holds these on our editions',
+    customerImpact: 'foundations that, unattended, can take a site or its email down', priority: bySeverity('critical', 'high', 'low') },
+
+  // ── Dormant (a feature that doesn’t exist yet — nobody, ever, until it ships) ──
+  { key: 'opt_dormant', category: 'platform', audience: 'none', timing: 'none', ttlDays: 90,
+    types: ['analytics.not_connected', 'local_presence.apple_business_unconnected'],
+    dimensions: ['business_accuracy'], impactNote: 'integrations not shipped; emitted for completeness, surfaced to no one',
+    customerImpact: 'none — there is nothing to act on until the feature exists', priority: () => 'informational' },
 ];
 
 /** Deterministic suppression — noise never reaches M9.2. Each check returns a
@@ -261,7 +347,7 @@ export function judge(evidence: EvidenceRow[], ctx: JudgeContext): JudgeResult {
       dedupe_key: rule.key,
       expires_at: expires,
       rule: rule.key,
-      audience: rule.audience,
+      audience: resolveRuleAudience(rule.audience, ctx.plan || 'presence'),
       status: 'active',
       suppression_reason: '',
       evidence_count: matched.length,
