@@ -423,6 +423,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <button class="addline" style="margin-top:38px" onclick="openEditDesk('site_polish','business',null,'readability')"><span class="aimark">✦</span> Polish my whole website’s writing</button>
         <button class="addline" style="border-top:none" onclick="openReviewDesk()"><span class="aimark">✦</span> Look over my website’s writing</button>
         <button class="addline" style="border-top:none" onclick="openBrandDesk()"><span class="aimark">✦</span> Does it all sound like me?</button>
+        <button class="addline" style="border-top:none" onclick="openCoachDesk()"><span class="aimark">✦</span> What’s worth planning for?</button>
       </section>
 
       <!-- MENU -->
@@ -1299,6 +1300,81 @@ function renderReviewFindings(report, reportBase) {
     const dis = el("button", "quietact", "Dismiss");
     dis.addEventListener("click", async () => {
       try { await api("POST", `${reportBase}/${report.id}/dismiss`, { finding_id: f.review_id }); card.remove(); }
+      catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(dis);
+    card.appendChild(acts);
+    wrap.appendChild(card);
+  });
+}
+
+// ── M9.5E: the Growth Coach — timed opportunities; every decision is the customer's ──
+async function openCoachDesk() {
+  DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> Worth planning for';
+  $("deskSub").textContent = "What’s coming up for the business — holidays, seasons, small openings the site is showing. Nothing happens unless you start it; ignoring any of these is always fine.";
+  $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Looking ahead…</div><div class="shimmer"></div></div>`;
+  $("deskGo").hidden = true;
+  openSheet("deskScrim");
+  try {
+    await api("POST", "/coach/run");
+    const r = await api("GET", "/coach/opportunities");
+    renderCoachOpps(r.data || []);
+  } catch (err) {
+    $("deskResults").innerHTML = "";
+    toast(err.message, true);
+  }
+}
+function renderCoachOpps(opps) {
+  const wrap = $("deskResults"); wrap.innerHTML = "";
+  if (!opps.length) {
+    wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">Nothing pressing.</div><div class="eh">No timely opportunities right now — that’s a fine place to be. Check back as seasons and holidays approach.</div></div>`;
+    return;
+  }
+  opps.forEach((o) => {
+    const card = el("div", "deskopt");
+    card.appendChild(el("div", "dol", (o.timing_phrase || o.area.replace(/_/g, " "))));
+    card.appendChild(el("div", "dop", o.opportunity));
+    const meta = el("p", "aihint", `Why now: ${o.why_it_matters} The gain: ${o.expected_benefit}. Effort: ${o.estimated_effort}.`);
+    meta.style.marginTop = "6px";
+    card.appendChild(meta);
+    if ((o.supporting_evidence || []).length) {
+      const q = el("p", "aihint", o.supporting_evidence.map((e) => e.detail).join(" · "));
+      q.style.marginTop = "4px";
+      card.appendChild(q);
+    }
+    const next = el("p", "aihint", `First step: ${o.suggested_next_step}`);
+    next.style.marginTop = "4px";
+    card.appendChild(next);
+    const acts = el("div", "doa");
+    const start = el("button", "textact", o.ai_can_draft ? "✦ Start it with help" : "I’ll take it on");
+    start.addEventListener("click", async () => {
+      try {
+        const d = await api("POST", `/coach/opportunities/${o.id}/decide`, { decision: "accept" });
+        const h = d.data.handoff;
+        if (h && h.route === "writer") {
+          closeSheet("deskScrim");
+          openDesk(h.kind, WRITE_KIND_VIEW[h.kind] || "business");
+          if (h.brief) $("deskInstructions").value = h.brief;
+        } else if (h && h.route === "editor") {
+          closeSheet("deskScrim");
+          openEditDesk(h.kind, EDIT_KIND_VIEW[h.kind] || "business", h.target_id || null, h.action || "rewrite");
+        } else {
+          card.remove(); toast("Yours to run with — the first step is written above.");
+        }
+      } catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(start);
+    const later = el("button", "quietact", "Later");
+    later.addEventListener("click", async () => {
+      try { await api("POST", `/coach/opportunities/${o.id}/decide`, { decision: "defer" }); card.remove(); toast("Set aside — it’ll come back around."); }
+      catch (err) { toast(err.message, true); }
+    });
+    acts.appendChild(later);
+    const dis = el("button", "quietact", "Not for us");
+    dis.addEventListener("click", async () => {
+      try { await api("POST", `/coach/opportunities/${o.id}/decide`, { decision: "dismiss" }); card.remove(); }
       catch (err) { toast(err.message, true); }
     });
     acts.appendChild(dis);
