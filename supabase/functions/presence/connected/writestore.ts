@@ -40,6 +40,31 @@ export async function decideWritePlan(siteId: string, id: string, decision: 'app
   return r.ok && Array.isArray(r.json) ? (r.json[0] || null) : null;
 }
 
+// ── L4.4 hardening: atomic execution claim ───────────────────────────────────
+// Prevents concurrent/duplicate execution (a double post) and recovers from an
+// interrupted one. Only ONE caller can claim an approved plan: the claim is an
+// atomic compare-and-swap on executed_at (still 'approved', now stamped). A
+// second concurrent execute finds executed_at already set → no row → refused. A
+// plan whose execution was INTERRUPTED (stamped but never finished) becomes
+// reclaimable after a staleness window, so it is never wedged forever.
+const STALE_CLAIM_MS = 2 * 60 * 1000;
+export async function claimWriteForExecution(siteId: string, id: string): Promise<any | null> {
+  const cutoff = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  const r = await svc(`presence_connection_writes?id=eq.${encodeURIComponent(id)}&site_id=eq.${encodeURIComponent(siteId)}&status=eq.approved&or=(executed_at.is.null,executed_at.lt.${cutoff})&select=${WRITE_SELECT}`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ executed_at: new Date().toISOString() }),
+  });
+  return r.ok && Array.isArray(r.json) ? (r.json[0] || null) : null;
+}
+
+/** Release a claim after a run that didn't complete — back to approved & retryable,
+ *  optionally recording why (provider response) without consuming the approval. */
+export async function releaseWriteClaim(id: string, providerResponse: unknown = null, verification: unknown = null): Promise<void> {
+  await svc(`presence_connection_writes?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH', body: JSON.stringify({ executed_at: null, provider_response: providerResponse, verification }),
+  });
+}
+
 /** Record the outcome of an execution. status: 'executed' | 'failed'. */
 export async function markWriteOutcome(id: string, status: 'executed' | 'failed', providerResponse: unknown, verification: unknown): Promise<void> {
   await svc(`presence_connection_writes?id=eq.${encodeURIComponent(id)}`, {

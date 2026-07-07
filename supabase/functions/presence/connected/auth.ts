@@ -6,6 +6,7 @@
 // available on this environment yet" — never a fake success.
 import type { TokenBundle } from './store.ts';
 import { providerByKey } from './providers.ts';
+import { seal, open, encryptionConfigured } from './crypto.ts';
 
 const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
 export const REDIRECT_URI = `${SITE_URL}/connections-callback.html`;
@@ -52,8 +53,39 @@ export function apiKeyConfigured(providerKey: string): boolean {
   const p = providerByKey(providerKey); return !!p && p.auth === 'api_key';
 }
 
+// ── L4.4 hardening: signed, site-bound, short-lived OAuth state ──────────────
+// The state parameter defends the callback against replay/CSRF/mismatched-code:
+// it is a sealed (AES-GCM, unforgeable) token binding the exact site + provider +
+// a timestamp, verified server-side before any code is exchanged. A replayed or
+// cross-site callback fails to verify and is refused — nothing is connected.
+const STATE_TTL_MS = 10 * 60 * 1000; // a consent flow that takes >10 min is stale, not an attack we honor
+const urlsafe = (s: string) => s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unurlsafe = (s: string) => { const t = s.replace(/-/g, '+').replace(/_/g, '/'); return t + '='.repeat((4 - (t.length % 4)) % 4); };
+
+/** A signed state for the consent redirect. Falls back to an opaque nonce only
+ *  when encryption isn't configured (dev) — never a fake sense of security. */
+export async function signState(siteId: string, providerKey: string): Promise<string> {
+  const sealed = await seal(JSON.stringify({ s: siteId, k: providerKey, t: Date.now() }));
+  if (!sealed) return `${providerKey}:${crypto.randomUUID()}`;
+  return `${urlsafe(sealed.ciphertext)}.${urlsafe(sealed.iv)}`;
+}
+
+/** Verify a returned state binds THIS site + provider and is fresh. When
+ *  encryption isn't configured we cannot verify — accept (dev-only path). */
+export async function verifyState(state: string, siteId: string, providerKey: string): Promise<boolean> {
+  if (!encryptionConfigured()) return true;
+  if (!state || !state.includes('.')) return false;
+  const [ct, iv] = state.split('.');
+  const plain = await open({ ciphertext: unurlsafe(ct), iv: unurlsafe(iv) });
+  if (!plain) return false;
+  try {
+    const p = JSON.parse(plain);
+    return p.s === siteId && p.k === providerKey && typeof p.t === 'number' && (Date.now() - p.t) < STATE_TTL_MS;
+  } catch { return false; }
+}
+
 // Build the provider's own consent URL. `state` ties the callback back to the
-// site + provider (signed/opaque, held by the caller).
+// site + provider (signed by signState(), verified by verifyState()).
 export function authorizeUrl(providerKey: string, state: string): string | null {
   const ep = OAUTH[providerKey]; const p = providerByKey(providerKey); const c = creds(providerKey);
   if (!ep || !p || !c.id) return null;

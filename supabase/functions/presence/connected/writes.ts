@@ -110,17 +110,21 @@ export function buildWritePlan(workflow: WriteWorkflow, provider: ConnectedProvi
         rollback: 'The post can be deleted from your listing — one step, and it’s gone as if it were never there.',
         verify: 'We read your listing back and confirm the post is actually live before calling it done.',
         payload: { summary: str(input.text) }, prior_state: null };
-    case 'gbp_hours':
+    case 'gbp_hours': {
+      const havePrior = !!(input.priorHours && Object.keys(input.priorHours).length);
       return { ...base, kind: 'write',
         title: 'Update the hours on your Google listing',
-        summary: `Your opening hours on ${provider.customerLabel} are set to match what you told us. Your previous hours are saved first, so this can always be put back.`,
+        summary: `Your opening hours on ${provider.customerLabel} are set to match what you told us.${havePrior ? ' Your current hours are saved first, so this can be put straight back.' : ' Hours can always be changed back at any time.'}`,
         what_changes: ['Your listed opening hours change to the new hours you approved.'],
         what_stays: ['Your name, address, phone, photos, and reviews are untouched.', 'Your website’s hours are separate — they change only if you update them there too.'],
-        risk: 'Low. Hours are easy to correct, and your previous hours are saved in this plan.',
+        risk: 'Low. Hours are easy to correct at any time.',
         reversible: true,
-        rollback: 'Your previous hours are saved here; restoring them is one step.',
+        rollback: havePrior
+          ? 'Your previous hours are saved here; restoring them is one approved step.'
+          : 'Hours can be set back at any time — approve a new hours update with the previous values.',
         verify: 'We read your listing back and confirm the hours now match what you approved.',
-        payload: { hours: input.hours || {} }, prior_state: input.priorHours ? { hours: input.priorHours } : null };
+        payload: { hours: input.hours || {} }, prior_state: havePrior ? { hours: input.priorHours } : null };
+    }
     case 'gsc_verify':
       return { ...base, kind: 'write',
         title: 'Ask Google to verify your site in Search Console',

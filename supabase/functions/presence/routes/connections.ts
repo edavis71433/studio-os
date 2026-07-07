@@ -18,13 +18,13 @@ import { loadPlan } from '../commerce/enforce.ts';
 import { providerByKey } from '../connected/providers.ts';
 import { connectableFor, profileOf } from '../connected/inventory.ts';
 import type { EditionKey } from '../connected/contract.ts';
-import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken } from '../connected/auth.ts';
+import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState } from '../connected/auth.ts';
 import { saveTokens, loadTokens, disconnect as storeDisconnect } from '../connected/store.ts';
 import { readProvider } from '../connected/adapters.ts';
 import { encryptionConfigured } from '../connected/crypto.ts';
 import { buildWritePlan, writeSpec, writeWorkflowsForProvider } from '../connected/writes.ts';
 import type { WriteWorkflow } from '../connected/writes.ts';
-import { saveWritePlan, listWritePlans, getWritePlan, decideWritePlan, markWriteOutcome, auditWrite } from '../connected/writestore.ts';
+import { saveWritePlan, listWritePlans, getWritePlan, decideWritePlan, markWriteOutcome, claimWriteForExecution, releaseWriteClaim, auditWrite } from '../connected/writestore.ts';
 import { executeWrite, writeConfigured } from '../connected/execute.ts';
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -74,7 +74,7 @@ export async function handleConnectionConnect(req: Request, site: SiteRow, key: 
 
   if (isOAuth(key)) {
     if (!oauthConfigured(key)) return json({ error: 'not_available', message: `Connecting ${p.customerLabel} isn’t available on this environment yet.` }, 503, cors);
-    const state = `${key}:${crypto.randomUUID()}`;
+    const state = await signState(site.id, key);
     const url = authorizeUrl(key, state);
     return json({ data: { mode: 'oauth', authorize_url: url, state, message: `You’ll approve access to ${p.customerLabel} on ${p.name}’s own screen — read-only, and you can disconnect any time.` } }, 200, cors);
   }
@@ -98,6 +98,12 @@ export async function handleConnectionCallback(req: Request, site: SiteRow, key:
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const code = String(body?.code || '');
   if (!code) return json({ error: 'bad_request', message: 'The connection didn’t return a code — please try again.' }, 422, cors);
+  // L4.4 hardening: the returned state must verify (site + provider bound, fresh).
+  // Refuses replayed, cross-site, or forged callbacks before any code is exchanged.
+  const state = String(body?.state || '');
+  if (!(await verifyState(state, site.id, key))) {
+    return json({ error: 'bad_state', message: 'That connection couldn’t be verified — please start connecting again. Nothing changed.' }, 400, cors);
+  }
   try {
     const tokens = await exchangeCode(key, code);
     const ok = await saveTokens(site.id, key, tokens, p.scopes);
@@ -180,16 +186,30 @@ export async function handleWriteDecide(req: Request, site: SiteRow, key: string
 export async function handleWriteExecute(site: SiteRow, key: string, planId: string, principal: Principal, cors: Record<string, string>) {
   const p = providerByKey(key);
   if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
-  const plan = await getWritePlan(site.id, planId);
-  if (!plan) return json({ error: 'not_found', message: 'No such plan.' }, 404, cors);
-  if (plan.status !== 'approved') {
-    return json({ error: 'not_approved', message: 'Writes happen only after you approve them — that’s a law, not a setting.' }, 409, cors);
+  const existing = await getWritePlan(site.id, planId);
+  if (!existing) return json({ error: 'not_found', message: 'No such plan.' }, 404, cors);
+  if (existing.status !== 'approved') {
+    return json({ error: 'not_approved', message: existing.status === 'executed' ? 'This has already been done.' : 'Writes happen only after you approve them — that’s a law, not a setting.' }, 409, cors);
   }
+  // L4.4: atomically claim the plan — the ONLY winner proceeds. Concurrent or
+  // duplicate execute calls find it already claimed and are refused, so a write
+  // can never happen twice. An interrupted claim becomes reclaimable after a
+  // staleness window (never wedged).
+  const plan = await claimWriteForExecution(site.id, planId);
+  if (!plan) return json({ error: 'in_progress', message: 'This is already being carried out — nothing is done twice.' }, 409, cors);
+
   const result = await executeWrite(site.id, plan, p.customerLabel);
   if (!result.ok) {
-    if (result.reason === 'not_available') return json({ error: 'not_available', message: `Writing to ${p.customerLabel} isn’t switched on for this environment yet. Your approval is saved.` }, 503, cors);
-    if (result.reason === 'not_connected') return json({ error: 'not_connected', message: `${p.customerLabel} needs a quick reconnect before this can run.` }, 409, cors);
-    await markWriteOutcome(planId, 'failed', result.response ?? null, result.verification ?? null);
+    // recoverable, nothing attempted at the provider: release the claim, approval stands
+    if (result.reason === 'not_available' || result.reason === 'not_connected') {
+      await releaseWriteClaim(planId);
+      const msg = result.reason === 'not_available'
+        ? `Writing to ${p.customerLabel} isn’t switched on for this environment yet. Your approval is saved.`
+        : `${p.customerLabel} needs a quick reconnect before this can run. Your approval is saved.`;
+      return json({ error: result.reason, message: msg }, result.reason === 'not_available' ? 503 : 409, cors);
+    }
+    // attempted but the provider rejected it: record it, release for retry, nothing half-done
+    await releaseWriteClaim(planId, result.response ?? null, { ok: false, note: 'The write did not complete; your approval stands and it can be tried again.' });
     await auditWrite(site.id, key, 'write_fail', `failed: ${plan.title}`, actorOf(principal));
     return json({ error: 'write_failed', message: `That didn’t go through, and nothing was half-done — your approval stands and it can be tried again.` }, 502, cors);
   }
