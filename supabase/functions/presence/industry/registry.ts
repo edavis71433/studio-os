@@ -14,6 +14,7 @@ export interface IndustryEntry { key: IndustryKey; label: string; family: Indust
 export const INDUSTRIES: readonly IndustryEntry[] = [
   { key: 'restaurant', label: 'Restaurant', family: 'food' },
   { key: 'coffee_shop', label: 'Coffee Shop', family: 'food' },
+  { key: 'home_services', label: 'Home Services', family: 'home_services' },
   { key: 'contractor', label: 'General Contractor', family: 'home_services' },
   { key: 'electrician', label: 'Electrician', family: 'home_services' },
   { key: 'plumber', label: 'Plumber', family: 'home_services' },
@@ -94,10 +95,17 @@ export function composePack(key: IndustryKey): IndustryPack {
     seen.add(cur.key); chain.push(cur);
     cur = cur.extends ? resolvePack(cur.extends) : null;
   }
-  // fold parent→child so the child wins; array/record layers concatenate/merge
+  // fold parent→child so the child wins; EVERY layer inherits (a child that
+  // leaves a layer empty keeps the parent's — L5.3: extends must inherit all).
   const base = key === 'generic' ? chain : [GENERIC_PACK, ...chain.reverse()];
   return base.reduce((acc, p) => ({
-    ...acc, ...p,
+    ...acc, ...p,   // top-level identity (key/label/family/version/status/extends) = the child's
+    profile: {
+      summary: p.profile.summary || acc.profile.summary,
+      typicalServices: uniq([...acc.profile.typicalServices, ...p.profile.typicalServices]),
+      keyFields: uniq([...acc.profile.keyFields, ...p.profile.keyFields]),
+      bookingPosture: p.profile.bookingPosture !== 'none' ? p.profile.bookingPosture : acc.profile.bookingPosture,
+    },
     vocabulary: { ...acc.vocabulary, ...p.vocabulary },
     evidence: { providerNames: uniq([...acc.evidence.providerNames, ...p.evidence.providerNames]), catalogTypes: uniq([...acc.evidence.catalogTypes, ...p.evidence.catalogTypes]) },
     intelligence: {
@@ -107,11 +115,33 @@ export function composePack(key: IndustryKey): IndustryPack {
       conciergeIntents: uniq([...acc.intelligence.conciergeIntents, ...p.intelligence.conciergeIntents]),
       coachAreas: uniq([...acc.intelligence.coachAreas, ...p.intelligence.coachAreas]),
     },
+    growth: { pack: p.growth.pack ?? acc.growth.pack, notes: p.growth.notes || acc.growth.notes },
+    creative: {
+      writer: p.creative.writer ?? acc.creative.writer,
+      photographyGuidance: uniq([...acc.creative.photographyGuidance, ...p.creative.photographyGuidance]),
+      mediaSuggestions: uniq([...acc.creative.mediaSuggestions, ...p.creative.mediaSuggestions]),
+      brandDefaults: { ...acc.creative.brandDefaults, ...p.creative.brandDefaults },
+    },
     connected: { relevantProviders: uniq([...acc.connected.relevantProviders, ...p.connected.relevantProviders]), defaults: { ...acc.connected.defaults, ...p.connected.defaults }, emphasises: uniq([...acc.connected.emphasises, ...p.connected.emphasises]) },
     cms: { navigation: uniq([...acc.cms.navigation, ...p.cms.navigation]), pages: uniq([...acc.cms.pages, ...p.cms.pages]), components: uniq([...acc.cms.components, ...p.cms.components]), servicePages: p.cms.servicePages || acc.cms.servicePages, landingPages: uniq([...acc.cms.landingPages, ...p.cms.landingPages]), blogCategories: uniq([...acc.cms.blogCategories, ...p.cms.blogCategories]) },
+    compliance: { requirements: uniq([...acc.compliance.requirements, ...p.compliance.requirements]), notes: p.compliance.notes || acc.compliance.notes },
   }), GENERIC_PACK);
 }
 const uniq = <T>(a: T[]): T[] => [...new Set(a)];
+
+/** Is `siteIndustry` the target industry, or does it extend it (transitively)?
+ *  This is what makes a CHILD pack inherit a PARENT's self-gated evidence: the
+ *  restaurant provider fires for a coffee_shop because coffee_shop IS-A restaurant. */
+export function industryIsA(siteIndustry: string | undefined | null, target: string): boolean {
+  let cur: string | null = siteIndustry || null;
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur)) {
+    if (cur === target) return true;
+    seen.add(cur);
+    cur = resolvePack(cur).extends;
+  }
+  return false;
+}
 
 // ── engine extension WITHOUT modification ────────────────────────────────────
 // The proof that a pack extends an engine's registry additively: baseline first,

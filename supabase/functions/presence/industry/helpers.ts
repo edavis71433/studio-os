@@ -5,16 +5,18 @@
 // re-implementing (and mis-implementing) them. Pure; no engine dependency.
 import type { Provider } from '../evidence/providers.ts';
 import type { IndustryPack } from './contract.ts';
+import { industryIsA } from './registry.ts';
 
 // ── self-gating provider (was a hand-written `if (i.industry !== 'x') return`) ──
 // Guarantees a pack's provider is inert for every other industry — the author
-// can't forget to gate, because the wrapper does it. This is the ONLY safe way
-// for a pack to add an evidence provider.
+// can't forget to gate, because the wrapper does it. INHERITANCE-AWARE (L5.3):
+// it fires when the site's industry IS this industry OR extends it, so a CHILD
+// pack (coffee_shop) inherits a PARENT's evidence (restaurant) for free.
 export function packProvider(industry: string, name: string, provide: (i: any, emit: any) => void): Provider {
   return {
     name,
     provide(i: any, emit: any) {
-      if (i?.industry !== industry) return;   // self-gating, enforced
+      if (!industryIsA(i?.industry, industry)) return;   // self-gating, inheritance-aware
       provide(i, emit);
     },
   };
