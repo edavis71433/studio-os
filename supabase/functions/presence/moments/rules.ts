@@ -7,6 +7,7 @@
 // thoughtful business partner: never alarmist, never robotic, never blaming.
 import type { Moment, MomentType, Tone } from './contract.ts';
 import { momentHash } from './contract.ts';
+import { PACK_MOMENT_TEMPLATES } from '../industry/compose.ts';
 
 /** The recommendation shape this engine consumes — M9.2's stored fields it needs. */
 export interface RecRow {
@@ -29,7 +30,7 @@ export interface MomentContext {
 
 export const DISMISSAL_TTL_DAYS = 30;
 
-interface MomentTemplate {
+export interface MomentTemplate {
   recRule: string;                     // consumes this M9.2 rule
   key: string;                         // moment deduplication_key
   type: MomentType;
@@ -137,6 +138,9 @@ export const TEMPLATES: MomentTemplate[] = [
   { recRule: 'rec_connected_improved', key: 'connected_win', type: 'celebration', tone: 'celebratory', mergeable: false, bundleWord: '', ttlDays: 7,
     headline: 'More people are finding you lately.',
     summary: 'One of your connected accounts is showing real improvement — more visits, more interest from search, or kinder words from customers. Nothing to do here; it’s simply a good sign worth knowing.' },
+
+  // ── L5.1 Industry Pack moment templates (customer copy in the industry's words) ──
+  ...PACK_MOMENT_TEMPLATES,
 ];
 
 const ALL_WELL: Omit<MomentTemplate, 'recRule' | 'mergeable' | 'bundleWord'> = {

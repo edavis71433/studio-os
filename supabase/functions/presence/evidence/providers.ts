@@ -9,6 +9,7 @@ import type { EvidenceItem } from './contract.ts';
 import { makeEmit } from './contract.ts';
 import { OPTIMIZATION_PROVIDERS } from '../optimization/providers.ts';
 import { connectedProvider } from '../connected/evidence.ts';
+import { PACK_PROVIDERS } from '../industry/compose.ts';
 
 export interface Provider {
   name: string;
@@ -310,6 +311,7 @@ export const PROVIDERS: Provider[] = [
   // cache), emits evidence. Connected data enters the ONE pipeline here, never
   // around it.
   connectedProvider,
+  ...PACK_PROVIDERS,        // L5.1: Industry Pack providers (each self-gates on industry)
 ];
 
 /** Run every provider purely; a provider failure never poisons the others. */

@@ -15,6 +15,7 @@
 
 import { OPT_CATALOG } from '../optimization/catalog.ts';
 import { CONNECTED_CATALOG } from '../connected/evidence.ts';
+import { PACK_CATALOG } from '../industry/compose.ts';
 
 export type Severity = 'critical' | 'warning' | 'info';
 
@@ -348,6 +349,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   // additivity rules above prescribe. Defined in optimization/catalog.ts.
   ...OPT_CATALOG,
   ...CONNECTED_CATALOG,   // L4.1: connected-provider read observations
+  ...PACK_CATALOG,        // L5.1: Industry Pack observations (self-gated by provider)
 };
 
 /** Stable fingerprint: identity of an observation across runs. */

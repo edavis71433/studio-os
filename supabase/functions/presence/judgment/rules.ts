@@ -10,6 +10,7 @@
 import type { EvidenceRow, Judgment, Priority, Timing, Audience, JudgmentCategory, ImpactDimension } from './contract.ts';
 import { judgmentHash, maxSeverity, minConfidence, buildReasoning, SEV_RANK } from './contract.ts';
 import { deriveConnectedIntelligence } from '../connected/intelligence.ts';
+import { PACK_JUDGMENT_RULES } from '../industry/compose.ts';
 
 export interface JudgeContext {
   siteId: string;
@@ -18,7 +19,7 @@ export interface JudgeContext {
   plan?: string;                                       // L3.1: the commercial rung, for edition-aware audience
 }
 
-interface Rule {
+export interface Rule {
   key: string;                       // judgment_key + dedupe_key (stable per site)
   category: JudgmentCategory;
   // L3.1: audience may be edition-dependent — the SAME evidence reaches a
@@ -330,6 +331,11 @@ export const RULES: Rule[] = [
     types: ['analytics.connected_traffic_up', 'seo.connected_search_up', 'reviews.connected_rating_up', 'reviews.connected_reviews_up'],
     dimensions: ['reputation', 'search_visibility', 'conversion'], impactNote: 'measured improvement since the prior read — traffic, search, rating, or new reviews up',
     customerImpact: 'the business is doing better on a channel it can see — worth acknowledging', priority: () => 'low' },
+
+  // ── L5.1 Industry Pack judgment rules — appended generically; each consumes
+  //    ONLY its pack's namespaced evidence types, so it is inert for every other
+  //    industry (no engine industry-filter). Restaurant is the flagship pack.
+  ...PACK_JUDGMENT_RULES,
 ];
 
 /** Deterministic suppression — noise never reaches M9.2. Each check returns a

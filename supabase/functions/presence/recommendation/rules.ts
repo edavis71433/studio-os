@@ -10,6 +10,7 @@
 // byte-identical output, order-independent.
 import type { JudgmentRow, Recommendation, ActionType, ValueDimension, Effort, Risk, Undoability } from './contract.ts';
 import { recommendationHash } from './contract.ts';
+import { PACK_REC_RULES } from '../industry/compose.ts';
 
 export interface RecommendContext {
   siteId: string;
@@ -17,7 +18,7 @@ export interface RecommendContext {
   previous: Record<string, { first_seen_at: string }>; // recommendation_key → prior state
 }
 
-interface RecRule {
+export interface RecRule {
   judgmentRule: string;              // consumes this M9.1 rule
   action: ActionType;
   title: string;                     // internal structured title
@@ -212,6 +213,9 @@ export const REC_RULES: RecRule[] = [
     description: 'a connected source shows real improvement since the prior read (more visits, more search reach, a higher rating, or new reviews); acknowledge it — nothing to change',
     expected_benefit: 'the business sees, in plain words, that a channel it can measure is doing better',
     value: ['reputation', 'search_visibility'], effort: 'minutes', risk: 'none', undoability: 'not_applicable', requires_ai: false, ttlDays: 14 },
+
+  // ── L5.1 Industry Pack recommendation rules (one per interruptible pack judgment rule) ──
+  ...PACK_REC_RULES,
 ];
 
 export interface RecommendResult {

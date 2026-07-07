@@ -10,6 +10,7 @@ import { normalizeSnapshotContent } from '../lib/render_types.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
 import { collectOptimization } from '../optimization/collect.ts';
 import { fetchExternalSite } from '../monitor/external.ts';
+import { resolveIndustryKey } from '../industry/registry.ts';
 import type { OptInput } from '../optimization/collect.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -49,6 +50,7 @@ export interface ObservationInput {
   opt: OptInput | null;             // M10 optimization probes (additive; null = probes unavailable)
   connected: unknown[];             // L4.1 normalized read-only connected data (empty = no connections)
   connectedPrior: unknown[];        // L4.2 the prior normalized snapshot per provider, for change detection
+  industry: string;                 // L5.1 resolved Industry Pack key — industry providers self-gate on this
   /** M11: true when pages/liveFetch describe the customer's EXISTING EXTERNAL
    *  website (Monitor edition). Providers whose observations are only true of
    *  Presence-hosted sites (not-live, hosting-missing, hours-not-public) check
@@ -182,6 +184,8 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
   return {
     site, now,
     connected, connectedPrior,
+    industry: resolveIndustryKey(site.template_slug),
+
     draft: normalizeSnapshotContent(structuredClone(snapshot.content)),
     live: external ? null : live,
     lastLiveAt: external ? null : (lastLive?.created_at ?? null),
