@@ -30,6 +30,7 @@ import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
+import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -116,6 +117,16 @@ serve(async (req) => {
   if (route === '/editor/improve' && method === 'POST') return handleEditorImprove(req, site, cors);
   // ── M9.5C: the AI Reviewer (critique only; no write path to content exists) ──
   if (route === '/review/run' && method === 'POST') return handleReviewRun(req, site, cors);
+  // ── M9.5D: the Brand Guardian (protects identity; findings only) ──
+  if (route === '/brand/profile' && method === 'GET') return handleBrandProfileGet(jwt, site, cors);
+  if (route === '/brand/profile' && method === 'PUT') return handleBrandProfilePut(req, jwt, site, principal, cors);
+  if (route === '/brand/review' && method === 'POST') return handleBrandReviewRun(req, site, cors);
+  if (route === '/brand/reports' && method === 'GET') return handleBrandReportList(jwt, site, cors);
+  {
+    const m = route.match(/^\/brand\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);
+    if (m && !m[2] && method === 'GET') return handleBrandReportGet(jwt, site, m[1], cors);
+    if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
+  }
   if (route === '/review/reports' && method === 'GET') return handleReviewList(jwt, site, cors);
   {
     const m = route.match(/^\/review\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);

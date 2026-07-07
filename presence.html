@@ -422,6 +422,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
         <button class="addline" style="margin-top:38px" onclick="openEditDesk('site_polish','business',null,'readability')"><span class="aimark">✦</span> Polish my whole website’s writing</button>
         <button class="addline" style="border-top:none" onclick="openReviewDesk()"><span class="aimark">✦</span> Look over my website’s writing</button>
+        <button class="addline" style="border-top:none" onclick="openBrandDesk()"><span class="aimark">✦</span> Does it all sound like me?</button>
       </section>
 
       <!-- MENU -->
@@ -1239,24 +1240,34 @@ function renderDeskOptions(draft) {
 /* ── the review desk (M9.5C) — findings only; fixes go through the Editor ── */
 const EDIT_KIND_VIEW = { edit_identity: "business", edit_faq: "faqs", edit_offering: "offerings", edit_post: "updates", site_polish: "business" };
 const WRITE_KIND_VIEW = { faqs: "faqs", identity_copy: "business", post: "updates" };
-async function openReviewDesk() {
+async function openFindingsDesk(cfg) {
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
-  $("deskTitle").innerHTML = '<span class="aimark">✦</span> A look over your writing';
-  $("deskSub").textContent = "A read-through of what’s written — description, answers, item descriptions, updates. Nothing changes; you get honest notes, and every note can be dismissed or handed to the editor.";
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> ' + cfg.title;
+  $("deskSub").textContent = cfg.sub;
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading it all over…</div><div class="shimmer"></div></div>`;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">${cfg.loading}</div><div class="shimmer"></div></div>`;
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
-    const r = await api("POST", "/review/run", { scope: "site" });
-    const report = await api("GET", `/review/reports/${r.data.review_id}`);
-    renderReviewFindings(report.data);
+    const r = await api("POST", cfg.runPath, { scope: "site" });
+    const report = await api("GET", `${cfg.reportBase}/${r.data.review_id || r.data.report_id}`);
+    renderReviewFindings(report.data, cfg.reportBase);
   } catch (err) {
     $("deskResults").innerHTML = "";
     toast(err.message, true);
   }
 }
-function renderReviewFindings(report) {
+const openReviewDesk = () => openFindingsDesk({
+  title: "A look over your writing",
+  sub: "A read-through of what’s written — description, answers, item descriptions, updates. Nothing changes; you get honest notes, and every note can be dismissed or handed to the editor.",
+  loading: "Reading it all over…", runPath: "/review/run", reportBase: "/review/reports",
+});
+const openBrandDesk = () => openFindingsDesk({
+  title: "A look over your brand",
+  sub: "Does everything sound like the same business? Tone, wording, formatting, photographs — checked for consistency. Nothing changes; every note can be dismissed or handed to the editor.",
+  loading: "Listening for your voice…", runPath: "/brand/review", reportBase: "/brand/reports",
+});
+function renderReviewFindings(report, reportBase) {
   const wrap = $("deskResults"); wrap.innerHTML = "";
   const open = (report.findings || []).filter((f) => f.status === "open");
   if (!open.length) {
@@ -1287,7 +1298,7 @@ function renderReviewFindings(report) {
     }
     const dis = el("button", "quietact", "Dismiss");
     dis.addEventListener("click", async () => {
-      try { await api("POST", `/review/reports/${report.id}/dismiss`, { finding_id: f.review_id }); card.remove(); }
+      try { await api("POST", `${reportBase}/${report.id}/dismiss`, { finding_id: f.review_id }); card.remove(); }
       catch (err) { toast(err.message, true); }
     });
     acts.appendChild(dis);
