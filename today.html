@@ -107,7 +107,8 @@ function render(moments, features){
     $('sub').textContent = "Nothing needs your attention today.";
     html += `<div class="moment calm"><span class="tag">All clear</span>
       <h2>Everything customers can see is current.</h2>
-      <p>Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.</p></div>`;
+      <p>Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.</p>
+      <div class="row"><a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your leads</a></div></div>`;
   } else {
     $('sub').textContent = items.length === 1 ? "One thing worth a look — no rush." : `${items.length} small things worth a look — none of them urgent.`;
     for(const m of items){
@@ -151,14 +152,21 @@ function wire(){
 async function explain(id, btn){
   const box = $('ans-'+id); if(!box) return;
   btn.disabled = true; btn.textContent = 'One moment…';
-  try{ const r = await apiPost('/concierge/ask', { question: 'how do I fix this?', topic_id: id });
+  try{ const r = await apiPost('/concierge/ask', { question: 'What does this mean, and what should I do about it?', topic_id: id });
     box.textContent = (r && r.data && r.data.text) || 'Open it when you have a minute — nothing changes until you decide.';
   }catch(_){ box.textContent = 'I couldn’t load the details just now — nothing’s wrong, try again in a moment.'; }
   box.hidden = false; btn.disabled = false; btn.textContent = 'Walk me through it';
 }
 async function dismiss(id, btn){
   const card = btn.closest('.moment'); btn.disabled = true;
-  try{ await apiPost('/moments/'+id+'/dismiss', {}); if(card){ card.style.opacity = '.35'; btn.textContent = 'Set aside'; } }
+  try{
+    await apiPost('/moments/'+id+'/dismiss', {});
+    if(card){
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+      if(reduce){ card.remove(); }
+      else { card.style.transition='opacity .3s ease, transform .3s ease'; card.style.opacity='0'; card.style.transform='translateY(-6px)'; setTimeout(()=>card.remove(), 300); }
+    }
+  }
   catch(_){ btn.disabled = false; }
 }
 async function ask(){
