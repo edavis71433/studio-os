@@ -364,6 +364,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <button class="navitem" data-view="testimonials">Kind words</button>
       <button class="navitem" data-view="updates">Updates</button>
       <button class="navitem" data-view="media">Photographs</button>
+      <button class="navitem" data-view="design">Design</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
     </nav>
@@ -406,6 +407,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div id="bizWaiting"></div>
 
         <h5 class="rune">About your business <span class="whisper" id="save-identity"></span><button class="quietact" style="letter-spacing:0;text-transform:none;font-weight:400" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> draft with help</button></h5>
+        <h2 style="font-size:14px;margin:4px 0 2px;color:var(--ink-2,#666);letter-spacing:.04em;text-transform:uppercase">The basics</h2>
         <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
         <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
         <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
@@ -413,6 +415,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
         <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Told on your About page, in your words.</div></div>
         <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
+        <h2 style="font-size:14px;margin:22px 0 2px;color:var(--ink-2,#666);letter-spacing:.04em;text-transform:uppercase">Search &amp; discovery</h2>
         <div class="field"><label for="f-industry">What kind of business</label><select id="f-industry">
           <option value="generic">General / other</option>
           <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
@@ -426,6 +429,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="160"><div class="hint">The line under the headline in search results. Empty = your description.</div></div>
         <div class="field"><label for="f-gsv">Google Search Console code</label><input type="text" id="f-gsv" maxlength="100" placeholder='paste the content="…" value'><div class="hint">Search Console → Settings → Ownership verification → HTML tag. Paste just the code, publish, then click Verify at Google — unlocks indexing reports and sitemap submission.</div></div>
         <div class="field"><label for="f-bsv">Bing Webmaster code</label><input type="text" id="f-bsv" maxlength="100" placeholder="optional"><div class="hint">Same idea for Bing (also powers Copilot search).</div></div>
+        <h2 style="font-size:14px;margin:22px 0 2px;color:var(--ink-2,#666);letter-spacing:.04em;text-transform:uppercase">Links &amp; booking</h2>
         <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
         <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
 
@@ -516,6 +520,20 @@ h5.rune .whisper.ok{color:var(--sage)}
       </section>
 
       <!-- HISTORY -->
+      <section class="view" id="view-design">
+        <h1 class="doc">Design</h1>
+        <p class="docsub">How your website looks — colors, type, layout, and what appears on your home page. Every choice is designed to stay readable; nothing applies until you publish, and every previous look stays restorable.</p>
+        <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
+          <div id="designHost" style="flex:1;min-width:300px"></div>
+          <div id="designPreviewWrap" style="flex:0 1 400px;min-width:280px;position:sticky;top:14px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px">Your home page, as it would publish</div>
+            <div style="border:1px solid var(--line,#ddd);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.07)">
+              <iframe id="designPreview" title="Live design preview of your draft home page" style="width:200%;height:840px;border:none;transform:scale(.5);transform-origin:0 0;pointer-events:none" aria-hidden="true"></iframe>
+            </div>
+            <div class="hint" style="margin-top:6px">A live proof of your draft — it updates as you choose.</div>
+          </div>
+        </div>
+      </section>
       <section class="view" id="view-history">
         <h1 class="doc">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
@@ -714,6 +732,7 @@ function go(view) {
   if (view === "today") loadToday();
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
+  if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
 }
 $("nav").addEventListener("click", (e) => { const b = e.target.closest(".navitem"); if (b) go(b.dataset.view); });
 $("dock").addEventListener("click", (e) => {
@@ -2461,7 +2480,7 @@ async function saveTokens(change, msg) {
     DESIGN_TOKENS = next;
     const card = $("designCard"); if (card) card.remove();
     mountDesignCard();
-    toast(msg + " — publish to see it live"); scheduleChangesRefresh();
+    toast(msg + " — publish to see it live"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(err.message, true); }
 }
 function pillRow(host, label, opts, isOn, onPick) {
@@ -2482,7 +2501,7 @@ function pillRow(host, label, opts, isOn, onPick) {
   return rowEl;
 }
 async function mountDesignCard() {
-  const host = $("view-business"); if (!host || $("designCard")) return;
+  const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
   try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
   catch (_) { return; } // not an owner/developer on this site → no card
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
@@ -2503,10 +2522,10 @@ async function mountDesignCard() {
   if (((S.site && S.site.template) || "").indexOf("business-classic") === 0) {
     const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
     pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-      async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } });
+      async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(err.message, true); } });
     const navRow = [["Standard", ""], ["Centered", "centered"]];
     pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-      async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } });
+      async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(err.message, true); } });
   }
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
@@ -2539,11 +2558,11 @@ async function saveSections(order, hidden) {
     const r = await api("PUT", "/settings", { sections_order: order, sections_hidden: hidden });
     S.settings = r.data || { ...S.settings, sections_order: order, sections_hidden: hidden };
     const c = $("sectionsCard"); if (c) c.remove(); mountSectionsCard();
-    toast("Home page updated — publish to apply"); scheduleChangesRefresh();
+    toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(err.message, true); }
 }
 function mountSectionsCard() {
-  const host = $("view-business"); if (!host || $("sectionsCard")) return;
+  const host = $("designHost") || $("view-business"); if (!host || $("sectionsCard")) return;
   const hidden = new Set((S.settings && S.settings.sections_hidden) || []);
   const saved = ((S.settings && S.settings.sections_order) || []).filter((k) => HOME_SECTION_DEFS.some(([d]) => d === k));
   const order = [...saved, ...HOME_SECTION_DEFS.map(([k]) => k).filter((k) => !saved.includes(k))];
@@ -2565,6 +2584,34 @@ function mountSectionsCard() {
   });
   card.appendChild(el("div", "hint", "Choose which sections appear on your home page, and their order. Unchecked sections are kept, never lost."));
   host.appendChild(card);
+  mountLookCard();
+  refreshDesignPreview();
+}
+// ── CP-2.5: the Look card — the template switcher's discoverable front door ──
+async function mountLookCard() {
+  const host = $("designHost"); if (!host || $("lookCard")) return;
+  let looks = null;
+  try { looks = (await api("GET", "/site/templates")).data; } catch (_) { return; }
+  if (!looks || (looks.templates || []).length < 2) return;
+  const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Your site's look"));
+  const cur = looks.templates.find((t) => t.slug === looks.current.slug);
+  card.appendChild(el("div", "hint", "You're dressed as “" + ((cur && cur.name) || looks.current.slug) + "”. Try another look safely — preview it with your real content before deciding."));
+  const b = el("button", null, "Try another look in the proof →");
+  b.type = "button";
+  b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  b.addEventListener("click", () => openPreview("draft"));
+  card.appendChild(b);
+  host.appendChild(card);
+}
+// ── CP-2.5: live style preview — the EXISTING /preview pipeline, nothing new ──
+let designPreviewTimer = null;
+function refreshDesignPreview() {
+  const frame = $("designPreview"); if (!frame) return;
+  clearTimeout(designPreviewTimer);
+  designPreviewTimer = setTimeout(async () => {
+    try { frame.srcdoc = await apiHtml("/preview?version=draft&page=%2F"); } catch (_) { /* quiet — the big proof still works */ }
+  }, 350);
 }
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
 [["f-gsv", "google_site_verification"], ["f-bsv", "bing_site_verification"]].forEach(([id, key]) => {
