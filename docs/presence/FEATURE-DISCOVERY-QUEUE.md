@@ -85,6 +85,12 @@
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
 
+### FD-AEM1 · Public headless content delivery API
+**What:** the snapshot is already clean structured JSON (and /export proves it); expose a read-only, token-scoped content API so the same facts can power other frontends/channels (AEM Content-Fragments/GraphQL class). **Source:** AEM spec comparison. **Value:** Medium (new market surface) · **Effort:** Medium. **Disposition:** V1.1+.
+
+### FD-AEM2 · Conversational editing (chat-driven changes, approval-first)
+**What:** Concierge answers + writers draft today; a chat interface that DRIVES edits ("move tacos above burritos, raise the price to $12") emitting normal draft changes for approval. **Source:** AEM comparison (conversational authoring/MCP class). **Disposition:** Future.
+
 ### FD-Q1 · Guided, owner-approved Terms of Service
 **What:** Terms are deliberately NOT auto-generated (they make business-specific legal promises — refunds, liability, jurisdiction — a platform must not invent). V1.1: a guided intake (owner answers refund/cancellation/jurisdiction questions) → drafted terms → owner approves → rendered like the other legal pages. **Source:** Phase Q. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
 
