@@ -6,6 +6,32 @@
 
 ---
 
+## 🔴 Deepest gap found (challenge review) — the product can only publish a *restaurant* site
+
+*Surfaced by going into the render/template/industry files. This is the single biggest competitive gap and it was hiding behind "templates: parity, SDK-authored."*
+
+**The facts (verified in code):**
+- **One template exists** — `restaurant-classic` 1.0.0 is the only entry in the render registry. `presence_sites.template_slug` **defaults to `'restaurant-classic'`** for every new site.
+- That template **hardcodes restaurant framing**: the nav is a fixed `/menu/ "Menu"`, the offerings page is `<h1>Menu</h1>`, and the **structured data emits `@type: Restaurant / Menu / MenuSection / MenuItem` for every published site.**
+- The **industry packs (4: restaurant, coffee_shop, home_services, pet_grooming) are guidance-only** — they contribute judgment/recommendation/moment/coach rules and *declare* the right navigation/pages ("Services", "Service Areas", …) that the contract says "a template can realize" — **but no template realizes any of them.** The restaurant template ignores the pack's declared nav/pages.
+
+**The consequence:** the *intelligence* is multi-industry (a plumber gets plumber-appropriate Moments and coaching), but the **website a non-restaurant customer actually publishes is a restaurant site that says "Menu" and is marked up as a restaurant** — wrong for their brand and actively wrong for SEO (`@type: Restaurant/Menu` on a plumber's page).
+
+**Why it matters vs competitors:** Squarespace/Wix/Webflow/Shopify each ship *hundreds* of industry templates. Studio OS ships **one**, restaurant-shaped. Every website competitor beats this on day one for any non-restaurant customer.
+
+**The strategic question for the owner (this changes the launch definition):**
+- **If V1's market is "restaurants served by a studio"** → one template is fine; multi-industry templates are V1.1. Ship as-is.
+- **If V1's market is "small businesses" broadly** (which the editions, industry packs, and Business-OS framing all imply) → **the single restaurant template is a Version 1 blocker for every non-restaurant customer.** They cannot get a correct site.
+
+**Minimum viable fix (recommended even for a restaurant-first launch):**
+1. ➕ **A `generic`/`business-classic` template** that reads the industry pack's declared `navigation`/`pages` and emits neutral vocabulary + correct schema (`@type: LocalBusiness` instead of `Restaurant`, "Services"/"Offerings" instead of "Menu"). This alone lets *any* business publish a correct site.
+2. ➕ **Point the site's default template at the resolved industry** (the pack already knows the vocabulary; the site just needs to pick a template that realizes it).
+3. ➕ **A handful of vertical templates** (home services, salon/beauty, professional services, retail) authored via the existing SDK — the architecture is genuinely ready; it's authoring work, not new plumbing.
+
+**Add to roadmap as → Phase T — Template Library & Industry Realization** (the highest-value pre-broad-launch build; gate its V1-vs-V1.1 status on the market-scope answer above).
+
+---
+
 ## Completed (verified, committed — NOT yet pushed)
 
 Foundation & Core Architecture · Security, Multi-tenancy & Permissions · CMS · Business OS · AI Platform · Connected Platform · Commerce & Billing Foundation · CRM / Relationship Center · Developer Mode (+ render integration) · Unified Workspace Shell · Client Portal · Agency & Enterprise Foundations · Packaging & Editions · Commercial Activation · Product Integrity Verification · Commercial Readiness · Site Operations & Feature Optimization · Market Validation & Operational Excellence.
@@ -45,6 +71,18 @@ macOS · Windows · iPhone · Android · feature parity · one-codebase-where-pr
 Validate every customer journey · Pricing flows · **Demo flows** · **Booking flows** · Forms · Emails · Preview · Launch checklist.
 - ➕ **Genuinely new here:** *demo flows* (a way to try without buying) and *booking flows* (FD-F3 — the `booking` form kind exists as capture; real calendar availability is unbuilt). Forms/preview/emails are ✅ done (Phase F) — validate, don't rebuild.
 - ➕ **The launch checklist should include "cross the go-live gate (push)"** as an explicit, owner-owned step.
+
+### Phase T — Template Library & Industry Realization  ·  ➕ ADDED (highest-value competitive gap)
+*See the 🔴 finding above. Today the product publishes a restaurant site for everyone.*
+- **`generic`/`business-classic` template** that realizes the industry pack's declared navigation/pages + emits correct schema (`LocalBusiness`, not `Restaurant`) and neutral vocabulary. Unblocks every non-restaurant customer.
+- **Default-template resolution by industry** (pick the template the pack's vocabulary fits).
+- **A few vertical templates** (home services, salon/beauty, professional services, retail) via the existing SDK.
+- 🔍 **EXPAND / decide:** V1 blocker vs V1.1 depends entirely on the target-market answer (restaurant-first vs small-business-broad). This is the most important product-scope decision left.
+
+### Phase U — Customer-Site Capabilities  ·  ➕ ADDED (secondary gaps, likely V1.1)
+- **Selling on the customer's own site** — today `offerings` show `price_text` but there's no cart/checkout; a retail or order-taking business can only link out (`ordering_url`/`booking_url`). Intentional "link-out" is defensible for V1; note it explicitly so it's a *decision*, not a surprise. (Shopify/Squarespace Commerce do this natively.)
+- **Arbitrary pages / landing pages** — the render emits a fixed set (home/menu/about/contact + blog). No custom pages or campaign landing pages. Webflow/Wix allow any page. V1.1.
+- **Real booking with availability (FD-F3)** — the `booking` form kind captures a request; there's no calendar/availability. V1.1.
 
 ### Phase S — Security & Engineering Hardening  ·  ➕ ADDED (missing from the roadmap)
 *The roadmap has no backend-quality/security-hardening phase. These are real pre-scale items, not features.*
