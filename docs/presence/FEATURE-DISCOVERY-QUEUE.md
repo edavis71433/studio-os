@@ -85,6 +85,18 @@
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
 
+### FD-INF1 · In-product domain purchase (registrar/reseller integration)
+**What:** buy + auto-connect + renew a domain inside Studio OS (reseller API; renewal billed through the platform). **Why:** the single biggest "own a website, not a hosting account" completer — every builder has it; today Studio OS is connect-only. **Source:** Phase U infra audit. **Value:** High · **Effort:** High. **Disposition:** V1.1+.
+
+### FD-INF2 · Registrar-aware connect (per-registrar guidance + API auto-connect)
+**What:** "at GoDaddy, click…" per-registrar copy + Entri-class API auto-connect where supported, layered on the existing plan-gated connect. **Source:** Phase U. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-INF3 · Renewal/expiry watching for BYO domains
+**What:** RDAP expiry check → a calm Business Moment before a customer domain lapses. **Source:** Phase U. **Value:** Medium-High (a lapsed domain is a dead site) · **Effort:** Low-Medium. **Disposition:** V1.1.
+
+### FD-INF4 · Agency bulk infrastructure views (portfolio foundations roll-up)
+**What:** one screen: every client domain/SSL/email posture + expiries + drift; pairs with [[FD-C5]]. **Source:** Phase U. **Value:** Medium (agency scale) · **Effort:** Medium. **Disposition:** V1.1.
+
 ### FD-T15 · Comparison table + fixed-formula calculator blocks (Phase T4)
 **What:** structured comparison-table block + a calculator-lite (fixed formula as data — inputs × declared rates → deterministic result; never runtime code). **Source:** T4 AEM/competitor benchmark. **Value:** Medium · **Effort:** Medium. **Disposition:** V1.1 (with FD-T5).
 

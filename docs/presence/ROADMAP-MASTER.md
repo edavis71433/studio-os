@@ -95,6 +95,9 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 - **V1 (small, high-dignity):** FD-N2 **logo upload** → header + real favicon + OG fallback (no logo field exists today) · FD-N3 **OG/social-share image picker** · FD-N4 **announcement bar** realized (pairs with the built scheduled expiry) · FD-N5 **device preview toggle** (trivial).
 - **V1.1:** FD-N6 form field/success/auto-reply config (endpoint already accepts fields{}) · FD-N7 redirects manager UI · FD-N8 per-page SEO overrides + noindex · FD-N9 GBP review embed (Connected already reads the data). Adapted-not-copied: per-device visibility as a structured flag; density presets instead of spacing sliders; contrast-validated palettes inside FD-T6. Rejected: freeform layout, popups, auto-publish.
 
+### Phase U-INF — Infrastructure Experience (audited ✅ — already substantially built)
+*Phase U audit verdict: the invisibility ideal is largely SHIPPED — Foundations Desk (plain-words domain/DNS/SSL/email/hosting), desired-zone DNS with versioning+rollback, changes as approval plans, Launch Assistant, auto SSL/CDN. No competitor pairs plain-language DNS with approval-gated changes. Remaining = integrations, all V1.1: FD-INF1 buy-domain · FD-INF2 registrar-aware connect · FD-INF3 expiry watching · FD-INF4 agency bulk views. No V1 implementation warranted. See [PHASE-U-INFRASTRUCTURE-AUDIT](PHASE-U-INFRASTRUCTURE-AUDIT.md).*
+
 ### Phase S — Security & Engineering Hardening  ·  ➕ ADDED (missing from the roadmap)
 *The roadmap has no backend-quality/security-hardening phase. These are real pre-scale items, not features.*
 - **`svc()` id-scope audit** — confirm every service-role query taking a request-supplied id filters by tenant/site/org. Service role bypasses RLS; one missing filter is a cross-tenant leak. Do this once, deliberately, before real tenants. (Was B6 on the Launch Board.)
