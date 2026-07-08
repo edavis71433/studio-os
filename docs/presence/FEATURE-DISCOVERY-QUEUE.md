@@ -85,6 +85,21 @@
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
 
+### FD-R1 · Subscription lifecycle & wind-down operations 🔴 (verified gap — the biggest untracked cluster)
+**What:** the entitlement states exist and gate the WORKSPACE (lapsed → friendly 403), but **nothing acts on them commercially**: no trial-ending nudge (trial_ends_at is recorded, nobody emails), no payment-failed communication (Stripe retries silently; past_due→paused invisibly), and **no wind-down policy — a cancelled customer's published site stays live forever** (verified: no consumer of 'lapsed' beyond the middleware). Define + build: trial-day-11 email · payment-failed email · cancellation → grace window with export reminder → park/unpublish · documented retention policy · win-back. **Why:** revenue leaks + legal exposure + honest offboarding (the "right to leave" needs a defined ending). **Source:** owner roadmap sweep (post-P). **Value:** High · **Effort:** Medium. **Disposition:** comms + written policy = **V1 (before the first paying cohort)**; full automation V1.1.
+
+### FD-R2 · Workspace vocabulary matches the industry (the "Menu" mismatch)
+**What:** post-T3 a plumber's SITE says "Services" but their WORKSPACE nav still says "Menu" (presence.html data-view label + the 'menu item' noun in content specs — verified). Drive workspace labels from the same vocab (offeringLabel via /portal/context or settings). **Source:** T3 follow-through (missed then, caught now). **Value:** Medium-High (coherence) · **Effort:** Low-Medium. **Disposition:** V1 polish candidate.
+
+### FD-R3 · Per-item scheduled visibility (AEM on/off times)
+**What:** offerings/posts gain optional visible_from/visible_until — "pumpkin spice retires Nov 1" without remembering. Deterministic against snapshot time (the announcement-expiry pattern), pairs with scheduled publish. **Source:** AEM benchmark sweep (verified absent). **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-R4 · Multi-language customer sites (AEM language copies, SMB edition)
+**What:** nothing exists beyond the SiteConfig locale seam (verified). Spanish-speaking small businesses are a major segment; the structured-content model translates cleanly (facts once, rendered per language). **Source:** AEM sweep. **Value:** High (market) · **Effort:** High. **Disposition:** V1.1+/Future — but a deliberate decision, not an accident.
+
+### FD-R5 · "Get found" starter ops (search-engine verification + submission)
+**What:** sitemap/robots ship, but nothing helps the owner verify with Google/Bing + submit the sitemap (a meta-tag field + guided step; pairs with FD-INF2). **Value:** Medium · **Effort:** Low. **Disposition:** V1.1.
+
 ### FD-P1 · Self-serve plan change (upgrade/downgrade route)
 **What:** a route + UI applying catalog.planChange (policy already written: upgrades immediate+prorated, downgrades at cycle end) through Stripe. Founder-era changes are studio-handled (appropriate); self-serve when volume demands. **Source:** Phase P. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
 
