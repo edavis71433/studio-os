@@ -77,7 +77,13 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // Developer-Mode layer, so a developer edit publishes identically to any change.
   const t = getTemplate(snapshotArg.snapshot.template_slug, snapshotArg.snapshot.template_version);
   if (!t) return await fail('render', `unknown template ${snapshotArg.snapshot.template_slug}@${snapshotArg.snapshot.template_version}`);
-  const siteCfg = { baseUrl: site.custom_domain ? `https://${site.custom_domain}` : `https://${site.netlify_site_id}.netlify.app` };
+  // Phase F FD-2: activate the site's contact form — the template renders a real
+  // <form> posting to the public capture endpoint (was a mailto CTA when absent).
+  const fnBase = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+  const siteCfg = {
+    baseUrl: site.custom_domain ? `https://${site.custom_domain}` : `https://${site.netlify_site_id}.netlify.app`,
+    ...(fnBase ? { formEndpoint: `${fnBase}/functions/v1/presence/forms/${site.id}/submit` } : {}),
+  };
   let fileMap: Record<string, string | Uint8Array>;
   try { fileMap = renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);

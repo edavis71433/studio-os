@@ -30,6 +30,7 @@ import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut } from './routes/dev.ts';
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { resolveSiteRole } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -93,6 +94,16 @@ serve(async (req) => {
   if (route === '/commerce' || route.startsWith('/commerce/')) {
     return handleCommerce(req, route, method, principal, cors);
   }
+
+  // ── Phase F: PUBLIC commercial routes — a website visitor's form submission
+  //    (FD-2) and a client's one-tap approval via a signed token (FD-3). No
+  //    session; both are authorized by the target itself (site id / signed token).
+  {
+    const m = route.match(/^\/forms\/([0-9a-f-]{36})\/submit$/);
+    if (m && method === 'POST') return handleFormSubmit(req, m[1], cors);
+  }
+  if (route === '/approve' && method === 'GET') return handleApproveGet(req, cors);
+  if (route === '/approve' && method === 'POST') return handleApprovePost(req, cors);
 
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
   //    not client-scoped: reachable by staff or system (service-role/cron), and
@@ -258,6 +269,21 @@ serve(async (req) => {
     const m = route.match(/^\/crm\/notes\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleCrmNoteDelete(jwt, site, principal, m[1], cors);
   }
+
+  // ── Phase F: authed commercial routes — scheduled publish (FD-1), lead inbox
+  //    (FD-2), notify client for one-tap approval (FD-3). Site-scoped via the gate.
+  if (route === '/schedule' && method === 'POST') return handleScheduleCreate(req, site, principal, cors);
+  if (route === '/schedule' && method === 'GET') return handleScheduleList(site, cors);
+  {
+    const m = route.match(/^\/schedule\/([0-9a-f-]{36})\/cancel$/);
+    if (m && method === 'POST') return handleScheduleCancel(site, m[1], principal, cors);
+  }
+  if (route === '/forms/inbox' && method === 'GET') return handleFormInbox(site, cors);
+  {
+    const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
+    if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);
+  }
+  if (route === '/approve/send' && method === 'POST') return handleApproveSend(site, principal, cors);
 
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
   if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);

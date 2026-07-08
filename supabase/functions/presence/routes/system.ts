@@ -7,7 +7,7 @@
 //   GET  /system/health  ?secret=…   (or x-system-secret header)
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { runOperationsCycle, retryFailedRuns } from '../ops/scheduler.ts';
+import { runOperationsCycle, retryFailedRuns, runDuePublishes } from '../ops/scheduler.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -72,7 +72,11 @@ export async function handleSystem(req: Request, route: string, method: string, 
     try {
       if (task === 'retry') return json({ data: await retryFailedRuns(limit) }, 200, cors);
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);
-      return json({ data: await runOperationsCycle({ limit }) }, 200, cors);
+      if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
+      // default cycle ALSO fires any due scheduled publishes, so a single cron tick covers both
+      const cycle = await runOperationsCycle({ limit });
+      const scheduled = await runDuePublishes(limit);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures } } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

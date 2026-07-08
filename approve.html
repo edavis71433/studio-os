@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Review &amp; approve — Presence</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;
+    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 12px 34px rgba(27,21,37,.10);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 12px 34px rgba(0,0,0,.4)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh;display:grid;place-items:center;padding:24px}
+  .box{max-width:460px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:34px 30px}
+  .brand{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--soft);margin-bottom:18px}
+  .brand .m{width:22px;height:22px;border-radius:7px;background:var(--p);color:#fff;display:grid;place-items:center;font-family:var(--serif);font-size:14px}
+  h1{font-family:var(--serif);font-weight:500;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
+  .who{font-size:13px;color:var(--faint);margin-bottom:18px}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:22px}
+  .card h2{font-family:var(--serif);font-weight:500;font-size:18px;margin:0 0 5px}
+  .card p{margin:0;color:var(--soft);font-size:14.5px}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 10px;font-weight:600;margin-bottom:9px}
+  .row{display:flex;gap:10px}
+  button{flex:1;font-family:inherit;font-size:15px;font-weight:600;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:13px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--p)} button:disabled{opacity:.55;cursor:default}
+  button.approve{background:var(--p);color:#fff;border-color:var(--p)} button.approve:hover{background:var(--p-deep)}
+  .note{font-size:12.5px;color:var(--faint);margin-top:16px;text-align:center}
+  .center{text-align:center;padding:10px 0}
+  .center .big{font-family:var(--serif);font-size:22px;margin:0 0 8px}
+  .muted{color:var(--soft);font-size:14.5px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:30px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="box" id="box"><div class="spin" role="status" aria-label="Loading"></div></div>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const token=new URLSearchParams(location.search).get('token')||'';
+const H={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY};
+
+function brand(){return `<div class="brand"><span class="m">P</span>Presence</div>`;}
+function trouble(msg){$('box').innerHTML=`${brand()}<div class="center"><p class="big">This link isn’t usable.</p><p class="muted">${esc(msg||'Open your workspace to review.')}</p><p style="margin-top:18px"><a class="link" href="/today.html">Open your workspace →</a></p></div>`;}
+function done(kind){const approved=kind==='approved';$('box').innerHTML=`${brand()}<div class="center"><p class="big">${approved?'Approved — thank you.':'Set aside.'}</p><p class="muted">${approved?'Your studio will take it from here. Nothing goes live without your OK — and you just gave it.':'No change was made. Your studio will follow up.'}</p><p style="margin-top:18px"><a class="link" href="/today.html">Open your workspace →</a></p></div>`;}
+
+function render(d){
+  $('box').innerHTML=`${brand()}
+    <h1>Ready for your approval</h1>
+    <div class="who">for ${esc(d.business_name||'your business')}</div>
+    <div class="card"><span class="tag">${esc(d.kind==='connected'?'Connected change':'Change')}</span>
+      <h2>${esc(d.title||'A change is ready')}</h2>${d.summary?`<p>${esc(d.summary)}</p>`:''}</div>
+    <div class="row"><button id="reject">Not yet</button><button class="approve" id="approve">Approve</button></div>
+    <p class="note">Nothing happens until you choose. This link is just for you.</p>`;
+  $('approve').addEventListener('click',()=>decide('approve'));
+  $('reject').addEventListener('click',()=>decide('reject'));
+}
+async function decide(decision){
+  document.querySelectorAll('button').forEach(b=>b.disabled=true);
+  if($('approve'))$('approve').textContent=decision==='approve'?'Approving…':'Approve';
+  try{
+    const r=await fetch(FN+'/approve',{method:'POST',headers:H,body:JSON.stringify({token,decision})});
+    const b=await r.json().catch(()=>({}));
+    if(r.ok){done(b.data&&b.data.decision||(decision==='approve'?'approved':'set_aside'));}
+    else{trouble(b.message);}
+  }catch(_){trouble('Something went wrong — please try again.');}
+}
+(async function(){
+  if(!token){trouble('This link is missing its code.');return;}
+  try{
+    const r=await fetch(FN+'/approve?token='+encodeURIComponent(token),{headers:H});
+    const b=await r.json().catch(()=>({}));
+    if(r.ok){render(b.data||{});}
+    else if(r.status===409){$('box').innerHTML=`${brand()}<div class="center"><p class="big">Already handled.</p><p class="muted">This was already reviewed — nothing more to do.</p><p style="margin-top:18px"><a class="link" href="/today.html">Open your workspace →</a></p></div>`;}
+    else{trouble(b.message);}
+  }catch(_){trouble('We couldn’t load this just now.');}
+})();
+</script>
+</body>
+</html>

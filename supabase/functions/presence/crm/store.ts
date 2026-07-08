@@ -7,7 +7,7 @@ import type { SiteRow } from '../lib/site.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import {
   type TimelineItem, type ClientProfileSummary, type Audience,
-  mapPublish, mapChange, mapConnected, mapMoment, mapApproval, mapNote, mergeTimeline, deriveClientHealth,
+  mapPublish, mapChange, mapConnected, mapMoment, mapApproval, mapNote, mapLead, mergeTimeline, deriveClientHealth,
 } from './contract.ts';
 
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
@@ -45,7 +45,7 @@ export async function loadProfile(site: SiteRow, nowIso: string): Promise<Client
  *  plus relationship notes. Returns ALL items (internal + shared); the caller
  *  filters by audience. */
 export async function loadTimeline(site: SiteRow, opts: { includeInternalNotes: boolean; limit?: number }): Promise<TimelineItem[]> {
-  const [pubs, changes, connEvents, moments, infra, writes, notes] = await Promise.all([
+  const [pubs, changes, connEvents, moments, infra, writes, notes, leads] = await Promise.all([
     svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,created_at,completed_at&order=created_at.desc&limit=25`),
     svc(`presence_change_events?site_id=eq.${site.id}&select=id,entity_type,action,summary,created_at,provenance&order=created_at.desc&limit=40`),
     svc(`presence_connection_events?site_id=eq.${site.id}&select=id,provider_key,action,created_at&order=created_at.desc&limit=20`),
@@ -53,6 +53,7 @@ export async function loadTimeline(site: SiteRow, opts: { includeInternalNotes: 
     svc(`presence_infra_plans?site_id=eq.${site.id}&select=id,title,summary,status,created_at&order=created_at.desc&limit=15`),
     svc(`presence_connection_writes?site_id=eq.${site.id}&select=id,title,summary,status,provider_key,created_at&order=created_at.desc&limit=15`),
     svc(`presence_relationship_notes?site_id=eq.${site.id}&deleted_at=is.null&select=id,audience,body,author,pinned,created_at&order=created_at.desc&limit=30`),
+    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,message,created_at&order=created_at.desc&limit=15`),
   ]);
   const noteRows = arr(notes).filter((n) => opts.includeInternalNotes || n.audience === 'shared');
   const groups: TimelineItem[][] = [
@@ -63,6 +64,7 @@ export async function loadTimeline(site: SiteRow, opts: { includeInternalNotes: 
     arr(infra).map((r) => mapApproval(r, 'infrastructure')),
     arr(writes).map((r) => mapApproval(r, 'connected')),
     noteRows.map((r) => mapNote(r as any)),
+    arr(leads).map(mapLead),
   ];
   return mergeTimeline(groups, opts.limit ?? 60);
 }

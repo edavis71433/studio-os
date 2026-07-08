@@ -8,7 +8,7 @@
 // This file is PURE: the timeline normalizers, the audience rule, and the calm
 // summary. No network, no clock beyond passed-in `now`. Tested in isolation.
 
-export type TimelineKind = 'publish' | 'change' | 'connected' | 'moment' | 'approval' | 'note';
+export type TimelineKind = 'publish' | 'change' | 'connected' | 'moment' | 'approval' | 'note' | 'lead';
 export type Audience = 'internal' | 'shared';
 
 export interface TimelineItem {
@@ -85,6 +85,13 @@ export function mapApproval(r: { id: string; title?: string; summary?: string; s
 
 export function mapNote(r: { id: string; audience: Audience; body: string; author?: string; created_at: string; pinned?: boolean }): TimelineItem {
   return { id: `note:${r.id}`, at: r.created_at, kind: 'note', audience: r.audience, title: r.pinned ? 'Pinned note' : 'Note', detail: r.body };
+}
+
+/** FD-2: a lead from the published site's form — shared (the client's own inbound). */
+export function mapLead(r: { id: string; form_kind: string; name?: string; email?: string; message?: string; created_at: string }): TimelineItem {
+  const who = [r.name, r.email].filter(Boolean).join(' · ') || 'Someone';
+  const label = r.form_kind === 'quote' ? 'Quote request' : r.form_kind === 'booking' ? 'Booking request' : 'New message';
+  return { id: `lead:${r.id}`, at: r.created_at, kind: 'lead', audience: 'shared', title: `${label} from ${who}`, detail: r.message || undefined };
 }
 
 /** Merge normalized items into ONE chronological feed (newest first), capped. Pure. */

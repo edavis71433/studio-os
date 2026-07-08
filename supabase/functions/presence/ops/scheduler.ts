@@ -10,6 +10,8 @@
 // SiteRow, exactly as the agency bulk runner already does.
 
 import { svc } from '../lib/db.ts';
+import { runPipeline } from '../routes/publish.ts';
+import type { Principal } from '../../_shared/auth.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
 import { runRecommendation } from '../recommendation/engine.ts';
@@ -37,6 +39,40 @@ async function activeSites(limit: number): Promise<SiteRow[]> {
   const sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);
   const sites = (sr.ok && Array.isArray(sr.json) ? sr.json : []).filter((s: any) => activeClients.has(String(s.client_id)));
   return sites.slice(0, limit) as SiteRow[];
+}
+
+// ── FD-1: fire due scheduled publishes/reverts through the ONE publish pipeline.
+// A due row loads its frozen snapshot and runs runPipeline (publish or restore),
+// exactly as a manual publish would — no second publish path. Each row's outcome
+// is recorded; one failure never stops the others.
+export async function runDuePublishes(limit = 25): Promise<CycleResult> {
+  const nowIso = new Date().toISOString();
+  const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary&order=scheduled_for.asc&limit=${limit}`);
+  const rows = (q.ok && Array.isArray(q.json)) ? q.json : [];
+  const results: SiteRunResult[] = [];
+  const sysPrincipal: Principal = { kind: 'system', userId: 'scheduler', tenantId: null, role: null, email: null, jwt: null, requestId: 'scheduled-publish' };
+  for (const row of rows) {
+    // claim it (pending → running-ish) so a concurrent cycle can't double-fire
+    const claim = await svc(`presence_scheduled_publishes?id=eq.${row.id}&status=eq.pending`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ fired_at: nowIso }) });
+    if (!claim.ok || !claim.json?.[0]) continue;   // someone else took it
+    let ok = false, err = '';
+    try {
+      const site = (await svc(`presence_sites?id=eq.${row.site_id}&select=${SITE_COLS}&limit=1`)).json?.[0];
+      const snap = (await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization&limit=1`)).json?.[0];
+      if (!site || !snap) { err = 'site or snapshot gone'; }
+      else {
+        const snapshot = { content: snap.content, content_contract_version: snap.content_contract_version, template_slug: snap.template_slug, template_version: snap.template_version, created_at: snap.created_at, dev_customization: snap.dev_customization ?? null };
+        const res = await runPipeline(site as SiteRow, sysPrincipal, row.kind === 'revert' ? 'restore' : 'publish', { snapshot, snapshotId: row.snapshot_id, mediaManifest: snap.media_manifest || [] }, row.summary || 'Scheduled change', {});
+        ok = res.status === 200;
+        if (!ok) { try { err = (await res.clone().json())?.error || `status ${res.status}`; } catch { err = `status ${res.status}`; } }
+      }
+    } catch (e) { err = String(e).slice(0, 200); }
+    await svc(`presence_scheduled_publishes?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ status: ok ? 'done' : 'failed', last_error: err }) });
+    results.push({ site_id: String(row.site_id), ok, steps: { [row.kind]: ok }, error: err || undefined });
+  }
+  const failures = results.filter((r) => !r.ok).length;
+  if (failures > 0) await alertFailures('scheduled-publish', failures, results.length, results.filter((r) => !r.ok));
+  return { ok: failures === 0, run_type: 'scheduled-publish', considered: rows.length, ran: results.length, failures, results };
 }
 
 // Run one site through the observation pipeline, isolated. Evidence gates the

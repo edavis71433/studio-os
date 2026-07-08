@@ -73,14 +73,24 @@
 
 ## High value
 
-### FD-1 · Scheduled publish / unpublish (+ content expiry)
-**What:** publish a change at a future date/time; auto-retire content on a date (a `publish_at` / `expires_at` on a publish, driven by the existing scheduler). **Why:** every major competitor has it (AEM, Webflow, WordPress, Wix); it's genuinely useful for small businesses — holiday hours that flip automatically, a limited-time promo that retires itself, a seasonal page. Studio OS is publish-now only. Fits the snapshot/versioning model cleanly (additive). **Source:** competitor/operational review. **Value:** High · **Effort:** Medium. **Disposition:** Queued — strong candidate.
+### FD-1 · Scheduled publish / unpublish (+ content expiry) — ✅ IMPLEMENTED (Phase F)
+**Built:** `presence_scheduled_publishes` + `runDuePublishes` in the scheduler fires due rows through the ONE publish pipeline (publish a frozen draft, or revert to a prior version = expiry). Routes `/schedule*`; `/system/run` task `publish`. In-app scheduling UI = FD-F1. See [PHASE-F-COMMERCIAL-READINESS](PHASE-F-COMMERCIAL-READINESS.md). **Disposition:** Done (backend); UI FD-F1.
 
-### FD-2 · Form / lead capture
-**What:** contact/booking form submissions from a customer's published site land in an inbox they can see (and optionally email/notify). **Why:** small businesses live on inbound leads; a static site's contact form currently has no submission home in the platform. Likely the biggest "wait, it can't do that?" gap. **Source:** competitor/operational review (verified: no submissions table/route). **Value:** High · **Effort:** Medium (needs a capture endpoint + inbox; respects the no-tracking ethos). **Disposition:** Queued — verify template form behavior first.
+### FD-F1 · Scheduling & leads inbox UI
+**What:** a "Schedule" option in the publish flow + a dedicated leads inbox screen. **Why:** the FD-1/FD-2 backends are complete + tested + deployed; the in-app screens are the remaining wiring for a polished V1. **Source:** Phase F. **Value:** High (finishes V1 polish) · **Effort:** Low-Medium. **Disposition:** Queued — V1 before launch.
 
-### FD-3 · Approval → notify → one-tap approve loop
-**What:** when the operator prepares a publish/connected-write/AI draft, the client gets a plain email → one tap into a focused approve/reject view → it proceeds. **Why:** the whole platform is approval-gated (the moat), but the *handoff* isn't a loop — the client must happen to be in the app. Turns great architecture into a delightful ritual; pairs with the A7.2 client portal. **Source:** operator-experience recommendation. **Value:** High · **Effort:** Medium. **Disposition:** Queued — highest relationship value.
+### FD-F2 · Auto-notify on plan proposal
+**What:** send the one-tap approval email automatically when a plan is proposed (today `/approve/send` is operator-triggered). **Source:** Phase F. **Value:** Medium · **Effort:** Low. **Disposition:** Queued (V1.1).
+
+### FD-2 · Form / lead capture — ✅ IMPLEMENTED (Phase F)
+**Built (Phase F):** public capture `POST /forms/:id/submit` (honeypot spam, no raw IP) → `presence_form_submissions` inbox + CRM timeline `lead` items; template renders a real form via `formEndpoint` on publish; owner emailed best-effort. Inbox UI = FD-F1.
+
+_orig:_ **What:** contact/booking form submissions from a customer's published site land in an inbox they can see (and optionally email/notify). **Why:** small businesses live on inbound leads; a static site's contact form currently has no submission home in the platform. Likely the biggest "wait, it can't do that?" gap. **Source:** competitor/operational review (verified: no submissions table/route). **Value:** High · **Effort:** Medium (needs a capture endpoint + inbox; respects the no-tracking ethos). **Disposition:** Queued — verify template form behavior first.
+
+### FD-3 · Approval → notify → one-tap approve loop — ✅ IMPLEMENTED (Phase F)
+**Built (Phase F):** stateless HMAC token → `/approve/send` emails the client one-tap links; `approve.html` + `/approve` (GET/POST) apply the decision through the existing approval spine. Auto-notify-on-propose = FD-F2.
+
+_orig:_ **What:** when the operator prepares a publish/connected-write/AI draft, the client gets a plain email → one tap into a focused approve/reject view → it proceeds. **Why:** the whole platform is approval-gated (the moat), but the *handoff* isn't a loop — the client must happen to be in the app. Turns great architecture into a delightful ritual; pairs with the A7.2 client portal. **Source:** operator-experience recommendation. **Value:** High · **Effort:** Medium. **Disposition:** Queued — highest relationship value.
 
 ### FD-4 · Operator/system monitoring + alerting + backup drill
 **What:** external uptime check on `/system/health` with paging; log-based error/failure alerting; a recorded PITR recovery drill. **Why:** today an operator won't *know* if a publish breaks, a connection drops, or the system is down (Ops audit CRIT-1/HIGH-1/2). Managed competitors do this for you. **Source:** Operations & Production Readiness audit. **Value:** High (operational) · **Effort:** Medium (mostly infra/config). **Disposition:** Queued — already tracked as Owner Activation; surfaced here for the Board.
