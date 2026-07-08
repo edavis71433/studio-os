@@ -16,7 +16,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 | ~~**GM-1**~~ | ✅ **CLOSED (Phase M)** — **V1 UI completion for the Phase F commercial features (FD-F1)**: the **Scheduling** screen (`schedule.html`) and the **Leads inbox** (`leads.html`), both surfaced in the one nav, + a CRM notify-to-approve action. | 🤖 | Built in Phase M as screens over the existing tested endpoints; verified by the nav dead-link guard. Remaining: authed browser QA. See [PHASE-M-SITE-OPERATIONS](PHASE-M-SITE-OPERATIONS.md). |
 | ~~**GM-2**~~ | ✅ **CLOSED (Phase V)** — the capture endpoint accepts plain HTML form posts (maps `contact`→email/phone), the template form carries the `_hp` honeypot + hidden context fields, and visitors land on a rendered `/thanks/` page (303, no JS needed). Verified by 5 new pure tests + live smoke on both envs. | 🤖 | See [PHASE-V-NO-CODE-ESSENTIALS](PHASE-V-NO-CODE-ESSENTIALS.md). |
 
-*(Owner activation — RESEND_KEY, APPROVAL_SECRET, cron on `/system/run` — and human live-browser/AT passes remain separate, non-engineering gates.)*
+*(Owner activation — RESEND_KEY **+ verify the sending domain in Resend (SPF/DKIM) — the Phase-RL lifecycle emails depend on deliverability**, APPROVAL_SECRET, cron on `/system/run` — and human live-browser/AT passes remain separate, non-engineering gates.)*
 
 ---
 
@@ -26,7 +26,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 | # | Item | Owner | Why |
 |---|---|---|---|
 | B1 | **Cross the go-live gate**: confirm the L1 prices, register the Stripe *subscription* webhook events, add nav links to the new pages, then **push the 25 commits** | 🧑 | Nothing since L1 is live on the website; pushing publishes real purchasable pages |
-| B2 | **Portal must show the core value**: Business Moments + the Concierge, in the shipped portal (backend exists; wire the UI) | 🤖 | The intelligence is invisible without a front door |
+| ~~B2~~ | ✅ **CLOSED** — `today.html` is the Business-Moments front door (+ Concierge ask, dismiss, doorways); portal links to it. | 🤖 | Built in Launch Track 2 / optimized Phase M. |
 | B3 | **CI**: one command runs the whole test suite; green required on every push | 🤖 | No automated gate today (tests need a local `$TMPDIR` incantation) |
 | B4 | **Backups + a real restore test** on both Supabase projects | 🧑🔒 | You cannot sell what you can't recover |
 | B5 | **Reconcile migration history** so a single migration applies without the hold-back ritual | 🤖 | The current ritual is manual and one typo from a prod mistake |
@@ -42,7 +42,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 
 | # | Item | Owner | Why |
 |---|---|---|---|
-| P1 | **Connected Platform UI + `connections-callback.html`**, and register the provider OAuth apps you actually want live | 🧑🤖🔒 | Connect can't complete today; the callback page is missing |
+| P1 | 🟢 **Engineering half CLOSED** — `connections.html` + `connections-callback.html` built (L5.9). **Remaining: owner registers the provider OAuth apps** to go live. | 🧑🔒 | UI complete; credentials are the gate. |
 | P2 | **Cookie Policy + consent flow** | 🤖🔒 | Public-launch legal baseline |
 | P3 | **DPA + sub-processor list** (Supabase, Netlify, Stripe, connected providers) | 🧑🔒 | Hard enterprise blocker |
 | P4 | **Connected-provider consent copy** in the connect flow (what's read/written, revocation) | 🤖 | Trust + legal at the moment of connection |
