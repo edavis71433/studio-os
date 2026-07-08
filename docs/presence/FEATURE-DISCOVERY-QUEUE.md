@@ -51,6 +51,15 @@
 ### FD-13 · Explicit workspace/role switcher
 For a person who is both a business owner and an agency member — one switcher. **Value:** Low · **Effort:** Low.
 
+### FD-15 · Design-token consolidation (one shared stylesheet)
+**What:** extract the canonical design tokens (palette, type scale, spacing, radii) into ONE shared stylesheet that every surface consumes, or codify them in `styleguide.html` as the enforced source. **Why:** today the portal family uses `dds-foundation.css` (`--p:#5b3fa0`, "one value everywhere") while the newer Presence pages (`today/connections/visual-studio/client/agency/sharing`) each **inline-duplicate** the same tokens. Values are now consistent (A8 aligned the last outlier), but they're physically duplicated — a maintainability gap for future browser/desktop/mobile/website work. **Source:** A8 design-system audit. **Value:** Medium (future-platform foundation) · **Effort:** Medium. **Trade-off:** the Presence pages were made self-contained on purpose (no CDN dependency) — consolidation must preserve that resilience (e.g., a build-time inline of shared tokens). **Disposition:** Queued.
+
+### FD-16 · Typeface unification
+**What:** one serif strategy across all surfaces. **Why:** the portal family uses Fraunces (Google Fonts CDN); the Presence pages use a system serif — a subtle "different app" signal. **Source:** A6 (B-8) + A8. **Value:** Low-Medium · **Effort:** Low-Medium (self-host the serif, or standardize on the system stack). **Disposition:** Queued.
+
+### FD-17 · Minor naming: portal.html "Client Portal" → product wordmark
+**What:** `portal.html` titles as "Client Portal | Davis Digital Studio" while the product wordmark elsewhere is "Presence." **Why:** small residual naming inconsistency. **Source:** A8 naming review. **Value:** Low · **Effort:** Low. **Disposition:** Queued (defensible as-is — portal is the studio's broader client home).
+
 ### FD-14 · Task / reminder surface in Business OS
 A light task/reminder list (the Growth Coach is adjacent). **Value:** Low · **Effort:** Medium. **Watch:** risks scope creep vs the calm ethos.
 
