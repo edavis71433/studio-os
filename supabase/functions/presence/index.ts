@@ -20,7 +20,7 @@ import { checkEntitlement } from './middleware/entitlement.ts';
 import { handleGetSite } from './routes/site.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
-import { handlePublish, handleRestore, handlePublishHistory } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin } from './routes/admin.ts';
@@ -204,6 +204,10 @@ serve(async (req) => {
   if (route === '/publish' && method === 'POST') return handlePublish(site, principal, cors);
   if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
+  {
+    const m = route.match(/^\/publishes\/([0-9a-f-]{36})\/label$/);
+    if (m && method === 'POST') return handleVersionLabel(req, site, principal, m[1], cors);   // Phase AA FD-7
+  }
   if (route === '/media/upload-url' && method === 'POST') return handleMediaUpload(req, site, principal, cors);
   {
     const m = route.match(/^\/media\/([0-9a-f-]{36})$/);

@@ -85,6 +85,8 @@
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
 
+### FD-7 · ✅ IMPLEMENTED (Phase AA) — named versions: label/rename any kept version from History (POST /publishes/:id/label, mig 0053, provenance-logged, journal shows the name first)
+
 ### FD-AEM1 · Public headless content delivery API
 **What:** the snapshot is already clean structured JSON (and /export proves it); expose a read-only, token-scoped content API so the same facts can power other frontends/channels (AEM Content-Fragments/GraphQL class). **Source:** AEM spec comparison. **Value:** Medium (new market surface) · **Effort:** Medium. **Disposition:** V1.1+.
 

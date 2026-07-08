@@ -2235,6 +2235,8 @@ async function loadHistory() {
       const body = el("div", "hbody");
       const sum = el("div", "hsum");
       if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
+      // Phase AA (FD-7): a named version leads with its name
+      if (p.label) { const lb = el("strong", null, "“" + p.label + "” — "); sum.appendChild(lb); }
       sum.appendChild(document.createTextNode(p.status === "failed" ? "A publish didn’t go through." : p.summary));
       body.appendChild(sum);
       body.appendChild(el("div", "hmeta",
@@ -2243,6 +2245,27 @@ async function loadHistory() {
         : (p.kind === "restore" ? "A restored version · " : "") + "published"));
       row.appendChild(body);
       const acts = el("div", "hacts");
+      if (p.status === "live") {
+        // Phase AA (FD-7): name (or rename) any kept version — inline, no dialog
+        const nameBtn = el("button", "quietact", p.label ? "Rename" : "Name it");
+        nameBtn.addEventListener("click", () => {
+          if (row.querySelector(".labeledit")) return;
+          const inp = el("input", "labeledit");
+          inp.type = "text"; inp.value = p.label || ""; inp.maxLength = 60;
+          inp.placeholder = "e.g. Spring menu"; inp.setAttribute("aria-label", "Version name");
+          inp.style.cssText = "width:100%;margin-top:6px;padding:6px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px";
+          const commit = async () => {
+            const val = inp.value.trim();
+            if (val === (p.label || "")) { inp.remove(); return; }
+            try { await api("POST", `/publishes/${p.id}/label`, { label: val }); p.label = val; loadHistory(); toast(val ? "Version named" : "Name removed"); }
+            catch (err) { toast(err.message, true); inp.remove(); }
+          };
+          inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
+          inp.addEventListener("blur", commit);
+          body.appendChild(inp); inp.focus(); inp.select();
+        });
+        acts.appendChild(nameBtn);
+      }
       if (p.status === "live" && p.restorable) {
         const view = el("button", "quietact", "Look");
         view.addEventListener("click", () => openPublishPreview(p.id));

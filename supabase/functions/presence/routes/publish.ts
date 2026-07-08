@@ -168,15 +168,33 @@ export async function handlePublishHistory(site: SiteRow, cors: Record<string, s
     }
   }
 
-  const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,created_at,completed_at,snapshot_id&order=created_at.desc&limit=30`);
+  const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,version_label,created_at,completed_at,snapshot_id&order=created_at.desc&limit=30`);
   const rows = Array.isArray(r.json) ? r.json : [];
   return json({
     data: rows.map((p: any) => ({
       id: p.id, kind: p.kind,
       status: p.status === 'live' ? 'live' : p.status === 'failed' ? 'failed' : 'publishing',
       summary: p.change_summary || (p.kind === 'restore' ? 'Restored an earlier version' : 'Published your site'),
+      label: p.version_label || '',
       at: p.created_at, completed_at: p.completed_at,
       restorable: !!p.snapshot_id && p.status === 'live',
     })),
   }, 200, cors);
+}
+
+// ── Phase AA (FD-7): name a kept version ─────────────────────────────────────
+// POST /publishes/:id/label { label } — set or clear (empty) the human name on
+// any of the site's kept versions. Site-scoped; provenance-logged; 60-char cap.
+export async function handleVersionLabel(req: Request, site: SiteRow, principal: Principal, publishId: string, cors: Record<string, string>) {
+  if (!/^[0-9a-f-]{36}$/.test(publishId)) return json({ error: 'bad_request', message: 'Invalid version reference.' }, 400, cors);
+  let body: any = null; try { body = await req.json(); } catch { /* */ }
+  let label = '';
+  for (const ch of String(body?.label ?? '')) { const c = ch.codePointAt(0)!; if (c >= 32) label += ch; }
+  label = label.trim().slice(0, 60);
+  const r = await svc(`presence_publishes?id=eq.${publishId}&site_id=eq.${site.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ version_label: label }),
+  });
+  if (!r.ok || !Array.isArray(r.json) || !r.json.length) return json({ error: 'not_found', message: 'That version isn’t in your journal.' }, 404, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'publish', entityId: publishId, action: 'update', summary: label ? `Named a kept version “${label}”` : 'Removed a version’s name', principal, provenance: 'human', fields: ['version_label'] });
+  return json({ data: { id: publishId, label } }, 200, cors);
 }
