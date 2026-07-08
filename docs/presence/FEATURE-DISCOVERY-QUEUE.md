@@ -76,8 +76,8 @@
 ### FD-1 · Scheduled publish / unpublish (+ content expiry) — ✅ IMPLEMENTED (Phase F)
 **Built:** `presence_scheduled_publishes` + `runDuePublishes` in the scheduler fires due rows through the ONE publish pipeline (publish a frozen draft, or revert to a prior version = expiry). Routes `/schedule*`; `/system/run` task `publish`. In-app scheduling UI = FD-F1. See [PHASE-F-COMMERCIAL-READINESS](PHASE-F-COMMERCIAL-READINESS.md). **Disposition:** Done (backend); UI FD-F1.
 
-### FD-F1 · Scheduling & leads inbox UI
-**What:** a "Schedule" option in the publish flow + a dedicated leads inbox screen. **Why:** the FD-1/FD-2 backends are complete + tested + deployed; the in-app screens are the remaining wiring for a polished V1. **Source:** Phase F. **Value:** High (finishes V1 polish) · **Effort:** Low-Medium. **Disposition:** Queued — V1 before launch.
+### FD-F1 · Scheduling & leads inbox UI — 🚩 LAUNCH GATE (required V1 UI completion before Gold Master QA)
+**What:** a "Schedule" option in the publish flow + a dedicated leads inbox screen. **Why:** the FD-1/FD-2 backends are complete + tested + deployed, but "the capability exists" ≠ "customers can discover and use it naturally." **This is a required V1 UI completion item, NOT V1.1** — it must be explicitly revisited and finished before Gold Master QA (tracked as GM-1 on the [LAUNCH-BOARD](LAUNCH-BOARD.md)). **Source:** Phase F + owner direction. **Value:** High (V1 completeness) · **Effort:** Low-Medium. **Disposition:** REQUIRED before Gold Master QA.
 
 ### FD-F2 · Auto-notify on plan proposal
 **What:** send the one-tap approval email automatically when a plan is proposed (today `/approve/send` is operator-triggered). **Source:** Phase F. **Value:** Medium · **Effort:** Low. **Disposition:** Queued (V1.1).

@@ -4,6 +4,19 @@ One prioritized plan consolidating every fix from the L5.8 Launch Readiness Revi
 
 Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Claude; 🔒 = external (registrar/provider/legal counsel).
 
+> **⚠️ Note (current):** the tiers below are the original L5.8 review and are partly historical — much of MUST-FIX-BEFORE-BETA has since shipped (portal/Moments front door, one shell, CI logic, etc.). The **live** launch gate is the block immediately below.
+
+---
+
+## 🚩 REQUIRED BEFORE GOLD MASTER QA (live gate — added Phase F)
+*Engineering that must be finished before Gold Master QA, distinct from owner activation and human live passes. "The capability exists" ≠ "customers can discover and use it naturally."*
+
+| # | Item | Owner | Why |
+|---|---|---|---|
+| **GM-1** | **V1 UI completion for the Phase F commercial features (FD-F1)**: the in-app **Scheduling** screen (in the publish flow) and the **Leads inbox** screen. | 🤖 | Phase F shipped FD-1 (scheduled publish) and FD-2 (lead capture) **backends** — tested + deployed — but a customer can't yet *discover or operate* them without their screens. Required V1 UI completion, not V1.1. See [PHASE-F-COMMERCIAL-READINESS](PHASE-F-COMMERCIAL-READINESS.md) + [FEATURE-DISCOVERY-QUEUE](FEATURE-DISCOVERY-QUEUE.md) FD-F1. |
+
+*(Owner activation — RESEND_KEY, APPROVAL_SECRET, cron on `/system/run` — and human live-browser/AT passes remain separate, non-engineering gates.)*
+
 ---
 
 ## 🚦 MUST FIX BEFORE BETA
