@@ -6,6 +6,34 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
+### FD-M1 · Auto-draft the starter site at first-run 🔴 (biggest member-experience automation win)
+**What:** the `starter_site` writer already drafts a WHOLE structured website from the customer's business facts — but it's manual-only (`POST /writer/generate`, "only when asked"). Wire a prominent one-click **"Build my starter site"** at first-run/Today that calls it with the info already collected, so a new member goes from blank → a complete draft to review (approval-first preserved; needs `ANTHROPIC_KEY`, degrades gracefully). **Why:** today onboarding is 4 manual steps (details → voice → domain → publish) starting from blank; the capability to auto-populate exists and isn't surfaced. **Source:** Phase-M member-experience deep-dive (grounded in `writer/contract.ts` + `commerce/provision.ts`). **Value:** Very High (activation + premium feel) · **Effort:** Medium. **Disposition:** V1 candidate.
+
+### FD-M2 · Rate limiting on public endpoints (forms submit + signup)
+**What:** `POST /forms/:id/submit` and `POST /commerce/signup` are public and have **no rate limiting** (no rate-limit helper in code, though a table exists). Add a lightweight per-IP/site throttle. **Why:** abuse/spam protection for the new public surface the forms feature created. **Source:** Phase-M deep-dive (verified). **Value:** High (security) · **Effort:** Low-Medium. **Disposition:** V1 (fold into roadmap Phase S).
+
+### FD-M3 · Legal pages on published customer sites (privacy + cookie)
+**What:** the rendered customer site has **no privacy policy / cookie notice** — yet forms now collect PII (name/email). Generate a privacy/cookie page from the business facts. **Why:** compliance gap the forms feature created (GDPR/CCPA); a lead-collecting site needs a privacy policy. **Source:** Phase-M deep-dive (verified: 0 legal markup in the template). **Value:** High (compliance/trust) · **Effort:** Medium. **Disposition:** V1 candidate.
+
+### FD-M4 · Self-serve account deletion / right-to-erasure
+**What:** no self-serve account/data deletion (export exists; delete does not). **Why:** GDPR right-to-erasure + trust; flagged in the earlier data-governance audit (R1), still unresolved. **Source:** Phase-M deep-dive (verified). **Value:** Medium-High (compliance) · **Effort:** Medium. **Disposition:** V1.1 (V1 if EU customers).
+
+### Member-experience audit (two deep file surveys) — implemented + tracked
+**✅ Implemented now (safe UI wins, parse-checked):**
+- **leads.html** — prefilled reply email (subject + greeting + quoted message), `tel:` links + a "Call" action for phone-only leads, auto-mark-read when you reply, and a "Try again" retry.
+- **schedule.html** — a "preview your draft" link (no more scheduling blind), a local-timezone hint on the time field, a `min` that blocks past times in the picker, and a retry.
+- **today.html / crm.html** — "Try again" buttons replacing manual-refresh dead ends.
+
+**➕ Tracked (bigger, by value):**
+- **FD-M5 · Guided first-run on the self-serve side** — `welcome.html` dumps a new member into the workspace on faith; port `portal.html`'s working "3 steps to go live" checklist model. *High · V1.*
+- **FD-M6 · Auto-populate the project brief from `discovery_intake`** — `start.html` and `portal.html`'s 11-field brief re-ask the same questions; carry them over by email. *High · V1.1.*
+- **FD-M7 · Magic-link invited-member activation** — `set-password.html` fights autofill on a hand-typed OTP; a pre-authenticated link removes the most error-prone step. Also add a "Set up my password" link on `portal.html`'s login card. *High · V1.1.*
+- **FD-M8 · Proactive "connect your Google listing" first-card** on connections.html (flat equal-weight list today; one-click OAuth already exists). *Medium · V1.1.*
+- **FD-M9 · AI-suggested alt text + inline field** (replace `visual-studio.html`'s native `prompt()`); multi-photo upload; PDF/text parse for knowledge import. *Medium · V1.1.*
+- **FD-M10 · Surface Coach/Review suggestions on Today** (they're proposal-only already; hidden behind a manual desk-open in presence.html). *Medium · V1.1.*
+- **FD-M11 · Light auto-refresh/polling + standardized optimistic-UI** across the member pages (nothing polls today; only sharing.html has optimistic rollback). *Medium · V1.1.*
+- **FD-M12 · Smart new-business defaults** — "typical hours Mon–Fri 9–5" one-click (hours default to all-closed today); a self-serve shared nav shell so the secondary pages stop changing shape. *Medium · V1.1.*
+
 ### FD-J1 · Operator activation badge (surface health.capabilities in the admin UI)
 **What:** show the `/system/health` capability map (purchase/email/publishing/… green-red) in the admin tool so the operator sees activation status without curling. **Source:** Phase J. **Value:** Medium · **Effort:** Low. **Disposition:** Queued (V1.1).
 

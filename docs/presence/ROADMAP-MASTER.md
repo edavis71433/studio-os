@@ -72,12 +72,13 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 - ➕ **Genuinely new here:** *demo flows* (a way to try without buying) and *booking flows* (FD-F3 — the `booking` form kind exists as capture; real calendar availability is unbuilt). Forms/preview/emails are ✅ done (Phase F) — validate, don't rebuild.
 - ➕ **The launch checklist should include "cross the go-live gate (push)"** as an explicit, owner-owned step.
 
-### Phase T — Template Library & Industry Realization  ·  ➕ ADDED (highest-value competitive gap)
+### Phase T — Template Library, Components & Industry Realization  ·  ➕ ADDED (highest-value competitive gap)
 *See the 🔴 finding above. Today the product publishes a restaurant site for everyone.*
 - **`generic`/`business-classic` template** that realizes the industry pack's declared navigation/pages + emits correct schema (`LocalBusiness`, not `Restaurant`) and neutral vocabulary. Unblocks every non-restaurant customer.
 - **Default-template resolution by industry** (pick the template the pack's vocabulary fits).
 - **A few vertical templates** (home services, salon/beauty, professional services, retail) via the existing SDK.
-- 🔍 **EXPAND / decide:** V1 blocker vs V1.1 depends entirely on the target-market answer (restaurant-first vs small-business-broad). This is the most important product-scope decision left.
+- ➕ **An out-of-the-box COMPONENT / block library** (owner request) — a set of ready-made, *configurable* content blocks customers can turn on and fill: hero, gallery, testimonials, FAQ, hours, map/location, services/menu grid, team, pricing/packages, CTA banner, contact/lead form, announcement bar, before/after, reviews. **Constitution-safe:** these are *structured blocks you choose and fill* (fields → deterministic render), NOT a free-form drag-drop page builder — so it stays within the structured-content + determinism + approval-first laws. Each block declares its fields + schema; templates realize them; the SDK is the authoring surface. This is the "easy to build a real site" layer that makes the template library reusable across industries.
+- 🔍 **EXPAND / decide:** V1 blocker vs V1.1 depends entirely on the target-market answer (restaurant-first vs small-business-broad). This is the most important product-scope decision left. The component library is what makes non-restaurant sites genuinely good, not just correct.
 
 ### Phase U — Customer-Site Capabilities  ·  ➕ ADDED (secondary gaps, likely V1.1)
 - **Selling on the customer's own site** — today `offerings` show `price_text` but there's no cart/checkout; a retail or order-taking business can only link out (`ordering_url`/`booking_url`). Intentional "link-out" is defensible for V1; note it explicitly so it's a *decision*, not a surprise. (Shopify/Squarespace Commerce do this natively.)

@@ -64,14 +64,17 @@ const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABA
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function fmt(iso){return new Date(iso).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'});}
+function tzName(){try{return new Date().toLocaleTimeString('en-US',{timeZoneName:'short'}).split(' ').pop();}catch(_){return 'local';}}
+function localMin(){const d=new Date(Date.now()+60000);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
 
 function render(){
   let h=`<div class="rolebadge">● Scheduled</div>
     <header><h1>Scheduled changes</h1><p class="sub">Publish your current draft at a future moment — holiday hours, a seasonal update, a launch. Nothing goes live until then.</p></header>
     <section><h2>Schedule this draft</h2>
       <div class="card">
-        <label for="when">When should your current draft go live?</label>
-        <input type="datetime-local" id="when">
+        <p style="margin:0 0 14px;font-size:14px"><a class="link" href="/presence.html">See exactly what will publish — preview your draft →</a></p>
+        <label for="when">When should your current draft go live? <span style="font-weight:400;color:var(--faint)">(${esc(tzName())} time)</span></label>
+        <input type="datetime-local" id="when" min="${localMin()}">
         <label for="note" style="margin-top:14px">A note for yourself (optional)</label>
         <input type="text" id="note" placeholder="e.g. Holiday hours">
         <div style="margin-top:16px"><button class="primary" id="add">Schedule publish</button></div>
@@ -101,7 +104,7 @@ async function add(){
 }
 async function cancel(id){const r=await api('/schedule/'+id+'/cancel','POST');if(r.ok){toast('Canceled.');load();}else toast('Couldn’t cancel that.');}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to schedule a publish.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){const r=await api('/schedule');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Scheduling lives in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}LIST=(r.body.data&&r.body.data.scheduled)||[];render();}
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

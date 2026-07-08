@@ -178,8 +178,9 @@ function signedOut(){
 }
 function trouble(){
   $('main').innerHTML = `<div class="center"><h2>We couldn’t load your day just now.</h2>
-    <p class="muted">Nothing’s wrong on your site — this is only this page. Please refresh in a moment.</p>
-    <p style="margin-top:20px"><a class="link" href="/portal.html">Open your full workspace →</a></p></div>`;
+    <p class="muted">Nothing’s wrong on your site — this is only this page.</p>
+    <p style="margin-top:18px"><button onclick="location.reload()" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></p>
+    <p style="margin-top:14px"><a class="link" href="/presence.html">Open your full workspace →</a></p></div>`;
 }
 
 (async function init(){
