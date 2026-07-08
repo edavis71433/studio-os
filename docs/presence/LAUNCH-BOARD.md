@@ -25,7 +25,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 
 | # | Item | Owner | Why |
 |---|---|---|---|
-| B1 | **Cross the go-live gate**: confirm the L1 prices, register the Stripe *subscription* webhook events, add nav links to the new pages, then **push the 25 commits** | 🧑 | Nothing since L1 is live on the website; pushing publishes real purchasable pages |
+| B1 | 🟢 **Stripe half CLOSED (Jul 2026)**: live key verified via API (account activated, charges+payouts enabled), set in prod; webhook endpoint updated — **customer.subscription.created registered** (6/6 events, enabled). Remaining: confirm prices, then **the push**. | 🧑🤖 | Billing chain live end-to-end; the push stays the final gate. |
 | ~~B2~~ | ✅ **CLOSED** — `today.html` is the Business-Moments front door (+ Concierge ask, dismiss, doorways); portal links to it. | 🤖 | Built in Launch Track 2 / optimized Phase M. |
 | B3 | **CI**: one command runs the whole test suite; green required on every push | 🤖 | No automated gate today (tests need a local `$TMPDIR` incantation) |
 | B4 | **Backups + a real restore test** on both Supabase projects | 🧑🔒 | You cannot sell what you can't recover |
