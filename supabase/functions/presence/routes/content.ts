@@ -96,6 +96,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   logo_media_id: { kind: 'uuid' }, og_media_id: { kind: 'uuid' },
   announcement_text: { max: 140 }, announcement_url: { max: 300 }, announcement_expires_at: { kind: 'date' },
   industry_key: { max: 40 },   // Phase T3: drives template vocabulary + schema
+  google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
 };
 
 function validateFields(payload: Record<string, unknown>, spec: Record<string, FieldRule>, requireRequired: boolean) {
@@ -287,6 +288,6 @@ export async function handleVoice(req: Request, jwt: string, site: SiteRow, prin
 export const handleSettings = (req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, jwt, site, principal, cors, {
     table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
-    select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,updated_at',
+    select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,updated_at',
     conflict: 'site_id', summary: 'Updated site settings',
   });

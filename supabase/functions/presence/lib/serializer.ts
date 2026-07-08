@@ -94,6 +94,10 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     settings: {
       category_order: Array.isArray(settings.category_order) ? settings.category_order : [],
       industry: String(settings.industry_key || 'generic'),   // Phase T3: templates read vocabFor(industry)
+      // Phase Z: ownership-verification tokens (emitted as meta tags when set)
+      ...(String(settings.google_site_verification || '').trim() || String(settings.bing_site_verification || '').trim()
+        ? { verification: { google: String(settings.google_site_verification || '').trim() || undefined, bing: String(settings.bing_site_verification || '').trim() || undefined } }
+        : {}),
       // Phase V no-code essentials — through ref() so variants land in the media manifest
       logo: ref(settings.logo_media_id),
       og_image: ref(settings.og_media_id),

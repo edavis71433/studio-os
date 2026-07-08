@@ -240,6 +240,7 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
 <title>${esc(o.title)}</title>
 <meta name="description" content="${attr(o.description)}">
 <link rel="canonical" href="${attr(canonical)}">
+${c.settings?.verification?.google ? `<meta name="google-site-verification" content="${attr(c.settings.verification.google)}">` : ''}${c.settings?.verification?.bing ? `\n<meta name="msvalidate.01" content="${attr(c.settings.verification.bing)}">` : ''}
 <link rel="icon" href="${attr(x.icon || '/favicon.svg')}"${x.icon ? '' : ' type="image/svg+xml"'}>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${attr(i.business_name)}">

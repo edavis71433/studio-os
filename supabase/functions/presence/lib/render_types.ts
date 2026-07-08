@@ -46,6 +46,8 @@ export interface SnapshotContent {
     category_order?: string[];
     /** Phase T3: the business industry (lib/industry_vocab key) — templates read vocabFor(industry). */
     industry?: string;
+    /** Phase Z: search-engine ownership tokens (meta tags at render). */
+    verification?: { google?: string; bing?: string };
     logo?: MediaRef | null;
     og_image?: MediaRef | null;
     announcement?: { text: string; url?: string; expires_at?: string | null };

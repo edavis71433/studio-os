@@ -86,6 +86,13 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('no form endpoint → privacy honestly says nothing is collected', noForm['privacy/index.html'].includes('no forms and collects nothing'));
 }
 
+// ═══ 5c. Phase Z: search-engine verification — a field, not a technical task ═══
+{
+  const f = render('plumber', { verification: { google: 'GTOKEN123', bing: 'BTOKEN456' } });
+  ok('verification meta tags render on every page when set', f['index.html'].includes('name="google-site-verification" content="GTOKEN123"') && f['about/index.html'].includes('name="msvalidate.01" content="BTOKEN456"'));
+  ok('no tokens → no verification meta (clean default)', !render('plumber')['index.html'].includes('google-site-verification'));
+}
+
 // ═══ 6. determinism ═══
 {
   const a = render('plumber'), b = render('plumber');

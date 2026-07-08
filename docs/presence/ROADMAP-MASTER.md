@@ -109,6 +109,9 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 Whole-platform certification · Zero-Surprise Certification · every action has a clear outcome · unified experience review.
 - ⚠️ **Phase E (Product Integrity Verification) already produced an Integrity Certification** across editions/roles/workflows/integrations, with a Risk Register. **Trim O to its one genuinely-new delta:** a *"every action has a clear, understandable outcome"* pass — i.e., an empty-state + confirmation-copy + error-message review across the surfaces (a UX-writing audit), not a re-certification. Otherwise it re-does E.
 
+### Phase Z — Search, SEO, Local & AI Discoverability  ·  ✅ IMPLEMENTED
+*Anchored in Google's CURRENT AI-search guidance (fetched): no AI-specific files needed — the fundamentals we guarantee ARE the AI-search strategy (schema structurally matches visible text; zero-JS; cookieless). Shipped the one verified gap: **Search Console/Bing verification as a browser field** (was IMPOSSIBLE — mig 0054, both templates, kind paste-the-tag extraction). llms.txt demoted per Google's own guidance. FD-Z1 cookieless analytics · FD-Z2 NAP drift-watch · FD-Z3/Z4 queued. See [PHASE-Z-SEARCH-DISCOVERABILITY](PHASE-Z-SEARCH-DISCOVERABILITY.md).*
+
 ### Phase AA — Adobe Enterprise Capability Implementation  ·  ✅ IMPLEMENTED
 *Strict-filter pass over the AEM benchmark: Named Versions SHIPPED (FD-7 — mig 0053, label route, journal UI) + the customer-facing Availability Statement on help.html; service description done prior turn. Launches/diff/reuse/headless/translation stay V1.1 with reasoning — real architecture that would delay launch without changing what a V1 customer can do. See [PHASE-AA-ADOBE-CAPABILITIES](PHASE-AA-ADOBE-CAPABILITIES.md).*
 

@@ -87,6 +87,18 @@
 
 ### FD-7 · ✅ IMPLEMENTED (Phase AA) — named versions: label/rename any kept version from History (POST /publishes/:id/label, mig 0053, provenance-logged, journal shows the name first)
 
+### FD-Z1 · Cookieless visitor counts (server-side analytics → calm sentences)
+**What:** Netlify-analytics-class server-side counts surfaced in Business OS as sentences ("about 120 people visited this week") — answers the real owner question with ZERO privacy cost (no cookies/banner; preserves the Phase-Q differentiator). GA4/GTM/pixels stay rejected as defaults. **Value:** High · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-Z2 · NAP drift-watch (site facts vs Google Business Profile → a Moment)
+**What:** the connected GBP read + the site's own facts already exist; compare them in the evidence engine and raise a calm Moment when name/address/phone/hours drift (local-SEO's #1 silent killer). **Value:** High · **Effort:** Low-Medium (one evidence rule). **Disposition:** V1.1 (early).
+
+### FD-Z3 · llms.txt — watch, don't build
+**What:** community convention for AI crawlers; Google explicitly states AI-specific files are unnecessary (guidance fetched this session). Revisit if other engines formalize it. **Disposition:** V1.1-watch.
+
+### FD-Z4 · Apple Business Connect + Bing Places providers
+**What:** extend the connected-provider registry beyond GBP for the other local surfaces. **Disposition:** V1.1.
+
 ### FD-AEM1 · Public headless content delivery API
 **What:** the snapshot is already clean structured JSON (and /export proves it); expose a read-only, token-scoped content API so the same facts can power other frontends/channels (AEM Content-Fragments/GraphQL class). **Source:** AEM spec comparison. **Value:** Medium (new market surface) · **Effort:** Medium. **Disposition:** V1.1+.
 
@@ -108,7 +120,7 @@
 ### FD-R4 · Multi-language customer sites (AEM language copies, SMB edition)
 **What:** nothing exists beyond the SiteConfig locale seam (verified). Spanish-speaking small businesses are a major segment; the structured-content model translates cleanly (facts once, rendered per language). **Source:** AEM sweep. **Value:** High (market) · **Effort:** High. **Disposition:** V1.1+/Future — but a deliberate decision, not an accident.
 
-### FD-R5 · "Get found" starter ops (search-engine verification + submission)
+### FD-R5 · 🟢 CORE IMPLEMENTED (Phase Z) — search verification is now a browser field; remaining = guided sitemap-submission link (V1.1-lite)
 **What:** sitemap/robots ship, but nothing helps the owner verify with Google/Bing + submit the sitemap (a meta-tag field + guided step; pairs with FD-INF2). **Value:** Medium · **Effort:** Low. **Disposition:** V1.1.
 
 ### FD-P1 · Self-serve plan change (upgrade/downgrade route)

@@ -424,6 +424,8 @@ h5.rune .whisper.ok{color:var(--sage)}
         </select><div class="hint">Sets the right words (“Services” vs “Menu”) and the right behind-the-scenes search markup. Applies when you next publish.</div></div>
         <div class="field"><label for="f-seo_title">Search headline (SEO title)</label><input type="text" id="f-seo_title" data-sing="identity" data-field="seo_title" maxlength="60"><div class="hint">What Google shows as your page title. Empty = your business name.</div></div>
         <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="160"><div class="hint">The line under the headline in search results. Empty = your description.</div></div>
+        <div class="field"><label for="f-gsv">Google Search Console code</label><input type="text" id="f-gsv" maxlength="100" placeholder='paste the content="…" value'><div class="hint">Search Console → Settings → Ownership verification → HTML tag. Paste just the code, publish, then click Verify at Google — unlocks indexing reports and sitemap submission.</div></div>
+        <div class="field"><label for="f-bsv">Bing Webmaster code</label><input type="text" id="f-bsv" maxlength="100" placeholder="optional"><div class="hint">Same idea for Bing (also powers Copilot search).</div></div>
         <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
         <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
 
@@ -2308,6 +2310,8 @@ function fillSingles() {
   [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
     .forEach(([id, k]) => { $(id).value = i[k] || ""; });
   if ($("f-industry")) $("f-industry").value = (S.settings && S.settings.industry_key) || "generic";
+  if ($("f-gsv")) $("f-gsv").value = (S.settings && S.settings.google_site_verification) || "";
+  if ($("f-bsv")) $("f-bsv").value = (S.settings && S.settings.bing_site_verification) || "";
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
@@ -2326,6 +2330,21 @@ async function refreshAll() {
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
 }
+// ── Phase Z: search-engine verification codes — a field, not a technical task ──
+[["f-gsv", "google_site_verification"], ["f-bsv", "bing_site_verification"]].forEach(([id, key]) => {
+  $(id).addEventListener("change", async () => {
+    // accept a pasted full meta tag too — extract the content value kindly
+    let v = $(id).value.trim();
+    const m = v.match(/content=["']([^"']+)["']/); if (m) { v = m[1]; $(id).value = v; }
+    try {
+      const body = {}; body[key] = v;
+      const r = await api("PUT", "/settings", body);
+      S.settings = r.data || { ...(S.settings || {}), ...body };
+      toast(v ? "Saved — publish, then verify at the search engine" : "Cleared");
+      scheduleChangesRefresh();
+    } catch (err) { toast(err.message, true); }
+  });
+});
 // ── Phase O: industry selector — drives the template's vocabulary + schema ──
 $("f-industry").addEventListener("change", async () => {
   const sel = $("f-industry");
