@@ -1689,6 +1689,29 @@ function renderMediaGrid(grid, manage, onPick) {
     cell.appendChild(alt);
     if (onPick) cell.addEventListener("click", () => onPick(m.id));
     if (manage) {
+      // Phase V (FD-N2/N3): one-tap logo + share-image assignment — no code, publish applies it
+      const row = el("div"); row.style.cssText = "display:flex;gap:6px;margin-top:6px;flex-wrap:wrap";
+      const mkAssign = (field, onLabel, offLabel) => {
+        const on = S.settings && S.settings[field] === m.id;
+        const b = el("button", null, on ? onLabel + " ✓" : offLabel);
+        b.type = "button";
+        b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--accent, #8c3b2e)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--accent, #8c3b2e)" : "transparent") + ";color:" + (on ? "#fff" : "inherit") + ";cursor:pointer";
+        b.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            const body = {}; body[field] = on ? null : m.id;
+            const r = await api("PUT", "/settings", body);
+            S.settings = r.data || { ...(S.settings || {}), ...body };
+            renderMediaGrid(grid, true);
+            toast(on ? offLabel + " cleared" : onLabel + " set — publish to apply");
+            scheduleChangesRefresh();
+          } catch (err) { toast(err.message, true); }
+        });
+        return b;
+      };
+      row.appendChild(mkAssign("logo_media_id", "Logo", "Set as logo"));
+      row.appendChild(mkAssign("og_media_id", "Share image", "Use when shared"));
+      cell.appendChild(row);
       const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
       del.addEventListener("click", async () => {
         if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
@@ -2225,6 +2248,36 @@ async function refreshAll() {
   S.media = med.data || []; S.settings = set.data || {};
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
+  mountAnnouncementCard();
+}
+// ── Phase V (FD-N4): the announcement bar — a simple site-wide notice, no code ──
+function mountAnnouncementCard() {
+  const host = $("view-business"); if (!host || $("annCard")) return;
+  const card = el("div", "field"); card.id = "annCard"; card.style.marginTop = "18px";
+  card.innerHTML = `<label for="ann-text">Announcement bar</label>
+    <input type="text" id="ann-text" maxlength="140" placeholder="e.g. Closed July 4th — back Monday!">
+    <div class="hint">One short notice at the top of every page of your website. Leave empty for none.</div>
+    <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <input type="url" id="ann-url" placeholder="Link (optional)" style="flex:1;min-width:160px">
+      <label for="ann-until" style="margin:0;font-size:12px">Until</label>
+      <input type="date" id="ann-until">
+      <button class="btn" id="ann-save" type="button">Save notice</button>
+    </div>
+    <div class="hint">It appears when you next publish, and drops off publishes after the date you choose.</div>`;
+  host.appendChild(card);
+  $("ann-text").value = S.settings.announcement_text || "";
+  $("ann-url").value = S.settings.announcement_url || "";
+  $("ann-until").value = (S.settings.announcement_expires_at || "").slice(0, 10);
+  $("ann-save").addEventListener("click", async () => {
+    const until = $("ann-until").value;
+    const body = {
+      announcement_text: $("ann-text").value.trim(),
+      announcement_url: $("ann-url").value.trim(),
+      announcement_expires_at: until ? until + "T23:59:59Z" : null,
+    };
+    try { const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, ...body }; toast(body.announcement_text ? "Notice saved — publish to show it" : "Notice cleared"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
 }
 // ── L2: the commercial capacity notice — one calm card, never a number ──
 async function renderPlanNotice() {

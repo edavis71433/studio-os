@@ -119,6 +119,10 @@ article.post ul,article.post ol{margin:0 0 1em 1.4em}
 article.post blockquote{border-left:3px solid var(--accent);padding-left:16px;color:var(--soft);margin:0 0 1em}
 .post-meta{color:var(--soft);font-size:.9rem}
 .post-list article{padding:22px 0;border-bottom:1px solid var(--line)}
+.annbar{background:var(--accent);color:#fff;text-align:center;padding:9px 16px;font-size:.95rem}
+.annbar a{color:#fff;text-decoration:underline}
+.brandlogo{height:34px;width:auto;vertical-align:middle;margin-right:10px;border-radius:6px}
+.hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
 footer.site{background:var(--ink);color:#e9e0d2;padding:44px 0 30px;margin-top:56px}
 footer.site a{color:#f2d9b8}
 footer.site .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:28px}
@@ -220,8 +224,9 @@ const ldSite = (c: SnapshotContent, site: SiteConfig) => ({ '@context': 'https:/
 
 interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; active: string; body: string }
 
-function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpts): string {
+function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpts, x: { announce?: string; icon?: string } = {}): string {
   const i = c.identity;
+  const logo = c.settings?.logo || null;   // Phase V FD-N2: logo in the brand slot
   const nav: Array<[string, string, string]> = [
     ['/', 'Home', 'home'], ['/menu/', 'Menu', 'menu'], ['/about/', 'About', 'about'],
     ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
@@ -245,7 +250,7 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
 <title>${esc(o.title)}</title>
 <meta name="description" content="${attr(o.description)}">
 <link rel="canonical" href="${attr(canonical)}">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="${attr(x.icon || '/favicon.svg')}"${x.icon ? '' : ' type="image/svg+xml"'}>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${attr(i.business_name)}">
 <meta property="og:title" content="${attr(o.title)}">
@@ -261,9 +266,10 @@ ${o.ld.map((x) => `<script type="application/ld+json">${JSON.stringify(x).replac
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
+${x.announce || ''}
 ${closedNotice}
 <header class="site"><div class="wrap nav">
-  <a class="brand" href="/">${esc(i.business_name)}</a>
+  <a class="brand" href="/">${logo?.variants?.w400 ? `<img src="${attr(logo.variants.w400)}" alt="" class="brandlogo">` : ''}${esc(i.business_name)}</a>
   <nav class="primary" aria-label="Main"><ul>${nav.map(([p, label, key]) =>
     `<li><a href="${attr(p)}"${o.active === key ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')}</ul></nav>
 </div></header>
@@ -354,6 +360,9 @@ function contactBody(c: SnapshotContent, site: SiteConfig): string {
   const form = site.formEndpoint
     ? `<form method="post" action="${attr(site.formEndpoint)}" class="card" style="margin-top:24px">
 <h2>Send us a message</h2>
+<input type="hidden" name="form_kind" value="contact">
+<input type="hidden" name="source_page" value="/contact/">
+<p class="hp" aria-hidden="true"><label for="f-hp">Leave this field empty</label><input id="f-hp" name="_hp" tabindex="-1" autocomplete="off"></p>
 <p><label for="f-name">Your name</label><br><input id="f-name" name="name" required maxlength="120" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px"></p>
 <p><label for="f-email">Email or phone</label><br><input id="f-email" name="contact" required maxlength="254" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px"></p>
 <p><label for="f-msg">Message</label><br><textarea id="f-msg" name="message" required maxlength="2000" rows="5" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px"></textarea></p>
@@ -403,10 +412,23 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
 
   const siteTitle = i.seo_title || i.business_name;
   const siteDesc = i.seo_description || i.description;
-  const ogImg = (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600) || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600);
+  // Phase V FD-N3: the owner's chosen share image wins; then offerings/posts; then the logo
+  const ogImg = c.settings?.og_image?.variants?.w1600
+    || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
+    || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600)
+    || c.settings?.logo?.variants?.w1600;
+
+  // Phase V FD-N4: announcement bar — deterministic expiry against snapshot time
+  const ann = c.settings?.announcement;
+  const annLive = ann && ann.text && (!ann.expires_at || String(ann.expires_at) > snapshot.created_at);
+  const announce = annLive
+    ? `<div class="annbar" role="status">${ann!.url ? `<a href="${attr(ann!.url)}">${esc(ann!.text)}</a>` : esc(ann!.text)}</div>` : '';
+  // Phase V FD-N2: the logo becomes the favicon when present
+  const icon = c.settings?.logo?.variants?.w400 || '';
+  const extras = { announce, icon };
 
   const page = (path: string, opts: Omit<Parameters<typeof shell>[3], 'path'>) => {
-    const html = shell(c, site, cssPath, { path, ...opts });
+    const html = shell(c, site, cssPath, { path, ...opts }, extras);
     const file = path === '/' ? 'index.html' : `${path.replace(/^\/|\/$/g, '')}/index.html`;
     files[file] = html;
   };
@@ -425,11 +447,18 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
     });
   }
 
+  // Phase V FD-N1: the form's landing page — calm confirmation, noindex, not in nav/sitemap
+  page('/thanks/', {
+    title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact',
+    body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>`,
+  });
+  files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
+
   // 404 (styled, navigable)
   files['404.html'] = shell(c, site, cssPath, {
     path: '/404.html', title: `Page not found — ${i.business_name}`, description: siteDesc, ld: [], active: '',
     body: `<section class="hero wrap"><h1>That page isn’t here</h1><p class="tagline">The page you’re after may have moved.</p><div class="cta-row"><a class="btn" href="/">Back to ${esc(i.business_name)}</a><a class="btn ghost" href="/menu/">See the menu</a></div></section>`,
-  });
+  }, extras);
 
   // favicon: deterministic SVG from the first letter
   const letter = (i.business_name || 'P').trim()[0]?.toUpperCase() || 'P';

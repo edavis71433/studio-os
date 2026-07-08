@@ -38,6 +38,23 @@ const clip = (s: unknown, n: number): string => {
   return o.trim().slice(0, n);
 };
 
+/** Phase V FD-N1: map a plain HTML form post (urlencoded/multipart) to the JSON
+ *  submission shape. The published template posts `name`/`contact`/`message` —
+ *  `contact` becomes email when it looks like one, else phone. Pure. */
+export function formParamsToSubmission(get: (k: string) => string | null): any {
+  const contact = String(get('contact') ?? '').trim();
+  const looksEmail = EMAIL_RE.test(contact);
+  return {
+    form_kind: get('form_kind') ?? 'contact',
+    name: get('name') ?? '',
+    email: looksEmail ? contact : (get('email') ?? ''),
+    phone: !looksEmail && contact ? contact : (get('phone') ?? ''),
+    message: get('message') ?? '',
+    source_page: get('source_page') ?? '',
+    _hp: get('_hp') ?? '',
+  };
+}
+
 /** Validate + sanitize a public form submission. Honeypot (`_hp`) marks spam
  *  without rejecting (so bots think they succeeded). Caps every field. */
 export function validateSubmission(body: any): { ok: true; sub: CleanSubmission; spam: boolean } | { ok: false; error: string } {

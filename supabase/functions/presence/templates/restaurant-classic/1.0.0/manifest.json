@@ -25,6 +25,10 @@
       "kind": "contact"
     },
     {
+      "path": "/thanks/",
+      "kind": "thanks"
+    },
+    {
       "path": "/updates/",
       "kind": "post_index"
     },

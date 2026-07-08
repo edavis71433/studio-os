@@ -87,9 +87,10 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 - **Arbitrary pages / landing pages** — the render emits a fixed set (home/menu/about/contact + blog). No custom pages or campaign landing pages. Webflow/Wix allow any page. V1.1.
 - **Real booking with availability (FD-F3)** — the `booking` form kind captures a request; there's no calendar/availability. V1.1.
 
-### Phase V — No-Code Essentials  ·  ➕ ADDED (from the No-Code Gap Audit)
+### Phase V — No-Code Essentials  ·  ✅ IMPLEMENTED (V1 items; V1.1 tier queued)
 *Button-level gaps a normal owner hits in their first hour — machinery mostly exists; the control surface does not. See [NO-CODE-GAP-AUDIT](NO-CODE-GAP-AUDIT.md).*
-- 🔴 **FD-N1 · V1 BLOCKER — fix the published contact form** (template posts form-encoded name/contact; the capture endpoint parses JSON email/phone → real submissions 400; no honeypot in markup; no thank-you page). Small fix, launch-gating — tracked as **GM-2** on the LAUNCH-BOARD.
+- ✅ **FD-N1 (GM-2) CLOSED** + ✅ FD-N2 logo (header/favicon/OG) + ✅ FD-N3 share-image picker + ✅ FD-N4 announcement bar (with deterministic expiry) + ✅ FD-N5 (device preview — already existed). Migration 0051 + template + endpoint + presence.html controls; deployed staging+prod; room 38/38 + pipeline 30/30 live. See [PHASE-V-NO-CODE-ESSENTIALS](PHASE-V-NO-CODE-ESSENTIALS.md).
+- ~~🔴 FD-N1 (was): fix the published contact form~~ (template posts form-encoded name/contact; the capture endpoint parses JSON email/phone → real submissions 400; no honeypot in markup; no thank-you page). Small fix, launch-gating — tracked as **GM-2** on the LAUNCH-BOARD.
 - **V1 (small, high-dignity):** FD-N2 **logo upload** → header + real favicon + OG fallback (no logo field exists today) · FD-N3 **OG/social-share image picker** · FD-N4 **announcement bar** realized (pairs with the built scheduled expiry) · FD-N5 **device preview toggle** (trivial).
 - **V1.1:** FD-N6 form field/success/auto-reply config (endpoint already accepts fields{}) · FD-N7 redirects manager UI · FD-N8 per-page SEO overrides + noindex · FD-N9 GBP review embed (Connected already reads the data). Adapted-not-copied: per-device visibility as a structured flag; density presets instead of spacing sliders; contrast-validated palettes inside FD-T6. Rejected: freeform layout, popups, auto-publish.
 

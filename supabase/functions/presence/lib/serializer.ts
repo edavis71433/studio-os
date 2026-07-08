@@ -91,7 +91,15 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       hours: loc.hours || [], holiday_exceptions: loc.holiday_exceptions || [],
       temporarily_closed: !!loc.temporarily_closed, temporarily_closed_note: loc.temporarily_closed_note || '',
     })),
-    settings: { category_order: Array.isArray(settings.category_order) ? settings.category_order : [] },
+    settings: {
+      category_order: Array.isArray(settings.category_order) ? settings.category_order : [],
+      // Phase V no-code essentials — through ref() so variants land in the media manifest
+      logo: ref(settings.logo_media_id),
+      og_image: ref(settings.og_media_id),
+      ...(String(settings.announcement_text || '').trim()
+        ? { announcement: { text: String(settings.announcement_text).trim(), url: String(settings.announcement_url || '').trim() || undefined, expires_at: settings.announcement_expires_at || null } }
+        : {}),
+    },
     offerings: offerings.map((o: any) => ({ id: o.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media: ref(o.media_id), sort_order: o.sort_order })),
     testimonials: testimonials.map((t: any) => ({ id: t.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || undefined, sort_order: t.sort_order })),
     faqs: faqs.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer, sort_order: f.sort_order })),

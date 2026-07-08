@@ -38,8 +38,16 @@ export interface SnapshotContent {
   /** M7 (reconciliation §9): locations is a LIST — v1 carries exactly one.
    *  Multi-location becomes an additive change, not a contract major. */
   locations: LocationContent[];
-  /** M7: presentation settings — offering section (category) display order. */
-  settings?: { category_order?: string[] };
+  /** M7: presentation settings — offering section (category) display order.
+   *  Phase V (additive, all optional): logo (header/favicon/OG fallback), the
+   *  chosen share image, and the announcement bar. Old snapshots lack them and
+   *  render exactly as before. */
+  settings?: {
+    category_order?: string[];
+    logo?: MediaRef | null;
+    og_image?: MediaRef | null;
+    announcement?: { text: string; url?: string; expires_at?: string | null };
+  };
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
   faqs: Array<{ id: string; question: string; answer: string; sort_order?: number }>;

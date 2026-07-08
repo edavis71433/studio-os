@@ -12,7 +12,7 @@ import { sendEmail } from '../commerce/account.ts';
 import { decideWritePlan } from '../connected/writestore.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import {
-  validateScheduleTime, isScheduleKind, validateSubmission,
+  validateScheduleTime, isScheduleKind, validateSubmission, formParamsToSubmission,
   signApprovalToken, verifyApprovalToken, type ApprovalTokenPayload,
 } from '../lib/commercial.ts';
 
@@ -78,20 +78,42 @@ export async function handleScheduleCancel(site: SiteRow, id: string, principal:
 export async function handleFormSubmit(req: Request, siteId: string, cors: Record<string, string>) {
   const ok200 = (msg: string) => json({ data: { ok: true, message: msg } }, 200, cors); // always 200 to bots
   if (!/^[0-9a-f-]{36}$/.test(siteId)) return json({ error: 'not_found' }, 404, cors);
-  let b: any = {}; try { b = await req.json(); } catch { /* */ }
-  const v = validateSubmission(b);
-  if (!v.ok) return json({ error: v.error, message: v.error === 'bad_email' ? 'That email doesn’t look right.' : v.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : 'Add a short message.' }, 400, cors);
 
-  const site = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id&limit=1`);
+  // Phase V FD-N1: the published template posts a plain HTML form (urlencoded).
+  // Accept both encodings; browser form posts get a 303 redirect to the site's
+  // rendered thank-you page (works with no JS) instead of raw JSON.
+  const ctype = (req.headers.get('content-type') || '').toLowerCase();
+  const isFormPost = ctype.includes('application/x-www-form-urlencoded') || ctype.includes('multipart/form-data');
+  let b: any = {};
+  if (isFormPost) {
+    try { const fd = await req.formData(); b = formParamsToSubmission((k) => { const x = fd.get(k); return typeof x === 'string' ? x : null; }); } catch { /* */ }
+  } else {
+    try { b = await req.json(); } catch { /* */ }
+  }
+
+  const site = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id&limit=1`);
   if (!site.json?.[0]) return json({ error: 'not_found' }, 404, cors);
+  const siteRow = site.json[0];
+  const siteOrigin = siteRow.custom_domain ? `https://${siteRow.custom_domain}` : (siteRow.netlify_site_id ? `https://${siteRow.netlify_site_id}.netlify.app` : '');
+  const redirectTo = (path: string) => new Response(null, { status: 303, headers: { ...cors, Location: `${siteOrigin}${path}` } });
+
+  const v = validateSubmission(b);
+  if (!v.ok) {
+    if (isFormPost && siteOrigin) return redirectTo('/contact/');   // calm retry; browser `required` makes this rare
+    return json({ error: v.error, message: v.error === 'bad_email' ? 'That email doesn’t look right.' : v.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : 'Add a short message.' }, 400, cors);
+  }
   const ipHash = await hashIp(req);
 
   const ins = await svc('presence_form_submissions', {
     method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ site_id: siteId, form_kind: v.sub.form_kind, name: v.sub.name, email: v.sub.email, phone: v.sub.phone, message: v.sub.message, fields: v.sub.fields, source_page: v.sub.source_page, spam: v.spam, ip_hash: ipHash }),
   });
-  if (!ins.ok) return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
+  if (!ins.ok) {
+    if (isFormPost && siteOrigin) return redirectTo('/contact/');
+    return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
+  }
   if (!v.spam) { notifyOwnerOfLead(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
+  if (isFormPost && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
   return ok200('Thanks — your message was sent.');
 }
 
