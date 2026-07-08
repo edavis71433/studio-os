@@ -207,3 +207,6 @@ Walked the signed-in workflows for removable clicks. Closed the one real gap: th
 
 ### Phase OS — Operating System Integration & Cohesion ✅ (implemented)
 Audited every signed-in surface/transition as ONE OS. Cohesion already high (one shell/nav/session/palette/bell/approval-spine). Closed the one real seam: Today now mirrors the Phase-FLOW bell — notices + pending approvals render as the top actionable cards on today.html, each deep-linking to where it resolves; #foundations deep-link added (FD-OS1). Frontend-only. Open (V1.1, recommended): FD-OS2 client-portal home mirrors the same treatment.
+
+### Phase SKU — Standalone Product Experience & Packaging ✅ (implemented)
+Audited CMS / Business-OS / Studio-OS editions as standalone products. Model is strong (editions as data, nav derived, upgrades only add). Closed the one real leak: the CMS workspace showed Business-OS brains (Moments/Connections/Visual Studio/Growth-Coach) — presence.html now gates by edition_features; website drafting AI stays; no-op for studio_os (FD-SKU1). Open (V1.1, recommended): FD-SKU2 per-edition onboarding copy, FD-SKU3 CRM Today empty-state edition-awareness, FD-SKU4 felt upgrade moment.

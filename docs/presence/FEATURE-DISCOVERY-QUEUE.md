@@ -369,3 +369,16 @@ today.html now consumes /portal/feed and renders notices + pending approvals as 
 
 ### FD-OS2 · 🔵 RECOMMENDED (V1.1) — client-portal home mirrors the same treatment
 Render the client's pending approvals in client.html as the same actionable "needs you" cards (same role-filtered /portal/feed), so the client experience is as cohesive as the owner's Today. Direct mirror of FD-OS1, no new system.
+
+## Phase SKU — standalone product packaging
+### FD-SKU1 · ✅ IMPLEMENTED (Phase SKU) — CMS workspace no longer leaks Business-OS surfaces
+presence.html reads edition_features from /portal/context and gates the four Business-OS leaks in the CMS home (Business Moments render, Connections link, Visual Studio link, Studio-Desk "Plan"/Growth-Coach). Website drafting/review/polish AI stays (cms_only allowsDrafting:true). Defaults to all-features-on when no entitlement recorded → studio_os unchanged. Frontend-only; regression green.
+
+### FD-SKU2 · 🔵 RECOMMENDED (V1.1) — per-edition onboarding + empty states
+CMS-only first-run/empty states that speak purely in website terms (pages/publishing/domains), so guidance never surfaces a Business-OS word. Runtime leak already closed; this is the copy layer.
+
+### FD-SKU3 · 🔵 RECOMMENDED (V1.1) — CRM Today empty-state edition-awareness
+today.html "All clear" card links to website/leads; drop those for a website-less business_os_only account, point at relationship/connections instead. Small edition-aware tweak (Today already fetches context).
+
+### FD-SKU4 · 🔵 RECOMMENDED (V1.1) — the felt "upgrade moment"
+On first landing after an upgrade, a one-time calm card naming exactly what became available (from featureDelta) — makes an already-additive upgrade feel additive at the moment it happens.

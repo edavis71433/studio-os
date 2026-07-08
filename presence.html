@@ -393,8 +393,8 @@ h5.rune .whisper.ok{color:var(--sage)}
           <div class="journal" id="recentList"></div>
         </div>
         <div class="presence-links" style="margin-top:30px;padding-top:18px;border-top:1px solid var(--hair-2);display:flex;gap:20px;flex-wrap:wrap;font-size:13.5px">
-          <a href="connections.html" style="color:var(--plum);font-weight:600;text-decoration:none">Connections →</a>
-          <a href="visual-studio.html" style="color:var(--plum);font-weight:600;text-decoration:none">Visual Studio →</a>
+          <a id="lnkConnections" href="connections.html" style="color:var(--plum);font-weight:600;text-decoration:none">Connections →</a>
+          <a id="lnkVisual" href="visual-studio.html" style="color:var(--plum);font-weight:600;text-decoration:none">Visual Studio →</a>
           <a href="sharing.html" style="color:var(--plum);font-weight:600;text-decoration:none">Sharing &amp; access →</a>
           <a href="client.html" style="color:var(--plum);font-weight:600;text-decoration:none">Preview client view →</a>
         </div>
@@ -1331,11 +1331,13 @@ function openStudioDesk() {
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
   $("deskGo").hidden = true;
   const wrap = $("deskResults"); wrap.innerHTML = "";
-  [
+  const opts = [
     ["Review", "A read-through of your writing and your brand — one honest report. Nothing changes.", openCombinedReviewDesk],
-    ["Plan", "What’s coming up — holidays, seasons, small openings worth preparing for.", openCoachDesk],
-    ["Polish", "One pass over all your written words, improved in place — you approve every change.", () => { closeSheet("deskScrim"); openEditDesk("site_polish", "business", null, "readability"); }],
-  ].forEach(([name, sub, go]) => {
+  ];
+  // "Plan" is the Growth Coach — a Business-OS surface; a standalone CMS omits it.
+  if (hasFeature("business_moments")) opts.push(["Plan", "What’s coming up — holidays, seasons, small openings worth preparing for.", openCoachDesk]);
+  opts.push(["Polish", "One pass over all your written words, improved in place — you approve every change.", () => { closeSheet("deskScrim"); openEditDesk("site_polish", "business", null, "readability"); }]);
+  opts.forEach(([name, sub, go]) => {
     const card = el("div", "deskopt");
     card.appendChild(el("div", "dol", name));
     const p = el("p", "aihint", sub); p.style.marginTop = "6px";
@@ -1864,16 +1866,26 @@ function openPicker(onPick) {
 }
 $("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if (pickerCb) pickerCb(null); });
 
+/* ── Phase SKU: feature-edition gate. null features = all on (studio_os default,
+   preserves today's behavior). A standalone CMS lacks the Business-OS brains
+   (business_moments/connected/ai) even while it keeps full website drafting. ── */
+function hasFeature(f) { return !S.features || S.features.indexOf(f) >= 0; }
+function applyEditionGating() {
+  const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
+  const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("ai");               // Visual Studio = AI brains
+}
+
 /* ── today: statement, prose facts, letters, journal ── */
 async function loadToday() {
   try {
+    const showMoments = hasFeature("business_moments");   // CMS-Only has no Moments surface
     const [h, c, n, mo] = await Promise.all([
       api("GET", "/health"), api("GET", "/changes"), api("GET", "/notes"),
-      api("GET", "/moments").catch(() => ({ data: [] })),
+      showMoments ? api("GET", "/moments").catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
     ]);
     S.health = h.data; S.changes = c.data; S.moments = mo.data || [];
     renderStatement(); renderFactsProse();
-    if (S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
+    if (showMoments && S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
     renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
   } catch (err) { toast(err.message, true); }
 }
@@ -2407,14 +2419,20 @@ function fillSingles() {
   renderHours();
 }
 async function refreshAll() {
-  const [siteR, off, faq, tes, pos, med, set] = await Promise.all([
+  const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
     api("GET", "/site"),
     api("GET", "/offerings"), api("GET", "/faqs"), api("GET", "/testimonials"), api("GET", "/posts"),
     api("GET", "/media"), api("GET", "/settings"),
+    api("GET", "/portal/context").catch(() => null),
   ]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
+  // Phase SKU: the FEATURE edition — so the standalone CMS workspace shows only
+  // website + drafting surfaces, never the Business-OS "brains" it doesn't include.
+  // null = no entitlement recorded → all features (studio_os default, unchanged).
+  S.features = (ctxR && ctxR.data && ctxR.data.edition_features) || null;
+  applyEditionGating();
   applyVocab();
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
