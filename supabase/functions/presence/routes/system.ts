@@ -11,26 +11,91 @@ import { runOperationsCycle, retryFailedRuns, runDuePublishes } from '../ops/sch
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
-// Required vs optional secrets — the platform runs degraded but honest without
-// the optional ones (AI off, billing off), and cannot run at all without required.
-const REQUIRED = ['SUPABASE_URL', 'SERVICE_ROLE_KEY', 'SCHEDULER_SECRET'];
-const OPTIONAL = ['SUPABASE_ANON_KEY', 'ANTHROPIC_KEY', 'STRIPE_SECRET', 'BILLING_SYNC_SECRET', 'NETLIFY_AUTH_TOKEN', 'RESEND_KEY'];
-
+// ── Phase J: the production activation dashboard ─────────────────────────────
+// Every production secret the `presence` function reads, grouped by the
+// capability it activates, with what each one enables and whether it's required
+// for the platform to boot or optional (the feature degrades gracefully without
+// it). `/system/health` reports this so the owner sees exactly what's live and
+// what a missing secret disables — the activation source of truth.
 function envPresent(name: string): boolean {
-  // tolerate the two service-role aliases used across the codebase
   if (name === 'SERVICE_ROLE_KEY') return !!(Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
   if (name === 'SUPABASE_URL') return !!(Deno.env.get('SUPABASE_URL') || Deno.env.get('SB_URL'));
+  if (name === 'SUPABASE_ANON_KEY') return !!(Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY'));
   return !!Deno.env.get(name);
 }
 
+interface SecretDef { name: string; required: boolean; enables: string }
+const SECRET_GROUPS: Record<string, SecretDef[]> = {
+  core: [
+    { name: 'SUPABASE_URL', required: true, enables: 'database + storage (platform cannot run without it)' },
+    { name: 'SERVICE_ROLE_KEY', required: true, enables: 'system-table reads/writes (platform cannot run without it)' },
+    { name: 'SUPABASE_ANON_KEY', required: true, enables: 'caller-JWT RLS reads (platform cannot run without it)' },
+    { name: 'SCHEDULER_SECRET', required: true, enables: 'the cron/operations surface (/system/run) + billing-sync auth' },
+  ],
+  commerce: [
+    { name: 'STRIPE_SECRET', required: false, enables: 'checkout + subscriptions (without it: signup creates the account but checkout returns "billing unavailable")' },
+    { name: 'STRIPE_WEBHOOK_SECRET', required: false, enables: 'verifying Stripe webhooks (provisioning on payment)' },
+    { name: 'BILLING_SYNC_SECRET', required: false, enables: 'the authed billing-sync path' },
+  ],
+  email: [
+    { name: 'RESEND_KEY', required: false, enables: 'ALL email — lead notifications, one-tap approvals, digests, receipts (without it: email silently no-ops, logged)' },
+    { name: 'EMAIL_FROM', required: false, enables: 'the From address (defaults to a studio address)' },
+    { name: 'OPS_ALERT_EMAIL', required: false, enables: 'operational failure alerts (defaults to a studio address)' },
+  ],
+  hosting: [
+    { name: 'NETLIFY_AUTH_TOKEN', required: false, enables: 'publishing customer sites (without it: publish fails with a clear config error — nothing goes live)' },
+  ],
+  approvals: [
+    { name: 'APPROVAL_SECRET', required: false, enables: 'one-tap client approval links (falls back to SCHEDULER_SECRET; without either: /approve/send returns 503)' },
+  ],
+  ai: [
+    { name: 'ANTHROPIC_KEY', required: false, enables: 'AI drafting / concierge / coach (without it: honest "AI unavailable", never filler)' },
+    { name: 'VISUAL_MODEL_KEY', required: false, enables: 'AI Visual Studio image generation (gated off without it)' },
+  ],
+  connected: [
+    { name: 'GOOGLE_CLIENT_ID', required: false, enables: 'Google OAuth (Connected Platform)' },
+    { name: 'GOOGLE_CLIENT_SECRET', required: false, enables: 'Google OAuth token exchange' },
+    { name: 'STATE_SIGNING_SECRET', required: false, enables: 'signed OAuth state (CSRF-safe connect flow)' },
+    { name: 'CONNECTION_ENC_KEY', required: false, enables: 'encrypting connected tokens at rest (FAIL-CLOSED: without it, token storage is refused, not faked)' },
+  ],
+  site: [
+    { name: 'SITE_URL', required: false, enables: 'absolute links in emails (defaults to the production host)' },
+  ],
+};
+
+/** The activation dashboard: presence of every secret, grouped, + the derived
+ *  "which capabilities are live right now" map. Pure over the environment. */
 export function validateSecrets() {
-  const missingRequired = REQUIRED.filter((n) => !envPresent(n));
-  const missingOptional = OPTIONAL.filter((n) => !envPresent(n));
+  const groups: Record<string, Array<SecretDef & { present: boolean }>> = {};
+  const missingRequired: string[] = [];
+  const missingOptional: string[] = [];
+  for (const [group, defs] of Object.entries(SECRET_GROUPS)) {
+    groups[group] = defs.map((d) => {
+      const present = envPresent(d.name);
+      if (!present) (d.required ? missingRequired : missingOptional).push(d.name);
+      return { ...d, present };
+    });
+  }
+  const has = (n: string) => envPresent(n);
+  const capabilities = {
+    platform_boots: has('SUPABASE_URL') && has('SERVICE_ROLE_KEY') && has('SUPABASE_ANON_KEY'),
+    purchase_and_billing: has('STRIPE_SECRET'),
+    stripe_webhooks: has('STRIPE_WEBHOOK_SECRET'),
+    email: has('RESEND_KEY'),
+    publishing: has('NETLIFY_AUTH_TOKEN'),
+    scheduled_publishing: has('SCHEDULER_SECRET'), // + an external cron actually calling /system/run
+    one_tap_approvals: has('APPROVAL_SECRET') || has('SCHEDULER_SECRET'),
+    ai: has('ANTHROPIC_KEY'),
+    visual_studio: has('VISUAL_MODEL_KEY'),
+    connected_platform: has('GOOGLE_CLIENT_ID') && has('GOOGLE_CLIENT_SECRET') && has('CONNECTION_ENC_KEY'),
+  };
   return {
-    ok: missingRequired.length === 0,
-    required_present: REQUIRED.filter(envPresent),
+    ok: missingRequired.length === 0,           // backward-compatible
+    required_present: Object.values(groups).flat().filter((s) => s.required && s.present).map((s) => s.name),
     missing_required: missingRequired,
     missing_optional: missingOptional,
+    groups,                                       // Phase J: full grouped inventory
+    capabilities,                                 // Phase J: what's live right now
   };
 }
 

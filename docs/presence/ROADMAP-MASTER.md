@@ -42,11 +42,11 @@ Foundation & Core Architecture · Security, Multi-tenancy & Permissions · CMS �
 
 ## Remaining Roadmap (reconciled)
 
-### Phase J — Owner Activation  ·  *do this first; it's a real gate*
+### Phase J — Owner Activation  ·  ⚙️ ENGINEERING SIDE DONE · owner credential steps remain
 Stripe production · OAuth providers · **Resend (email)** · **Cron on `/system/run`** · Secrets (**`APPROVAL_SECRET`**) · Monitoring + alerting · **PITR backups + a real restore drill** · Production activation.
-- ➕ **These are load-bearing, not config trivia:** without Resend the lead + one-tap-approval emails silently no-op; without cron, scheduled publishes never fire; without `APPROVAL_SECRET` one-tap returns 503. Each feature degrades gracefully, so this won't crash — it will just quietly not work. Put an owner name next to each.
-- ➕ **Secret rotation** (Netlify token, any secret shown in chat) before real tenants.
-- 🔍 **EXPAND:** define the restore drill concretely (clone from PITR → run suites → confirm `presence_*` rows intact → record the date).
+- ✅ **Engineering delivered:** every dependency degrades gracefully / fails-closed; `/system/health` is now a live **activation dashboard** (grouped secrets + a "what's live" capability map), locked by `activation_test` (10/10); the Owner Activation Guide + checklist ship. Deployed staging+prod.
+- 🔴 **Owner-action blockers (I cannot do these):** enter live Stripe/Resend/Netlify/`APPROVAL_SECRET`/Google-OAuth secrets · schedule cron to hit `/system/run` · confirm PITR + a restore drill · **the go-live push** (frontend unpushed). Verify each via `GET /system/health?secret=…` → `capabilities`.
+- See [OWNER-ACTIVATION-GUIDE](OWNER-ACTIVATION-GUIDE.md) + [PHASE-J-OWNER-ACTIVATION](PHASE-J-OWNER-ACTIVATION.md).
 
 ### Phase K — Gold Master QA  ·  *the biggest quality unknown right now*
 Human browser testing · Cross-browser · Mobile · Accessibility · Regression · Performance · Production readiness sign-off.

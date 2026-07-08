@@ -6,6 +6,12 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
+### FD-J1 · Operator activation badge (surface health.capabilities in the admin UI)
+**What:** show the `/system/health` capability map (purchase/email/publishing/… green-red) in the admin tool so the operator sees activation status without curling. **Source:** Phase J. **Value:** Medium · **Effort:** Low. **Disposition:** Queued (V1.1).
+
+### FD-J2 · Cold-start secret self-check log
+**What:** on function cold start, log which optional capabilities are off (activation-debugging aid). **Source:** Phase J. **Value:** Low · **Effort:** trivial. **Disposition:** Queued (V1.1).
+
 ### FD-D1 · Commercial rungs for CMS-Only & Business-OS-Only — ✅ IMPLEMENTED (Phase D1)
 **What:** `cms_only` + `business_os_only` added to `commerce/catalog.ts` PLANS (self-serve, founder-priced $24/mo, trialable), the `presence_entitlements.plan` CHECK widened (migration 0049), no Stripe-dashboard config needed (dynamic `price_data`). Both live on staging+prod — `/commerce/plans` lists 7. **Delivered in Phase D1.** See [PHASE-D1-COMMERCIAL-ACTIVATION](PHASE-D1-COMMERCIAL-ACTIVATION.md). **Disposition:** Done.
 
