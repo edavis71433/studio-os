@@ -35,6 +35,17 @@ ok('healthy paying customer → zero noise', lifecycleEventsFor(ent({ stripe_sub
   ok('business name lands in the email', lifecycleCopy('trial_ending', 'Bloom Salon').html.includes('Bloom Salon'));
 }
 
+// ═══ 3b. CP-3: wind-down + win-back + welcome-back ═══
+{
+  const old = (d) => new Date(Date.parse(NOW) - d * 86400_000).toISOString();
+  ok('lapsed 30+ days → win_back joins the events', lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(31) }), NOW).includes('win_back'));
+  ok('lapsed 45+ days → winddown_reminder joins', lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(46) }), NOW).includes('winddown_reminder'));
+  ok('freshly lapsed → neither (only the lapse notice)', (() => { const e = lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(2) }), NOW); return !e.includes('win_back') && !e.includes('winddown_reminder'); })());
+  ok('winddown copy: states day-60 + the download door', /day 60/.test(lifecycleCopy('winddown_reminder', 'X').html) && /download/i.test(lifecycleCopy('winddown_reminder', 'X').html));
+  ok('win-back copy: nothing deleted, no pressure', /nothing was deleted/i.test(lifecycleCopy('win_back', 'X').html));
+  ok('welcome-back copy exists and is warm', /welcome back/i.test(lifecycleCopy('welcome_back', 'X').subject));
+}
+
 // ═══ 4. dedupe period ═══
 ok('period bucket = YYYY-MM (matches the notices unique key)', periodOf(NOW) === '2026-07');
 

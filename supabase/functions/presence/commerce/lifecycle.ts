@@ -13,7 +13,7 @@
 import { svc } from '../lib/db.ts';
 import { sendEmail } from './account.ts';
 
-export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup';
+export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
 export interface EntitlementView {
   client_id: string;
@@ -44,7 +44,13 @@ export function lifecycleEventsFor(e: EntitlementView, nowIso: string): Lifecycl
   }
   if (shouldExpireTrial(e, nowIso)) out.push('trial_ended');
   if (e.status === 'paused') out.push('payment_trouble');
-  if (e.status === 'lapsed') out.push('account_lapsed');
+  if (e.status === 'lapsed') {
+    out.push('account_lapsed');
+    const lapsedAt = e.updated_at ? Date.parse(e.updated_at) : NaN;
+    const days = Number.isFinite(lapsedAt) ? (now - lapsedAt) / 86400_000 : 0;
+    if (days >= 30) out.push('win_back');            // once ever (period 'once')
+    if (days >= 45) out.push('winddown_reminder');   // day-45 export reminder
+  }
   return out;
 }
 
@@ -76,6 +82,24 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
       subject: 'Your website is live — one small step gets you Google’s reports',
       html: `<p>Your website for <strong>${name}</strong> is live and search engines can find it.</p><p>One optional step unlocks Google’s own reports about how people find you: add your free Search Console code in your workspace (Business → Search &amp; discovery). Two minutes, once — we handle everything else automatically.</p>`,
     };
+    case 'winddown_reminder': return {
+      headline: 'Two weeks left before your site comes down',
+      body: 'Your subscription ended a while ago, so your published website comes down soon — around day 60. Everything you own is still downloadable, and restarting brings it all back instantly.',
+      subject: 'Two weeks left — your website comes down soon',
+      html: `<p>The subscription for <strong>${name}</strong> ended about 45 days ago, so your published website comes down soon (around day 60).</p><p>Two doors stay open: <strong>download everything you own</strong> from your workspace any time, or <strong>restart your plan</strong> and everything returns exactly as you left it.</p>`,
+    };
+    case 'win_back': return {
+      headline: 'Your workspace is exactly where you left it',
+      body: 'It’s been about a month. Nothing was deleted — your site, words, and photos are all kept. Restart whenever you like and pick up mid-sentence.',
+      subject: 'Everything is where you left it',
+      html: `<p>It’s been about a month since your subscription for <strong>${name}</strong> ended.</p><p>No pressure — just a reminder that nothing was deleted. Your site, your words, and your photos are kept, and restarting brings it all back exactly as you left it.</p><p><a href="https://davisdigitalstudio.com/pricing.html">See plans</a></p>`,
+    };
+    case 'welcome_back': return {
+      headline: 'Welcome back — everything is just as you left it',
+      body: 'Your subscription is active again. Your site, content, and settings are exactly as they were. Pick up right where you stopped.',
+      subject: 'Welcome back to Studio OS',
+      html: `<p>Welcome back! The subscription for <strong>${name}</strong> is active again.</p><p>Everything is exactly as you left it — your site, your words, your design. Pick up right where you stopped.</p>`,
+    };
     case 'account_lapsed': return {
       headline: 'Your subscription has ended',
       body: `Your published website stays up for ${WIND_DOWN_DAYS} days from when the subscription ended, and your data is yours to download at any time — that door never closes. Restart whenever you like and everything is exactly where you left it.`,
@@ -90,7 +114,7 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
   const nowIso = new Date().toISOString();
   let expired = 0, notices = 0, emails = 0;
 
-  const ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=client_id,status,trial_ends_at,stripe_subscription_id&limit=${limit * 4}`);
+  const ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=client_id,status,trial_ends_at,stripe_subscription_id,updated_at&limit=${limit * 4}`);
   const rows: EntitlementView[] = Array.isArray(ents.json) ? ents.json : [];
 
   for (const e of rows.slice(0, limit * 4)) {
@@ -129,9 +153,10 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
     for (const kind of events) {
       const copy = lifecycleCopy(kind, bizName);
       // send-once: the unique(client,kind,period) key decides — a returned row = newly inserted
+      const dedupe = kind === 'win_back' ? 'once' : periodOf(nowIso);
       const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
         method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ site_id: siteId, client_id: e.client_id, kind, period: periodOf(nowIso), headline: copy.headline, body: copy.body, status: 'active' }),
+        body: JSON.stringify({ site_id: siteId, client_id: e.client_id, kind, period: dedupe, headline: copy.headline, body: copy.body, status: 'active' }),
       });
       const fresh = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
       if (fresh) {
@@ -141,4 +166,33 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
     }
   }
   return { expired_trials: expired, notices, emails };
+}
+
+// ── Phase CP-3 (CP-5): the weekly owner digest — the Monday routine, automated ──
+export async function runWeeklyDigest(): Promise<{ sent: boolean }> {
+  const to = Deno.env.get('OPS_ALERT_EMAIL') || '';
+  if (!to) return { sent: false };
+  const st = await svc('presence_ops_state?id=eq.1&select=last_digest_at');
+  const last = st.json?.[0]?.last_digest_at ? Date.parse(st.json[0].last_digest_at) : 0;
+  if (Date.now() - last < 7 * 86400_000) return { sent: false };
+  const since = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const twoDays = new Date(Date.now() - 2 * 86400_000).toISOString();
+  const [subsQ, pausedQ, lapsedQ, leadsQ, failsQ] = await Promise.all([
+    svc(`presence_entitlements?product=eq.presence&created_at=gt.${since}&select=client_id`),
+    svc('presence_entitlements?product=eq.presence&status=eq.paused&select=client_id'),
+    svc('presence_entitlements?product=eq.presence&status=eq.lapsed&select=client_id'),
+    svc(`presence_form_submissions?status=eq.new&spam=is.false&created_at=lt.${twoDays}&select=id`),
+    svc(`presence_publishes?status=eq.failed&created_at=gt.${since}&select=id`),
+  ]);
+  const n = (r: { json?: unknown }) => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: unknown[] }).json.length : 0);
+  const html = `<p>Your Studio OS week, in one glance:</p><ul>
+<li><strong>${n(subsQ)}</strong> new subscription${n(subsQ) === 1 ? '' : 's'}</li>
+<li><strong>${n(pausedQ)}</strong> with payment trouble${n(pausedQ) ? ' — they were told their site is still up' : ''}</li>
+<li><strong>${n(lapsedQ)}</strong> lapsed (wind-down comms run automatically)</li>
+<li><strong>${n(leadsQ)}</strong> lead${n(leadsQ) === 1 ? '' : 's'} waiting more than 2 days for a reply</li>
+<li><strong>${n(failsQ)}</strong> failed publish${n(failsQ) === 1 ? '' : 'es'} this week</li>
+</ul><p>Details live in Stripe, the leads inbox, and /system/health. The watchdog emails you separately if production ever goes dark.</p>`;
+  const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html);
+  await svc('presence_ops_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ last_digest_at: new Date().toISOString() }) });
+  return { sent: ok };
 }

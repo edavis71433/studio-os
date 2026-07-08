@@ -204,12 +204,32 @@ function trouble(){
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     render(list, features?.data || {});
     planCard(ctx && ctx.data);
+    healthLine();
   }catch(_){ trouble(); }
 })();
 
 // ── Phase P: "what you own" + the honest upsell — quiet, at the bottom, never a
 // dead end. Shown only when the platform says there IS a next rung (owners only;
 // the server computes gains from featureDelta so this can never overpromise).
+// ── CP-3: the health rollup — one calm sentence answering "is everything okay?" ──
+async function healthLine(){
+  let h = null;
+  try { h = (await apiGet('/search/health')).data; } catch(_) { return; }
+  if (!h) return;
+  const issues = [];
+  if (!(h.seo_fields && h.seo_fields.title && h.seo_fields.description)) issues.push({ t: 'your search headline isn\u2019t set', href: '/presence.html#business' });
+  (h.links || []).forEach((l) => { if (l.ok === false) issues.push({ t: 'your ' + String(l.kind).replace('social:', '') + ' link isn\u2019t answering', href: '/presence.html#business' }); });
+  const host = document.querySelector('main') || document.body;
+  const line = document.createElement('div');
+  line.style.cssText = 'max-width:860px;margin:10px auto 0;padding:12px 20px;border-radius:12px;font-size:14px;border:1px solid ' + (issues.length ? '#ecd9c6' : '#d6e8dc') + ';background:' + (issues.length ? '#fdf8f1' : '#f4faf6') + ';color:#3d4a42';
+  if (!issues.length) {
+    line.textContent = '\u2713 Everything looks healthy \u2014 site, links, and search setup are all in order.';
+  } else {
+    const a = issues[0];
+    line.innerHTML = 'One thing could use you: ' + a.t + '. <a href="' + a.href + '" style="color:#5b3fa0">Take a look \u2192</a>' + (issues.length > 1 ? ' <span style="color:#8a8172">(+' + (issues.length - 1) + ' more inside)</span>' : '');
+  }
+  host.insertBefore(line, host.firstChild ? host.firstChild.nextSibling : null);
+}
 function planCard(c){
   if(!c || !c.edition_name) return;
   const host = document.querySelector('main') || document.body;

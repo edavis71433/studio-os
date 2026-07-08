@@ -15,7 +15,7 @@
 ### FD-M3 · ✅ IMPLEMENTED (Phase Q) — generated legal foundation on every published site
 **What:** the rendered customer site has **no privacy policy / cookie notice** — yet forms now collect PII (name/email). Generate a privacy/cookie page from the business facts. **Why:** compliance gap the forms feature created (GDPR/CCPA); a lead-collecting site needs a privacy policy. **Source:** Phase-M deep-dive (verified: 0 legal markup in the template). **Value:** High (compliance/trust) · **Effort:** Medium. **Disposition:** V1 candidate.
 
-### FD-M4 · Self-serve account deletion / right-to-erasure
+### FD-M4 · ✅ IMPLEMENTED (CP-3) — self-serve deletion REQUEST (recorded + confirmed + ops-alerted; 30-day human execution per runbook)
 **What:** no self-serve account/data deletion (export exists; delete does not). **Why:** GDPR right-to-erasure + trust; flagged in the earlier data-governance audit (R1), still unresolved. **Source:** Phase-M deep-dive (verified). **Value:** Medium-High (compliance) · **Effort:** Medium. **Disposition:** V1.1 (V1 if EU customers).
 
 ### Member-experience audit (two deep file surveys) — implemented + tracked
@@ -27,7 +27,7 @@
 **➕ Tracked (bigger, by value):**
 - **FD-M5 · Guided first-run on the self-serve side** — `welcome.html` dumps a new member into the workspace on faith; port `portal.html`'s working "3 steps to go live" checklist model. *High · V1.*
 - **FD-M6 · Auto-populate the project brief from `discovery_intake`** — `start.html` and `portal.html`'s 11-field brief re-ask the same questions; carry them over by email. *High · V1.1.*
-- **FD-M7 · Magic-link invited-member activation** — `set-password.html` fights autofill on a hand-typed OTP; a pre-authenticated link removes the most error-prone step. Also add a "Set up my password" link on `portal.html`'s login card. *High · V1.1.*
+- **FD-M7 · ✅ IMPLEMENTED (CP-3)** — invites email a one-tap magic link (GoTrue generate_link; invite→magiclink fallback).
 - **FD-M8 · Proactive "connect your Google listing" first-card** on connections.html (flat equal-weight list today; one-click OAuth already exists). *Medium · V1.1.*
 - **FD-M9 · AI-suggested alt text + inline field** (replace `visual-studio.html`'s native `prompt()`); multi-photo upload; PDF/text parse for knowledge import. *Medium · V1.1.*
 - **FD-M10 · Surface Coach/Review suggestions on Today** (they're proposal-only already; hidden behind a manual desk-open in presence.html). *Medium · V1.1.*
@@ -87,10 +87,10 @@
 
 ### FD-7 · ✅ IMPLEMENTED (Phase AA) — named versions: label/rename any kept version from History (POST /publishes/:id/label, mig 0053, provenance-logged, journal shows the name first)
 
-### FD-RL1 · Wind-down automation (day-45 reminder + auto-park at day 60)
+### FD-RL1 · ✅ IMPLEMENTED (CP-3) — day-45 reminder automated (day-60 parking stays human, reminder-first, by documented choice)
 **What:** the policy is written and communicated (Phase RL); automate the tail — a day-45 export reminder and the day-60 site parking as a system task instead of an operator action. **Disposition:** V1.1.
 
-### FD-RL2 · Reactivation & win-back comms
+### FD-RL2 · ✅ IMPLEMENTED (CP-3) — day-30 win-back (once ever) + welcome-back at the billing-sync seam
 **What:** welcome-back email on reactivation; a single polite win-back at day 30. Mechanics already work (Stripe + entitlement); this is the comms tail. **Disposition:** V1.1.
 
 ### FD-BZ1 · Public searchable knowledge base
@@ -102,7 +102,7 @@
 ### FD-BZ3 · Sales one-pager / deck
 **What:** generated from the editions + support matrices (the data already exists in code). **Disposition:** V1.1/launch-week.
 
-### FD-BZ4 · Owner weekly digest email
+### FD-BZ4 · ✅ IMPLEMENTED (CP-3) — the Monday routine automated (7-day dedupe, rides the cron; merges FD-5's owner-digest half)
 **What:** automate the Monday routine (new subs, failed payments, unanswered leads, health) into one email — merges with FD-5. **Disposition:** V1.1.
 
 ### FD-Z1 · Cookieless visitor counts (server-side analytics → calm sentences)

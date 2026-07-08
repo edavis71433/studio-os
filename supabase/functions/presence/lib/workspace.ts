@@ -47,6 +47,31 @@ export async function listSiteMembers(siteId: string): Promise<Array<{ id: strin
   return (r.ok && Array.isArray(r.json)) ? r.json : [];
 }
 
+// CP-9: the invite email — a one-tap magic link instead of a hand-typed code.
+// Best-effort: the membership row is the truth; the email never blocks it.
+async function sendInviteLink(email: string, siteId: string): Promise<void> {
+  const base = Deno.env.get('SUPABASE_URL') || '';
+  const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  if (!base || !key) return;
+  const site = Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com';
+  const gen = async (type: string) => {
+    const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
+      method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, email, options: { redirect_to: `${site}/portal.html` } }),
+    });
+    const j = await r.json().catch(() => null);
+    return (r.ok && j && (j.action_link || j.properties?.action_link)) || '';
+  };
+  let link = await gen('invite');            // new user → invite (creates the account)
+  if (!link) link = await gen('magiclink');  // existing user → magic link
+  if (!link) return;
+  const { sendEmail } = await import('../commerce/account.ts');
+  const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
+  const name = String(bn.json?.[0]?.business_name || 'a business on Studio OS');
+  await sendEmail(email, `You’ve been invited to help run ${name}`,
+    `<p>You’ve been invited to help run <strong>${name}</strong> on Studio OS.</p><p><a href="${link}">Tap here to sign in</a> — no code to type. You can set a password afterwards from your portal.</p>`).catch(() => {});
+}
+
 export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string }> {
   const clean = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return { ok: false, error: 'bad_email' };
@@ -55,6 +80,7 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }),
   });
+  if (r.ok) sendInviteLink(clean, siteId).catch(() => {});   // CP-9: one-tap invite email, best-effort
   return r.ok ? { ok: true } : { ok: false, error: 'write_failed' };
 }
 

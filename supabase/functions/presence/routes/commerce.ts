@@ -27,6 +27,7 @@ import { supportFor } from '../commerce/support.ts';
 import { validEmail, passwordProblem, findClientByEmail, createAuthUser, deleteAuthUser, createContactAndClient, sendEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
+import { lifecycleCopy } from '../commerce/lifecycle.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
 import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPortal } from '../commerce/stripe.ts';
 
@@ -291,6 +292,9 @@ const BILLING_SYNC_SECRET = Deno.env.get('BILLING_SYNC_SECRET') || Deno.env.get(
 
 // PATCH only the defined keys of a patch onto an existing entitlement row.
 async function applyEntitlementPatch(clientId: string, patch: EntitlementPatch): Promise<boolean> {
+  // CP-3: reactivation detection — lapsed/paused → active gets a welcome-back
+  let priorStatus = '';
+  try { const pr = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(clientId)}&product=eq.presence&select=status&limit=1`); priorStatus = String(pr.json?.[0]?.status || ''); } catch { /* */ }
   const body: Record<string, unknown> = { status: patch.status };
   const carry: (keyof EntitlementPatch)[] = [
     'plan', 'term', 'founder', 'trial_ends_at', 'stripe_customer_id', 'stripe_subscription_id',
@@ -300,7 +304,24 @@ async function applyEntitlementPatch(clientId: string, patch: EntitlementPatch):
   const r = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(clientId)}&product=eq.presence`, {
     method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body),
   });
-  return r.ok && Array.isArray(r.json) && r.json.length > 0;
+  const applied = r.ok && Array.isArray(r.json) && r.json.length > 0;
+  if (applied && patch.status === 'active' && (priorStatus === 'lapsed' || priorStatus === 'paused')) {
+    try {
+      const [siteQ, clQ] = await Promise.all([
+        svc(`presence_sites?client_id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`),
+        svc(`clients?id=eq.${encodeURIComponent(clientId)}&select=email,name&limit=1`),
+      ]);
+      const copy = lifecycleCopy('welcome_back', String(clQ.json?.[0]?.name || ''));
+      if (siteQ.json?.[0]?.id) {
+        await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+          method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+          body: JSON.stringify({ site_id: siteQ.json[0].id, client_id: clientId, kind: 'welcome_back', period: new Date().toISOString().slice(0, 7), headline: copy.headline, body: copy.body, status: 'active' }),
+        });
+      }
+      if (clQ.json?.[0]?.email) sendEmail(clQ.json[0].email, copy.subject, copy.html).catch(() => {});
+    } catch { /* welcome-back is best-effort, never blocks billing truth */ }
+  }
+  return applied;
 }
 
 async function businessNameFor(clientId: string): Promise<string> {
@@ -387,6 +408,29 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
 export async function handleCommerce(req: Request, route: string, method: string, principal: Principal, cors: Record<string, string>): Promise<Response> {
   // public
   if (route === '/commerce/plans' && method === 'GET') return handlePlans(cors);
+  if (route === '/commerce/delete-request' && method === 'POST') {
+    // CP-10: self-serve deletion REQUEST — recorded immediately, confirmed to the
+    // customer, alerted to ops; execution follows the written 30-day runbook.
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    const site = jwt ? await resolveSite(jwt) : null;
+    if (!site || !site.client_id) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence`, {
+      method: 'PATCH', body: JSON.stringify({ deletion_requested_at: new Date().toISOString() }),
+    });
+    const name = await businessNameFor(site.client_id);
+    await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify({ site_id: site.id, client_id: site.client_id, kind: 'deletion_requested', period: 'once',
+        headline: 'Your deletion request is recorded',
+        body: 'We’ll delete your account and data within 30 days. Until then you can still download everything you own — or cancel this request by emailing us.', status: 'active' }),
+    });
+    const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`);
+    if (cl.json?.[0]?.email) sendEmail(cl.json[0].email, 'Your deletion request is recorded',
+      `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes within 30 days. Until then, everything you own is still downloadable from your workspace — and if you change your mind, just reply to this email.</p>`).catch(() => {});
+    const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
+    if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion. Runbook: complete within 30 days.</p>`).catch(() => {});
+    return json({ data: { ok: true, completes_within_days: 30 } }, 200, cors);
+  }
   if (route === '/commerce/signup' && method === 'POST') return handleSignup(req, cors);
   if (route === '/commerce/verify' && method === 'POST') return handleVerify(req, cors);
   if (route === '/commerce/checkout-status' && method === 'GET') return handleCheckoutStatus(req, cors);

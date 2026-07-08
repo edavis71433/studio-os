@@ -2420,6 +2420,24 @@ async function refreshAll() {
   mountAnnouncementCard();
   mountDesignCard();
   mountSearchCard();
+  mountDeletionCard();
+}
+// ── CP-10: leaving for good — honest, calm, reversible until executed ──
+function mountDeletionCard() {
+  const host = $("view-business"); if (!host || $("deleteCard")) return;
+  const d = el("details"); d.id = "deleteCard"; d.style.cssText = "margin-top:26px";
+  d.appendChild(Object.assign(el("summary", null, "Leaving for good? Delete your account"), { style: "cursor:pointer;font-size:12.5px;color:var(--ink-2,#777)" }));
+  const p = el("p", "hint", "This asks us to delete your account and everything in it within 30 days. Your published site comes down, and this can’t be undone once completed. Download everything you own first — that door stays open until deletion.");
+  const b = el("button", null, "Request deletion");
+  b.type = "button";
+  b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid #b3261e;color:#b3261e;background:transparent;cursor:pointer";
+  b.addEventListener("click", async () => {
+    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Are you sure? Click again to confirm"; setTimeout(() => { delete b.dataset.armed; b.textContent = "Request deletion"; }, 6000); return; }
+    try { await api("POST", "/commerce/delete-request", {}); b.disabled = true; b.textContent = "Request recorded — check your email"; toast("Deletion requested — we emailed you the details"); }
+    catch (err) { toast(err.message, true); }
+  });
+  d.append(p, b);
+  host.appendChild(d);
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──
 const PAGE_DEFS = [ ["offerings", "Your offerings page"], ["about", "About"], ["faq", "Questions"], ["updates", "Updates"], ["contact", "Contact"] ];
