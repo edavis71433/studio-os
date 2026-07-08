@@ -6,6 +6,21 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
+### FD-C1 · AI-enhanced relationship summary
+**What:** optionally let Concierge draft the CRM relationship summary / a next-best-step, on the AI spine, approval-safe. **Why:** the Phase C summary is deterministic (always-on, calm, no cost); AI could add nuance when keys are configured. **Source:** Phase C. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.
+
+### FD-C2 · Structured relationship fields (not custom fields)
+**What:** a *small, typed* set of relationship fields (e.g. renewal date, primary contact) only if a real need appears — never free-form custom fields. **Why:** custom fields are generic-CRM mimicry that conflicts with structured content; typed fields could serve a genuine gap. **Source:** Phase C (reviewed + rejected as custom fields). **Value:** Low · **Effort:** Low. **Disposition:** Watch — resist generic-CRM drift.
+
+### FD-C3 · Shared relationship files
+**What:** attach a contract/brief to the relationship (studio↔client). **Why:** a small real gap; pairs with [[FD-20]] brand assets. **Source:** Phase C. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.
+
+### FD-C4 · Formal CRM navigation entry
+**What:** add "Relationship" to `buildNav` (currently reached via doorways from today.html/agency.html). **Why:** Phase C honored the "do not modify navigation" fence; the entitlement-driven nav is the right long-term home. **Source:** Phase C. **Value:** Low · **Effort:** Low. **Disposition:** Queued — do when the fence lifts.
+
+### FD-C5 · Agency-wide relationship roll-up
+**What:** a portfolio health board reusing the agency portfolio + CRM health. **Why:** one glance across all clients' relationship health. **Source:** Phase C. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.
+
 ### FD-B1 · Publish-time render injection for Developer Mode (determinism-preserving) — ✅ IMPLEMENTED (Phase B1)
 **What:** fold a site's Developer-Mode customization into the **snapshot** (`presence_snapshots.dev_customization`, a sibling of content) and apply it in the ONE render entry (`renderSnapshot` → `injectDevLayer`), so publish/preview/restore all render it identically. **Delivered in Phase B1** — migration 0047, `injectDevLayer`/`devLayerFragments` in `lib/render.ts`, `buildDevLayer` in the serializer, threaded through publish/restore/preview/admin-restore/restore-to-draft. *Same snapshot → same render → same bytes → same rollback/restore/preview.* No parallel renderer, no second publish path. See [PHASE-B1-DEVELOPER-MODE-COMPLETION](PHASE-B1-DEVELOPER-MODE-COMPLETION.md). **Disposition:** Done.
 

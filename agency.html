@@ -98,7 +98,7 @@ function openClient(siteId){
     <div><div class="n">${c.archived?'Archived':'Active'}</div><div class="l">status</div></div>
   </div></div>`;
   html+=`<div class="card"><p class="muted">Deeper work for this client — reviewing, publishing, connecting — happens in your studio workspace with your agency permissions. This dashboard keeps your whole portfolio in one calm place.</p>
-    <p style="margin-top:12px"><a class="link" href="/dds-studio-manage-9k2p.html">Open studio tools →</a></p></div></div>`;
+    <p style="margin-top:12px"><a class="link" href="/crm.html">Open relationship →</a> &nbsp; <a class="link" href="/dds-studio-manage-9k2p.html">Open studio tools →</a></p></div></div>`;
   $('main').innerHTML=html;
   $('back').addEventListener('click',()=>{ACTING=null;try{localStorage.removeItem('dds-acting-as');}catch(_){}renderList('');});
 }

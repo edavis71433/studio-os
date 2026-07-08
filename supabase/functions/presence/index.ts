@@ -29,6 +29,7 @@ import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handle
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut } from './routes/dev.ts';
+import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { resolveSiteRole } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -240,6 +241,23 @@ serve(async (req) => {
   if (route === '/dev/files' && method === 'GET') return handleDevFiles(jwt, site, principal, cors);
   if (route === '/dev/customization' && method === 'GET') return handleDevCustomizationGet(jwt, site, principal, cors);
   if (route === '/dev/customization' && method === 'PUT') return handleDevCustomizationPut(req, jwt, site, principal, cors);
+
+  // ── Phase C: the Client Relationship Center (CRM) — aggregates existing
+  //    signals into one calm per-client view + relationship notes. Audience is
+  //    studio-vs-client (existing principal/agency signals); reviewer is already
+  //    refused. No new permission/visibility/navigation model.
+  if (route === '/crm/profile' && method === 'GET') return handleCrmProfile(jwt, site, principal, cors);
+  if (route === '/crm/timeline' && method === 'GET') return handleCrmTimeline(jwt, site, principal, cors);
+  if (route === '/crm/notes' && method === 'GET') return handleCrmNotesList(jwt, site, principal, cors);
+  if (route === '/crm/notes' && method === 'POST') return handleCrmNoteAdd(req, jwt, site, principal, cors);
+  {
+    const m = route.match(/^\/crm\/notes\/([0-9a-f-]{36})\/pin$/);
+    if (m && method === 'POST') return handleCrmNotePin(req, jwt, site, principal, m[1], cors);
+  }
+  {
+    const m = route.match(/^\/crm\/notes\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleCrmNoteDelete(jwt, site, principal, m[1], cors);
+  }
 
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
   if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relationship — Presence</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="One calm view of a client relationship — health, activity, approvals, and notes.">
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;
+    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--bad:#a3423a;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--bad:#e39a92;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:34px 20px 90px}
+  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .15em;letter-spacing:-.01em}
+  header .summary{color:var(--soft);font-size:15.5px;margin:0;max-width:60ch}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.healthy{background:var(--good-soft);color:var(--good)} .chip.healthy .d{background:var(--good)}
+  .chip.attention{background:var(--warn-soft);color:var(--warn)} .chip.attention .d{background:var(--warn)}
+  .chip.new,.chip.quiet{background:var(--p-soft);color:var(--p)} .chip.new .d,.chip.quiet .d{background:var(--p)}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:22px}
+  .fact{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+  .fact .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .fact .v{font-family:var(--serif);font-size:20px;margin-top:3px}
+  .fact .v small{font-family:var(--sans);font-size:12.5px;color:var(--soft);font-weight:400}
+  section{margin-top:32px}
+  h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 14px;display:flex;align-items:center;justify-content:space-between}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
+  .attention-card{border-left:3px solid var(--warn)}
+  .note{display:flex;gap:12px;align-items:flex-start}
+  .note .body{flex:1;font-size:14.5px;white-space:pre-wrap}
+  .note .meta{font-size:12px;color:var(--faint);margin-top:5px}
+  .note .aud{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 8px}
+  .note .aud.internal{background:var(--p-soft);color:var(--p)} .note .aud.shared{background:var(--good-soft);color:var(--good)}
+  .note .acts{display:flex;gap:8px}
+  .note .acts button{font-size:12px;padding:5px 10px}
+  .tl{position:relative;padding-left:20px}
+  .tl:before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .ev{position:relative;padding:0 0 16px 8px}
+  .ev:before{content:"";position:absolute;left:-18px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--p);border:2px solid var(--bg)}
+  .ev.publish:before{background:var(--good)} .ev.approval:before{background:var(--warn)} .ev.note:before{background:var(--p)} .ev.connected:before{background:#3f6f8a} .ev.moment:before{background:var(--p)}
+  .ev .t{font-size:14.5px;font-weight:600}
+  .ev .dt{font-size:13.5px;color:var(--soft);margin-top:1px}
+  .ev .when{font-size:12px;color:var(--faint);margin-top:2px}
+  textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;resize:vertical;min-height:70px}
+  textarea:focus{outline:none;border-color:var(--p)}
+  .noterow{display:flex;gap:9px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .seg button{border:none;border-radius:0;padding:8px 14px;font-size:13px}
+  .seg button.on{background:var(--p-soft);color:var(--p)}
+  .links{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600;font-size:14px} a.link:hover{text-decoration:underline}
+  .muted{color:var(--soft);font-size:14px}
+  .center{text-align:center;padding:56px 20px}
+  .center h2{display:block;font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Presence · Relationship — one calm view of how a client is doing. It reflects real activity; it never sells or scores.</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// The Client Relationship Center (Phase C). Aggregates existing signals via
+// /crm/* into one calm view + relationship notes. The server enforces audience
+// (studio sees internal; the client side sees shared only) — this page just
+// presents what it's given.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="";
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
+
+let STUDIO=false, NEWAUD='internal';
+const ICON={publish:'✓',change:'✎',connected:'⇄',moment:'✦',approval:'⏳',note:'✐'};
+
+function render(profile,summary,notes,items,studio){
+  STUDIO=studio;
+  const h=profile.health;
+  const facts=[
+    ['Website', profile.live?'Live':(profile.last_published_at?'Offline':'Not yet'), profile.last_published_at?('published '+when(profile.last_published_at)):''],
+    ['Approvals', String(profile.pending_approvals), profile.pending_approvals?'waiting':'all clear'],
+    ['Connected', String(profile.connected), profile.connected_needing_attention?(profile.connected_needing_attention+' need a look'):'healthy'],
+    ['Moments', String(profile.active_moments), 'worth a look'],
+    ['Team', String(profile.members), 'with access'],
+  ];
+  let html=`<div class="rolebadge">● ${studio?'Studio view':'Your account'}</div>
+    <header><h1>${esc(profile.business_name||'This business')}</h1>
+      <div style="margin:6px 0 10px"><span class="chip ${esc(h)}"><span class="d"></span>${h==='attention'?'Needs attention':h==='new'?'Getting set up':h==='quiet'?'Quiet':'Healthy'}</span></div>
+      <p class="summary">${esc(summary)}</p></header>`;
+
+  html+=`<div class="facts">`+facts.map(f=>`<div class="fact"><div class="k">${esc(f[0])}</div><div class="v">${esc(f[1])} <small>${esc(f[2])}</small></div></div>`).join('')+`</div>`;
+
+  // relationship notes
+  html+=`<section><h2>Relationship notes</h2>`;
+  html+=`<div class="card"><textarea id="nb" placeholder="${studio?'A note about this client… (internal by default)':'Leave a note for your studio…'}"></textarea>
+    <div class="noterow">`;
+  if(studio){html+=`<span class="seg"><button data-aud="internal" class="on">Internal</button><button data-aud="shared">Shared with client</button></span>`;}
+  html+=`<button class="primary" id="addnote">Add note</button><span class="muted" id="notehint">${studio?'Internal notes stay with your studio.':'Your studio will see this.'}</span></div></div>`;
+  if(!notes.length)html+=`<p class="muted" style="margin:2px 4px 0">No notes yet.</p>`;
+  for(const n of notes){
+    html+=`<div class="card note"><div class="body">${esc(n.body)}<div class="meta"><span class="aud ${esc(n.audience)}">${n.audience==='internal'?'Internal':'Shared'}</span> · ${esc(when(n.created_at))}</div></div>`;
+    if(studio)html+=`<div class="acts"><button data-pin="${esc(n.id)}">${n.pinned?'Unpin':'Pin'}</button><button data-del="${esc(n.id)}">Remove</button></div>`;
+    html+=`</div>`;
+  }
+  html+=`</section>`;
+
+  // activity timeline
+  html+=`<section><h2>Activity</h2>`;
+  if(!items.length)html+=`<p class="muted">Nothing yet — activity will appear here as it happens.</p>`;
+  else{html+=`<div class="tl">`;for(const e of items){html+=`<div class="ev ${esc(e.kind)}"><div class="t">${ICON[e.kind]||'•'} ${esc(e.title)}</div>${e.detail?`<div class="dt">${esc(e.detail)}</div>`:''}<div class="when">${esc(when(e.at))}</div></div>`;}html+=`</div>`;}
+  html+=`</section>`;
+
+  // integrated doorways (no duplication — these open the existing surfaces)
+  html+=`<section><h2>Open in context</h2><div class="links">
+    <a class="link" href="/today.html">Business Moments →</a>
+    <a class="link" href="/connections.html">Connected services →</a>
+    <a class="link" href="/presence.html">Website & publishing →</a>
+    <a class="link" href="/sharing.html">Sharing & access →</a>
+    <a class="link" href="#" id="exportlink">Export everything →</a></div></section>`;
+
+  $('main').innerHTML=html;wire();
+}
+function wire(){
+  const add=$('addnote');if(add)add.addEventListener('click',addNote);
+  document.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');document.querySelectorAll('[data-aud]').forEach(x=>x.classList.toggle('on',x===b));const h=$('notehint');if(h)h.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
+  document.querySelectorAll('[data-pin]').forEach(b=>b.addEventListener('click',()=>pin(b.getAttribute('data-pin'),b.textContent==='Pin')));
+  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>del(b.getAttribute('data-del'))));
+  const ex=$('exportlink');if(ex)ex.addEventListener('click',(e)=>{e.preventDefault();doExport();});
+}
+async function addNote(){
+  const t=$('nb');const body=(t&&t.value||'').trim();if(!body){toast('Write a little something first.');return;}
+  const btn=$('addnote');btn.disabled=true;
+  const r=await api('/crm/notes','POST',{audience:STUDIO?NEWAUD:'shared',body});
+  btn.disabled=false;
+  if(r.ok){toast(r.body.data&&r.body.data.message||'Saved.');load();}else{toast(r.body.message||'That didn’t save.');}
+}
+async function pin(id,on){const r=await api('/crm/notes/'+id+'/pin','POST',{pinned:on});if(r.ok)load();else toast('Couldn’t update that note.');}
+async function del(id){const r=await api('/crm/notes/'+id,'DELETE');if(r.ok){toast('Removed.');load();}else toast('Couldn’t remove that note.');}
+async function doExport(){toast('Preparing your export…');const r=await fetch(FN+'/export',{headers:H()});if(!r.ok){toast('Export isn’t available right now.');return;}const blob=await r.blob();const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='presence-export.json';a.click();URL.revokeObjectURL(u);}
+
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open the relationship view.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+
+async function load(){
+  const [p,tl,nt]=await Promise.all([api('/crm/profile'),api('/crm/timeline'),api('/crm/notes')]);
+  if(p.status===403||tl.status===403){$('main').innerHTML=`<div class="center"><h2>This view lives in your studio workspace.</h2><p class="muted">Your client view shows what your studio shares with you.</p></div>`;return;}
+  if(!p.ok){trouble();return;}
+  const d=p.body.data||{};
+  render(d.profile||{},d.summary||'',(nt.ok&&nt.body.data.notes)||[],(tl.ok&&tl.body.data.items)||[],!!d.is_studio_view);
+}
+(async function(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}await load();
+  }catch(_){trouble();}
+})();
+</script>
+</body>
+</html>
