@@ -26,6 +26,25 @@ export async function handleMediaUpload(req: Request, site: SiteRow, principal: 
   return json({ data: res }, 200, cors);
 }
 
+// Phase O: edit a photo's description (alt text) AFTER upload — a11y/SEO-critical
+// and previously impossible without deleting + re-uploading. The next snapshot
+// picks the new alt up automatically (serializer reads it fresh).
+export async function handleMediaUpdate(req: Request, site: SiteRow, principal: Principal, mediaId: string, cors: Record<string, string>) {
+  if (!/^[0-9a-f-]{36}$/.test(mediaId)) return json({ error: 'bad_request', message: 'Invalid image reference.' }, 400, cors);
+  let body: any = null;
+  try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
+  let alt = '';
+  for (const ch of String(body?.alt_text ?? '')) { const c = ch.codePointAt(0)!; if (c >= 32) alt += ch; }
+  alt = alt.trim().slice(0, 300);
+  if (alt.length < 3) return json({ error: 'alt_required', message: 'Describe the photo in a few words — it’s what screen readers and search engines see.' }, 422, cors);
+  const r = await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${site.id}&deleted_at=is.null`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ alt_text: alt }),
+  });
+  if (!r.ok || !Array.isArray(r.json) || !r.json.length) return json({ error: 'not_found', message: 'That photo isn’t in your collection.' }, 404, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: mediaId, action: 'update', summary: 'Updated a photo description', principal, provenance: 'human', fields: ['alt_text'] });
+  return json({ data: { id: mediaId, alt_text: alt } }, 200, cors);
+}
+
 export async function handleMediaDelete(site: SiteRow, principal: Principal, mediaId: string, cors: Record<string, string>) {
   if (!/^[0-9a-f-]{36}$/.test(mediaId)) return json({ error: 'bad_request', message: 'Invalid image reference.' }, 400, cors);
   const res = await deleteMedia(site.id, mediaId);

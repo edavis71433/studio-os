@@ -21,7 +21,7 @@ import { handleGetSite } from './routes/site.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory } from './routes/publish.ts';
-import { handleMediaUpload, handleMediaDelete } from './routes/media.ts';
+import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
@@ -208,6 +208,7 @@ serve(async (req) => {
   {
     const m = route.match(/^\/media\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleMediaDelete(site, principal, m[1], cors);
+    if (m && method === 'PUT') return handleMediaUpdate(req, site, principal, m[1], cors);   // Phase O: edit alt text
   }
 
   // ── AI Visual Studio (V1): brand-aware image generation, approval before use ──

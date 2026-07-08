@@ -412,6 +412,18 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
         <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
         <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Told on your About page, in your words.</div></div>
+        <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
+        <div class="field"><label for="f-industry">What kind of business</label><select id="f-industry">
+          <option value="generic">General / other</option>
+          <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
+          <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
+          <option value="home_services">Home services</option><option value="plumber">Plumber</option><option value="hvac">HVAC</option><option value="electrician">Electrician</option><option value="contractor">Contractor</option><option value="landscaping">Landscaping</option><option value="cleaning">Cleaning</option><option value="roofing">Roofing</option>
+          <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
+          <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
+          <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
+        </select><div class="hint">Sets the right words (“Services” vs “Menu”) and the right behind-the-scenes search markup. Applies when you next publish.</div></div>
+        <div class="field"><label for="f-seo_title">Search headline (SEO title)</label><input type="text" id="f-seo_title" data-sing="identity" data-field="seo_title" maxlength="60"><div class="hint">What Google shows as your page title. Empty = your business name.</div></div>
+        <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="160"><div class="hint">The line under the headline in search results. Empty = your description.</div></div>
         <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
         <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
 
@@ -1726,6 +1738,31 @@ function renderMediaGrid(grid, manage, onPick) {
       };
       row.appendChild(mkAssign("logo_media_id", "Logo", "Set as logo"));
       row.appendChild(mkAssign("og_media_id", "Share image", "Use when shared"));
+      // Phase O: edit the photo description (alt text) after upload — a11y/SEO
+      const ed = el("button", null, "Edit description");
+      ed.type = "button";
+      ed.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+      ed.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (cell.querySelector(".altedit")) return;
+        const inp = el("input", "altedit");
+        inp.type = "text"; inp.value = m.alt_text || ""; inp.maxLength = 300;
+        inp.setAttribute("aria-label", "Photo description");
+        inp.style.cssText = "width:100%;margin-top:6px;padding:6px 8px;font:inherit;font-size:12px;border:1px solid var(--line,#ddd);border-radius:8px";
+        const commit = async () => {
+          const val = inp.value.trim();
+          if (val === (m.alt_text || "") || val.length < 3) { inp.remove(); return; }
+          try {
+            await api("PUT", `/media/${m.id}`, { alt_text: val });
+            m.alt_text = val; renderMediaGrid(grid, true);
+            toast("Description updated — publish to apply");
+          } catch (err) { toast(err.message, true); inp.remove(); }
+        };
+        inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
+        inp.addEventListener("blur", commit);
+        cell.appendChild(inp); inp.focus(); inp.select();
+      });
+      row.appendChild(ed);
       cell.appendChild(row);
       const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
       del.addEventListener("click", async () => {
@@ -2245,8 +2282,9 @@ $("btnRestoreGo").addEventListener("click", async () => {
 /* ── initial load (identical fetches) ── */
 function fillSingles() {
   const i = S.identity || {};
-  [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"]]
+  [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
     .forEach(([id, k]) => { $(id).value = i[k] || ""; });
+  if ($("f-industry")) $("f-industry").value = (S.settings && S.settings.industry_key) || "generic";
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
@@ -2265,6 +2303,16 @@ async function refreshAll() {
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
 }
+// ── Phase O: industry selector — drives the template's vocabulary + schema ──
+$("f-industry").addEventListener("change", async () => {
+  const sel = $("f-industry");
+  try {
+    const r = await api("PUT", "/settings", { industry_key: sel.value });
+    S.settings = r.data || { ...(S.settings || {}), industry_key: sel.value };
+    toast("Saved — your site uses the right words when you next publish");
+    scheduleChangesRefresh();
+  } catch (err) { toast(err.message, true); }
+});
 // ── Phase V (FD-N4): the announcement bar — a simple site-wide notice, no code ──
 function mountAnnouncementCard() {
   const host = $("view-business"); if (!host || $("annCard")) return;

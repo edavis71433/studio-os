@@ -105,7 +105,7 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 - **Serialized/ephemeral integration test harness (FD-E1)** — integration suites flake under concurrent staging state (pass in isolation). Fix before relying on the suite as a CI merge gate — false green is a trust risk.
 - 🔍 **EXPAND:** a lightweight dependency/secret-exposure review + confirm the `RESEND`/`STRIPE`/`NETLIFY` tokens are least-privilege.
 
-### Phase O — Zero-Gap Certification  ·  ⚠️ REDUNDANT (mostly done in Phase E)
+### Phase O — Studio Workspace Experience  ·  ✅ IMPLEMENTED (browser gaps closed)
 Whole-platform certification · Zero-Surprise Certification · every action has a clear outcome · unified experience review.
 - ⚠️ **Phase E (Product Integrity Verification) already produced an Integrity Certification** across editions/roles/workflows/integrations, with a Risk Register. **Trim O to its one genuinely-new delta:** a *"every action has a clear, understandable outcome"* pass — i.e., an empty-state + confirmation-copy + error-message review across the surfaces (a UX-writing audit), not a re-certification. Otherwise it re-does E.
 
