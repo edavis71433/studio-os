@@ -73,7 +73,7 @@ export function buildNav(c: NavContext): NavSection[] {
 
   // Settings (+ the Developer Mode entry point, only if the capability is granted)
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }];
-  if (has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/presence.html#developer' });
+  if (has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
   sections.push({ key: 'settings', label: 'Settings', items: settings });
 
   // Help

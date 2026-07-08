@@ -6,6 +6,21 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
+### FD-B1 · Publish-time render injection for Developer Mode (determinism-preserving)
+**What:** fold a site's Developer-Mode customization (theme tokens + custom CSS + sanitized HTML) into the content **snapshot**, and emit it via the reserved `SiteConfig` seam so the template renders one `<style id="dev-custom">` block + a sanitized HTML slot at build time. **Why:** it's the one seam between "authored + previewed + versioned + stored" (shipped in Phase B) and "reflected in the live deployed bytes." Doing it in the snapshot keeps *same snapshot → same bytes* (determinism) and makes restore exact. **Source:** Phase B. **Value:** High · **Effort:** Medium — **touches the frozen serializer/render, so it wants its own careful, live-verified milestone** (deliberately not bundled into Phase B). **Disposition:** Queued — strong candidate.
+
+### FD-B2 · Hardened allow-list HTML sanitizer (+ published-site CSP)
+**What:** replace Phase B's aggressive denylist regex sanitizer with an allow-list parser and add a published-site Content-Security-Policy as the second layer. **Why:** raises the security floor before custom-HTML authoring opens beyond trusted developers. **Source:** Phase B security review. **Value:** Medium (security strengthening) · **Effort:** Medium. **Disposition:** Queued.
+
+### FD-B3 · Syntax highlighting in the Developer Mode editors
+**What:** a self-hosted, lightweight highlighter for the CSS/HTML editors (no CDN dependency — preserve page resilience). **Why:** developer-experience polish. **Source:** Phase B. **Value:** Low-Medium · **Effort:** Low-Medium. **Disposition:** Queued.
+
+### FD-B4 · Custom fonts (self-hosted, approved)
+**What:** let a developer add a self-hosted webfont via the brand-asset library ([[FD-20]]). **Why:** completes theme control without external font CDNs. **Source:** Phase B. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.
+
+### FD-B5 · Per-template customization presets
+**What:** save/reuse a theme+CSS set across a portfolio (pairs with [[FD-18]] client setup templates). **Why:** agency speed as the portfolio grows. **Source:** Phase B. **Value:** Medium (agency) · **Effort:** Medium. **Disposition:** Queued.
+
 ### FD-18 · Client Setup Templates (clone a client setup)
 **What:** an agency clones a proven client configuration to stand up a new client fast (HighLevel-style "snapshots"). **Why:** compounds agency onboarding speed as the portfolio grows. **Source:** A9 competitive review (HighLevel/Duda). **Value:** Medium-High (agency) · **Effort:** Medium. **A9 decision:** Approve for future.
 

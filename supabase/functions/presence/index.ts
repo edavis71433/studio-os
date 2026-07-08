@@ -28,6 +28,7 @@ import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } 
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
+import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut } from './routes/dev.ts';
 import { resolveSiteRole } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -231,6 +232,14 @@ serve(async (req) => {
   }
   if (route === '/portal/shares' && method === 'GET') return handleSharesList(jwt, site, principal, cors);
   if (route === '/portal/shares' && method === 'POST') return handleShareSet(req, jwt, site, principal, cors);
+
+  // ── Phase B: Developer Mode — safe presentation-layer authoring, gated by the
+  //    use_developer_mode capability (operator OR developer role). Publishing,
+  //    versioning, approval and isolation are unchanged — this only stores the
+  //    validated/sanitized theme + CSS + HTML the developer authors.
+  if (route === '/dev/files' && method === 'GET') return handleDevFiles(jwt, site, principal, cors);
+  if (route === '/dev/customization' && method === 'GET') return handleDevCustomizationGet(jwt, site, principal, cors);
+  if (route === '/dev/customization' && method === 'PUT') return handleDevCustomizationPut(req, jwt, site, principal, cors);
 
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
   if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);

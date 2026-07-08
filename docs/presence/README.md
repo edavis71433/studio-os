@@ -55,6 +55,7 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[OPERATIONS](OPERATIONS.md)** — the L2 operational model (capacity, metering, the unattended cycle).
 
 ### Architecture & Permissions
+- **[Developer Mode — Guide](DEVELOPER-MODE-GUIDE.md)** + **[Phase B — Developer Mode](PHASE-B-DEVELOPER-MODE.md)** — the built Developer Mode capability: safe theme/CSS/HTML customization on the *same* site as the no-code workspace, gated by `use_developer_mode`, sanitized server-side (no runtime code), published through the existing approval/version/rollback ritual. The guide covers Theme/CSS/HTML/Template/Component/SDK/Best-Practices/Extension/Architecture; the report covers deliverables, security, versioning, and the honest open seam (FD-B1 live-render injection).
 - **[Workspace Information Architecture (A7.5)](WORKSPACE-INFORMATION-ARCHITECTURE-A75.md)** — the finalized IA: navigation as one entitlement-driven source of truth (`/portal/context.nav`), workspace/edition/role maps, Developer-Mode placement, packaging review.
 - **[Feature Discovery & Product Review Queue](FEATURE-DISCOVERY-QUEUE.md)** — the standing queue of discovered capabilities (scheduled publish, lead capture, notify-to-approve, etc.), documented not built, for the A9 Product Review Board.
 - **[Workspace Experience (A7.2)](WORKSPACE-EXPERIENCE-A72.md)** — the client portal, agency dashboard, sharing UI, reviewer boundary.
