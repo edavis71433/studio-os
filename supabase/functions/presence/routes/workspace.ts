@@ -15,6 +15,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor } from '../lib/navigation.ts';
+import { editionFromPlan, editionFromSite, featuresOf, editionFlags, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc } from '../lib/db.ts';
@@ -46,17 +47,34 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   let isAgency = false;
   if (role !== 'client_reviewer') { try { isAgency = !!(await resolveAgencyMember(jwt)); } catch { /* */ } }
   const caps = capabilitiesOf(role);
-  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator };
+
+  // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
+  // the site edition when no entitlement plan is recorded). Navigation adapts to
+  // it automatically — one nav, many editions. Never throws on missing rows.
+  let editionKey: EditionKey = editionFromSite(site.edition, { isAgency });
+  try {
+    if (site.client_id) {
+      const ent = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=plan&limit=1`);
+      const plan = ent.ok && Array.isArray(ent.json) && ent.json[0]?.plan;
+      if (plan) editionKey = editionFromPlan(String(plan));
+    }
+  } catch { /* keep the fallback edition */ }
+
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey };
   return json({ data: {
     site_role: role,
     capabilities: caps,
-    edition: site.edition,               // 'monitor' | 'presence' (site) — drives edition-adaptive nav
+    edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
+    edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)
+    edition_name: EDITION_DEFS[editionKey]?.name || '',
+    edition_features: featuresOf(editionKey),
+    edition_flags: editionFlags(editionKey),
     is_agency: isAgency,
     is_operator: isOperator,
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
     landing: landingFor(navCtx),
-    nav: buildNav(navCtx),               // the ONE navigation source of truth, entitlement-filtered
+    nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);
 }
 

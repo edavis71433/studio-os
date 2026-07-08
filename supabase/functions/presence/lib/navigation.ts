@@ -5,6 +5,7 @@
 // no dead ends, no separate builds. Pure — reads the frozen role/visibility
 // models, never modifies them.
 import type { SiteRole, SiteCapability } from './site_roles.ts';
+import { editionFlags, type EditionKey, type EditionFlags } from '../commerce/editions.ts';
 
 export interface NavItem { key: string; label: string; href: string; }
 export interface NavSection { key: string; label: string; items: NavItem[]; }
@@ -15,11 +16,17 @@ export interface NavContext {
   capabilities: SiteCapability[];
   isAgency: boolean;            // the caller is also an agency member
   isOperator: boolean;          // staff/system (operator)
+  editionKey?: EditionKey;      // Phase D: the FEATURE edition; when absent, all features (today's behavior)
 }
 
 const has = (c: NavContext, cap: SiteCapability) => c.capabilities.includes(cap);
 const canDraft = (c: NavContext) => c.edition !== 'monitor' && has(c, 'edit');       // Monitor never drafts
 const canPublish = (c: NavContext) => c.edition !== 'monitor' && has(c, 'publish');
+
+// Every feature on — the default when no edition entitlement is set, so existing
+// behavior is preserved exactly. An explicit editionKey narrows this.
+const ALL_FEATURES: EditionFlags = { hasWebsite: true, hasBusinessOS: true, hasRelationship: true, hasConnected: true, hasReports: true, hasClientPortal: true, hasDeveloper: true, hasAgency: true, hasEnterprise: true };
+const flagsOf = (c: NavContext): EditionFlags => (c.editionKey ? editionFlags(c.editionKey) : ALL_FEATURES);
 
 /** The client reviewer's whole world is one calm surface. */
 function reviewerNav(): NavSection[] {
@@ -33,48 +40,53 @@ function reviewerNav(): NavSection[] {
 export function buildNav(c: NavContext): NavSection[] {
   if (c.role === 'client_reviewer') return reviewerNav();
 
+  const f = flagsOf(c);                 // Phase D: which feature areas this edition includes
   const sections: NavSection[] = [];
 
-  // Landing / daily
-  sections.push({ key: 'today', label: 'Today', items: [
-    { key: 'today', label: 'Today', href: '/today.html' },
-    { key: 'workspace', label: 'Your Presence', href: '/presence.html' },
-    { key: 'relationship', label: 'Relationship', href: '/crm.html' },  // Phase C1: CRM in the one nav (was doorway-only)
-  ] });
+  // Landing / daily — items appear only if their feature area is in the edition,
+  // so CMS-Only and Business-OS-Only each get a complete, non-empty Today.
+  const today: NavItem[] = [];
+  if (f.hasBusinessOS) today.push({ key: 'today', label: 'Today', href: '/today.html' });
+  if (f.hasWebsite) today.push({ key: 'workspace', label: 'Your Presence', href: '/presence.html' });
+  if (f.hasRelationship) today.push({ key: 'relationship', label: 'Relationship', href: '/crm.html' });
+  sections.push({ key: 'today', label: 'Today', items: today });
 
-  // Website (CMS)
-  const website: NavItem[] = [{ key: 'content', label: 'Your website', href: '/presence.html' }];
-  if (c.edition !== 'monitor') website.push({ key: 'media', label: 'Photos', href: '/presence.html#media' });
-  if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
-  sections.push({ key: 'website', label: 'Website', items: website });
+  // Website (CMS) — only when the edition includes it (Business-OS-Only hides it)
+  if (f.hasWebsite) {
+    const website: NavItem[] = [{ key: 'content', label: 'Your website', href: '/presence.html' }];
+    if (c.edition !== 'monitor') website.push({ key: 'media', label: 'Photos', href: '/presence.html#media' });
+    if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
+    sections.push({ key: 'website', label: 'Website', items: website });
 
-  // Create (drafting) — only where the edition allows drafting
-  if (canDraft(c)) sections.push({ key: 'create', label: 'Create', items: [
-    { key: 'studio', label: 'Creative Studio', href: '/presence.html' },
-    { key: 'visual', label: 'Visual Studio', href: '/visual-studio.html' },
-  ] });
+    if (canDraft(c)) sections.push({ key: 'create', label: 'Create', items: [
+      { key: 'studio', label: 'Creative Studio', href: '/presence.html' },
+      { key: 'visual', label: 'Visual Studio', href: '/visual-studio.html' },
+    ] });
+  }
 
-  // Grow
-  sections.push({ key: 'grow', label: 'Grow', items: [
-    { key: 'moments', label: 'Business Moments', href: '/today.html' },
-    { key: 'growth', label: 'Growth', href: '/presence.html' },
-    { key: 'connect', label: 'Connections', href: '/connections.html' },
-  ] });
+  // Grow (Business OS) — moments/growth/connections; hidden entirely for CMS-Only
+  if (f.hasBusinessOS) {
+    const grow: NavItem[] = [];
+    if (f.hasBusinessOS) grow.push({ key: 'moments', label: 'Business Moments', href: '/today.html' });
+    grow.push({ key: 'growth', label: 'Growth', href: '/presence.html' });
+    if (f.hasConnected) grow.push({ key: 'connect', label: 'Connections', href: '/connections.html' });
+    sections.push({ key: 'grow', label: 'Grow', items: grow });
+  }
 
-  // Clients (only for someone who can invite/manage sharing — the owner)
-  if (has(c, 'invite')) sections.push({ key: 'clients', label: 'Clients', items: [
+  // Clients (sharing) — the ownership/relationship surface, for someone who can invite
+  if (f.hasClientPortal && has(c, 'invite')) sections.push({ key: 'clients', label: 'Clients', items: [
     { key: 'sharing', label: 'Sharing & access', href: '/sharing.html' },
     { key: 'preview', label: 'Preview client view', href: '/client.html' },
   ] });
 
-  // Agency (only for agency members)
-  if (c.isAgency) sections.push({ key: 'agency', label: 'Agency', items: [
+  // Agency (only for agency members whose edition includes it)
+  if (f.hasAgency && c.isAgency) sections.push({ key: 'agency', label: 'Agency', items: [
     { key: 'portfolio', label: 'Portfolio', href: '/agency.html' },
   ] });
 
-  // Settings (+ the Developer Mode entry point, only if the capability is granted)
+  // Settings (+ Developer Mode when the edition includes it AND the capability is granted)
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }];
-  if (has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
+  if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
   sections.push({ key: 'settings', label: 'Settings', items: settings });
 
   // Help
@@ -83,9 +95,12 @@ export function buildNav(c: NavContext): NavSection[] {
   return sections.filter((s) => s.items.length > 0);
 }
 
-/** The caller's landing surface, by role. */
+/** The caller's landing surface, by role + edition. A CMS-Only account lands on
+ *  its website; everyone with Business OS lands on Today; agency on the portfolio. */
 export function landingFor(c: NavContext): string {
   if (c.role === 'client_reviewer') return '/client.html';
   if (c.isAgency) return '/agency.html';
+  const f = flagsOf(c);
+  if (!f.hasBusinessOS && f.hasWebsite) return '/presence.html';
   return '/today.html';
 }

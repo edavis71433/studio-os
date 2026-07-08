@@ -6,6 +6,15 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
+### FD-D1 · Commercial rungs for CMS-Only & Business-OS-Only
+**What:** append `cms_only` + `business_os_only` to `commerce/catalog.ts` PLANS, widen the `presence_entitlements.plan` CHECK, and add the Stripe products, so the two new editions can be *purchased* (they already work end-to-end in the platform). **Why:** Phase D built the feature editions but left the frozen commercial catalog (DB check + `commerce_test` asserts 5 rungs) untouched by design. **Source:** Phase D. **Value:** High (to sell them) · **Effort:** Low-Medium (append + migration + Stripe). **Disposition:** Queued (V1 to sell).
+
+### FD-D2 · Self-serve upgrade/downgrade UI
+**What:** a plan-change screen driven by `featureDelta` — preview gained/lost before confirming; data-preserved messaging. **Why:** makes the upgrade path a delightful moment; the math already exists. **Source:** Phase D. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued (V1.1).
+
+### FD-D3 · Per-feature add-ons
+**What:** license a single feature onto a lower edition (e.g. Developer Mode on CMS-Only). **Why:** flexible packaging. **Source:** Phase D. **Value:** Medium · **Effort:** Medium. **Watch:** avoid nickel-and-diming the calm. **Disposition:** Queued (V1.1).
+
 ### FD-C1 · AI-enhanced relationship summary
 **What:** optionally let Concierge draft the CRM relationship summary / a next-best-step, on the AI spine, approval-safe. **Why:** the Phase C summary is deterministic (always-on, calm, no cost); AI could add nuance when keys are configured. **Source:** Phase C. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.
 
