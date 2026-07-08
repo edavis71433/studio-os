@@ -76,8 +76,13 @@ function render(ctx,feed){
   const moments=(feed.moments||[]);
   const pending=(feed.pending_approvals||[]);
   const pub=feed.last_published;
+  // Section 4: mirror the owner's Today — lead with what (if anything) needs you.
+  const need=pending.length;
+  const subtext = need
+    ? (need===1 ? 'One thing needs your OK — no rush.' : `${need} things need your OK — no rush.`)
+    : 'You’re all caught up — nothing needs you right now.';
   let html=`<div class="rolebadge">● Client view</div>`;
-  html+=`<header><h1>Your updates</h1><p class="sub">Here's what your studio has ready, and where your website stands. You approve what's yours to approve.</p></header>`;
+  html+=`<header><h1>Your updates</h1><p class="sub">${esc(subtext)}</p></header>`;
   if(pub){const when=new Date(pub.completed_at||pub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     html+=`<div class="status"><span class="d"></span>Your website is live — last updated ${esc(when)}.</div>`;}
 

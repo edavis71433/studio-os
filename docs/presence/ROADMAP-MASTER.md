@@ -210,3 +210,6 @@ Audited every signed-in surface/transition as ONE OS. Cohesion already high (one
 
 ### Phase SKU — Standalone Product Experience & Packaging ✅ (implemented)
 Audited CMS / Business-OS / Studio-OS editions as standalone products. Model is strong (editions as data, nav derived, upgrades only add). Closed the one real leak: the CMS workspace showed Business-OS brains (Moments/Connections/Visual Studio/Growth-Coach) — presence.html now gates by edition_features; website drafting AI stays; no-op for studio_os (FD-SKU1). Open (V1.1, recommended): FD-SKU2 per-edition onboarding copy, FD-SKU3 CRM Today empty-state edition-awareness, FD-SKU4 felt upgrade moment.
+
+### Phase PP — Product Polish & Launch Refinements ✅ (implemented)
+Consolidation: PP-1 lead-notice lifecycle fix; PP-2/CP-3.1 annual renewal heads-up (mig 0062); Section 3 merged FD-CRM2/INF4/FLOW2 into one Agency Portfolio Status; Section 4 client-portal "needs you"; PP-5 CRM empty-state; PP-6 Studio-OS upgrade welcome; terminology sweep (Photos, sections-sheet vocab, workspace prose). Regression green; deployed both envs. Open: FD-PP1 consolidate workspace nav labels; FD-SKU2 per-edition first-run copy; post-Playwright CP-7 + SD-5.

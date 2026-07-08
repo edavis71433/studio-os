@@ -51,8 +51,8 @@ async function gather(agencyId: string, nowIso: string): Promise<PortfolioInput>
     return { sites: [], links: [], clientNames: {}, moments: [], evidence: [], opportunities: [], plans: [], drafts: [], connections: [], reviewReports: [], brandReports: [], lastChange: {}, nowIso };
   }
   const IN = `site_id=in.(${ids.join(',')})`;
-  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ] = await Promise.all([
-    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain&limit=1000`),
+  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ] = await Promise.all([
+    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at&limit=1000`),
     svc(`presence_moments?${IN}&status=eq.active&select=site_id,moment_key,moment_type,headline&limit=1000`),
     svc(`presence_growth_opportunities?${IN}&status=eq.open&select=site_id,area,opportunity,timing_ends,created_at&limit=1000`),
     svc(`presence_infra_plans?${IN}&status=in.(proposed,approved)&select=site_id,kind,title,status&limit=1000`),
@@ -62,6 +62,8 @@ async function gather(agencyId: string, nowIso: string): Promise<PortfolioInput>
     svc(`presence_brand_reports?${IN}&status=eq.open&select=site_id,status,open_count&limit=1000`),
     svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
     svc(`presence_evidence_runs?${IN}&finished_at=not.is.null&error_text=is.null&select=id,site_id,started_at&order=started_at.desc&limit=500`),
+    svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=site_id&limit=2000`),   // Section 3: leads waiting
+    svc(`presence_plan_notices?${IN}&status=eq.active&select=site_id,kind&limit=2000`),             // Section 3: attention + billing
   ]);
   // latest change per site + latest run per site (reduce, not re-query)
   const lastChange: Record<string, string> = {};
@@ -81,6 +83,10 @@ async function gather(agencyId: string, nowIso: string): Promise<PortfolioInput>
   const clientIds = [...new Set(sites.map((s) => s.client_id))];
   const namesQ = clientIds.length ? await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : { json: [] };
   const nameByClient = Object.fromEntries(((namesQ.json ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
+  // Section 3: authoritative billing status per client → mapped to each of their sites (one query, fixed cost).
+  const entQ = clientIds.length ? await svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status&limit=1000`) : { json: [] };
+  const statusByClient = Object.fromEntries(((entQ.json ?? []) as Array<{ client_id: string; status: string }>).map((e) => [e.client_id, e.status]));
+  const billingBySite = Object.fromEntries(sites.map((s) => [s.id, statusByClient[s.client_id] || 'active']));
   return {
     sites, links,
     clientNames: Object.fromEntries(sites.map((s) => [s.id, nameByClient[s.client_id] || ''])),
@@ -90,6 +96,9 @@ async function gather(agencyId: string, nowIso: string): Promise<PortfolioInput>
       .map((e) => ({ site_id: runToSite[e.run_id], type: e.type, severity: e.severity, human: e.human })).filter((e) => e.site_id),
     opportunities: oppQ.json ?? [], plans: planQ.json ?? [], drafts: draftQ.json ?? [],
     connections: connQ.json ?? [], reviewReports: revQ.json ?? [], brandReports: brandQ.json ?? [],
+    leads: (leadsQ.json ?? []) as Array<{ site_id: string }>,
+    notices: (noticesQ.json ?? []) as Array<{ site_id: string; kind: string }>,
+    billingBySite,
     lastChange, nowIso,
   };
 }

@@ -79,10 +79,18 @@ function renderList(filter){
   html+=`<input class="search" id="search" placeholder="Search clients…" value="${esc(filter||'')}">`;
   if(!list.length){html+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet — add businesses from your studio tools.'}</p></div>`;}
   for(const c of list){
-    const waiting=Number(c.plans_waiting||0);
+    // Section 3 — the at-a-glance status: everything asking for someone, from data the platform already computes.
+    const att=Number(c.attention||0);
+    const bits=[];
+    const lw=Number(c.leads_waiting||0); if(lw) bits.push(`${lw} lead${lw===1?'':'s'} waiting`);
+    const de=c.domain_expires_at?Math.floor((Date.parse(c.domain_expires_at)-Date.now())/86400000):null;
+    if(de!==null&&de<=30) bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);
+    const si=Number(c.search_issues||0); if(si) bits.push(`${si} search issue${si===1?'':'s'}`);
+    if(c.billing_issue) bits.push('billing needs a look');
+    const statusLine=bits.length?`<br><span class="m" style="color:var(--warn);font-family:var(--sans)">${esc(bits.join(' · '))}</span>`:'';
     html+=`<button class="client" data-open="${esc(c.site_id)}"><span class="av">${esc(initial(c.name))}</span>
-      <span><span class="n">${esc(c.name||'(unnamed)')}</span><br><span class="m">${esc(c.edition||'presence')} · ${esc(c.status||'')}</span></span>
-      <span class="badge ${waiting?'wait':'ok'}">${waiting?waiting+' waiting':'all clear'}</span></button>`;
+      <span><span class="n">${esc(c.name||'(unnamed)')}</span><br><span class="m">${esc(c.edition||'presence')} · ${esc(c.status||'')}</span>${statusLine}</span>
+      <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
   }
   // ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
   html+=`<div class="detail" style="margin-top:18px"><div class="card"><div class="stat" style="margin-bottom:6px">Starter kits</div>

@@ -6,7 +6,9 @@
 // The builders are pure functions of batched query results, so the whole
 // portfolio costs a FIXED number of queries regardless of client count.
 
-export interface SiteLite { id: string; edition: string; status: string; last_published_at: string | null; custom_domain: string | null }
+export interface SiteLite { id: string; edition: string; status: string; last_published_at: string | null; custom_domain: string | null; domain_registrar?: string | null; domain_expires_at?: string | null }
+export interface LeadLite { site_id: string }
+export interface NoticeLite { site_id: string; kind: string }
 export interface LinkRow { site_id: string; status: string; tags: string[]; owner_email: string; assigned: string[]; notes: string; onboarded_at: string }
 export interface MomentLite { site_id: string; moment_key: string; type: string; headline: string }
 export interface EvLite { site_id: string; type: string; severity: string; human: string }
@@ -22,6 +24,8 @@ export interface PortfolioInput {
   moments: MomentLite[]; evidence: EvLite[]; opportunities: OppLite[];
   plans: PlanLite[]; drafts: DraftLite[]; connections: ConnLite[];
   reviewReports: ReportLite[]; brandReports: ReportLite[];
+  leads?: LeadLite[]; notices?: NoticeLite[];   // PP/Section-3: waiting leads + active notices
+  billingBySite?: Record<string, string>;       // site_id → entitlement status (active|paused|lapsed)
   lastChange: Record<string, string>;      // site_id → latest change event at
   nowIso: string;
 }
@@ -37,12 +41,21 @@ const days = (a: string, b: string) => Math.floor((new Date(a).getTime() - new D
 export function buildPortfolio(i: PortfolioInput) {
   const moments = by(i.moments), ev = by(i.evidence), opps = by(i.opportunities),
     plans = by(i.plans), drafts = by(i.drafts), conns = by(i.connections),
-    reviews = by(i.reviewReports), brands = by(i.brandReports);
+    reviews = by(i.reviewReports), brands = by(i.brandReports),
+    leads = by(i.leads || []), notices = by(i.notices || []);
+  const billingBySite = i.billingBySite || {};
   const links = new Map(i.links.map((l) => [l.site_id, l]));
   return i.sites.map((s) => {
     const l = links.get(s.id);
     const crit = (ev.get(s.id) || []).filter((e) => e.severity === 'critical');
     const lastChange = i.lastChange[s.id] || null;
+    // Section 3: the at-a-glance status, all from rows already gathered.
+    const plansWaiting = (plans.get(s.id) || []).filter((p) => p.status === 'proposed' || p.status === 'approved').length;
+    const noticeRows = notices.get(s.id) || [];
+    const billing = billingBySite[s.id] || 'active';
+    const billing_issue = billing === 'paused' || billing === 'lapsed'
+      || noticeRows.some((n) => n.kind === 'payment_trouble' || n.kind === 'account_lapsed');
+    const search_issues = (ev.get(s.id) || []).filter((e) => /^(search|seo)\./.test(e.type)).length;
     return {
       site_id: s.id,
       name: i.clientNames[s.id] || '(unnamed)',
@@ -51,11 +64,18 @@ export function buildPortfolio(i: PortfolioInput) {
       tags: l?.tags || [], owner: l?.owner_email || '', assigned: l?.assigned || [],
       has_notes: !!(l?.notes || '').trim(),
       domain: s.custom_domain,
+      domain_registrar: s.domain_registrar || null,
+      domain_expires_at: s.domain_expires_at || null,
       moments: (moments.get(s.id) || []).length,
       criticals: crit.length,
       open_opportunities: (opps.get(s.id) || []).length,
-      plans_waiting: (plans.get(s.id) || []).filter((p) => p.status === 'proposed' || p.status === 'approved').length,
+      plans_waiting: plansWaiting,
       drafts_waiting: (drafts.get(s.id) || []).filter((d) => d.status === 'proposed').length,
+      leads_waiting: (leads.get(s.id) || []).length,
+      search_issues,
+      billing_issue,
+      // one number the agency scans: things actively asking for someone (active notices + approvals + waiting leads)
+      attention: noticeRows.length + plansWaiting + (leads.get(s.id) || []).length,
       review_open: (reviews.get(s.id) || []).some((r) => r.status === 'open' && r.open_count > 0)
         || (brands.get(s.id) || []).some((r) => r.status === 'open' && r.open_count > 0),
       migration: (conns.get(s.id) || [])[0]?.readiness?.state || null,

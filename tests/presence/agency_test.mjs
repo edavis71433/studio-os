@@ -29,7 +29,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 const NOW = '2027-01-20T12:00:00Z';
 const INPUT = {
   sites: [
-    { id: 's1', edition: 'presence', status: 'ready', last_published_at: '2027-01-01T00:00:00Z', custom_domain: 'marlows.example' },
+    { id: 's1', edition: 'presence', status: 'ready', last_published_at: '2027-01-01T00:00:00Z', custom_domain: 'marlows.example', domain_registrar: 'GoDaddy.com, LLC', domain_expires_at: '2027-02-05T00:00:00Z' },
     { id: 's2', edition: 'monitor', status: 'ready', last_published_at: null, custom_domain: null },
     { id: 's3', edition: 'presence', status: 'ready', last_published_at: '2027-01-10T00:00:00Z', custom_domain: null },
   ],
@@ -58,6 +58,10 @@ const INPUT = {
   connections: [{ site_id: 's2', status: 'verified', readiness: { state: 'ready' } }],
   reviewReports: [{ site_id: 's1', status: 'open', open_count: 3 }],
   brandReports: [{ site_id: 's2', status: 'open', open_count: 2 }],
+  // Section 3 — at-a-glance status inputs
+  leads: [{ site_id: 's1' }, { site_id: 's1' }],                                     // 2 leads waiting on s1
+  notices: [{ site_id: 's1', kind: 'lead_followup' }, { site_id: 's2', kind: 'payment_trouble' }],
+  billingBySite: { s1: 'active', s2: 'active', s3: 'lapsed' },
   lastChange: { s1: '2027-01-15T00:00:00Z', s2: '2027-01-18T00:00:00Z' },
   nowIso: NOW,
 };
@@ -70,6 +74,12 @@ const INPUT = {
     m.moments === 1 && m.criticals === 1 && m.open_opportunities === 1 && m.plans_waiting === 1 && m.review_open === true &&
     m.unpublished_changes === true && rows.find((r) => r.site_id === 's2').migration === 'ready');
   ok('portfolio: archived stays visible only when asked', filterPortfolio(rows, {}).length === 2 && filterPortfolio(rows, { archived: true }).length === 1);
+  // Section 3 — at-a-glance status (all from already-gathered rows)
+  ok('portfolio: leads waiting counted per client', m.leads_waiting === 2 && rows.find((r) => r.site_id === 's2').leads_waiting === 0);
+  ok('portfolio: attention = active notices + waiting approvals + waiting leads', m.attention === (1 /*notice*/ + 1 /*plan proposed*/ + 2 /*leads*/));
+  ok('portfolio: domain expiry + registrar surfaced for the row', m.domain_expires_at === '2027-02-05T00:00:00Z' && /GoDaddy/.test(m.domain_registrar));
+  ok('portfolio: billing issue from a payment_trouble notice (s2) and from lapsed status (s3)',
+    rows.find((r) => r.site_id === 's2').billing_issue === true && filterPortfolio(rows, { archived: true }).find((r) => r.site_id === 's3').billing_issue === true && m.billing_issue === false);
   ok('portfolio: search hits names, domains, and tags', filterPortfolio(rows, { search: 'marlow' }).length === 1 &&
     filterPortfolio(rows, { search: 'dental' }).length === 1 && filterPortfolio(rows, { tag: 'la' }).length === 1);
 }

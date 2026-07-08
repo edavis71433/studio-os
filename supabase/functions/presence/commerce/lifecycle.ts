@@ -12,7 +12,8 @@
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc } from '../lib/db.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
-import { leadFollowupDue, leadFollowupCopy } from '../lib/commercial.ts';
+import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
+import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
@@ -273,4 +274,39 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
     }
   }
   return { nudged };
+}
+
+// ── PP-2 / CP-3.1: the annual renewal heads-up ───────────────────────────────
+// Never surprise a customer with a yearly charge. For annual terms not set to
+// cancel, a calm note goes out ~30 days and again ~7 days before the renewal
+// date — the plan, the date, what they built this year, and a link to manage it.
+// Same notices rail + send-once (period = renewal-date:window) + email.
+export async function runRenewalReminders(limit = 50): Promise<{ reminded: number }> {
+  const nowIso = new Date().toISOString();
+  const within = new Date(Date.now() + 31 * 86400_000).toISOString();
+  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  const q = await svc(`presence_entitlements?product=eq.presence&term=eq.annual&cancel_at_period_end=eq.false&current_period_end=not.is.null&current_period_end=lte.${encodeURIComponent(within)}&select=client_id,plan,current_period_end&limit=${limit}`);
+  let reminded = 0;
+  for (const e of (Array.isArray(q.json) ? q.json : []) as Array<{ client_id: string; plan: string; current_period_end: string }>) {
+    const win = renewalReminderWindow(e, nowIso);
+    if (!win) continue;
+    const siteQ = await svc(`presence_sites?client_id=eq.${encodeURIComponent(e.client_id)}&select=id&order=created_at.asc&limit=1`);
+    const siteId = siteQ.json?.[0]?.id;
+    if (!siteId) continue;
+    const pubQ = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=id&limit=200`);
+    const published = Array.isArray(pubQ.json) ? pubQ.json.length : 0;
+    const planName = EDITION_DEFS[editionFromPlan(e.plan)]?.name || 'your';
+    const copy = renewalReminderCopy(planName, e.current_period_end, win, published);
+    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ site_id: siteId, client_id: e.client_id, kind: 'renewal_reminder', period: renewalNoticePeriod(e.current_period_end, win), headline: copy.headline, body: copy.body, status: 'active' }),
+    });
+    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+      reminded++;
+      const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=email&limit=1`);
+      const owner = ident.json?.[0]?.email;
+      if (owner) sendEmail(String(owner), copy.subject, `<p>${copy.body}</p><p><a href="${base}/portal.html">Review or manage your plan →</a></p>`).catch(() => {});
+    }
+  }
+  return { reminded };
 }

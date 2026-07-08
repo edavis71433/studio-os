@@ -382,3 +382,20 @@ today.html "All clear" card links to website/leads; drop those for a website-les
 
 ### FD-SKU4 · 🔵 RECOMMENDED (V1.1) — the felt "upgrade moment"
 On first landing after an upgrade, a one-time calm card naming exactly what became available (from featureDelta) — makes an already-additive upgrade feel additive at the moment it happens.
+
+## Phase PP — consolidation (closed a batch of queued items)
+- **PP-1 · ✅ lead-followup notice lifecycle fixed** — clears on reply/read/archive; Today + bell + badge drop it at once. (Closed the bug from Phase CRM.)
+- **CP-3.1 / PP-2 · ✅ annual renewal heads-up** — 30d + 7d calm notice + email, once per window; mig 0062.
+- **FD-CRM2 + FD-INF4 + FD-FLOW2 · ✅ MERGED → Agency Portfolio Status** — one at-a-glance surface (attention/leads/domain/registrar/search/billing per client), fixed-query. Did NOT build three separate features.
+- **FD-OS2 · ✅ client portal mirrors "needs you"** — attention-aware framing over the role-filtered feed.
+- **FD-SKU3 · ✅ CRM Today empty-state edition-aware** (PP-5).
+- **FD-SKU4 · ✅ Studio OS upgrade welcome** (PP-6, one-time, from the feature delta).
+- **Terminology · ✅** Photos/Photographs aligned; sections sheet vocab-synced (Menu/Services); workspace prose standardized.
+
+### FD-PP1 · 🔵 RECOMMENDED — consolidate workspace nav labels
+Your Presence / Your website / Creative Studio / Growth all → /presence.html. Pick the canonical entry; give Growth its own #growth deep-link to the Growth Coach (like #foundations). IA decision, not a blind rename.
+
+### FD-SKU2 · 🔵 STILL OPEN — per-edition first-run onboarding COPY
+Runtime + empty states are edition-correct; the remaining piece is first-run wording per edition (website-only vs relationship-only language). Copy layer, no architecture.
+
+### Still post-Playwright (unchanged): CP-7 NAP drift-watch (GBP adapter scope), SD-5 Search Console provider (new OAuth). FD-CRM3 AI reply-draft = V1.1.

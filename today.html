@@ -102,9 +102,12 @@ function greet(){ const h = new Date().getHours(); return h < 12 ? 'Good morning
 // tone → calm styling class (never a score, never a colour alarm)
 function toneClass(t){ if(t==='good_news'||t==='celebration'||t==='celebratory'||t==='reassuring') return 'good'; if(t==='needs_attention'||t==='attentive') return 'attn'; return ''; }
 
-function render(moments, features, feed){
+function render(moments, features, feed, ctx){
   $('greeting').textContent = greet();
   const items = (moments||[]).filter(Boolean);
+  // PP-5: the empty-state speaks in the language of what this edition actually is.
+  const edFeats = (ctx && ctx.edition_features) || null;
+  const hasWebsite = !edFeats || edFeats.indexOf('website') >= 0;
   // ── needs you now: the SAME items the top-bar bell counts (notices + pending
   //    approvals) so the home page and the bell tell one story — each taps
   //    straight through to the page that resolves it. ──────────────────────────
@@ -129,10 +132,16 @@ function render(moments, features, feed){
   }
   if(!items.length && !needs){
     $('sub').textContent = "Nothing needs your attention today.";
+    const clearBody = hasWebsite
+      ? 'Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.'
+      : 'Everything across your business is quiet, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.';
+    const clearLinks = hasWebsite
+      ? `<a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your leads</a>`
+      : `<a class="link" href="/crm.html">Open your relationships</a> <span style="color:var(--soft)">·</span> <a class="link" href="/connections.html">Your connections</a>`;
     html += `<div class="moment calm"><span class="tag">All clear</span>
-      <h2>Everything customers can see is current.</h2>
-      <p>Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.</p>
-      <div class="row"><a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your leads</a></div></div>`;
+      <h2>${hasWebsite ? 'Everything customers can see is current.' : 'Everything’s quiet across your business.'}</h2>
+      <p>${clearBody}</p>
+      <div class="row">${clearLinks}</div></div>`;
   } else {
     const parts = [];
     if(needs) parts.push(needs === 1 ? 'one thing needs you' : `${needs} things need you`);
@@ -215,7 +224,7 @@ function trouble(){
   $('main').innerHTML = `<div class="center"><h2>We couldn’t load your day just now.</h2>
     <p class="muted">Nothing’s wrong on your site — this is only this page.</p>
     <p style="margin-top:18px"><button onclick="location.reload()" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></p>
-    <p style="margin-top:14px"><a class="link" href="/presence.html">Open your full workspace →</a></p></div>`;
+    <p style="margin-top:14px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;
 }
 
 (async function init(){
@@ -230,11 +239,47 @@ function trouble(){
       apiGet('/portal/feed').catch(()=>null),
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
-    render(list, features?.data || {}, feed && feed.data);
+    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data);
+    orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);
     healthLine();
   }catch(_){ trouble(); }
 })();
+
+// ── PP-6: the one-time "welcome to your new plan" orientation. When the edition
+// grows (an upgrade added feature areas), name exactly what became available —
+// orient, don't market. Fully client-side off the feature list; the first sight
+// of any edition orients silently (no false "upgrade" for a brand-new account).
+const FEATURE_LABEL = {
+  website:'your website workspace', developer:'Developer Mode', forms:'website lead capture',
+  business_moments:'Business Moments', connected:'Connections', ai:'AI drafting & the Concierge',
+  relationship:'the relationship view', reports:'exports & reports', client_portal:'client sharing',
+  managed_service:'managed service', agency:'the agency portfolio', enterprise:'enterprise controls',
+};
+function orientationCard(c){
+  if(!c || !c.edition_features || !c.edition_name) return;
+  const KEY='dds-oriented'; let prev=null;
+  try{ prev=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){}
+  const now={ key:c.edition_key, feats:c.edition_features };
+  if(!prev || prev.key===now.key){ try{ localStorage.setItem(KEY, JSON.stringify(now)); }catch(_){}
+    if(!prev) return;  // first sight → orient silently, never a false upgrade
+    return;
+  }
+  const gained=(now.feats||[]).filter(f=>!(prev.feats||[]).includes(f));
+  try{ localStorage.setItem(KEY, JSON.stringify(now)); }catch(_){}
+  if(!gained.length) return;  // lateral move / downgrade → nothing to welcome
+  const list=gained.map(f=>FEATURE_LABEL[f]||String(f).replace(/_/g,' ')).filter(Boolean);
+  const host=document.querySelector('main')||document.body;
+  const card=document.createElement('div');
+  card.style.cssText='max-width:860px;margin:0 auto 20px;padding:20px 22px;border:1px solid var(--accent);border-radius:16px;background:var(--accent-soft)';
+  card.innerHTML=`<div style="font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:6px">Welcome to ${esc(c.edition_name)}</div>
+    <div style="font-family:var(--serif);font-size:20px;margin-bottom:8px">You now have ${list.length===1?'':'a few more things'}${list.length===1?'':':'}</div>
+    <p style="margin:0 0 14px;color:var(--soft);font-size:14.5px">${esc(list.join(' · '))}. It’s all here whenever you want it — nothing you need to set up.</p>
+    <button class="primary" id="orientDone">Got it</button>`;
+  host.insertBefore(card, host.firstChild);
+  const b=document.getElementById('orientDone');
+  if(b) b.addEventListener('click',()=>{ card.style.transition='opacity .25s'; card.style.opacity='0'; setTimeout(()=>card.remove(),250); });
+}
 
 // ── Phase P: "what you own" + the honest upsell — quiet, at the bottom, never a
 // dead end. Shown only when the platform says there IS a next rung (owners only;

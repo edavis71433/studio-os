@@ -15,6 +15,7 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import {
   validateScheduleTime, isScheduleKind, validateSubmission, formParamsToSubmission,
   signApprovalToken, verifyApprovalToken, type ApprovalTokenPayload,
+  leadFollowupResolvesOn, leadFollowupNoticeKey,
 } from '../lib/commercial.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -133,7 +134,17 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
   const status = ['new', 'read', 'archived'].includes(b?.status) ? b.status : 'read';
   const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status }) });
-  return (r.ok && r.json?.[0]) ? json({ data: { ok: true } }, 200, cors) : json({ error: 'not_found' }, 404, cors);
+  if (!(r.ok && r.json?.[0])) return json({ error: 'not_found' }, 404, cors);
+  // PP-1: acting on the lead resolves its follow-up nudge — so Today's card, the
+  // bell, and the attention badge (all reading active notices) drop it at once.
+  // Keyed period=lead:<id>, this touches exactly this lead's notice, nothing else.
+  if (leadFollowupResolvesOn(status)) {
+    const k = leadFollowupNoticeKey(id);
+    await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, {
+      method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),
+    }).catch(() => {});
+  }
+  return json({ data: { ok: true } }, 200, cors);
 }
 
 async function hashIp(req: Request): Promise<string> {

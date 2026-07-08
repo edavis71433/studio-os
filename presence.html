@@ -363,7 +363,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <button class="navitem" data-view="faqs">Questions</button>
       <button class="navitem" data-view="testimonials">Kind words</button>
       <button class="navitem" data-view="updates">Updates</button>
-      <button class="navitem" data-view="media">Photographs</button>
+      <button class="navitem" data-view="media">Photos</button>
       <button class="navitem" data-view="design">Design</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
@@ -502,8 +502,8 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- PHOTOGRAPHS -->
       <section class="view" id="view-media">
-        <h1 class="doc">Photographs</h1>
-        <p class="docsub">Your collection. Photographs marked “on your site” are at work; the rest wait here, ready when you are.</p>
+        <h1 class="doc">Photos</h1>
+        <p class="docsub">Your collection. Photos marked “on your site” are at work; the rest wait here, ready when you are.</p>
         <div style="display:flex;align-items:baseline;gap:20px">
           <button class="textact" id="btnUpload">＋ Add a photograph</button>
           <span class="whisper" id="save-media" style="font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2)"></span>
@@ -758,8 +758,9 @@ $("dock").addEventListener("click", (e) => {
 });
 (function buildSectionsSheet() {
   const wrap = $("sectionsNav");
-  [["business","Business"],["offerings","Menu"],["faqs","Questions"],["testimonials","Kind words"],["updates","Updates"],["media","Photographs"],["history","History"]].forEach(([v, label]) => {
+  [["business","Business"],["offerings","Menu"],["faqs","Questions"],["testimonials","Kind words"],["updates","Updates"],["media","Photos"],["history","History"]].forEach(([v, label]) => {
     const b = el("button", "navitem", label); b.style.padding = "10px 0"; b.style.fontSize = "15px";
+    b.dataset.view = v;   // so applyVocab keeps the offerings label (Menu/Services) in sync here too
     b.addEventListener("click", () => { closeSheet("sectionsScrim"); go(v); });
     wrap.appendChild(b);
   });
@@ -2578,7 +2579,7 @@ function vocabWords() {
 }
 function applyVocab() {
   VOCAB = vocabWords();
-  const nav = document.querySelector('[data-view="offerings"]'); if (nav) nav.textContent = VOCAB.label;
+  document.querySelectorAll('.navitem[data-view="offerings"]').forEach((n) => { n.textContent = VOCAB.label; });   // main tab + sections sheet stay in sync
   const h = document.querySelector("#view-offerings h1.doc"); if (h) h.textContent = VOCAB.label;
   const sub = document.querySelector("#view-offerings .docsub"); if (sub) sub.textContent = VOCAB.sub;
   const pb = document.querySelector('#pageWords button[data-page="/menu/"]');

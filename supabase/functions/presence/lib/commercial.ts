@@ -105,6 +105,57 @@ export function leadFollowupCopy(form_kind: string, who: string): { headline: st
   };
 }
 
+/** PP-1: the follow-up nudge must represent reality. Acting on a lead — reply
+ *  (auto-marks read), mark read, or archive — resolves it; a still-'new' lead
+ *  does not. Pure. */
+export function leadFollowupResolvesOn(status: string): boolean {
+  return status === 'read' || status === 'archived';
+}
+
+/** PP-1: the exact notices-rail key for a lead's follow-up nudge. Because the
+ *  period embeds the lead id, resolving one lead can never touch another's
+ *  notice (or a notice of any other kind). Pure. */
+export function leadFollowupNoticeKey(leadId: string): { kind: string; period: string } {
+  return { kind: 'lead_followup', period: `lead:${leadId}` };
+}
+
+// ── PP-2 / CP-3.1: the annual renewal heads-up ───────────────────────────────
+// Never surprise a customer with a yearly charge. For ANNUAL terms not already
+// set to cancel, a calm reminder goes out ~30 days and again ~7 days before the
+// renewal date. Informational, not sales. Pure decision; the runner sends it.
+export interface RenewalView { term?: string | null; current_period_end?: string | null; cancel_at_period_end?: boolean; }
+export function renewalReminderWindow(e: RenewalView, nowIso: string): 7 | 30 | null {
+  if (e?.term !== 'annual' || e?.cancel_at_period_end || !e?.current_period_end) return null;
+  const end = Date.parse(String(e.current_period_end)), now = Date.parse(nowIso);
+  if (!isFinite(end) || !isFinite(now)) return null;
+  const days = Math.floor((end - now) / 86400_000);
+  if (days < 0) return null;
+  if (days <= 7) return 7;
+  if (days <= 30) return 30;
+  return null;
+}
+
+/** The send-once key for a renewal reminder: one per renewal cycle per window,
+ *  so the 30-day and 7-day notes each fire exactly once. Pure. */
+export function renewalNoticePeriod(currentPeriodEndIso: string, window: 7 | 30): string {
+  return `${String(currentPeriodEndIso).slice(0, 10)}:${window}`;
+}
+
+/** Calm, informational renewal copy — renewal date, plan, what they've built,
+ *  and a link to manage the plan. No urgency, no upsell. Pure. */
+export function renewalReminderCopy(planName: string, renewalDateIso: string, window: 7 | 30, publishedUpdates: number): { headline: string; body: string; subject: string } {
+  const when = new Date(renewalDateIso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const lead = window === 7 ? `Your ${planName} plan renews on ${when}` : `A heads-up: your ${planName} plan renews ${when}`;
+  const built = publishedUpdates > 0
+    ? ` Over the past year your website published ${publishedUpdates} update${publishedUpdates === 1 ? '' : 's'} and stayed correct and online the whole way.`
+    : ' Your website has stayed correct and online all year.';
+  return {
+    headline: lead,
+    body: `${lead}, continuing your annual plan.${built} Nothing is needed from you — it renews automatically. If you'd like to review or change your plan, you can do that any time.`,
+    subject: lead,
+  };
+}
+
 // ── FD-3: one-tap approve — stateless signed token ───────────────────────────
 // HMAC-SHA256 over the payload with a server secret; base64url; carries an expiry.
 // No table: verification is pure crypto. The token authorizes exactly ONE decision
