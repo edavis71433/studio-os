@@ -170,7 +170,7 @@ export async function handleRestoreToDraft(req: Request, site: SiteRow, principa
   if (!rec) return json({ error: 'not_found', message: 'We couldn’t find that version.' }, 404, cors);
   if (!rec.snapshot_id) return json({ error: 'not_restorable', message: 'That version is no longer restorable (older versions are kept for a limited time).' }, 410, cors);
 
-  const s = await svc(`presence_snapshots?id=eq.${rec.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version&limit=1`);
+  const s = await svc(`presence_snapshots?id=eq.${rec.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,dev_customization&limit=1`);
   const snap = s.json?.[0];
   if (!snap) return json({ error: 'not_restorable', message: 'That version is no longer restorable.' }, 410, cors);
   if (!snapshotContentUsable(snap.content)) return json({ error: 'not_restorable', message: 'That version predates the current site format and can’t be restored.' }, 410, cors);

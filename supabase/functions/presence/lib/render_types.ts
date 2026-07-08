@@ -82,12 +82,26 @@ export interface MediaRef {
   width?: number; height?: number;
 }
 
+/** Phase B1: the Developer-Mode presentation layer, a SIBLING of content in the
+ *  snapshot (never inside the structured-content contract). Present only when a
+ *  site has customization; absent → render is byte-identical to before. Values
+ *  are already sanitized (at save AND at serialize time), so the renderer treats
+ *  them as inert data. This is what makes a developer edit part of the ONE
+ *  snapshot → one render → same bytes → same rollback/restore/preview. */
+export interface SnapshotDevLayer {
+  theme_tokens: Record<string, string>;
+  custom_css: string;
+  custom_html: string;
+}
+
 export interface Snapshot {
   content: SnapshotContent;
   content_contract_version: number;
   template_slug: string;
   template_version: string;
   created_at: string;
+  /** optional presentation layer (Developer Mode); omitted when empty */
+  dev_customization?: SnapshotDevLayer | null;
 }
 
 export interface TemplateManifest {

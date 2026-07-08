@@ -161,10 +161,13 @@ Nothing on this ladder executes untrusted code at runtime. Everything is version
                     └───────────────────────────────┘
 ```
 
-- **Storage:** `presence_dev_customizations` (one row per site; theme tokens JSON + sanitized CSS/HTML). Deny-all RLS, function-mediated — same isolation as every other table.
+- **Live edit storage:** `presence_dev_customizations` (one row per site; theme tokens JSON + sanitized CSS/HTML) — the working copy the editor reads and writes. Deny-all RLS, function-mediated.
+- **Snapshot storage (Phase B1):** on publish, the sanitized dev layer is captured into the **snapshot** (`presence_snapshots.dev_customization`), a sibling of `content`. This is what makes a developer edit part of the ONE snapshot — so it versions, rolls back, restores, and previews exactly like content.
+- **The one render path (Phase B1):** `renderSnapshot(snapshot, siteCfg)` in `lib/render.ts` is the single render entry. It renders the template, then applies the snapshot's dev layer (`injectDevLayer`) as a deterministic post-render pass — one `<style id="presence-dev">` (theme tokens as `:root` vars + custom CSS) before `</head>`, and the sanitized HTML block before `</body>`. **Publish, preview, and restore all call it**, so there is no second renderer, no second publish path, no special deployment. With no customization the pass is a no-op and bytes are identical.
+- **Determinism:** the dev layer lives in the snapshot, so *same snapshot → same render → same bytes*. Template-agnostic injection keeps the shipped templates immutable (no per-version edits). Templates consume theme tokens by referencing the `:root` variables; the immutable restaurant-classic 1.0.0 doesn't, so on it tokens take effect through your custom CSS (e.g. `.cta{background:var(--accent)}`) or a future token-aware template version via the SDK.
 - **Access:** `use_developer_mode` capability (operator or developer). Enforced server-side in `routes/dev.ts`; nav entry gated in `lib/navigation.ts`.
-- **Safety:** all input passes `lib/devmode.ts` (`validateThemeTokens`, `sanitizeDevCss`, `sanitizeDevHtml`) before storage — no script/handler/dangerous-URL can land. The preview is a `sandbox=""` iframe (no script permission), so even unsaved input can't execute.
-- **Publishing / versioning:** unchanged. Developer Mode stores the customization; the existing `/publish`, `/publishes`, `/restore` ritual carries it live, versions it, and rolls it back. Nothing bypasses approval.
+- **Safety:** all input passes `lib/devmode.ts` (`validateThemeTokens`, `sanitizeDevCss`, `sanitizeDevHtml`) before storage **and** again at snapshot time (`buildDevLayer`) — no script/handler/dangerous-URL can land. The in-app sample preview is a `sandbox=""` iframe (no script permission); the "Preview real page" button renders through the server `/preview` (the publish renderer).
+- **Publishing / versioning / rollback / restore:** unchanged pipeline — Developer Mode only adds a sibling field to the snapshot. `/publish` captures it, `/publishes` versions it, `/restore` and restore-to-draft bring it back. Nothing bypasses approval.
 - **Frozen spines untouched:** the Intelligence Pipeline and the Approved-Plan Lifecycle are not modified; the 14 platform invariants hold (14/14).
 
 ---

@@ -6,7 +6,7 @@
 // snapshot with kind=restore. History never lies; clients get plain language.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { getTemplate } from '../lib/render.ts';
+import { getTemplate, renderSnapshot } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
@@ -48,6 +48,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
         site_id: site.id, content: snapshotArg.snapshot.content, media_manifest: snapshotArg.mediaManifest,
         content_contract_version: snapshotArg.snapshot.content_contract_version,
         template_slug: snapshotArg.snapshot.template_slug, template_version: snapshotArg.snapshot.template_version,
+        dev_customization: snapshotArg.snapshot.dev_customization ?? null,  // Phase B1: capture the dev layer with the snapshot
         created_by: principal.userId, created_by_kind: actorKind,
       }),
     });
@@ -71,12 +72,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   if (!site.netlify_site_id) return await fail('config', 'site has no netlify_site_id (admin has not connected hosting)');
   if (!netlifyConfigured()) return await fail('config', 'NETLIFY_AUTH_TOKEN not configured');
 
-  // render (pure) + variants (EXIF-stripped webp bytes) → one file map
+  // render (pure) + variants (EXIF-stripped webp bytes) → one file map.
+  // Phase B1: renderSnapshot is the ONE render entry — it applies the snapshot's
+  // Developer-Mode layer, so a developer edit publishes identically to any change.
   const t = getTemplate(snapshotArg.snapshot.template_slug, snapshotArg.snapshot.template_version);
   if (!t) return await fail('render', `unknown template ${snapshotArg.snapshot.template_slug}@${snapshotArg.snapshot.template_version}`);
   const siteCfg = { baseUrl: site.custom_domain ? `https://${site.custom_domain}` : `https://${site.netlify_site_id}.netlify.app` };
   let fileMap: Record<string, string | Uint8Array>;
-  try { fileMap = t.render(snapshotArg.snapshot, t.manifest, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
+  try { fileMap = renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
   Object.assign(fileMap, images);
@@ -135,11 +138,11 @@ export async function handleRestore(req: Request, site: SiteRow, principal: Prin
   if (!row) return json({ error: 'not_found', message: 'We couldn’t find that version.' }, 404, cors);
   if (!row.snapshot_id) return json({ error: 'not_restorable', message: 'That version is no longer restorable (older versions are kept for a limited time).' }, 410, cors);
 
-  const snap = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at`);
+  const snap = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
   const s = snap.json?.[0];
   if (!s) return json({ error: 'not_restorable', message: 'That version is no longer restorable.' }, 410, cors);
 
-  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at };
+  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
   const summary = `Restored the version from ${new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
   return runPipeline(site, principal, 'restore', { snapshot, snapshotId: row.snapshot_id, mediaManifest: s.media_manifest || [] }, summary, cors);
 }

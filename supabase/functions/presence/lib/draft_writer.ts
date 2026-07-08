@@ -41,7 +41,7 @@ function mediaResolver(mediaManifest: MediaManifestRow[], liveMedia: Array<{ id:
 
 export async function applySnapshotToDraft(
   site: SiteRow,
-  snapshot: { content: unknown; media_manifest?: MediaManifestRow[]; content_contract_version: number; template_slug: string; template_version: string },
+  snapshot: { content: unknown; media_manifest?: MediaManifestRow[]; content_contract_version: number; template_slug: string; template_version: string; dev_customization?: { theme_tokens?: Record<string, string>; custom_css?: string; custom_html?: string } | null },
   principal: Principal,
   summary: string,
 ): Promise<ApplyResult> {
@@ -63,6 +63,7 @@ export async function applySnapshotToDraft(
           site_id: site.id, content: cur.snapshot.content, media_manifest: cur.mediaManifest,
           content_contract_version: cur.snapshot.content_contract_version,
           template_slug: site.template_slug, template_version: site.template_version,
+          dev_customization: cur.snapshot.dev_customization ?? null,  // Phase B1: safety snapshot keeps the current dev layer too
           created_by: principal.userId, created_by_kind: actorKind,
         }),
       });
@@ -163,6 +164,24 @@ export async function applySnapshotToDraft(
   if (demote.length) {
     await svc(`presence_posts?id=in.(${demote.join(',')})`, { method: 'PATCH', body: JSON.stringify({ status: 'draft' }) });
     hidden += demote.length;
+  }
+
+  // 7b. Phase B1: restore the Developer-Mode layer too, so restore-to-draft brings
+  // back the exact customization of that version (or clears it if the version had
+  // none) — the draft matches the restored snapshot completely.
+  {
+    const d = snapshot.dev_customization || null;
+    await svc('presence_dev_customizations?on_conflict=site_id', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        site_id: site.id,
+        theme_tokens: d?.theme_tokens ?? {},
+        custom_css: d?.custom_css ?? '',
+        custom_html: d?.custom_html ?? '',
+        updated_by: principal.userId || 'restore',
+        updated_at: new Date().toISOString(),
+      }),
+    });
   }
 
   // 8. provenance — one event, names only

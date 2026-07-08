@@ -7,7 +7,8 @@
 // consumes, computes the media manifest (deterministic output paths per
 // variant), and stamps contract/template versions + timestamp.
 import { svc } from './db.ts';
-import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest } from './render_types.ts';
+import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
+import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -36,9 +37,20 @@ function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | 
   return { alt: m.alt_text, variants, width: m.width ?? undefined, height: m.height ?? undefined };
 }
 
+/** Build the sanitized dev layer from the raw row, or null when there's nothing
+ *  to apply — so the snapshot omits it entirely (byte-identical to no-dev). Pure. */
+export function buildDevLayer(row: { theme_tokens?: unknown; custom_css?: unknown; custom_html?: unknown } | undefined): SnapshotDevLayer | null {
+  if (!row) return null;
+  const theme_tokens = validateThemeTokens(row.theme_tokens).tokens;
+  const custom_css = sanitizeDevCss(String(row.custom_css ?? ''));
+  const custom_html = sanitizeDevHtml(String(row.custom_html ?? ''));
+  if (Object.keys(theme_tokens).length === 0 && !custom_css.trim() && !custom_html.trim()) return null;
+  return { theme_tokens, custom_css, custom_html };
+}
+
 export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
-  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr] = await Promise.all([
+  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr, devArr] = await Promise.all([
     q(`presence_identity?site_id=eq.${siteId}&limit=1`),
     q(`presence_locations?site_id=eq.${siteId}&order=created_at.asc`),
     q(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
@@ -48,6 +60,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,width,height`),
     q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
     q(`presence_settings?site_id=eq.${siteId}&limit=1`),
+    q(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`),
   ]);
 
   const mediaById = new Map<string, MediaRow>((media as MediaRow[]).map((m) => [m.id, m]));
@@ -94,12 +107,19 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     };
   });
 
+  // Phase B1: the Developer-Mode layer rides in the snapshot as a sibling of
+  // content. Re-sanitize here so the snapshot always carries inert values even
+  // if the row were somehow tampered; omit entirely when empty so a site with no
+  // customization produces a byte-identical snapshot (no version churn).
+  const devCustomization = buildDevLayer(devArr[0]);
+
   const snapshot: Snapshot = {
     content,
     content_contract_version: CONTENT_CONTRACT_VERSION,
     template_slug: opts.templateSlug,
     template_version: opts.templateVersion,
     created_at: opts.now,
+    ...(devCustomization ? { dev_customization: devCustomization } : {}),
   };
   return { snapshot, mediaManifest };
 }

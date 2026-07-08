@@ -9,7 +9,7 @@
 // inlined so a lone HTML response is self-contained.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { getTemplate } from '../lib/render.ts';
+import { getTemplate, renderSnapshot } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { previewUrlMap } from '../lib/media.ts';
@@ -33,13 +33,13 @@ async function loadSnapshotFor(site: SiteRow, version: string, publishId: string
   } else {
     return null; // caller serializes the draft
   }
-  const s = await svc(`presence_snapshots?id=eq.${snapId}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at`);
+  const s = await svc(`presence_snapshots?id=eq.${snapId}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
   const row = s.json?.[0];
   if (!row) return { error: 'not_restorable', message: 'That version is no longer available to view.', status: 410 };
   // degenerate pre-contract snapshots are retained in history but can't be shown
   if (!snapshotContentUsable(row.content)) return { error: 'not_restorable', message: 'That version predates the current site format and can’t be shown.', status: 410 };
   return {
-    snapshot: { content: row.content, content_contract_version: row.content_contract_version, template_slug: row.template_slug, template_version: row.template_version, created_at: row.created_at },
+    snapshot: { content: row.content, content_contract_version: row.content_contract_version, template_slug: row.template_slug, template_version: row.template_version, created_at: row.created_at, dev_customization: row.dev_customization ?? null },
     mediaManifest: row.media_manifest || [],
   };
 }
@@ -68,10 +68,11 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
     blockers = v.blockers.length; warnings = v.warnings.length;
   }
 
-  const snapTemplate = getTemplate(snapshot.template_slug, snapshot.template_version) || t;
   let fileMap;
   try {
-    fileMap = snapTemplate.render(snapshot, snapTemplate.manifest, { baseUrl: 'https://preview.invalid' });
+    // Phase B1: same renderSnapshot as publish/restore — preview is pixel-identical
+    // to production for the same snapshot (incl. the Developer-Mode layer).
+    fileMap = renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' });
   } catch (e) {
     console.error('preview render failed:', (e as Error)?.message);
     return json({ error: 'render_failed', message: 'We couldn’t draw this preview. Your content is safe — your concierge has been notified.' }, 500, cors);

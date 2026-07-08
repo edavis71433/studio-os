@@ -295,9 +295,9 @@ async function handleRetry(req: Request, site: SiteRow, principal: Principal, co
   const rec = (await svc(q)).json?.[0];
   if (!rec) return json({ error: 'not_found', message: 'No failed publish to retry for this site.' }, 404, cors);
   if (!rec.snapshot_id) return json({ error: 'not_restorable', message: 'That publish’s snapshot is no longer retained — run a fresh publish instead.' }, 410, cors);
-  const s = (await svc(`presence_snapshots?id=eq.${rec.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at`)).json?.[0];
+  const s = (await svc(`presence_snapshots?id=eq.${rec.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`)).json?.[0];
   if (!s) return json({ error: 'not_restorable', message: 'That publish’s snapshot is no longer retained — run a fresh publish instead.' }, 410, cors);
-  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at };
+  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
   return runPipeline(site, principal, rec.kind === 'restore' ? 'restore' : 'publish',
     { snapshot, snapshotId: rec.snapshot_id, mediaManifest: s.media_manifest || [] },
     `Retry: ${rec.change_summary || 'previous publish'}`, cors);
@@ -321,9 +321,9 @@ async function handleRestoreSnapshot(req: Request, site: SiteRow, principal: Pri
   const body = await readBody(req);
   const snapId = String(body?.snapshot_id || '');
   if (!UUID_RE.test(snapId)) return json({ error: 'bad_request', message: 'snapshot_id (uuid) is required.' }, 400, cors);
-  const s = (await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at`)).json?.[0];
+  const s = (await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`)).json?.[0];
   if (!s) return json({ error: 'not_found', message: 'No retained snapshot with that id for this site.' }, 404, cors);
-  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at };
+  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
   const when = new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return runPipeline(site, principal, 'restore', { snapshot, snapshotId: snapId, mediaManifest: s.media_manifest || [] }, `Operator restored the snapshot from ${when}`, cors);
 }

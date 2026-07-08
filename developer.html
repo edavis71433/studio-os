@@ -170,7 +170,7 @@ function readonlyView(path){
   return `<div class="readonly"><h2>Read-only — render code</h2>
     <div class="box"><b>${esc(path)}</b><br><br>Template render logic is authored with the <b>Presence SDK</b> at build time and version-pinned to your site (currently <b>${esc(STATE.template.slug||'')}@${esc(STATE.template.version||'')}</b>). It is deployed with the platform — never edited or executed at runtime — which is what keeps every site deterministic and secure.<br><br>To change render logic, publish a new template version through the SDK. See the <a class="link" href="/docs/presence/DEVELOPER-MODE-GUIDE.md">Developer Guide</a>.</div></div>`;
 }
-function previewBlock(){return `<div class="preview"><h2>Live preview <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)">— sandboxed, no scripts run</span></h2><iframe class="pv" id="pv" title="Preview" sandbox=""></iframe></div>`;}
+function previewBlock(){return `<div class="preview"><h2 style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span>Live preview <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)">— sandboxed, no scripts run</span></span><button id="realpv" style="font-size:12px;padding:6px 12px">Preview real page →</button></h2><iframe class="pv" id="pv" title="Preview" sandbox=""></iframe><p class="hint" id="pvnote" style="margin-top:8px">Sample content with your theme applied. “Preview real page” saves, then renders your actual site through the same pipeline that publishes — pixel-identical to production except for unpublished changes.</p></div>`;}
 function approvalBlock(){return `<div class="approval"><b>Publishing:</b> Save keeps your work. It goes live only when you <b>Publish</b> from your workspace — through the same approval flow as any change, versioned and reversible. Nothing here bypasses approval.</div>`;}
 
 // gather current edits from the DOM (so preview + save use live values)
@@ -225,6 +225,21 @@ function wire(){
   document.querySelectorAll('[data-tokcolor]').forEach(c=>c.addEventListener('input',()=>{const k=c.getAttribute('data-tokcolor');const t=document.querySelector(`[data-tok="${k}"]`);if(t)t.value=c.value;collect();refreshPreview();}));
   document.querySelectorAll('[data-tok]').forEach(i=>i.addEventListener('input',()=>{const k=i.getAttribute('data-tok');const c=document.querySelector(`[data-tokcolor="${k}"]`);if(c&&/^#[0-9a-fA-F]{6}$/.test(i.value))c.value=i.value;collect();refreshPreview();}));
   ['css','html'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',()=>{collect();refreshPreview();});});
+  const rp=$('realpv');if(rp)rp.addEventListener('click',loadRealPreview);
+}
+// Render the REAL page through the server /preview — the exact renderer publish
+// uses (dev layer included). Saves first so the server sees the current layer.
+async function loadRealPreview(){
+  const btn=$('realpv');const note=$('pvnote');const f=$('pv');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  await save();
+  if(btn)btn.textContent='Rendering…';
+  try{
+    const r=await fetch(FN+'/preview?version=draft&page=/',{headers:H()});
+    if(!r.ok){if(note)note.textContent='Couldn’t render the real page just now — the sample above still reflects your theme.';}
+    else{const html=await r.text();if(f)f.srcdoc=html;if(note)note.textContent='This is your real site, rendered through the publishing pipeline with your saved customization. Publish from your workspace to take it live.';}
+  }catch(_){if(note)note.textContent='Couldn’t render the real page just now.';}
+  if(btn){btn.disabled=false;btn.textContent='Preview real page →';}
 }
 async function save(){
   collect();
