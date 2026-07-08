@@ -12,6 +12,7 @@
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc } from '../lib/db.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
+import { leadFollowupDue, leadFollowupCopy } from '../lib/commercial.ts';
 import { sendEmail } from './account.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
@@ -237,4 +238,39 @@ export async function runDomainWatch(limit = 10): Promise<{ checked: number; war
     }
   }
   return { checked, warned };
+}
+
+// ── Phase CRM (FD-CRM1): the un-replied lead follow-up nudge ──────────────────
+// A lead emails the owner once on arrival; if it then sits 'new' for a day,
+// nothing tapped them until the weekly digest — too slow for a hot quote. Raise
+// ONE calm notice + email per lead (period = the lead id → exactly once, ever),
+// for non-spam leads 1–7 days old still marked 'new'. Same 15-min sweep, same
+// notices rail, same send-once semantics as every other lifecycle touch.
+export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> {
+  const nowIso = new Date().toISOString();
+  const from = new Date(Date.now() - 7 * 86400_000).toISOString();   // still fresh (<1 week)
+  const to = new Date(Date.now() - 24 * 3600_000).toISOString();     // aged at least a day
+  const q = await svc(`presence_form_submissions?status=eq.new&spam=is.false&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,created_at&order=created_at.asc&limit=${limit}`);
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  let nudged = 0;
+  for (const lead of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; form_kind: string; name?: string; email?: string; created_at: string }>) {
+    if (!leadFollowupDue(lead, nowIso)) continue;                    // pure guard (defends the SQL window)
+    const siteQ = await svc(`presence_sites?id=eq.${lead.site_id}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+    const who = lead.name || lead.email || 'Someone';
+    const copy = leadFollowupCopy(lead.form_kind, who);
+    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ site_id: lead.site_id, client_id: clientId, kind: 'lead_followup', period: `lead:${lead.id}`, headline: copy.headline, body: copy.body, status: 'active' }),
+    });
+    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+      nudged++;
+      const ident = await svc(`presence_identity?site_id=eq.${lead.site_id}&select=email&limit=1`);
+      const owner = ident.json?.[0]?.email;
+      if (owner) sendEmail(String(owner), copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p><a href="${base}/leads.html">Reply now →</a> A quick response keeps them warm.</p>`).catch(() => {});
+    }
+  }
+  return { nudged };
 }

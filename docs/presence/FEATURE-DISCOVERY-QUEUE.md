@@ -345,3 +345,13 @@ A light task/reminder list (the Growth Coach is adjacent). **Value:** Low · **E
 ---
 
 *Triage owner: the A9 Product Review Board. Nothing here is scheduled or approved until the Board accepts it.*
+
+## Phase CRM — relationship follow-through
+### FD-CRM1 · ✅ IMPLEMENTED (Phase CRM) — un-replied lead follow-up nudge
+A non-spam lead sitting `status='new'` for 1–7 days now raises one calm notice + email (Reply now → leads inbox), send-once via period=lead:id on the existing notices rail + 15-min sweep. Closes the gap between the arrival email and the weekly digest. Pure core tested (commercial 40/40), mig 0061, both envs.
+
+### FD-CRM2 · 🔵 RECOMMENDED (V1.1) — agency "leads needing a reply" roll-up
+The per-site un-replied-lead query already exists; surface it across an agency's whole client list as one read. Rides the next agency-surface touch. Naturally extends FD-CRM1 from per-owner to per-agency.
+
+### FD-CRM3 · 🔵 RECOMMENDED (V1.1) — optional AI "draft a reply" on a lead
+Reply-prefill already removes the blank page deterministically; an AI draft button is a nicety, not a gap. Gated on ANTHROPIC_KEY, metered like every other generative op.

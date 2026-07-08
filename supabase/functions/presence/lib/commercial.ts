@@ -77,6 +77,34 @@ export function validateSubmission(body: any): { ok: true; sub: CleanSubmission;
   return { ok: true, sub: { form_kind, name, email, phone, message, fields, source_page }, spam };
 }
 
+// ── Phase CRM (FD-CRM1): the un-replied lead follow-up nudge ──────────────────
+// A lead emails the owner once on arrival. If it then sits un-actioned (still
+// 'new', not spam) for a day, nothing tapped them until the WEEKLY digest — too
+// slow for a hot quote. A lead deserves ONE calm follow-up nudge when it's aged
+// at least a day but is still fresh enough to matter (under a week). Older-still-
+// new leads are left to the digest; nudging about week-old leads would only
+// annoy. Reply auto-marks a lead 'read', so 'new' is an honest "not yet dealt
+// with" signal. Pure — the runner in commerce/lifecycle.ts raises the notice.
+export function leadFollowupDue(lead: { status?: string; spam?: boolean; created_at?: string }, nowIso: string): boolean {
+  if (lead?.status !== 'new' || lead?.spam) return false;
+  const t = Date.parse(String(lead?.created_at ?? '')), now = Date.parse(nowIso);
+  if (!isFinite(t) || !isFinite(now)) return false;
+  const ageMs = now - t;
+  return ageMs >= 24 * 3600_000 && ageMs <= 7 * 86400_000;
+}
+
+/** Calm, reply-oriented copy for the follow-up nudge — no pressure, no sales
+ *  language, just "someone's waiting, a quick reply keeps them warm." Pure. */
+export function leadFollowupCopy(form_kind: string, who: string): { headline: string; body: string; subject: string } {
+  const label = form_kind === 'quote' ? 'A quote request' : form_kind === 'booking' ? 'A booking request' : 'A message';
+  const name = (who || '').trim() || 'Someone';
+  return {
+    headline: `${label} is waiting for a reply`,
+    body: `${name} reached out through your website about a day ago and hasn’t heard back yet. A quick reply keeps them warm — it only takes a minute.`,
+    subject: `${label} is waiting for your reply`,
+  };
+}
+
 // ── FD-3: one-tap approve — stateless signed token ───────────────────────────
 // HMAC-SHA256 over the payload with a server secret; base64url; carries an expiry.
 // No table: verification is pure crypto. The token authorizes exactly ONE decision

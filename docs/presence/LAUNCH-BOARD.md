@@ -32,7 +32,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 | B5 | **Reconcile migration history** so a single migration applies without the hold-back ritual | 🤖 | The current ritual is manual and one typo from a prod mistake |
 | B6 | **`svc()` id-scope security audit**: every service-role query that takes a request-supplied id must filter by tenant/site/org | 🤖 | Service role bypasses RLS; one missing filter = cross-tenant leak |
 | B7 | **Secret rotation confirmed** (Netlify token, any password shown in chat); never reset `edavis7143@yahoo.com` | 🧑 | Historical exposure |
-| B8 | **Basic monitoring + alerting** (function errors, failed deploys, DB health) + a one-page incident runbook. 🟢 *Partial:* cross-region watchdog (staging→prod `/system/health` every 5 min → email), weekly owner digest, and (Phase INF) the **domain-expiry watch** all ship health signals on the cron. Remaining: function-error/failed-deploy alerting + the runbook page. | 🧑🤖 | Operating blind is not acceptable for paid users |
+| B8 | **Basic monitoring + alerting** (function errors, failed deploys, DB health) + a one-page incident runbook. 🟢 *Partial:* cross-region watchdog (staging→prod `/system/health` every 5 min → email), weekly owner digest, the domain-expiry watch, and (Phase CRM) the **un-replied-lead follow-up nudge** all ship health/safety-net signals on the cron. Remaining: function-error/failed-deploy alerting + the runbook page. | 🧑🤖 | Operating blind is not acceptable for paid users |
 | B9 | **In-product AI disclosure** at the point of generation + confirm AI-capacity metering is enforced | 🤖 | Legal + trust; manual path must stay first-class |
 
 ---

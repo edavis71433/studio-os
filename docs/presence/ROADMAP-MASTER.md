@@ -198,3 +198,6 @@ Ordered by value-per-effort:
 - **Engineering / platform implementation:** ~100% (tested, deployed to staging+prod).
 - **Live to a customer:** ~0% (frontend unpushed; activation not done).
 - **Overall V1 (including activation + QA + front door + onboarding + push):** the honest number is lower than 98% — call it "engine done, last mile remaining." The remaining phases are mostly non-engineering (activation, QA, website, onboarding) plus the trimmed deltas above and the new hardening phase (S).
+
+### Phase CRM — CRM Excellence & Competitive Benchmark ✅ (implemented)
+Verified the operational-relationship-hub architecture against HubSpot/Salesforce/GHL/Zoho/Pipedrive/Monday. Closed the one real gap — **FD-CRM1 un-replied lead follow-up nudge** (per-lead once-only notice+email, 1–7d window, notices rail + cron, mig 0061, both envs). Deliberate non-gaps documented (no pipeline/deal objects for owner-operators). Open (V1.1, recommended): FD-CRM2 agency leads-needing-reply roll-up, FD-CRM3 optional AI reply draft.
