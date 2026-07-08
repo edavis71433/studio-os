@@ -22,6 +22,9 @@ export interface NormalizedConnected {
   upcoming_appointments?: number; contacts?: number;
   subscribers?: number; open_rate?: number;
   revenue?: number; payments?: number;
+  tags_installed?: number;       // Google Tag Manager — measurement tags present
+  managed_assets?: number;       // Meta Business — pages/accounts managed
+  listing_verified?: number;     // Apple Business Connect — 1 if the place card is claimed/verified
   label: string;                 // the provider's customerLabel, for messages
 }
 
@@ -36,7 +39,7 @@ export const NORMALIZERS: Record<string, (raw: any, label: string) => Normalized
   google_search_console: (r, label) => ({ label, search_clicks: num(r?.clicks ?? r?.rows?.[0]?.clicks), search_impressions: num(r?.impressions ?? r?.rows?.[0]?.impressions), indexing_issues: num(r?.indexingIssues) }),
   bing_webmaster: (r, label) => ({ label, search_clicks: num(r?.Clicks), search_impressions: num(r?.Impressions) }),
   google_analytics: (r, label) => ({ label, visitors: num(r?.visitors ?? r?.totals?.users), pageviews: num(r?.pageviews ?? r?.totals?.screenPageViews) }),
-  yelp: (r, label) => ({ label, rating: num(r?.rating), review_count: num(r?.review_count) }),
+  yelp: (r, label) => ({ label, rating: num(r?.rating ?? r?.businesses?.[0]?.rating), review_count: num(r?.review_count ?? r?.businesses?.[0]?.review_count) }),
   trustpilot: (r, label) => ({ label, rating: num(r?.score?.trustScore ?? r?.stars), review_count: num(r?.numberOfReviews) }),
   facebook_page: (r, label) => ({ label, followers: num(r?.followers_count ?? r?.fan_count), posts_recent: num(r?.posts?.data?.length) }),
   instagram: (r, label) => ({ label, followers: num(r?.followers_count), posts_recent: num(r?.media?.data?.length) }),
@@ -50,9 +53,12 @@ export const NORMALIZERS: Record<string, (raw: any, label: string) => Normalized
   klaviyo: (r, label) => ({ label, subscribers: num(r?.data?.[0]?.attributes?.profile_count) }),
   stripe_connect: (r, label) => ({ label, payments: num(r?.data?.length), revenue: num(r?.total) }),
   square: (r, label) => ({ label, payments: num(r?.payments?.length), revenue: num(r?.total) }),
-  google_tag_manager: (r, label) => ({ label }),
-  meta_business: (r, label) => ({ label }),
-  apple_business_connect: (r, label) => ({ label }),
+  // Google Tag Manager — how many measurement tags/containers are installed.
+  google_tag_manager: (r, label) => ({ label, tags_installed: num(r?.tag?.length ?? r?.container?.length ?? r?.account?.length) }),
+  // Meta Business — how many pages/accounts the business manages.
+  meta_business: (r, label) => ({ label, managed_assets: num(r?.data?.length ?? r?.businesses?.data?.length ?? r?.accounts?.data?.length) }),
+  // Apple Business Connect — whether the place card is claimed/verified (1/0).
+  apple_business_connect: (r, label) => ({ label, listing_verified: (r?.verified === true || r?.status === 'VERIFIED' || r?.status === 'PUBLISHED') ? 1 : ((r?.status !== undefined || r?.verified !== undefined) ? 0 : undefined) }),
 };
 
 // Where each adapter reads from (documented endpoints). The fetch is a bearer GET;
@@ -71,7 +77,36 @@ const READ_ENDPOINT: Record<string, string> = {
   mailchimp: 'https://us1.api.mailchimp.com/3.0/lists',
   stripe_connect: 'https://api.stripe.com/v1/charges?limit=100',
   square: 'https://connect.squareup.com/v2/payments',
+  // ── A1 completion: the remaining intentionally-started providers ──
+  // Documented base endpoints; account-specific parameters (business id, site
+  // url, Salesforce instance) are finalized at owner activation — the platform's
+  // "query shaping set at app registration" principle, unchanged.
+  bing_webmaster: 'https://ssl.bing.com/webmaster/api.svc/json/GetRankAndTrafficStats',
+  yelp: 'https://api.yelp.com/v3/businesses/search?limit=1',
+  trustpilot: 'https://api.trustpilot.com/v1/business-units/find',
+  salesforce: 'https://login.salesforce.com/services/data/v59.0/limits',   // instance_url substituted at activation
+  klaviyo: 'https://a.klaviyo.com/api/lists/',
+  google_tag_manager: 'https://tagmanager.googleapis.com/tagmanager/v2/accounts',
+  meta_business: 'https://graph.facebook.com/v19.0/me/businesses',
+  apple_business_connect: 'https://businessconnect.apple.com/businesses',   // read via ownership-verified session (activation)
 };
+
+// Per-provider request shaping. The shared read is a bearer GET; the API-key
+// providers that don't use a Bearer header get their documented auth here. This
+// is the "per-provider detail" the contract always allowed — not a new flow.
+function readRequest(providerKey: string, endpoint: string, token: string): { url: string; headers: Record<string, string> } {
+  const accept: Record<string, string> = { accept: 'application/json' };
+  switch (providerKey) {
+    case 'bing_webmaster':
+      return { url: `${endpoint}${endpoint.includes('?') ? '&' : '?'}apikey=${encodeURIComponent(token)}`, headers: accept };
+    case 'trustpilot':
+      return { url: endpoint, headers: { ...accept, apikey: token } };
+    case 'klaviyo':
+      return { url: endpoint, headers: { ...accept, Authorization: `Klaviyo-API-Key ${token}`, revision: '2024-10-15' } };
+    default:
+      return { url: endpoint, headers: { ...accept, Authorization: `Bearer ${token}` } };
+  }
+}
 
 export interface ConnectedAdapter { key: string; label: string; }
 export const ADAPTERS: ConnectedAdapter[] = CONNECTED_PROVIDERS.map((p) => ({ key: p.key, label: p.customerLabel }));
@@ -96,7 +131,8 @@ export async function readProvider(siteId: string, providerKey: string, label: s
     }
     const endpoint = READ_ENDPOINT[providerKey];
     if (!endpoint) { await saveConnectedData(siteId, providerKey, normalize(providerKey, {}, label)); return normalize(providerKey, {}, label); }
-    const r = await fetch(endpoint, { headers: { Authorization: `Bearer ${tokens.access_token}`, accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+    const req = readRequest(providerKey, endpoint, tokens.access_token);
+    const r = await fetch(req.url, { headers: req.headers, signal: AbortSignal.timeout(8000) });
     if (!r.ok) { await markStatus(siteId, providerKey, r.status === 401 ? 'expired' : 'error', r.status === 401 ? 'attention' : 'down', `read ${r.status}`); return null; }
     const raw = await r.json().catch(() => ({}));
     const data = normalize(providerKey, raw, label);

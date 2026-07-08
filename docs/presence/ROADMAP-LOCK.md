@@ -22,12 +22,9 @@ M1–M8.5 foundations · M9/M9.5 intelligence + Creative Studio · L1–L3 comme
 
 ### Phase A — Version 1 finish-up (small, closes V1 loose ends)
 
-**A1 · Connected Platform Completion** *(started, partially complete — must finish the intentionally-started providers)*
-Registry = **21 providers**. Verified tiers:
-- **Complete (13)** — real read endpoint + normalizer: `google_business_profile`, `google_search_console`, `google_analytics`, `youtube`, `google_calendar`, `facebook_page`, `instagram`, `linkedin`, `calendly`, `hubspot`, `mailchimp`, `stripe_connect`, `square`. *(All still require owner OAuth-app activation to go live.)*
-- **Partial (5)** — normalizer shape defined, **no live read endpoint** (returns empty until an endpoint is wired): `bing_webmaster`, `yelp`, `trustpilot`, `salesforce`, `klaviyo`.
-- **Stub / Placeholder (3)** — label-only normalizer, no data mapping: **`google_tag_manager`**, **`meta_business`**, **`apple_business_connect`**.
-- **Remaining work:** finish the 3 stubs + 5 partials (real normalizers + read endpoints); extend write coverage beyond GBP post/hours + GSC verify. *(Additive; the architecture is complete and frozen.)*
+**A1 · Connected Platform Completion** — ✅ **DONE** (see [CONNECTED-PLATFORM-COMPLETION-A1](CONNECTED-PLATFORM-COMPLETION-A1.md)).
+All **21 providers** now have a real read adapter (endpoint + normalizer + auth shaping): the 3 stubs (`google_tag_manager`, `meta_business`, `apple_business_connect`) got real normalizers; the 5 partials (`bing_webmaster`, `yelp`, `trustpilot`, `salesforce`, `klaviyo`) got read endpoints; Bing/Trustpilot/Klaviyo got non-Bearer auth shaping. **19 Complete; 2 read-complete with activation caveats:** Salesforce (`instance_url` at activation) and **Apple Business Connect** (its `ownership_verification` **connect flow is not built** — a distinct auth path, deferred as new auth architecture; the one genuine remaining build item, carried on the Owner Activation list). Invariants 14/14; deployed staging+prod.
+- **Still on roadmap (not part of A1):** extend **connected write coverage** beyond GBP post/hours + GSC verify (V1.1, additive); build the **Apple ownership-verification connect flow** (deferred auth path).
 
 **A2 · Deployment & CI Completion** *(partially complete)*
 - **Done:** CI pre-deploy **test gate** (pure suites + 14 invariants; deploys `needs: test`) — Ops HIGH-3.

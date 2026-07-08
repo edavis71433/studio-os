@@ -54,10 +54,21 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('normalize: Search Console → clicks/impressions', gsc.search_clicks === 240 && gsc.search_impressions === 9000);
   const ga = normalize('google_analytics', { totals: { users: 512, screenPageViews: 2100 } }, 'visitors');
   ok('normalize: Analytics → visitors/pageviews (nested)', ga.visitors === 512 && ga.pageviews === 2100);
-  const unknown = normalize('meta_business', { anything: true }, 'meta');
-  ok('normalize: an un-mapped provider degrades to a safe label-only shape', unknown.label === 'meta' && unknown.rating === undefined);
+  const unknown = normalize('no_such_provider_xyz', { anything: true }, 'meta');
+  ok('normalize: an un-registered provider degrades to a safe label-only shape', unknown.label === 'meta' && unknown.rating === undefined);
   const junk = normalize('google_business_profile', null, 'x');
   ok('normalize: garbage input never throws', junk.label === 'x' && junk.rating === undefined);
+
+  // ── A1 completion: the intentionally-started providers now normalize real data ──
+  ok('normalize: Bing → clicks/impressions', (() => { const b = normalize('bing_webmaster', { Clicks: 12, Impressions: 300 }, 'bing'); return b.search_clicks === 12 && b.search_impressions === 300; })());
+  ok('normalize: Yelp → rating/reviews (detail OR search shape)', (() => { const d = normalize('yelp', { rating: 4.5, review_count: 88 }, 'y'); const s = normalize('yelp', { businesses: [{ rating: 4.0, review_count: 20 }] }, 'y'); return d.rating === 4.5 && d.review_count === 88 && s.rating === 4.0 && s.review_count === 20; })());
+  ok('normalize: Trustpilot → score/reviews', (() => { const t = normalize('trustpilot', { score: { trustScore: 4.2 }, numberOfReviews: 51 }, 't'); return t.rating === 4.2 && t.review_count === 51; })());
+  ok('normalize: Salesforce → contacts (totalSize)', normalize('salesforce', { totalSize: 340 }, 's').contacts === 340);
+  ok('normalize: Klaviyo → subscribers', normalize('klaviyo', { data: [{ attributes: { profile_count: 900 } }] }, 'k').subscribers === 900);
+  ok('normalize: Tag Manager → tags_installed', normalize('google_tag_manager', { tag: [{}, {}, {}] }, 'gtm').tags_installed === 3);
+  ok('normalize: Meta Business → managed_assets', normalize('meta_business', { data: [{}, {}] }, 'meta').managed_assets === 2);
+  ok('normalize: Apple Business Connect → listing_verified', (() => { const v = normalize('apple_business_connect', { status: 'VERIFIED' }, 'a'); const n = normalize('apple_business_connect', { status: 'PENDING' }, 'a'); return v.listing_verified === 1 && n.listing_verified === 0; })());
+  ok('normalize: every completed provider still degrades safely on garbage', ['bing_webmaster','yelp','trustpilot','salesforce','klaviyo','google_tag_manager','meta_business','apple_business_connect'].every((k) => normalize(k, null, 'z').label === 'z'));
 }
 
 // ═══ 4. connected data → EVIDENCE, through the ONE pipeline (no bypass) ═══

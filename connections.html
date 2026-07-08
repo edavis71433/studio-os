@@ -126,6 +126,9 @@ function dataLine(d){
   if(d.subscribers!=null) bits.push(esc(d.subscribers)+' subscribers');
   if(d.open_rate!=null) bits.push(esc(d.open_rate)+'% open rate');
   if(d.payments!=null) bits.push(esc(d.payments)+' payments');
+  if(d.tags_installed!=null) bits.push(esc(d.tags_installed)+' tags installed');
+  if(d.managed_assets!=null) bits.push(esc(d.managed_assets)+' pages managed');
+  if(d.listing_verified!=null) bits.push(d.listing_verified?'Verified':'Not verified');
   if(!bits.length) return '';
   const asof = d.as_of ? `<span class="asof">as of ${esc(String(d.as_of).slice(0,10))}</span>` : '';
   return `<div class="data">${bits.join(' · ')}${asof}</div>`;
