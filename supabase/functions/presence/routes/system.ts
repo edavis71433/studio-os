@@ -8,7 +8,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes } from '../ops/scheduler.ts';
-import { runLifecycleSweep, runWeeklyDigest } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch } from '../commerce/lifecycle.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -145,7 +145,8 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const scheduled = await runDuePublishes(limit);
       const lifecycle = await runLifecycleSweep(limit);   // Phase RL: one cron tick covers the revenue lifecycle too
       const digest = await runWeeklyDigest();             // CP-3: the Monday routine, automated (7-day dedupe)
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, lifecycle, digest } }, 200, cors);
+      const domains = await runDomainWatch(10);           // INF: RDAP expiry+registrar, 24h per-domain dedupe
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, lifecycle, digest, domains } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

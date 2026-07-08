@@ -87,6 +87,9 @@
 
 ### FD-7 · ✅ IMPLEMENTED (Phase AA) — named versions: label/rename any kept version from History (POST /publishes/:id/label, mig 0053, provenance-logged, journal shows the name first)
 
+### CP-3.1 · Annual Renewal Heads-Up (owner-approved, queued under Revenue Lifecycle)
+**What:** notify customers 7–14 days before an ANNUAL renewal: what their subscription includes, the value received (publishes, leads, moments this year), and a clear link to manage/change the plan. **Tone: informational, never sales.** **Why here:** part of the lifecycle & trust story, not billing mechanics (owner's placement). **Fit:** one more lifecycle event (term=annual + current_period_end within 14d → notice+email, once per period). **Effort:** S. **Status:** approved, ready to build with the next lifecycle touch.
+
 ### FD-RL1 · ✅ IMPLEMENTED (CP-3) — day-45 reminder automated (day-60 parking stays human, reminder-first, by documented choice)
 **What:** the policy is written and communicated (Phase RL); automate the tail — a day-45 export reminder and the day-60 site parking as a system task instead of an operator action. **Disposition:** V1.1.
 
@@ -108,7 +111,7 @@
 ### FD-Z1 · Cookieless visitor counts (server-side analytics → calm sentences)
 **What:** Netlify-analytics-class server-side counts surfaced in Business OS as sentences ("about 120 people visited this week") — answers the real owner question with ZERO privacy cost (no cookies/banner; preserves the Phase-Q differentiator). GA4/GTM/pixels stay rejected as defaults. **Value:** High · **Effort:** Medium. **Disposition:** V1.1.
 
-### FD-Z2 · NAP drift-watch (site facts vs Google Business Profile → a Moment)
+### FD-Z2 (CP-7) · SEQUENCED WITH SD-5 — verified (Phase INF): the GBP adapter stores only rating/review metrics, no name/phone; the comparison needs a connected read-scope extension, which SD-5's provider work opens anyway. Post-Playwright.
 **What:** the connected GBP read + the site's own facts already exist; compare them in the evidence engine and raise a calm Moment when name/address/phone/hours drift (local-SEO's #1 silent killer). **Value:** High · **Effort:** Low-Medium (one evidence rule). **Disposition:** V1.1 (early).
 
 ### FD-Z3 · llms.txt — watch, don't build
@@ -168,13 +171,13 @@
 ### FD-INF1 · In-product domain purchase (registrar/reseller integration)
 **What:** buy + auto-connect + renew a domain inside Studio OS (reseller API; renewal billed through the platform). **Why:** the single biggest "own a website, not a hosting account" completer — every builder has it; today Studio OS is connect-only. **Source:** Phase U infra audit. **Value:** High · **Effort:** High. **Disposition:** V1.1+.
 
-### FD-INF2 · Registrar-aware connect (per-registrar guidance + API auto-connect)
+### FD-INF2 · 🟢 LITE SHIPPED (Phase INF) — the Foundations Desk names the registrar + renewal month and gives that registrar's own DNS directions (8 registrars + honest generic). Full Entri-class API auto-connect remains V1.1.
 **What:** "at GoDaddy, click…" per-registrar copy + Entri-class API auto-connect where supported, layered on the existing plan-gated connect. **Source:** Phase U. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
 
-### FD-INF3 · Renewal/expiry watching for BYO domains
+### FD-INF3 · ✅ IMPLEMENTED (Phase INF / CP-8) — daily RDAP domain watch: expiry + registrar stored on the site; 30-day notice+email (calm copy), 7-day ops alert; monthly dedupe; keyless + fenced
 **What:** RDAP expiry check → a calm Business Moment before a customer domain lapses. **Source:** Phase U. **Value:** Medium-High (a lapsed domain is a dead site) · **Effort:** Low-Medium. **Disposition:** V1.1.
 
-### FD-INF4 · Agency bulk infrastructure views (portfolio foundations roll-up)
+### FD-INF4 · 🟢 HALF-CHEAP NOW (Phase INF stored domain_registrar/expires_at on sites) — the portfolio line ('domain renews Jan 2027 · GoDaddy') is one read; recommended with the next agency touch.
 **What:** one screen: every client domain/SSL/email posture + expiries + drift; pairs with [[FD-C5]]. **Source:** Phase U. **Value:** Medium (agency scale) · **Effort:** Medium. **Disposition:** V1.1.
 
 ### FD-T15 · Comparison table + fixed-formula calculator blocks (Phase T4)

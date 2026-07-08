@@ -118,7 +118,8 @@ Whole-platform certification · Zero-Surprise Certification · every action has 
 ### Phase Q — Legal, Privacy, Compliance & Trust Foundation  ·  ✅ IMPLEMENTED (FD-M3 closed)
 *Every published site now generates a Privacy Policy + Accessibility Statement from business facts (lib/legal_pages.ts, both templates, footer links, sitemap; effective date = snapshot date — deterministic). The honest differentiator: the templates are verified cookieless/tracking-free, so NO consent banner is required and the privacy page says so truthfully. Terms deliberately not auto-generated (FD-Q1, guided V1.1). See [PHASE-Q-LEGAL-FOUNDATION](PHASE-Q-LEGAL-FOUNDATION.md).*
 
-### Phase R/RL — Revenue Lifecycle & Retention  ·  ✅ IMPLEMENTED (Phase RL)
+### Phase R/RL — Revenue Lifecycle & Retention  ·  ✅ IMPLEMENTED (Phase RL; CP-3 added the automation tails)
+- ➕ **CP-3.1 · Annual Renewal Heads-Up** (owner-approved): 7–14 days before annual renewal — what's included, the value received, a manage-plan link; informational tone, never sales. Ready to build (one lifecycle event).
 *✅ FD-R1 CLOSED (Phase RL): lifecycle sweep in the daily /system/run cycle — no-card trial expiry ENFORCED (was: trials never ended), T-3 trial nudge, payment-trouble + lapse comms (workspace notice + email, one calm voice, honesty contract test-locked), written 60-day wind-down policy, and the right-to-leave fixed (GET /export now survives lapse). lifecycle 16/16; mig 0055; deployed both envs. Remaining R-items: FD-R2 workspace-vocab (V1 polish) · FD-R3 per-item windows · FD-R4 multi-language · FD-R5 core done (Phase Z). New: FD-RL1 wind-down automation, FD-RL2 win-back comms (V1.1). See [PHASE-RL-REVENUE-LIFECYCLE](PHASE-RL-REVENUE-LIFECYCLE.md).*
 
 ### Phase P — Editions, Entitlements, Pricing & Upgrade Experience  ·  ✅ IMPLEMENTED

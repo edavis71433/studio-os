@@ -8,6 +8,7 @@
 // decided; automated steps are applied by the OPERATOR route (admin) using
 // provider capabilities, and only on approved plans.
 import { json } from '../../_shared/http.ts';
+import { registrarTip } from '../lib/rdap.ts';
 import { asUser, svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { readZone } from '../platform/dns.ts';
@@ -49,7 +50,13 @@ export async function handleFoundationsGet(site: SiteRow, cors: Record<string, s
   return json({ data: {
     domain: domain ? {
       name: domain,
-      sentence: `Your address is ${domain}. The name itself lives at your registrar; keeping auto-renew on is the one thing that matters.`,
+      sentence: await (async () => {
+        const dQ = await svc(`presence_sites?id=eq.${site.id}&select=domain_registrar,domain_expires_at&limit=1`);
+        const reg = String(dQ.json?.[0]?.domain_registrar || '');
+        const exp = dQ.json?.[0]?.domain_expires_at ? new Date(dQ.json[0].domain_expires_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '';
+        const tip = registrarTip(reg);
+        return `Your address is ${domain}${reg ? `, registered at ${reg}` : ''}${exp ? ` — renews ${exp}` : ''}. Keeping auto-renew on is the one thing that matters.${tip ? ' ' + tip : ''}`;
+      })(),
     } : { name: null, sentence: 'No custom domain yet — the site answers on its included address. A domain of your own can be connected any time.' },
     dns: zone ? {
       record_count: zone.records.length,

@@ -11,6 +11,7 @@
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc } from '../lib/db.ts';
+import { rdapLookup, daysUntil } from '../lib/rdap.ts';
 import { sendEmail } from './account.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
@@ -195,4 +196,45 @@ export async function runWeeklyDigest(): Promise<{ sent: boolean }> {
   const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html);
   await svc('presence_ops_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ last_digest_at: new Date().toISOString() }) });
   return { sent: ok };
+}
+
+// ── Phase INF (CP-8): the domain watch — RDAP expiry + registrar, daily ──────
+export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number }> {
+  const nowIso = new Date().toISOString();
+  const staleBefore = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain&limit=${limit}`);
+  let checked = 0, warned = 0;
+  for (const site of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_id: string; custom_domain: string }>) {
+    const info = await rdapLookup(site.custom_domain);
+    checked++;
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
+      domain_checked_at: nowIso,
+      ...(info ? { domain_registrar: info.registrar, domain_expires_at: info.expires_at } : {}),
+    }) });
+    const days = info ? daysUntil(info.expires_at, nowIso) : null;
+    if (days !== null && days <= 30) {
+      const soon = days <= 7;
+      const when = days <= 0 ? 'has expired' : `expires in ${days} day${days === 1 ? '' : 's'}`;
+      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+        body: JSON.stringify({ site_id: site.id, client_id: site.client_id, kind: 'domain_expiry', period: periodOf(nowIso),
+          headline: `Your domain ${when}`,
+          body: `${site.custom_domain} ${when}${info?.registrar ? ` at ${info.registrar}` : ''}. Renew it at your registrar (auto-renew is the calm option) — if it lapses, your website and email stop answering. Nothing else is needed on our side.`,
+          status: 'active' }),
+      });
+      if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+        warned++;
+        const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`);
+        if (cl.json?.[0]?.email) {
+          await sendEmail(cl.json[0].email, `Your domain ${site.custom_domain} ${when}`,
+            `<p><strong>${site.custom_domain}</strong> ${when}${info?.registrar ? ` at <strong>${info.registrar}</strong>` : ''}.</p><p>Renewing at your registrar (auto-renew is the calm option) keeps your website and email answering. Nothing is needed on our side — this is just the reminder registrars are quiet about.</p>`);
+        }
+        if (soon) {
+          const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
+          if (ops) sendEmail(ops, `[Studio OS ops] Domain ${when}: ${site.custom_domain}`, `<p>Customer domain ${site.custom_domain} ${when}. They have been notified.</p>`).catch(() => {});
+        }
+      }
+    }
+  }
+  return { checked, warned };
 }
