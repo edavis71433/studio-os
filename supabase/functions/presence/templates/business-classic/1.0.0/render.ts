@@ -9,6 +9,7 @@
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
+import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
 const loc0 = (c: SnapshotContent): LocationContent | null => c.locations?.[0] ?? null;
@@ -270,7 +271,7 @@ ${o.body}
     <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${social ? `<p>${social}</p>` : ''}</div>
     <div>${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
-  <div class="credit"><span>© ${esc(i.business_name)}</span>${credit}</div>
+  <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
 </body>
 </html>`;
@@ -431,6 +432,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   page('/contact/', { title: `Contact & Hours — ${i.business_name}`, description: `Address, phone, and hours for ${i.business_name}.`, ld: [ldBiz], active: 'contact', body: contactBody(c, site) });
   page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>` });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
+  // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
+  page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
+  page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
   page('/updates/', { title: `Updates — ${i.business_name}`, description: `News and updates from ${i.business_name}.`, ld: [], active: 'updates', body: postIndexBody(c) });
   for (const p of c.posts) {
     page(`/updates/${p.slug}/`, {
@@ -449,7 +453,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#23635a"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#f7f7f5" text-anchor="middle">${esc(letter)}</text></svg>`;
 
   const lastmod = snapshot.created_at.slice(0, 10);
-  const urls = ['/', v.offeringPath, '/about/', '/faq/', '/contact/', '/updates/', ...c.posts.map((p) => `/updates/${p.slug}/`)];
+  const urls = ['/', v.offeringPath, '/about/', '/faq/', '/contact/', '/updates/', '/privacy/', '/accessibility/', ...c.posts.map((p) => `/updates/${p.slug}/`)];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
 

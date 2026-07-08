@@ -109,6 +109,9 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 Whole-platform certification · Zero-Surprise Certification · every action has a clear outcome · unified experience review.
 - ⚠️ **Phase E (Product Integrity Verification) already produced an Integrity Certification** across editions/roles/workflows/integrations, with a Risk Register. **Trim O to its one genuinely-new delta:** a *"every action has a clear, understandable outcome"* pass — i.e., an empty-state + confirmation-copy + error-message review across the surfaces (a UX-writing audit), not a re-certification. Otherwise it re-does E.
 
+### Phase Q — Legal, Privacy, Compliance & Trust Foundation  ·  ✅ IMPLEMENTED (FD-M3 closed)
+*Every published site now generates a Privacy Policy + Accessibility Statement from business facts (lib/legal_pages.ts, both templates, footer links, sitemap; effective date = snapshot date — deterministic). The honest differentiator: the templates are verified cookieless/tracking-free, so NO consent banner is required and the privacy page says so truthfully. Terms deliberately not auto-generated (FD-Q1, guided V1.1). See [PHASE-Q-LEGAL-FOUNDATION](PHASE-Q-LEGAL-FOUNDATION.md).*
+
 ### Phase R — Revenue Lifecycle & Retention  ·  ➕ ADDED (owner sweep, post-P; verified gaps)
 *The biggest untracked cluster: entitlement states exist but nothing acts on them — no trial-ending nudge, no payment-failed comms, and a cancelled customer's site stays live forever (no wind-down/retention policy). 🔴 FD-R1 comms+policy = V1 before the first paying cohort; + FD-R2 workspace-vocab mismatch (plumber sees "Menu"), FD-R3 per-item visibility windows (AEM on/off times), FD-R4 multi-language (deliberate decision, not accident), FD-R5 get-found ops. AEM-standard sweep over the post-V/T3/T4/U/S/O/P state.*
 

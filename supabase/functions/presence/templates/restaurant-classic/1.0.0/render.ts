@@ -5,6 +5,7 @@
 // markdown passes through the sanitizer; URLs pass through safeHref.
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
+import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest } from '../../../lib/render_types.ts';
 
 // v1 renders the first (only) location; the contract carries a list (M7).
@@ -281,7 +282,7 @@ ${o.body}
     <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${social ? `<p>${social}</p>` : ''}</div>
     <div>${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
-  <div class="credit"><span>© ${esc(i.business_name)}</span>${credit}</div>
+  <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
 <script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
 <script>${OPEN_NOW_JS}</script>
@@ -454,6 +455,10 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
 
+  // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
+  page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
+  page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
+
   // 404 (styled, navigable)
   files['404.html'] = shell(c, site, cssPath, {
     path: '/404.html', title: `Page not found — ${i.business_name}`, description: siteDesc, ld: [], active: '',
@@ -466,7 +471,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
 
   // sitemap (lastmod = snapshot time — the only clock the renderer may read)
   const lastmod = snapshot.created_at.slice(0, 10);
-  const urls = ['/', '/menu/', '/about/', '/faq/', '/contact/', '/updates/', ...c.posts.map((p) => `/updates/${p.slug}/`)];
+  const urls = ['/', '/menu/', '/about/', '/faq/', '/contact/', '/updates/', '/privacy/', '/accessibility/', ...c.posts.map((p) => `/updates/${p.slug}/`)];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
 

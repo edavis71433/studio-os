@@ -35,6 +35,14 @@
     {
       "path": "/updates/:slug/",
       "kind": "post"
+    },
+    {
+      "path": "/privacy/",
+      "kind": "privacy"
+    },
+    {
+      "path": "/accessibility/",
+      "kind": "accessibility"
     }
   ],
   "entities": {

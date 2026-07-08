@@ -12,7 +12,7 @@
 ### FD-M2 · ✅ IMPLEMENTED (Phase S) — rate limiting on public endpoints
 **What:** `POST /forms/:id/submit` and `POST /commerce/signup` are public and have **no rate limiting** (no rate-limit helper in code, though a table exists). Add a lightweight per-IP/site throttle. **Why:** abuse/spam protection for the new public surface the forms feature created. **Source:** Phase-M deep-dive (verified). **Value:** High (security) · **Effort:** Low-Medium. **Disposition:** V1 (fold into roadmap Phase S).
 
-### FD-M3 · Legal pages on published customer sites (privacy + cookie)
+### FD-M3 · ✅ IMPLEMENTED (Phase Q) — generated legal foundation on every published site
 **What:** the rendered customer site has **no privacy policy / cookie notice** — yet forms now collect PII (name/email). Generate a privacy/cookie page from the business facts. **Why:** compliance gap the forms feature created (GDPR/CCPA); a lead-collecting site needs a privacy policy. **Source:** Phase-M deep-dive (verified: 0 legal markup in the template). **Value:** High (compliance/trust) · **Effort:** Medium. **Disposition:** V1 candidate.
 
 ### FD-M4 · Self-serve account deletion / right-to-erasure
@@ -84,6 +84,9 @@
 
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
+
+### FD-Q1 · Guided, owner-approved Terms of Service
+**What:** Terms are deliberately NOT auto-generated (they make business-specific legal promises — refunds, liability, jurisdiction — a platform must not invent). V1.1: a guided intake (owner answers refund/cancellation/jurisdiction questions) → drafted terms → owner approves → rendered like the other legal pages. **Source:** Phase Q. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
 
 ### FD-R1 · Subscription lifecycle & wind-down operations 🔴 (verified gap — the biggest untracked cluster)
 **What:** the entitlement states exist and gate the WORKSPACE (lapsed → friendly 403), but **nothing acts on them commercially**: no trial-ending nudge (trial_ends_at is recorded, nobody emails), no payment-failed communication (Stripe retries silently; past_due→paused invisibly), and **no wind-down policy — a cancelled customer's published site stays live forever** (verified: no consumer of 'lapsed' beyond the middleware). Define + build: trial-day-11 email · payment-failed email · cancellation → grace window with export reminder → park/unpublish · documented retention policy · win-back. **Why:** revenue leaks + legal exposure + honest offboarding (the "right to leave" needs a defined ending). **Source:** owner roadmap sweep (post-P). **Value:** High · **Effort:** Medium. **Disposition:** comms + written policy = **V1 (before the first paying cohort)**; full automation V1.1.

@@ -121,7 +121,7 @@ const h = renderSnapshot(hostile, SITE);
     if (!/<main id="main">/.test(s)) bad.push(`${k}: no main landmark`);
     if (!/<nav class="primary" aria-label="Main">/.test(s)) bad.push(`${k}: no labeled nav`);
     if (!/<html lang="en">/.test(s)) bad.push(`${k}: no lang`);
-    if (!/aria-current="page"/.test(s) && !k.startsWith('404') && !k.startsWith('updates/')) bad.push(`${k}: no aria-current`);
+    if (!/aria-current="page"/.test(s) && !k.startsWith('404') && !k.startsWith('updates/') && !k.startsWith('privacy/') && !k.startsWith('accessibility/')) bad.push(`${k}: no aria-current`);   // footer utility pages aren't nav destinations
     // every <img has non-empty alt
     for (const m of s.matchAll(/<img\b[^>]*>/g)) {
       const alt = m[0].match(/alt="([^"]*)"/);

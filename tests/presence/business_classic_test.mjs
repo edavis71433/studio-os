@@ -57,7 +57,7 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   const pages = Object.entries(f).filter(([k, v]) => k.endsWith('.html') && !String(v).includes('http-equiv="refresh"')).map(([k, v]) => [k, String(v)]);
   ok('every page: lang + skip link + main landmark + single h1', pages.every(([, h]) => h.includes('lang="en"') && h.includes('class="skip"') && h.includes('<main id="main">') && (h.match(/<h1[\s>]/g) || []).length === 1));
   ok('every page: title + description + canonical + og:title', pages.every(([, h]) => h.includes('<title>') && h.includes('name="description"') && h.includes('rel="canonical"') && h.includes('og:title')));
-  ok('aria-current marks the active nav item', pages.filter(([k]) => k !== '404.html' && k !== 'thanks/index.html').every(([, h]) => h.includes('aria-current="page"')));
+  ok('aria-current marks the active nav item', pages.filter(([k]) => !['404.html', 'thanks/index.html', 'privacy/index.html', 'accessibility/index.html'].includes(k)).every(([, h]) => h.includes('aria-current="page"')));
   ok('sitemap lists /services/ (not /menu/, not /thanks/)', f['sitemap.xml'].includes('/services/') && !f['sitemap.xml'].includes('/menu/') && !f['sitemap.xml'].includes('/thanks/'));
   ok('robots disallows /thanks/ + points at the sitemap', f['robots.txt'].includes('Disallow: /thanks/') && f['robots.txt'].includes('sitemap.xml'));
   ok('zero JavaScript emitted (pure static)', pages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(h)));
@@ -70,6 +70,20 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   const contact = render('plumber')['contact/index.html'];
   ok('form: honeypot + hidden kind/source + posts to the endpoint', contact.includes('name="_hp"') && contact.includes('name="form_kind"') && contact.includes(SITE.formEndpoint));
   ok('thanks page: noindex + calm copy', render('plumber')['thanks/index.html'].includes('name="robots" content="noindex"'));
+}
+
+// ═══ 5b. Phase Q: the generated legal foundation ═══
+{
+  const f = render('plumber');
+  ok('privacy + accessibility pages generated', 'privacy/index.html' in f && 'accessibility/index.html' in f);
+  const pv = f['privacy/index.html'];
+  ok('privacy: facts-true (title + contact-form coverage + effective date)', pv.includes('Privacy policy') && pv.includes('contact form') && pv.includes('Effective '));
+  ok('privacy: honest no-cookies/no-tracking claim (the templates ARE cookieless)', pv.includes('no cookies') && pv.includes('no analytics or tracking'));
+  ok('accessibility: promises the template actually keeps', f['accessibility/index.html'].includes('keyboard') && f['accessibility/index.html'].includes('written description'));
+  ok('every page footer links Privacy · Accessibility', f['index.html'].includes('href="/privacy/"') && f['about/index.html'].includes('href="/accessibility/"'));
+  ok('sitemap includes the legal pages', f['sitemap.xml'].includes('/privacy/') && f['sitemap.xml'].includes('/accessibility/'));
+  const noForm = renderSnapshot(snapFor('plumber'), { baseUrl: 'https://example.com' });
+  ok('no form endpoint → privacy honestly says nothing is collected', noForm['privacy/index.html'].includes('no forms and collects nothing'));
 }
 
 // ═══ 6. determinism ═══
