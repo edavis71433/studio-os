@@ -733,7 +733,20 @@ function go(view) {
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
   if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
+  // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
+  try { history.replaceState(null, "", "#" + view); } catch (_) {}
 }
+// ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
+const HASH_VIEWS = { today: "today", business: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
+function routeHash() {
+  const h = (location.hash || "").replace("#", "").toLowerCase();
+  if (!h) return;
+  if (h === "publish") { openRitual(); return; }
+  if (h === "preview") { openPreview("draft"); return; }
+  const v = HASH_VIEWS[h];
+  if (v && $("view-" + v)) go(v);
+}
+window.addEventListener("hashchange", routeHash);
 $("nav").addEventListener("click", (e) => { const b = e.target.closest(".navitem"); if (b) go(b.dataset.view); });
 $("dock").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
@@ -2757,6 +2770,7 @@ async function renderFirstRun() {
     if (v === "preview") openPreview("draft");
     else if (v === "publish") openRitual();
     else if (v && $("view-" + v)) go(v);
+    routeHash();   // CP-2.6: #hash deep-links (palette/nav) — hash wins when present
   } catch (err) {
     if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or send a note from your portal.", true);
     else if (err.status === 403) showGate("Paused for now", err.message, true);

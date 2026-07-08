@@ -55,9 +55,12 @@ export function buildNav(c: NavContext): NavSection[] {
   // Website (CMS) — only when the edition includes it (Business-OS-Only hides it)
   if (f.hasWebsite) {
     const website: NavItem[] = [{ key: 'content', label: 'Your website', href: '/presence.html' }];
+    website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });   // CP-2.6: searchable
+    if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });      // CP-2.6: the Design tab, palette-findable
     if (c.edition !== 'monitor') website.push({ key: 'media', label: 'Photos', href: '/presence.html#media' });
     if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
     if (canPublish(c)) website.push({ key: 'scheduled', label: 'Scheduled', href: '/schedule.html' });  // Phase M: surface FD-1 scheduling
+    if (canPublish(c)) website.push({ key: 'history', label: 'History & versions', href: '/presence.html#history' });   // CP-2.6
     sections.push({ key: 'website', label: 'Website', items: website });
 
     if (canDraft(c)) sections.push({ key: 'create', label: 'Create', items: [
