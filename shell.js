@@ -71,6 +71,7 @@
     var activeKey = activeItemKey(location.pathname, nav);
     DESTS = flatten(nav);
     var ctxLabel = brandCtxLabel(nav, activeKey);
+    var att = (CTX && CTX.attention_count) || 0;   // Phase FLOW: bell badge from context (no extra request)
 
     var navHtml = nav.map(function (sec) {
       var single = sec.items.length === 1;
@@ -90,7 +91,7 @@
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>⌘K</kbd></div>' +
       '<div class="dds-right">' +
-        '<button class="dds-ic" id="dds-bell" aria-label="Notifications">🔔</button>' +
+        '<button class="dds-ic" id="dds-bell" aria-label="Notifications">🔔' + (att > 0 ? '<span class="dot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</button>' +
         '<a class="dds-ic" href="/help.html" aria-label="Help">?</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account">◐</button>' +
       '</div>';
@@ -165,6 +166,9 @@
       var body = notif.querySelector('.body');
       if (!r.ok) { body.innerHTML = '<div class="muted">You’re all caught up.</div>'; return; }
       var d = r.body.data || {}; var out = '';
+      // Phase FLOW: notices first (a lead waiting, a domain expiring) — each taps
+      // straight through to the page that resolves it, from any screen.
+      (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(n.href || '/today.html') + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
       (d.pending_approvals || []).forEach(function (p) { out += '<a class="row" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>'; });
       (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="/today.html">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
       body.innerHTML = out || '<div class="muted">You’re all caught up.</div>';

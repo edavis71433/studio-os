@@ -74,6 +74,23 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     }
   }
 
+  // Phase FLOW: one "needs you" count powers the shell bell badge on EVERY page,
+  // so the owner sees there's something waiting without clicking into the portal.
+  // Active notices (owner surfaces only) + plans awaiting approval, one cheap
+  // parallel read on the boot path; best-effort so the shell never breaks on it.
+  let attention_count = 0;
+  try {
+    const seesFull = siteCan(role, 'view_all');
+    const showApprovals = visibleTo(role, 'approvals');
+    const none = Promise.resolve({ ok: true, json: [] as any[] });
+    const [nQ, iQ, wQ] = await Promise.all([
+      seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id`) : none,
+      showApprovals ? svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
+      showApprovals ? svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
+    ]);
+    attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0);
+  } catch { /* the badge is best-effort — never block the shell on it */ }
+
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey };
   return json({ data: {
     site_role: role,
@@ -90,9 +107,23 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
     landing: landingFor(navCtx),
+    attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals)
     nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);
 }
+
+// Phase FLOW: where each notice kind sends the owner when tapped in the bell —
+// straight to the page that resolves it, not a generic landing (one fewer hop).
+const NOTICE_HREF: Record<string, string> = {
+  lead_followup: '/leads.html',
+  domain_expiry: '/presence.html#business',
+  search_setup: '/presence.html#search',
+  welcome_back: '/today.html',
+  capacity: '/portal.html', trial_ending: '/portal.html', trial_ended: '/portal.html',
+  payment_trouble: '/portal.html', account_lapsed: '/portal.html',
+  winddown_reminder: '/portal.html', win_back: '/portal.html', deletion_requested: '/portal.html',
+};
+const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 
 /** The client portal's read: only what's shared with the reviewer — shared
  *  Business Moments, the site's publish status, and the plans awaiting their OK.
@@ -100,11 +131,13 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
   const shares = await loadShares(site.id);
-  const [momQ, pubQ, infraQ, writeQ] = await Promise.all([
+  const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
+  const [momQ, pubQ, infraQ, writeQ, noticeQ] = await Promise.all([
     svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id,title,summary,risk&limit=10`),
     svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id,provider_key,title,summary&limit=10`),
+    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,headline,body,created_at&order=created_at.desc&limit=10`) : Promise.resolve({ ok: true, json: [] as any[] }),
   ]);
   const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
@@ -114,7 +147,11 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     ...(((writeQ.ok && writeQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'connected', provider: p.provider_key, title: p.title, summary: p.summary, decide_path: `/connections/${p.provider_key}/write/${p.id}/decide` })),
   ] : [];
   const last = (pubQ.ok && pubQ.json?.[0]) || null;
-  return json({ data: { role, moments, pending_approvals: pending, last_published: last } }, 200, cors);
+  // Phase FLOW: the notices rail joins the ONE global feed the shell bell reads,
+  // so "a lead is waiting" / "your domain expires soon" surface on every page —
+  // not only in the portal card. Each carries the href that resolves it.
+  const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, headline: n.headline, body: n.body, href: noticeHref(n.kind) }));
+  return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last } }, 200, cors);
 }
 
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

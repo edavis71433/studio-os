@@ -355,3 +355,10 @@ The per-site un-replied-lead query already exists; surface it across an agency's
 
 ### FD-CRM3 · 🔵 RECOMMENDED (V1.1) — optional AI "draft a reply" on a lead
 Reply-prefill already removes the blank page deterministically; an AI draft button is a nicety, not a gap. Gated on ANTHROPIC_KEY, metered like every other generative op.
+
+## Phase FLOW — workflow simplification
+### FD-FLOW1 · ✅ IMPLEMENTED (Phase FLOW) — one bell for everything that needs you
+Notices rail folded into `/portal/feed`; `attention_count` added to `/portal/context` (cheap, on the existing boot read) → bell badge on every page + notices listed first, each deep-linking to the page that resolves it. Removes the last siloed "needs you" surface (was portal-only). Regression green; backend deployed both envs; shell.js follows the UI-staging pattern.
+
+### FD-FLOW2 · 🔵 RECOMMENDED (V1.1) — agency per-client attention badge
+The per-site `attention_count` rolls up to the agency portfolio ("2 clients need you"), one read, no new pipeline. Converges with FD-CRM2 / FD-INF4 agency roll-ups. Rides the next agency-surface touch.

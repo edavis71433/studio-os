@@ -201,3 +201,6 @@ Ordered by value-per-effort:
 
 ### Phase CRM — CRM Excellence & Competitive Benchmark ✅ (implemented)
 Verified the operational-relationship-hub architecture against HubSpot/Salesforce/GHL/Zoho/Pipedrive/Monday. Closed the one real gap — **FD-CRM1 un-replied lead follow-up nudge** (per-lead once-only notice+email, 1–7d window, notices rail + cron, mig 0061, both envs). Deliberate non-gaps documented (no pipeline/deal objects for owner-operators). Open (V1.1, recommended): FD-CRM2 agency leads-needing-reply roll-up, FD-CRM3 optional AI reply draft.
+
+### Phase FLOW — Workflow Simplification & Product Excellence ✅ (implemented)
+Walked the signed-in workflows for removable clicks. Closed the one real gap: the global shell bell now surfaces the **notices rail** + an **attention badge** on every page (FD-FLOW1), each notice one tap from the page that resolves it — the last siloed "needs you" surface, gone. No new system. Open (V1.1, recommended): FD-FLOW2 agency per-client attention badge.
