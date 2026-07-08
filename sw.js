@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v5'; // bumped: purges a cached config.js that was committed by mistake
+const CACHE_NAME = 'dds-v6'; // bumped: excludes the signed-in Presence app surfaces (today/connections/visual-studio/presence) from cache-first — purges any stale app shells
 const PRECACHE = [
   '/about',
   '/services',
@@ -47,6 +47,11 @@ self.addEventListener('fetch', function(e) {
   if (url.pathname === '/dp-mode.js') return;
   if (url.pathname === '/config.js') return; // per-deployment config must NEVER be cache-served
   if (url.pathname.startsWith('/set-password')) return;
+  // The signed-in Presence app surfaces are living apps too — never serve them
+  // stale (they load live data via the API; a cached shell after a deploy is a
+  // correctness bug). Let the browser hit the network.
+  if (url.pathname.startsWith('/presence') || url.pathname.startsWith('/today') ||
+      url.pathname.startsWith('/connections') || url.pathname.startsWith('/visual-studio')) return;
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });
