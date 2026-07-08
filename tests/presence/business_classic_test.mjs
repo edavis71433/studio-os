@@ -93,6 +93,31 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('no tokens → no verification meta (clean default)', !render('plumber')['index.html'].includes('google-site-verification'));
 }
 
+// ═══ 5d. Phase CP-2: the Design Studio renders ═══
+{
+  const css = render('plumber')[Object.keys(render('plumber')).find((k) => k.startsWith('assets/'))];
+  ok('CSS adopts the studio tokens (type/scale/density/radius/bg vars with safe fallbacks)',
+    css.includes('var(--font-body,') && css.includes('var(--font-display,') && css.includes('var(--font-scale,1)') && css.includes('var(--spacing-scale,1)') && css.includes('var(--radius,') && css.includes('var(--bg,'));
+  const hidden = render('plumber', { sections: { hidden: ['testimonials', 'faqs'], order: [] } })['index.html'];
+  ok('sections hide (testimonials+faqs off the home page, kept elsewhere)', !hidden.includes('What customers say') && !hidden.includes('Good to know') && hidden.includes('About us'));
+  const reordered = render('plumber', { sections: { hidden: [], order: ['faqs', 'about'] } })['index.html'];
+  ok('sections reorder (faqs before about)', reordered.indexOf('Good to know') < reordered.indexOf('About us'));
+  const noSet = render('plumber')['index.html'];
+  ok('no settings → all four sections in default order', noSet.indexOf('About us') < noSet.indexOf('What customers say'));
+  // DS-6 split hero consumes DS-5 focal — the first cropping presentation
+  const base = JSON.parse(JSON.stringify(fixture));
+  const heroOffering = base.content.offerings.find((o) => o.media);
+  if (heroOffering) heroOffering.media.focal = { x: 100, y: 0 };
+  base.template_slug = 'business-classic'; base.template_version = '1.0.0';
+  base.content.settings = { ...(base.content.settings || {}), industry: 'plumber', hero_layout: 'split' };
+  const split = renderSnapshot(base, SITE)['index.html'];
+  ok('split hero renders with object-fit cropping + the focal point', split.includes('hero-split') && split.includes('object-position:100% 0%'));
+  const centeredNav = render('plumber', { nav_style: 'centered' })['index.html'];
+  ok('centered header style applies via class', centeredNav.includes('wrap nav centered'));
+  const noFooter = render('plumber', { footer: { hours: false, social: false } })['index.html'];
+  ok('footer toggles hide hours + social', !noFooter.includes('<caption>Hours</caption>'));
+}
+
 // ═══ 6. determinism ═══
 {
   const a = render('plumber'), b = render('plumber');

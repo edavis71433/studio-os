@@ -1766,6 +1766,29 @@ function renderMediaGrid(grid, manage, onPick) {
         cell.appendChild(inp); inp.focus(); inp.select();
       });
       row.appendChild(ed);
+      // Phase CP-2 (DS-5): focus point — 3×3 chooser; used wherever the site crops
+      const fp = el("button", null, "Set focus");
+      fp.type = "button";
+      fp.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+      fp.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (cell.querySelector(".focalgrid")) return;
+        const g = el("div", "focalgrid");
+        g.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px;width:96px";
+        [["Top left",0,0],["Top",50,0],["Top right",100,0],["Left",0,50],["Center",50,50],["Right",100,50],["Bottom left",0,100],["Bottom",50,100],["Bottom right",100,100]].forEach(([nm,x,y]) => {
+          const dot = el("button", null, "");
+          dot.type = "button"; dot.title = "Focus: " + nm; dot.setAttribute("aria-label", "Focus point: " + nm);
+          const cur = (m.focal_x === x && m.focal_y === y);
+          dot.style.cssText = "width:28px;height:22px;border-radius:5px;cursor:pointer;border:1px solid var(--line,#ccc);background:" + (cur ? "#5b3fa0" : "rgba(0,0,0,.06)");
+          dot.addEventListener("click", async () => {
+            try { await api("PUT", `/media/${m.id}`, { focal_x: x, focal_y: y }); m.focal_x = x; m.focal_y = y; g.remove(); toast("Focus set — publish to apply"); scheduleChangesRefresh(); }
+            catch (err) { toast(err.message, true); }
+          });
+          g.appendChild(dot);
+        });
+        cell.appendChild(g);
+      });
+      row.appendChild(fp);
       cell.appendChild(row);
       const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
       del.addEventListener("click", async () => {
@@ -2396,9 +2419,9 @@ function applyVocab() {
   const pb = document.querySelector('#pageWords button[data-page="/menu/"]');
   if (pb && VOCAB.path !== "/menu/") { pb.dataset.page = VOCAB.path; pb.textContent = VOCAB.label; }
 }
-// ── Phase COMP (FD-T6-lite): your site's colors — curated palettes, no code ──
-// Writes the SAME theme tokens Developer Mode uses (one machinery); tokens ride
-// the snapshot and apply at next publish. Owners pick; contrast is pre-validated.
+// ── Phase CP-2: the Design Studio — every choice curated, contrast-safe, no code ──
+// All controls write the SAME dev-token layer (one machinery). Owners = tokens
+// only; a developer's custom CSS/HTML is never touched. Publish applies.
 const PALETTES = [
   { key: "", name: "Original", accent: "" },
   { key: "terracotta", name: "Warm terracotta", accent: "#8c3b2e", tokens: { accent: "#8c3b2e", accent_dark: "#6f2e24", ink: "#241d1a", soft: "#6b5f58" } },
@@ -2408,38 +2431,139 @@ const PALETTES = [
   { key: "espresso", name: "Espresso", accent: "#5d4037", tokens: { accent: "#5d4037", accent_dark: "#43302a", ink: "#25201d", soft: "#6d625c" } },
   { key: "slate", name: "Modern slate", accent: "#37474f", tokens: { accent: "#37474f", accent_dark: "#263238", ink: "#1e262a", soft: "#5c686e" } },
 ];
-async function mountDesignCard() {
-  const host = $("view-business"); if (!host || $("designCard")) return;
-  let current = "";
+const TYPE_PRESETS = [
+  { key: "", name: "Original", tokens: {} },
+  { key: "classic_serif", name: "Classic serif", tokens: { font_display: "Georgia, 'Iowan Old Style', 'Times New Roman', serif", font_body: "Georgia, 'Times New Roman', serif" } },
+  { key: "modern_sans", name: "Modern sans", tokens: { font_display: "system-ui, -apple-system, 'Segoe UI', sans-serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif" } },
+  { key: "editorial", name: "Editorial", tokens: { font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif" } },
+  { key: "friendly", name: "Friendly rounded", tokens: { font_display: "'Avenir Next Rounded', 'Trebuchet MS', system-ui, sans-serif", font_body: "'Trebuchet MS', system-ui, sans-serif" } },
+  { key: "typewriter", name: "Understated mono", tokens: { font_display: "'Courier New', ui-monospace, monospace", font_body: "system-ui, -apple-system, sans-serif" } },
+];
+const SIZE_OPTS = [ ["Cozy","0.95"], ["Standard",""], ["Larger","1.08"] ];
+const CORNER_OPTS = [ ["Sharp","2px"], ["Soft",""], ["Round","18px"] ];
+const BG_OPTS = [ ["Bright",""], ["Warm","#faf6ee"], ["Cool","#f3f5f7"] ];
+const DENSITY_OPTS = [ ["Compact","0.82"], ["Comfortable",""], ["Airy","1.18"] ];
+// DS-8: deterministic suggestion by industry (no model call — instant, explainable)
+const SUGGEST = { restaurant:["terracotta","classic_serif"], coffee_shop:["espresso","editorial"], bar:["slate","editorial"],
+  salon:["plum","editorial"], barber:["slate","classic_serif"], spa:["evergreen","editorial"], fitness:["slate","modern_sans"],
+  plumber:["harbor","modern_sans"], hvac:["harbor","modern_sans"], electrician:["harbor","modern_sans"], contractor:["slate","modern_sans"],
+  landscaping:["evergreen","modern_sans"], cleaning:["harbor","modern_sans"], roofing:["slate","modern_sans"], home_services:["harbor","modern_sans"],
+  law:["slate","classic_serif"], accounting:["harbor","classic_serif"], insurance:["harbor","modern_sans"], consulting:["slate","editorial"],
+  marketing:["plum","modern_sans"], real_estate:["slate","editorial"], photography:["slate","editorial"],
+  medical:["harbor","modern_sans"], dental:["harbor","modern_sans"], veterinary:["evergreen","friendly"],
+  retail:["plum","modern_sans"], nonprofit:["evergreen","editorial"], church:["espresso","classic_serif"], professional:["slate","editorial"] };
+let DESIGN_TOKENS = {};
+async function saveTokens(change, msg) {
+  const next = { ...DESIGN_TOKENS };
+  for (const [k, v] of Object.entries(change)) { if (v === "" || v == null) delete next[k]; else next[k] = v; }
   try {
-    const r = await api("GET", "/dev/customization");
-    const acc = ((r.data && r.data.theme_tokens) || {}).accent || "";
-    const hit = PALETTES.find((p) => p.accent && acc && p.accent.toLowerCase() === String(acc).toLowerCase());
-    current = hit ? hit.key : (acc ? "custom" : "");
-  } catch (_) { return; } // not an owner/developer on this site → no card
-  const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Your site's colors"));
-  const rowEl = el("div"); rowEl.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-  PALETTES.forEach((p) => {
+    await api("PUT", "/dev/customization", { theme_tokens: next });
+    DESIGN_TOKENS = next;
+    const card = $("designCard"); if (card) card.remove();
+    mountDesignCard();
+    toast(msg + " — publish to see it live"); scheduleChangesRefresh();
+  } catch (err) { toast(err.message, true); }
+}
+function pillRow(host, label, opts, isOn, onPick) {
+  const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
+  wrapEl.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
+  const rowEl = el("div"); rowEl.style.cssText = "display:flex;gap:7px;flex-wrap:wrap";
+  opts.forEach((o) => {
+    const on = isOn(o);
     const b = el("button", null, "");
-    b.type = "button"; b.title = p.name; b.setAttribute("aria-label", "Color palette: " + p.name);
-    const on = current === p.key;
-    b.style.cssText = "display:flex;align-items:center;gap:7px;font:inherit;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "#5b3fa0" : "var(--line,#ddd)") + ";background:" + (on ? "#faf7ff" : "transparent");
-    const dot = el("span"); dot.style.cssText = "width:14px;height:14px;border-radius:50%;display:inline-block;background:" + (p.accent || "linear-gradient(135deg,#8c3b2e,#23635a)") + ";border:1px solid rgba(0,0,0,.15)";
-    b.appendChild(dot); b.appendChild(document.createTextNode(p.name + (on ? " ✓" : "")));
-    b.addEventListener("click", async () => {
-      try {
-        await api("PUT", "/dev/customization", { theme_tokens: p.key ? p.tokens : {} });
-        card.remove(); mountDesignCard();
-        toast(p.key ? p.name + " — publish to see it live" : "Back to the original — publish to apply");
-        scheduleChangesRefresh();
-      } catch (err) { toast(err.message, true); }
-    });
+    b.type = "button";
+    b.style.cssText = "display:flex;align-items:center;gap:6px;font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "#5b3fa0" : "var(--line,#ddd)") + ";background:" + (on ? "#faf7ff" : "transparent");
+    if (o.accent !== undefined) { const dot = el("span"); dot.style.cssText = "width:13px;height:13px;border-radius:50%;display:inline-block;background:" + (o.accent || "linear-gradient(135deg,#8c3b2e,#23635a)") + ";border:1px solid rgba(0,0,0,.15)"; b.appendChild(dot); }
+    b.appendChild(document.createTextNode((o.name || o[0]) + (on ? " ✓" : "")));
+    b.addEventListener("click", () => onPick(o));
     rowEl.appendChild(b);
   });
-  if (current === "custom") rowEl.appendChild(el("span", "hint", "A developer set custom colors — picking a palette replaces them."));
-  card.appendChild(rowEl);
-  card.appendChild(el("div", "hint", "Designed, readable color pairings for your whole site. Applies when you next publish; every previous version stays restorable."));
+  wrapEl.appendChild(rowEl); host.appendChild(wrapEl);
+  return rowEl;
+}
+async function mountDesignCard() {
+  const host = $("view-business"); if (!host || $("designCard")) return;
+  try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
+  catch (_) { return; } // not an owner/developer on this site → no card
+  const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Design studio"));
+  const T = DESIGN_TOKENS;
+  // colors
+  pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
+    (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"));
+  // type
+  pillRow(card, "Type", TYPE_PRESETS, (t) => (t.key ? T.font_display === t.tokens.font_display : !T.font_display),
+    (t) => saveTokens(t.key ? { ...t.tokens } : { font_display: "", font_body: "" }, t.key ? t.name : "Original type"));
+  // size / corners / background / density
+  pillRow(card, "Text size", SIZE_OPTS, (o) => String(T.font_scale || "") === o[1], (o) => saveTokens({ font_scale: o[1] }, "Text size: " + o[0]));
+  pillRow(card, "Corners", CORNER_OPTS, (o) => String(T.radius || "") === o[1], (o) => saveTokens({ radius: o[1] }, "Corners: " + o[0]));
+  pillRow(card, "Background", BG_OPTS, (o) => String(T.bg || "") === o[1], (o) => saveTokens({ bg: o[1] }, "Background: " + o[0]));
+  pillRow(card, "Spacing", DENSITY_OPTS, (o) => String(T.spacing_scale || "") === o[1], (o) => saveTokens({ spacing_scale: o[1] }, "Spacing: " + o[0]));
+  // DS-6/DS-7: layout choices (business-classic renders them; restaurant keeps its identity)
+  if (((S.site && S.site.template) || "").indexOf("business-classic") === 0) {
+    const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
+    pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
+      async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } });
+    const navRow = [["Standard", ""], ["Centered", "centered"]];
+    pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
+      async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } });
+  }
+  // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
+  const ik = (S.settings && S.settings.industry_key) || "generic";
+  const sug = SUGGEST[ik];
+  if (sug) {
+    const [pk, tk] = sug;
+    const p = PALETTES.find((x) => x.key === pk), t = TYPE_PRESETS.find((x) => x.key === tk);
+    const already = p && t && String(T.accent || "").toLowerCase() === p.accent && T.font_display === t.tokens.font_display;
+    if (p && t && !already) {
+      const rowEl = el("div"); rowEl.style.cssText = "margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+      rowEl.appendChild(el("span", "hint", "Suggested for your kind of business: " + p.name + " + " + t.name + "."));
+      const b = el("button", null, "Apply suggestion");
+      b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;cursor:pointer";
+      b.addEventListener("click", () => saveTokens({ ...p.tokens, ...t.tokens }, p.name + " + " + t.name));
+      rowEl.appendChild(b);
+      card.appendChild(rowEl);
+    }
+  }
+  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. Every previous look stays restorable."));
+  if (DESIGN_TOKENS && Object.keys(DESIGN_TOKENS).length && !PALETTES.some((p) => p.accent && String(DESIGN_TOKENS.accent || "").toLowerCase() === p.accent) && DESIGN_TOKENS.accent) {
+    card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them."));
+  }
+  host.appendChild(card);
+  mountSectionsCard();
+}
+// ── Phase CP-2 (DS-2): your home page — section visibility + order ──
+const HOME_SECTION_DEFS = [ ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];
+async function saveSections(order, hidden) {
+  try {
+    const r = await api("PUT", "/settings", { sections_order: order, sections_hidden: hidden });
+    S.settings = r.data || { ...S.settings, sections_order: order, sections_hidden: hidden };
+    const c = $("sectionsCard"); if (c) c.remove(); mountSectionsCard();
+    toast("Home page updated — publish to apply"); scheduleChangesRefresh();
+  } catch (err) { toast(err.message, true); }
+}
+function mountSectionsCard() {
+  const host = $("view-business"); if (!host || $("sectionsCard")) return;
+  const hidden = new Set((S.settings && S.settings.sections_hidden) || []);
+  const saved = ((S.settings && S.settings.sections_order) || []).filter((k) => HOME_SECTION_DEFS.some(([d]) => d === k));
+  const order = [...saved, ...HOME_SECTION_DEFS.map(([k]) => k).filter((k) => !saved.includes(k))];
+  const card = el("div", "field"); card.id = "sectionsCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Your home page"));
+  order.forEach((key, idx) => {
+    const def = HOME_SECTION_DEFS.find(([k]) => k === key); if (!def) return;
+    const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line,#eee)";
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !hidden.has(key); cb.id = "sec-" + key;
+    cb.addEventListener("change", () => { const h = new Set(hidden); cb.checked ? h.delete(key) : h.add(key); saveSections(order, [...h]); });
+    const lb = el("label", null, def[1]); lb.setAttribute("for", "sec-" + key); lb.style.cssText = "flex:1;margin:0;font-weight:400";
+    const up = el("button", null, "↑"); up.type = "button"; up.disabled = idx === 0; up.title = "Move up";
+    const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = idx === order.length - 1; dn.title = "Move down";
+    [up, dn].forEach((b) => b.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer" + (b.disabled ? ";opacity:.35;cursor:default" : ""));
+    up.addEventListener("click", () => { if (idx === 0) return; const o = [...order]; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; saveSections(o, [...hidden]); });
+    dn.addEventListener("click", () => { if (idx === order.length - 1) return; const o = [...order]; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; saveSections(o, [...hidden]); });
+    rowEl.append(cb, lb, up, dn);
+    card.appendChild(rowEl);
+  });
+  card.appendChild(el("div", "hint", "Choose which sections appear on your home page, and their order. Unchecked sections are kept, never lost."));
   host.appendChild(card);
 }
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──

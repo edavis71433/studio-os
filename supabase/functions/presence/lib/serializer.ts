@@ -12,7 +12,7 @@ import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
-interface MediaRow { id: string; storage_path: string; alt_text: string; width: number | null; height: number | null }
+interface MediaRow { id: string; storage_path: string; alt_text: string; width: number | null; height: number | null; focal_x?: number | null; focal_y?: number | null }
 
 // deterministic variant output path: /img/<fnv(storage_path)>-<width>.webp
 function fnv(s: string): string {
@@ -34,7 +34,11 @@ function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | 
   if (!m) return null;
   const variants: Record<string, string> = {};
   for (const [name, v] of Object.entries(manifest.image_variants)) variants[name] = variantPath(m.storage_path, v.width);
-  return { alt: m.alt_text, variants, width: m.width ?? undefined, height: m.height ?? undefined };
+  return {
+    alt: m.alt_text, variants, width: m.width ?? undefined, height: m.height ?? undefined,
+    // Phase CP-2: focal point (0-100 %) — consumed wherever a template crops
+    ...(Number.isFinite(Number(m.focal_x)) && Number.isFinite(Number(m.focal_y)) ? { focal: { x: Math.min(100, Math.max(0, Number(m.focal_x))), y: Math.min(100, Math.max(0, Number(m.focal_y))) } } : {}),
+  };
 }
 
 /** Build the sanitized dev layer from the raw row, or null when there's nothing
@@ -57,7 +61,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     q(`presence_testimonials?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_posts?site_id=eq.${siteId}&deleted_at=is.null&status=eq.published&order=published_at.desc`),
-    q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,width,height`),
+    q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,width,height,focal_x,focal_y`),
     q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
     q(`presence_settings?site_id=eq.${siteId}&limit=1`),
     q(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`),
@@ -94,6 +98,14 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     settings: {
       category_order: Array.isArray(settings.category_order) ? settings.category_order : [],
       industry: String(settings.industry_key || 'generic'),   // Phase T3: templates read vocabFor(industry)
+      // Phase CP-2 Design Studio: structured layout choices
+      hero_layout: String(settings.hero_layout || ''),
+      nav_style: String(settings.nav_style || ''),
+      sections: {
+        hidden: Array.isArray(settings.sections_hidden) ? settings.sections_hidden.map(String).slice(0, 12) : [],
+        order: Array.isArray(settings.sections_order) ? settings.sections_order.map(String).slice(0, 12) : [],
+      },
+      footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase Z: ownership-verification tokens (emitted as meta tags when set)
       ...(String(settings.google_site_verification || '').trim() || String(settings.bing_site_verification || '').trim()
         ? { verification: { google: String(settings.google_site_verification || '').trim() || undefined, bing: String(settings.bing_site_verification || '').trim() || undefined } }

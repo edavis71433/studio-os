@@ -36,13 +36,22 @@ export async function handleMediaUpdate(req: Request, site: SiteRow, principal: 
   let alt = '';
   for (const ch of String(body?.alt_text ?? '')) { const c = ch.codePointAt(0)!; if (c >= 32) alt += ch; }
   alt = alt.trim().slice(0, 300);
-  if (alt.length < 3) return json({ error: 'alt_required', message: 'Describe the photo in a few words — it’s what screen readers and search engines see.' }, 422, cors);
+  if (alt.length < 3 && body?.alt_text !== undefined) return json({ error: 'alt_required', message: 'Describe the photo in a few words — it’s what screen readers and search engines see.' }, 422, cors);
+  // Phase CP-2 (DS-5): focal point (0-100 %) — used wherever a template crops
+  const patch: Record<string, unknown> = {};
+  if (body?.alt_text !== undefined) patch.alt_text = alt;
+  if (body?.focal_x !== undefined || body?.focal_y !== undefined) {
+    const fx = Math.round(Number(body?.focal_x)), fy = Math.round(Number(body?.focal_y));
+    if (!Number.isFinite(fx) || !Number.isFinite(fy) || fx < 0 || fx > 100 || fy < 0 || fy > 100) return json({ error: 'bad_focal', message: 'The focus point must be within the photo.' }, 422, cors);
+    patch.focal_x = fx; patch.focal_y = fy;
+  }
+  if (!Object.keys(patch).length) return json({ error: 'empty_update', message: 'Nothing to change.' }, 400, cors);
   const r = await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${site.id}&deleted_at=is.null`, {
-    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ alt_text: alt }),
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch),
   });
   if (!r.ok || !Array.isArray(r.json) || !r.json.length) return json({ error: 'not_found', message: 'That photo isn’t in your collection.' }, 404, cors);
-  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: mediaId, action: 'update', summary: 'Updated a photo description', principal, provenance: 'human', fields: ['alt_text'] });
-  return json({ data: { id: mediaId, alt_text: alt } }, 200, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: mediaId, action: 'update', summary: patch.alt_text !== undefined ? 'Updated a photo description' : 'Set a photo’s focus point', principal, provenance: 'human', fields: Object.keys(patch) });
+  return json({ data: { id: mediaId, ...patch } }, 200, cors);
 }
 
 export async function handleMediaDelete(site: SiteRow, principal: Principal, mediaId: string, cors: Record<string, string>) {

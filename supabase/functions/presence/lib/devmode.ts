@@ -24,6 +24,9 @@ const TOKEN_RULES: Record<string, RegExp> = {
   ink: /^#[0-9a-fA-F]{3,8}$/,
   bg: /^#[0-9a-fA-F]{3,8}$/,
   radius: /^\d{1,3}(px|rem|em)$/,
+  font_display: /^[a-zA-Z0-9'\", -]{3,120}$/,   // CP-2: curated stack strings — no {};()/ url possible
+  font_body: /^[a-zA-Z0-9'\", -]{3,120}$/,
+  spacing_scale: /^(0?\.\d+|1(\.\d+)?)$/,        // CP-2: density preset (like font_scale)
   font_scale: /^(0?\.\d+|1(\.\d+)?)$/,
 };
 export const ALLOWED_TOKENS = Object.keys(TOKEN_RULES);

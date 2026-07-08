@@ -51,6 +51,11 @@ export interface SnapshotContent {
     logo?: MediaRef | null;
     og_image?: MediaRef | null;
     announcement?: { text: string; url?: string; expires_at?: string | null };
+    /** Phase CP-2 Design Studio: structured layout choices (all optional/additive). */
+    hero_layout?: string;
+    nav_style?: string;
+    sections?: { hidden: string[]; order: string[] };
+    footer?: { hours: boolean; social: boolean };
   };
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
@@ -92,6 +97,8 @@ export interface MediaRef {
   /** variant name -> site-relative output path (e.g. { w800: "/img/ab12cd-800.webp" }) */
   variants: Record<string, string>;
   width?: number; height?: number;
+  /** Phase CP-2: focal point (0-100 %) for cropped presentations. */
+  focal?: { x: number; y: number };
 }
 
 /** Phase B1: the Developer-Mode presentation layer, a SIBLING of content in the

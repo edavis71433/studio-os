@@ -64,7 +64,7 @@
 ### FD-T1 · ✅ IMPLEMENTED (Phase T3) — business-classic authored + production default
 **What:** author `business-classic/1.0.0` — the shared render engine emitting `vocabFor(industry)` (correct `LocalBusiness`-family schema + "Services" vocabulary), register it, and point provisioning at `templateSlugForIndustry`. **Why:** Phase T built + tested the primitives (`lib/industry_vocab.ts`, `lib/site_components.ts`, `templateSlugForIndustry`), but until this ONE template is authored, a non-restaurant customer still publishes the restaurant template with wrong `@type: Restaurant/Menu` markup. **Source:** Phase T. **Value:** Very High · **Effort:** Medium (authoring against ready primitives). **Disposition:** **V1 blocker if launching broad; V1.1 if restaurant-first** — gated on the owner's market-scope decision (see ROADMAP-MASTER 🔴).
 
-### FD-T6 · 🟢 LITE SHIPPED (Phase COMP) — curated color palettes are live no-code (6 WCAG-validated palettes, owner tokens-only via the ONE dev-token machinery). Remaining for the FULL Design Studio (V1.1): font pairings · type scale · spacing/density presets · dark mode
+### FD-T6 · ✅ COMPLETE (Phase CP-2) — the full Design Studio: palettes + type pairings + size + corners + background + density + hero/header layouts + industry suggestion + home sections + focal point. Remaining V1.1+: dark-paper variant (needs inverse design pass), per-block layout variants (with FD-T5).
 **What (owner request):** a Design surface for the *business owner* (no developer role needed) to set their site's look: pick from **curated palettes**, **font pairings**, and a **type-scale/size** control — plus their logo/brand colors from the brand asset library ([[FD-20]]). **Not** raw CSS/hex-anything: designed choices → theme tokens → deterministic render → approval-first publish. **Why it's a gap:** today NO customer can change fonts/colors at all — the theme-token machinery exists (Phase B/B1: tokens ride in the snapshot and render deterministically) but is gated behind Developer Mode; and the product's "Visual Studio" is AI *images*, not design. This is the missing customer half of the Phase T theme system (pairs with FD-T3 theme variants + FD-B4 self-hosted fonts). **Value:** High (every competitor lets customers pick fonts/colors; ours can do it *safely*) · **Effort:** Medium (a curated-picker UI over the existing token layer). **Disposition:** V1.1 — strong candidate right after FD-T1 (the neutral template), since themes make every template's look customer-tunable.
 
 ### FD-T7 · Launches — a parallel future version, promoted without downtime 🔴 (owner request)
@@ -79,10 +79,10 @@
 ### FD-T10 · Stock photography integration
 **What:** search/import license-safe stock (Unsplash/Pexels API) directly into the media library (copied in — published sites stay self-contained, no hotlinking). Every competitor has this; empty photo slots are a real first-run wall. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
 
-### FD-T11 · Image editing basics (crop · focal point)
+### FD-T11 · 🟢 FOCAL SHIPPED (Phase CP-2) — 3×3 focus chooser + object-position in cropping presentations (split hero first). Full crop pipeline stays deferred (image-processing reason).
 **What:** crop + focal-point control in the media library so variants frame correctly (verified: none exists today — variants are automatic). **Value:** Medium · **Effort:** Medium. **Disposition:** V1.1.
 
-### FD-T12 · Section ordering as structured data
+### FD-T12 · ✅ IMPLEMENTED (Phase CP-2) — home sections show/hide + reorder, structured (sections_hidden/order → both templates), never-lost semantics
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
 
 ### FD-7 · ✅ IMPLEMENTED (Phase AA) — named versions: label/rename any kept version from History (POST /publishes/:id/label, mig 0053, provenance-logged, journal shows the name first)

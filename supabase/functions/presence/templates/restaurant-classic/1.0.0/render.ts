@@ -61,12 +61,13 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 }
 
 // ═════════ CSS (one hand-authored sheet; system font stack — zero external assets) ═════════
-const CSS = `:root{--ink:#241d1a;--soft:#6b5f58;--cream:#faf6ef;--card:#ffffff;--accent:#8c3b2e;--accent-dark:#6f2e24;--line:#e7ddd0;--good:#2e6b46}
+const CSS = `:root{--ink:#241d1a;--soft:#6b5f58;--cream:var(--bg,#faf6ef);--card:#ffffff;--accent:#8c3b2e;--accent-dark:#6f2e24;--line:#e7ddd0;--good:#2e6b46}
+html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
-body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--cream);color:var(--ink);line-height:1.65;font-size:16.5px}
-h1,h2,h3,.brand{font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-weight:400;line-height:1.2;text-wrap:balance}
+body{font-family:var(--font-body,system-ui,-apple-system,"Segoe UI",sans-serif);background:var(--cream);color:var(--ink);line-height:1.65;font-size:1.03rem}
+h1,h2,h3,.brand{font-family:var(--font-display,Georgia,'Iowan Old Style','Times New Roman',serif);font-weight:400;line-height:1.2;text-wrap:balance}
 h1{font-size:clamp(2rem,5.5vw,3.2rem)}h2{font-size:clamp(1.5rem,3.5vw,2rem);margin-bottom:.6em}h3{font-size:1.15rem}
 a{color:var(--accent)}a:hover{color:var(--accent-dark)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:2px}
@@ -92,7 +93,7 @@ main{display:block}
 .strip .wrap{display:flex;gap:10px 24px;justify-content:center;flex-wrap:wrap;text-align:center}
 .strip a{color:#f7f1e8}
 .notice{background:#7a2f24;color:#fff;padding:12px 0;text-align:center;font-weight:600}
-section.block{padding:44px 0}
+section.block{padding:calc(44px * var(--spacing-scale,1)) 0}
 section.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .menu-cat{margin-bottom:34px}
 .menu-cat h3{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:.95rem;font-family:system-ui,sans-serif;font-weight:700;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
@@ -103,7 +104,7 @@ ul.items{list-style:none}
 .item .pr{white-space:nowrap;color:var(--ink);font-variant-numeric:tabular-nums}
 .dots{flex:1;border-bottom:1px dotted var(--line);transform:translateY(-4px);min-width:24px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 4px);padding:22px}
 blockquote.t{font-size:1.05rem}
 blockquote.t footer{margin-top:10px;color:var(--soft);font-size:.9rem;font-style:normal}
 .faq dt{font-weight:600;margin-top:18px}
@@ -280,8 +281,8 @@ ${o.body}
 </main>
 <footer class="site"><div class="wrap">
   <div class="cols">
-    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${social ? `<p>${social}</p>` : ''}</div>
-    <div>${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
+    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
+    <div>${(c.settings?.footer?.hours !== false) && loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
@@ -292,6 +293,15 @@ ${o.body}
 }
 
 // ═════════ page bodies ═════════
+
+// Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
+const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
+function homeSectionOrder(c: SnapshotContent): string[] {
+  const hidden = new Set(c.settings?.sections?.hidden || []);
+  const chosen = (c.settings?.sections?.order || []).filter((k) => HOME_SECTIONS.includes(k));
+  const rest = HOME_SECTIONS.filter((k) => !chosen.includes(k));
+  return [...chosen, ...rest].filter((k) => !hidden.has(k));
+}
 
 function homeBody(c: SnapshotContent, site: SiteConfig): string {
   const i = c.identity;
@@ -320,16 +330,21 @@ function homeBody(c: SnapshotContent, site: SiteConfig): string {
   ${tel ? `<span>${tel}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
 </div></div>
-<section class="block wrap"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>
-${featured.length ? `<section class="block alt"><div class="wrap"><h2>From the menu</h2><ul class="items">${featured.map((o) => `
+${(() => {
+  const parts: Record<string, string> = {
+    about: `<section class="block wrap"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>`,
+    offerings: featured.length ? `<section class="block alt"><div class="wrap"><h2>From the menu</h2><ul class="items">${featured.map((o) => `
   <li class="item"${prE('offering', o.id)}><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
-</ul><p style="margin-top:18px"><a class="btn ghost" href="/menu/">Full menu</a></p></div></section>` : ''}
-${tst.length ? `<section class="block wrap"><h2>What guests say</h2><div class="cards">${tst.map((t) => `
+</ul><p style="margin-top:18px"><a class="btn ghost" href="/menu/">Full menu</a></p></div></section>` : '',
+    testimonials: tst.length ? `<section class="block wrap"><h2>What guests say</h2><div class="cards">${tst.map((t) => `
   <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
-</div></section>` : ''}
-${faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
+</div></section>` : '',
+    faqs: faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
-</dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : ''}`;
+</dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
+  };
+  return homeSectionOrder(c).map((k) => parts[k]).join('');
+})()}`;
 }
 
 function menuBody(c: SnapshotContent): string {

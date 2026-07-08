@@ -55,13 +55,20 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 }
 
 // ═════════ CSS — a modern, confident, industry-neutral look (zero external assets) ═════════
-const CSS = `:root{--ink:#1c2430;--soft:#5b6572;--paper:#f7f7f5;--card:#ffffff;--accent:#23635a;--accent-dark:#17453f;--line:#e2e4e1;--wash:#eef1ee}
+const CSS = `:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--card:#ffffff;--accent:#23635a;--accent-dark:#17453f;--line:#e2e4e1;--wash:#eef1ee}
+html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px;-webkit-font-smoothing:antialiased}
-h1,h2,h3{line-height:1.15;letter-spacing:-.015em;font-weight:700}
+body{font-family:var(--font-body,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.65;font-size:1.03rem;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--font-display,inherit);line-height:1.15;letter-spacing:-.015em;font-weight:700}
 h1{font-size:clamp(2.1rem,5.5vw,3.4rem)}h2{font-size:clamp(1.35rem,3vw,1.8rem);margin-bottom:16px}h3{font-size:1.1rem}
 .skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}
 .wrap{max-width:1000px;margin:0 auto;padding:0 22px}
+.nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
+.hero-split{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:center;text-align:left}
+.hero-split .cta-row{justify-content:flex-start}
+.hero-split .split-img{border-radius:16px;overflow:hidden;box-shadow:0 20px 50px rgba(28,36,48,.14)}
+.hero-split .split-img img{width:100%;height:100%;min-height:280px;object-fit:cover;display:block}
+@media (max-width:760px){.hero-split{grid-template-columns:1fr}}
 .annbar{background:var(--accent);color:#fff;text-align:center;padding:9px 16px;font-size:.95rem}
 .annbar a{color:#fff;text-decoration:underline}
 .notice{background:#fdf3e4;color:#6b4c12;text-align:center;padding:10px 16px;font-size:.95rem}
@@ -73,12 +80,12 @@ nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.95rem;border-radius:8px}
 nav.primary a:hover{color:var(--ink);background:var(--wash)}
 nav.primary a[aria-current="page"]{color:var(--accent-dark);background:var(--wash)}
-.hero{padding:72px 0 48px}
+.hero{padding:calc(72px * var(--spacing-scale,1)) 0 calc(48px * var(--spacing-scale,1))}
 .hero .kicker{color:var(--accent-dark);font-weight:700;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase}
 .hero h1{margin:10px 0 12px;max-width:20ch;text-wrap:balance}
 .tagline{font-size:1.2rem;color:var(--soft);max-width:52ch}
 .cta-row{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
-.btn{display:inline-block;background:var(--accent);color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem}
+.btn{display:inline-block;background:var(--accent);color:#fff;padding:13px 24px;border-radius:var(--radius,10px);text-decoration:none;font-weight:700;font-size:1rem}
 .btn:hover{background:var(--accent-dark)}
 .btn.ghost{background:transparent;color:var(--accent-dark);border:2px solid var(--accent)}
 .btn.ghost:hover{background:var(--wash)}
@@ -87,10 +94,10 @@ nav.primary a[aria-current="page"]{color:var(--accent-dark);background:var(--was
 .strip{background:var(--ink);color:#e8ebe9;font-size:.92rem}
 .strip .wrap{display:flex;gap:22px;flex-wrap:wrap;padding:11px 22px}
 .strip a{color:#bfe3da}
-.block{padding:52px 0}
+.block{padding:calc(52px * var(--spacing-scale,1)) 0}
 .block.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:8px}
-.svc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.svc{background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 4px);padding:20px 22px}
 .block.alt .svc{background:var(--paper)}
 .svc .nm{font-weight:700;font-size:1.05rem}
 .svc .ds{color:var(--soft);font-size:.95rem;margin-top:6px}
@@ -98,7 +105,7 @@ nav.primary a[aria-current="page"]{color:var(--accent-dark);background:var(--was
 .svc img{width:100%;height:auto;border-radius:10px;margin-top:12px}
 .cat-h{margin-top:34px;padding-bottom:8px;border-bottom:2px solid var(--wash)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 4px);padding:22px}
 blockquote.t p{font-size:1.02rem}
 blockquote.t footer{margin-top:12px;color:var(--soft);font-size:.92rem;font-weight:600}
 dl.faq dt{font-weight:700;margin-top:20px}
@@ -110,7 +117,7 @@ table.hours td{padding:7px 0}
 .holiday{margin-top:14px;font-size:.94rem}.holiday ul{margin:6px 0 0 18px}
 address{font-style:normal}
 form.card label{font-weight:600;font-size:.94rem}
-form.card input,form.card textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;font:inherit;margin-top:5px;background:var(--paper)}
+form.card input,form.card textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:var(--radius,9px);font:inherit;margin-top:5px;background:var(--paper)}
 form.card input:focus,form.card textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 form.card p{margin-bottom:14px}
 .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
@@ -127,7 +134,7 @@ footer.site h2{font-size:1.1rem}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 @media (max-width:640px){.hero{padding:52px 0 36px}.block{padding:40px 0}}`;
 
-const CRITICAL = `:root{--ink:#1c2430;--soft:#5b6572;--paper:#f7f7f5;--accent:#23635a;--line:#e2e4e1}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.15;letter-spacing:-.015em}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1000px;margin:0 auto;padding:0 22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:#5b6572;font-weight:600}.hero{padding:72px 0 48px}`;
+const CRITICAL = `:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--accent:#23635a;--line:#e2e4e1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.15;letter-spacing:-.015em}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1000px;margin:0 auto;padding:0 22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:#5b6572;font-weight:600}.hero{padding:72px 0 48px}`;
 
 // ═════════ partials ═════════
 
@@ -259,7 +266,7 @@ ${o.ld.map((j) => `<script type="application/ld+json">${JSON.stringify(j).replac
 <a class="skip" href="#main">Skip to main content</a>
 ${x.announce}
 ${closedNotice}
-<header class="site"><div class="wrap nav">
+<header class="site"><div class="wrap nav${c.settings?.nav_style === 'centered' ? ' centered' : ''}">
   <a class="brand" href="/">${logo?.variants?.w400 ? `<img src="${attr(logo.variants.w400)}" alt="" class="brandlogo">` : ''}${esc(i.business_name)}</a>
   <nav class="primary" aria-label="Main"><ul>${x.nav.map(([p, label, key]) =>
     `<li><a href="${attr(p)}"${o.active === key ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')}</ul></nav>
@@ -269,8 +276,8 @@ ${o.body}
 </main>
 <footer class="site"><div class="wrap">
   <div class="cols">
-    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${social ? `<p>${social}</p>` : ''}</div>
-    <div>${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
+    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
+    <div>${(c.settings?.footer?.hours !== false) && loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
@@ -279,6 +286,15 @@ ${o.body}
 }
 
 // ═════════ page bodies ═════════
+
+// Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
+const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
+function homeSectionOrder(c: SnapshotContent): string[] {
+  const hidden = new Set(c.settings?.sections?.hidden || []);
+  const chosen = (c.settings?.sections?.order || []).filter((k) => HOME_SECTIONS.includes(k));
+  const rest = HOME_SECTIONS.filter((k) => !chosen.includes(k));
+  return [...chosen, ...rest].filter((k) => !hidden.has(k));
+}
 
 function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>): string {
   const i = c.identity;
@@ -290,8 +306,7 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
   const maps = mapsHref(c);
   const book = safeHref(i.booking_url || '');
   const order = safeHref(i.ordering_url || '');
-  return `
-<section class="hero wrap">
+  const heroText = `
   ${i.service_area ? `<p class="kicker"${pr('identity.service_area')}>${esc(i.service_area)}</p>` : ''}
   <h1${pr('identity.business_name')}>${esc(i.business_name)}</h1>
   ${i.tagline ? `<p class="tagline"${pr('identity.tagline')}>${esc(i.tagline)}</p>` : ''}
@@ -300,24 +315,38 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
     ${order ? `<a class="btn${book ? ' ghost' : ''}" href="${attr(order)}" rel="noopener">Order online</a>` : ''}
     ${!book && !order ? `<a class="btn" href="${attr(v.offeringPath)}">See our ${esc(v.offeringLabel.toLowerCase())}</a>` : ''}
     ${(book || order) ? `<a class="btn ghost" href="/contact/">Contact us</a>` : ''}
-  </div>
-  ${hero && hero !== c.settings?.logo ? `<div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div>` : ''}
+  </div>`;
+  const heroImgOk = hero && hero !== c.settings?.logo;
+  // DS-6 split layout — the first CROPPING presentation, so the focal point (DS-5) drives it
+  const useSplit = c.settings?.hero_layout === 'split' && heroImgOk;
+  const focalStyle = hero?.focal ? ` style="object-position:${hero.focal.x}% ${hero.focal.y}%"` : '';
+  const splitImg = useSplit && hero?.variants
+    ? `<div class="split-img"><img src="${attr(hero.variants.w800 || hero.variants.w400 || '')}"${hero.variants.w400 && hero.variants.w1600 ? ` srcset="${attr(hero.variants.w400)} 400w, ${attr(hero.variants.w800 || hero.variants.w1600)} 800w, ${attr(hero.variants.w1600)} 1600w" sizes="(max-width:760px) 100vw, 45vw"` : ''} alt="${attr(hero.alt)}" fetchpriority="high"${focalStyle}></div>`
+    : '';
+  return `
+<section class="hero wrap">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
+  ${heroImgOk ? `<div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div>` : ''}`}
 </section>
 <div class="strip"><div class="wrap">
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
 </div></div>
-<section class="block wrap"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>
-${featured.length ? `<section class="block alt"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
+${(() => {
+  const parts: Record<string, string> = {
+    about: `<section class="block wrap"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>`,
+    offerings: featured.length ? `<section class="block alt"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
-</div><p style="margin-top:22px"><a class="btn ghost" href="${attr(v.offeringPath)}">All ${esc(v.offeringLabel.toLowerCase())}</a></p></div></section>` : ''}
-${tst.length ? `<section class="block wrap"><h2>What customers say</h2><div class="cards">${tst.map((t) => `
+</div><p style="margin-top:22px"><a class="btn ghost" href="${attr(v.offeringPath)}">All ${esc(v.offeringLabel.toLowerCase())}</a></p></div></section>` : '',
+    testimonials: tst.length ? `<section class="block wrap"><h2>What customers say</h2><div class="cards">${tst.map((t) => `
   <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
-</div></section>` : ''}
-${faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
+</div></section>` : '',
+    faqs: faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
-</dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : ''}`;
+</dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
+  };
+  return homeSectionOrder(c).map((k) => parts[k]).join('');
+})()}`;
 }
 
 function offeringsBody(c: SnapshotContent, v: ReturnType<typeof vocabFor>): string {
