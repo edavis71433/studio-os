@@ -109,7 +109,7 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 Whole-platform certification · Zero-Surprise Certification · every action has a clear outcome · unified experience review.
 - ⚠️ **Phase E (Product Integrity Verification) already produced an Integrity Certification** across editions/roles/workflows/integrations, with a Risk Register. **Trim O to its one genuinely-new delta:** a *"every action has a clear, understandable outcome"* pass — i.e., an empty-state + confirmation-copy + error-message review across the surfaces (a UX-writing audit), not a re-certification. Otherwise it re-does E.
 
-### Phase P — Platform Optimization  ·  ⚠️ LARGELY REDUNDANT (Phases L + M)
+### Phase P — Editions, Entitlements, Pricing & Upgrade Experience  ·  ✅ IMPLEMENTED
 Click reduction · Navigation optimization · Workflow optimization · Search quality · Keyboard shortcuts · Operator/customer efficiency.
 - ⚠️ Click/nav/workflow/operator/customer optimization was the substance of **Phase M (Site Operations)** and **Phase L (Operational Excellence)** — done. **Trim P to the two genuinely-new items:** **content search across items** (V1.1 — today's palette searches nav only) and **keyboard shortcuts** (V1.1 — beyond ⌘K). Don't re-run the optimization pass.
 

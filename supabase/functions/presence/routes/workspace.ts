@@ -15,7 +15,8 @@ import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor } from '../lib/navigation.ts';
-import { editionFromPlan, editionFromSite, featuresOf, editionFlags, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
+import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelta, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
+import { nextPlanUp } from '../commerce/catalog.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc } from '../lib/db.ts';
@@ -52,13 +53,26 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // the site edition when no entitlement plan is recorded). Navigation adapts to
   // it automatically — one nav, many editions. Never throws on missing rows.
   let editionKey: EditionKey = editionFromSite(site.edition, { isAgency });
+  let planKey: string | null = null;
   try {
     if (site.client_id) {
       const ent = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=plan&limit=1`);
       const plan = ent.ok && Array.isArray(ent.json) && ent.json[0]?.plan;
-      if (plan) editionKey = editionFromPlan(String(plan));
+      if (plan) { planKey = String(plan); editionKey = editionFromPlan(planKey); }
     }
   } catch { /* keep the fallback edition */ }
+
+  // Phase P: the honest upsell — the next self-serve rung + what it GAINS (from
+  // featureDelta, so it can never overpromise). Shown only to owners (never to
+  // client reviewers or operators); null at the top of the ladder = no card.
+  let upsell: { plan_key: string; name: string; tagline: string; monthly: number | null; gains: string[] } | null = null;
+  if (planKey && role === 'business_owner' && !isOperator) {
+    const next = nextPlanUp(planKey);
+    if (next) {
+      const gains = featureDelta(editionKey, editionFromPlan(next.key)).gained;
+      upsell = { plan_key: next.key, name: next.name, tagline: next.tagline || '', monthly: next.monthly, gains: gains.slice(0, 4) };
+    }
+  }
 
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey };
   return json({ data: {
@@ -69,6 +83,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     edition_name: EDITION_DEFS[editionKey]?.name || '',
     edition_features: featuresOf(editionKey),
     edition_flags: editionFlags(editionKey),
+    plan_key: planKey,                   // Phase P: what they own, by name
+    upsell,                              // Phase P: the next rung + honest gains (null at the top)
     is_agency: isAgency,
     is_operator: isOperator,
     sees_full_workspace: siteCan(role, 'view_all'),

@@ -196,14 +196,39 @@ function trouble(){
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
-    const [moments, features] = await Promise.all([
+    const [moments, features, ctx] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
+      apiGet('/portal/context').catch(()=>null),
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     render(list, features?.data || {});
+    planCard(ctx && ctx.data);
   }catch(_){ trouble(); }
 })();
+
+// ── Phase P: "what you own" + the honest upsell — quiet, at the bottom, never a
+// dead end. Shown only when the platform says there IS a next rung (owners only;
+// the server computes gains from featureDelta so this can never overpromise).
+function planCard(c){
+  if(!c || !c.edition_name) return;
+  const host = document.querySelector('main') || document.body;
+  const card = document.createElement('div');
+  card.style.cssText = 'max-width:860px;margin:26px auto 40px;padding:16px 20px;border:1px solid #e4ddf2;border-radius:14px;background:#fbfaff;font-size:14px;color:#574d68';
+  const own = document.createElement('div');
+  own.innerHTML = '<strong>Your plan: ' + esc(c.edition_name) + '.</strong> Everything you see here is included.';
+  card.appendChild(own);
+  if(c.upsell && c.upsell.name){
+    const up = document.createElement('div');
+    up.style.marginTop = '8px';
+    const gains = (c.upsell.gains||[]).map(g => esc(String(g).replace(/_/g,' '))).join(', ');
+    up.innerHTML = esc(c.upsell.name) + (c.upsell.monthly ? ' (from $' + c.upsell.monthly + '/mo)' : '') +
+      (gains ? ' adds: ' + gains + '.' : '.') +
+      ' <a href="mailto:hello@davisdigitalstudio.com?subject=' + encodeURIComponent('Upgrading to ' + c.upsell.name) + '" style="color:#5b3fa0">Ask about upgrading →</a>';
+    card.appendChild(up);
+  }
+  host.appendChild(card);
+}
 </script>
 </body>
 </html>

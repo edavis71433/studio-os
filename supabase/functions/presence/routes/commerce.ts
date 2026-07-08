@@ -23,6 +23,7 @@ import {
   stripeInterval, editionFor, evaluateChange, FOUNDERS_OPEN,
 } from '../commerce/catalog.ts';
 import type { PlanKey, Term } from '../commerce/catalog.ts';
+import { supportFor } from '../commerce/support.ts';
 import { validEmail, passwordProblem, findClientByEmail, createAuthUser, deleteAuthUser, createContactAndClient, sendEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
@@ -53,7 +54,10 @@ function planPayload(founder: boolean) {
 }
 
 function handlePlans(cors: Record<string, string>) {
-  return json({ data: { founders_open: FOUNDERS_OPEN, trial_days: TRIAL_DAYS, plans: planPayload(grantFounder()) } }, 200, cors);
+  // Phase P: every plan ships its SERVICE tier (onboarding/support/AI/implementation/
+  // training/maintenance) so software and service packages can never drift apart.
+  const plans = planPayload(grantFounder()).map((p: any) => ({ ...p, support: supportFor(p.key) }));
+  return json({ data: { founders_open: FOUNDERS_OPEN, trial_days: TRIAL_DAYS, plans } }, 200, cors);
 }
 
 // ── PUBLIC: signup ──────────────────────────────────────────────────────────

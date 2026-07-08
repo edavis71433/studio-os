@@ -168,6 +168,18 @@ export function editionFor(key: PlanKey): Edition {
 }
 
 // Upgrade / downgrade classification between two rungs.
+/** Phase P: the next SELF-SERVE rung above a plan — the honest upsell target.
+ *  Skips contact-sales rungs (agency/enterprise); null at the top. Pure. */
+export function nextPlanUp(currentKey: string | null | undefined): PlanDef | null {
+  const cur = currentKey ? PLANS.find((p) => p.key === currentKey) : null;
+  const rank = cur ? cur.rank : 0;
+  const price = cur?.monthly ?? 0;
+  // strictly MORE capable AND more expensive — a lateral rung (cms↔bos, same
+  // price) is a different shape, not an upgrade, and is never auto-pitched.
+  return PLANS.filter((p) => p.rank > rank && p.selfServe && p.monthly != null && p.monthly > price)
+    .sort((a, b) => a.rank - b.rank)[0] || null;
+}
+
 export type ChangeKind = 'same' | 'upgrade' | 'downgrade';
 export function changeKind(from: PlanKey, to: PlanKey): ChangeKind {
   const a = planByKey(from)?.rank ?? 0;

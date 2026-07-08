@@ -85,6 +85,12 @@
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
 
+### FD-P1 · Self-serve plan change (upgrade/downgrade route)
+**What:** a route + UI applying catalog.planChange (policy already written: upgrades immediate+prorated, downgrades at cycle end) through Stripe. Founder-era changes are studio-handled (appropriate); self-serve when volume demands. **Source:** Phase P. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-P2 · In-nav locked-feature teasers
+**What:** grayed nav rows for features the edition lacks ("Business Moments — included in Presence →") linking to the pricing page. Needs Phase H as the link target. **Source:** Phase P Step 2. **Value:** Medium · **Effort:** Low-Medium. **Disposition:** V1.1 (after Phase H).
+
 ### FD-S1 · Load-verify real p95 / cold-start / bundle size
 **What:** measure /observe + full pipeline p95 on a large live site; check edge cold-start + bundle. **Source:** Phase S. **Value:** Med · **Effort:** Low. **Disposition:** V1 owner-activation (measurement, not code).
 
