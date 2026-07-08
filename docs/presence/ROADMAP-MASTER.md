@@ -162,9 +162,11 @@ Ordered by value-per-effort:
 
 ## 🔍 Things to look into / expand
 
+### Phase UX — End-to-End Journey Certification  ·  ✅ COMPLETE
+*Four personas walked customer-eyes-only (code-accurate simulation; human browser pass remains the visual confirmation). Verdict: the post-signup product CERTIFIES — drafted-for-you onboarding, calm honesty, no dead ends; blockers to launch are purely operational (activation, browser pass, front door). Implemented FD-R2 (workspace vocabulary + the preview /menu/ bug fix). See [PHASE-UX-JOURNEY-CERTIFICATION](PHASE-UX-JOURNEY-CERTIFICATION.md).*
+
 ### 📌 Parked engineering pickups (come back after activation/QA — small, ready to build)
 *Owner-parked on purpose; each is scoped, verified, and queued in detail in the Feature Discovery Queue:*
-- **FD-R2 · Workspace vocabulary matches industry** — a plumber's workspace still says "Menu"/"menu item"; drive labels from the industry vocab (~small; strongest GM-QA-adjacent polish).
 - **FD-RL1 · Wind-down automation** — day-45 export reminder + day-60 auto-park (the policy is written + communicated; this automates the tail).
 - **FD-RL2 · Reactivation & win-back comms** — welcome-back email + one polite day-30 win-back.
 - **FD-N7 · Redirects manager UI** · **FD-N8 · per-page SEO overrides** — the last two no-code tails.

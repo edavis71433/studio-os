@@ -868,8 +868,8 @@ function renderOfferings() {
     const n = S.offerings.filter((o) => (o.category || "Menu") === cat).length;
     head.appendChild(el("span", "mv", `${n} dish${n === 1 ? "" : "es"}`));
     const ctl = el("div", "ctl");
-    const up = el("button", null, "↑"); up.title = `Move ${cat} earlier`; up.setAttribute("aria-label", `Move ${cat} earlier in the menu`);
-    const dn = el("button", null, "↓"); dn.title = `Move ${cat} later`; dn.setAttribute("aria-label", `Move ${cat} later in the menu`);
+    const up = el("button", null, "↑"); up.title = `Move ${cat} earlier`; up.setAttribute("aria-label", `Move ${cat} earlier`);
+    const dn = el("button", null, "↓"); dn.title = `Move ${cat} later`; dn.setAttribute("aria-label", `Move ${cat} later`);
     up.disabled = ci === 0; dn.disabled = ci === cats.length - 1;
     up.addEventListener("click", () => moveCategory(cat, -1));
     dn.addEventListener("click", () => moveCategory(cat, +1));
@@ -882,7 +882,7 @@ function renderOfferings() {
   });
   const ns = $("newSectionWrap"); ns.innerHTML = "";
   if (S.offerings.length) {
-    const b = el("button", "addline", "＋ Start a new section of the menu");
+    const b = el("button", "addline", VOCAB.addLine);
     b.style.borderTop = "none"; b.style.marginTop = "18px";
     b.addEventListener("click", () => addDishLine(ns, ""));
     ns.appendChild(b);
@@ -894,7 +894,7 @@ function dishLine(o, wash) {
   row.setAttribute("aria-label", `Edit ${o.name}`);
   const left = el("span");
   const nm = el("span", "dn", o.name);
-  if (o.is_visible === false) nm.appendChild(Object.assign(el("span", "smalltag", "off the menu"), { style: "margin-left:10px;text-decoration:none;display:inline-block" }));
+  if (o.is_visible === false) nm.appendChild(Object.assign(el("span", "smalltag", VOCAB.offTag), { style: "margin-left:10px;text-decoration:none;display:inline-block" }));
   left.appendChild(nm);
   if (o.description) left.appendChild(el("div", "dd", o.description));
   row.append(left, el("span", "lead"), el("span", "dp", o.price_text || "—"));
@@ -920,7 +920,7 @@ function dishEditor(o) {
     </div>
     <div class="eacts">
       <button class="pillbtn inked" data-act="save">Save</button>
-      <button class="textact" data-act="vis" style="background:none">${o.is_visible === false ? "Put it back on the menu" : "Take it off the menu"}</button>
+      <button class="textact" data-act="vis" style="background:none">${o.is_visible === false ? VOCAB.putBack : VOCAB.takeOff}</button>
       <span class="spacer"></span>
       <button class="danger" data-act="del">Remove for good</button>
     </div>`;
@@ -953,7 +953,7 @@ function addDishLine(afterNode, cat) {
       <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" maxlength="40" placeholder="$18 · MP"></div>
     </div>
     ${cat === "" ? `<div class="field"><label>Section</label><input type="text" data-k="category" maxlength="60" placeholder="Desserts, Drinks, Specials…"></div>` : ""}
-    <div class="eacts"><button class="pillbtn inked" data-act="add">Add to the menu</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
+    <div class="eacts"><button class="pillbtn inked" data-act="add">${VOCAB.addBtn}</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
   ed.querySelector('[data-act="cancel"]').addEventListener("click", () => ed.remove());
   ed.querySelector('[data-act="add"]').addEventListener("click", async () => {
     const name = ed.querySelector('[data-k="name"]').value.trim();
@@ -2326,9 +2326,41 @@ async function refreshAll() {
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
+  applyVocab();
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
+}
+// ── Phase UX (FD-R2): the workspace speaks the business's language ──
+// A plumber's SITE says "Services" (T3 vocabulary) — the workspace must too.
+// Words follow the template first (restaurant-classic always renders a menu),
+// then the industry. Also fixes the preview page-word: it pointed at /menu/,
+// a page that doesn't exist on business-classic sites.
+const OFFER_WORDS = {
+  food:      { label: "Menu",     path: "/menu/",     sub: "This page reads the way your menu reads. Choose any line to change it; anything you take off the menu stays kept here, never lost.", addLine: "＋ Start a new section of the menu", putBack: "Put it back on the menu", takeOff: "Take it off the menu", offTag: "off the menu", addBtn: "Add to the menu" },
+  retail:    { label: "Products", path: "/products/", sub: "What you sell, in your words. Choose any product to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new product group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this product" },
+  fitness:   { label: "Classes",  path: "/classes/",  sub: "Your classes and sessions, in your words. Choose any class to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new class group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this class" },
+  community: { label: "Programs", path: "/programs/", sub: "Your programs, in your words. Choose any one to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new program group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this program" },
+  generic:   { label: "Services", path: "/services/", sub: "What you offer, in your words. Choose any service to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new service category", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this service" },
+};
+let VOCAB = OFFER_WORDS.food;   // matches the pre-load default markup
+function vocabWords() {
+  const tpl = (S.site && S.site.template) || "";
+  if (tpl.indexOf("restaurant-classic") === 0) return OFFER_WORDS.food;
+  const k = (S.settings && S.settings.industry_key) || "generic";
+  if (["restaurant", "coffee_shop", "cafe", "bar", "food_truck"].includes(k)) return OFFER_WORDS.food;
+  if (k === "retail") return OFFER_WORDS.retail;
+  if (["fitness", "gym", "yoga"].includes(k)) return OFFER_WORDS.fitness;
+  if (["nonprofit", "church"].includes(k)) return OFFER_WORDS.community;
+  return OFFER_WORDS.generic;
+}
+function applyVocab() {
+  VOCAB = vocabWords();
+  const nav = document.querySelector('[data-view="offerings"]'); if (nav) nav.textContent = VOCAB.label;
+  const h = document.querySelector("#view-offerings h1.doc"); if (h) h.textContent = VOCAB.label;
+  const sub = document.querySelector("#view-offerings .docsub"); if (sub) sub.textContent = VOCAB.sub;
+  const pb = document.querySelector('#pageWords button[data-page="/menu/"]');
+  if (pb && VOCAB.path !== "/menu/") { pb.dataset.page = VOCAB.path; pb.textContent = VOCAB.label; }
 }
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
 [["f-gsv", "google_site_verification"], ["f-bsv", "bing_site_verification"]].forEach(([id, key]) => {
