@@ -12,6 +12,7 @@ export interface OrgPlan extends ApprovedPlanBase {
   targets: string[];            // location site_ids the change fans out to
   what_changes: string[];
   what_stays: string[];
+  rollback: string;             // plain-language how-to-undo (shared plan field)
   rollback_note: string;
 }
 

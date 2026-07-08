@@ -9,7 +9,9 @@ Everything needed to deploy, monitor, recover, and maintain production. Consolid
 
 ## Deploying the function
 
-Use **`supabase-go.exe`** (the standard `supabase.exe` segfaults intermittently on deploy). The verified path:
+**Primary path (CI — A2):** the `presence` function now deploys through GitHub Actions (`.github/workflows/deploy.yml`) — **staging** automatically on push to the `staging` branch, **production** via a confirmation-gated `workflow_dispatch` (type `deploy-production`, from `main`). Every deploy is gated by the pure test suites + `deno check` + migration-integrity check, and followed by smoke tests (clever-api handshake + presence catalog 200 + `/connections` 401). **Rollback:** run `.github/workflows/rollback.yml` with a known-good ref (SHA/tag); production requires the `rollback-production` phrase. Function rollback is a stateless redeploy; **migration rollback stays manual** (apply the target migration's `-- rollback:` inverse via the hold-back technique). CI secrets required: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF_STAGING`, `SUPABASE_PROJECT_REF_PROD`.
+
+**Local / emergency fallback:** use **`supabase-go.exe`** (the standard `supabase.exe` segfaults intermittently on deploy). The verified path:
 
 ```
 pwsh scripts/deploy-presence.ps1 -Env staging   # then -Env prod

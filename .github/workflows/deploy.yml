@@ -47,6 +47,16 @@ jobs:
           done
           if [ "$fail" -ne 0 ]; then echo "Pre-deploy test gate FAILED"; exit 1; fi
           echo "Pre-deploy test gate passed."
+      - name: Type-check (deno check)
+        run: deno check supabase/functions/presence/index.ts
+      - name: Verify migrations (fenced files intact; numbers unique)
+        run: |
+          for n in 0003 0004 0005; do
+            ls supabase/migrations/${n}_*.sql >/dev/null 2>&1 || { echo "fenced migration $n missing — history integrity broken"; exit 1; }
+          done
+          dupes=$(ls supabase/migrations/[0-9]*.sql | sed -E 's#.*/([0-9]+)_.*#\1#' | sort | uniq -d)
+          if [ -n "$dupes" ]; then echo "duplicate migration numbers: $dupes"; exit 1; fi
+          echo "migrations verified: fenced 0003-0005 present, numbers unique."
 
   deploy-staging:
     if: github.event_name == 'push'
@@ -70,7 +80,15 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx --yes supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
-      - name: Smoke test — version handshake
+      # Presence platform function (A2): the function does its own fail-closed
+      # auth, so --no-verify-jwt matches production. The benign "sdk.ts" read WARN
+      # does not fail the deploy; the smoke test below is the real gate.
+      - name: Deploy presence (staging)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
+      - name: Smoke test — clever-api version handshake
         run: |
           sleep 5
           curl -s --fail -X POST \
@@ -78,6 +96,14 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"type":"version"}' | tee /tmp/version.json
           grep -q '"build"' /tmp/version.json
+
+      - name: Smoke test — presence catalog + gated route
+        run: |
+          base="https://${{ secrets.SUPABASE_PROJECT_REF_STAGING }}.supabase.co/functions/v1/presence"
+          curl -s --fail "$base/commerce/plans" | grep -q -i 'plan' || { echo "presence /commerce/plans smoke FAILED"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
+          [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
+          echo "presence smoke passed (catalog 200, /connections 401 gated)."
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
@@ -108,7 +134,12 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx --yes supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
-      - name: Smoke test — version handshake
+      - name: Deploy presence (PRODUCTION)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
+      - name: Smoke test — clever-api version handshake
         run: |
           sleep 5
           curl -s --fail -X POST \
@@ -116,3 +147,11 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"type":"version"}' | tee /tmp/version.json
           grep -q '"build"' /tmp/version.json
+
+      - name: Smoke test — presence catalog + gated route
+        run: |
+          base="https://${{ secrets.SUPABASE_PROJECT_REF_PROD }}.supabase.co/functions/v1/presence"
+          curl -s --fail "$base/commerce/plans" | grep -q -i 'plan' || { echo "presence /commerce/plans smoke FAILED"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
+          [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
+          echo "presence smoke passed (catalog 200, /connections 401 gated)."

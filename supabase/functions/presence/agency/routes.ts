@@ -306,7 +306,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   const orgIdsOf = async (): Promise<string[]> => {
     if (!sites.length) return [];
     const r = await svc(`presence_sites?id=in.(${sites.join(',')})&org_id=not.is.null&select=org_id`);
-    return [...new Set((r.json ?? []).map((s: any) => s.org_id).filter(Boolean))];
+    return [...new Set(((r.json ?? []) as any[]).map((s) => String(s.org_id)).filter(Boolean))];
   };
 
   // the organizations this agency manages (fenced: only orgs of its own sites)

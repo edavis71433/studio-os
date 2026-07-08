@@ -26,12 +26,11 @@ M1–M8.5 foundations · M9/M9.5 intelligence + Creative Studio · L1–L3 comme
 All **21 providers** now have a real read adapter (endpoint + normalizer + auth shaping): the 3 stubs (`google_tag_manager`, `meta_business`, `apple_business_connect`) got real normalizers; the 5 partials (`bing_webmaster`, `yelp`, `trustpilot`, `salesforce`, `klaviyo`) got read endpoints; Bing/Trustpilot/Klaviyo got non-Bearer auth shaping. **19 Complete; 2 read-complete with activation caveats:** Salesforce (`instance_url` at activation) and **Apple Business Connect** (its `ownership_verification` **connect flow is not built** — a distinct auth path, deferred as new auth architecture; the one genuine remaining build item, carried on the Owner Activation list). Invariants 14/14; deployed staging+prod.
 - **Still on roadmap (not part of A1):** extend **connected write coverage** beyond GBP post/hours + GSC verify (V1.1, additive); build the **Apple ownership-verification connect flow** (deferred auth path).
 
-**A2 · Deployment & CI Completion** *(partially complete)*
-- **Done:** CI pre-deploy **test gate** (pure suites + 14 invariants; deploys `needs: test`) — Ops HIGH-3.
-- **Remaining:** wire the **presence function deploy** into CI (today it's manual `supabase-go`; the standard CLI segfaults on it — needs a working CI recipe); a full release pipeline (tag → deploy → smoke → publish); automated rollback. Type checking in CI (ties to A3).
+**A2 · Deployment & CI Completion** — ✅ **DONE** (see [DEPLOYMENT-CI-COMPLETION-A2](DEPLOYMENT-CI-COMPLETION-A2.md)).
+- **Done:** presence function now deploys through CI (staging auto, prod confirmation-gated) behind test + **`deno check` type** + **migration-integrity** gates, with pre/post **smoke tests** (catalog 200 + gated 401); a confirmation-gated **rollback workflow** (`rollback.yml`) redeploys any known-good ref. All existing safety gates preserved.
+- **Intentionally manual (by design):** migration *application* (hold-back technique; CI verifies integrity, doesn't auto-apply). **Owner:** set CI secrets + confirm the first CI run.
 
-**A3 · Type Cleanup** *(not started — cosmetic, not ignored)*
-- Baseline `deno check` errors: `rollback` on `OrgPlan`/`MarketplacePlan`; the `marketplace_ops` comparison. Pre-existing; suites green; edge runtime doesn't type-check — but **not to be ignored**. Clean so `deno check` is green and can gate CI.
+**A3 · Type Cleanup** — ✅ **DONE** (folded into A2). The 6 baseline `deno check` errors fixed (`OrgPlan`/`MarketplacePlan` `rollback` field; redundant `marketplace_ops` comparison; `agency/routes` cast); `deno check` = **0 errors**; type-only, regression-clean; now a CI gate.
 
 **A4 · Documentation Finalization** *(mostly complete — post-QA pass)*
 - **Done:** full doc set (72 presence docs incl. the master index) + 24 legal docs; Architecture/API/SDK/Database/Deployment/Operations/Customer Guide/Administrator Guide/Security/Privacy/Release Notes all present; 0 dangling links.

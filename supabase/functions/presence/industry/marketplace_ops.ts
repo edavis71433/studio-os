@@ -99,6 +99,7 @@ export interface MarketplacePlan extends ApprovedPlanBase {
   version: string;
   what_changes: string[];
   what_stays: string[];
+  rollback: string;                    // plain-language how-to-undo (shared plan field)
   rollback_op: MarketplaceOp | null;   // the inverse operation, where one exists
   blocked: string[];                    // non-empty ⇒ the operation is refused (assessment failed)
   dependencies: DependencyResolution;
@@ -113,7 +114,7 @@ export function planMarketplaceOperation(op: MarketplaceOp, pack: IndustryPack, 
   const blocked: string[] = [];
   // install/update must pass assessment; enable/disable/remove only need the pack to exist installed
   if ((op === 'install' || op === 'update') && !assess.ok) blocked.push(...assess.problems);
-  if ((op === 'enable' || op === 'disable' || op === 'remove') && !installed.some((p) => p.key === pack.key) && op !== 'install') {
+  if ((op === 'enable' || op === 'disable' || op === 'remove') && !installed.some((p) => p.key === pack.key)) {
     // (for enable/disable/remove the pack should already be installed — the store enforces the real state)
   }
   const label = pack.label;
