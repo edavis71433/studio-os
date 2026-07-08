@@ -59,9 +59,9 @@ Website audit + messaging refresh · Interactive product tour · "Why Studio OS"
 - ➕ **Resolve the naming/positioning** (Studio OS vs Presence vs Davis Digital Studio) here — the A9 board called this the #1 commercial risk; the edition-comparison matrix already exists as data (`commerce/editions.ts`) and can drive the public matrix.
 - 🔍 **EXPAND / commercial:** pressure-test the $24–$49 founder prices against value before the founder cohort locks rates.
 
-### Phase I — Guided Onboarding  ·  *A9 C-2*
+### Phase I — Guided Onboarding  ·  ✅ IMPLEMENTED (get-started.html)
 First-run experience · Guided setup · Product education · Customer activation journey.
-- Note: a first-run checklist backend already exists (`/commerce/first-run`); this phase is the *guided* layer over it.
+- ✅ **Built:** `get-started.html` — 2-question intake → the existing `starter_site` writer auto-drafts the whole site (review-first, approval preserved) → review/preview/publish; graceful fallback when AI is off; contextual lessons. Promotes FD-M1. Needs `ANTHROPIC_KEY` (activation) + browser QA. See PHASE-I-GUIDED-ONBOARDING.md.
 
 ### Phase G — Native Apps  ·  *sequence AFTER launch, not before*
 macOS · Windows · iPhone · Android · feature parity · one-codebase-where-practical.

@@ -43,7 +43,7 @@ const ENVS = {
 const qs = new URLSearchParams(location.search);
 const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
-const roomHref = "/presence.html" + (qs.get('env')==='staging'?'?env=staging':'');
+const roomHref = "/get-started.html" + (qs.get('env')==='staging'?'?env=staging':'');   // Phase I: new customers land in the guided first-run, never a blank workspace
 const H = { apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json' };
 
 // Email verification (non-blocking) if a token is present.

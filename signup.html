@@ -138,8 +138,8 @@ async function submitForm(e){
     // Sign in now so the session persists through checkout and into the workspace.
     try { await sb.auth.signInWithPassword({ email, password }); } catch(_){}
     if (j.data.mode === 'trial'){
-      showMsg('Your workspace is ready. Taking you there…', 'ok');
-      location.href = "/presence.html" + (qs.get('env')==='staging'?'?env=staging':'');
+      showMsg('Your workspace is ready. Let’s build your site…', 'ok');
+      location.href = "/get-started.html" + (qs.get('env')==='staging'?'?env=staging':'');   // Phase I: guided first-run, not a blank workspace
     } else if (j.data.mode === 'checkout' && j.data.url){
       showMsg('Taking you to secure checkout…', 'ok');
       location.href = j.data.url;

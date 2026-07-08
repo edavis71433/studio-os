@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v11'; // bumped: unified workspace shell (shell.js/css) + signed-in surfaces excluded from cache-first — always fresh chrome
+const CACHE_NAME = 'dds-v12'; // bumped: unified workspace shell (shell.js/css) + signed-in surfaces excluded from cache-first — always fresh chrome
 const PRECACHE = [
   '/about',
   '/services',
@@ -55,7 +55,8 @@ self.addEventListener('fetch', function(e) {
       url.pathname.startsWith('/client') || url.pathname.startsWith('/agency') || url.pathname.startsWith('/sharing') ||
       url.pathname.startsWith('/developer') || url.pathname.startsWith('/crm') ||
       url.pathname.startsWith('/shell') || url.pathname.startsWith('/approve') ||
-      url.pathname.startsWith('/leads') || url.pathname.startsWith('/schedule')) return;   // shell + token-approve + leads/schedule — always fresh
+      url.pathname.startsWith('/leads') || url.pathname.startsWith('/schedule') ||
+      url.pathname.startsWith('/get-started')) return;   // shell + token-approve + leads/schedule + first-run — always fresh
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });
