@@ -93,6 +93,18 @@
 ### FD-RL2 · Reactivation & win-back comms
 **What:** welcome-back email on reactivation; a single polite win-back at day 30. Mechanics already work (Stripe + entitlement); this is the comms tail. **Disposition:** V1.1.
 
+### FD-BZ1 · Public searchable knowledge base
+**What:** help.html covers V1 scale; a searchable KB (articles per task) when support volume justifies it. **Disposition:** V1.1.
+
+### FD-BZ2 · Interactive demo account (seeded data)
+**What:** a look-around demo workspace for prospects (fenced until launch marketing begins). **Disposition:** V1.1/launch-week.
+
+### FD-BZ3 · Sales one-pager / deck
+**What:** generated from the editions + support matrices (the data already exists in code). **Disposition:** V1.1/launch-week.
+
+### FD-BZ4 · Owner weekly digest email
+**What:** automate the Monday routine (new subs, failed payments, unanswered leads, health) into one email — merges with FD-5. **Disposition:** V1.1.
+
 ### FD-Z1 · Cookieless visitor counts (server-side analytics → calm sentences)
 **What:** Netlify-analytics-class server-side counts surfaced in Business OS as sentences ("about 120 people visited this week") — answers the real owner question with ZERO privacy cost (no cookies/banner; preserves the Phase-Q differentiator). GA4/GTM/pixels stay rejected as defaults. **Value:** High · **Effort:** Medium. **Disposition:** V1.1.
 
