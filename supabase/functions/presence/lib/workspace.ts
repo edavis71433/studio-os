@@ -26,6 +26,10 @@ async function callerOf(jwt: string): Promise<{ id?: string; email?: string } | 
  *  owning client = business_owner (unchanged default). */
 export async function resolveSiteRole(jwt: string, siteId: string, principalKind: string): Promise<SiteRole> {
   if (principalKind === 'staff' || principalKind === 'system') return 'business_owner';
+  // fast path: the overwhelming common case is a site with NO extra members —
+  // the caller is the owning client (business_owner) and we skip the auth lookup.
+  const any = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&select=id&limit=1`);
+  if (!(any.ok && any.json?.length)) return 'business_owner';
   const user = await callerOf(jwt);
   if (!user?.id && !user?.email) return 'business_owner';
   const email = (user.email || '').toLowerCase();

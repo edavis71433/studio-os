@@ -51,7 +51,8 @@ self.addEventListener('fetch', function(e) {
   // stale (they load live data via the API; a cached shell after a deploy is a
   // correctness bug). Let the browser hit the network.
   if (url.pathname.startsWith('/presence') || url.pathname.startsWith('/today') ||
-      url.pathname.startsWith('/connections') || url.pathname.startsWith('/visual-studio')) return;
+      url.pathname.startsWith('/connections') || url.pathname.startsWith('/visual-studio') ||
+      url.pathname.startsWith('/client') || url.pathname.startsWith('/agency') || url.pathname.startsWith('/sharing')) return;
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });

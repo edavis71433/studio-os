@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your updates — Presence</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Review and approve what your studio has ready for you.">
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;
+    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:660px;margin:0 auto;padding:40px 20px 90px}
+  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px;font-family:var(--sans)}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);margin:16px 0 .1em;letter-spacing:-.01em}
+  header .sub{color:var(--soft);font-size:15px;margin:0}
+  .status{margin-top:22px;padding:14px 18px;background:var(--good-soft);border-radius:13px;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:10px}
+  .status .d{width:8px;height:8px;border-radius:50%;background:var(--good);flex:0 0 auto}
+  section{margin-top:34px}
+  h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card h3{font-family:var(--serif);font-weight:500;font-size:18px;margin:0 0 5px;line-height:1.2}
+  .card p{margin:0;color:var(--soft);font-size:14.5px}
+  .card.approve{border-left:3px solid var(--p)}
+  .row{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 17px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
+  button.approve{background:var(--p);color:#fff;border-color:var(--p)} button.approve:hover{background:var(--p-deep);color:#fff}
+  .tag{display:inline-block;font-size:11px;font-family:var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 9px;font-weight:600;margin-bottom:9px}
+  .center{text-align:center;padding:52px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
+  .muted{color:var(--soft);font-size:14px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Presence · by Davis Digital Studio — you see only what your studio shares with you.</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// The simplified Client Portal (A7.2). Consumes ONLY /portal/context + /portal/feed
+// + the approval decide routes — the reviewer boundary is enforced server-side, so
+// this can never over-expose. Review-first: see shared updates, approve what's ready.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="";
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+function render(ctx,feed){
+  const moments=(feed.moments||[]);
+  const pending=(feed.pending_approvals||[]);
+  const pub=feed.last_published;
+  let html=`<div class="rolebadge">● Client view</div>`;
+  html+=`<header><h1>Your updates</h1><p class="sub">Here's what your studio has ready, and where your website stands. You approve what's yours to approve.</p></header>`;
+  if(pub){const when=new Date(pub.completed_at||pub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    html+=`<div class="status"><span class="d"></span>Your website is live — last updated ${esc(when)}.</div>`;}
+
+  if(pending.length){
+    html+=`<section><h2>Waiting for your OK</h2>`;
+    for(const p of pending){html+=`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span>
+      <h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p>
+      <div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`;}
+    html+=`</section>`;
+  }
+
+  html+=`<section><h2>Recent updates</h2>`;
+  if(!moments.length){html+=`<div class="card"><p class="muted">Nothing new to share right now — your studio will surface anything worth a look here.</p></div>`;}
+  else for(const m of moments){html+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;}
+  html+=`</section>`;
+  $('main').innerHTML=html;wire();
+}
+function wire(){
+  document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decide(b.getAttribute('data-approve'),'approve',b)));
+  document.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decide(b.getAttribute('data-decline'),'abandon',b)));
+}
+async function decide(path,decision,btn){
+  btn.disabled=true;btn.textContent=decision==='approve'?'Approving…':'…';
+  const r=await api(path,'POST',{decision});
+  if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Set aside.');return load();}
+  toast('That didn’t go through — nothing changed. Please try again.');btn.disabled=false;btn.textContent=decision==='approve'?'Approve':'Not yet';
+}
+function ownerNote(ctx){
+  $('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div>
+    <h2 style="margin-top:14px">This is the client view.</h2>
+    <p class="muted">You have the full workspace. This simplified view is what a client you invite as a reviewer sees.</p>
+    <p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+
+async function load(){
+  const ctx=await api('/portal/context');
+  if(!ctx.ok){trouble();return;}
+  const c=ctx.body.data||{};
+  if(c.sees_full_workspace){ownerNote(c);return;}   // owner/operator → point to the full workspace
+  const feed=await api('/portal/feed');
+  if(!feed.ok){trouble();return;}
+  render(c,feed.body.data||{});
+}
+(async function(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}await load();
+  }catch(_){trouble();}
+})();
+</script>
+</body>
+</html>

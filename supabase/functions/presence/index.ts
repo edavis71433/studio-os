@@ -27,7 +27,8 @@ import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
-import { handlePortalContext, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
+import { resolveSiteRole } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
@@ -163,6 +164,17 @@ serve(async (req) => {
     return json({ error: 'entitlement_paused', message: ent.message }, 403, cors);
   }
 
+  // 4b. A7.2 reviewer boundary: a client_reviewer (the client portal audience) may
+  //     reach ONLY the shared feed + the approvals put to them. Everything else in
+  //     the client gate is refused — the simplified portal is a real boundary, not
+  //     a UI facade. Fast-path: sites with no extra members skip this entirely.
+  {
+    const siteRole = await resolveSiteRole(jwt, site.id, principal.kind);
+    if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
+      return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
+    }
+  }
+
   // ── M11 boundary: Monitor sites observe an EXISTING external website.
   //    Publishing concepts don't exist for them — the platform never writes
   //    to a website it doesn't host. Everything else (profile, studio,
@@ -210,6 +222,7 @@ serve(async (req) => {
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors);
+  if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);
   if (route === '/portal/members' && method === 'GET') return handleMembersList(jwt, site, principal, cors);
   if (route === '/portal/members' && method === 'POST') return handleMemberAdd(req, jwt, site, principal, cors);
   {

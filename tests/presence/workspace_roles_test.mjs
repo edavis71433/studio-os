@@ -63,6 +63,20 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('filter: reviewer sees shared moment + shared draft + published, not the internal note', reviewer.map((x) => x.id).sort().join(',') === 'a,b,d');
 }
 
+// ═══ 6. reviewer route boundary (the client portal is a real gate) ═══
+{
+  const { reviewerAllowed } = await import('../../supabase/functions/presence/routes/workspace.ts');
+  ok('reviewer: may read context + feed', reviewerAllowed('/portal/context', 'GET') && reviewerAllowed('/portal/feed', 'GET'));
+  ok('reviewer: may approve an infra plan', reviewerAllowed('/foundations/plans/11111111-1111-1111-1111-111111111111/decide', 'POST'));
+  ok('reviewer: may approve a connected write', reviewerAllowed('/connections/google_business_profile/write/11111111-1111-1111-1111-111111111111/decide', 'POST'));
+  ok('reviewer: may NOT edit content', !reviewerAllowed('/offerings', 'POST') && !reviewerAllowed('/identity', 'PUT'));
+  ok('reviewer: may NOT publish', !reviewerAllowed('/publish', 'POST'));
+  ok('reviewer: may NOT connect a service', !reviewerAllowed('/connections/yelp/connect', 'POST'));
+  ok('reviewer: may NOT read the full moments feed directly', !reviewerAllowed('/moments', 'GET'));
+  ok('reviewer: may NOT generate with AI or Visual Studio', !reviewerAllowed('/writer/generate', 'POST') && !reviewerAllowed('/visual/generate', 'POST'));
+  ok('reviewer: may NOT manage members/shares', !reviewerAllowed('/portal/members', 'POST') && !reviewerAllowed('/portal/shares', 'POST'));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.error('FAILURES'); (globalThis.Deno ? Deno : process).exit(1); }

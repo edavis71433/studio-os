@@ -14,7 +14,20 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
-import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, setShare } from '../lib/workspace.ts';
+import { filterForRole, visibleTo } from '../lib/visibility.ts';
+import { svc } from '../lib/db.ts';
+import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
+
+/** The ONLY routes a client_reviewer (the client portal audience) may reach.
+ *  Everything else in the client gate is 403 for a reviewer — so the simplified
+ *  portal is a real security boundary, not a UI facade. Pure + exported for tests.
+ *  Reviewer = read the shared feed, and approve the plans put to them. */
+export function reviewerAllowed(route: string, method: string): boolean {
+  if (method === 'GET' && (route === '/portal/context' || route === '/portal/feed')) return true;
+  if (method === 'POST' && /^\/foundations\/plans\/[0-9a-f-]{36}\/decide$/.test(route)) return true;   // approve an infra plan
+  if (method === 'POST' && /^\/connections\/[a-z0-9_]+\/write\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // approve a connected write
+  return false;
+}
 
 async function requireManager(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ role: SiteRole } | Response> {
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
@@ -32,6 +45,29 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
   } }, 200, cors);
+}
+
+/** The client portal's read: only what's shared with the reviewer — shared
+ *  Business Moments, the site's publish status, and the plans awaiting their OK.
+ *  Computed server-side with the visibility model, so it can never over-expose. */
+export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const shares = await loadShares(site.id);
+  const [momQ, pubQ, infraQ, writeQ] = await Promise.all([
+    svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
+    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
+    svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id,title,summary,risk&limit=10`),
+    svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id,provider_key,title,summary&limit=10`),
+  ]);
+  const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
+  // approvals are 'always' visible to the reviewer (they must see what to approve)
+  const showApprovals = visibleTo(role, 'approvals');
+  const pending = showApprovals ? [
+    ...(((infraQ.ok && infraQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'infrastructure', title: p.title, summary: p.summary, decide_path: `/foundations/plans/${p.id}/decide` })),
+    ...(((writeQ.ok && writeQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'connected', provider: p.provider_key, title: p.title, summary: p.summary, decide_path: `/connections/${p.provider_key}/write/${p.id}/decide` })),
+  ] : [];
+  const last = (pubQ.ok && pubQ.json?.[0]) || null;
+  return json({ data: { role, moments, pending_approvals: pending, last_published: last } }, 200, cors);
 }
 
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
