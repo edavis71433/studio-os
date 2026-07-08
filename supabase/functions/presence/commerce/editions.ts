@@ -11,9 +11,9 @@
 // This adds the FEATURE dimension (what you can do), which is what nav adapts to.
 
 export type EditionKey =
-  | 'cms_only' | 'business_os_only' | 'studio_os' | 'managed' | 'agency' | 'enterprise';
+  | 'monitor' | 'cms_only' | 'business_os_only' | 'studio_os' | 'managed' | 'agency' | 'enterprise';
 
-export const EDITIONS: readonly EditionKey[] = ['cms_only', 'business_os_only', 'studio_os', 'managed', 'agency', 'enterprise'];
+export const EDITIONS: readonly EditionKey[] = ['monitor', 'cms_only', 'business_os_only', 'studio_os', 'managed', 'agency', 'enterprise'];
 export function isEditionKey(x: unknown): x is EditionKey { return typeof x === 'string' && (EDITIONS as readonly string[]).includes(x); }
 
 // Feature areas — the atoms editions are composed from. Each maps to real,
@@ -36,8 +36,15 @@ export type EditionFeature =
 const CMS: EditionFeature[] = ['website', 'developer', 'forms', 'client_portal', 'reports'];
 const BOS: EditionFeature[] = ['business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];
 const STUDIO: EditionFeature[] = Array.from(new Set([...CMS, ...BOS]));
+// Monitor OBSERVES an existing website (read-only) plus full intelligence. It
+// shows the workspace (the observed site + migration readiness) and Business OS,
+// but never drafts/publishes — that's enforced by the site edition ('monitor'),
+// not by hiding the surface. No CMS authoring (developer/forms) since it hosts
+// nothing. This is why Monitor is its OWN edition, not business_os_only.
+const MONITOR: EditionFeature[] = ['website', 'business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];
 
 const MATRIX: Record<EditionKey, EditionFeature[]> = {
+  monitor: MONITOR,
   cms_only: CMS,
   business_os_only: BOS,
   studio_os: STUDIO,
@@ -55,6 +62,7 @@ export interface EditionDef {
 }
 
 export const EDITION_DEFS: Record<EditionKey, EditionDef> = {
+  monitor: { key: 'monitor', rank: 1, name: 'Monitor', promise: 'Watch your existing website — and know the moment it needs you.', features: MATRIX.monitor },
   cms_only: { key: 'cms_only', rank: 1, name: 'CMS', promise: 'A website that stays correct — structured, versioned, and yours.', features: MATRIX.cms_only },
   business_os_only: { key: 'business_os_only', rank: 1, name: 'Business OS', promise: 'Know your business at a glance — moments, connections, and relationships.', features: MATRIX.business_os_only },
   studio_os: { key: 'studio_os', rank: 2, name: 'Studio OS', promise: 'Your website and your business, one calm operating system.', features: MATRIX.studio_os },
@@ -91,7 +99,7 @@ export function editionFromPlan(planKey: string): EditionKey {
     case 'presence_managed': return 'managed';
     case 'agency': return 'agency';
     case 'enterprise': return 'enterprise';
-    case 'presence_monitor': return 'business_os_only'; // watch an existing site = intelligence, no CMS hosting
+    case 'presence_monitor': return 'monitor';          // observe an existing site + intelligence (no publish)
     case 'cms_only': return 'cms_only';
     case 'business_os_only': return 'business_os_only';
     default: return 'studio_os';
@@ -132,6 +140,6 @@ export function editionFlags(edition: EditionKey): EditionFlags {
 export function editionFromSite(siteEdition: string, opts?: { isAgency?: boolean; isEnterprise?: boolean }): EditionKey {
   if (opts?.isEnterprise) return 'enterprise';
   if (opts?.isAgency) return 'agency';
-  if (siteEdition === 'monitor') return 'business_os_only';
+  if (siteEdition === 'monitor') return 'monitor';   // observe-only site → the Monitor edition (workspace visible, no publish)
   return 'studio_os';
 }

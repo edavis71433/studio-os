@@ -16,7 +16,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 // ═══ 1. matrix — supersets, inclusion, guards ═══
 {
-  ok('six editions defined', EDITIONS.length === 6 && isEditionKey('studio_os') && !isEditionKey('nope'));
+  ok('seven editions defined (incl. Monitor)', EDITIONS.length === 7 && isEditionKey('monitor') && isEditionKey('studio_os') && !isEditionKey('nope'));
+  ok('monitor: observes the website (view) + business_os, never publishes via a hidden surface', editionIncludes('monitor', 'website') && editionIncludes('monitor', 'business_moments') && !editionIncludes('monitor', 'developer'));
   ok('cms_only has website, not business_moments', editionIncludes('cms_only', 'website') && !editionIncludes('cms_only', 'business_moments') && !editionIncludes('cms_only', 'relationship'));
   ok('business_os_only has moments/relationship, not website', editionIncludes('business_os_only', 'business_moments') && editionIncludes('business_os_only', 'relationship') && !editionIncludes('business_os_only', 'website'));
   ok('studio_os = cms ∪ business_os', editionIncludes('studio_os', 'website') && editionIncludes('studio_os', 'business_moments') && editionIncludes('studio_os', 'relationship'));
@@ -42,9 +43,9 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('presence → studio_os', editionFromPlan('presence') === 'studio_os');
   ok('presence_managed → managed', editionFromPlan('presence_managed') === 'managed');
   ok('agency → agency, enterprise → enterprise', editionFromPlan('agency') === 'agency' && editionFromPlan('enterprise') === 'enterprise');
-  ok('presence_monitor → business_os_only (watch = intelligence)', editionFromPlan('presence_monitor') === 'business_os_only');
+  ok('presence_monitor → monitor (observe + intelligence, its own edition)', editionFromPlan('presence_monitor') === 'monitor');
   ok('unknown plan → studio_os (safe default)', editionFromPlan('???') === 'studio_os');
-  ok('editionFromSite: presence→studio_os, monitor→business_os_only, agency flag→agency', editionFromSite('presence') === 'studio_os' && editionFromSite('monitor') === 'business_os_only' && editionFromSite('presence', { isAgency: true }) === 'agency');
+  ok('editionFromSite: presence→studio_os, monitor→monitor, agency flag→agency', editionFromSite('presence') === 'studio_os' && editionFromSite('monitor') === 'monitor' && editionFromSite('presence', { isAgency: true }) === 'agency');
 }
 
 // ═══ 4. flags drive nav ═══
@@ -61,11 +62,12 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   const caps = ['view_all', 'edit', 'publish', 'connect', 'configure', 'invite', 'use_developer_mode'];
   for (const ed of EDITIONS) {
     const isAgencyEd = ed === 'agency' || ed === 'enterprise';
-    const nav = buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: isAgencyEd, isOperator: false, editionKey: ed });
+    const siteEd = ed === 'monitor' ? 'monitor' : 'presence';   // Monitor's hosting dimension disables publish
+    const nav = buildNav({ role: 'business_owner', edition: siteEd, capabilities: caps, isAgency: isAgencyEd, isOperator: false, editionKey: ed });
     const allNonEmpty = nav.length > 0 && nav.every((s) => s.items.length > 0);
     const hrefs = new Set();
     nav.forEach((s) => s.items.forEach((i) => hrefs.add(i.href.split('#')[0])));
-    const landing = landingFor({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: isAgencyEd, isOperator: false, editionKey: ed });
+    const landing = landingFor({ role: 'business_owner', edition: siteEd, capabilities: caps, isAgency: isAgencyEd, isOperator: false, editionKey: ed });
     const landingReachable = [...hrefs].some((h) => landing.split('#')[0] === h) || landing === '/agency.html';
     ok(`${ed}: nav complete + non-empty + landing reachable`, allNonEmpty && landingReachable, `sections=${nav.map((s) => s.key).join(',')} landing=${landing}`);
   }

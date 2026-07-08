@@ -58,8 +58,8 @@ const src = (rel) => Deno.readTextFileSync(new URL(`../../supabase/functions/pre
   ok('maturity: GBP is fully mature (reads + intelligence + approved writes)', by.get('google_business_profile').stage === 'fully_mature');
   ok('maturity: Search Console is fully mature (search intelligence + verify write)', by.get('google_search_console').stage === 'fully_mature');
   ok('maturity: Analytics + Yelp are connected-intelligence (read + feed intelligence, no writes)', by.get('google_analytics').stage === 'connected_intelligence' && by.get('yelp').stage === 'connected_intelligence');
-  ok('maturity: unmapped stubs are honestly "planned" (Meta Business, Apple, Tag Manager)',
-    by.get('meta_business').stage === 'planned' && by.get('apple_business_connect').stage === 'planned' && by.get('google_tag_manager').stage === 'planned');
+  ok('maturity: Meta Business reads after Phase A1 completion; Apple + Tag Manager stay honestly "planned" (reads need activation params)',
+    by.get('meta_business').stage === 'read' && by.get('apple_business_connect').stage === 'planned' && by.get('google_tag_manager').stage === 'planned');
   const sum = maturitySummary();
   ok('maturity: the summary accounts for every provider exactly once', Object.values(sum).reduce((a, b) => a + b, 0) === CONNECTED_PROVIDERS.length, JSON.stringify(sum));
 }

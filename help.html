@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Help — Presence</title>
+<meta name="description" content="How Presence works — publishing, your data, connected services, billing, and how to reach a person.">
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;
+    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:40px 22px 96px}
+  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(28px,5vw,36px);margin:14px 0 .1em;letter-spacing:-.01em}
+  header .sub{color:var(--soft);font-size:16px;margin:0;max-width:56ch}
+  section{margin-top:32px}
+  h2{font-family:var(--serif);font-weight:500;font-size:21px;margin:0 0 4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card p{margin:0;color:var(--soft);font-size:15px}
+  .card p + p{margin-top:8px}
+  .q{font-weight:600;color:var(--ink);font-size:15.5px;margin:0 0 5px}
+  .contact{margin-top:14px;padding:18px 20px;background:var(--good-soft);border-radius:15px}
+  .contact h2{margin-bottom:6px}
+  .contact p{color:var(--ink);font-size:15px;margin:0}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  a.link:hover{text-decoration:underline}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:8px}
+  .grid a{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px}
+  .grid a:hover{border-color:var(--p);color:var(--p)}
+  .grid a span{display:block;color:var(--faint);font-weight:400;font-size:12.5px;margin-top:2px}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="rolebadge">● Help</div>
+    <h1>How Presence works</h1>
+    <p class="sub">Plain answers to the things people ask most — and a real person when you need one.</p>
+  </header>
+
+  <section>
+    <h2>Getting around</h2>
+    <div class="card">
+      <p>The bar at the top is the same everywhere — your workspaces, search (press ⌘K or /), what needs a look, and your account. What you see adapts to your plan and role; anything you don't have simply isn't shown, so there are no dead ends.</p>
+    </div>
+    <div class="grid">
+      <a href="/today.html">Today<span>What needs you</span></a>
+      <a href="/presence.html">Your website<span>Edit &amp; publish</span></a>
+      <a href="/crm.html">Relationship<span>Accounts &amp; activity</span></a>
+      <a href="/connections.html">Connections<span>Your services</span></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Publishing &amp; approval</h2>
+    <div class="card">
+      <p class="q">Nothing goes live without your OK.</p>
+      <p>You edit a draft, preview it, then publish with one calm step. Every publish is kept as a version — if anything looks wrong, you can restore an earlier one. Your live site never changes until you publish, and a failed publish leaves it untouched.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Your data &amp; ownership</h2>
+    <div class="card">
+      <p class="q">It's yours, always.</p>
+      <p>You can export everything you own at any time, connect or disconnect services freely, and leave without penalty. We store business facts and text, never your customers' card details (billing is handled by Stripe).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Connected services</h2>
+    <div class="card">
+      <p>Connect the tools you already use to read your own data — safely, with only the access you approve. Any change we'd make on your behalf is proposed first and waits for your approval. You can disconnect at any time and your accounts stay exactly as they are.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Your plan &amp; billing</h2>
+    <div class="card">
+      <p>Your plan decides which features you see. Upgrading adds capabilities — nothing resets and no data is lost. Downgrading simply hides what you're not using; your information is preserved and comes back if you upgrade again. Manage your subscription, payment method, or cancel any time from your billing portal.</p>
+      <p style="margin-top:10px"><a class="link" href="/pricing.html">See plans &amp; pricing →</a></p>
+    </div>
+  </section>
+
+  <div class="contact">
+    <h2>Talk to a person</h2>
+    <p>Presence is run by a real studio. If something isn't right, email <a class="link" href="mailto:support@davisdigitalstudio.com">support@davisdigitalstudio.com</a> and a person who knows the product will help.</p>
+  </div>
+
+  <footer>Presence · by Davis Digital Studio — calm software, real people.</footer>
+</div>
+</body>
+</html>

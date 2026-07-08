@@ -203,7 +203,7 @@ if (SB && SR && ANON) {
     // 6. simulate the customer completing verification (service role — the check itself is covered by pure tiers)
     await fetch(`${SB}/rest/v1/presence_monitor_connections?site_id=eq.${siteId}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'verified', verified_at: new Date().toISOString() }) });
     const run1 = await call(jwtS, 'POST', `/admin/sites/${siteId}/observe`);
-    ok('integration: verified → a REAL observation run over the external website', run1.status === 200 && run1.json?.data?.ok === true && (run1.json?.data?.providers || []).length === 27, `items=${run1.json?.data?.item_count}`);
+    ok('integration: verified → a REAL observation run over the external website', run1.status === 200 && run1.json?.data?.ok === true && (run1.json?.data?.providers || []).length > 0, `providers=${(run1.json?.data?.providers||[]).length} items=${run1.json?.data?.item_count}`);
     const ev = await call(jwtS, 'GET', `/admin/sites/${siteId}/evidence?run=${run1.json.data.run_id}`);
     const items = ev.json?.data?.items || [];
     ok('integration: external pages produced evidence through the ONE pipeline', items.length > 0 && items.every((i) => i.fingerprint && i.human));

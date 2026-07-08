@@ -9,6 +9,12 @@
 ### FD-D1 · Commercial rungs for CMS-Only & Business-OS-Only — ✅ IMPLEMENTED (Phase D1)
 **What:** `cms_only` + `business_os_only` added to `commerce/catalog.ts` PLANS (self-serve, founder-priced $24/mo, trialable), the `presence_entitlements.plan` CHECK widened (migration 0049), no Stripe-dashboard config needed (dynamic `price_data`). Both live on staging+prod — `/commerce/plans` lists 7. **Delivered in Phase D1.** See [PHASE-D1-COMMERCIAL-ACTIVATION](PHASE-D1-COMMERCIAL-ACTIVATION.md). **Disposition:** Done.
 
+### FD-E2 · Automated nav/dead-link integrity check in CI
+**What:** a test that asserts every `buildNav` + shell href resolves to an existing page. **Why:** Phase E found `/help.html` was linked everywhere but never existed — a dead end in every edition; a cheap automated check would have caught it. **Source:** Phase E. **Value:** High (cheap) · **Effort:** Low. **Disposition:** Queued (V1).
+
+### FD-E1 · Serialized / ephemeral integration test harness
+**What:** run integration suites with per-run scratch data or serialized execution so concurrent staging state can't cause false failures. **Why:** Phase E's full batch showed `connected_writes`/`pipeline` flaking under contention though both pass in isolation. **Source:** Phase E. **Value:** Medium (test infra) · **Effort:** Medium. **Disposition:** Queued (V1.1).
+
 ### FD-D4 · Coupons / promotional codes
 **What:** wire Stripe promotion codes into Checkout for future promos. **Why:** promotional pricing without touching the catalog. **Source:** Phase D1. **Value:** Medium · **Effort:** Low-Medium. **Disposition:** Queued (V1.1).
 
