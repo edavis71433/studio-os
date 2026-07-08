@@ -34,6 +34,21 @@
 - **FD-M11 · Light auto-refresh/polling + standardized optimistic-UI** across the member pages (nothing polls today; only sharing.html has optimistic rollback). *Medium · V1.1.*
 - **FD-M12 · Smart new-business defaults** — "typical hours Mon–Fri 9–5" one-click (hours default to all-closed today); a self-serve shared nav shell so the secondary pages stop changing shape. *Medium · V1.1.*
 
+### FD-T1 · Author the neutral `business-classic` template + wire default-by-industry 🔴 (the decisive template item)
+**What:** author `business-classic/1.0.0` — the shared render engine emitting `vocabFor(industry)` (correct `LocalBusiness`-family schema + "Services" vocabulary), register it, and point provisioning at `templateSlugForIndustry`. **Why:** Phase T built + tested the primitives (`lib/industry_vocab.ts`, `lib/site_components.ts`, `templateSlugForIndustry`), but until this ONE template is authored, a non-restaurant customer still publishes the restaurant template with wrong `@type: Restaurant/Menu` markup. **Source:** Phase T. **Value:** Very High · **Effort:** Medium (authoring against ready primitives). **Disposition:** **V1 blocker if launching broad; V1.1 if restaurant-first** — gated on the owner's market-scope decision (see ROADMAP-MASTER 🔴).
+
+### FD-T2 · Lazy/indexed template registry
+**What:** replace static-import-per-version with a lazy/indexed registry once template count grows. **Source:** Phase T scalability review. **Value:** Medium (future) · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-T3 · Theme-variant system (multiple looks per template via token sets)
+**What:** the same template realization in multiple visual themes — "3 restaurant templates" = 1 realization × 3 themes. **Source:** Phase T. **Value:** High (catalog breadth cheap) · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-T4 · Vertical templates (home services, salon, professional, retail …)
+**What:** industry-specific realizations authored via the SDK on the Phase-T primitives. **Source:** Phase T industry strategy. **Value:** High · **Effort:** Medium per vertical. **Disposition:** V1.1 (after FD-T1).
+
+### FD-T5 · Realize the component catalog in the render engine
+**What:** wire each `site_components.ts` block's deterministic render so templates compose from the catalog (the structured site builder made real). **Source:** Phase T. **Value:** High · **Effort:** Medium-High. **Disposition:** V1.1 (incremental — blocks land one at a time).
+
 ### FD-J1 · Operator activation badge (surface health.capabilities in the admin UI)
 **What:** show the `/system/health` capability map (purchase/email/publishing/… green-red) in the admin tool so the operator sees activation status without curling. **Source:** Phase J. **Value:** Medium · **Effort:** Low. **Disposition:** Queued (V1.1).
 

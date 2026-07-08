@@ -72,8 +72,8 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 - ➕ **Genuinely new here:** *demo flows* (a way to try without buying) and *booking flows* (FD-F3 — the `booking` form kind exists as capture; real calendar availability is unbuilt). Forms/preview/emails are ✅ done (Phase F) — validate, don't rebuild.
 - ➕ **The launch checklist should include "cross the go-live gate (push)"** as an explicit, owner-owned step.
 
-### Phase T — Template Library, Components & Industry Realization  ·  ➕ ADDED (highest-value competitive gap)
-*See the 🔴 finding above. Today the product publishes a restaurant site for everyone.*
+### Phase T — Template Ecosystem & Industry Realization  ·  ⚙️ ARCHITECTURE + PRIMITIVES DONE · neutral-template authoring staged (FD-T1)
+*See the 🔴 finding above.* ✅ **Phase T delivered:** the templates-as-data architecture (engine × industry vocab × theme × components) + the tested primitives — `lib/industry_vocab.ts` (correct schema.org + vocabulary for 25+ industries: plumber→Plumber/Services, not Restaurant/Menu), `lib/site_components.ts` (~30 structured blocks as data with fields/schema/a11y), `templateSlugForIndustry` (default-by-industry). 24/24 tests. See [PHASE-T-TEMPLATE-ECOSYSTEM](PHASE-T-TEMPLATE-ECOSYSTEM.md). 🔴 **Remaining decisive step = FD-T1:** author the neutral `business-classic` template that renders the vocab — until then a non-restaurant customer still gets the restaurant template. Gate on the market-scope decision below.
 - **`generic`/`business-classic` template** that realizes the industry pack's declared navigation/pages + emits correct schema (`LocalBusiness`, not `Restaurant`) and neutral vocabulary. Unblocks every non-restaurant customer.
 - **Default-template resolution by industry** (pick the template the pack's vocabulary fits).
 - **A few vertical templates** (home services, salon/beauty, professional services, retail) via the existing SDK.
