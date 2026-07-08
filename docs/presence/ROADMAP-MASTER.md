@@ -42,7 +42,7 @@ Foundation & Core Architecture · Security, Multi-tenancy & Permissions · CMS �
 
 ## Remaining Roadmap (reconciled)
 
-### Phase J — Owner Activation  ·  ⚙️ ENGINEERING SIDE DONE · owner credential steps remain
+### Phase J — Owner Activation  ·  ✅ ROUND 2 COMPLETE — capabilities 9/10 TRUE, CRON LIVE; 6 dashboard items remain (see PHASE-J2-ACTIVATION-REPORT)
 Stripe production · OAuth providers · **Resend (email)** · **Cron on `/system/run`** · Secrets (**`APPROVAL_SECRET`**) · Monitoring + alerting · **PITR backups + a real restore drill** · Production activation.
 - ✅ **Engineering delivered:** every dependency degrades gracefully / fails-closed; `/system/health` is now a live **activation dashboard** (grouped secrets + a "what's live" capability map), locked by `activation_test` (10/10); the Owner Activation Guide + checklist ship. Deployed staging+prod.
 - 🔴 **Owner-action blockers (I cannot do these):** enter live Stripe/Resend/Netlify/`APPROVAL_SECRET`/Google-OAuth secrets · schedule cron to hit `/system/run` · confirm PITR + a restore drill · **the go-live push** (frontend unpushed). Verify each via `GET /system/health?secret=…` → `capabilities`.
