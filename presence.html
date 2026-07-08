@@ -2389,7 +2389,8 @@ async function renderPlanNotice() {
   let notices = [];
   try { const r = await api("GET", "/commerce/notices"); notices = (r.data && r.data.notices) || []; }
   catch (_) { return; }
-  const n = notices.find((x) => x.kind === "capacity");
+  // Phase RL: lifecycle notices (trial/payment/lapse) ride the same calm card rail
+  const n = notices.find((x) => ["trial_ending", "trial_ended", "payment_trouble", "account_lapsed"].includes(x.kind)) || notices.find((x) => x.kind === "capacity");
   if (!n) return;
   const host = $("welcomeWrap");
   if (!host) return;

@@ -170,6 +170,11 @@ serve(async (req) => {
   // 4. entitlement gate (boundary; outside RLS)
   const ent = await checkEntitlement(principal, site.client_id);
   if (ent.mode === 'denied') {
+    // Phase RL: the right to leave survives lapsing — a customer whose
+    // subscription ended can ALWAYS take their data. Export only; read-only.
+    if (route === '/export' && method === 'GET') {
+      return handleExport(site, principal, cors);
+    }
     return json({ error: 'entitlement_inactive', message: ent.message }, 403, cors);
   }
   const isWrite = method === 'PUT' || method === 'POST' || method === 'DELETE' || method === 'PATCH';

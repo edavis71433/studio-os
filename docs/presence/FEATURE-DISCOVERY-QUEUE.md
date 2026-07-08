@@ -87,6 +87,12 @@
 
 ### FD-7 · ✅ IMPLEMENTED (Phase AA) — named versions: label/rename any kept version from History (POST /publishes/:id/label, mig 0053, provenance-logged, journal shows the name first)
 
+### FD-RL1 · Wind-down automation (day-45 reminder + auto-park at day 60)
+**What:** the policy is written and communicated (Phase RL); automate the tail — a day-45 export reminder and the day-60 site parking as a system task instead of an operator action. **Disposition:** V1.1.
+
+### FD-RL2 · Reactivation & win-back comms
+**What:** welcome-back email on reactivation; a single polite win-back at day 30. Mechanics already work (Stripe + entitlement); this is the comms tail. **Disposition:** V1.1.
+
 ### FD-Z1 · Cookieless visitor counts (server-side analytics → calm sentences)
 **What:** Netlify-analytics-class server-side counts surfaced in Business OS as sentences ("about 120 people visited this week") — answers the real owner question with ZERO privacy cost (no cookies/banner; preserves the Phase-Q differentiator). GA4/GTM/pixels stay rejected as defaults. **Value:** High · **Effort:** Medium. **Disposition:** V1.1.
 
@@ -108,7 +114,7 @@
 ### FD-Q1 · Guided, owner-approved Terms of Service
 **What:** Terms are deliberately NOT auto-generated (they make business-specific legal promises — refunds, liability, jurisdiction — a platform must not invent). V1.1: a guided intake (owner answers refund/cancellation/jurisdiction questions) → drafted terms → owner approves → rendered like the other legal pages. **Source:** Phase Q. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
 
-### FD-R1 · Subscription lifecycle & wind-down operations 🔴 (verified gap — the biggest untracked cluster)
+### FD-R1 · ✅ IMPLEMENTED (Phase RL) — lifecycle sweep + comms + written wind-down policy (trial expiry enforced; export survives lapse)
 **What:** the entitlement states exist and gate the WORKSPACE (lapsed → friendly 403), but **nothing acts on them commercially**: no trial-ending nudge (trial_ends_at is recorded, nobody emails), no payment-failed communication (Stripe retries silently; past_due→paused invisibly), and **no wind-down policy — a cancelled customer's published site stays live forever** (verified: no consumer of 'lapsed' beyond the middleware). Define + build: trial-day-11 email · payment-failed email · cancellation → grace window with export reminder → park/unpublish · documented retention policy · win-back. **Why:** revenue leaks + legal exposure + honest offboarding (the "right to leave" needs a defined ending). **Source:** owner roadmap sweep (post-P). **Value:** High · **Effort:** Medium. **Disposition:** comms + written policy = **V1 (before the first paying cohort)**; full automation V1.1.
 
 ### FD-R2 · Workspace vocabulary matches the industry (the "Menu" mismatch)
