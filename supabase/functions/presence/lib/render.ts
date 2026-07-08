@@ -37,7 +37,15 @@ export function devLayerFragments(dev: Snapshot['dev_customization']): { style: 
   if (!dev) return { style: '', block: '' };
   const tokens = dev.theme_tokens || {};
   const vars = Object.entries(tokens)
-    .map(([k, v]) => `--${k.replace(/[^a-z0-9_]/gi, '')}:${String(v).replace(HTML_ESCAPE_TOKEN, '')}`)
+    .flatMap(([k, v]) => {
+      const key = k.replace(/[^a-z0-9_]/gi, '');
+      const val = String(v).replace(HTML_ESCAPE_TOKEN, '');
+      const out = [`--${key}:${val}`];
+      // Phase COMP: underscore tokens also emit their dash form (templates use
+      // dash-cased vars like --accent-dark); additive, so existing output keeps.
+      if (key.includes('_')) out.push(`--${key.replace(/_/g, '-')}:${val}`);
+      return out;
+    })
     .join(';');
   const css = dev.custom_css || '';
   const style = (vars || css)

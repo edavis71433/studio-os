@@ -167,6 +167,7 @@ Ordered by value-per-effort:
 
 ### 📌 Parked engineering pickups (come back after activation/QA — small, ready to build)
 *Owner-parked on purpose; each is scoped, verified, and queued in detail in the Feature Discovery Queue:*
+- ~~FD-T6-lite~~ ✅ SHIPPED (Phase COMP): curated color palettes as no-code. Full Design Studio (fonts/scale/density/dark) stays V1.1.
 - **FD-RL1 · Wind-down automation** — day-45 export reminder + day-60 auto-park (the policy is written + communicated; this automates the tail).
 - **FD-RL2 · Reactivation & win-back comms** — welcome-back email + one polite day-30 win-back.
 - **FD-N7 · Redirects manager UI** · **FD-N8 · per-page SEO overrides** — the last two no-code tails.

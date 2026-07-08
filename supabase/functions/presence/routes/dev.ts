@@ -26,6 +26,13 @@ export function devModeAllowed(role: SiteRole, principalKind: string): boolean {
   return siteCan(role, 'use_developer_mode');
 }
 
+/** Phase COMP (FD-T6-lite): the DESIGN surface — theme tokens only — is an
+ *  OWNER capability, not a developer one. Picking a curated palette is everyday
+ *  authoring; custom CSS/HTML remain Developer Mode. Pure + exported for tests. */
+export function designAllowed(role: SiteRole, principalKind: string): boolean {
+  return devModeAllowed(role, principalKind) || role === 'business_owner';
+}
+
 async function requireDeveloper(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ role: SiteRole } | Response> {
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
   if (!devModeAllowed(role, principal.kind)) {
@@ -44,7 +51,12 @@ export async function handleDevFiles(jwt: string, site: SiteRow, principal: Prin
 }
 
 export async function handleDevCustomizationGet(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const g = await requireDeveloper(jwt, site, principal, cors); if (g instanceof Response) return g;
+  // Phase COMP: owners may READ the customization (the Design card shows the
+  // current palette); full Developer Mode still gates the editor surface.
+  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  if (!designAllowed(role, principal.kind)) {
+    return json({ error: 'forbidden', message: 'Developer Mode is available to developers on this account. Ask your studio to grant developer access.' }, 403, cors);
+  }
   const r = await svc(`presence_dev_customizations?site_id=eq.${site.id}&select=theme_tokens,custom_css,custom_html,updated_at,updated_by&limit=1`);
   const row = (r.ok && r.json?.[0]) || null;
   return json({ data: {
@@ -58,8 +70,20 @@ export async function handleDevCustomizationGet(jwt: string, site: SiteRow, prin
 }
 
 export async function handleDevCustomizationPut(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const g = await requireDeveloper(jwt, site, principal, cors); if (g instanceof Response) return g;
+  // Phase COMP: two tiers through ONE machinery — a developer edits everything;
+  // a business owner edits THEME TOKENS ONLY (the Design card's curated
+  // palettes). An owner's request never touches css/html: whatever a developer
+  // saved there is preserved verbatim.
+  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const isDev = devModeAllowed(role, principal.kind);
+  if (!isDev && !designAllowed(role, principal.kind)) {
+    return json({ error: 'forbidden', message: 'Developer Mode is available to developers on this account. Ask your studio to grant developer access.' }, 403, cors);
+  }
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  if (!isDev) {
+    const existing = await svc(`presence_dev_customizations?site_id=eq.${site.id}&select=custom_css,custom_html&limit=1`);
+    body = { theme_tokens: body?.theme_tokens, custom_css: existing.json?.[0]?.custom_css ?? '', custom_html: existing.json?.[0]?.custom_html ?? '' };
+  }
 
   // report which tokens were rejected BEFORE we strip them (developer feedback)
   const rejected = validateThemeTokens(body?.theme_tokens).rejected;

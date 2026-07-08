@@ -19,6 +19,8 @@ export interface DevCustomization {
 const TOKEN_RULES: Record<string, RegExp> = {
   accent: /^#[0-9a-fA-F]{3,8}$/,
   accent_soft: /^#[0-9a-fA-F]{3,8}$/,
+  accent_dark: /^#[0-9a-fA-F]{3,8}$/,   // Phase COMP: hover/active shade (templates read --accent-dark)
+  soft: /^#[0-9a-fA-F]{3,8}$/,          // Phase COMP: secondary text
   ink: /^#[0-9a-fA-F]{3,8}$/,
   bg: /^#[0-9a-fA-F]{3,8}$/,
   radius: /^\d{1,3}(px|rem|em)$/,

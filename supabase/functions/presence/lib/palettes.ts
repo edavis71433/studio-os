@@ -1,0 +1,34 @@
+// ── Curated color palettes (Phase COMP — FD-T6-lite) ─────────────────────────
+// The no-code half of styling: an OWNER picks a designed palette; it becomes the
+// SAME theme tokens Developer Mode uses (one machinery, no duplication), rides
+// the snapshot, renders deterministically, and publishes approval-first.
+// Every palette is contrast-validated by test (white-on-accent ≥ 4.5:1 for
+// buttons; ink-on-paper ≥ 7:1 for body text) so accessibility stays a platform
+// guarantee even when the customer chooses the look. Backgrounds are left to the
+// template on purpose — palettes recolor the BRAND, not the paper.
+export interface Palette {
+  key: string;
+  name: string;
+  /** the tokens written to the dev-customization layer (validated by devmode rules) */
+  tokens: { accent: string; accent_dark: string; ink: string; soft: string };
+}
+
+export const PALETTES: Palette[] = [
+  { key: 'terracotta', name: 'Warm terracotta', tokens: { accent: '#8c3b2e', accent_dark: '#6f2e24', ink: '#241d1a', soft: '#6b5f58' } },
+  { key: 'evergreen',  name: 'Evergreen',       tokens: { accent: '#23635a', accent_dark: '#17453f', ink: '#1c2430', soft: '#5b6572' } },
+  { key: 'harbor',     name: 'Harbor blue',     tokens: { accent: '#2f5d8a', accent_dark: '#224566', ink: '#1b2530', soft: '#5a6570' } },
+  { key: 'plum',       name: 'Quiet plum',      tokens: { accent: '#5b3fa0', accent_dark: '#463079', ink: '#221e2c', soft: '#635d70' } },
+  { key: 'espresso',   name: 'Espresso',        tokens: { accent: '#5d4037', accent_dark: '#43302a', ink: '#25201d', soft: '#6d625c' } },
+  { key: 'slate',      name: 'Modern slate',    tokens: { accent: '#37474f', accent_dark: '#263238', ink: '#1e262a', soft: '#5c686e' } },
+];
+
+export function paletteByKey(key: string): Palette | null {
+  return PALETTES.find((p) => p.key === key) || null;
+}
+
+/** Which palette (if any) the current tokens correspond to; '' = original/custom. */
+export function currentPaletteKey(tokens: Record<string, string> | null | undefined): string {
+  if (!tokens || !tokens.accent) return '';
+  const hit = PALETTES.find((p) => p.tokens.accent.toLowerCase() === String(tokens.accent).toLowerCase());
+  return hit ? hit.key : '';
+}

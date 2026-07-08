@@ -2330,6 +2330,7 @@ async function refreshAll() {
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
+  mountDesignCard();
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──
 // A plumber's SITE says "Services" (T3 vocabulary) — the workspace must too.
@@ -2361,6 +2362,52 @@ function applyVocab() {
   const sub = document.querySelector("#view-offerings .docsub"); if (sub) sub.textContent = VOCAB.sub;
   const pb = document.querySelector('#pageWords button[data-page="/menu/"]');
   if (pb && VOCAB.path !== "/menu/") { pb.dataset.page = VOCAB.path; pb.textContent = VOCAB.label; }
+}
+// ── Phase COMP (FD-T6-lite): your site's colors — curated palettes, no code ──
+// Writes the SAME theme tokens Developer Mode uses (one machinery); tokens ride
+// the snapshot and apply at next publish. Owners pick; contrast is pre-validated.
+const PALETTES = [
+  { key: "", name: "Original", accent: "" },
+  { key: "terracotta", name: "Warm terracotta", accent: "#8c3b2e", tokens: { accent: "#8c3b2e", accent_dark: "#6f2e24", ink: "#241d1a", soft: "#6b5f58" } },
+  { key: "evergreen", name: "Evergreen", accent: "#23635a", tokens: { accent: "#23635a", accent_dark: "#17453f", ink: "#1c2430", soft: "#5b6572" } },
+  { key: "harbor", name: "Harbor blue", accent: "#2f5d8a", tokens: { accent: "#2f5d8a", accent_dark: "#224566", ink: "#1b2530", soft: "#5a6570" } },
+  { key: "plum", name: "Quiet plum", accent: "#5b3fa0", tokens: { accent: "#5b3fa0", accent_dark: "#463079", ink: "#221e2c", soft: "#635d70" } },
+  { key: "espresso", name: "Espresso", accent: "#5d4037", tokens: { accent: "#5d4037", accent_dark: "#43302a", ink: "#25201d", soft: "#6d625c" } },
+  { key: "slate", name: "Modern slate", accent: "#37474f", tokens: { accent: "#37474f", accent_dark: "#263238", ink: "#1e262a", soft: "#5c686e" } },
+];
+async function mountDesignCard() {
+  const host = $("view-business"); if (!host || $("designCard")) return;
+  let current = "";
+  try {
+    const r = await api("GET", "/dev/customization");
+    const acc = ((r.data && r.data.theme_tokens) || {}).accent || "";
+    const hit = PALETTES.find((p) => p.accent && acc && p.accent.toLowerCase() === String(acc).toLowerCase());
+    current = hit ? hit.key : (acc ? "custom" : "");
+  } catch (_) { return; } // not an owner/developer on this site → no card
+  const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Your site's colors"));
+  const rowEl = el("div"); rowEl.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
+  PALETTES.forEach((p) => {
+    const b = el("button", null, "");
+    b.type = "button"; b.title = p.name; b.setAttribute("aria-label", "Color palette: " + p.name);
+    const on = current === p.key;
+    b.style.cssText = "display:flex;align-items:center;gap:7px;font:inherit;font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "#5b3fa0" : "var(--line,#ddd)") + ";background:" + (on ? "#faf7ff" : "transparent");
+    const dot = el("span"); dot.style.cssText = "width:14px;height:14px;border-radius:50%;display:inline-block;background:" + (p.accent || "linear-gradient(135deg,#8c3b2e,#23635a)") + ";border:1px solid rgba(0,0,0,.15)";
+    b.appendChild(dot); b.appendChild(document.createTextNode(p.name + (on ? " ✓" : "")));
+    b.addEventListener("click", async () => {
+      try {
+        await api("PUT", "/dev/customization", { theme_tokens: p.key ? p.tokens : {} });
+        card.remove(); mountDesignCard();
+        toast(p.key ? p.name + " — publish to see it live" : "Back to the original — publish to apply");
+        scheduleChangesRefresh();
+      } catch (err) { toast(err.message, true); }
+    });
+    rowEl.appendChild(b);
+  });
+  if (current === "custom") rowEl.appendChild(el("span", "hint", "A developer set custom colors — picking a palette replaces them."));
+  card.appendChild(rowEl);
+  card.appendChild(el("div", "hint", "Designed, readable color pairings for your whole site. Applies when you next publish; every previous version stays restorable."));
+  host.appendChild(card);
 }
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
 [["f-gsv", "google_site_verification"], ["f-bsv", "bing_site_verification"]].forEach(([id, key]) => {
