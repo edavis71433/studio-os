@@ -1,0 +1,18 @@
+{
+  "name": "studio-os-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Studio OS — Playwright browser end-to-end verification suite (Phase PW).",
+  "scripts": {
+    "serve": "http-server . -p 4173 -c-1 --silent",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:update-snapshots": "playwright test --update-snapshots",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.48.0",
+    "http-server": "^14.1.1"
+  }
+}

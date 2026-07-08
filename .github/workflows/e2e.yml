@@ -1,0 +1,52 @@
+name: E2E (Playwright)
+
+# Browser end-to-end gate (Phase PW). Runs the hermetic Playwright suite —
+# real page JS against stubbed Supabase + mocked API fixtures — across
+# desktop / tablet / mobile. No secrets, no live backend, fully deterministic.
+#
+# To make this a REQUIRED gate: Settings → Branches → protect `main` and add
+# "e2e / browser" as a required status check.
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - "**/*.html"
+      - "shell.js"
+      - "shell.css"
+      - "tests/e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - ".github/workflows/e2e.yml"
+  pull_request:
+    paths:
+      - "**/*.html"
+      - "shell.js"
+      - "shell.css"
+      - "tests/e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
+  workflow_dispatch:
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run browser E2E
+        run: npm run test:e2e
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

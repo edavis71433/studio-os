@@ -27,7 +27,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 |---|---|---|---|
 | B1 | 🟢 **Stripe half CLOSED (Jul 2026)**: live key verified via API (account activated, charges+payouts enabled), set in prod; webhook endpoint updated — **customer.subscription.created registered** (6/6 events, enabled). Remaining: confirm prices, then **the push**. | 🧑🤖 | Billing chain live end-to-end; the push stays the final gate. |
 | ~~B2~~ | ✅ **CLOSED** — `today.html` is the Business-Moments front door (+ Concierge ask, dismiss, doorways); portal links to it. | 🤖 | Built in Launch Track 2 / optimized Phase M. |
-| B3 | **CI**: one command runs the whole test suite; green required on every push | 🤖 | No automated gate today (tests need a local `$TMPDIR` incantation) |
+| B3 | **CI**: one command runs the whole test suite; green required on every push. 🟢 *Two gates now exist:* the deno pre-deploy suite (deploy.yml) + the **Phase PW Playwright browser gate** (e2e.yml, hermetic, 3 viewports). Remaining: mark both as required status checks in branch protection. | 🤖🧑 | Automated gates now cover backend + browser |
 | B4 | **Backups + a real restore test** on both Supabase projects | 🧑🔒 | You cannot sell what you can't recover |
 | B5 | **Reconcile migration history** so a single migration applies without the hold-back ritual | 🤖 | The current ritual is manual and one typo from a prod mistake |
 | B6 | **`svc()` id-scope security audit**: every service-role query that takes a request-supplied id must filter by tenant/site/org | 🤖 | Service role bypasses RLS; one missing filter = cross-tenant leak |
