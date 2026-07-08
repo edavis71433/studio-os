@@ -796,6 +796,21 @@ function renderHours() {
     open.addEventListener("change", save); close.addEventListener("change", save);
     grid.appendChild(row);
   });
+  // Phase T2: one-click typical hours — kills the seven-row all-closed first-run chore
+  if (hoursFromState().every((d) => d.closed)) {
+    const quick = el("button", null, "Use typical hours (Mon–Fri, 9–5)");
+    quick.type = "button";
+    quick.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:6px 13px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+    quick.addEventListener("click", async () => {
+      const hours = hoursFromState().map((d) => ["sat", "sun"].includes(d.day)
+        ? { day: d.day, closed: true, intervals: [] }
+        : { day: d.day, closed: false, intervals: [{ open: "09:00", close: "17:00" }] });
+      S.location = { ...(S.location || {}), hours };
+      try { await api("PUT", "/location", { hours }); renderHours(); toast("Typical hours set — adjust any day"); scheduleChangesRefresh(); }
+      catch (err) { toast(err.message, true); }
+    });
+    grid.appendChild(quick);
+  }
   const sw = $("closedSwitch"), note = $("f-closednote");
   sw.checked = !!(S.location && S.location.temporarily_closed);
   note.hidden = !sw.checked; note.value = (S.location && S.location.temporarily_closed_note) || "";

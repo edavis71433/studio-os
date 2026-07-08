@@ -32,7 +32,7 @@
 - **FD-M9 · AI-suggested alt text + inline field** (replace `visual-studio.html`'s native `prompt()`); multi-photo upload; PDF/text parse for knowledge import. *Medium · V1.1.*
 - **FD-M10 · Surface Coach/Review suggestions on Today** (they're proposal-only already; hidden behind a manual desk-open in presence.html). *Medium · V1.1.*
 - **FD-M11 · Light auto-refresh/polling + standardized optimistic-UI** across the member pages (nothing polls today; only sharing.html has optimistic rollback). *Medium · V1.1.*
-- **FD-M12 · Smart new-business defaults** — "typical hours Mon–Fri 9–5" one-click (hours default to all-closed today); a self-serve shared nav shell so the secondary pages stop changing shape. *Medium · V1.1.*
+- **FD-M12 · Smart new-business defaults** — ✅ typical-hours one-click IMPLEMENTED (Phase T2, shows when all days are closed); remaining: the self-serve shared nav shell. *V1.1.*
 
 ### FD-N1 · ✅ IMPLEMENTED (Phase V) — published contact form fixed (GM-2 closed)
 **What (found by the No-Code Gap Audit, verified):** the template renders a plain HTML form POST (`application/x-www-form-urlencoded`, fields `name`/`contact`/`message`) but `POST /forms/:id/submit` parses **JSON** and expects **separate `email`/`phone`** — so a real visitor's submission returns 400; the form also has **no `_hp` honeypot** and **no success handling** (even a successful post would land the visitor on raw JSON). The flagship FD-2 lead capture silently fails end-to-end on a published site. **Fix spec:** endpoint accepts form-encoded + maps `contact`→email-or-phone; add the hidden `_hp` field to the template form; redirect to a rendered thank-you page (deterministic, no-JS). **Source:** [NO-CODE-GAP-AUDIT](NO-CODE-GAP-AUDIT.md). **Value:** Critical · **Effort:** Low. **Disposition:** **V1 BLOCKER — fix before launch.**
@@ -84,6 +84,9 @@
 
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
+
+### FD-T14 · Differentiator components (innovate, not imitate)
+**What (Phase T2):** Studio-OS-native structured blocks competitors can’t match because they’re FACTS-driven: **Trust & guarantees** (licenses/insured/guarantee — pairs with certifications), **Availability/emergency banner** (driven by live hours/holiday state), **Business timeline** (“since 1998” — pairs with the story field), **Review highlights** (connected GBP data — FD-N9’s display half). All deterministic, catalog-pattern. **Value:** Medium-High (differentiation) · **Effort:** Medium. **Disposition:** V1.1 (with FD-T5 realization).
 
 ### FD-T2 · Lazy/indexed template registry
 **What:** replace static-import-per-version with a lazy/indexed registry once template count grows. **Source:** Phase T scalability review. **Value:** Medium (future) · **Effort:** Medium. **Disposition:** V1.1.
@@ -158,7 +161,7 @@
 **What:** save/reuse a theme+CSS set across a portfolio (pairs with [[FD-18]] client setup templates). **Why:** agency speed as the portfolio grows. **Source:** Phase B. **Value:** Medium (agency) · **Effort:** Medium. **Disposition:** Queued.
 
 ### FD-18 · Client Setup Templates (clone a client setup)
-**What:** an agency clones a proven client configuration to stand up a new client fast (HighLevel-style "snapshots"). **Why:** compounds agency onboarding speed as the portfolio grows. **Source:** A9 competitive review (HighLevel/Duda). **Value:** Medium-High (agency) · **Effort:** Medium. **A9 decision:** Approve for future.
+**What:** an agency clones a proven client configuration to stand up a new client fast (HighLevel-style "snapshots"). **Why:** compounds agency onboarding speed as the portfolio grows. **Source:** A9 competitive review (HighLevel/Duda). **Value:** Medium-High (agency) · **Effort:** Medium. **A9 decision:** Approve for future. **T2 elevation:** moved to the TOP of the V1.1 lane — verified zero reuse machinery exists; this is the agency-scaling multiplier (with [[FD-B5]]).
 
 ### FD-19 · Shared Comments on shared items
 **What:** a lightweight comment thread on a shared draft/asset so client feedback stays in one place (not scattered to email/text). **Why:** completes the client-review loop with the A7.2 portal. **Source:** A9 (Notion/HighLevel). **Value:** Medium · **Effort:** Medium. **A9 decision:** Approve for future.
