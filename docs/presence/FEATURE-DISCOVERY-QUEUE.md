@@ -34,6 +34,33 @@
 - **FD-M11 · Light auto-refresh/polling + standardized optimistic-UI** across the member pages (nothing polls today; only sharing.html has optimistic rollback). *Medium · V1.1.*
 - **FD-M12 · Smart new-business defaults** — "typical hours Mon–Fri 9–5" one-click (hours default to all-closed today); a self-serve shared nav shell so the secondary pages stop changing shape. *Medium · V1.1.*
 
+### FD-N1 · 🔴 V1 BLOCKER — the published contact form doesn't work with the capture endpoint
+**What (found by the No-Code Gap Audit, verified):** the template renders a plain HTML form POST (`application/x-www-form-urlencoded`, fields `name`/`contact`/`message`) but `POST /forms/:id/submit` parses **JSON** and expects **separate `email`/`phone`** — so a real visitor's submission returns 400; the form also has **no `_hp` honeypot** and **no success handling** (even a successful post would land the visitor on raw JSON). The flagship FD-2 lead capture silently fails end-to-end on a published site. **Fix spec:** endpoint accepts form-encoded + maps `contact`→email-or-phone; add the hidden `_hp` field to the template form; redirect to a rendered thank-you page (deterministic, no-JS). **Source:** [NO-CODE-GAP-AUDIT](NO-CODE-GAP-AUDIT.md). **Value:** Critical · **Effort:** Low. **Disposition:** **V1 BLOCKER — fix before launch.**
+
+### FD-N2 · Logo upload → site header + favicon + OG fallback
+**What:** no logo field exists anywhere (verified: identity/brand/serializer/template 0 hits; favicon = generated letter). Add `logo_media_id` to identity → render in the header, real favicon, OG fallback. The single most basic owner expectation. **Value:** High · **Effort:** Low-Medium. **Disposition:** Should be no-code **V1**.
+
+### FD-N3 · Social-share (OG) image picker
+**What:** the OG image is auto-picked (first offering photo / post hero, `render.ts:406`) with no choice. One picker field. **Value:** Medium-High · **Effort:** Low. **Disposition:** Should be no-code **V1**.
+
+### FD-N4 · Announcement bar — first realized component (with expiry)
+**What:** the #1 everyday block ("holiday hours notice") is in the component catalog but unrealized. Realize it first: text + optional link + expiry (pairs with the built scheduled revert). **Value:** High · **Effort:** Low-Medium. **Disposition:** Should be no-code **V1**.
+
+### FD-N5 · Device preview toggle (mobile / tablet / desktop)
+**What:** preview has no width switcher (verified). A trivial iframe-width toggle. **Value:** Medium · **Effort:** Trivial. **Disposition:** Should be no-code **V1**.
+
+### FD-N6 · Form controls: curated extra-field picker + custom success message + auto-reply
+**What:** the endpoint already accepts bounded `fields{}`; the rendered form is fixed at 3 fields with no success/auto-reply config. **Disposition:** V1.1.
+
+### FD-N7 · Redirects manager UI
+**What:** `presence_redirects` exists and ships in the snapshot, but there is no customer-facing editor. **Disposition:** V1.1.
+
+### FD-N8 · Per-page SEO overrides + per-page noindex
+**What:** per-page meta is auto-derived (right default); allow overrides + noindex for the few who need it. **Disposition:** V1.1.
+
+### FD-N9 · Review embed from connected GBP data
+**What:** Connected Platform already reads reviews; realize the catalog's `reviews` block from that data (approval-safe display). **Disposition:** V1.1.
+
 ### FD-T1 · Author the neutral `business-classic` template + wire default-by-industry 🔴 (the decisive template item)
 **What:** author `business-classic/1.0.0` — the shared render engine emitting `vocabFor(industry)` (correct `LocalBusiness`-family schema + "Services" vocabulary), register it, and point provisioning at `templateSlugForIndustry`. **Why:** Phase T built + tested the primitives (`lib/industry_vocab.ts`, `lib/site_components.ts`, `templateSlugForIndustry`), but until this ONE template is authored, a non-restaurant customer still publishes the restaurant template with wrong `@type: Restaurant/Menu` markup. **Source:** Phase T. **Value:** Very High · **Effort:** Medium (authoring against ready primitives). **Disposition:** **V1 blocker if launching broad; V1.1 if restaurant-first** — gated on the owner's market-scope decision (see ROADMAP-MASTER 🔴).
 
