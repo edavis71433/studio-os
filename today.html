@@ -43,6 +43,9 @@
   .tag{display:inline-block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:8px}
   .calm{background:var(--good-soft);border-color:transparent}
   .calm h2{color:var(--good)}
+  a.moment.todo{display:block;text-decoration:none;color:inherit}
+  a.moment.todo:hover{border-color:var(--accent)}
+  .golink{color:var(--accent);font-weight:600;font-size:14px}
   .features{margin-top:40px;padding-top:26px;border-top:1px solid var(--line)}
   .features .lead{font-size:13px;color:var(--soft);margin:0 0 12px}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -99,18 +102,42 @@ function greet(){ const h = new Date().getHours(); return h < 12 ? 'Good morning
 // tone → calm styling class (never a score, never a colour alarm)
 function toneClass(t){ if(t==='good_news'||t==='celebration'||t==='celebratory'||t==='reassuring') return 'good'; if(t==='needs_attention'||t==='attentive') return 'attn'; return ''; }
 
-function render(moments, features){
+function render(moments, features, feed){
   $('greeting').textContent = greet();
   const items = (moments||[]).filter(Boolean);
+  // ── needs you now: the SAME items the top-bar bell counts (notices + pending
+  //    approvals) so the home page and the bell tell one story — each taps
+  //    straight through to the page that resolves it. ──────────────────────────
+  const notices = (feed && feed.notices) || [];
+  const approvals = (feed && feed.pending_approvals) || [];
+  const needs = notices.length + approvals.length;
   let html = '';
-  if(!items.length){
+  for(const n of notices){
+    html += `<a class="moment attn todo" href="${esc(n.href||'/today.html')}">
+      <span class="tag">Needs you</span>
+      <h2>${esc(n.headline||'Something needs a look')}</h2>
+      ${n.body?`<p>${esc(n.body)}</p>`:''}
+      <div class="row"><span class="golink">Take care of it →</span></div></a>`;
+  }
+  for(const p of approvals){
+    const href = p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
+    html += `<a class="moment attn todo" href="${href}">
+      <span class="tag">Waiting for your approval</span>
+      <h2>${esc(p.title||'A change is ready')}</h2>
+      ${p.summary?`<p>${esc(p.summary)}</p>`:''}
+      <div class="row"><span class="golink">Review &amp; approve →</span></div></a>`;
+  }
+  if(!items.length && !needs){
     $('sub').textContent = "Nothing needs your attention today.";
     html += `<div class="moment calm"><span class="tag">All clear</span>
       <h2>Everything customers can see is current.</h2>
       <p>Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.</p>
       <div class="row"><a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your leads</a></div></div>`;
   } else {
-    $('sub').textContent = items.length === 1 ? "One thing worth a look — no rush." : `${items.length} small things worth a look — none of them urgent.`;
+    const parts = [];
+    if(needs) parts.push(needs === 1 ? 'one thing needs you' : `${needs} things need you`);
+    if(items.length) parts.push(items.length === 1 ? 'one more worth a look' : `${items.length} more worth a look`);
+    const s = parts.join(' · '); $('sub').textContent = s.charAt(0).toUpperCase() + s.slice(1) + '.';
     for(const m of items){
       const cls = toneClass(m.moment_type || m.tone);
       const celebrate = cls === 'good';
@@ -196,13 +223,14 @@ function trouble(){
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
-    const [moments, features, ctx] = await Promise.all([
+    const [moments, features, ctx, feed] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       apiGet('/portal/context').catch(()=>null),
+      apiGet('/portal/feed').catch(()=>null),
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
-    render(list, features?.data || {});
+    render(list, features?.data || {}, feed && feed.data);
     planCard(ctx && ctx.data);
     healthLine();
   }catch(_){ trouble(); }

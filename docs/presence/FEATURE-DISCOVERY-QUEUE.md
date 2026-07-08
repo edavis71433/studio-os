@@ -362,3 +362,10 @@ Notices rail folded into `/portal/feed`; `attention_count` added to `/portal/con
 
 ### FD-FLOW2 · 🔵 RECOMMENDED (V1.1) — agency per-client attention badge
 The per-site `attention_count` rolls up to the agency portfolio ("2 clients need you"), one read, no new pipeline. Converges with FD-CRM2 / FD-INF4 agency roll-ups. Rides the next agency-surface touch.
+
+## Phase OS — operating-system cohesion
+### FD-OS1 · ✅ IMPLEMENTED (Phase OS) — Today mirrors the unified attention feed
+today.html now consumes /portal/feed and renders notices + pending approvals as the top "needs you" cards (each deep-linking to where it resolves), so the home page and the top-bar bell tell one story. Added #foundations deep-link to presence.html (technical desk now bell/⌘K-reachable). Frontend-only; regression green.
+
+### FD-OS2 · 🔵 RECOMMENDED (V1.1) — client-portal home mirrors the same treatment
+Render the client's pending approvals in client.html as the same actionable "needs you" cards (same role-filtered /portal/feed), so the client experience is as cohesive as the owner's Today. Direct mirror of FD-OS1, no new system.

@@ -204,3 +204,6 @@ Verified the operational-relationship-hub architecture against HubSpot/Salesforc
 
 ### Phase FLOW — Workflow Simplification & Product Excellence ✅ (implemented)
 Walked the signed-in workflows for removable clicks. Closed the one real gap: the global shell bell now surfaces the **notices rail** + an **attention badge** on every page (FD-FLOW1), each notice one tap from the page that resolves it — the last siloed "needs you" surface, gone. No new system. Open (V1.1, recommended): FD-FLOW2 agency per-client attention badge.
+
+### Phase OS — Operating System Integration & Cohesion ✅ (implemented)
+Audited every signed-in surface/transition as ONE OS. Cohesion already high (one shell/nav/session/palette/bell/approval-spine). Closed the one real seam: Today now mirrors the Phase-FLOW bell — notices + pending approvals render as the top actionable cards on today.html, each deep-linking to where it resolves; #foundations deep-link added (FD-OS1). Frontend-only. Open (V1.1, recommended): FD-OS2 client-portal home mirrors the same treatment.

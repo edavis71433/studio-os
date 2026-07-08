@@ -743,6 +743,7 @@ function routeHash() {
   if (!h) return;
   if (h === "publish") { openRitual(); return; }
   if (h === "preview") { openPreview("draft"); return; }
+  if (h === "foundations") { openFoundationsDesk(); return; }   // deep-link the technical desk (Today/bell/⌘K → approve here)
   const v = HASH_VIEWS[h];
   if (v && $("view-" + v)) go(v);
 }
