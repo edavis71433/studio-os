@@ -54,7 +54,8 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[RUNBOOKS](RUNBOOKS.md)** + **[runbooks/](../runbooks/)** — step-by-step operator procedures (new customer, domain, DNS, promotion, byte-check).
 - **[OPERATIONS](OPERATIONS.md)** — the L2 operational model (capacity, metering, the unattended cycle).
 
-### Architecture & Permissions (design)
+### Architecture & Permissions
+- **[Workspace Implementation (A7)](WORKSPACE-IMPLEMENTATION-A7.md)** — the built foundation: site roles + the Presence `client_visible` visibility model + `/portal/*` API + developer-mode hook + canonical naming (tested, deployed); the client-portal/agency UIs staged on it.
 - **[Workspace Architecture, Visibility & Experience (A6)](WORKSPACE-ARCHITECTURE-A6.md)** — the whole-platform workspace/cohesion/navigation/Developer-Mode/UX review + role matrix + implementation plan (design only).
 - **[Client Portal Visibility & Permission Model](CLIENT-PORTAL-VISIBILITY-MODEL.md)** — the detailed audience/surface/client-portal visibility matrices, permission gap analysis, and the freelancer→client exposure model (design only).
 

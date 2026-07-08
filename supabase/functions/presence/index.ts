@@ -27,6 +27,7 @@ import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
+import { handlePortalContext, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet } from './routes/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
@@ -207,6 +208,17 @@ serve(async (req) => {
     if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
   }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
+  // ── A7: Workspace context, members, and client-visibility shares ──
+  if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors);
+  if (route === '/portal/members' && method === 'GET') return handleMembersList(jwt, site, principal, cors);
+  if (route === '/portal/members' && method === 'POST') return handleMemberAdd(req, jwt, site, principal, cors);
+  {
+    const m = route.match(/^\/portal\/members\/([0-9a-f-]{36})\/revoke$/);
+    if (m && method === 'POST') return handleMemberRevoke(jwt, site, m[1], principal, cors);
+  }
+  if (route === '/portal/shares' && method === 'GET') return handleSharesList(jwt, site, principal, cors);
+  if (route === '/portal/shares' && method === 'POST') return handleShareSet(req, jwt, site, principal, cors);
+
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
   if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);
   {
