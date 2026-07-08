@@ -70,6 +70,7 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[Customer Guide](CUSTOMER-GUIDE.md)** — administrator + customer user guide, onboarding, per-feature how-to, FAQ, troubleshooting, known issues, support.
 
 ### Release
+- **[Product Review Board (A9)](PRODUCT-REVIEW-BOARD-A9.md)** — the independent board verdict: ratify V1 as the permanent baseline; the honest market-readiness gaps (front door, onboarding, scheduled publish, lead capture) triaged into the discovery queue.
 - **[Remaining Engineering Roadmap (LOCKED)](ROADMAP-LOCK.md)** — the permanent post-RC1 roadmap: V1 finish-up (connected completion, CI, type cleanup, docs), Developer Mode, Desktop, Mobile, CRM, Packaging, then Website → Onboarding → Owner Activation → Launch. Nothing removed.
 - **[Release Candidate RC1](RELEASE-CANDIDATE-RC1.md)** — the V1 capstone: completion report, full inventory, frozen-architecture verification, documentation verification, and the `v1.0.0-rc1` release recommendation.
 - **[Release Notes](RELEASE-NOTES.md)** — V1 release notes, full version history (M1 → L5.9 + Visual Studio), the **Technical Debt Register**, the **Version 1.1 Backlog**, and the **Owner/Production Activation Checklists**.

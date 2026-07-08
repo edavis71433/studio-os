@@ -4,6 +4,17 @@
 
 > **Rule:** nothing here is committed work. Adding an item ≠ approving it. The Product Review Board (A9) triages.
 
+> **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
+
+### FD-18 · Client Setup Templates (clone a client setup)
+**What:** an agency clones a proven client configuration to stand up a new client fast (HighLevel-style "snapshots"). **Why:** compounds agency onboarding speed as the portfolio grows. **Source:** A9 competitive review (HighLevel/Duda). **Value:** Medium-High (agency) · **Effort:** Medium. **A9 decision:** Approve for future.
+
+### FD-19 · Shared Comments on shared items
+**What:** a lightweight comment thread on a shared draft/asset so client feedback stays in one place (not scattered to email/text). **Why:** completes the client-review loop with the A7.2 portal. **Source:** A9 (Notion/HighLevel). **Value:** Medium · **Effort:** Medium. **A9 decision:** Approve for future.
+
+### FD-20 · Brand Asset Library
+**What:** a home for logo/colors/fonts/approved images the studio and Visual Studio draw from. **Why:** natural extension of the brand profile + media + Visual Studio; keeps brand consistent. **Source:** A9. **Value:** Medium · **Effort:** Medium. **A9 decision:** Approve for future.
+
 ---
 
 ## High value
