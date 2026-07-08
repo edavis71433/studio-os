@@ -50,8 +50,9 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[RUNBOOKS](RUNBOOKS.md)** + **[runbooks/](../runbooks/)** — step-by-step operator procedures (new customer, domain, DNS, promotion, byte-check).
 - **[OPERATIONS](OPERATIONS.md)** — the L2 operational model (capacity, metering, the unattended cycle).
 
-### Security
+### Security & Privacy
 - **[SECURITY](SECURITY.md)** — authentication, authorization, RLS, approval enforcement, encryption, secrets, tenant/org/agency isolation, AI safety, Visual/Connected security, and the security checklist.
+- **[Data Governance & Privacy Audit](DATA-GOVERNANCE-PRIVACY-AUDIT.md)** — the verified data inventory, classification, flows, AI/Connected/Visual/Commerce data handling, customer rights, retention, the privacy risk register, and the compliance mapping the legal documents must match.
 
 ### Customer & Support
 - **[Customer Guide](CUSTOMER-GUIDE.md)** — administrator + customer user guide, onboarding, per-feature how-to, FAQ, troubleshooting, known issues, support.
