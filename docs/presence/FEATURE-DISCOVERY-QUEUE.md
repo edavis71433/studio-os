@@ -15,8 +15,14 @@
 ### FD-C3 · Shared relationship files
 **What:** attach a contract/brief to the relationship (studio↔client). **Why:** a small real gap; pairs with [[FD-20]] brand assets. **Source:** Phase C. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.
 
-### FD-C4 · Formal CRM navigation entry
-**What:** add "Relationship" to `buildNav` (currently reached via doorways from today.html/agency.html). **Why:** Phase C honored the "do not modify navigation" fence; the entitlement-driven nav is the right long-term home. **Source:** Phase C. **Value:** Low · **Effort:** Low. **Disposition:** Queued — do when the fence lifts.
+### FD-C4 · Formal CRM navigation entry — ✅ IMPLEMENTED (Phase C1)
+**What:** "Relationship" is now in `buildNav` (Today section), surfaced by the unified shell — no longer doorway-only. **Delivered in Phase C1.** **Disposition:** Done.
+
+### FD-C1-shell · Persisted notifications
+**What:** persist "needs a look" as dismissible, per-user notifications (the Phase C1 bell recomputes from `/portal/feed`). **Why:** a real notification state (read/unread) completes the global chrome. **Source:** Phase C1. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued (V1.1).
+
+### FD-C1-org · Explicit organization/enterprise switcher
+**What:** a true org selector in the shell when enterprise orgs exist (today the profile menu links portfolio/admin). **Why:** enterprise context switching without leaving the frame. **Source:** Phase C1. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued (V1.1).
 
 ### FD-C5 · Agency-wide relationship roll-up
 **What:** a portfolio health board reusing the agency portfolio + CRM health. **Why:** one glance across all clients' relationship health. **Source:** Phase C. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued.

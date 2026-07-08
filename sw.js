@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v8'; // bumped: excludes the signed-in Presence app surfaces (today/connections/visual-studio/presence/client/agency/sharing/developer/crm) from cache-first — purges any stale app shells
+const CACHE_NAME = 'dds-v9'; // bumped: unified workspace shell (shell.js/css) + signed-in surfaces excluded from cache-first — always fresh chrome
 const PRECACHE = [
   '/about',
   '/services',
@@ -53,7 +53,8 @@ self.addEventListener('fetch', function(e) {
   if (url.pathname.startsWith('/presence') || url.pathname.startsWith('/today') ||
       url.pathname.startsWith('/connections') || url.pathname.startsWith('/visual-studio') ||
       url.pathname.startsWith('/client') || url.pathname.startsWith('/agency') || url.pathname.startsWith('/sharing') ||
-      url.pathname.startsWith('/developer') || url.pathname.startsWith('/crm')) return;
+      url.pathname.startsWith('/developer') || url.pathname.startsWith('/crm') ||
+      url.pathname.startsWith('/shell')) return;   // the unified shell (js/css) — always fresh
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });

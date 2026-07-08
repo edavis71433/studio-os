@@ -1,0 +1,91 @@
+/* ── Studio OS — Unified Workspace Shell (Phase C1) ───────────────────────────
+   ONE application frame, injected by shell.js on every signed-in surface. It
+   consumes buildNav (the one nav source of truth) and gives every workspace the
+   same chrome: brand, global nav, current-workspace indicator, search,
+   notifications, help, and a profile/context menu. Self-contained, theme-aware,
+   and the CANONICAL design tokens (this is the one place the shell's palette,
+   type, spacing and radii live — pages inherit the frame from here). */
+:root{
+  --dds-bg:#faf8f5; --dds-card:#fff; --dds-ink:#1b1525; --dds-soft:#6b6478; --dds-faint:#938ba3; --dds-line:#eee9e0;
+  --dds-p:#5b3fa0; --dds-p-deep:#2a1b4a; --dds-p-soft:#efeafa;
+  --dds-good:#3f7a5a; --dds-good-soft:#e7f1ea; --dds-warn:#8a6d3b; --dds-warn-soft:#f3ead9;
+  --dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09);
+  --dds-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --dds-serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --dds-shell-h:54px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --dds-bg:#171320; --dds-card:#1f1a2b; --dds-ink:#efeaf7; --dds-soft:#a79ebc; --dds-faint:#7a7192; --dds-line:#2a2338;
+  --dds-p:#b79ceb; --dds-p-soft:#241d38; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316;
+  --dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);
+}}
+:root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#938ba3;--dds-line:#eee9e0;--dds-p:#5b3fa0;--dds-p-soft:#efeafa}
+:root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#7a7192;--dds-line:#2a2338;--dds-p:#b79ceb;--dds-p-soft:#241d38}
+
+/* pages get top-room for the fixed shell once it mounts */
+html.dds-has-shell body{padding-top:var(--dds-shell-h)}
+
+#dds-shell{position:fixed;top:0;left:0;right:0;height:var(--dds-shell-h);z-index:2147483000;
+  background:color-mix(in srgb,var(--dds-card) 92%,transparent);backdrop-filter:saturate(1.4) blur(10px);
+  border-bottom:1px solid var(--dds-line);font-family:var(--dds-sans);color:var(--dds-ink);
+  display:flex;align-items:center;gap:10px;padding:0 14px}
+#dds-shell *{box-sizing:border-box}
+.dds-brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:15px;color:var(--dds-ink);text-decoration:none;flex:0 0 auto}
+.dds-brand .mark{width:22px;height:22px;border-radius:7px;background:var(--dds-p);color:#fff;display:grid;place-items:center;font-family:var(--dds-serif);font-size:14px;font-weight:500}
+.dds-brand .ctx{color:var(--dds-faint);font-weight:500}
+.dds-nav{display:flex;align-items:center;gap:2px;flex:1 1 auto;min-width:0;overflow:hidden}
+.dds-nav .sec{position:relative}
+.dds-nav .sec > button{font-family:inherit;font-size:13.5px;font-weight:500;color:var(--dds-soft);background:none;border:none;border-radius:8px;padding:7px 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.dds-nav .sec > button:hover{color:var(--dds-ink);background:var(--dds-p-soft)}
+.dds-nav .sec.active > button{color:var(--dds-p);background:var(--dds-p-soft)}
+.dds-nav .sec .menu{position:absolute;top:calc(100% + 6px);left:0;min-width:190px;background:var(--dds-card);border:1px solid var(--dds-line);border-radius:12px;box-shadow:var(--dds-shadow);padding:6px;display:none;flex-direction:column;gap:1px}
+.dds-nav .sec.open .menu{display:flex}
+.dds-nav .sec .menu a{font-size:13.5px;color:var(--dds-ink);text-decoration:none;padding:8px 10px;border-radius:8px;white-space:nowrap}
+.dds-nav .sec .menu a:hover{background:var(--dds-p-soft);color:var(--dds-p)}
+.dds-nav .sec .menu a.here{color:var(--dds-p);font-weight:600}
+.dds-right{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.dds-ic{width:34px;height:34px;border-radius:9px;border:none;background:none;color:var(--dds-soft);cursor:pointer;display:grid;place-items:center;font-size:16px;position:relative}
+.dds-ic:hover{background:var(--dds-p-soft);color:var(--dds-p)}
+.dds-ic .dot{position:absolute;top:7px;right:7px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;background:var(--dds-warn);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;font-family:var(--dds-sans)}
+.dds-search{display:flex;align-items:center;gap:7px;background:var(--dds-bg);border:1px solid var(--dds-line);border-radius:9px;padding:6px 11px;color:var(--dds-faint);font-size:13px;cursor:text;min-width:150px}
+.dds-search kbd{margin-left:auto;font-family:var(--dds-sans);font-size:11px;background:var(--dds-card);border:1px solid var(--dds-line);border-radius:5px;padding:1px 5px;color:var(--dds-faint)}
+@media (max-width:900px){.dds-search span,.dds-search kbd{display:none}.dds-search{min-width:0}}
+
+/* dropdown panels (notifications / profile) */
+.dds-pop{position:fixed;top:calc(var(--dds-shell-h) + 6px);right:12px;width:320px;max-width:calc(100vw - 24px);background:var(--dds-card);border:1px solid var(--dds-line);border-radius:14px;box-shadow:var(--dds-shadow);padding:8px;z-index:2147483001;display:none}
+.dds-pop.open{display:block}
+.dds-pop h4{margin:6px 8px 8px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dds-faint)}
+.dds-pop .row{padding:9px 10px;border-radius:9px;font-size:13.5px;color:var(--dds-ink);display:block;text-decoration:none}
+.dds-pop .row:hover{background:var(--dds-p-soft)}
+.dds-pop .row .sub{color:var(--dds-soft);font-size:12.5px;margin-top:1px}
+.dds-pop .muted{color:var(--dds-soft);font-size:13px;padding:12px 10px;text-align:center}
+.dds-pop .who{padding:10px;border-bottom:1px solid var(--dds-line);margin-bottom:6px}
+.dds-pop .who .n{font-weight:600;font-size:14px}
+.dds-pop .who .r{color:var(--dds-soft);font-size:12.5px;text-transform:capitalize}
+
+/* command palette */
+.dds-palette{position:fixed;inset:0;background:rgba(27,21,37,.35);z-index:2147483002;display:none;padding-top:12vh}
+.dds-palette.open{display:block}
+.dds-palette .box{max-width:520px;margin:0 auto;background:var(--dds-card);border:1px solid var(--dds-line);border-radius:16px;box-shadow:var(--dds-shadow);overflow:hidden}
+.dds-palette input{width:100%;border:none;border-bottom:1px solid var(--dds-line);background:none;color:var(--dds-ink);font-family:var(--dds-sans);font-size:16px;padding:16px 18px}
+.dds-palette input:focus{outline:none}
+.dds-palette .results{max-height:52vh;overflow:auto;padding:6px}
+.dds-palette .res{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;text-decoration:none;color:var(--dds-ink)}
+.dds-palette .res.sel,.dds-palette .res:hover{background:var(--dds-p-soft)}
+.dds-palette .res .s{margin-left:auto;font-size:11.5px;color:var(--dds-faint)}
+.dds-palette .none{padding:22px;text-align:center;color:var(--dds-soft);font-size:14px}
+
+/* mobile drawer */
+.dds-burger{display:none}
+.dds-drawer{position:fixed;inset:var(--dds-shell-h) 0 0 0;background:var(--dds-bg);z-index:2147482999;padding:16px;overflow:auto;display:none}
+.dds-drawer.open{display:block}
+.dds-drawer .g{margin-bottom:16px}
+.dds-drawer .g .t{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dds-faint);margin:0 0 6px}
+.dds-drawer .g a{display:block;font-size:16px;color:var(--dds-ink);text-decoration:none;padding:11px 8px;border-radius:9px}
+.dds-drawer .g a.here{color:var(--dds-p);font-weight:600;background:var(--dds-p-soft)}
+@media (max-width:760px){
+  .dds-nav{display:none}
+  .dds-burger{display:grid}
+  .dds-brand .ctx{display:none}
+}
+@media (prefers-reduced-motion:reduce){#dds-shell,.dds-pop,.dds-palette{transition:none}}

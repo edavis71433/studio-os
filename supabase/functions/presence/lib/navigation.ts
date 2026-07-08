@@ -39,6 +39,7 @@ export function buildNav(c: NavContext): NavSection[] {
   sections.push({ key: 'today', label: 'Today', items: [
     { key: 'today', label: 'Today', href: '/today.html' },
     { key: 'workspace', label: 'Your Presence', href: '/presence.html' },
+    { key: 'relationship', label: 'Relationship', href: '/crm.html' },  // Phase C1: CRM in the one nav (was doorway-only)
   ] });
 
   // Website (CMS)
