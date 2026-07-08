@@ -62,6 +62,7 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[Customer Guide](CUSTOMER-GUIDE.md)** — administrator + customer user guide, onboarding, per-feature how-to, FAQ, troubleshooting, known issues, support.
 
 ### Release
+- **[Release Candidate RC1](RELEASE-CANDIDATE-RC1.md)** — the V1 capstone: completion report, full inventory, frozen-architecture verification, documentation verification, and the `v1.0.0-rc1` release recommendation.
 - **[Release Notes](RELEASE-NOTES.md)** — V1 release notes, full version history (M1 → L5.9 + Visual Studio), the **Technical Debt Register**, the **Version 1.1 Backlog**, and the **Owner/Production Activation Checklists**.
 - **[Full-System QA](FULL-SYSTEM-QA.md)** — the master QA pass (every area), the QA matrix, link audit, per-area reports, bug/fix logs, and the release recommendation.
 - **[QA-RELEASE-VERIFICATION](QA-RELEASE-VERIFICATION.md)** — the deep QA pass and its verdict.
