@@ -46,6 +46,7 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[Testing](V1-SYSTEM-REFERENCE.md#testing)** — how the 44 suites run (pure + live-staging integration).
 
 ### Operations
+- **[Operations & Production Readiness](OPERATIONS-PRODUCTION-READINESS.md)** — the SRE/DevOps audit: monitoring, alerting, backups/DR, reliability, security ops, the Infrastructure Risk Register, and the production/launch checklists.
 - **[Deployment & Operations](DEPLOYMENT-AND-OPERATIONS.md)** — deploy technique (function + migration hold-back), monitoring, logging, backups, rollback, disaster recovery, maintenance, production checklist.
 - **[RUNBOOKS](RUNBOOKS.md)** + **[runbooks/](../runbooks/)** — step-by-step operator procedures (new customer, domain, DNS, promotion, byte-check).
 - **[OPERATIONS](OPERATIONS.md)** — the L2 operational model (capacity, metering, the unattended cycle).
