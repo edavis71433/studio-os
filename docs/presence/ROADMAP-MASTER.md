@@ -162,6 +162,14 @@ Ordered by value-per-effort:
 
 ## 🔍 Things to look into / expand
 
+### 📌 Parked engineering pickups (come back after activation/QA — small, ready to build)
+*Owner-parked on purpose; each is scoped, verified, and queued in detail in the Feature Discovery Queue:*
+- **FD-R2 · Workspace vocabulary matches industry** — a plumber's workspace still says "Menu"/"menu item"; drive labels from the industry vocab (~small; strongest GM-QA-adjacent polish).
+- **FD-RL1 · Wind-down automation** — day-45 export reminder + day-60 auto-park (the policy is written + communicated; this automates the tail).
+- **FD-RL2 · Reactivation & win-back comms** — welcome-back email + one polite day-30 win-back.
+- **FD-N7 · Redirects manager UI** · **FD-N8 · per-page SEO overrides** — the last two no-code tails.
+- **FD-Z2 · NAP drift-watch** — one evidence rule comparing site facts vs the connected Google listing → a calm Moment.
+
 - **Sequencing (post-RL reality — every engineering gate CLOSED: V/T3/S/O/P/Q/AA/Z/RL all ✅):** **J (owner activation — incl. verifying the Resend sending domain, which the RL lifecycle emails depend on) → K (Gold Master browser QA; fold in the FD-R2 workspace-vocab polish) → H (front door/pricing copy) → N (the push)** → then G (native). Native before launch is premature.
 - **The go-live push is a decision, not a phase** — surface it explicitly in N's launch checklist with an owner.
 - **Progress framing:** engineering ≈ 100%; *shippable-to-a-paying-customer* is lower until J + K + H + the push land. Consider tracking two numbers so "98%" doesn't read as "2 weeks from revenue."
