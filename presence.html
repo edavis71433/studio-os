@@ -737,7 +737,7 @@ function go(view) {
   try { history.replaceState(null, "", "#" + view); } catch (_) {}
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", business: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", business: "business", settings: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
 function routeHash() {
   const h = (location.hash || "").replace("#", "").toLowerCase();
   if (!h) return;
