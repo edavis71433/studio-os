@@ -162,7 +162,7 @@ Ordered by value-per-effort:
 
 ## 🔍 Things to look into / expand
 
-- **Sequencing:** J (activate) → K (QA) → H (front door) → I (onboarding) → N (launch checklist + push) → **then** G (native apps). Native before launch is premature.
+- **Sequencing (post-RL reality — every engineering gate CLOSED: V/T3/S/O/P/Q/AA/Z/RL all ✅):** **J (owner activation — incl. verifying the Resend sending domain, which the RL lifecycle emails depend on) → K (Gold Master browser QA; fold in the FD-R2 workspace-vocab polish) → H (front door/pricing copy) → N (the push)** → then G (native). Native before launch is premature.
 - **The go-live push is a decision, not a phase** — surface it explicitly in N's launch checklist with an owner.
 - **Progress framing:** engineering ≈ 100%; *shippable-to-a-paying-customer* is lower until J + K + H + the push land. Consider tracking two numbers so "98%" doesn't read as "2 weeks from revenue."
 - **Booking availability (FD-F3)** and **demo flows** are the only genuinely-unbuilt customer-facing capabilities in N — scope them before committing dates.
