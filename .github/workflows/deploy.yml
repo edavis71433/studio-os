@@ -21,8 +21,36 @@ on:
         required: true
 
 jobs:
+  # Pre-deploy quality gate (Ops audit HIGH-3): run the deterministic pure test
+  # suites — including the 14 machine-enforced platform invariants — before any
+  # deploy. The four integration-only suites (admin/pipeline/room/service) need
+  # live staging credentials and are skipped here; every other suite runs its
+  # pure tier with no env and must pass. A red gate blocks the deploy.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+      - name: Run pure test suites + platform invariants
+        run: |
+          fail=0
+          for f in tests/presence/*_test.mjs; do
+            b=$(basename "$f")
+            case "$b" in
+              admin_test.mjs|pipeline_test.mjs|room_test.mjs|service_test.mjs)
+                echo "skip (integration-only, needs live env): $b"; continue;;
+            esac
+            echo "== $b =="
+            deno run --allow-read --allow-env "$f" || { echo "FAILED: $b"; fail=1; }
+          done
+          if [ "$fail" -ne 0 ]; then echo "Pre-deploy test gate FAILED"; exit 1; fi
+          echo "Pre-deploy test gate passed."
+
   deploy-staging:
     if: github.event_name == 'push'
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +81,7 @@ jobs:
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Confirmation gate
