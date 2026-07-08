@@ -14,6 +14,8 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
+import { buildNav, landingFor } from '../lib/navigation.ts';
+import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc } from '../lib/db.ts';
 import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
@@ -39,11 +41,22 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
 
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const isOperator = principal.kind === 'staff' || principal.kind === 'system';
+  // agency membership drives the Agency nav section (reviewers never need it)
+  let isAgency = false;
+  if (role !== 'client_reviewer') { try { isAgency = !!(await resolveAgencyMember(jwt)); } catch { /* */ } }
+  const caps = capabilitiesOf(role);
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator };
   return json({ data: {
     site_role: role,
-    capabilities: capabilitiesOf(role),
+    capabilities: caps,
+    edition: site.edition,               // 'monitor' | 'presence' (site) — drives edition-adaptive nav
+    is_agency: isAgency,
+    is_operator: isOperator,
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
+    landing: landingFor(navCtx),
+    nav: buildNav(navCtx),               // the ONE navigation source of truth, entitlement-filtered
   } }, 200, cors);
 }
 

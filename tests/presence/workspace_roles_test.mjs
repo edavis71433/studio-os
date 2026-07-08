@@ -77,6 +77,34 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('reviewer: may NOT manage members/shares', !reviewerAllowed('/portal/members', 'POST') && !reviewerAllowed('/portal/shares', 'POST'));
 }
 
+// ═══ 7. information architecture — nav adapts by role + edition, no empty menus ═══
+{
+  const { buildNav, landingFor } = await import('../../supabase/functions/presence/lib/navigation.ts');
+  const ctx = (o) => ({ role: 'business_owner', edition: 'presence', capabilities: [], isAgency: false, isOperator: false, ...o });
+  const caps = (role) => { return { business_owner: ['view_all','edit','approve','publish','connect','configure','delete','export','invite','comment'], business_staff: ['view_all','edit','approve','publish','connect','export','comment'], client_reviewer: ['view_shared','approve','export','comment'], developer: ['view_all','edit','approve','publish','connect','configure','export','comment','use_developer_mode'] }[role]; };
+
+  const owner = buildNav(ctx({ capabilities: caps('business_owner') }));
+  ok('nav: owner gets a full workspace (Today/Website/Create/Grow/Clients/Settings/Help)', owner.some(s=>s.key==='website') && owner.some(s=>s.key==='create') && owner.some(s=>s.key==='clients') && owner.some(s=>s.key==='settings'));
+  ok('nav: no empty sections ever', owner.every(s=>s.items.length>0));
+
+  const reviewer = buildNav(ctx({ role:'client_reviewer', capabilities: caps('client_reviewer') }));
+  ok('nav: reviewer gets ONE calm surface (Your updates only)', reviewer.length===1 && reviewer[0].items[0].href==='/client.html');
+  ok('nav: reviewer landing = client portal', landingFor(ctx({role:'client_reviewer',capabilities:caps('client_reviewer')}))==='/client.html');
+
+  const monitor = buildNav(ctx({ edition:'monitor', capabilities: caps('business_owner') }));
+  ok('nav: Monitor edition hides Publish + Create (observe-only)', !monitor.some(s=>s.key==='create') && !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
+
+  const staff = buildNav(ctx({ role:'business_staff', capabilities: caps('business_staff') }));
+  ok('nav: business_staff has no Clients section (cannot invite)', !staff.some(s=>s.key==='clients'));
+
+  const agency = buildNav(ctx({ isAgency:true, capabilities: caps('business_owner') }));
+  ok('nav: agency member gets the Agency section; landing = agency', agency.some(s=>s.key==='agency') && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+
+  const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
+  ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));
+  ok('nav: non-developer does NOT see Developer Mode', !owner.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.error('FAILURES'); (globalThis.Deno ? Deno : process).exit(1); }

@@ -55,6 +55,9 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[OPERATIONS](OPERATIONS.md)** — the L2 operational model (capacity, metering, the unattended cycle).
 
 ### Architecture & Permissions
+- **[Workspace Information Architecture (A7.5)](WORKSPACE-INFORMATION-ARCHITECTURE-A75.md)** — the finalized IA: navigation as one entitlement-driven source of truth (`/portal/context.nav`), workspace/edition/role maps, Developer-Mode placement, packaging review.
+- **[Feature Discovery & Product Review Queue](FEATURE-DISCOVERY-QUEUE.md)** — the standing queue of discovered capabilities (scheduled publish, lead capture, notify-to-approve, etc.), documented not built, for the A9 Product Review Board.
+- **[Workspace Experience (A7.2)](WORKSPACE-EXPERIENCE-A72.md)** — the client portal, agency dashboard, sharing UI, reviewer boundary.
 - **[Workspace Implementation (A7)](WORKSPACE-IMPLEMENTATION-A7.md)** — the built foundation: site roles + the Presence `client_visible` visibility model + `/portal/*` API + developer-mode hook + canonical naming (tested, deployed); the client-portal/agency UIs staged on it.
 - **[Workspace Architecture, Visibility & Experience (A6)](WORKSPACE-ARCHITECTURE-A6.md)** — the whole-platform workspace/cohesion/navigation/Developer-Mode/UX review + role matrix + implementation plan (design only).
 - **[Client Portal Visibility & Permission Model](CLIENT-PORTAL-VISIBILITY-MODEL.md)** — the detailed audience/surface/client-portal visibility matrices, permission gap analysis, and the freelancer→client exposure model (design only).
