@@ -1,5 +1,7 @@
 # Presence API Inventory — v1 FROZEN (M5)
 
+> **⚠️ HISTORICAL (M5 surface only).** This inventory froze the M5 route subset; it predates `/moments`, `/concierge`, `/connections`, `/visual`, marketplace/enterprise/agency, and more. For the **current, complete route surface** use **[API-REFERENCE.md](API-REFERENCE.md)**. Kept for the M5 governance record.
+
 **Frozen 2026-07-06 at end of M5.** This is the surface the mobile app and future
 clients consume. **Any change requires explicit approval** (Constitution / M3.75
 §2 governance): additive-only in a minor (new route, new optional field, new

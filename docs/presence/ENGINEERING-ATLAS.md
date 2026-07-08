@@ -1,5 +1,7 @@
 # Engineering Atlas v1 — Studio OS Presence
 
+> **⚠️ HISTORICAL (depth: M1–M8.5 only).** This Atlas froze before the Intelligence pipeline, Connected Platform, Industry Platform, Marketplace, Enterprise, Agency, and Visual Studio existed. For the **current whole-platform picture** use **[V1-SYSTEM-REFERENCE.md](V1-SYSTEM-REFERENCE.md)**; start from **[README.md](README.md)**. This document is kept for its deeper M1–M8.5 narrative.
+
 **Documentation only. Changes nothing. Describes the platform exactly as it exists at commit `d15c4d1` (2026-07-06).**
 Sources of truth: `docs/presence/constitution/00–06` (all frozen), `docs/presence/API-INVENTORY-v1-FROZEN.md`, `docs/presence/RUNBOOKS.md`, migrations `0001–0019`, and the milestone commits M1→M8.5. Where this document and a constitution disagree, the constitution wins. Where reality is genuinely undecided, it is listed in §11 as an open question, not guessed.
 
