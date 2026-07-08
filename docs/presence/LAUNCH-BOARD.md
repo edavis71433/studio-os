@@ -14,6 +14,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 | # | Item | Owner | Why |
 |---|---|---|---|
 | ~~**GM-1**~~ | ✅ **CLOSED (Phase M)** — **V1 UI completion for the Phase F commercial features (FD-F1)**: the **Scheduling** screen (`schedule.html`) and the **Leads inbox** (`leads.html`), both surfaced in the one nav, + a CRM notify-to-approve action. | 🤖 | Built in Phase M as screens over the existing tested endpoints; verified by the nav dead-link guard. Remaining: authed browser QA. See [PHASE-M-SITE-OPERATIONS](PHASE-M-SITE-OPERATIONS.md). |
+| **GM-2** | 🔴 **Fix the published contact form ↔ capture endpoint mismatch (FD-N1)** — accept form-encoded + map `contact`→email/phone, add the `_hp` honeypot to the template form, redirect to a rendered thank-you page. | 🤖 | Found by the No-Code Gap Audit: real visitor submissions currently fail with a 400 — the flagship FD-2 lead capture silently breaks end-to-end on a published site. Small fix, launch-gating. |
 
 *(Owner activation — RESEND_KEY, APPROVAL_SECRET, cron on `/system/run` — and human live-browser/AT passes remain separate, non-engineering gates.)*
 
