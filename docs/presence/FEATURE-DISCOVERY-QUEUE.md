@@ -61,7 +61,7 @@
 ### FD-N9 · Review embed from connected GBP data
 **What:** Connected Platform already reads reviews; realize the catalog's `reviews` block from that data (approval-safe display). **Disposition:** V1.1.
 
-### FD-T1 · Author the neutral `business-classic` template + wire default-by-industry 🔴 (the decisive template item)
+### FD-T1 · ✅ IMPLEMENTED (Phase T3) — business-classic authored + production default
 **What:** author `business-classic/1.0.0` — the shared render engine emitting `vocabFor(industry)` (correct `LocalBusiness`-family schema + "Services" vocabulary), register it, and point provisioning at `templateSlugForIndustry`. **Why:** Phase T built + tested the primitives (`lib/industry_vocab.ts`, `lib/site_components.ts`, `templateSlugForIndustry`), but until this ONE template is authored, a non-restaurant customer still publishes the restaurant template with wrong `@type: Restaurant/Menu` markup. **Source:** Phase T. **Value:** Very High · **Effort:** Medium (authoring against ready primitives). **Disposition:** **V1 blocker if launching broad; V1.1 if restaurant-first** — gated on the owner's market-scope decision (see ROADMAP-MASTER 🔴).
 
 ### FD-T6 · Customer-facing Design Studio (fonts · colors · sizes — curated, not CSS)
@@ -84,6 +84,9 @@
 
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
+
+### FD-T15 · Comparison table + fixed-formula calculator blocks (Phase T4)
+**What:** structured comparison-table block + a calculator-lite (fixed formula as data — inputs × declared rates → deterministic result; never runtime code). **Source:** T4 AEM/competitor benchmark. **Value:** Medium · **Effort:** Medium. **Disposition:** V1.1 (with FD-T5).
 
 ### FD-T14 · Differentiator components (innovate, not imitate)
 **What (Phase T2):** Studio-OS-native structured blocks competitors can’t match because they’re FACTS-driven: **Trust & guarantees** (licenses/insured/guarantee — pairs with certifications), **Availability/emergency banner** (driven by live hours/holiday state), **Business timeline** (“since 1998” — pairs with the story field), **Review highlights** (connected GBP data — FD-N9’s display half). All deterministic, catalog-pattern. **Value:** Medium-High (differentiation) · **Effort:** Medium. **Disposition:** V1.1 (with FD-T5 realization).

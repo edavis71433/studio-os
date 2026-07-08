@@ -44,6 +44,8 @@ export interface SnapshotContent {
    *  render exactly as before. */
   settings?: {
     category_order?: string[];
+    /** Phase T3: the business industry (lib/industry_vocab key) — templates read vocabFor(industry). */
+    industry?: string;
     logo?: MediaRef | null;
     og_image?: MediaRef | null;
     announcement?: { text: string; url?: string; expires_at?: string | null };

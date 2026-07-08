@@ -5,10 +5,15 @@
 import type { RenderFn, Snapshot, SiteConfig, TemplateManifest, FileMap } from './render_types.ts';
 import { render as restaurantClassic_1_0_0 } from '../templates/restaurant-classic/1.0.0/render.ts';
 import manifest_rc_1_0_0 from '../templates/restaurant-classic/1.0.0/manifest.json' with { type: 'json' };
+import { render as businessClassic_1_0_0 } from '../templates/business-classic/1.0.0/render.ts';
+import manifest_bc_1_0_0 from '../templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
 
 const REGISTRY: Record<string, Record<string, { render: RenderFn; manifest: TemplateManifest }>> = {
   'restaurant-classic': {
     '1.0.0': { render: restaurantClassic_1_0_0, manifest: manifest_rc_1_0_0 as unknown as TemplateManifest },
+  },
+  'business-classic': {   // Phase T3: the neutral, vocabulary-driven production default
+    '1.0.0': { render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest },
   },
 };
 

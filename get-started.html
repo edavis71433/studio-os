@@ -125,11 +125,18 @@ function wireIntake(){
   document.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{readIntake();INTAKE.services.splice(+b.getAttribute('data-rm'),1);if(!INTAKE.services.length)INTAKE.services=[''];renderIntake();}));
   $('addsvc').addEventListener('click',()=>{readIntake();INTAKE.services.push('');renderIntake();setTimeout(()=>{const el=document.querySelector('[data-svc="'+(INTAKE.services.length-1)+'"]');if(el)el.focus();},0);});
   $('build').addEventListener('click',build);
-  $('manual').addEventListener('click',()=>location.href='/presence.html');
+  $('manual').addEventListener('click',()=>{readIntake();saveIndustry();location.href='/presence.html';});
 }
 
+// Phase T3: persist the industry — the site's template reads vocabFor(industry)
+// from the snapshot (correct schema + vocabulary). 'other' maps to the safe generic.
+async function saveIndustry(){
+  const key=INTAKE.industry==='other'?'generic':INTAKE.industry;
+  try{await api('/settings','PUT',{industry_key:key});}catch(_){/* non-blocking */}
+}
 async function build(){
   readIntake();
+  saveIndustry();
   if(!INTAKE.services.some(s=>s.trim())&&INTAKE.description.trim().length<8){renderIntake();$('desc').focus();return;}
   $('main').innerHTML=`<div class="center"><div class="spin" role="status"></div><p class="big">Drafting your website…</p><p class="sub" style="margin:0 auto">Turning what you told us into real pages, homepage copy, and SEO. This takes a few seconds.</p></div>`;
   const req=buildStarterRequest(INTAKE);
