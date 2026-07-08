@@ -106,6 +106,9 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
         order: Array.isArray(settings.sections_order) ? settings.sections_order.map(String).slice(0, 12) : [],
       },
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
+      // Phase SD: per-page search visibility + overrides
+      pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],
+      page_seo: (settings.page_seo && typeof settings.page_seo === 'object') ? settings.page_seo : {},
       // Phase Z: ownership-verification tokens (emitted as meta tags when set)
       ...(String(settings.google_site_verification || '').trim() || String(settings.bing_site_verification || '').trim()
         ? { verification: { google: String(settings.google_site_verification || '').trim() || undefined, bing: String(settings.bing_site_verification || '').trim() || undefined } }
@@ -120,7 +123,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     offerings: offerings.map((o: any) => ({ id: o.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media: ref(o.media_id), sort_order: o.sort_order })),
     testimonials: testimonials.map((t: any) => ({ id: t.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || undefined, sort_order: t.sort_order })),
     faqs: faqs.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer, sort_order: f.sort_order })),
-    posts: posts.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at })),
+    posts: posts.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at, noindex: p.noindex === true })),
     redirects: redirects.map((r: any) => ({ from_path: r.from_path, to_path: r.to_path })),
   };
 

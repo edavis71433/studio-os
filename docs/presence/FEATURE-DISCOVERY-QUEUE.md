@@ -52,10 +52,10 @@
 ### FD-N6 · Form controls: curated extra-field picker + custom success message + auto-reply
 **What:** the endpoint already accepts bounded `fields{}`; the rendered form is fixed at 3 fields with no success/auto-reply config. **Disposition:** V1.1.
 
-### FD-N7 · Redirects manager UI
+### FD-N7 · ✅ IMPLEMENTED (Phase SD) — "Forward old page addresses" in Search & visibility (CRUD routes + plain-words validation, 50 cap)
 **What:** `presence_redirects` exists and ships in the snapshot, but there is no customer-facing editor. **Disposition:** V1.1.
 
-### FD-N8 · Per-page SEO overrides + per-page noindex
+### FD-N8 · ✅ IMPLEMENTED (Phase SD) — per-page search wording overrides + "Which pages should show on Google?" toggles (+ per-post)
 **What:** per-page meta is auto-derived (right default); allow overrides + noindex for the few who need it. **Disposition:** V1.1.
 
 ### FD-N9 · Review embed from connected GBP data

@@ -118,6 +118,25 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('footer toggles hide hours + social', !noFooter.includes('<caption>Hours</caption>'));
 }
 
+// ═══ 5e. Phase SD: search visibility as human questions ═══
+{
+  const f = render('plumber', { pages_noindex: ['faq', 'contact'] });
+  ok('hidden pages get noindex + leave the sitemap (but still exist)', f['faq/index.html'].includes('content="noindex"') && f['contact/index.html'].includes('content="noindex"') && !f['sitemap.xml'].includes('/faq/') && !f['sitemap.xml'].includes('/contact/') && f['sitemap.xml'].includes('/services/'));
+  ok('default: nothing customer-facing is noindexed (only /thanks/)', !render('plumber')['faq/index.html'].includes('content="noindex"'));
+  const ov = render('plumber', { page_seo: { about: { title: 'Meet the crew', description: 'Two generations of pipes.' } } });
+  ok('per-page search wording overrides title + description', ov['about/index.html'].includes('<title>Meet the crew</title>') && ov['about/index.html'].includes('content="Two generations of pipes."'));
+  ok('blank overrides keep the good defaults', render('plumber')['about/index.html'].includes('<title>About — '));
+  const base = JSON.parse(JSON.stringify(fixture));
+  base.template_slug = 'business-classic'; base.template_version = '1.0.0';
+  base.content.settings = { ...(base.content.settings || {}), industry: 'plumber' };
+  if (base.content.posts[0]) {
+    base.content.posts[0].noindex = true;
+    const pf = renderSnapshot(base, SITE);
+    const slug = base.content.posts[0].slug;
+    ok('a post can be hidden from Google (noindex + out of the sitemap, still published)', pf[`updates/${slug}/index.html`].includes('content="noindex"') && !pf['sitemap.xml'].includes(`/updates/${slug}/`) && (`updates/${slug}/index.html` in pf));
+  }
+}
+
 // ═══ 6. determinism ═══
 {
   const a = render('plumber'), b = render('plumber');

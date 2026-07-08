@@ -448,6 +448,17 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   ];
   const extras: Extras = { announce, icon, nav };
 
+  // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,
+  // and per-page search headline/description overrides. Plain choices, our plumbing.
+  const noidx = new Set(c.settings?.pages_noindex || []);
+  const pseo = c.settings?.page_seo || {};
+  const seoOv = (key: string, title: string, description: string) => ({
+    title: (pseo[key]?.title || '').trim() || title,
+    description: (pseo[key]?.description || '').trim() || description,
+  });
+  const markNoindex = (file: string) => { files[file] = (files[file] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">'); };
+
+
   const page = (path: string, opts: Omit<PageOpts, 'path'>) => {
     const html = shell(c, site, cssPath, { path, ...opts }, extras);
     const file = path === '/' ? 'index.html' : `${path.replace(/^\/|\/$/g, '')}/index.html`;
@@ -456,22 +467,28 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
 
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
   page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site)], ogImage: ogImg, active: 'home', body: homeBody(c, site, v) });
-  page(v.offeringPath, { title: `${v.offeringLabel} — ${i.business_name}`, description: `${v.offeringLabel} from ${i.business_name}.`, ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });
-  page('/about/', { title: `About — ${i.business_name}`, description: siteDesc, ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });
-  page('/faq/', { title: `FAQ — ${i.business_name}`, description: `Answers to common questions about ${i.business_name}.`, ld: c.faqs.length ? [ldFaq(c)] : [], active: 'faq', body: faqBody(c) });
-  page('/contact/', { title: `Contact & Hours — ${i.business_name}`, description: `Address, phone, and hours for ${i.business_name}.`, ld: [ldBiz], active: 'contact', body: contactBody(c, site) });
+  page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });
+  if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
+  page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });
+  if (noidx.has('about')) markNoindex('about/index.html');
+  page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: c.faqs.length ? [ldFaq(c)] : [], active: 'faq', body: faqBody(c) });
+  if (noidx.has('faq')) markNoindex('faq/index.html');
+  page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, `Address, phone, and hours for ${i.business_name}.`), ld: [ldBiz], active: 'contact', body: contactBody(c, site) });
+  if (noidx.has('contact')) markNoindex('contact/index.html');
   page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>` });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
   // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
   page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
   page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
-  page('/updates/', { title: `Updates — ${i.business_name}`, description: `News and updates from ${i.business_name}.`, ld: [], active: 'updates', body: postIndexBody(c) });
+  page('/updates/', { ...seoOv('updates', `Updates — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', body: postIndexBody(c) });
+  if (noidx.has('updates')) markNoindex('updates/index.html');
   for (const p of c.posts) {
     page(`/updates/${p.slug}/`, {
       title: `${p.title} — ${i.business_name}`, description: p.excerpt || siteDesc,
       ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [p.title, `/updates/${p.slug}/`]])],
       ogImage: p.hero?.variants?.w1600, active: 'updates', body: postBody(c, p),
     });
+    if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
   }
 
   files['404.html'] = shell(c, site, cssPath, {
@@ -483,7 +500,8 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#23635a"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#f7f7f5" text-anchor="middle">${esc(letter)}</text></svg>`;
 
   const lastmod = snapshot.created_at.slice(0, 10);
-  const urls = ['/', v.offeringPath, '/about/', '/faq/', '/contact/', '/updates/', '/privacy/', '/accessibility/', ...c.posts.map((p) => `/updates/${p.slug}/`)];
+  const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
+  const urls = ['/', ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => p), '/privacy/', '/accessibility/', ...c.posts.filter((p) => !p.noindex).map((p) => `/updates/${p.slug}/`)];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
 

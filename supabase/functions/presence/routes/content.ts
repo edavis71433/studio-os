@@ -75,8 +75,9 @@ export const SPECS: Record<string, EntitySpec> = {
       title: { max: 160, required: true }, slug: { kind: 'slug', max: 80 },
       body_md: { max: 20000 }, excerpt: { max: 300 },
       hero_media_id: { kind: 'uuid' }, status: { max: 12 }, published_at: { kind: 'date' },
+      noindex: { kind: 'bool' },   // Phase SD: 'Show this update on Google?'
     },
-    select: 'id,title,slug,body_md,excerpt,hero_media_id,status,published_at,updated_at',
+    select: 'id,title,slug,body_md,excerpt,hero_media_id,status,published_at,noindex,updated_at',
     order: 'updated_at.desc', softDelete: true,
   },
 };
@@ -101,6 +102,8 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   hero_layout: { max: 20 }, nav_style: { max: 12 },
   sections_hidden: { kind: 'json' }, sections_order: { kind: 'json' },
   footer_hours: { kind: 'bool' }, footer_social: { kind: 'bool' },
+  // Phase SD: search visibility as human questions
+  pages_noindex: { kind: 'json' }, page_seo: { kind: 'json' },
 };
 
 function validateFields(payload: Record<string, unknown>, spec: Record<string, FieldRule>, requireRequired: boolean) {
@@ -292,6 +295,6 @@ export async function handleVoice(req: Request, jwt: string, site: SiteRow, prin
 export const handleSettings = (req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, jwt, site, principal, cors, {
     table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
-    select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,updated_at',
+    select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,updated_at',
     conflict: 'site_id', summary: 'Updated site settings',
   });

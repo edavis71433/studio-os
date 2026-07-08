@@ -444,6 +444,17 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   const icon = c.settings?.logo?.variants?.w400 || '';
   const extras = { announce, icon };
 
+  // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,
+  // and per-page search headline/description overrides. Plain choices, our plumbing.
+  const noidx = new Set(c.settings?.pages_noindex || []);
+  const pseo = c.settings?.page_seo || {};
+  const seoOv = (key: string, title: string, description: string) => ({
+    title: (pseo[key]?.title || '').trim() || title,
+    description: (pseo[key]?.description || '').trim() || description,
+  });
+  const markNoindex = (file: string) => { files[file] = (files[file] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">'); };
+
+
   const page = (path: string, opts: Omit<Parameters<typeof shell>[3], 'path'>) => {
     const html = shell(c, site, cssPath, { path, ...opts }, extras);
     const file = path === '/' ? 'index.html' : `${path.replace(/^\/|\/$/g, '')}/index.html`;
@@ -451,17 +462,23 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   };
 
   page('/', { title: siteTitle, description: siteDesc, ld: [ldRestaurant(c, site), ldSite(c, site)], ogImage: ogImg, active: 'home', body: homeBody(c, site) });
-  page('/menu/', { title: `Menu — ${i.business_name}`, description: `The menu at ${i.business_name}.`, ld: [ldMenu(c, site)], ogImage: ogImg, active: 'menu', body: menuBody(c) });
-  page('/about/', { title: `About — ${i.business_name}`, description: siteDesc, ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });
-  page('/faq/', { title: `FAQ — ${i.business_name}`, description: `Answers to common questions about ${i.business_name}.`, ld: c.faqs.length ? [ldFaq(c)] : [], active: 'faq', body: faqBody(c) });
-  page('/contact/', { title: `Contact & Hours — ${i.business_name}`, description: `Address, phone, and opening hours for ${i.business_name}.`, ld: [ldRestaurant(c, site)], active: 'contact', body: contactBody(c, site) });
-  page('/updates/', { title: `Updates — ${i.business_name}`, description: `News and updates from ${i.business_name}.`, ld: [], active: 'updates', body: postIndexBody(c) });
+  page('/menu/', { ...seoOv('offerings', `Menu — ${i.business_name}`, `The menu at ${i.business_name}.`), ld: [ldMenu(c, site)], ogImage: ogImg, active: 'menu', body: menuBody(c) });
+  if (noidx.has('offerings')) markNoindex('menu/index.html');
+  page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });
+  if (noidx.has('about')) markNoindex('about/index.html');
+  page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: c.faqs.length ? [ldFaq(c)] : [], active: 'faq', body: faqBody(c) });
+  if (noidx.has('faq')) markNoindex('faq/index.html');
+  page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, `Address, phone, and opening hours for ${i.business_name}.`), ld: [ldRestaurant(c, site)], active: 'contact', body: contactBody(c, site) });
+  if (noidx.has('contact')) markNoindex('contact/index.html');
+  page('/updates/', { ...seoOv('updates', `Updates — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', body: postIndexBody(c) });
+  if (noidx.has('updates')) markNoindex('updates/index.html');
   for (const p of c.posts) {
     page(`/updates/${p.slug}/`, {
       title: `${p.title} — ${i.business_name}`, description: p.excerpt || siteDesc,
       ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [p.title, `/updates/${p.slug}/`]])],
       ogImage: p.hero?.variants?.w1600, active: 'updates', body: postBody(c, p),
     });
+    if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
   }
 
   // Phase V FD-N1: the form's landing page — calm confirmation, noindex, not in nav/sitemap
@@ -487,7 +504,8 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
 
   // sitemap (lastmod = snapshot time — the only clock the renderer may read)
   const lastmod = snapshot.created_at.slice(0, 10);
-  const urls = ['/', '/menu/', '/about/', '/faq/', '/contact/', '/updates/', '/privacy/', '/accessibility/', ...c.posts.map((p) => `/updates/${p.slug}/`)];
+  const KEY_PATHS: Array<[string, string]> = [['offerings', '/menu/'], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
+  const urls = ['/', ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => p), '/privacy/', '/accessibility/', ...c.posts.filter((p) => !p.noindex).map((p) => `/updates/${p.slug}/`)];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
 

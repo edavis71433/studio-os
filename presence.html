@@ -2419,6 +2419,102 @@ async function refreshAll() {
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
   mountDesignCard();
+  mountSearchCard();
+}
+// ── Phase SD: Search & visibility — human questions, our plumbing ──
+const PAGE_DEFS = [ ["offerings", "Your offerings page"], ["about", "About"], ["faq", "Questions"], ["updates", "Updates"], ["contact", "Contact"] ];
+async function mountSearchCard() {
+  const host = $("view-business"); if (!host || $("searchCard")) return;
+  const card = el("div", "field"); card.id = "searchCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Search & visibility"));
+  const status = el("div", "hint", "Checking your search setup…"); card.appendChild(status);
+  host.appendChild(card);
+  let h = null;
+  try { h = (await api("GET", "/search/health")).data; } catch (_) { status.textContent = "The search check couldn’t run just now."; return; }
+  status.remove();
+  // 1. the health sentences
+  const line = (ok2, good, fix) => {
+    const p = el("div", null, ""); p.style.cssText = "display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px";
+    p.appendChild(Object.assign(el("span", null, ok2 ? "✓" : "•"), { style: "color:" + (ok2 ? "#2e6b46" : "#a05a2c") + ";font-weight:700" }));
+    p.appendChild(el("span", null, ok2 ? good : fix));
+    card.appendChild(p);
+  };
+  line(true, "Google can read your site — sitemap, page details, and your " + (h.schema && h.schema.type ? h.schema.type : "business") + " listing info are built in automatically.");
+  line(h.seo_fields.title && h.seo_fields.description, "Your search headline and description are set.", "Add a search headline and description above — until then Google shows your name and description.");
+  line(h.verification.google, "Google Search Console is connected.", "Add your free Google Search Console code above to see how people find you.");
+  if (h.verification.bing) line(true, "Bing is connected too (that powers Copilot search).");
+  (h.links || []).forEach((l) => { if (l.ok === false) line(false, "", "Your " + l.kind.replace("social:", "") + " link isn’t answering — check " + l.url.slice(0, 40) + "…"); });
+  if ((h.links || []).length && (h.links || []).every((l) => l.ok !== false)) line(true, "All your outside links (booking, social, redirects) are answering.");
+  // 2. page visibility toggles
+  const sec = el("div", null, ""); sec.style.cssText = "margin-top:12px";
+  sec.appendChild(Object.assign(el("div", null, "Which pages should show up on Google?"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
+  const hidden = new Set((S.settings && S.settings.pages_noindex) || []);
+  PAGE_DEFS.forEach(([key, label]) => {
+    const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 0";
+    const cb = el("input"); cb.type = "checkbox"; cb.id = "nx-" + key; cb.checked = !hidden.has(key);
+    cb.addEventListener("change", async () => {
+      const nh = new Set((S.settings && S.settings.pages_noindex) || []);
+      cb.checked ? nh.delete(key) : nh.add(key);
+      try { const r = await api("PUT", "/settings", { pages_noindex: [...nh] }); S.settings = r.data || { ...S.settings, pages_noindex: [...nh] }; toast(cb.checked ? label + " will show on Google — publish to apply" : label + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
+      catch (err) { toast(err.message, true); cb.checked = !cb.checked; }
+    });
+    const lb = el("label", null, label); lb.setAttribute("for", "nx-" + key); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
+    rowEl.append(cb, lb); sec.appendChild(rowEl);
+  });
+  sec.appendChild(el("div", "hint", "Your home page always shows. Hiding a page keeps it on your site — it just stops appearing in search results."));
+  card.appendChild(sec);
+  // 3. per-page search wording (page_seo overrides)
+  const ov = el("details"); ov.style.cssText = "margin-top:10px";
+  ov.appendChild(Object.assign(el("summary", null, "Fine-tune how each page reads in search results (optional)"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
+  PAGE_DEFS.forEach(([key, label]) => {
+    const cur = ((S.settings && S.settings.page_seo) || {})[key] || {};
+    const box = el("div"); box.style.cssText = "margin:8px 0 12px";
+    box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:3px" }));
+    const ti = el("input"); ti.type = "text"; ti.maxLength = 60; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
+    const di = el("input"); di.type = "text"; di.maxLength = 160; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
+    [ti, di].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
+    const save = async () => {
+      const map = { ...((S.settings && S.settings.page_seo) || {}) };
+      const entry = { title: ti.value.trim(), description: di.value.trim() };
+      if (!entry.title && !entry.description) delete map[key]; else map[key] = entry;
+      try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Search wording saved — publish to apply"); scheduleChangesRefresh(); }
+      catch (err) { toast(err.message, true); }
+    };
+    [ti, di].forEach((inp) => inp.addEventListener("change", save));
+    box.append(ti, di); ov.appendChild(box);
+  });
+  card.appendChild(ov);
+  // 4. redirects manager (moved a page? send visitors to the new spot)
+  const rd = el("details"); rd.style.cssText = "margin-top:8px";
+  rd.appendChild(Object.assign(el("summary", null, "Moved from an old website? Forward old page addresses"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
+  const list = el("div", "hint", "Loading…"); rd.appendChild(list);
+  const form = el("div"); form.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:6px";
+  const fi = el("input"); fi.placeholder = "/old-page/"; const tiR = el("input"); tiR.placeholder = "/services/ or https://…";
+  [fi, tiR].forEach((inp) => { inp.type = "text"; inp.style.cssText = "flex:1;min-width:120px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
+  const add = el("button", null, "Forward it"); add.type = "button";
+  add.style.cssText = "font:inherit;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  form.append(fi, tiR, add); rd.appendChild(form);
+  rd.appendChild(el("div", "hint", "Anyone visiting the old address lands on the new one — and Google follows along. Applies when you publish."));
+  card.appendChild(rd);
+  async function loadRedirects() {
+    try {
+      const r = await api("GET", "/redirects"); const rows = r.data || [];
+      list.innerHTML = rows.length ? "" : "No forwards yet.";
+      rows.forEach((row) => {
+        const line2 = el("div"); line2.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0";
+        line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
+        const x = el("button", null, "✕"); x.type = "button"; x.title = "Remove this forward";
+        x.style.cssText = "border:none;background:none;cursor:pointer;color:var(--ink-2,#888)";
+        x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } });
+        line2.appendChild(x); list.appendChild(line2);
+      });
+    } catch (_) { list.textContent = "Forwards couldn’t load just now."; }
+  }
+  add.addEventListener("click", async () => {
+    try { await api("POST", "/redirects", { from_path: fi.value, to_path: tiR.value }); fi.value = ""; tiR.value = ""; loadRedirects(); toast("Forward added — publish to apply"); scheduleChangesRefresh(); }
+    catch (err) { toast(err.message, true); }
+  });
+  loadRedirects();
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──
 // A plumber's SITE says "Services" (T3 vocabulary) — the workspace must too.

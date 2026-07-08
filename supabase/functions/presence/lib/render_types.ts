@@ -56,11 +56,15 @@ export interface SnapshotContent {
     nav_style?: string;
     sections?: { hidden: string[]; order: string[] };
     footer?: { hours: boolean; social: boolean };
+    /** Phase SD: page keys hidden from search (noindex + out of the sitemap). */
+    pages_noindex?: string[];
+    /** Phase SD: per-page search headline/description overrides, keyed by page. */
+    page_seo?: Record<string, { title?: string; description?: string }>;
   };
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
   faqs: Array<{ id: string; question: string; answer: string; sort_order?: number }>;
-  posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string }>;
+  posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string; noindex?: boolean }>;
   redirects: Array<{ from_path: string; to_path: string }>;
   // voice is present in the snapshot but marked private — the renderer MUST NOT read it.
 }

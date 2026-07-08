@@ -18,6 +18,7 @@ import { resolvePrincipal } from '../_shared/auth.ts';
 import { resolveSite } from './lib/site.ts';
 import { checkEntitlement } from './middleware/entitlement.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
+import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
@@ -204,6 +205,13 @@ serve(async (req) => {
   // 5. router — exact routes only
   if (route === '/site' && method === 'GET') return handleGetSite(jwt, site, cors);
   if (route === '/site/templates' && method === 'GET') return handleTemplatesList(site, cors);            // Phase CP-1
+  if (route === '/search/health' && method === 'GET') return handleSearchHealth(site, cors);              // Phase SD
+  if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
+  if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
+  {
+    const rm = route.match(/^\/redirects\/([0-9a-f-]{36})$/);
+    if (rm && method === 'DELETE') return handleRedirectDelete(site, principal, rm[1], cors);
+  }
   if (route === '/site/template' && method === 'PUT') return handlePutTemplate(req, jwt, site, principal, cors); // Phase CP-1
   if (route === '/identity' && method === 'GET') return handleGetIdentity(jwt, site, cors);
   if (route === '/identity' && method === 'PUT') return handlePutIdentity(req, jwt, site, principal, cors);
