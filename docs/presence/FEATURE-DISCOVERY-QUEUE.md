@@ -40,6 +40,24 @@
 ### FD-T6 · Customer-facing Design Studio (fonts · colors · sizes — curated, not CSS)
 **What (owner request):** a Design surface for the *business owner* (no developer role needed) to set their site's look: pick from **curated palettes**, **font pairings**, and a **type-scale/size** control — plus their logo/brand colors from the brand asset library ([[FD-20]]). **Not** raw CSS/hex-anything: designed choices → theme tokens → deterministic render → approval-first publish. **Why it's a gap:** today NO customer can change fonts/colors at all — the theme-token machinery exists (Phase B/B1: tokens ride in the snapshot and render deterministically) but is gated behind Developer Mode; and the product's "Visual Studio" is AI *images*, not design. This is the missing customer half of the Phase T theme system (pairs with FD-T3 theme variants + FD-B4 self-hosted fonts). **Value:** High (every competitor lets customers pick fonts/colors; ours can do it *safely*) · **Effort:** Medium (a curated-picker UI over the existing token layer). **Disposition:** V1.1 — strong candidate right after FD-T1 (the neutral template), since themes make every template's look customer-tunable.
 
+### FD-T7 · Launches — a parallel future version, promoted without downtime 🔴 (owner request)
+**What:** an AEM-style **Launch**: while the live site keeps running (and stays hotfixable), prepare a **second, named version** — a template switch, a seasonal redesign, a rebrand — edit it in parallel, preview it as-if-live, then **promote it at a moment** (one click or scheduled) through the same approval-first publish. Live page never goes down. **Industry names for the same concept:** AEM Launches, Contentful Launch, Sanity Releases, Shopify unpublished-theme preview. **Why it's a real gap (verified):** we have exactly ONE draft per site; scheduled publish freezes a snapshot at schedule time, so you can't keep working on the future version, and a template switch today would hijack the only draft. **Constitution reconciliation:** general A/B branching + staging environments stay excluded (locked); a Launch is the *bounded* version — **one live lane + one launch lane**, same snapshot/render/approval machinery (a launch = a second draft workspace whose promote = the existing publish). Calm, deterministic, no branching trees. **Value:** Very High (the flagship "change templates without taking the page down") · **Effort:** Medium-High (a second draft scope + promote path). **Disposition:** V1.1 — pairs with FD-T1/T3 (you'll want it the day the second template exists).
+
+### FD-T8 · Template switch with staged preview (folds into FD-T7)
+**What:** Shopify-style: preview your **content in a different template** before committing the switch (render the current snapshot with a candidate template slug — the pure engine already supports rendering any snapshot with any compatible template). The commit path is a Launch (FD-T7); the *preview* half is cheap and could land alone. **Value:** High · **Effort:** Low-Medium (a `?template=` preview parameter + a chooser). **Disposition:** V1.1, first slice of FD-T7.
+
+### FD-T9 · Brand kit auto-extraction (logo → palette)
+**What:** upload your logo → propose a matching palette + font pairing (into the FD-T6 Design Studio as *suggested* choices, member approves). Squarespace/Canva-style brand-kit start. **Value:** Medium-High (creatives + the auto-onboarding story) · **Effort:** Medium. **Disposition:** V1.1 (after FD-T6).
+
+### FD-T10 · Stock photography integration
+**What:** search/import license-safe stock (Unsplash/Pexels API) directly into the media library (copied in — published sites stay self-contained, no hotlinking). Every competitor has this; empty photo slots are a real first-run wall. **Value:** Medium-High · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-T11 · Image editing basics (crop · focal point)
+**What:** crop + focal-point control in the media library so variants frame correctly (verified: none exists today — variants are automatic). **Value:** Medium · **Effort:** Medium. **Disposition:** V1.1.
+
+### FD-T12 · Section ordering as structured data
+**What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
+
 ### FD-T2 · Lazy/indexed template registry
 **What:** replace static-import-per-version with a lazy/indexed registry once template count grows. **Source:** Phase T scalability review. **Value:** Medium (future) · **Effort:** Medium. **Disposition:** V1.1.
 
@@ -194,7 +212,7 @@ A light task/reminder list (the Growth Coach is adjacent). **Value:** Low · **E
 
 ## Deliberately NOT queued (out of ethos / constitution)
 
-- Page-builder/component versioning · A/B branching · per-customer staging environments · runtime third-party plugins · AI-generated customer photos · auto-publish/auto-social without approval. These conflict with the structured-content / determinism / approval / Product-Law stances and are intentionally excluded (see [EXTENSIBILITY-REVIEW](EXTENSIBILITY-REVIEW.md) and the [Roadmap locked exclusions](ROADMAP-LOCK.md)).
+- Page-builder/component versioning · A/B branching (multi-branch trees) · per-customer staging environments · runtime third-party plugins · AI-generated customer photos · auto-publish/auto-social without approval. *(Owner-requested reconciliation: the BOUNDED single-lane **Launch** — FD-T7 — is queued; unbounded branching/staging stays excluded.)* These conflict with the structured-content / determinism / approval / Product-Law stances and are intentionally excluded (see [EXTENSIBILITY-REVIEW](EXTENSIBILITY-REVIEW.md) and the [Roadmap locked exclusions](ROADMAP-LOCK.md)).
 
 ---
 
