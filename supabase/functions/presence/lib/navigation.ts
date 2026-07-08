@@ -49,6 +49,7 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasBusinessOS) today.push({ key: 'today', label: 'Today', href: '/today.html' });
   if (f.hasWebsite) today.push({ key: 'workspace', label: 'Your Presence', href: '/presence.html' });
   if (f.hasRelationship) today.push({ key: 'relationship', label: 'Relationship', href: '/crm.html' });
+  if (f.hasWebsite) today.push({ key: 'leads', label: 'Leads', href: '/leads.html' });   // Phase M: surface the FD-2 inbox
   sections.push({ key: 'today', label: 'Today', items: today });
 
   // Website (CMS) — only when the edition includes it (Business-OS-Only hides it)
@@ -56,6 +57,7 @@ export function buildNav(c: NavContext): NavSection[] {
     const website: NavItem[] = [{ key: 'content', label: 'Your website', href: '/presence.html' }];
     if (c.edition !== 'monitor') website.push({ key: 'media', label: 'Photos', href: '/presence.html#media' });
     if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
+    if (canPublish(c)) website.push({ key: 'scheduled', label: 'Scheduled', href: '/schedule.html' });  // Phase M: surface FD-1 scheduling
     sections.push({ key: 'website', label: 'Website', items: website });
 
     if (canDraft(c)) sections.push({ key: 'create', label: 'Create', items: [

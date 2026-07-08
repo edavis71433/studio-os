@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scheduled — Presence</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Publish your current draft at a future time — set it and forget it.">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:620px;margin:0 auto;padding:34px 20px 90px}
+  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
+  header .sub{color:var(--soft);font-size:15px;margin:0;max-width:52ch}
+  section{margin-top:28px}
+  h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--soft);margin-bottom:6px}
+  input[type=datetime-local],input[type=text]{width:100%;font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+  input:focus{outline:none;border-color:var(--p)}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:8px}
+  button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 18px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.55;cursor:default}
+  button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
+  .sch{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px}
+  .sch .w{font-weight:600;font-size:14.5px}
+  .sch .m{font-size:13px;color:var(--soft);margin-top:2px}
+  .sch .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;font-weight:600}
+  .sch button{font-size:12.5px;padding:6px 13px}
+  .muted{color:var(--soft);font-size:14px}
+  .center{text-align:center;padding:20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Presence · Scheduled changes — your live site never changes until the moment you choose.</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="",LIST=[];
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function fmt(iso){return new Date(iso).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'});}
+
+function render(){
+  let h=`<div class="rolebadge">● Scheduled</div>
+    <header><h1>Scheduled changes</h1><p class="sub">Publish your current draft at a future moment — holiday hours, a seasonal update, a launch. Nothing goes live until then.</p></header>
+    <section><h2>Schedule this draft</h2>
+      <div class="card">
+        <label for="when">When should your current draft go live?</label>
+        <input type="datetime-local" id="when">
+        <label for="note" style="margin-top:14px">A note for yourself (optional)</label>
+        <input type="text" id="note" placeholder="e.g. Holiday hours">
+        <div style="margin-top:16px"><button class="primary" id="add">Schedule publish</button></div>
+        <p class="hint">This freezes your draft exactly as it is now. Keep editing freely — the scheduled version won't change.</p>
+      </div>
+    </section>
+    <section><h2>Upcoming</h2>`;
+  if(!LIST.length)h+=`<p class="muted">Nothing scheduled. When you schedule a publish, it appears here until it goes live.</p>`;
+  else for(const s of LIST){
+    h+=`<div class="sch"><div><div class="w">${esc(fmt(s.scheduled_for))}</div><div class="m"><span class="k">${s.kind==='revert'?'Revert':'Publish'}</span> ${esc(s.summary||'')}</div></div><button data-cancel="${esc(s.id)}">Cancel</button></div>`;
+  }
+  h+=`</section>`;
+  $('main').innerHTML=h;wire();
+}
+function wire(){
+  $('add').addEventListener('click',add);
+  document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancel(b.getAttribute('data-cancel'))));
+}
+async function add(){
+  const v=$('when').value;if(!v){toast('Pick a date and time.');return;}
+  const iso=new Date(v).toISOString();
+  const btn=$('add');btn.disabled=true;btn.textContent='Scheduling…';
+  const r=await api('/schedule','POST',{scheduled_for:iso,note:$('note').value||''});
+  btn.disabled=false;btn.textContent='Schedule publish';
+  if(r.ok){toast(r.body.data&&r.body.data.message||'Scheduled.');load();}
+  else{toast(r.body.message||'That didn’t schedule.');}
+}
+async function cancel(id){const r=await api('/schedule/'+id+'/cancel','POST');if(r.ok){toast('Canceled.');load();}else toast('Couldn’t cancel that.');}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to schedule a publish.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+async function load(){const r=await api('/schedule');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Scheduling lives in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}LIST=(r.body.data&&r.body.data.scheduled)||[];render();}
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>

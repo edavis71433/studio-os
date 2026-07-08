@@ -13,7 +13,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 
 | # | Item | Owner | Why |
 |---|---|---|---|
-| **GM-1** | **V1 UI completion for the Phase F commercial features (FD-F1)**: the in-app **Scheduling** screen (in the publish flow) and the **Leads inbox** screen. | 🤖 | Phase F shipped FD-1 (scheduled publish) and FD-2 (lead capture) **backends** — tested + deployed — but a customer can't yet *discover or operate* them without their screens. Required V1 UI completion, not V1.1. See [PHASE-F-COMMERCIAL-READINESS](PHASE-F-COMMERCIAL-READINESS.md) + [FEATURE-DISCOVERY-QUEUE](FEATURE-DISCOVERY-QUEUE.md) FD-F1. |
+| ~~**GM-1**~~ | ✅ **CLOSED (Phase M)** — **V1 UI completion for the Phase F commercial features (FD-F1)**: the **Scheduling** screen (`schedule.html`) and the **Leads inbox** (`leads.html`), both surfaced in the one nav, + a CRM notify-to-approve action. | 🤖 | Built in Phase M as screens over the existing tested endpoints; verified by the nav dead-link guard. Remaining: authed browser QA. See [PHASE-M-SITE-OPERATIONS](PHASE-M-SITE-OPERATIONS.md). |
 
 *(Owner activation — RESEND_KEY, APPROVAL_SECRET, cron on `/system/run` — and human live-browser/AT passes remain separate, non-engineering gates.)*
 

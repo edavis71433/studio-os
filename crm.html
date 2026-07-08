@@ -140,9 +140,14 @@ function render(profile,summary,notes,items,studio){
   else{html+=`<div class="tl">`;for(const e of items){html+=`<div class="ev ${esc(e.kind)}"><div class="t">${ICON[e.kind]||'•'} ${esc(e.title)}</div>${e.detail?`<div class="dt">${esc(e.detail)}</div>`:''}<div class="when">${esc(when(e.at))}</div></div>`;}html+=`</div>`;}
   html+=`</section>`;
 
+  // studio action: nudge the client to approve what's pending, in one tap (surfaces the existing one-tap loop)
+  if(studio && profile.pending_approvals>0){
+    html+=`<section><h2>Waiting on the client</h2><div class="card"><p class="muted" style="margin-bottom:12px">${profile.pending_approvals} ${profile.pending_approvals===1?'change is':'changes are'} waiting for approval. Send a plain email with a one-tap approve link.</p><button class="primary" id="notifyapprove">Email the client to approve</button></div></section>`;
+  }
   // integrated doorways (no duplication — these open the existing surfaces)
   html+=`<section><h2>Open in context</h2><div class="links">
     <a class="link" href="/today.html">Business Moments →</a>
+    <a class="link" href="/leads.html">Leads →</a>
     <a class="link" href="/connections.html">Connected services →</a>
     <a class="link" href="/presence.html">Website & publishing →</a>
     <a class="link" href="/sharing.html">Sharing & access →</a>
@@ -156,6 +161,7 @@ function wire(){
   document.querySelectorAll('[data-pin]').forEach(b=>b.addEventListener('click',()=>pin(b.getAttribute('data-pin'),b.textContent==='Pin')));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>del(b.getAttribute('data-del'))));
   const ex=$('exportlink');if(ex)ex.addEventListener('click',(e)=>{e.preventDefault();doExport();});
+  const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'));});
 }
 async function addNote(){
   const t=$('nb');const body=(t&&t.value||'').trim();if(!body){toast('Write a little something first.');return;}
