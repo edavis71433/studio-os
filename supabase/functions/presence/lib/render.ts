@@ -21,6 +21,19 @@ export function getTemplate(slug: string, version: string): { render: RenderFn; 
   return REGISTRY[slug]?.[version] ?? null;
 }
 
+/** Phase CP-1: the newest version of a template (registry keys sorted). */
+export function latestTemplateVersion(slug: string): string | null {
+  const versions = Object.keys(REGISTRY[slug] ?? {});
+  return versions.sort().at(-1) ?? null;
+}
+/** The switchable-template catalog (slug, name, latest version). */
+export function listTemplates(): Array<{ slug: string; name: string; version: string }> {
+  return Object.entries(REGISTRY).map(([slug, vs]) => {
+    const version = Object.keys(vs).sort().at(-1)!;
+    return { slug, name: vs[version].manifest.name, version };
+  });
+}
+
 // ── Phase B1: the ONE render pipeline, Developer-Mode-aware ──────────────────
 // A developer's customization lives in the snapshot (a sibling of content). It
 // is applied here, deterministically, as a post-render pass over the template's

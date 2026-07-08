@@ -68,6 +68,7 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 let TOKEN="",ME=null,CLIENTS=[],ACTING=null;
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 
 function renderList(filter){
@@ -83,9 +84,47 @@ function renderList(filter){
       <span><span class="n">${esc(c.name||'(unnamed)')}</span><br><span class="m">${esc(c.edition||'presence')} · ${esc(c.status||'')}</span></span>
       <span class="badge ${waiting?'wait':'ok'}">${waiting?waiting+' waiting':'all clear'}</span></button>`;
   }
+  // ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
+  html+=`<div class="detail" style="margin-top:18px"><div class="card"><div class="stat" style="margin-bottom:6px">Starter kits</div>
+    <p class="muted" style="margin-bottom:10px">Save a client's setup (services, FAQs, voice, colors, industry — never their name, reviews, or photos) and start the next client from it. Applying only fills what's empty; it never overwrites work.</p>
+    <div id="kitList" class="muted">Loading…</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+      <select id="kitFromSite" class="search" style="margin:0;flex:1;min-width:150px"><option value="">Save a kit from…</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
+      <input id="kitName" class="search" style="margin:0;flex:1;min-width:130px" placeholder="Kit name (e.g. Contractor Starter)">
+      <button class="client" id="kitSave" style="width:auto;margin:0;padding:10px 16px;justify-content:center">Save kit</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+      <select id="kitPick" class="search" style="margin:0;flex:1;min-width:150px"><option value="">Apply a kit…</option></select>
+      <select id="kitToSite" class="search" style="margin:0;flex:1;min-width:150px"><option value="">…to client</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
+      <button class="client" id="kitApply" style="width:auto;margin:0;padding:10px 16px;justify-content:center">Apply</button>
+    </div></div></div>`;
   $('main').innerHTML=html;
   const s=$('search'); if(s) s.addEventListener('input',()=>renderList(s.value));
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openClient(b.getAttribute('data-open'))));
+  loadKits();
+}
+let KITS=[];
+async function loadKits(){
+  const host=$('kitList'); if(!host) return;
+  try{
+    const r=await api('/agency/kits'); KITS=(r.body&&r.body.data)||[];
+    host.innerHTML=KITS.length?KITS.map(k=>`<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;margin:0 6px 6px 0;font-size:13px">${esc(k.name)} <button data-delkit="${esc(k.id)}" title="Delete kit" style="border:none;background:none;cursor:pointer;color:var(--faint);font-size:13px">✕</button></span>`).join(''):'No kits yet — save your best-configured client as the first one.';
+    const pick=$('kitPick'); if(pick){pick.innerHTML='<option value="">Apply a kit…</option>'+KITS.map(k=>`<option value="${esc(k.id)}">${esc(k.name)}</option>`).join('');}
+    document.querySelectorAll('[data-delkit]').forEach(b=>b.addEventListener('click',async()=>{if(!b.dataset.armed){b.dataset.armed='1';b.textContent='?';setTimeout(()=>{delete b.dataset.armed;b.textContent='✕';},2500);return;}await apiSend('DELETE','/agency/kits/'+b.getAttribute('data-delkit'));loadKits();}));
+    const save=$('kitSave'); if(save)save.addEventListener('click',async()=>{
+      const sid=$('kitFromSite').value,nm=$('kitName').value.trim();
+      if(!sid||!nm){alert('Pick a client and name the kit.');return;}
+      const r2=await apiSend('POST','/agency/kits',{site_id:sid,name:nm});
+      if(r2.ok){$('kitName').value='';loadKits();}else alert((r2.body&&r2.body.message)||'That didn’t save.');
+    });
+    const ap=$('kitApply'); if(ap)ap.addEventListener('click',async()=>{
+      const kid=$('kitPick').value,sid=$('kitToSite').value;
+      if(!kid||!sid){alert('Pick a kit and a client.');return;}
+      const r3=await apiSend('POST','/agency/kits/'+kid+'/apply',{site_id:sid});
+      if(r3.ok){const a=(r3.body.data&&r3.body.data.applied)||{};const sk=(r3.body.data&&r3.body.data.skipped)||[];alert('Applied: '+(a.offerings||0)+' services, '+(a.faqs||0)+' FAQs'+(a.voice?', voice':'')+(a.colors?', colors':'')+(a.industry?', industry':'')+(sk.length?'\nSkipped (already set): '+sk.join('; '):''));}
+      else alert((r3.body&&r3.body.message)||'That didn’t apply.');
+    });
+  }catch(_){host.textContent='Kits wouldn’t load just now.';}
 }
 function openClient(siteId){
   ACTING=CLIENTS.find(c=>c.site_id===siteId)||null; if(!ACTING) return;

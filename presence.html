@@ -616,6 +616,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <button data-page="/updates/">Updates</button>
       <button data-page="/contact/">Contact</button>
     </div>
+    <div class="pagewords" id="lookSeg" aria-label="Try another look"></div>
     <div class="grow"></div>
     <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(255,253,248,.55);padding-bottom:11px" class="deskprivacy">A private proof — only you can see it.</span>
     <div class="deskseg" id="devSeg">
@@ -2041,10 +2042,42 @@ function renderWelcome() {
 }
 
 /* ── the proofing desk (identical /preview calls) ── */
-const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null };
+const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null, template: "" };
+// ── Phase CP-1 (FD-T8): try another look — preview-only until "Use this look" ──
+let LOOKS = null;   // { current: {slug}, templates: [{slug,name,version}] }
+async function mountLookSeg() {
+  const seg = $("lookSeg"); if (!seg) return;
+  try { if (!LOOKS) LOOKS = (await api("GET", "/site/templates")).data; } catch (_) { return; }
+  if (!LOOKS || (LOOKS.templates || []).length < 2) return;   // one look → no chooser
+  seg.innerHTML = "";
+  seg.appendChild(Object.assign(el("span", null, "Look:"), { style: "font-size:12px;color:rgba(255,253,248,.55);padding:8px 4px 0 0" }));
+  LOOKS.templates.forEach((t) => {
+    const b = el("button", null, t.name);
+    b.dataset.look = t.slug;
+    const active = (PV.template || LOOKS.current.slug) === t.slug;
+    if (active) b.classList.add("on");
+    b.addEventListener("click", () => { PV.template = t.slug === LOOKS.current.slug ? "" : t.slug; mountLookSeg(); loadPreview(); });
+    seg.appendChild(b);
+  });
+  if (PV.template) {
+    const use = el("button", null, "Use this look");
+    use.style.cssText = "font-weight:700";
+    use.addEventListener("click", async () => {
+      try {
+        const r = await api("PUT", "/site/template", { slug: PV.template });
+        toast("Now dressed as " + (r.data.name || PV.template) + " — publish to make it live");
+        LOOKS = null; PV.template = "";
+        const s = await api("GET", "/site"); S.site = s.data.site;
+        mountLookSeg(); loadPreview(); scheduleChangesRefresh(); applyVocab();
+      } catch (err) { toast(err.message, true); }
+    });
+    seg.appendChild(use);
+  }
+}
 async function openPreview(ver) {
   if (ver) PV.ver = ver;
   PV.publishId = null;
+  mountLookSeg();
   $("verSeg").style.display = "";
   syncStageChrome();
   openStage();
@@ -2078,7 +2111,7 @@ async function loadPreview() {
   const frame = $("previewFrame");
   frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Proofing your ${PV.publishId ? "kept version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
   try {
-    const q = PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`;
+    const q = (PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`) + (PV.template ? `&template=${encodeURIComponent(PV.template)}` : "");
     let html = await apiHtml(`/preview?${q}`);
     html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
     frame.srcdoc = html;

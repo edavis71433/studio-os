@@ -70,7 +70,7 @@
 ### FD-T7 · Launches — a parallel future version, promoted without downtime 🔴 (owner request)
 **What:** an AEM-style **Launch**: while the live site keeps running (and stays hotfixable), prepare a **second, named version** — a template switch, a seasonal redesign, a rebrand — edit it in parallel, preview it as-if-live, then **promote it at a moment** (one click or scheduled) through the same approval-first publish. Live page never goes down. **Industry names for the same concept:** AEM Launches, Contentful Launch, Sanity Releases, Shopify unpublished-theme preview. **Why it's a real gap (verified):** we have exactly ONE draft per site; scheduled publish freezes a snapshot at schedule time, so you can't keep working on the future version, and a template switch today would hijack the only draft. **Constitution reconciliation:** general A/B branching + staging environments stay excluded (locked); a Launch is the *bounded* version — **one live lane + one launch lane**, same snapshot/render/approval machinery (a launch = a second draft workspace whose promote = the existing publish). Calm, deterministic, no branching trees. **Value:** Very High (the flagship "change templates without taking the page down") · **Effort:** Medium-High (a second draft scope + promote path). **Disposition:** V1.1 — pairs with FD-T1/T3 (you'll want it the day the second template exists).
 
-### FD-T8 · Template switch with staged preview (folds into FD-T7)
+### FD-T8 · ✅ IMPLEMENTED (Phase CP-1) — Look switcher in preview (?template= through the one renderer) + Use-this-look apply (PUT /site/template, owner-only, provenance-logged)
 **What:** Shopify-style: preview your **content in a different template** before committing the switch (render the current snapshot with a candidate template slug — the pure engine already supports rendering any snapshot with any compatible template). The commit path is a Launch (FD-T7); the *preview* half is cheap and could land alone. **Value:** High · **Effort:** Low-Medium (a `?template=` preview parameter + a chooser). **Disposition:** V1.1, first slice of FD-T7.
 
 ### FD-T9 · Brand kit auto-extraction (logo → palette)
@@ -255,7 +255,7 @@
 ### FD-B5 · Per-template customization presets
 **What:** save/reuse a theme+CSS set across a portfolio (pairs with [[FD-18]] client setup templates). **Why:** agency speed as the portfolio grows. **Source:** Phase B. **Value:** Medium (agency) · **Effort:** Medium. **Disposition:** Queued.
 
-### FD-18 · Client Setup Templates (clone a client setup)
+### FD-18 · ✅ IMPLEMENTED (Phase CP-1) — starter kits: save any client setup, apply fill-only-empty (structure+house-style, never facts/reviews); mig 0056 + agency routes + dashboard card. With [[FD-B5]] partially absorbed (kits carry palettes/voice).
 **What:** an agency clones a proven client configuration to stand up a new client fast (HighLevel-style "snapshots"). **Why:** compounds agency onboarding speed as the portfolio grows. **Source:** A9 competitive review (HighLevel/Duda). **Value:** Medium-High (agency) · **Effort:** Medium. **A9 decision:** Approve for future. **T2 elevation:** moved to the TOP of the V1.1 lane — verified zero reuse machinery exists; this is the agency-scaling multiplier (with [[FD-B5]]).
 
 ### FD-19 · Shared Comments on shared items

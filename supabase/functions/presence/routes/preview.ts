@@ -9,7 +9,7 @@
 // inlined so a lone HTML response is self-contained.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { getTemplate, renderSnapshot } from '../lib/render.ts';
+import { getTemplate, renderSnapshot, latestTemplateVersion } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { previewUrlMap } from '../lib/media.ts';
@@ -66,6 +66,19 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
     // preview is allowed while INVALID — clients need to see drafts — but blockers ride along in headers
     const v = validateSnapshot(snapshot, t.manifest);
     blockers = v.blockers.length; warnings = v.warnings.length;
+  }
+
+  // Phase CP-1 (FD-T8): try-another-look — render THIS snapshot with a different
+  // template, preview-only (nothing persisted; content untouched by architecture).
+  const tryTemplate = url.searchParams.get('template') || '';
+  if (tryTemplate && tryTemplate !== snapshot.template_slug) {
+    const v = latestTemplateVersion(tryTemplate);
+    const cand = v ? getTemplate(tryTemplate, v) : null;
+    if (!cand) return json({ error: 'bad_template', message: 'That look isn’t available.' }, 400, cors);
+    if (cand.manifest.content_contract_version !== snapshot.content_contract_version) {
+      return json({ error: 'incompatible_template', message: 'That look can’t show this content yet.' }, 400, cors);
+    }
+    snapshot = { ...snapshot, template_slug: tryTemplate, template_version: v! };
   }
 
   let fileMap;

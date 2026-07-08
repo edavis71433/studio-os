@@ -166,7 +166,7 @@ Ordered by value-per-effort:
 *Four personas walked customer-eyes-only (code-accurate simulation; human browser pass remains the visual confirmation). Verdict: the post-signup product CERTIFIES — drafted-for-you onboarding, calm honesty, no dead ends; blockers to launch are purely operational (activation, browser pass, front door). Implemented FD-R2 (workspace vocabulary + the preview /menu/ bug fix). See [PHASE-UX-JOURNEY-CERTIFICATION](PHASE-UX-JOURNEY-CERTIFICATION.md).*
 
 ### ⏸️ Strongest V1 — remaining build plan (Phase CP, AWAITING OWNER APPROVAL)
-*The Excellence Directive re-triage: see [PHASE-CP-UNIFIED-PORTAL-RECOMMENDATIONS](PHASE-CP-UNIFIED-PORTAL-RECOMMENDATIONS.md) — Tier 1 (14 items, required-before-launch) + Tier 2 (4, sequenced) + Future/Reject with stated reasons. Supersedes the parked-pickups list below (its items are absorbed as CP-4/5/6/7). Nothing implemented until approval.*
+*✅ **CP-1 SHIPPED** (kits + look-switcher + never-ask-twice). The Excellence Directive re-triage: see [PHASE-CP-UNIFIED-PORTAL-RECOMMENDATIONS](PHASE-CP-UNIFIED-PORTAL-RECOMMENDATIONS.md) — Tier 1 (14 items, required-before-launch) + Tier 2 (4, sequenced) + Future/Reject with stated reasons. Supersedes the parked-pickups list below (its items are absorbed as CP-4/5/6/7). Nothing implemented until approval.*
 
 ### 📌 Parked engineering pickups (come back after activation/QA — small, ready to build)
 *Owner-parked on purpose; each is scoped, verified, and queued in detail in the Feature Discovery Queue:*

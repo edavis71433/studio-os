@@ -194,7 +194,17 @@ function signedOut(){$('main').innerHTML=`<div class="center"><p class="big">Sig
       if(c.edition_flags&&c.edition_flags.hasWebsite===false){location.href=c.landing||'/today.html';return;}
     }catch(_){/* proceed with defaults */}
     try{const idn=await api('/identity');const bn=idn.body&&idn.body.data&&idn.body.data.business_name;if(bn)BIZ=bn;}catch(_){}
+    // Phase CP-1.3: never ask twice — if the studio already set this workspace up
+    // (a starter kit, pre-filled services, a chosen industry), start from THAT.
+    try{
+      const [set,off]=await Promise.all([api('/settings'),api('/offerings')]);
+      const ik=set.body&&set.body.data&&set.body.data.industry_key;
+      if(ik&&ik!=='generic'&&INDUSTRIES.some(i=>i.key===ik))INTAKE.industry=ik;
+      const names=((off.body&&off.body.data)||[]).map(o=>o.name).filter(Boolean).slice(0,8);
+      if(names.length){INTAKE.services=names;INTAKE.prepared=true;}
+    }catch(_){/* fresh workspace — defaults stand */}
     renderIntake();
+    if(INTAKE.prepared){const h=$('inds');if(h&&h.parentElement){const note=document.createElement('p');note.className='hint';note.textContent='Your studio started you off — these are already set up. Tweak anything, then continue.';h.parentElement.insertBefore(note,h);}}
   }catch(_){renderIntake();}
 })();
 </script>
