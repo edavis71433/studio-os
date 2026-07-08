@@ -63,7 +63,9 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 
 ### Release
 - **[Release Notes](RELEASE-NOTES.md)** — V1 release notes, full version history (M1 → L5.9 + Visual Studio), the **Technical Debt Register**, the **Version 1.1 Backlog**, and the **Owner/Production Activation Checklists**.
+- **[Full-System QA](FULL-SYSTEM-QA.md)** — the master QA pass (every area), the QA matrix, link audit, per-area reports, bug/fix logs, and the release recommendation.
 - **[QA-RELEASE-VERIFICATION](QA-RELEASE-VERIFICATION.md)** — the deep QA pass and its verdict.
+- **[Audit Findings Implementation](AUDIT-FINDINGS-IMPLEMENTATION.md)** — the Critical/High/Must-Before-QA findings and their resolution.
 - **[PRODUCT-FREEZE](PRODUCT-FREEZE.md)** — the feature-freeze audit.
 
 ### Per-subsystem deep dives (reference depth)
