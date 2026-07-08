@@ -1,5 +1,5 @@
 // ── L1 Self-Serve Signup & Commerce suite ───────────────────────────────────
-// Pure tiers (run anywhere): the commercial ladder (five rungs, ranks, self-
+// Pure tiers (run anywhere): the commercial ladder (seven rungs, ranks, self-
 // serve honesty, founder rate-lock math, monthly/annual pricing, edition
 // mapping, upgrade/downgrade rules) and the Stripe-subscription → entitlement
 // translation across every lifecycle state (active, past-due grace, voluntary
@@ -18,22 +18,27 @@ import {
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 
-// ═══ 1. the ladder — five rungs, honest self-serve boundary ═══
+// ═══ 1. the ladder — seven rungs (Phase D1 added CMS-Only + Business-OS-Only) ═══
 {
-  ok('catalog: exactly five rungs', PLANS.length === 5);
+  ok('catalog: exactly seven rungs', PLANS.length === 7);
   const keys = PLANS.map((p) => p.key);
-  ok('catalog: the constitution\'s rungs, in order', JSON.stringify(keys) === JSON.stringify(['presence_monitor', 'presence', 'presence_managed', 'agency', 'enterprise']));
+  ok('catalog: the rungs, in order', JSON.stringify(keys) === JSON.stringify(['presence_monitor', 'cms_only', 'business_os_only', 'presence', 'presence_managed', 'agency', 'enterprise']));
   const ranks = PLANS.map((p) => p.rank);
-  ok('catalog: ranks are 1..5, unique and ascending', JSON.stringify(ranks) === JSON.stringify([1, 2, 3, 4, 5]));
-  ok('catalog: Monitor/Presence/Managed are self-serve; Agency/Enterprise are not (§3.10/§3.11)',
+  ok('catalog: ranks are 1..7, unique and ascending', JSON.stringify(ranks) === JSON.stringify([1, 2, 3, 4, 5, 6, 7]));
+  ok('catalog: CMS-Only + Business-OS-Only are self-serve, priced, trial-eligible',
+    planByKey('cms_only').selfServe && planByKey('cms_only').monthly === 29 && planByKey('cms_only').founderMonthly === 24 && planByKey('cms_only').trialEligible &&
+    planByKey('business_os_only').selfServe && planByKey('business_os_only').monthly === 29 && planByKey('business_os_only').trialEligible);
+  ok('catalog: CMS-Only hosts a website (presence); Business-OS-Only does not (monitor)',
+    planByKey('cms_only').edition === 'presence' && planByKey('business_os_only').edition === 'monitor');
+  ok('catalog: Monitor/CMS/BusinessOS/Presence/Managed are self-serve; Agency/Enterprise are not (§3.10/§3.11)',
     planByKey('presence_monitor').selfServe && planByKey('presence').selfServe && planByKey('presence_managed').selfServe &&
     !planByKey('agency').selfServe && !planByKey('enterprise').selfServe);
   ok('catalog: self-serve plans expose a price; contact plans do not',
     selfServePlans().every((p) => p.monthly != null) && planByKey('agency').monthly === null && planByKey('enterprise').monthly === null);
-  ok('catalog: only Monitor/Presence are trial-eligible (Managed is concierge)',
+  ok('catalog: Monitor/CMS/BusinessOS/Presence are trial-eligible (Managed is concierge)',
     planByKey('presence_monitor').trialEligible && planByKey('presence').trialEligible && !planByKey('presence_managed').trialEligible);
   ok('catalog: every rung has a plain-language tagline + features', PLANS.every((p) => p.tagline.length > 10 && p.features.length >= 3));
-  ok('type guards: isPlanKey / isTerm', isPlanKey('presence') && !isPlanKey('nope') && isTerm('monthly') && isTerm('annual') && !isTerm('weekly'));
+  ok('type guards: isPlanKey / isTerm', isPlanKey('presence') && isPlanKey('cms_only') && isPlanKey('business_os_only') && !isPlanKey('nope') && isTerm('monthly') && isTerm('annual') && !isTerm('weekly'));
 }
 
 // ═══ 2. pricing — founder rate-lock + annual discount, no metered anything ═══
@@ -146,7 +151,7 @@ async function runIntegration({ SB_URL, SERVICE, ANON }) {
     // public: the catalog
     const plansR = await fetch(`${FN}/commerce/plans`, { headers: authH });
     const plans = await plansR.json();
-    iok('GET /commerce/plans is public and lists five rungs', plansR.status === 200 && plans?.data?.plans?.length === 5);
+    iok('GET /commerce/plans is public and lists seven rungs', plansR.status === 200 && plans?.data?.plans?.length === 7);
 
     // public: a Monitor trial signs up and provisions with no operator, no card
     const suR = await fetch(`${FN}/commerce/signup`, { method: 'POST', headers: authH, body: JSON.stringify({ email, password, business_name: 'L1 Acceptance Co', plan: 'presence_monitor', trial: true }) });

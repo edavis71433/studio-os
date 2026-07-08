@@ -22,6 +22,8 @@ import type { PlanKey } from './catalog.ts';
 interface PlanCapacity { generativeMonthly: number | null; allowsDrafting: boolean; }
 const CAPACITY: Record<PlanKey, PlanCapacity> = {
   presence_monitor:  { generativeMonthly: 15,   allowsDrafting: false }, // observational only; no draft-to-publish
+  cms_only:          { generativeMonthly: 60,   allowsDrafting: true },  // full website drafting, no Business-OS brains
+  business_os_only:  { generativeMonthly: 30,   allowsDrafting: false }, // intelligence only; no website drafting
   presence:          { generativeMonthly: 60,   allowsDrafting: true },
   presence_managed:  { generativeMonthly: null, allowsDrafting: true },  // concierge does the work
   agency:            { generativeMonthly: null, allowsDrafting: true },

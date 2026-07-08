@@ -6,8 +6,11 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
-### FD-D1 · Commercial rungs for CMS-Only & Business-OS-Only
-**What:** append `cms_only` + `business_os_only` to `commerce/catalog.ts` PLANS, widen the `presence_entitlements.plan` CHECK, and add the Stripe products, so the two new editions can be *purchased* (they already work end-to-end in the platform). **Why:** Phase D built the feature editions but left the frozen commercial catalog (DB check + `commerce_test` asserts 5 rungs) untouched by design. **Source:** Phase D. **Value:** High (to sell them) · **Effort:** Low-Medium (append + migration + Stripe). **Disposition:** Queued (V1 to sell).
+### FD-D1 · Commercial rungs for CMS-Only & Business-OS-Only — ✅ IMPLEMENTED (Phase D1)
+**What:** `cms_only` + `business_os_only` added to `commerce/catalog.ts` PLANS (self-serve, founder-priced $24/mo, trialable), the `presence_entitlements.plan` CHECK widened (migration 0049), no Stripe-dashboard config needed (dynamic `price_data`). Both live on staging+prod — `/commerce/plans` lists 7. **Delivered in Phase D1.** See [PHASE-D1-COMMERCIAL-ACTIVATION](PHASE-D1-COMMERCIAL-ACTIVATION.md). **Disposition:** Done.
+
+### FD-D4 · Coupons / promotional codes
+**What:** wire Stripe promotion codes into Checkout for future promos. **Why:** promotional pricing without touching the catalog. **Source:** Phase D1. **Value:** Medium · **Effort:** Low-Medium. **Disposition:** Queued (V1.1).
 
 ### FD-D2 · Self-serve upgrade/downgrade UI
 **What:** a plan-change screen driven by `featureDelta` — preview gained/lost before confirming; data-preserved messaging. **Why:** makes the upgrade path a delightful moment; the math already exists. **Source:** Phase D. **Value:** Medium · **Effort:** Medium. **Disposition:** Queued (V1.1).

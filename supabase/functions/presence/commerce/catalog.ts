@@ -12,7 +12,7 @@
 // The five rungs map onto the two machine-real dimensions that already exist:
 //   plan  → an entitlement column (0036)   edition → a presence_sites column (0031)
 
-export type PlanKey = 'presence_monitor' | 'presence' | 'presence_managed' | 'agency' | 'enterprise';
+export type PlanKey = 'presence_monitor' | 'cms_only' | 'business_os_only' | 'presence' | 'presence_managed' | 'agency' | 'enterprise';
 export type Term = 'monthly' | 'annual';
 export type Edition = 'monitor' | 'presence';
 
@@ -56,18 +56,40 @@ export const PLANS: readonly PlanDef[] = [
     ],
   },
   {
-    key: 'presence', rank: 2, name: 'Presence', edition: 'presence',
+    key: 'cms_only', rank: 2, name: 'CMS', edition: 'presence',
+    tagline: 'A website that stays correct — structured, versioned, and yours.',
+    selfServe: true, trialEligible: true, monthly: 29, founderMonthly: 24,
+    features: [
+      'Managed hosting, SSL, and your custom domain — all handled',
+      'Structured content published with one calm ritual',
+      'Every version kept and restorable; the site never lies',
+      'Developer Mode available — customize safely, still approval-first',
+    ],
+  },
+  {
+    key: 'business_os_only', rank: 3, name: 'Business OS', edition: 'monitor',
+    tagline: 'Know your business at a glance — moments, connections, relationships.',
+    selfServe: true, trialEligible: true, monthly: 29, founderMonthly: 24,
+    features: [
+      'Business Moments: plain-language nudges when something needs you',
+      'Connect the services you already use — read your own data, safely',
+      'A calm relationship view of your accounts',
+      'Guidance in sentences, never scores — no website editing needed',
+    ],
+  },
+  {
+    key: 'presence', rank: 4, name: 'Presence', edition: 'presence',
     tagline: 'A website that stays correct — without becoming your hobby.',
     selfServe: true, trialEligible: true, monthly: 49, founderMonthly: 39,
     features: [
-      'Managed hosting, SSL, and your custom domain — all handled',
+      'Everything in CMS and Business OS, as one operating system',
       'Your business facts in one place, published with one calm ritual',
       'Every version kept and restorable; the site never lies',
       'Guidance that watches with you, in sentences, never scores',
     ],
   },
   {
-    key: 'presence_managed', rank: 3, name: 'Presence Managed', edition: 'presence',
+    key: 'presence_managed', rank: 5, name: 'Presence Managed', edition: 'presence',
     tagline: 'We keep it right for you — a real person watching alongside the system.',
     selfServe: true, trialEligible: false, monthly: 149, founderMonthly: 119,
     features: [
@@ -78,7 +100,7 @@ export const PLANS: readonly PlanDef[] = [
     ],
   },
   {
-    key: 'agency', rank: 4, name: 'Agency', edition: 'presence',
+    key: 'agency', rank: 6, name: 'Agency', edition: 'presence',
     tagline: 'Sell the outcome we sell — under your name, on our pipeline.',
     selfServe: false, trialEligible: false, monthly: null, founderMonthly: null,
     features: [
@@ -89,7 +111,7 @@ export const PLANS: readonly PlanDef[] = [
     ],
   },
   {
-    key: 'enterprise', rank: 5, name: 'Enterprise', edition: 'presence',
+    key: 'enterprise', rank: 7, name: 'Enterprise', edition: 'presence',
     tagline: 'Every location correct, every publish governed, one source of truth.',
     selfServe: false, trialEligible: false, monthly: null, founderMonthly: null,
     features: [
