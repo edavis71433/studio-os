@@ -45,6 +45,9 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 - **[Environment & Secrets](ENV-AND-SECRETS.md)** — every variable, required vs optional, per environment.
 - **[Testing](V1-SYSTEM-REFERENCE.md#testing)** — how the 44 suites run (pure + live-staging integration).
 
+### Frontend / Browser
+- **[Browser Platform Completion](BROWSER-PLATFORM-COMPLETION.md)** — the frontend/UX/a11y/performance/security review of the customer browser app, the browser risk register, and the completion checklist (Must-Before-QA / Recommended / V1.1).
+
 ### Operations
 - **[Operations & Production Readiness](OPERATIONS-PRODUCTION-READINESS.md)** — the SRE/DevOps audit: monitoring, alerting, backups/DR, reliability, security ops, the Infrastructure Risk Register, and the production/launch checklists.
 - **[Deployment & Operations](DEPLOYMENT-AND-OPERATIONS.md)** — deploy technique (function + migration hold-back), monitoring, logging, backups, rollback, disaster recovery, maintenance, production checklist.
