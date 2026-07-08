@@ -98,7 +98,7 @@ Validate every customer journey · Pricing flows · **Demo flows** · **Booking 
 ### Phase U-INF — Infrastructure Experience (audited ✅ — already substantially built)
 *Phase U audit verdict: the invisibility ideal is largely SHIPPED — Foundations Desk (plain-words domain/DNS/SSL/email/hosting), desired-zone DNS with versioning+rollback, changes as approval plans, Launch Assistant, auto SSL/CDN. No competitor pairs plain-language DNS with approval-gated changes. Remaining = integrations, all V1.1: FD-INF1 buy-domain · FD-INF2 registrar-aware connect · FD-INF3 expiry watching · FD-INF4 agency bulk views. No V1 implementation warranted. See [PHASE-U-INFRASTRUCTURE-AUDIT](PHASE-U-INFRASTRUCTURE-AUDIT.md).*
 
-### Phase S — Security & Engineering Hardening  ·  ➕ ADDED (missing from the roadmap)
+### Phase S — Security & Engineering Hardening  ·  ✅ IMPLEMENTED (rate limiting live; svc audit clean)  ·  ➕ ADDED (missing from the roadmap)
 *The roadmap has no backend-quality/security-hardening phase. These are real pre-scale items, not features.*
 - **`svc()` id-scope audit** — confirm every service-role query taking a request-supplied id filters by tenant/site/org. Service role bypasses RLS; one missing filter is a cross-tenant leak. Do this once, deliberately, before real tenants. (Was B6 on the Launch Board.)
 - **Hardened HTML sanitizer for Developer Mode (FD-B2)** — the current denylist regex is fine for trusted developers; replace with an allow-list parser + a published-site CSP *before* custom-HTML authoring broadens.

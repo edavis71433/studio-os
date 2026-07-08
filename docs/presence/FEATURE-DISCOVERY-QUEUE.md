@@ -9,7 +9,7 @@
 ### FD-M1 · Auto-draft the starter site at first-run — ✅ IMPLEMENTED (Phase I)
 **Built:** `get-started.html` guided first-run — a 2-question intake (industry + smart-default services + one line) → the EXISTING `starter_site` writer (`/writer/generate`) → auto-apply the single option to the DRAFT (never published) → review/preview/publish through the existing approval-first flow; graceful "set it up together" fallback when AI is off. Wired from signup + welcome. Pure core `lib/onboarding.ts` (onboarding_test 18/18). See [PHASE-I-GUIDED-ONBOARDING](PHASE-I-GUIDED-ONBOARDING.md). **Disposition:** Done (needs `ANTHROPIC_KEY` active + browser QA).
 
-### FD-M2 · Rate limiting on public endpoints (forms submit + signup)
+### FD-M2 · ✅ IMPLEMENTED (Phase S) — rate limiting on public endpoints
 **What:** `POST /forms/:id/submit` and `POST /commerce/signup` are public and have **no rate limiting** (no rate-limit helper in code, though a table exists). Add a lightweight per-IP/site throttle. **Why:** abuse/spam protection for the new public surface the forms feature created. **Source:** Phase-M deep-dive (verified). **Value:** High (security) · **Effort:** Low-Medium. **Disposition:** V1 (fold into roadmap Phase S).
 
 ### FD-M3 · Legal pages on published customer sites (privacy + cookie)
@@ -84,6 +84,24 @@
 
 ### FD-T12 · Section ordering as structured data
 **What:** let the member reorder a page's *sections* (an ordered list of structured blocks — `category_order` already proves the pattern). NOT free-form layout; order is data, render stays deterministic. **Value:** Medium (the safe half of "layout control") · **Effort:** Low-Medium. **Disposition:** V1.1 (with FD-T5 component realization).
+
+### FD-S1 · Load-verify real p95 / cold-start / bundle size
+**What:** measure /observe + full pipeline p95 on a large live site; check edge cold-start + bundle. **Source:** Phase S. **Value:** Med · **Effort:** Low. **Disposition:** V1 owner-activation (measurement, not code).
+
+### FD-S2 · Function-error metrics + alerting
+**What:** wire error metrics + alerting (external monitor) to the deployed function. **Source:** Phase S. **Disposition:** V1 owner-activation.
+
+### FD-S3 · Scheduled dependency-vulnerability audit
+**What:** a CI cadence that flags vulnerable deps. **Source:** Phase S. **Disposition:** V1.1.
+
+### FD-S4 · Reconcile migration history (retire the hold-back ritual)
+**What:** make a single migration apply without moving 0003-0005/0020-0035 aside. **Source:** Phase S (= B5). **Value:** Med (safety) · **Effort:** Med. **Disposition:** V1.1.
+
+### FD-S5 · CI gate on the test suite
+**What:** one command runs every suite; green required per push (wrap the local $TMPDIR runner). **Source:** Phase S. **Disposition:** V1.1.
+
+### FD-S6 · Sliding-window rate limiter
+**What:** upgrade the fixed-window limiter to sliding-window for smoother fairness. **Source:** Phase S. **Value:** Low · **Disposition:** Future (fixed-window is fine for V1).
 
 ### FD-INF1 · In-product domain purchase (registrar/reseller integration)
 **What:** buy + auto-connect + renew a domain inside Studio OS (reseller API; renewal billed through the platform). **Why:** the single biggest "own a website, not a hosting account" completer — every builder has it; today Studio OS is connect-only. **Source:** Phase U infra audit. **Value:** High · **Effort:** High. **Disposition:** V1.1+.

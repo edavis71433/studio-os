@@ -15,6 +15,7 @@
 //   POST /commerce/first-run/dismiss(authed)  dismiss the welcome
 import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
+import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import {
@@ -57,6 +58,8 @@ function handlePlans(cors: Record<string, string>) {
 
 // ── PUBLIC: signup ──────────────────────────────────────────────────────────
 async function handleSignup(req: Request, cors: Record<string, string>) {
+  // Phase S / FD-M2: throttle account creation per-IP (brute-force + abuse guard).
+  if (!(await rateAllow(`signup:ip:${clientIp(req)}`, 5, 60))) return tooMany(cors);
   let body: any = null;
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
 

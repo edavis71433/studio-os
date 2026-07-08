@@ -4,6 +4,7 @@
 // approval decide logic. No new architecture.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { getTemplate } from '../lib/render.ts';
@@ -78,6 +79,11 @@ export async function handleScheduleCancel(site: SiteRow, id: string, principal:
 export async function handleFormSubmit(req: Request, siteId: string, cors: Record<string, string>) {
   const ok200 = (msg: string) => json({ data: { ok: true, message: msg } }, 200, cors); // always 200 to bots
   if (!/^[0-9a-f-]{36}$/.test(siteId)) return json({ error: 'not_found' }, 404, cors);
+
+  // Phase S / FD-M2: throttle the public submit — per-IP and per-site fixed windows.
+  // A bot that ignores the honeypot is still capped; a real visitor is nowhere near it.
+  const rlIp = clientIp(req);
+  if (!(await rateAllow(`forms:ip:${rlIp}`, 10, 60)) || !(await rateAllow(`forms:site:${siteId}`, 60, 60))) return tooMany(cors);
 
   // Phase V FD-N1: the published template posts a plain HTML form (urlencoded).
   // Accept both encodings; browser form posts get a 303 redirect to the site's
@@ -181,6 +187,8 @@ export async function handleApproveSend(site: SiteRow, principal: Principal, cor
 
 /** PUBLIC — the one-tap page reads the pending item from a signed token. */
 export async function handleApproveGet(req: Request, cors: Record<string, string>) {
+  // Phase S / FD-M2: throttle the public token endpoint (guards against token-guessing).
+  if (!(await rateAllow(`approve:ip:${clientIp(req)}`, 20, 60))) return tooMany(cors);
   const token = new URL(req.url).searchParams.get('token') || '';
   const v = await verifyApprovalToken(token, APPROVAL_SECRET, Math.floor(Date.now() / 1000));
   if (!v.ok) return json({ error: v.error, message: linkMsg(v.error) }, 400, cors);
@@ -192,6 +200,7 @@ export async function handleApproveGet(req: Request, cors: Record<string, string
 
 /** PUBLIC — apply the client's decision through the existing approval spine. */
 export async function handleApprovePost(req: Request, cors: Record<string, string>) {
+  if (!(await rateAllow(`approve:ip:${clientIp(req)}`, 20, 60))) return tooMany(cors);
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
   const v = await verifyApprovalToken(String(b?.token || ''), APPROVAL_SECRET, Math.floor(Date.now() / 1000));
   if (!v.ok) return json({ error: v.error, message: linkMsg(v.error) }, 400, cors);
