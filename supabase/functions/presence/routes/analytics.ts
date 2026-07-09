@@ -17,9 +17,18 @@ import { gather } from '../agency/routes.ts';
 import { buildPortfolio } from '../agency/portfolio.ts';
 import {
   inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights,
-  periodWord, type Period,
+  trafficInsights, trafficNotice, periodWord, type Period,
 } from '../analytics/compose.ts';
+import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
 import type { SiteRow } from '../lib/site.ts';
+
+const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
+/** Load recent visit rows for a site over the current + prior window (for trend). */
+async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRow[]> {
+  const startIso = new Date(nowMs - 2 * periodDays(period) * 86_400_000).toISOString();
+  const r = await svc(`presence_visits?site_id=eq.${siteId}&ts=gte.${startIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`);
+  return (Array.isArray((r as any).json) ? (r as any).json : []) as VisitRow[];
+}
 
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
 const periodOf = (req: Request): Period => (new URL(req.url).searchParams.get('period') === 'month' ? 'month' : 'week');
@@ -36,6 +45,8 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
   const period = periodOf(req);
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
+  const visits = await loadVisits(site.id, period, nowMs);
+  const traffic = aggregateVisits(visits, nowMs, periodDays(period));
   const [subsR, pubsR, lastChangeR, momentsR, firstPubR, firstLeadR, identR, entR, metaR, conn] = await Promise.all([
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,form_kind,status&order=created_at.desc&limit=500`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.desc&limit=200`),
@@ -65,10 +76,12 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
   // ── journey (reuse the existing pure timeline) ──
   const ent = arr(entR)[0] || {};
   const verification = arr(identR)[0]?.settings?.verification;
+  const firstVisitorAt = [...visits].reverse().find((v) => v.kind === 'pageview')?.ts || null; // earliest in window (approx)
   const journey = buildTimeline({
     createdAt: arr(metaR)[0]?.created_at || nowIso,
     firstPublishedAt: arr(firstPubR)[0]?.completed_at || arr(firstPubR)[0]?.created_at || null,
     searchVerified: !!(verification && (verification.google || verification.bing)),
+    firstVisitorAt,
     firstInquiryAt: arr(firstLeadR)[0]?.created_at || null,
     firstCustomerAt: ent.status === 'active' ? (ent.created_at || null) : null,
     renewsAt: ent.current_period_end || null,
@@ -90,13 +103,20 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
     domainExpiringDays: null,
   }, nowIso);
 
+  // AN-2: real first-party traffic now leads the story; the traffic "not measured"
+  // card is gone (we measure it ourselves) — only Search (GSC) may remain honest.
+  const trafficCards = trafficInsights(traffic, period);
+  const notice = trafficNotice(traffic);
+  const watching = arr(momentsR).map((m) => ({ headline: m.headline, summary: m.summary, moment_type: m.moment_type }));
+  if (notice) watching.unshift({ ...notice, moment_type: 'celebration' });
+
   return json({ data: {
     period,
     headline: `Here’s how your business is doing this ${periodWord(period)}.`,
-    insights: [inquiries, publishing, ...(milestone ? [milestone] : [])],
+    insights: [...trafficCards, inquiries, publishing, ...(milestone ? [milestone] : [])],
     health: { sentence: health.headline, status: health.status, suggestions: (health.suggestions || []).slice(0, 3) },
-    watching: arr(momentsR).map((m) => ({ headline: m.headline, summary: m.summary, moment_type: m.moment_type })),
-    not_measured: notMeasured(conn.ga, conn.gsc),
+    watching,
+    not_measured: conn.gsc ? [] : notMeasured(true, false),   // traffic is first-party now; only Search may need connecting
   } }, 200, cors);
 }
 
@@ -116,6 +136,22 @@ export async function handleAnalyticsCustomers(req: Request, site: SiteRow, cors
   // Honest note: without a contact identity/orders table there is no truthful
   // "repeat customer" or "conversion" figure — we do not invent one.
   return json({ data: { period, inquiries, by_kind: byKind, total_all_time: subs.length, unread, recent, note: 'Studio OS counts inquiries — everyone who reached out. Repeat-customer and revenue figures aren’t tracked yet.' } }, 200, cors);
+}
+
+// ── AN-2: the Website view — real first-party traffic (honest empty state) ────
+export async function handleAnalyticsWebsite(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const period = periodOf(req);
+  const nowMs = Date.now();
+  const visits = await loadVisits(site.id, period, nowMs);
+  const agg = aggregateVisits(visits, nowMs, periodDays(period));
+  return json({ data: {
+    period,
+    insights: trafficInsights(agg, period),
+    visitors: agg.visitors, pageviews: agg.pageviews,
+    top_pages: agg.topPages, top_sources: agg.topSources, devices: agg.devices, countries: agg.countries,
+    events: agg.events,
+    has_data: agg.hasData,
+  } }, 200, cors);
 }
 
 export async function handleAnalyticsSearch(_req: Request, site: SiteRow, cors: Record<string, string>) {
@@ -148,11 +184,18 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const siteIds = await agencySiteIds(member.agency_id);
   if (!siteIds.length) return json({ data: { headline: 'No clients yet.', insights: [] } }, 200, cors);
   const nowIso = new Date().toISOString();
+  const nowMs = Date.parse(nowIso);
   const input = await gather(member.agency_id, nowIso);
   const portfolio = buildPortfolio(input);
+  // AN-2.4: per-client visitor counts (this week) — one bounded query, aggregated
+  // in code; reuses the same visits store (no duplicate aggregation).
+  const sinceIso = new Date(nowMs - 7 * 86_400_000).toISOString();
+  const vr = await svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&limit=20000`);
+  const perSite = new Map<string, Set<string>>();
+  for (const v of arr(vr)) { const s = perSite.get(v.site_id) || new Set<string>(); s.add(v.visitor_hash || String(Math.random())); perSite.set(v.site_id, s); }
   const { headline, insights } = portfolioInsights(
-    (portfolio || []).map((c: any) => ({ name: c.name, leads_waiting: c.leads_waiting, unpublished_changes: c.unpublished_changes, last_published_at: c.last_published_at, attention: c.attention })),
-    Date.parse(nowIso),
+    (portfolio || []).map((c: any) => ({ name: c.name, leads_waiting: c.leads_waiting, unpublished_changes: c.unpublished_changes, last_published_at: c.last_published_at, attention: c.attention, visitors: (perSite.get(c.site_id) || new Set()).size })),
+    nowMs,
   );
   return json({ data: { headline, insights, client_count: siteIds.length } }, 200, cors);
 }

@@ -19,8 +19,9 @@ export function windowCounts(isoTimes: Array<string | null | undefined>, nowMs: 
     if (!t) continue;
     const ms = Date.parse(t);
     if (Number.isNaN(ms)) continue;
-    if (ms > curStart && ms <= nowMs) current++;
-    else if (ms > priorStart && ms <= curStart) prior++;
+    // no upper bound on "current": clock skew must not drop a just-created row
+    if (ms > curStart) current++;
+    else if (ms > priorStart) prior++;
   }
   return { current, prior };
 }
@@ -101,14 +102,70 @@ export function searchReadinessInsight(x: { verified: boolean; titleSet: boolean
   return { key: 'search_readiness', title: 'Getting found', sentence, detail: x.sitemap ? 'Your sitemap is published for search engines.' : '', href: '/presence.html#business', tone };
 }
 
+// ── AN-2: first-party traffic, in plain English (real data now) ───────────────
+// Structural param (no import) so compose.ts stays dependency-free (AN-9 guard).
+export interface TrafficAgg {
+  visitors: number; priorVisitors: number; pageviews: number;
+  topPages: Array<{ path: string; views: number }>;
+  topSources: Array<{ source: string; visits: number }>;
+  devices: Array<{ device: string; share: number }>;
+  events: { phone: number; email: number; cta: number; download: number };
+  hasData: boolean;
+}
+const prettyPath = (p: string) => {
+  if (p === '/' || p === '') return 'your home page';
+  const seg = p.replace(/^\/|\/$/g, '').split('/')[0].replace(/-/g, ' ');
+  return `your ${seg} page`;
+};
+
+/** Visitor + page + source + engagement sentences. Empty when there's no data yet
+ *  (honest — never a fabricated number). AN-2.3/2.5. */
+export function trafficInsights(agg: TrafficAgg, period: Period): Insight[] {
+  const w = periodWord(period);
+  if (!agg.hasData) return [{ key: 'traffic', title: 'Website visitors', sentence: `No visits recorded yet this ${w} — once your site is published and shared, visitor numbers show up here.`, number: 0, href: '/presence.html#publish', tone: 'neutral' }];
+  const out: Insight[] = [];
+  out.push({ key: 'traffic', title: 'Website visitors', sentence: `${agg.visitors} ${agg.visitors === 1 ? 'person' : 'people'} visited your website this ${w}${trendPhrase(agg.visitors, agg.priorVisitors, w)}.`, number: agg.visitors, detail: `${agg.pageviews} page views in all.`, href: '/analytics.html', tone: 'good' });
+  if (agg.topSources.length) { const s = agg.topSources[0]; out.push({ key: 'source', title: 'Where they come from', sentence: `Most visitors arrive from ${s.source}.`, detail: agg.topSources.slice(1, 3).map((x) => x.source).join(' and ') ? `Then ${agg.topSources.slice(1, 3).map((x) => x.source).join(' and ')}.` : '', tone: 'neutral' });
+  }
+  if (agg.topPages.length) { const p = agg.topPages[0]; out.push({ key: 'top_page', title: 'What they look at', sentence: `${prettyPath(p.path).replace(/^your/, 'Your')} is getting the most attention.`, number: p.views, tone: 'neutral' }); }
+  const clicks = agg.events.phone + agg.events.email;
+  if (clicks > 0) out.push({ key: 'contact_clicks', title: 'Reaching out', sentence: `Visitors tapped to call or email you ${clicks} ${clicks === 1 ? 'time' : 'times'} this ${w}.`, number: clicks, detail: agg.events.phone ? `${agg.events.phone} tapped your phone number.` : '', tone: 'good' });
+  return out;
+}
+
+/** A traffic "moment" — only on a MEANINGFUL change, never daily noise (AN-2.7). */
+export function trafficNotice(agg: TrafficAgg): { headline: string; summary: string } | null {
+  if (!agg.hasData || agg.visitors < 12) return null;         // too small to be meaningful
+  if (agg.priorVisitors >= 4 && agg.visitors >= agg.priorVisitors * 2) {
+    return { headline: 'More people are finding you.', summary: `Visitors roughly doubled — ${agg.priorVisitors} to ${agg.visitors}.` };
+  }
+  const s = agg.topSources[0];
+  if (s && /google/i.test(s.source) && agg.topSources.length > 1 && s.visits >= agg.visitors * 0.6) {
+    return { headline: 'Google is becoming your biggest source.', summary: `Most of this ${'period'} run of visitors came from Google search.` };
+  }
+  return null;
+}
+
+/** Visitor milestones for the Customer Journey (AN-2.6). Pure. */
+export function visitorMilestones(totalVisitorsAllTime: number, firstVisitorAt: string | null): Array<{ key: string; label: string; achieved: boolean; note: string }> {
+  return [
+    { key: 'first_visitor', label: 'First visitor', achieved: !!firstVisitorAt, note: firstVisitorAt ? 'Someone visited your website for the first time. 🎉' : 'Your first visitor will show up here.' },
+    { key: 'hundred_visitors', label: 'First 100 visitors', achieved: totalVisitorsAllTime >= 100, note: totalVisitorsAllTime >= 100 ? 'Over 100 people have visited your website. 🎉' : `${totalVisitorsAllTime} of your first 100 visitors so far.` },
+  ];
+}
+
 /** Agency portfolio, in plain English — composes buildPortfolio rows (AN-7). Pure. */
-export interface PortfolioClientLite { name?: string; leads_waiting?: number; unpublished_changes?: boolean; last_published_at?: string | null; attention?: number; }
+export interface PortfolioClientLite { name?: string; leads_waiting?: number; unpublished_changes?: boolean; last_published_at?: string | null; attention?: number; visitors?: number; }
 export function portfolioInsights(clients: PortfolioClientLite[], nowMs: number): { headline: string; insights: Insight[] } {
   const total = clients.length;
   const withLeads = clients.filter((c) => (c.leads_waiting || 0) > 0);
   const needAttention = clients.filter((c) => (c.attention || 0) > 0);
   const stale = clients.filter((c) => c.last_published_at && (nowMs - Date.parse(c.last_published_at)) > 30 * 86_400_000);
+  const growing = clients.filter((c) => (c.visitors || 0) > 0).sort((a, b) => (b.visitors || 0) - (a.visitors || 0));
+  const trafficNoInquiry = clients.filter((c) => (c.visitors || 0) >= 15 && (c.leads_waiting || 0) === 0 && !c.unpublished_changes);
   const insights: Insight[] = [];
+  if (growing.length) insights.push({ key: 'traffic', title: 'Getting visitors', sentence: `${growing.length} of your ${total} clients had website visitors recently.`, number: growing.length, detail: `Busiest: ${growing.slice(0, 3).map((c) => `${c.name || 'a client'} (${c.visitors})`).join(', ')}.`, tone: 'good' });
+  if (trafficNoInquiry.length) insights.push({ key: 'traffic_no_inquiries', title: 'Traffic, no inquiries', sentence: `${trafficNoInquiry.length} ${trafficNoInquiry.length === 1 ? 'client is' : 'clients are'} getting visitors but no inquiries — their contact path may be worth a look.`, number: trafficNoInquiry.length, detail: trafficNoInquiry.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'attention' });
   if (withLeads.length) insights.push({ key: 'growing', title: 'New inquiries', sentence: `${withLeads.length} of your ${total} clients ${withLeads.length === 1 ? 'has' : 'have'} new inquiries waiting.`, number: withLeads.length, detail: withLeads.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'good' });
   if (needAttention.length) insights.push({ key: 'attention', title: 'Needs attention', sentence: `${needAttention.length} ${needAttention.length === 1 ? 'client needs' : 'clients need'} a look.`, number: needAttention.length, detail: needAttention.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'attention' });
   if (stale.length) insights.push({ key: 'quiet', title: 'Gone quiet', sentence: `${stale.length} ${stale.length === 1 ? 'client hasn’t' : 'clients haven’t'} published in over a month.`, number: stale.length, detail: stale.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'attention' });

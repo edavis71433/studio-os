@@ -42,7 +42,8 @@ import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
 import { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney, handleCoachMemory } from './routes/coach.ts';
-import { handleAnalyticsHome, handleAnalyticsCustomers, handleAnalyticsSearch, handleAnalyticsPortfolio } from './routes/analytics.ts';
+import { handleAnalyticsHome, handleAnalyticsWebsite, handleAnalyticsCustomers, handleAnalyticsSearch, handleAnalyticsPortfolio } from './routes/analytics.ts';
+import { handleCollect } from './routes/collect.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
@@ -106,6 +107,12 @@ serve(async (req) => {
   {
     const m = route.match(/^\/forms\/([0-9a-f-]{36})\/submit$/);
     if (m && method === 'POST') return handleFormSubmit(req, m[1], cors);
+  }
+  // ── AN-2: the first-party analytics collector — PUBLIC, pre-auth, authorized
+  //    by the site id itself. Privacy-first, bot-dropping, always 204. ──
+  {
+    const m = route.match(/^\/px\/([0-9a-f-]{36})$/);
+    if (m && method === 'POST') return handleCollect(req, m[1], cors);
   }
   if (route === '/approve' && method === 'GET') return handleApproveGet(req, cors);
   if (route === '/approve' && method === 'POST') return handleApprovePost(req, cors);
@@ -438,6 +445,7 @@ serve(async (req) => {
   // ── AN-1: Analytics — plain-English understanding composed from stored signals
   //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
   if (route === '/analytics' && method === 'GET') return handleAnalyticsHome(req, site, cors);
+  if (route === '/analytics/website' && method === 'GET') return handleAnalyticsWebsite(req, site, cors);
   if (route === '/analytics/customers' && method === 'GET') return handleAnalyticsCustomers(req, site, cors);
   if (route === '/analytics/search' && method === 'GET') return handleAnalyticsSearch(req, site, cors);
 

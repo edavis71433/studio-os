@@ -71,7 +71,7 @@ ok('searchReadiness: broken links flagged', /point somewhere broken/.test(search
   const composeSrc = await Deno.readTextFile(new URL('../../supabase/functions/presence/analytics/compose.ts', import.meta.url));
   const banned = /(writer\/model|anthropic|openai|concierge|runEvidence|runJudgment|runRecommendation|runMoments|runGrowthCoach)/;
   ok('AN-9: routes/analytics.ts imports no AI/model/engine-run (reads stored rows only)', !banned.test(routeSrc));
-  ok('AN-9: analytics/compose.ts is pure (no AI, no imports)', !banned.test(composeSrc) && !/\bimport\b/.test(composeSrc));
+  ok('AN-9: analytics/compose.ts is pure (no AI, no import statements)', !banned.test(composeSrc) && !/^\s*import\s/m.test(composeSrc));
 }
 
 const passed = results.filter((r) => r.p).length;

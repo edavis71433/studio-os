@@ -3,13 +3,14 @@
 // indexed (search verification present), first inquiry (first non-spam form
 // submission), first customer (entitlement active), and the upcoming renewal.
 // It celebrates what's been reached and shows what's next — a rewarding arc, not
-// a scoreboard. "First visitor" needs analytics we don't collect yet (honest —
-// arrives with GSC/analytics), so it isn't faked here.
+// a scoreboard. AN-2: first-party analytics now measure visitors, so "First
+// visitor" is a real, un-faked milestone.
 
 export interface JourneySignals {
   createdAt: string;
   firstPublishedAt: string | null;
   searchVerified: boolean;
+  firstVisitorAt: string | null;    // AN-2: first recorded website visit (real, not faked)
   firstInquiryAt: string | null;
   firstCustomerAt: string | null;   // entitlement became active / first paid
   renewsAt: string | null;
@@ -27,6 +28,7 @@ const ORDER: Array<{ key: string; label: string; pick: (s: JourneySignals) => { 
   { key: 'created', label: 'Your presence began', pick: (s) => ({ at: s.createdAt, done: true }), done: 'Your workspace was created — the journey starts here.', next: '' },
   { key: 'published', label: 'First published', pick: (s) => ({ at: s.firstPublishedAt, done: !!s.firstPublishedAt }), done: 'Your website went live for the first time. 🎉', next: 'Publish when you’re ready — this is the big one.' },
   { key: 'indexed', label: 'Findable on search', pick: (s) => ({ at: s.searchVerified ? s.firstPublishedAt : null, done: s.searchVerified }), done: 'Search engines can see your site.', next: 'Once you’re verified, search engines start listing you.' },
+  { key: 'first_visitor', label: 'First visitor', pick: (s) => ({ at: s.firstVisitorAt, done: !!s.firstVisitorAt }), done: 'Someone visited your website for the first time. 🎉', next: 'Your first visitor will show up here once your site is live and shared.' },
   { key: 'first_inquiry', label: 'First inquiry', pick: (s) => ({ at: s.firstInquiryAt, done: !!s.firstInquiryAt }), done: 'Someone reached out through your website. 🎉', next: 'Your first message from a visitor will land here.' },
   { key: 'first_customer', label: 'First customer', pick: (s) => ({ at: s.firstCustomerAt, done: !!s.firstCustomerAt }), done: 'You’re up and running with Studio OS. 🎉', next: '' },
   { key: 'renewal', label: 'One year strong', pick: (s) => ({ at: s.renewsAt, done: false }), done: '', next: 'Your first renewal — a full year of being found.' },

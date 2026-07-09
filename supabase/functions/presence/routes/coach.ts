@@ -74,9 +74,10 @@ export async function handleCoachHealth(site: SiteRow, cors: Record<string, stri
 // ── PT-7: the Customer Timeline — the business journey, from existing events ──
 export async function handleCoachJourney(site: SiteRow, cors: Record<string, string>) {
   const nowIso = new Date().toISOString();
-  const [firstPub, firstLead, ident, ent, meta] = await Promise.all([
+  const [firstPub, firstLead, firstVisit, ident, ent, meta] = await Promise.all([
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.asc&limit=1`),
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at&order=created_at.asc&limit=1`),
+    svc(`presence_visits?site_id=eq.${site.id}&kind=eq.pageview&select=ts&order=ts.asc&limit=1`),
     svc(`presence_identity?site_id=eq.${site.id}&select=settings&limit=1`),
     site.client_id ? svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=status,created_at,current_period_end&limit=1`) : Promise.resolve({ json: [] }),
     svc(`presence_sites?id=eq.${site.id}&select=created_at&limit=1`),
@@ -88,6 +89,7 @@ export async function handleCoachJourney(site: SiteRow, cors: Record<string, str
     createdAt: arr(meta)[0]?.created_at || nowIso,
     firstPublishedAt: arr(firstPub)[0]?.completed_at || arr(firstPub)[0]?.created_at || null,
     searchVerified: !!(verification && (verification.google || verification.bing)),
+    firstVisitorAt: arr(firstVisit)[0]?.ts || null,
     firstInquiryAt: arr(firstLead)[0]?.created_at || null,
     firstCustomerAt: e.status === 'active' ? (e.created_at || null) : null,
     renewsAt: e.current_period_end || null,

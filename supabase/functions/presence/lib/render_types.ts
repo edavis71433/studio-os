@@ -14,6 +14,8 @@ export interface SiteConfig {
   brand?: { credit?: string };
   /** inquiry-form endpoint; when absent the contact page renders a mailto CTA (M5 wires it) */
   formEndpoint?: string;
+  /** AN-2: the site id, baked into the injected first-party analytics tracker. */
+  siteId?: string;
 }
 
 export interface HoursInterval { open: string; close: string }

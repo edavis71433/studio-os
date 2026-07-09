@@ -82,6 +82,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const fnBase = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
   const siteCfg = {
     baseUrl: site.custom_domain ? `https://${site.custom_domain}` : `https://${site.netlify_site_id}.netlify.app`,
+    siteId: site.id,   // AN-2: baked into the injected first-party analytics tracker
     ...(fnBase ? { formEndpoint: `${fnBase}/functions/v1/presence/forms/${site.id}/submit` } : {}),
   };
   let fileMap: Record<string, string | Uint8Array>;

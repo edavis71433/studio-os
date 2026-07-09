@@ -9,6 +9,7 @@ import { render as businessClassic_1_0_0 } from '../templates/business-classic/1
 import manifest_bc_1_0_0 from '../templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
 import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.ts';
 import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
+import { trackerScript } from './visits.ts';
 
 const REGISTRY: Record<string, Record<string, { render: RenderFn; manifest: TemplateManifest }>> = {
   'restaurant-classic': {
@@ -103,5 +104,24 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
   if (t.manifest.content_contract_version !== snapshot.content_contract_version) {
     throw new Error(`contract mismatch: template consumes v${t.manifest.content_contract_version}, snapshot is v${snapshot.content_contract_version}`);
   }
-  return injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization);
+  return injectAnalytics(injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization), site.siteId);
+}
+
+/** AN-2: inject the ONE first-party analytics tracker into every rendered page.
+ *  Mirrors injectDevLayer — a single template-agnostic pass over .html files,
+ *  idempotent, before </body>. Skips entirely when the site id or the function
+ *  base URL is absent (e.g. local preview), so bytes are unchanged there. */
+export function injectAnalytics(fileMap: FileMap, siteId?: string): FileMap {
+  const base = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+  if (!siteId || !base) return fileMap;
+  const tag = trackerScript(siteId, `${base}/functions/v1/presence`);
+  const out: FileMap = {};
+  for (const [path, contents] of Object.entries(fileMap)) {
+    if (typeof contents === 'string' && path.endsWith('.html') && !contents.includes('id="presence-analytics"') && contents.includes('</body>')) {
+      out[path] = contents.replace('</body>', `${tag}</body>`);
+    } else {
+      out[path] = contents;
+    }
+  }
+  return out;
 }

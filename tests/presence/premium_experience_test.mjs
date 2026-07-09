@@ -27,11 +27,12 @@ const NOW = '2026-07-08T12:00:00Z';
 
 // ═══ PT-7 — Customer Timeline (celebrate real milestones) ═══
 {
-  const full = buildTimeline({ createdAt: '2025-06-01T00:00:00Z', firstPublishedAt: '2025-06-10T00:00:00Z', searchVerified: true, firstInquiryAt: '2025-07-01T00:00:00Z', firstCustomerAt: '2025-06-05T00:00:00Z', renewsAt: '2026-06-01T00:00:00Z' }, NOW);
-  ok('timeline: six milestones in order', full.milestones.length === 6 && full.milestones[0].key === 'created' && full.milestones.at(-1).key === 'renewal');
+  const full = buildTimeline({ createdAt: '2025-06-01T00:00:00Z', firstPublishedAt: '2025-06-10T00:00:00Z', searchVerified: true, firstVisitorAt: '2025-06-15T00:00:00Z', firstInquiryAt: '2025-07-01T00:00:00Z', firstCustomerAt: '2025-06-05T00:00:00Z', renewsAt: '2026-06-01T00:00:00Z' }, NOW);
+  ok('timeline: seven milestones in order (incl. AN-2 first visitor)', full.milestones.length === 7 && full.milestones[0].key === 'created' && full.milestones.at(-1).key === 'renewal');
   ok('timeline: published + inquiry marked achieved with dates', full.milestones.find((m) => m.key === 'published').achieved && full.milestones.find((m) => m.key === 'first_inquiry').at === '2025-07-01T00:00:00Z');
+  ok('timeline: first visitor is a real achieved milestone', full.milestones.find((m) => m.key === 'first_visitor').achieved && full.milestones.find((m) => m.key === 'first_visitor').at === '2025-06-15T00:00:00Z');
   ok('timeline: latest celebration is the most recent 🎉 milestone (the inquiry)', full.latestCelebration && full.latestCelebration.key === 'first_inquiry');
-  const early = buildTimeline({ createdAt: '2026-07-01T00:00:00Z', firstPublishedAt: null, searchVerified: false, firstInquiryAt: null, firstCustomerAt: null, renewsAt: null }, NOW);
+  const early = buildTimeline({ createdAt: '2026-07-01T00:00:00Z', firstPublishedAt: null, searchVerified: false, firstVisitorAt: null, firstInquiryAt: null, firstCustomerAt: null, renewsAt: null }, NOW);
   ok('timeline: unachieved milestones are anticipatory, not faked', !early.milestones.find((m) => m.key === 'published').achieved && early.latestCelebration === null && /Publish when/.test(early.milestones.find((m) => m.key === 'published').note));
 }
 

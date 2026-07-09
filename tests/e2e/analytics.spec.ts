@@ -6,6 +6,8 @@ const HOME = { data: {
   period: 'week',
   headline: 'Here’s how your business is doing this week.',
   insights: [
+    { key: 'traffic', title: 'Website visitors', sentence: '214 people visited your website this week — up from 180 the week before.', number: 214, detail: '512 page views in all.', href: '/analytics.html', tone: 'good' },
+    { key: 'source', title: 'Where they come from', sentence: 'Most visitors arrive from Google.', tone: 'neutral' },
     { key: 'inquiries', title: 'Inquiries', sentence: 'You received 6 inquiries this week — up from 4 the week before.', number: 6, detail: '2 inquiries are still waiting for a reply.', href: '/leads.html', tone: 'good' },
     { key: 'publishing', title: 'Your website', sentence: 'Your website was last updated 5 days ago.', number: 1, href: '/presence.html', tone: 'neutral' },
   ],
@@ -20,6 +22,7 @@ test.describe('Analytics (plain-English understanding)', () => {
     await page.goto('/analytics.html');
     await expect(page.locator('#dds-shell .dds-nav')).toContainText('Analytics');
     await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+    await expect(page.getByText('214 people visited your website this week — up from 180 the week before.')).toBeVisible();
     await expect(page.getByText('You received 6 inquiries this week — up from 4 the week before.')).toBeVisible();
     await expect(page.locator('canvas')).toHaveCount(0); // no charts
   });
