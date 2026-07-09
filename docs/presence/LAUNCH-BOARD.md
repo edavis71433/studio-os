@@ -52,7 +52,7 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 | P6 | **Fresh WCAG 2.2 AA pass** on templates + portal + any new UI (keyboard, zoom, VoiceOver/TalkBack, forms) | 🤖 | The bar moved; new surfaces unreviewed |
 | P7 | **Measure real p95** of `/observe` + full pipeline on a large live site; check edge cold-start & bundle size | 🤖 | Backend is fast in the pure tests; verify under real load |
 | P8 | **Consolidate redundant marketing pages**; let Industry Packs earn the industry pages | 🤖 | Overlap + maintenance drag |
-| P9 | **Apply `pg_cron`** (or a reliable external trigger) for L2 scheduled operations | 🧑🤖 | Scheduled ops currently need external triggering |
+| ~~P9~~ | ✅ **CLOSED (activation)** — `pg_cron` LIVE on both envs (15-min cadence hitting `/system/run`, Vault-stored secret). Scheduled ops no longer need external triggering. | 🧑🤖 | Was stale on this board; done during owner activation. |
 | P10 | **Customer help / KB** + agency + enterprise onboarding guides | 🤖 | Docs serve engineers, not customers yet |
 | P11 | **Retire or rename `opt_dormant`** (stop emitting evidence only to suppress it) | 🤖 | Generate-to-suppress is dead weight |
 | P12 | **Scope decision**: keep Marketplace/Enterprise/Agency behind an operator flag until they have UI | 🧑 | Ship value, not surface |

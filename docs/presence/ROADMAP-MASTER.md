@@ -309,3 +309,10 @@ The paid-audit tiers now reach Stripe (new `public_audit_checkout` in clever-api
 5. **[Med/SEO] Structured-data drift.** audit.html JSON-LD offers say "Essential/Growth/Studio Audit" with a wrong turnaround (Essential "5 business day" vs Starter 24h). Visible tiers are Starter/Digital Health Check/Competitive Intelligence. Reconcile names/prices/turnarounds so Google matches the page.
 6. **[Low] Nurture sequence not automated.** _internal/email-nurture-sequence.html is a template, not wired; captured audit_leads get no auto follow-up. Fine if manual; flag if automation wanted.
 Solid already: free Site Score (psi_fetch/deep_audit + audit_leads store + email-to-Eric), the rebuilt tier UI, server-side price in the handler, the webhook itself (invoice+audit+subscription), and the audit_orders/audit_leads/stripe_payments tables.
+
+### TD-1 — Code health / tech debt (QUEUED — found in the Jul 9 2026 FE+BE sweep)
+Not launch-gating; queued so it isn't lost:
+1. **[Med] `clever-api` has 46 strict type-errors.** `presence` + `stripe-webhook` typecheck 100% clean; `clever-api` (~12k-line legacy fn) does not. Deploys fine (esbuild bundles, no tsc gate) and the errors are mostly loose `any`/`unknown` on DB responses — low runtime risk, but the one place a latent bug could hide. Recommend a focused typing pass to 0, matching the other two functions.
+2. **[Low] Stray `console.log`/debug lines** in ~8 public HTML pages (agency, provision, portal, start, project-survey, mobile, a11y, tests). Harmless (invisible to visitors); a 10-min tidy. Behind the public-site fence.
+3. **[Low, governance] Per-model token→cost table** for $ reporting (recommended by AI-1; makes metered model spend legible in dollars).
+Verified-clean in the same sweep: no exposed secret keys in any HTML, no broken internal links (69 pages), env-switchers correctly default to prod, no hardcoded secrets in any function, no secret/token logging.
