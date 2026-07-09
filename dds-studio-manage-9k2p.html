@@ -912,13 +912,8 @@ button:focus-visible, .ibx-pill:focus-visible, .ibx-tab:focus-visible, .bf-act:f
       <button class="sn" data-dest="clients" onclick="go('analytics')" id="sn-analytics"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg> Analytics</button>
       <button class="sn" data-dest="clients" onclick="go('newclient')" id="sn-newclient" style="color:var(--p);font-weight:600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New client</button>
 
-      <!-- Quick actions (jump into a client task without leaving) -->
-      <div class="sl" style="margin-top:10px;font-size:10px;opacity:.7;">Quick send to a client</div>
-      <button class="sn sn-sub" data-dest="clients" onclick="go('messages')" id="sn-messages"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Message</button>
-      <button class="sn sn-sub" data-dest="clients" onclick="go('files')" id="sn-files"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Files</button>
-      <button class="sn sn-sub" data-dest="clients" onclick="go('approvals')" id="sn-approvals"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Approval</button>
-      <button class="sn sn-sub" data-dest="clients" onclick="go('invoices')" id="sn-invoices"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Invoice</button>
-      <button class="sn sn-sub" data-dest="clients" onclick="go('timeline')" id="sn-timeline"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Timeline</button>
+      <!-- (Message / Files / Approval / Invoice / Timeline are client-context
+           actions — reached inside a client's hub, not duplicated here. Decluttered PT-UI.) -->
 
       <!-- 4 · TOOLS -->
       <div class="sdiv"></div>
@@ -12099,14 +12094,12 @@ function anEngineNote(eng){
       +'<div style="text-align:center;padding:12px 0;"><button class="bf-whymore" style="color:var(--p);font-size:12.5px;" onclick="go(\'opportunities\')">View all priorities \u2192</button></div>'
       +'</div>');
 
-    var pulse='<div class="tdx-card"><div class="tdx-ph">\u25C8 STUDIO PULSE</div><div class="tdx-pulse">'
-      +'<div class="tdx-pu"><div class="tdx-pn">'+act.length+'</div><div class="tdx-pl">Active clients</div></div>'
-      +'<div class="tdx-pu"><div class="tdx-pn">'+money(mrr)+'</div><div class="tdx-pl">MRR</div></div>'
-      +'<div class="tdx-pu"><div class="tdx-pn">'+(pipe?money(pipe):openOpp.length)+'</div><div class="tdx-pl">'+(pipe?'Pipeline value':'Open opportunities')+'</div></div>'
-      +'<div class="tdx-pu"><div class="tdx-pn"'+(rv&&rv.over30>0?' style="color:#c0392b;"':'')+'>'+(rv?money(rv.outstanding):unpaid)+'</div><div class="tdx-pl">'+(rv?('Outstanding'+(rv.over30>0?' \u00b7 '+money(rv.over30)+' 30d+':(rv.over7>0?' \u00b7 '+money(rv.over7)+' 7d+':''))):('Invoices awaiting payment'))+'</div></div>'
-      +'</div>'
-      +(rv&&rv.forecast&&rv.forecast.months&&rv.forecast.months.length?('<div class="tdx-nw" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(41,25,66,0.06);">Next 3 months on current plans: '+rv.forecast.months.map(function(m){return esc(m.label)+' '+money(m.projected);}).join(' \u00b7 ')+'</div>'):'')
-      +(unpaid===0&&needs.length===0?'<div class="tdx-ok">\u2713 Everything looks healthy</div>':'')+'</div>';
+    // Quiet one-line pulse \u2014 no wall of zeros. Money shows only when there IS money.
+    var pulseBits=[act.length+' active client'+(act.length===1?'':'s')];
+    if(mrr>0) pulseBits.push(money(mrr)+' monthly');
+    if(openOpp.length) pulseBits.push(openOpp.length+' open opportunit'+(openOpp.length===1?'y':'ies'));
+    if(rv&&rv.outstanding>0) pulseBits.push(money(rv.outstanding)+' outstanding'+(rv.over30>0?' ('+money(rv.over30)+' 30d+)':''));
+    var pulse='<div style="margin-top:22px;padding-top:14px;border-top:1px solid rgba(41,25,66,0.07);font-size:12.5px;color:var(--muted);">'+esc(pulseBits.join('   \u00b7   '))+'</div>';
 
     var noticedHtml='<div class="tdx-card" style="margin-top:16px;"><div class="tdx-ph">\u2726 AI NOTICED</div>'
       +(noticed.length?noticed.map(function(n){
@@ -12126,14 +12119,21 @@ function anEngineNote(eng){
 
     var card20='<div class="tdx-20" style="margin-top:16px;"><b>Have 20 minutes?</b><p>Knock out today\u2019s outreach and set your pipeline in motion.</p><button class="go" style="background:var(--p);color:#fff;font-weight:700;font-size:13px;padding:9px 18px;border-radius:100px;border:none;cursor:pointer;" onclick="go(\'opportunities\')">Start outreach now \u2192</button></div>';
 
+    // Decluttered home: one calm column — the one thing, then today's list, a
+    // quiet pulse, the next communication, and a small wins footer. The old
+    // competing modules (AI Noticed, Have-20-minutes, Schedule) are folded away;
+    // everything is still reachable from the nav/priorities.
     root.innerHTML=
       '<div class="tdx-date">'+dateLine+'</div>'
       +'<div class="tdx-greet">'+greet+', Eric.</div>'
       +'<div class="tdx-sub">'+esc(sent)+'</div>'
       +stripHtml
-      +'<div class="tdx-grid">'
-        +'<div>'+heroHtml+needsHtml+schedHtml+actHtml+'</div>'
-        +'<div>'+pulse+'<div id="tdxComm"></div>'+noticedHtml+card20+'</div>'
+      +'<div style="max-width:720px;">'
+        +heroHtml
+        +needsHtml
+        +'<div id="tdxComm"></div>'
+        +pulse
+        +actHtml
       +'</div>';
     // ── the communication brain, on the surface Eric opens every morning.
     // "Client paid \u2192 review ask?", "quiet 30d \u2192 check-in ready" \u2014 fail-soft.
