@@ -125,7 +125,9 @@ function render(moments, features, feed, ctx){
       <div class="row"><span class="golink">Take care of it →</span></div></a>`;
   }
   for(const p of approvals){
-    const href = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
+    const _c=new URLSearchParams(location.search).get('client');
+    const _base = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
+    const href = (_c && _base.charAt(0)==='/') ? (()=>{const h=_base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');})() : _base;
     html += `<a class="moment attn todo" href="${href}">
       <span class="tag">Waiting for your approval</span>
       <h2>${esc(p.title||'A change is ready')}</h2>

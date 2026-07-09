@@ -213,7 +213,10 @@ export async function handleAssetUpdate(req: Request, site: SiteRow, principal: 
 // ── lifecycle (policy-based, reuses the approval philosophy) ──────────────────
 export async function handleAssetStatus(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
-  const action = ['submit', 'approve', 'reject', 'publish', 'archive', 'restore'].includes(b.action) ? b.action : null;
+  // Accept the reviewer/plan decide shape ({decision}) as well as {action}, so the
+  // ONE reviewer surface (client.html) approves a file exactly like any other plan.
+  const raw = b.action || (b.decision === 'approve' ? 'approve' : ['abandon', 'decline', 'reject'].includes(b.decision) ? 'reject' : '');
+  const action = ['submit', 'approve', 'reject', 'publish', 'archive', 'restore'].includes(raw) ? raw : null;
   if (!action) return json({ error: 'bad_request', message: 'Choose submit, approve, reject, publish, archive, or restore.' }, 400, cors);
   // DAM-2: a client reviewer may ONLY approve or reject (never submit/publish/archive)
   const role = await resolveSiteRole(principal.jwt || '', site.id, principal.kind);

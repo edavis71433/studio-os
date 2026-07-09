@@ -53,6 +53,9 @@ let TOKEN="";
 async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
+// SC-1: keep the agency drill-in scope on every internal link so a scoped operator
+// stays inside the client they opened.
+function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;const h=href.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c)+(h[1]?'#'+h[1]:'');}
 
 function render(feed,leads){
   const approvals=(feed.pending_approvals||[]);
@@ -64,7 +67,7 @@ function render(feed,leads){
   if(!total){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div>`;$('main').innerHTML=h;return;}
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
-    for(const p of approvals){const href=p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations';
+    for(const p of approvals){const href=scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations');
       h+=`<a class="item approve" href="${href}"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go">Review &amp; approve →</div></a>`;}}
 
   if(newLeads.length){h+=`<h2>New messages</h2>`;
