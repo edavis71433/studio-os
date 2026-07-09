@@ -20,7 +20,35 @@ import {
   trafficInsights, trafficNotice, periodWord, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
+import { searchInsights, searchNotice, searchHealth, searchMilestones, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
 import type { SiteRow } from '../lib/site.ts';
+
+/** Read the Google Search Console metrics that already live in the shared `signals`
+ *  table (source='gsc', keyed by client_id). No new store, no ingestion — reuse.
+ *  Returns hasData:false honestly when there's none (the state everywhere today). */
+async function readGsc(clientId: string | null | undefined): Promise<GscMetrics> {
+  const empty: GscMetrics = { impressions: 0, clicks: 0, priorImpressions: null, priorClicks: null, ctr: null, position: null, period: '', hasData: false, totalImpressions: 0, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null };
+  if (!clientId) return empty;
+  const r = await svc(`signals?client_id=eq.${encodeURIComponent(clientId)}&source=eq.gsc&select=metric,value,period&order=period.desc&limit=48`);
+  const rows = Array.isArray((r as any).json) ? (r as any).json : [];
+  if (!rows.length) return empty;
+  const periodsAsc = ([...new Set(rows.map((x: any) => String(x.period)))] as string[]).sort();
+  const cur = periodsAsc[periodsAsc.length - 1], prior = periodsAsc[periodsAsc.length - 2];
+  const val = (period: string, metric: string): number | null => { const m = rows.find((x: any) => x.period === period && x.metric === metric); return m ? Number(m.value) : null; };
+  const sum = (metric: string) => rows.filter((x: any) => x.metric === metric).reduce((a: number, x: any) => a + Number(x.value || 0), 0);
+  const firstWith = (metric: string) => { const p = periodsAsc.find((per) => (val(per, metric) || 0) > 0); return p ? `${p}-01T00:00:00.000Z` : null; };
+  return {
+    impressions: val(cur, 'search_impressions') || 0,
+    clicks: val(cur, 'search_clicks') || 0,
+    priorImpressions: prior ? val(prior, 'search_impressions') : null,
+    priorClicks: prior ? val(prior, 'search_clicks') : null,
+    ctr: val(cur, 'search_ctr'),
+    position: val(cur, 'avg_position'),
+    period: cur, hasData: true,
+    totalImpressions: sum('search_impressions'), totalClicks: sum('search_clicks'),
+    firstImpressionAt: firstWith('search_impressions'), firstSearchClickAt: firstWith('search_clicks'),
+  };
+}
 
 const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
 /** Load recent visit rows for a site over the current + prior window (for trend). */
@@ -91,32 +119,39 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
     : null;
 
   // ── health (reuse the Health Coach's pure read) ──
+  // AN-3: real Search Performance (Google) from the shared `signals` table.
+  const gsc = await readGsc(site.client_id);
+  const sh = searchHealth(gsc);
   const lastChangeAt = arr(lastChangeR)[0]?.created_at || null;
   const health = coachRead({
     live: site.status === 'live',
     lastPublishedAt: site.last_published_at || null,
     pendingApprovals: 0,
     connectedNeedingAttention: 0,
-    searchIssues: 0,
+    searchIssues: (sh.impressionsFalling || sh.noVisibility) ? 1 : 0,   // search visibility feeds the coach
     leadsWaiting: unread,
     unpublishedChanges: !!lastChangeAt && (!site.last_published_at || lastChangeAt > site.last_published_at),
     domainExpiringDays: null,
   }, nowIso);
 
-  // AN-2: real first-party traffic now leads the story; the traffic "not measured"
-  // card is gone (we measure it ourselves) — only Search (GSC) may remain honest.
+  // AN-2: real first-party traffic; AN-3: real search performance. Only surfaces
+  // that genuinely have no data stay in "not measured".
   const trafficCards = trafficInsights(traffic, period);
+  const searchCards = searchInsights(gsc);
   const notice = trafficNotice(traffic);
+  const sNotice = searchNotice(gsc);
   const watching = arr(momentsR).map((m) => ({ headline: m.headline, summary: m.summary, moment_type: m.moment_type }));
+  if (sNotice) watching.unshift({ headline: sNotice.headline, summary: sNotice.summary, moment_type: sNotice.tone === 'good' ? 'celebration' : 'needs_attention' });
   if (notice) watching.unshift({ ...notice, moment_type: 'celebration' });
 
+  const gscConnected = conn.gsc || gsc.hasData;
   return json({ data: {
     period,
     headline: `Here’s how your business is doing this ${periodWord(period)}.`,
-    insights: [...trafficCards, inquiries, publishing, ...(milestone ? [milestone] : [])],
+    insights: [...trafficCards, ...searchCards, inquiries, publishing, ...(milestone ? [milestone] : [])],
     health: { sentence: health.headline, status: health.status, suggestions: (health.suggestions || []).slice(0, 3) },
     watching,
-    not_measured: conn.gsc ? [] : notMeasured(true, false),   // traffic is first-party now; only Search may need connecting
+    not_measured: gscConnected ? [] : notMeasured(true, false),   // traffic is first-party; search real when connected
   } }, 200, cors);
 }
 
@@ -169,11 +204,18 @@ export async function handleAnalyticsSearch(_req: Request, site: SiteRow, cors: 
     sitemap: true, // emitted by construction for every published site
     brokenLinks: 0,
   });
+  // AN-3: real Search Performance from the shared `signals` table when present.
+  const gsc = await readGsc(site.client_id);
+  const connected = conn.gsc || gsc.hasData;
   return json({ data: {
     readiness,
-    // AN-4: honest about what needs a connection; never a fabricated impression/click.
-    not_measured: conn.gsc ? [] : notMeasured(true, false),
-    connected: { search_console: conn.gsc },
+    performance: searchInsights(gsc),               // real impressions/clicks when connected; [] otherwise
+    milestones: gsc.hasData ? searchMilestones(gsc.totalImpressions, gsc.totalClicks, gsc.firstImpressionAt, gsc.firstSearchClickAt) : [],
+    // Query- and page-level detail (which searches, which pages) isn't stored yet —
+    // honest, not faked. Impressions/clicks are the measured figures we have.
+    detail_available: false,
+    not_measured: connected ? [] : notMeasured(true, false),
+    connected: { search_console: connected },
   } }, 200, cors);
 }
 
@@ -197,5 +239,29 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
     (portfolio || []).map((c: any) => ({ name: c.name, leads_waiting: c.leads_waiting, unpublished_changes: c.unpublished_changes, last_published_at: c.last_published_at, attention: c.attention, visitors: (perSite.get(c.site_id) || new Set()).size })),
     nowMs,
   );
-  return json({ data: { headline, insights, client_count: siteIds.length } }, 200, cors);
+
+  // AN-3 (§Agency): per-client search state from the shared `signals` table — who's
+  // growing/falling on Google, and who hasn't connected Search Console. Reuses the
+  // portfolio; one site→client map + one signals query (no duplicate dashboard).
+  const sites = arr(await svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id`));
+  const clientIds = sites.map((s) => s.client_id).filter(Boolean);
+  const gscRows = clientIds.length ? arr(await svc(`signals?client_id=in.(${clientIds.join(',')})&source=eq.gsc&metric=eq.search_impressions&select=client_id,value,period&order=period.desc&limit=2000`)) : [];
+  const byClient = new Map<string, any[]>();
+  for (const r of gscRows) { const a = byClient.get(r.client_id) || []; a.push(r); byClient.set(r.client_id, a); }
+  const stateFor = (clientId: string) => {
+    const rows = byClient.get(clientId) || [];
+    if (!rows.length) return 'not_connected';
+    const periods = ([...new Set(rows.map((x: any) => String(x.period)))] as string[]).sort().reverse();
+    const cur = Number(rows.find((x) => x.period === periods[0])?.value || 0);
+    const prior = periods[1] ? Number(rows.find((x) => x.period === periods[1])?.value || 0) : null;
+    return agencySearchState({ impressions: cur, clicks: 0, priorImpressions: prior, priorClicks: null, ctr: null, position: null, period: periods[0], hasData: true, totalImpressions: cur, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null });
+  };
+  const counts = { not_connected: 0, growing: 0, falling: 0, steady: 0 } as Record<string, number>;
+  for (const s of sites) counts[stateFor(s.client_id)]++;
+  const searchInsightsAgency: any[] = [];
+  if (counts.growing) searchInsightsAgency.push({ key: 'search_growing', title: 'Rising on Google', sentence: `${counts.growing} ${counts.growing === 1 ? 'client is' : 'clients are'} getting seen more on Google lately.`, number: counts.growing, tone: 'good' });
+  if (counts.falling) searchInsightsAgency.push({ key: 'search_falling', title: 'Losing visibility', sentence: `${counts.falling} ${counts.falling === 1 ? 'client is' : 'clients are'} being seen less on Google — worth a fresh update.`, number: counts.falling, tone: 'attention' });
+  if (counts.not_connected) searchInsightsAgency.push({ key: 'search_not_connected', title: 'Search not connected', sentence: `${counts.not_connected} of ${siteIds.length} ${counts.not_connected === 1 ? 'client hasn’t' : 'clients haven’t'} connected Google Search Console — so their search numbers aren’t available yet.`, number: counts.not_connected, tone: 'neutral' });
+
+  return json({ data: { headline, insights: [...insights, ...searchInsightsAgency], client_count: siteIds.length } }, 200, cors);
 }
