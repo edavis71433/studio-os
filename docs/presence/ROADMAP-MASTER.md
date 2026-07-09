@@ -4,6 +4,8 @@
 
 > **Reality check up front:** engineering is effectively complete and green, but **nothing is live to a customer yet** — the edge function is deployed to staging + prod, but every frontend page is **committed-not-pushed** behind the go-live gate, and owner activation (keys/cron) isn't done. So "98% of the V1 roadmap" is true for *engineering*; the remaining ~2% (activation, human QA, front door, the push itself) is what stands between "built" and "a customer can pay for and use it." Treat that last mile as the real work, not a rounding error.
 
+> **✅ Phase FE-1 (done, live both envs):** feature/edition boundaries are now **enforced server-side** — `middleware/feature.ts` (`requireFeature`/`featureForRoute`) gates every capability area at the request boundary, mirroring `buildNav`; the previously-dead `editionIncludes()` is now the control. Product model ratified as **two apps** (Freelancer/Studio + Client), not three. CMS-only, Business OS, and Studio OS are each independently sellable **safely** (a `cms_only` browser can no longer reach `/crm`, etc.). Matrix 189/189, regression green, no schema change. See [PHASE-FE-1-FEATURE-ENFORCEMENT-AND-TWO-APP-MODEL](PHASE-FE-1-FEATURE-ENFORCEMENT-AND-TWO-APP-MODEL.md). Follow-up (not blocking): a `files` EditionFeature when DAM is sold standalone.
+
 ---
 
 ## 🔴 Deepest gap found (challenge review) — the product can only publish a *restaurant* site

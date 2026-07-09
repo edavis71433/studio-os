@@ -19,6 +19,8 @@ import { resolveSite } from './lib/site.ts';
 import type { SiteRow } from './lib/site.ts';
 import { resolveScopedSite } from './lib/scope.ts';
 import { checkEntitlement } from './middleware/entitlement.ts';
+import { featureForRoute, requireFeature, loadEdition } from './middleware/feature.ts';
+import { loadPlan, draftingDenial } from './commerce/enforce.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
 import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
@@ -234,6 +236,30 @@ serve(async (req) => {
   //    coach, concierge) prepares guidance and stays available.
   if (site.edition === 'monitor' && (route === '/publish' || route === '/restore') && method === 'POST') {
     return json({ error: 'edition_monitor', message: 'Your website stays exactly where it is — this plan observes and guides, it never publishes. Upgrading adds hosting and publishing whenever you’re ready.' }, 403, cors);
+  }
+
+  // ── Phase FE-1: FEATURE-boundary enforcement (outside RLS; mirrors buildNav).
+  //    The site's edition (from its entitlement plan) decides which capability
+  //    AREAS exist at all — CMS-only cannot reach Customers, Business-OS-only
+  //    cannot reach the website, and so on. Baseline/shell routes map to null and
+  //    are always allowed; supersets (Studio OS+) never deny. Applies to the
+  //    operator too when scoped into a client (bounded by that client's plan).
+  {
+    const needed = featureForRoute(route, method);
+    if (needed) {
+      const edition = await loadEdition(site.client_id, site.edition);
+      const denial = requireFeature(edition, needed, cors);
+      if (denial) return denial;
+    }
+  }
+
+  // ── Phase FE-1: Visual Studio CREATES brand assets → drafting-class. It sits in
+  //    the website area (feature-gated above), but generation must also honor the
+  //    drafting boundary, so an observe-only Monitor site cannot generate. List /
+  //    get / decide stay available (reviewing existing assets is not creation).
+  if (method === 'POST' && (route === '/visual/generate' || /^\/visual\/plans\/[0-9a-f-]{36}\/(vary|edit)$/.test(route))) {
+    const denial = draftingDenial(await loadPlan(site.client_id), cors);
+    if (denial) return denial;
   }
 
   // 5. router — exact routes only

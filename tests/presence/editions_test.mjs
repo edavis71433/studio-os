@@ -77,10 +77,11 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 {
   const caps = ['view_all', 'edit', 'publish', 'connect', 'configure', 'invite'];
   const keys = (ed, extra = {}) => buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: false, isOperator: false, editionKey: ed, ...extra }).map((s) => s.key);
-  ok('cms_only: has website, NOT grow', keys('cms_only').includes('website') && !keys('cms_only').includes('grow'));
-  ok('business_os_only: has grow, NOT website/create', keys('business_os_only').includes('grow') && !keys('business_os_only').includes('website') && !keys('business_os_only').includes('create'));
-  ok('studio_os: has both website + grow', keys('studio_os').includes('website') && keys('studio_os').includes('grow'));
-  ok('agency edition + member: shows agency section', buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: true, isOperator: false, editionKey: 'agency' }).some((s) => s.key === 'agency'));
+  // Architecture v1.0 outcomes-only nav: Today · Website · Customers · Files · Analytics · Inbox · (Studio)
+  ok('cms_only: has website, NOT today/customers', keys('cms_only').includes('website') && !keys('cms_only').includes('today') && !keys('cms_only').includes('customers'));
+  ok('business_os_only: has today+customers, NOT website/files', keys('business_os_only').includes('today') && keys('business_os_only').includes('customers') && !keys('business_os_only').includes('website') && !keys('business_os_only').includes('files'));
+  ok('studio_os: has both website + today + customers', keys('studio_os').includes('website') && keys('studio_os').includes('today') && keys('studio_os').includes('customers'));
+  ok('agency edition + member: shows Studio (agency) section', buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: true, isOperator: false, editionKey: 'agency' }).some((s) => s.key === 'studio'));
   ok('no editionKey → unchanged full nav (backward compatible)', keys('studio_os').join() === buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: false, isOperator: false }).map((s) => s.key).join());
 }
 
