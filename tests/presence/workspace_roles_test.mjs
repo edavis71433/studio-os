@@ -84,21 +84,22 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   const caps = (role) => { return { business_owner: ['view_all','edit','approve','publish','connect','configure','delete','export','invite','comment'], business_staff: ['view_all','edit','approve','publish','connect','export','comment'], client_reviewer: ['view_shared','approve','export','comment'], developer: ['view_all','edit','approve','publish','connect','configure','export','comment','use_developer_mode'] }[role]; };
 
   const owner = buildNav(ctx({ capabilities: caps('business_owner') }));
-  ok('nav: owner gets a full workspace (Today/Website/Create/Grow/Clients/Settings/Help)', owner.some(s=>s.key==='website') && owner.some(s=>s.key==='create') && owner.some(s=>s.key==='clients') && owner.some(s=>s.key==='settings'));
+  ok('nav: owner gets the v1.0 outcome areas (Today/Website/Customers/Files/Inbox/Settings)', owner.some(s=>s.key==='today') && owner.some(s=>s.key==='website') && owner.some(s=>s.key==='customers') && owner.some(s=>s.key==='files') && owner.some(s=>s.key==='inbox') && owner.some(s=>s.key==='settings'));
+  ok('nav: no CMS/CRM/DAM words leak into any label', owner.every(s=>!/CMS|CRM|\bDAM\b|Portal|Relationship/.test(s.label) && s.items.every(i=>!/CMS|CRM|\bDAM\b|Portal|Relationship/.test(i.label))));
   ok('nav: no empty sections ever', owner.every(s=>s.items.length>0));
 
   const reviewer = buildNav(ctx({ role:'client_reviewer', capabilities: caps('client_reviewer') }));
-  ok('nav: reviewer gets ONE calm surface (Your updates only)', reviewer.length===1 && reviewer[0].items[0].href==='/client.html');
-  ok('nav: reviewer landing = client portal', landingFor(ctx({role:'client_reviewer',capabilities:caps('client_reviewer')}))==='/client.html');
+  ok('nav: reviewer gets ONE calm surface', reviewer.length===1 && reviewer[0].items[0].href==='/client.html');
+  ok('nav: reviewer landing = the reviewer surface', landingFor(ctx({role:'client_reviewer',capabilities:caps('client_reviewer')}))==='/client.html');
 
   const monitor = buildNav(ctx({ edition:'monitor', capabilities: caps('business_owner') }));
-  ok('nav: Monitor edition hides Publish + Create (observe-only)', !monitor.some(s=>s.key==='create') && !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
+  ok('nav: Monitor edition hides Publish (observe-only)', !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
 
   const staff = buildNav(ctx({ role:'business_staff', capabilities: caps('business_staff') }));
-  ok('nav: business_staff has no Clients section (cannot invite)', !staff.some(s=>s.key==='clients'));
+  ok('nav: business_staff cannot invite (no Sharing in Settings)', !staff.find(s=>s.key==='settings').items.some(i=>i.key==='sharing'));
 
   const agency = buildNav(ctx({ isAgency:true, capabilities: caps('business_owner') }));
-  ok('nav: agency member gets the Agency section; landing = agency', agency.some(s=>s.key==='agency') && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+  ok('nav: agency member gets the Studio scope; landing = Studio', agency.some(s=>s.key==='studio') && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
 
   const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
   ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));

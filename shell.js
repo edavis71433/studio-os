@@ -87,7 +87,7 @@
 
     root.innerHTML =
       '<button class="dds-ic dds-burger" id="dds-burger" aria-label="Menu">☰</button>' +
-      '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Presence' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>' +
+      '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>' +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>⌘K</kbd></div>' +
       '<div class="dds-right">' +
@@ -218,7 +218,7 @@
     document.documentElement.classList.add('dds-has-shell');
   }
   function minimalShell() {
-    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Presence</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/portal.html" aria-label="Sign in">◐</a>';
+    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/portal.html" aria-label="Sign in">◐</a>';
   }
 
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────

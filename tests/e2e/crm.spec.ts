@@ -43,7 +43,7 @@ test.describe('Relationship view', () => {
     await installApp(page);
     await page.goto('/crm.html');
     await expect(page.getByRole('heading', { name: 'Marlow’s Kitchen' })).toBeVisible();
-    await expect(page.getByText('Relationship notes')).toBeVisible();
+    await expect(page.getByText('Notes')).toBeVisible();
     await expect(page.getByText('Quote request from Sam Rivera')).toBeVisible();
     await expect(page.getByText('Published the site')).toBeVisible();
   });

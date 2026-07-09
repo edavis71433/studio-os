@@ -40,62 +40,55 @@ function reviewerNav(): NavSection[] {
 export function buildNav(c: NavContext): NavSection[] {
   if (c.role === 'client_reviewer') return reviewerNav();
 
-  const f = flagsOf(c);                 // Phase D: which feature areas this edition includes
+  // ── Architecture v1.0: customer-facing OUTCOME areas, composed from Edition ×
+  // Role. Areas: Today · Website · Customers · Files · Inbox · (Connections) ·
+  // (Studio) · Settings · Help. No CMS/CRM/DAM/portal words ever reach the UI;
+  // the internal routes are unchanged. A single-item section renders as a
+  // top-level button; multi-item sections render as a labelled group.
+  const f = flagsOf(c);
   const sections: NavSection[] = [];
+  const single = (key: string, label: string, href: string) => sections.push({ key, label, items: [{ key, label, href }] });
 
-  // Landing / daily — items appear only if their feature area is in the edition,
-  // so CMS-Only and Business-OS-Only each get a complete, non-empty Today.
-  const today: NavItem[] = [];
-  if (f.hasBusinessOS) today.push({ key: 'today', label: 'Today', href: '/today.html' });
-  if (f.hasWebsite) today.push({ key: 'workspace', label: 'Your Presence', href: '/presence.html' });
-  if (f.hasRelationship) today.push({ key: 'relationship', label: 'Relationship', href: '/crm.html' });
-  if (f.hasWebsite) today.push({ key: 'leads', label: 'Leads', href: '/leads.html' });   // Phase M: surface the FD-2 inbox
-  sections.push({ key: 'today', label: 'Today', items: today });
+  // Today — the calm home
+  if (f.hasBusinessOS) single('today', 'Today', '/today.html');
 
-  // Website (CMS) — only when the edition includes it (Business-OS-Only hides it)
+  // Website — one home; its contents are sub-items (internally: the CMS)
   if (f.hasWebsite) {
-    const website: NavItem[] = [{ key: 'content', label: 'Your website', href: '/presence.html' }];
-    website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });   // CP-2.6: searchable
-    if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });      // CP-2.6: the Design tab, palette-findable
-    if (c.edition !== 'monitor') website.push({ key: 'media', label: 'Photos', href: '/presence.html#media' });
+    const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html' }];
+    website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
+    if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
     if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
-    if (canPublish(c)) website.push({ key: 'scheduled', label: 'Scheduled', href: '/schedule.html' });  // Phase M: surface FD-1 scheduling
-    if (canPublish(c)) website.push({ key: 'history', label: 'History & versions', href: '/presence.html#history' });   // CP-2.6
+    if (canPublish(c)) website.push({ key: 'history', label: 'History', href: '/presence.html#history' });
     sections.push({ key: 'website', label: 'Website', items: website });
-
-    if (canDraft(c)) sections.push({ key: 'create', label: 'Create', items: [
-      { key: 'studio', label: 'Creative Studio', href: '/presence.html' },
-      { key: 'visual', label: 'Visual Studio', href: '/visual-studio.html' },
-    ] });
   }
 
-  // Grow (Business OS) — moments/growth/connections; hidden entirely for CMS-Only
-  if (f.hasBusinessOS) {
-    const grow: NavItem[] = [];
-    if (f.hasBusinessOS) grow.push({ key: 'moments', label: 'Business Moments', href: '/today.html' });
-    grow.push({ key: 'growth', label: 'Growth', href: '/presence.html' });
-    if (f.hasConnected) grow.push({ key: 'connect', label: 'Connections', href: '/connections.html' });
-    sections.push({ key: 'grow', label: 'Grow', items: grow });
+  // Customers — the relationship area (internally: the CRM). Leads fold in here + Inbox.
+  if (f.hasRelationship) single('customers', 'Customers', '/crm.html');
+
+  // Files — the asset library (internally: the DAM). Photos + generated assets.
+  if (f.hasWebsite) {
+    const files: NavItem[] = [{ key: 'files_photos', label: 'Photos', href: '/presence.html#media' }];
+    if (canDraft(c)) files.push({ key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html' });
+    sections.push({ key: 'files', label: 'Files', items: files });
   }
 
-  // Clients (sharing) — the ownership/relationship surface, for someone who can invite
-  if (f.hasClientPortal && has(c, 'invite')) sections.push({ key: 'clients', label: 'Clients', items: [
-    { key: 'sharing', label: 'Sharing & access', href: '/sharing.html' },
-    { key: 'preview', label: 'Preview client view', href: '/client.html' },
-  ] });
+  // Inbox — ONE place for what needs you: messages, approvals, notifications, leads
+  single('inbox', 'Inbox', '/inbox.html');
 
-  // Agency (only for agency members whose edition includes it)
-  if (f.hasAgency && c.isAgency) sections.push({ key: 'agency', label: 'Agency', items: [
-    { key: 'portfolio', label: 'Portfolio', href: '/agency.html' },
-  ] });
+  // Connections — integrations (the connected services)
+  if (f.hasConnected) single('connections', 'Connections', '/connections.html');
 
-  // Settings (+ Developer Mode when the edition includes it AND the capability is granted)
+  // Studio — the agency scope (agency roles only); open a client to re-scope
+  if (f.hasAgency && c.isAgency) single('studio', 'Studio', '/agency.html');
+
+  // Settings — account, sharing/access, developer (Billing lives here, per the constitution)
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }];
+  if (f.hasClientPortal && has(c, 'invite')) settings.push({ key: 'sharing', label: 'Sharing & access', href: '/sharing.html' });
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
   sections.push({ key: 'settings', label: 'Settings', items: settings });
 
   // Help
-  sections.push({ key: 'help', label: 'Help', items: [{ key: 'help', label: 'Help', href: '/help.html' }] });
+  single('help', 'Help', '/help.html');
 
   return sections.filter((s) => s.items.length > 0);
 }

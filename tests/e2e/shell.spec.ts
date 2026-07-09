@@ -10,7 +10,8 @@ test.describe('App shell', () => {
     const shell = page.locator('#dds-shell');
     await expect(shell.locator('.dds-brand')).toContainText('Presence');
     await expect(shell.locator('.dds-nav')).toContainText('Website');
-    await expect(shell.locator('.dds-nav')).toContainText('Grow');
+    await expect(shell.locator('.dds-nav')).toContainText('Customers');
+    await expect(shell.locator('.dds-nav')).toContainText('Inbox');
     await expect(page.locator('#dds-search')).toContainText('Search');
     // the attention badge reflects context.attention_count (2)
     await expect(page.locator('#dds-bell .dot')).toHaveText('2');

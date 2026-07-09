@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Relationship — Presence</title>
+<title>Customers — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="One calm view of a client relationship — health, activity, approvals, and notes.">
 <style>
@@ -78,7 +78,7 @@
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Presence · Relationship — one calm view of how a client is doing. It reflects real activity; it never sells or scores.</footer>
+  <footer>Studio OS · Customers — one calm view of how a customer is doing. It reflects real activity; it never sells or scores.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <!-- PT-2C: one-time contextual tip -->
@@ -123,7 +123,7 @@ function render(profile,summary,notes,items,studio){
   html+=`<div class="facts">`+facts.map(f=>`<div class="fact"><div class="k">${esc(f[0])}</div><div class="v">${esc(f[1])} <small>${esc(f[2])}</small></div></div>`).join('')+`</div>`;
 
   // relationship notes
-  html+=`<section><h2>Relationship notes</h2>`;
+  html+=`<section><h2>Notes</h2>`;
   html+=`<div class="card"><textarea id="nb" placeholder="${studio?'A note about this client… (internal by default)':'Leave a note for your studio…'}"></textarea>
     <div class="noterow">`;
   if(studio){html+=`<span class="seg"><button data-aud="internal" class="on">Internal</button><button data-aud="shared">Shared with client</button></span>`;}

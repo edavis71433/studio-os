@@ -38,27 +38,23 @@ export const OWNER_SESSION = {
   user: { id: 'e2e-owner', email: 'owner@example.com', aud: 'authenticated', role: 'authenticated' },
 };
 
-// ── the ONE studio_os owner nav (mirrors lib/navigation.ts buildNav) ─────────
+// ── the ONE studio_os owner nav (mirrors lib/navigation.ts buildNav, v1.0) ───
 export const STUDIO_NAV = [
-  { key: 'today', label: 'Today', items: [
-    { key: 'today', label: 'Today', href: '/today.html' },
-    { key: 'workspace', label: 'Your Presence', href: '/presence.html' },
-    { key: 'relationship', label: 'Relationship', href: '/crm.html' },
-    { key: 'leads', label: 'Leads', href: '/leads.html' },
-  ] },
+  { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
   { key: 'website', label: 'Website', items: [
-    { key: 'content', label: 'Your website', href: '/presence.html' },
+    { key: 'content', label: 'Website', href: '/presence.html' },
     { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
     { key: 'design', label: 'Design', href: '/presence.html#design' },
-    { key: 'media', label: 'Photos', href: '/presence.html#media' },
     { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
-    { key: 'history', label: 'History & versions', href: '/presence.html#history' },
+    { key: 'history', label: 'History', href: '/presence.html#history' },
   ] },
-  { key: 'grow', label: 'Grow', items: [
-    { key: 'moments', label: 'Business Moments', href: '/today.html' },
-    { key: 'growth', label: 'Growth', href: '/presence.html' },
-    { key: 'connect', label: 'Connections', href: '/connections.html' },
+  { key: 'customers', label: 'Customers', items: [{ key: 'customers', label: 'Customers', href: '/crm.html' }] },
+  { key: 'files', label: 'Files', items: [
+    { key: 'files_photos', label: 'Photos', href: '/presence.html#media' },
+    { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html' },
   ] },
+  { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
+  { key: 'connections', label: 'Connections', items: [{ key: 'connect', label: 'Connections', href: '/connections.html' }] },
   { key: 'settings', label: 'Settings', items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
   { key: 'help', label: 'Help', items: [{ key: 'help', label: 'Help', href: '/help.html' }] },
 ];
