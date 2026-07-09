@@ -538,6 +538,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <section class="view" id="view-history">
         <h1 class="doc">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
+        <div id="previewBox"></div>
         <div id="launchBox"></div>
         <div id="pubList"></div>
       </section>
@@ -2424,7 +2425,41 @@ async function renderLaunches() {
   });
   box.appendChild(card);
 }
+// FD-T20/T21: Draft → Preview → Live management. Reuses /preview/* + the render
+// pipeline (the public preview URL) + the one publish pipeline (promote).
+async function renderPreviewPanel() {
+  const box = $("previewBox"); if (!box) return;
+  let st = null;
+  try { st = (await api("GET", "/preview/status")).data; } catch (_) { box.innerHTML = ""; return; }
+  box.innerHTML = "";
+  const card = el("div", "field"); card.style.marginBottom = "18px";
+  card.appendChild(el("label", null, "Draft · Preview · Live"));
+  card.appendChild(el("div", "hint", "Edit your Draft, publish it to a private Preview to review or share, then promote to Live. Your live site never changes until you promote."));
+  const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px";
+  const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
+  const dc = st.draft.unpublished_changes || 0;
+  grid.appendChild(stateCard("Draft", [dc + " unpublished change" + (dc === 1 ? "" : "s")]));
+  grid.appendChild(stateCard("Preview", st.preview.exists ? ["Updated " + new Date(st.preview.updated_at).toLocaleString(), st.preview.has_password ? "🔒 Password-protected" : "🔗 Open link"] : ["Not created yet"]));
+  grid.appendChild(stateCard("Live", st.live.published ? ["Published " + new Date(st.live.last_published_at).toLocaleDateString(), st.live.summary || ""] : ["Not live yet"]));
+  card.appendChild(grid);
+  const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:12px";
+  const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
+  const act = async (path, okMsg, body) => { try { await api("POST", path, body || {}); toast(okMsg); renderPreviewPanel(); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } };
+  mk("Update preview from draft", () => act("/preview/publish", "Preview updated — share it or promote when ready"), true);
+  if (st.preview.exists) {
+    mk("Open preview", () => { if (st.preview.url) window.open(st.preview.url, "_blank", "noopener"); });
+    mk("Copy link", () => { if (st.preview.url && navigator.clipboard) { navigator.clipboard.writeText(st.preview.url); toast("Preview link copied"); } });
+    mk("Preview in editor", () => openPreview("preview"));
+    mk(st.preview.has_password ? "Change / remove password" : "Password-protect", () => { const pw = prompt(st.preview.has_password ? "New password (leave blank to remove):" : "Set a preview password:", ""); if (pw !== null) act("/preview/settings", "Preview access updated", { password: pw }); });
+    mk("Reset link", () => { if (confirm("Reset the preview link? The old link stops working.")) act("/preview/settings", "Preview link reset", { regenerate_token: true }); });
+    if (st.live.published) mk("Compare with Live", () => openPreview("live"));
+    mk("Promote to Live", () => { if (confirm("Promote the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Promoting to Live — this usually takes under a minute"); }, true);
+  }
+  card.appendChild(acts);
+  box.appendChild(card);
+}
 async function loadHistory() {
+  renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
   renderLaunches();   // FD-T7: staged launches sit above the version journal
   const list = $("pubList");
   list.innerHTML = `<div class="loadline"><div class="lq">Opening the journal…</div><div class="shimmer"></div></div>`;

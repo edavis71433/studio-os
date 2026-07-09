@@ -25,6 +25,7 @@ import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/
 import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
+import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview } from './routes/preview_env.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -120,6 +121,12 @@ serve(async (req) => {
   }
   if (route === '/approve' && method === 'GET') return handleApproveGet(req, cors);
   if (route === '/approve' && method === 'POST') return handleApprovePost(req, cors);
+  // ── FD-T20: the PUBLIC, shareable preview URL — pre-auth, authorized by the
+  //    token itself (+ optional password); rendered through the ONE engine. ──
+  {
+    const m = route.match(/^\/p\/([0-9a-f]{16,80})$/i);
+    if (m && method === 'GET') return handlePublicPreview(req, m[1], cors);
+  }
 
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
   //    not client-scoped: reachable by staff or system (service-role/cron), and
@@ -278,6 +285,11 @@ serve(async (req) => {
   if (route === '/identity' && method === 'GET') return handleGetIdentity(jwt, site, cors);
   if (route === '/identity' && method === 'PUT') return handlePutIdentity(req, jwt, site, principal, cors);
   if (route === '/preview' && method === 'GET') return handlePreview(req, site, cors);
+  // ── FD-T20/T21: Draft → Preview → Live management (authed) ──
+  if (route === '/preview/status' && method === 'GET') return handlePreviewStatus(site, cors);
+  if (route === '/preview/publish' && method === 'POST') return handlePreviewPublish(site, principal, cors);
+  if (route === '/preview/promote' && method === 'POST') return handlePreviewPromote(site, principal, cors);
+  if (route === '/preview/settings' && method === 'POST') return handlePreviewSettings(req, site, principal, cors);
   if (route === '/publish' && method === 'POST') return handlePublish(site, principal, cors);
   if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);

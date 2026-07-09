@@ -31,6 +31,11 @@ async function loadSnapshotFor(site: SiteRow, version: string, publishId: string
     const p = await svc(`presence_publishes?id=eq.${publishId}&site_id=eq.${site.id}&select=snapshot_id&limit=1`);
     snapId = p.json?.[0]?.snapshot_id ?? null;
     if (!snapId) return { error: 'not_restorable', message: 'That version is no longer available to view.', status: 410 };
+  } else if (version === 'preview') {
+    // FD-T20: the pinned Preview snapshot (Draft → Preview → Live)
+    const pv = await svc(`presence_site_preview?site_id=eq.${site.id}&select=snapshot_id&limit=1`);
+    snapId = pv.json?.[0]?.snapshot_id ?? null;
+    if (!snapId) return { error: 'no_preview', message: 'No preview yet — update your preview first.', status: 404 };
   } else if (version === 'live') {
     const p = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id&order=created_at.desc&limit=1`);
     snapId = p.json?.[0]?.snapshot_id ?? null;

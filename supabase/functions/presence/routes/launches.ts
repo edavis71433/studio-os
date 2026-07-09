@@ -6,41 +6,19 @@
 // capability + writeChangeEvent (approval + audit). No new pipeline/scheduler.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { getTemplate } from '../lib/render.ts';
-import { serializeDraft } from '../lib/serializer.ts';
-import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { runPipeline } from './publish.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
 import { siteCan } from '../lib/site_roles.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
+import { captureDraftSnapshot, loadStagedSnapshot } from '../lib/staging.ts';
 import { cleanLaunchName, isValidSchedule, canApprove, canSchedule, canPromote, canRollback, canCancel, canRecapture, statusAfterRecapture, launchStatusLabel, type LaunchStatus } from '../lib/launches.ts';
-import type { Snapshot } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
-const actorKind = (p: Principal) => (p.kind === 'staff' ? 'staff' : 'client');
-
-/** Capture the current draft into a persisted (staged, unpublished) snapshot. */
-async function captureDraft(site: SiteRow, principal: Principal): Promise<{ snapshotId: string; blockers: any[]; warnings: any[] } | { error: string; message: string; status: number }> {
-  const t = getTemplate(site.template_slug, site.template_version);
-  if (!t) return { error: 'template_missing', message: 'This site’s template isn’t available.', status: 500 };
-  const now = new Date().toISOString();
-  const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
-  const v = validateSnapshot(snapshot, t.manifest);
-  const ins = await svc('presence_snapshots', {
-    method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: actorKind(principal) }),
-  });
-  if (!ins.ok || !ins.json?.[0]?.id) return { error: 'snapshot_failed', message: 'We couldn’t stage this launch just now.', status: 502 };
-  return { snapshotId: ins.json[0].id as string, blockers: v.blockers, warnings: v.warnings };
-}
-
-async function loadStaged(snapshotId: string): Promise<{ snapshot: Snapshot; mediaManifest: any[] } | null> {
-  const s = await svc(`presence_snapshots?id=eq.${snapshotId}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
-  const row = s.json?.[0]; if (!row) return null;
-  return { snapshot: { content: row.content, content_contract_version: row.content_contract_version, template_slug: row.template_slug, template_version: row.template_version, created_at: row.created_at, dev_customization: row.dev_customization ?? null }, mediaManifest: row.media_manifest || [] };
-}
+// The one capture/load path, shared with the Preview Environment (lib/staging.ts).
+const captureDraft = captureDraftSnapshot;
+const loadStaged = loadStagedSnapshot;
 
 async function getLaunch(site: SiteRow, id: string): Promise<any | null> {
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
