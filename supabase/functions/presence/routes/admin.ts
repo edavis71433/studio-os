@@ -9,6 +9,7 @@
 // actor, never a second renderer or deploy route.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { estimateUsageCostUsd } from '../commerce/pricing.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
@@ -437,6 +438,29 @@ async function handleScopedAccessAudit(req: Request, cors: Record<string, string
   return json({ data: { count: rows.length, denied, allowed: rows.length - denied, events: rows } }, 200, cors);
 }
 
+// ═══ AI cost view (operator-only; governance) ════════════════════════════════
+// Turns the metered token rollup (presence_ai_usage) into an estimated dollar
+// figure per client + a total, for the current period (?period=YYYY-MM to pick).
+// Customers never see this (Law 13); it exists so the owner can watch AI spend.
+async function handleAiUsage(req: Request, cors: Record<string, string>) {
+  const url = new URL(req.url);
+  const period = /^\d{4}-\d{2}$/.test(url.searchParams.get('period') || '') ? url.searchParams.get('period')! : new Date().toISOString().slice(0, 7);
+  const r = await svc(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops,input_tokens,output_tokens,last_at&order=output_tokens.desc.nullslast&limit=1000`);
+  const rows = Array.isArray(r.json) ? r.json : [];
+  const clients = rows.map((x: any) => ({
+    client_id: x.client_id, generative_ops: x.generative_ops || 0, assistive_ops: x.assistive_ops || 0,
+    input_tokens: x.input_tokens || 0, output_tokens: x.output_tokens || 0, last_at: x.last_at,
+    estimated_usd: estimateUsageCostUsd([{ input_tokens: x.input_tokens, output_tokens: x.output_tokens }]).total_usd,
+  }));
+  const totals = estimateUsageCostUsd(rows.map((x: any) => ({ input_tokens: x.input_tokens, output_tokens: x.output_tokens })));
+  return json({ data: {
+    period, client_count: clients.length,
+    totals: { generative_ops: rows.reduce((a: number, x: any) => a + (x.generative_ops || 0), 0), assistive_ops: rows.reduce((a: number, x: any) => a + (x.assistive_ops || 0), 0), input_tokens: rows.reduce((a: number, x: any) => a + (x.input_tokens || 0), 0), output_tokens: rows.reduce((a: number, x: any) => a + (x.output_tokens || 0), 0), ...totals },
+    note: 'Text-token estimate at listed model prices; verify against the provider’s pricing page. Image generation is metered separately (not in this rollup).',
+    clients,
+  } }, 200, cors);
+}
+
 // ═══ ROUTER ═══════════════════════════════════════════════════════════════════
 /** Dispatch /admin/* routes. Returns null when no admin route matches.
  *  Caller (index.ts) has already proven principal.kind === 'staff'. */
@@ -459,6 +483,9 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   // ── SC-2: scoped-access audit ledger — who (agency operator) reached which
   //    client via drill-in, allowed AND denied. Staff-only accountability trail.
   if (route === '/admin/scoped-access' && method === 'GET') return handleScopedAccessAudit(req, cors);
+
+  // ── AI cost view (operator/governance) — metered token usage → estimated $ ──
+  if (route === '/admin/ai-usage' && method === 'GET') return handleAiUsage(req, cors);
 
   // ── M13: agency provisioning (operator creates the agency + its owner seat) ──
   if (route === '/admin/agencies' && method === 'POST') {
