@@ -7,8 +7,12 @@
 // the room invokes the EXISTING Writer/Editor flow — proposal, approval,
 // Draft Writer, all unchanged. Ignoring an opportunity is always free.
 import { json } from '../../_shared/http.ts';
-import { asUser } from '../lib/db.ts';
+import { asUser, svc } from '../lib/db.ts';
 import { runGrowthCoach, decideOpportunity } from '../coach/engine.ts';
+import { coachRead } from '../lib/health_coach.ts';
+import { buildTimeline } from '../lib/customer_timeline.ts';
+import { memorySentence } from '../lib/business_memory.ts';
+import { loadBusinessMemory } from '../concierge/grounding.ts';
 import { anthropicModel } from '../writer/model.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { loadPlan } from '../commerce/enforce.ts';
@@ -34,6 +38,67 @@ export async function handleCoachList(jwt: string, site: SiteRow, cors: Record<s
   const r = await asUser(jwt, `presence_growth_opportunities?site_id=eq.${site.id}&or=(status.eq.open,and(status.eq.deferred,deferred_until.lte.${today}))&select=${OPP_SELECT}&order=timing_ends.asc.nullslast,created_at.desc&limit=12`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open the opportunity list just now.' }, 502, cors);
   return json({ data: r.json ?? [] }, 200, cors);
+}
+
+// ── PT-6: the Business Health Coach — one plain-English read, never a score ──
+// Composes signals the platform already stores into the coach's calm sentence +
+// at most three suggestions. Reuses the notices/approvals/leads/domain state.
+export async function handleCoachHealth(site: SiteRow, cors: Record<string, string>) {
+  const nowIso = new Date().toISOString();
+  const [infra, writes, conns, leads, lastChange, meta] = await Promise.all([
+    svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id`),
+    svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id`),
+    svc(`presence_connections?site_id=eq.${site.id}&select=status,health`),
+    svc(`presence_form_submissions?site_id=eq.${site.id}&status=eq.new&spam=is.false&select=id`),
+    svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
+    svc(`presence_sites?id=eq.${site.id}&select=domain_expires_at&limit=1`),
+  ]);
+  const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
+  const connAttn = arr(conns).filter((c) => ['error', 'expired', 'revoked'].includes(c.status) || ['attention', 'down'].includes(c.health)).length;
+  const lastChangeAt = arr(lastChange)[0]?.created_at || null;
+  const domExp = arr(meta)[0]?.domain_expires_at || null;
+  const domainDays = domExp ? Math.floor((Date.parse(domExp) - Date.parse(nowIso)) / 86400_000) : null;
+  const read = coachRead({
+    live: site.status === 'live',
+    lastPublishedAt: site.last_published_at || null,
+    pendingApprovals: arr(infra).length + arr(writes).length,
+    connectedNeedingAttention: connAttn,
+    searchIssues: 0,
+    leadsWaiting: arr(leads).length,
+    unpublishedChanges: !!lastChangeAt && (!site.last_published_at || lastChangeAt > site.last_published_at),
+    domainExpiringDays: domainDays,
+  }, nowIso);
+  return json({ data: read }, 200, cors);
+}
+
+// ── PT-7: the Customer Timeline — the business journey, from existing events ──
+export async function handleCoachJourney(site: SiteRow, cors: Record<string, string>) {
+  const nowIso = new Date().toISOString();
+  const [firstPub, firstLead, ident, ent, meta] = await Promise.all([
+    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.asc&limit=1`),
+    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at&order=created_at.asc&limit=1`),
+    svc(`presence_identity?site_id=eq.${site.id}&select=settings&limit=1`),
+    site.client_id ? svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=status,created_at,current_period_end&limit=1`) : Promise.resolve({ json: [] }),
+    svc(`presence_sites?id=eq.${site.id}&select=created_at&limit=1`),
+  ]);
+  const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
+  const verification = arr(ident)[0]?.settings?.verification;
+  const e = arr(ent)[0] || {};
+  const journey = buildTimeline({
+    createdAt: arr(meta)[0]?.created_at || nowIso,
+    firstPublishedAt: arr(firstPub)[0]?.completed_at || arr(firstPub)[0]?.created_at || null,
+    searchVerified: !!(verification && (verification.google || verification.bing)),
+    firstInquiryAt: arr(firstLead)[0]?.created_at || null,
+    firstCustomerAt: e.status === 'active' ? (e.created_at || null) : null,
+    renewsAt: e.current_period_end || null,
+  }, nowIso);
+  return json({ data: journey }, 200, cors);
+}
+
+// ── PT-9: AI Business Memory — what the AI knows, assembled from existing data ─
+export async function handleCoachMemory(site: SiteRow, cors: Record<string, string>) {
+  const memory = await loadBusinessMemory(site);
+  return json({ data: { memory, sentence: memorySentence(memory) } }, 200, cors);
 }
 
 export async function handleCoachDecide(req: Request, site: SiteRow, oppId: string, cors: Record<string, string>) {

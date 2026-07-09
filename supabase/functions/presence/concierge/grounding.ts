@@ -6,9 +6,11 @@
 // Engines untouched: this module only READS what M9.0–M9.3 stored.
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { buildBusinessMemory, type BusinessMemory } from '../lib/business_memory.ts';
 
 export interface Grounding {
   businessName: string;
+  businessMemory?: BusinessMemory;   // PT-9: what the AI "remembers" — assembled from existing data
   moments: Array<{
     id: string; key: string; moment_type: string; headline: string; summary: string;
     tone: string; supporting_recommendation_ids: string[];
@@ -23,9 +25,33 @@ export interface Grounding {
   evidence: Array<{ id: string; type: string; human: string; confidence: number }>;
 }
 
+/** PT-9: assemble the AI Business Memory from data the platform already holds —
+ *  ONE place, reused by grounding (concierge) and the /coach/memory endpoint.
+ *  Never a second memory store; pure assembly over existing rows. */
+export async function loadBusinessMemory(site: SiteRow): Promise<BusinessMemory> {
+  const [identQ, offQ] = await Promise.all([
+    svc(`presence_identity?site_id=eq.${site.id}&select=business_name,description,service_area,settings&limit=1`),
+    svc(`presence_offerings?site_id=eq.${site.id}&select=id&limit=200`),
+  ]);
+  const ident = identQ.json?.[0] || {};
+  const settings = ident.settings || {};
+  return buildBusinessMemory({
+    industry: settings.industry || null,
+    voiceTone: settings.voice?.tone || settings.voice_tone || null,
+    identityDescription: ident.description || null,
+    serviceArea: ident.service_area || null,
+    goals: Array.isArray(settings.goals) ? settings.goals : null,
+    siteStatus: site.status,
+    lastPublishedAt: site.last_published_at || null,
+    offeringsCount: Array.isArray(offQ.json) ? offQ.json.length : 0,
+    live: site.status === 'live',
+  }, new Date().toISOString());
+}
+
 export async function buildGrounding(site: SiteRow): Promise<Grounding> {
   const identQ = await svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`);
   const businessName = identQ.json?.[0]?.business_name || 'your business';
+  const businessMemory = await loadBusinessMemory(site).catch(() => undefined);
 
   const momentsQ = await svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,moment_key,moment_type,headline,summary,tone,supporting_recommendation_ids&order=importance.desc&limit=3`);
   const moments = (momentsQ.json ?? []).map((m: Record<string, unknown>) => ({
@@ -77,5 +103,5 @@ export async function buildGrounding(site: SiteRow): Promise<Grounding> {
     evidence = (eQ.json ?? []).map((e: Record<string, unknown>) => ({ id: e.id, type: e.type, human: e.human, confidence: Number(e.confidence) })) as Grounding['evidence'];
   }
 
-  return { businessName, moments, recommendations, judgments, evidence };
+  return { businessName, businessMemory, moments, recommendations, judgments, evidence };
 }

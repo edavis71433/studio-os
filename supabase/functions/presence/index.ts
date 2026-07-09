@@ -38,7 +38,7 @@ import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAc
 import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
-import { handleCoachRun, handleCoachList, handleCoachDecide } from './routes/coach.ts';
+import { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney, handleCoachMemory } from './routes/coach.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
@@ -386,6 +386,9 @@ serve(async (req) => {
   }
   // ── M9.5E: the Growth Coach (observes, plans, prepares; never executes) ──
   if (route === '/coach/run' && method === 'POST') return handleCoachRun(site, cors);
+  if (route === '/coach/health' && method === 'GET') return handleCoachHealth(site, cors);       // PT-6 Business Health Coach
+  if (route === '/coach/journey' && method === 'GET') return handleCoachJourney(site, cors);     // PT-7 Customer Timeline
+  if (route === '/coach/memory' && method === 'GET') return handleCoachMemory(site, cors);       // PT-9 AI Business Memory
   if (route === '/coach/opportunities' && method === 'GET') return handleCoachList(jwt, site, cors);
   {
     const m = route.match(/^\/coach\/opportunities\/([0-9a-f-]{36})\/decide$/);

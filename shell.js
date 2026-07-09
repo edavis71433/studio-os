@@ -221,8 +221,30 @@
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Presence</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/portal.html" aria-label="Sign in">◐</a>';
   }
 
+  // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────
+  // Declarative + reuses the shell: any page marks a `.dds-hint[data-hint]`
+  // element (hidden) next to the thing it explains. We reveal unseen ones with a
+  // "Got it", remember the dismissal, and never show it again. No tour, no steps.
+  function scanHints() {
+    var seen; try { seen = JSON.parse(localStorage.getItem('dds-hints') || '{}'); } catch (_) { seen = {}; }
+    Array.prototype.forEach.call(document.querySelectorAll('.dds-hint[data-hint]'), function (node) {
+      var key = node.getAttribute('data-hint');
+      if (!key || seen[key]) { node.remove(); return; }
+      node.hidden = false;
+      var x = document.createElement('button');
+      x.className = 'x'; x.type = 'button'; x.setAttribute('aria-label', 'Dismiss tip'); x.textContent = 'Got it';
+      x.addEventListener('click', function () {
+        try { seen[key] = 1; localStorage.setItem('dds-hints', JSON.stringify(seen)); } catch (_) { /* */ }
+        node.classList.remove('show'); setTimeout(function () { node.remove(); }, 200);
+      });
+      node.appendChild(x);
+      requestAnimationFrame(function () { node.classList.add('show'); });
+    });
+  }
+
   function boot() {
     mountFrame();
+    scanHints();
     ensureSupabase().then(function () {
       if (!window.supabase) { minimalShell(); return; }
       sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });

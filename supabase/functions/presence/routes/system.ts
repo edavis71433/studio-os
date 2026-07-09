@@ -9,6 +9,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes } from '../ops/scheduler.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runRenewalReminders } from '../commerce/lifecycle.ts';
+import { summarizeHealthCenter } from '../lib/health_center.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -124,7 +125,50 @@ async function health(): Promise<any> {
     failures24h = (fails.ok && Array.isArray(fails.json)) ? fails.json.length : 0;
   } catch { /* dbOk stays false */ }
   const ok = secrets.ok && dbOk;
-  return { ok, secrets, db_ok: dbOk, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, checked_at: new Date().toISOString() };
+  const health_center = await buildHealthCenter(lastCycle, failures24h).catch(() => null);
+  return { ok, secrets, db_ok: dbOk, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
+}
+
+// ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).
+// Aggregates signals the platform already produces into one status per area.
+async function buildHealthCenter(lastCycle: any, failedRuns: number): Promise<any> {
+  const nowIso = new Date().toISOString();
+  const period = nowIso.slice(0, 7);
+  const soon = new Date(Date.now() + 30 * 86400_000).toISOString();
+  const since = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []);
+  const [live, doms, domsSoon, ents, aiUse, notices, failPub] = await Promise.all([
+    svc('presence_sites?status=eq.live&select=id'),
+    svc('presence_sites?custom_domain=not.is.null&select=id'),
+    svc(`presence_sites?custom_domain=not.is.null&domain_expires_at=lte.${encodeURIComponent(soon)}&domain_expires_at=gte.${encodeURIComponent(nowIso)}&select=id`),
+    svc('presence_entitlements?product=eq.presence&select=status'),
+    svc(`presence_ai_usage?period=eq.${period}&select=generative_ops,assistive_ops`),
+    svc('presence_plan_notices?status=eq.active&select=id'),
+    svc(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since)}&select=id`),
+  ]);
+  const entRows = arr(ents) as Array<{ status: string }>;
+  const aiOps = (arr(aiUse) as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0);
+  const missing = Object.values(SECRET_GROUPS).flat().filter((d) => d.required && !envPresent(d.name)).map((d) => d.name);
+  return summarizeHealthCenter({
+    nowIso,
+    cronLastRunAt: lastCycle?.finished_at || lastCycle?.started_at || null,
+    secretsMissingRequired: missing,
+    domainsWatched: arr(doms).length,
+    domainsExpiringSoon: arr(domsSoon).length,
+    billing: {
+      active: entRows.filter((e) => e.status === 'active').length,
+      paused: entRows.filter((e) => e.status === 'paused').length,
+      lapsed: entRows.filter((e) => e.status === 'lapsed').length,
+    },
+    aiConfigured: envPresent('ANTHROPIC_KEY'),
+    aiOpsThisMonth: aiOps,
+    emailConfigured: envPresent('RESEND_KEY'),
+    sitesLive: arr(live).length,
+    failedPublishes: arr(failPub).length,
+    failedRuns,
+    activeNotices: arr(notices).length,
+    backupsVerified: envPresent('BACKUPS_VERIFIED'),
+  });
 }
 
 export async function handleSystem(req: Request, route: string, method: string, cors: Record<string, string>): Promise<Response> {

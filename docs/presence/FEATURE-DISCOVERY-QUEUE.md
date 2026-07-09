@@ -399,3 +399,12 @@ Your Presence / Your website / Creative Studio / Growth all → /presence.html. 
 Runtime + empty states are edition-correct; the remaining piece is first-run wording per edition (website-only vs relationship-only language). Copy layer, no architecture.
 
 ### Still post-Playwright (unchanged): CP-7 NAP drift-watch (GBP adapter scope), SD-5 Search Console provider (new OAuth). FD-CRM3 AI reply-draft = V1.1.
+
+## Phase PT-2B — premium experience (all delivered + tested)
+- PT-4 visual polish (skeleton utility + hint micro-interactions) ✅
+- PT-5 contextual onboarding (declarative shell hints, teach-once) ✅
+- PT-6 Business Health Coach — /coach/health, plain English, no scores ✅
+- PT-7 Customer Timeline — /coach/journey, celebrate milestones ✅
+- PT-8 Admin Health Center — folded into /system/health (no duplicate monitoring) ✅
+- PT-9 AI Business Memory — /coach/memory + concierge grounding, one loader over existing data ✅
+Note: a customer-facing UI for the Health Coach / Timeline / Admin Health Center endpoints is the natural next surface (endpoints + pure cores are done + tested; the HTML views can consume them).
