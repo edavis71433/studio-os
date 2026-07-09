@@ -85,7 +85,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null;
 
-const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN });
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') });
 async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; }
 async function apiPost(p, b){ const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; }
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 3000); }

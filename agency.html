@@ -134,21 +134,12 @@ async function loadKits(){
     });
   }catch(_){host.textContent='Kits wouldn’t load just now.';}
 }
+// SC-1: opening a client drills the WHOLE shell into that client's scope. The
+// scope rides the URL (?client=<id>) — per-tab, shareable, refresh-safe — and the
+// server re-validates it on every request (fail-closed). No app switch, one shell.
 function openClient(siteId){
-  ACTING=CLIENTS.find(c=>c.site_id===siteId)||null; if(!ACTING) return;
-  try{localStorage.setItem('dds-acting-as',JSON.stringify({site_id:ACTING.site_id,name:ACTING.name}));}catch(_){}
-  const c=ACTING,waiting=Number(c.plans_waiting||0);
-  let html=`<div class="acting"><span>Acting for <span class="who">${esc(c.name)}</span></span><button id="back">← All clients</button></div>`;
-  html+=`<h1>${esc(c.name||'(unnamed)')}</h1><p class="sub">${esc(c.edition||'presence')} · ${esc(c.status||'')}</p>`;
-  html+=`<div class="detail"><div class="card"><div class="stat">
-    <div><div class="n">${waiting}</div><div class="l">awaiting approval</div></div>
-    <div><div class="n">${esc(c.moments_count!=null?c.moments_count:'—')}</div><div class="l">open moments</div></div>
-    <div><div class="n">${c.archived?'Archived':'Active'}</div><div class="l">status</div></div>
-  </div></div>`;
-  html+=`<div class="card"><p class="muted">Deeper work for this client — reviewing, publishing, connecting — happens in your studio workspace with your agency permissions. This dashboard keeps your whole portfolio in one calm place.</p>
-    <p style="margin-top:12px"><a class="link" href="/crm.html">Open relationship →</a> &nbsp; <a class="link" href="/dds-studio-manage-9k2p.html">Open studio tools →</a></p></div></div>`;
-  $('main').innerHTML=html;
-  $('back').addEventListener('click',()=>{ACTING=null;try{localStorage.removeItem('dds-acting-as');}catch(_){}renderList('');});
+  const c = CLIENTS.find(x=>x.site_id===siteId); if(!c) return;
+  location.href = '/today.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your agency workspace.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}

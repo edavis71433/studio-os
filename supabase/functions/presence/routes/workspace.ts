@@ -41,7 +41,7 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
   return { role };
 }
 
-export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
   // agency membership drives the Agency nav section (reviewers never need it)
@@ -107,6 +107,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
     landing: landingFor(navCtx),
+    scope: scopedName ? { site_id: site.id, name: scopedName } : null,   // SC-1: agency drill-in → the breadcrumb "Studio › {name}"
     attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals)
     nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);

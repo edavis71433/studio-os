@@ -16,6 +16,8 @@ import { corsFor } from '../_shared/cors.ts';
 import { json } from '../_shared/http.ts';
 import { resolvePrincipal } from '../_shared/auth.ts';
 import { resolveSite } from './lib/site.ts';
+import type { SiteRow } from './lib/site.ts';
+import { resolveScopedSite } from './lib/scope.ts';
 import { checkEntitlement } from './middleware/entitlement.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
 import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
@@ -163,8 +165,20 @@ serve(async (req) => {
     return json({ error: 'not_found', message: `No admin route for ${method} ${route}.` }, 404, cors);
   }
 
-  // 3. resolve the caller's site (RLS-scoped; staff/no-site => null)
-  const site = await resolveSite(jwt);
+  // 3. resolve the caller's site. Un-scoped: RLS confines to the caller's OWN
+  //    site. Scoped (SC-1): an agency operator drilled into a client — the
+  //    x-dds-scope-site header is a REQUEST, re-validated here against agency
+  //    authorization and FAIL-CLOSED (never falls back to another tenant).
+  let site: SiteRow | null;
+  let scopedName: string | null = null;
+  const scopeReq = req.headers.get('x-dds-scope-site');
+  if (scopeReq) {
+    const sc = await resolveScopedSite(jwt, scopeReq);
+    if (!sc.ok) return json({ error: 'scope_denied', message: 'You don’t have access to that client.' }, sc.status, cors);
+    site = sc.site; scopedName = sc.scoped.name;
+  } else {
+    site = await resolveSite(jwt);
+  }
   if (!site) {
     return json({ error: 'no_site', message: 'No Presence site is set up for this account yet.' }, 404, cors);
   }
@@ -270,7 +284,7 @@ serve(async (req) => {
   }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
   // ── A7: Workspace context, members, and client-visibility shares ──
-  if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors);
+  if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);
   if (route === '/portal/members' && method === 'GET') return handleMembersList(jwt, site, principal, cors);
   if (route === '/portal/members' && method === 'POST') return handleMemberAdd(req, jwt, site, principal, cors);

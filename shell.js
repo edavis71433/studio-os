@@ -50,8 +50,19 @@
       document.head.appendChild(s);
     });
   }
+  // SC-1: the active client scope lives in the URL (?client=<id>) — per-tab,
+  // shareable, refresh-safe. It is a REQUEST; the server re-validates it and
+  // fails closed. Only send something UUID-shaped (cosmetic guard; server is law).
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function scopeId() { try { var v = new URLSearchParams(location.search).get('client') || ''; return UUID_RE.test(v) ? v : ''; } catch (_) { return ''; } }
+  function withScope(href) {
+    var s = scopeId(); if (!s || !href || href.charAt(0) !== '/') return href;
+    var hash = '', h = href, hi = h.indexOf('#'); if (hi >= 0) { hash = h.slice(hi); h = h.slice(0, hi); }
+    return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(s) + hash;
+  }
   function api(path) {
-    return fetch(FN + path, { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN } })
+    var s = scopeId();
+    return fetch(FN + path, { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': s } })
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
       .catch(function () { return { ok: false, status: 0, body: {} }; });
   }
@@ -79,15 +90,21 @@
       var isActive = sec.items.some(function (i) { return i.key === activeKey; });
       if (single) {
         var it = sec.items[0];
-        return '<div class="sec' + (isActive ? ' active' : '') + '"><button data-href="' + esc(it.href) + '">' + esc(sec.label) + '</button></div>';
+        return '<div class="sec' + (isActive ? ' active' : '') + '"><button data-href="' + esc(withScope(it.href)) + '">' + esc(sec.label) + '</button></div>';
       }
-      var items = sec.items.map(function (i) { return '<a href="' + esc(i.href) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('');
+      var items = sec.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('');
       return '<div class="sec' + (isActive ? ' active' : '') + '"><button data-sec="' + esc(sec.key) + '">' + esc(sec.label) + ' ▾</button><div class="menu">' + items + '</div></div>';
     }).join('');
 
+    // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
+    var scope = CTX && CTX.scope;
+    var brandHtml = scope && scope.name
+      ? '<span class="dds-brand"><span class="mark">P</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
+      : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
+
     root.innerHTML =
       '<button class="dds-ic dds-burger" id="dds-burger" aria-label="Menu">☰</button>' +
-      '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>' +
+      brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>⌘K</kbd></div>' +
       '<div class="dds-right">' +
@@ -152,7 +169,7 @@
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0; }) : DESTS;
     var box = pal.querySelector('.results');
     if (!list.length) { box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
-    box.innerHTML = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" href="' + esc(d.href) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
+    box.innerHTML = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
   }
 
   // ── notifications (lazy; reuses /portal/feed — no new system) ──
@@ -168,9 +185,9 @@
       var d = r.body.data || {}; var out = '';
       // Phase FLOW: notices first (a lead waiting, a domain expiring) — each taps
       // straight through to the page that resolves it, from any screen.
-      (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(n.href || '/today.html') + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
-      (d.pending_approvals || []).forEach(function (p) { out += '<a class="row" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>'; });
-      (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="/today.html">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
+      (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
+      (d.pending_approvals || []).forEach(function (p) { out += '<a class="row" href="' + esc(withScope((CTX && CTX.landing) || '/today.html')) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>'; });
+      (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
       body.innerHTML = out || '<div class="muted">You’re all caught up.</div>';
     });
   }
@@ -205,7 +222,7 @@
     if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return; }
     var activeKey = activeItemKey(location.pathname, nav);
     var html = (nav || []).map(function (s) {
-      return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(i.href) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('') + '</div>';
+      return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
     if (!drawer) { drawer = el('<div class="dds-drawer"></div>'); document.body.appendChild(drawer); }
     drawer.innerHTML = html; drawer.classList.add('open');

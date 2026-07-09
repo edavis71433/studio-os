@@ -686,7 +686,7 @@ async function api(method, route, body) {
   if (!jwt) { showGate("Please sign in", "Your room uses the same sign-in as your portal. Sign in there and come straight back.", true); throw new Error("no-session"); }
   const r = await fetch(FN + route, {
     method,
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt },
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await r.text();
@@ -697,7 +697,7 @@ async function api(method, route, body) {
 async function apiHtml(route) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt } });
+  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
   const text = await r.text();
   if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t draw that page just now."); e.status = r.status; throw e; }
   return text;

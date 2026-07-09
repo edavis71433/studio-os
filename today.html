@@ -96,8 +96,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "";
 
-async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN } }); return r.ok ? r.json() : Promise.reject(r.status); }
-async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') } }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
 
 function greet(){ const h = new Date().getHours(); return h < 12 ? 'Good morning.' : h < 18 ? 'Good afternoon.' : 'Good evening.'; }
 
