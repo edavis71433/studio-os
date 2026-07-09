@@ -53,5 +53,18 @@ select cron.schedule('presence_ops_coach', '0 15 * * 1', $$
   );
 $$);
 
+-- AN-3.1: Search Console sync — daily 07:00 UTC (GSC data is ~1–2 days behind + a
+-- generous daily quota; monthly totals don't need more than a daily refresh)
+select cron.schedule('presence_gsc_sync', '0 7 * * *', $$
+  select net.http_post(
+    url    := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
+    headers:= '{"Content-Type":"application/json"}'::jsonb,
+    body   := '{"secret":"<SCHEDULER_SECRET>","task":"gsc_sync"}'::jsonb
+  );
+$$);
+-- OWNER-GATED: this job does nothing until the Google OAuth app + CONNECTED_GOOGLE_
+-- SEARCH_CONSOLE_CLIENT_ID/_SECRET + CONNECTION_ENC_KEY are set and at least one
+-- customer has connected Search Console (each unconnected site is skipped).
+
 -- to inspect:   select jobname, schedule, active from cron.job where jobname like 'presence_ops_%';
 -- to remove:    select cron.unschedule('presence_ops_cycle'); (etc.)

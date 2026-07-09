@@ -20,7 +20,15 @@ import {
   trafficInsights, trafficNotice, periodWord, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
-import { searchInsights, searchNotice, searchHealth, searchMilestones, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
+import { searchInsights, searchNotice, searchHealth, searchMilestones, searchDetailInsights, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
+
+/** AN-3.1: top queries + pages for a period (from presence_search_terms). */
+async function readSearchTerms(clientId: string, period: string): Promise<{ queries: any[]; pages: any[] }> {
+  if (!clientId || !period) return { queries: [], pages: [] };
+  const r = await svc(`presence_search_terms?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${encodeURIComponent(period)}&select=dimension,key,clicks,impressions,position&order=clicks.desc&limit=20`);
+  const rows = Array.isArray((r as any).json) ? (r as any).json : [];
+  return { queries: rows.filter((x: any) => x.dimension === 'query').slice(0, 5), pages: rows.filter((x: any) => x.dimension === 'page').slice(0, 5) };
+}
 import type { SiteRow } from '../lib/site.ts';
 
 /** Read the Google Search Console metrics that already live in the shared `signals`
@@ -64,8 +72,8 @@ const periodOf = (req: Request): Period => (new URL(req.url).searchParams.get('p
 /** Are the traffic/search providers actually connected? (They are 'planned' today,
  *  so this is honestly false — Analytics then says so rather than faking a number.) */
 async function connectionState(siteId: string): Promise<{ ga: boolean; gsc: boolean }> {
-  const r = await svc(`presence_connections?site_id=eq.${siteId}&select=provider,status`);
-  const live = new Set(arr(r).filter((c) => ['connected', 'verified', 'active'].includes(String(c.status))).map((c) => c.provider));
+  const r = await svc(`presence_connections?site_id=eq.${siteId}&select=provider_key,status`);
+  const live = new Set(arr(r).filter((c) => ['connected', 'verified', 'active'].includes(String(c.status))).map((c) => c.provider_key));
   return { ga: live.has('google_analytics'), gsc: live.has('google_search_console') };
 }
 
@@ -207,13 +215,15 @@ export async function handleAnalyticsSearch(_req: Request, site: SiteRow, cors: 
   // AN-3: real Search Performance from the shared `signals` table when present.
   const gsc = await readGsc(site.client_id);
   const connected = conn.gsc || gsc.hasData;
+  // AN-3.1: query/page detail now flows from presence_search_terms (via the GSC sync)
+  const detail = gsc.hasData ? await readSearchTerms(site.client_id, gsc.period) : { queries: [], pages: [] };
+  const detailCards = searchDetailInsights(detail.queries, detail.pages);
   return json({ data: {
     readiness,
     performance: searchInsights(gsc),               // real impressions/clicks when connected; [] otherwise
+    detail: detailCards,                            // top searches + best page, in plain English
     milestones: gsc.hasData ? searchMilestones(gsc.totalImpressions, gsc.totalClicks, gsc.firstImpressionAt, gsc.firstSearchClickAt) : [],
-    // Query- and page-level detail (which searches, which pages) isn't stored yet —
-    // honest, not faked. Impressions/clicks are the measured figures we have.
-    detail_available: false,
+    detail_available: detailCards.length > 0,
     not_measured: connected ? [] : notMeasured(true, false),
     connected: { search_console: connected },
   } }, 200, cors);

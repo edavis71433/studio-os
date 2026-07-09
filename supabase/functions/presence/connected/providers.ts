@@ -14,7 +14,7 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
   // ── Search ──────────────────────────────────────────────────────────────
   { key: 'google_search_console', name: 'Google Search Console', customerLabel: 'how you show up in Google Search',
     category: 'search', purpose: 'See which searches bring people to you, and whether Google can find your pages.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['webmasters.readonly'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],   // AN-3.1: full scope URL (Google rejects the short form)
     reads: ['the searches that lead to you', 'how often you appear and get clicked', 'pages Google has trouble reading'],
     futureWrites: ['submit a sitemap', 'ask Google to re-check a page'], minEdition: 'presence_monitor',
     rateNote: 'generous daily quota; observed on a gentle schedule', status: 'planned' },

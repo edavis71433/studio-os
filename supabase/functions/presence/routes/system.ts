@@ -8,6 +8,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes } from '../ops/scheduler.ts';
+import { runGscSync } from '../ops/gsc_sync.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runRenewalReminders } from '../commerce/lifecycle.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
 
@@ -190,6 +191,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);
       if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
+      if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
       // default cycle ALSO fires any due scheduled publishes, so a single cron tick covers both
       const cycle = await runOperationsCycle({ limit });
       const scheduled = await runDuePublishes(limit);
