@@ -9,65 +9,164 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..500&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --p:#5b3fa0; --ink:#1a1523; --muted:#7a6d8e; --cream:#faf8f4; --line:rgba(91,63,160,0.14); }
+  :root { --p:#5b3fa0; --pdark:#2a1b4a; --ink:#1a1523; --muted:#7a6d8e; --cream:#faf8f4; --line:rgba(91,63,160,0.14); --good:#1a7e49; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Inter',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:20px; padding:44px 40px; max-width:520px; width:100%; }
+  body { font-family:'Inter',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; padding:32px 24px; }
+  .shell { max-width:940px; margin:0 auto; display:grid; grid-template-columns:1.15fr .85fr; gap:20px; align-items:start; }
+
+  /* LEFT — the offer, in plain language */
+  .detail { background:#fff; border:1px solid var(--line); border-radius:20px; padding:38px 36px; }
   .eyebrow { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--p); margin-bottom:10px; }
-  h1 { font-family:'Fraunces',serif; font-weight:400; font-size:30px; line-height:1.2; margin-bottom:10px; }
-  .sub { font-size:14.5px; line-height:1.6; color:var(--muted); margin-bottom:26px; }
-  .price { font-size:14.5px; color:var(--ink); margin-bottom:26px; }
-  .price strong { font-size:18px; }
+  h1 { font-family:'Fraunces',serif; font-weight:400; font-size:30px; line-height:1.18; margin-bottom:12px; }
+  .summary { font-size:14.5px; line-height:1.65; color:var(--muted); margin-bottom:22px; }
+  .meta { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:14px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-bottom:24px; }
+  .meta .amt { font-family:'Fraunces',serif; font-size:34px; color:var(--ink); line-height:1; }
+  .meta .when { font-size:13.5px; color:var(--muted); }
+  .inc-h { font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink); margin-bottom:16px; }
+  .inc { list-style:none; display:flex; flex-direction:column; gap:16px; }
+  .inc li { display:grid; grid-template-columns:22px 1fr; gap:12px; }
+  .inc .tick { width:22px; height:22px; border-radius:50%; background:rgba(91,63,160,0.09); color:var(--p); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+  .inc .what { font-size:14px; font-weight:600; color:var(--ink); line-height:1.4; margin-bottom:3px; }
+  .inc .why { font-size:13px; color:var(--muted); line-height:1.6; }
+  .credit { margin-top:24px; padding:14px 16px; background:rgba(26,126,73,0.07); border:1px solid rgba(26,126,73,0.18); border-radius:12px; font-size:13px; line-height:1.55; color:#256b45; }
+  .credit strong { color:var(--good); }
+
+  /* RIGHT — the checkout */
+  .buy { background:#fff; border:1px solid var(--line); border-radius:20px; padding:32px 30px; position:sticky; top:32px; }
+  .buy .bt { font-family:'Fraunces',serif; font-size:19px; margin-bottom:4px; }
+  .buy .bp { font-size:13.5px; color:var(--muted); margin-bottom:22px; }
+  .buy .bp strong { color:var(--ink); font-size:15px; }
   label { display:block; font-size:12.5px; font-weight:600; margin:0 0 6px; }
-  input, textarea { width:100%; font-family:inherit; font-size:14px; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px; background:var(--cream); outline:none; margin-bottom:16px; }
+  input, textarea { width:100%; font-family:inherit; font-size:14px; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px; background:var(--cream); outline:none; margin-bottom:15px; }
   input:focus, textarea:focus { border-color:var(--p); background:#fff; }
-  textarea { resize:vertical; min-height:70px; }
+  textarea { resize:vertical; min-height:64px; }
   button { width:100%; background:var(--p); color:#fff; border:none; padding:14px; border-radius:100px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
   button:disabled { opacity:.6; cursor:default; }
   .err { display:none; color:#c0392b; font-size:13px; margin-top:12px; text-align:center; }
   .fine { font-size:11.5px; color:var(--muted); text-align:center; margin-top:14px; line-height:1.5; }
+  .disc { font-size:11px; color:var(--muted); line-height:1.55; margin-top:18px; }
   .hp { position:absolute; left:-9999px; opacity:0; }
+  .back { display:inline-block; font-size:13px; color:var(--muted); text-decoration:none; margin-bottom:20px; }
+  .back:hover { color:var(--p); }
+
+  @media (max-width:760px) {
+    body { padding:20px 16px; }
+    .shell { grid-template-columns:1fr; gap:16px; }
+    .detail { padding:30px 24px; }
+    .buy { position:static; padding:28px 24px; }
+    h1 { font-size:26px; }
+  }
 </style>
 </head>
 <body>
-  <div class="card">
-    <div class="eyebrow">Davis Digital Studio</div>
-    <h1 id="a-title">Get your website audit</h1>
-    <p class="sub" id="a-desc">A complete review of your website and local search presence, done by a person, not a bot.</p>
-    <p class="price"><strong id="a-price">$99</strong> · <span id="a-delivery">delivered within 3 business days</span></p>
-    <label for="a-name">Your name or business name</label>
-    <input id="a-name" placeholder="e.g. Rosa's Bakery" maxlength="120">
-    <label for="a-email">Email</label>
-    <input id="a-email" type="email" placeholder="you@business.com" maxlength="200">
-    <label for="a-website">Your website <span style="font-weight:400;color:var(--muted);">(leave blank if you don't have one)</span></label>
-    <input id="a-website" placeholder="yourbusiness.com" maxlength="300">
-    <label for="a-notes">Anything specific you want looked at? <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
-    <textarea id="a-notes" maxlength="1000" placeholder="e.g. we're not showing up on Google Maps"></textarea>
-    <input class="hp" id="a-company" tabindex="-1" autocomplete="off" aria-hidden="true">
-    <button id="a-go" onclick="startCheckout()">Continue to secure checkout &rarr;</button>
-    <div class="err" id="a-err"></div>
-    <p class="fine">Secure payment via Stripe. Card, bank, Apple Pay &amp; Google Pay accepted.<br>Davis Digital Studio · 3727 W. Magnolia Blvd #1061, Burbank, CA 91505</p>
+  <div class="shell">
+    <!-- LEFT: what you get, and why each part matters -->
+    <div class="detail">
+      <a href="/audit.html#pricing" class="back">&larr; Compare all audit tiers</a>
+      <div class="eyebrow">Davis Digital Studio</div>
+      <h1 id="a-title">Get your website audit</h1>
+      <p class="summary" id="a-summary">A complete review of your website and local search presence, done by a person, not a bot.</p>
+      <div class="meta">
+        <span class="amt" id="a-price">$99</span>
+        <span class="when">· <span id="a-delivery">delivered within 3 business days</span></span>
+      </div>
+      <div class="inc-h">What's included</div>
+      <ul class="inc" id="a-includes"></ul>
+      <div class="credit" id="a-credit">Every dollar you pay here is <strong>credited toward a full project</strong> if you decide to move forward. You never pay twice.</div>
+    </div>
+
+    <!-- RIGHT: the checkout form -->
+    <div class="buy">
+      <div class="bt">Start your audit</div>
+      <p class="bp"><strong id="a-price2">$99</strong> · <span id="a-delivery2">3 business days</span></p>
+      <label for="a-name">Your name or business name</label>
+      <input id="a-name" placeholder="e.g. Rosa's Bakery" maxlength="120">
+      <label for="a-email">Email</label>
+      <input id="a-email" type="email" placeholder="you@business.com" maxlength="200">
+      <label for="a-website">Your website <span style="font-weight:400;color:var(--muted);">(leave blank if you don't have one)</span></label>
+      <input id="a-website" placeholder="yourbusiness.com" maxlength="300">
+      <label for="a-notes">Anything specific you want looked at? <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <textarea id="a-notes" maxlength="1000" placeholder="e.g. we're not showing up on Google Maps"></textarea>
+      <input class="hp" id="a-company" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button id="a-go" onclick="startCheckout()">Continue to secure checkout &rarr;</button>
+      <div class="err" id="a-err"></div>
+      <p class="fine">Secure payment via Stripe. Card, bank, Apple Pay &amp; Google Pay accepted.<br>Davis Digital Studio · 3727 W. Magnolia Blvd #1061, Burbank, CA 91505</p>
+      <p class="disc">Some audit inputs are AI-assisted and some use third-party tools like Google Lighthouse and SEMrush. Every paid audit includes strategic review and prioritization by Eric personally. No audit guarantees rankings, traffic, or revenue.</p>
+    </div>
   </div>
 <script>
 var FN = "https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api";
 var ANON = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE"; // same anon key the portal uses
 
-// Tier catalog for display only — the SERVER sets the real price. These are
-// just labels; changing a number here does NOT change what someone is charged.
+// Tier catalog for DISPLAY only — the SERVER sets the real price. Changing a
+// number or line here does NOT change what someone is charged; it only changes
+// what they read. Each included item is { what, why } so the page can explain,
+// in plain language, exactly what's in the tier AND why it's worth it. The line
+// items mirror what audit.html promises for each tier — one source of truth.
 var TIERS = {
-  starter:     { title: "Starter Audit",           price: "$99",  delivery: "delivered in 24 hours",       desc: "A real 1-page report you can act on, with your top 3 priority fixes." },
-  health:      { title: "Digital Health Check",     price: "$499", delivery: "delivered in 5 business days", desc: "The complete picture: a 6-page branded report covering everything, plus a walkthrough call." },
-  competitive: { title: "Competitive Intelligence", price: "$899", delivery: "delivered in 7 business days", desc: "Everything in the Health Check, plus 3 competitor sites analyzed and a 60-minute strategy call." }
+  starter: {
+    title: "Starter Audit",
+    price: "$99",
+    delivery: "delivered in 24 hours",
+    deliveryShort: "in 24 hours",
+    summary: "A fast, human review of your most important page — the three things worth fixing first, and exactly how to fix them.",
+    includes: [
+      { what: "A real homepage review, by a person", why: "Eric opens your site and goes through it the way a customer would — not an automated score that misses what actually matters." },
+      { what: "Your top 3 priority fixes", why: "The three changes that will move the needle most, ranked — so you know exactly where to start instead of guessing." },
+      { what: "Clear next steps for each", why: "Every fix comes with what to do about it, written so you or your developer can act on it right away." },
+      { what: "A 1-page branded PDF you keep", why: "A clean, shareable report that's yours to keep — whether or not you ever work with us." }
+    ]
+  },
+  health: {
+    title: "Digital Health Check",
+    price: "$499",
+    delivery: "delivered in 5 business days",
+    deliveryShort: "in 5 business days",
+    summary: "The complete picture across everything that affects whether customers find you and stay — plus a call to walk through it together.",
+    includes: [
+      { what: "Full Google visibility analysis", why: "Exactly how you show up in search today, what's holding you back, and what to fix first." },
+      { what: "Mobile & Lighthouse breakdown", why: "Your real Google performance and mobile scores, explained clearly — not just a wall of numbers." },
+      { what: "On-page SEO across every page", why: "Every page checked for the signals Google reads — titles, structure, keywords — not just the homepage." },
+      { what: "Content & messaging review", why: "Whether your words actually tell visitors what you do and why to choose you, page by page." },
+      { what: "Conversion path analysis", why: "Where visitors get stuck or drop off before they call or buy — and how to smooth the path." },
+      { what: "A prioritized fix list, ranked by impact", why: "Everything we find, ordered by what helps most, so your effort goes where it pays off." },
+      { what: "A 6-page branded PDF report", why: "A thorough, professional report you can keep, share, or hand to any developer." },
+      { what: "A 30-minute walkthrough call", why: "We go through the findings together, so you leave knowing exactly what to do next." }
+    ]
+  },
+  competitive: {
+    title: "Competitive Intelligence",
+    price: "$899",
+    delivery: "delivered in 7 business days",
+    deliveryShort: "in 7 business days",
+    summary: "Everything in the Health Check, plus a clear read on your competition — what they're doing that you aren't, and how to get ahead.",
+    includes: [
+      { what: "Everything in the Digital Health Check", why: "The full audit above, in its entirety, for your own site — nothing left out." },
+      { what: "3 competitor sites analyzed", why: "A side-by-side look at three competitors: what they're doing that you aren't, and where you can win." },
+      { what: "Keyword gap report (via SEMrush)", why: "The searches your competitors rank for and you don't — the exact terms worth going after." },
+      { what: "Backlink comparison", why: "Who links to them versus you — the reputation signals Google counts, and where to close the gap." },
+      { what: "Local SEO ranking report", why: "Exactly where you stand in local search near you, and what it takes to climb." },
+      { what: "A 60-minute strategy call", why: "A full hour to turn all of it into a plan you can actually run." }
+    ]
+  }
 };
 var TIER = (new URLSearchParams(location.search).get("tier") || "starter").toLowerCase();
 if (!TIERS[TIER]) TIER = "starter";
+
+function esc(s){ var d=document.createElement("div"); d.textContent=String(s==null?"":s); return d.innerHTML; }
 (function applyTier(){
   var t = TIERS[TIER];
   document.getElementById("a-title").textContent = t.title;
-  document.getElementById("a-desc").textContent = t.desc;
+  document.getElementById("a-summary").textContent = t.summary;
   document.getElementById("a-price").textContent = t.price;
+  document.getElementById("a-price2").textContent = t.price;
   document.getElementById("a-delivery").textContent = t.delivery;
+  document.getElementById("a-delivery2").textContent = t.deliveryShort;
   document.title = t.title + " | Davis Digital Studio";
+  var tick = '<span class="tick"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>';
+  document.getElementById("a-includes").innerHTML = t.includes.map(function(i){
+    return '<li>' + tick + '<div><div class="what">' + esc(i.what) + '</div><div class="why">' + esc(i.why) + '</div></div></li>';
+  }).join("");
 })();
 async function startCheckout() {
   var err = document.getElementById("a-err");
@@ -77,7 +176,7 @@ async function startCheckout() {
   if (!name) { err.textContent = "Please add your name or business name."; err.style.display = "block"; return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "Please add a valid email — your audit is delivered there."; err.style.display = "block"; return; }
   var btn = document.getElementById("a-go");
-  btn.disabled = true; btn.textContent = "Opening secure checkout\u2026";
+  btn.disabled = true; btn.textContent = "Opening secure checkout…";
   try {
     var r = await fetch(FN, {
       method: "POST",
@@ -96,10 +195,10 @@ async function startCheckout() {
     err.textContent = "Checkout couldn't start" + (j && j.detail ? ": " + j.detail : ". Please try again in a moment.");
     err.style.display = "block";
   } catch (e) {
-    err.textContent = "Connection issue \u2014 please try again.";
+    err.textContent = "Connection issue — please try again.";
     err.style.display = "block";
   }
-  btn.disabled = false; btn.textContent = "Continue to secure checkout \u2192";
+  btn.disabled = false; btn.textContent = "Continue to secure checkout →";
 }
 </script>
 </body>
