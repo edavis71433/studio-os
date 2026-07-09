@@ -9,32 +9,48 @@
 <style>
   :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 .1em;letter-spacing:-.01em}
+  .wrap{max-width:680px;margin:0 auto;padding:30px 20px 90px}
+  header{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:0 0 .1em;letter-spacing:-.01em}
   header .sub{color:var(--soft);font-size:15px;margin:0}
+  .seg{margin-left:auto;display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:2px}
+  .seg button{border:none;background:none;color:var(--soft);font:inherit;font-size:13px;font-weight:600;padding:6px 13px;border-radius:999px;cursor:pointer}
+  .seg button.on{background:var(--p-soft);color:var(--p)}
   h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:30px 0 12px}
-  .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
-  .item .who{font-weight:600;font-size:15.5px}
-  .item .body{margin-top:6px;font-size:14.5px;color:var(--soft)}
-  .lead{background:var(--p-soft);border:1px solid transparent;border-radius:14px;padding:18px 20px;margin-top:20px}
-  .lead p{font-size:15px;color:var(--ink)} .lead .m{color:var(--soft);font-size:14px;margin-top:6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px 19px;box-shadow:var(--shadow);margin-bottom:12px;display:block;text-decoration:none;color:inherit}
+  a.card:hover{border-color:var(--p)}
+  .card.good{border-left:3px solid var(--good)} .card.attention{border-left:3px solid var(--warn)}
+  .card .s{font-size:16px;line-height:1.5;font-weight:500}
+  .card .d{margin-top:6px;font-size:14px;color:var(--soft)}
+  .card .n{font-family:var(--serif);font-size:30px;line-height:1;color:var(--p);float:right;margin:0 0 6px 14px;font-variant-numeric:tabular-nums}
+  .card .go{margin-top:11px;color:var(--p);font-weight:600;font-size:13px}
+  .sugg{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .sugg a{color:var(--p);text-decoration:none;font-size:14px;font-weight:600}
+  .watch{background:var(--p-soft);border:1px solid transparent;border-radius:14px;padding:15px 18px;margin-bottom:12px}
+  .watch .h{font-weight:600;font-size:15px} .watch .b{font-size:14px;color:var(--soft);margin-top:4px}
+  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:15px 18px;color:var(--soft);font-size:14.5px;margin-bottom:12px}
+  .quiet b{color:var(--ink);font-weight:600}
+  .center{text-align:center;padding:56px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
   .muted{color:var(--soft);font-size:14.5px}
   a.link{color:var(--p);text-decoration:none;font-weight:600}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
-  .center{text-align:center;padding:56px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
-  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  .print{margin-top:26px;text-align:center}
+  .print button{background:none;border:1px solid var(--line);border-radius:10px;color:var(--soft);font:inherit;font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer}
+  .print button:hover{border-color:var(--p);color:var(--p)}
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  @media print{.seg,.print,#dds-shell,footer .noprint{display:none!important}.wrap{max-width:100%}.card{box-shadow:none;break-inside:avoid}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Analytics — your business in plain language.</footer>
+  <footer>Studio OS · Analytics — your business in plain language. Numbers only where they’re real.</footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
 <script>
@@ -44,26 +60,57 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="";
-async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+let TOKEN="", PERIOD='week', CTX=null;
+async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
 
-function render(feed){
-  const moments=(feed.moments||[]);
-  let h=`<header><h1>Analytics</h1><p class="sub">What’s happening with your business — in plain language.</p></header>`;
-  // Understanding, framed as sentences. Reuses the existing Business-understanding
-  // signals; the dedicated Analytics phase enriches this same home with visits,
-  // sources, and key actions.
-  if(moments.length){
-    h+=`<h2>What we’re noticing</h2>`;
-    for(const m of moments){h+=`<div class="item"><div class="who">${esc(m.headline||'A pattern in your business')}</div>${m.summary?`<div class="body">${esc(m.summary)}</div>`:''}</div>`;}
-  }else{
-    h+=`<div class="lead"><p>Your understanding is gathering.</p><p class="m">As people visit your website and reach out, Studio OS will explain what’s happening here — in sentences, not charts. In the meantime, <a class="link" href="/today.html">Today</a> shows what needs you now.</p></div>`;
+function insightCard(i){
+  const cls=i.tone==='good'?'good':i.tone==='attention'?'attention':'';
+  const num=(i.number!=null&&i.number!=='')?`<span class="n">${esc(i.number)}</span>`:'';
+  const go=i.href?`<div class="go">Take a look →</div>`:'';
+  const tag=i.href?'a':'div';const href=i.href?` href="${esc(i.href)}"`:'';
+  return `<${tag} class="card ${cls}"${href}>${num}<div class="s">${esc(i.sentence)}</div>${i.detail?`<div class="d">${esc(i.detail)}</div>`:''}${go}</${tag}>`;
+}
+function seg(){return `<div class="seg noprint"><button data-p="week" class="${PERIOD==='week'?'on':''}">This week</button><button data-p="month" class="${PERIOD==='month'?'on':''}">This month</button></div>`;}
+
+function renderHome(d){
+  let h=`<header><h1>Analytics</h1><p class="sub">${esc(d.headline||'How your business is doing.')}</p>${seg()}</header>`;
+  h+=(d.insights||[]).map(insightCard).join('');
+  if(d.health&&d.health.sentence){
+    h+=`<h2>Health</h2><div class="card ${d.health.status==='attention'?'attention':d.health.status==='healthy'?'good':''}"><div class="s">${esc(d.health.sentence)}</div>`;
+    if((d.health.suggestions||[]).length){h+=`<div class="sugg">`+d.health.suggestions.map(s=>`<a href="${esc(s.href||'#')}">${esc(s.text||s)} →</a>`).join('')+`</div>`;}
+    h+=`</div>`;
   }
+  if((d.watching||[]).length){h+=`<h2>What we’re noticing</h2>`+d.watching.map(m=>`<div class="watch"><div class="h">${esc(m.headline||'')}</div>${m.summary?`<div class="b">${esc(m.summary)}</div>`:''}</div>`).join('');}
+  if((d.not_measured||[]).length){
+    h+=`<h2>Not measured yet</h2>`;
+    h+=d.not_measured.map(c=>`<div class="quiet"><b>${esc(c.title)}.</b> ${esc(c.sentence)}${c.href?` <a class="link" href="${esc(c.href)}">Connect →</a>`:''}</div>`).join('');
+  }
+  h+=`<div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
+  $('main').innerHTML=h;
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{PERIOD=b.dataset.p;load();});
+}
+function renderPortfolio(d){
+  let h=`<header><h1>Analytics</h1><p class="sub">${esc(d.headline||'Across your clients.')}</p></header>`;
+  if(!(d.insights||[]).length){h+=`<div class="quiet"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`;}
+  h+=(d.insights||[]).map(insightCard).join('');
+  h+=`<div class="card"><div class="s">Open the Studio to work client by client.</div><a class="go" href="/agency.html">Open Studio →</a></div>`;
+  h+=`<div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
   $('main').innerHTML=h;
 }
+async function load(){
+  // Agency, unscoped → the portfolio lens (AN-7). Otherwise the business home.
+  if(CTX&&CTX.is_agency&&!scope()){
+    const r=await api('/analytics/portfolio');
+    if(r.ok){renderPortfolio(r.body.data||{});return;}
+  }
+  const r=await api('/analytics?period='+PERIOD);
+  if(!r.ok){ if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Analytics lives in your full workspace.</h2></div>`;return;} trouble(); return; }
+  renderHome(r.body.data||{});
+}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const feed=await api('/portal/feed');if(!feed.ok){trouble();return;}render((feed.body&&feed.body.data)||{});}catch(_){trouble();}})();
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const c=await api('/portal/context');CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
 </script>
 </body>
 </html>

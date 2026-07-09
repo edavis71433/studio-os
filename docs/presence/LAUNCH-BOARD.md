@@ -78,3 +78,10 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 ## The one-paragraph plan
 
 **Beta is close.** The engine is done and trustworthy; the beta work is almost entirely *plumbing to a front door and basic ops*: push what's built (B1), make the portal show Moments + Concierge (B2), stand up CI + backups + monitoring (B3, B4, B8), and close the two security items (B5, B6). **Public launch** adds the connected UI + legal + a11y + the operator-auth path. **Everything else waits for v1.1.** Do not let the breadth of the platform (marketplace, enterprise, agency) pull the beta scope wide — those are proven foundations that can ship behind a flag and get their UIs after the core product is live and monitored.
+
+---
+
+## Post-freeze customer-facing completions (not beta gates — quality/coverage)
+- **Architecture v1.0 migration** — primary nav = outcomes only (Analytics first-class; Settings/Connections/Help → overflow); full customer terminology sweep (Files/Customers/Messages/Website; brand = Studio OS).
+- **DAM-1 Files Excellence** — the DAM presented as **Files** (files.html) with where-used usage graph, safe replace/rollback/duplicate, PDF documents (mig 0065). Live-verified against staging (16/16); fixed a real storage-sign bug.
+- **AN-1 Analytics Excellence** — first-class Analytics as plain-English understanding (no dashboards, **zero added AI**, **never fabricates** — traffic/search honestly "not measured yet"). Composes existing signals; agency portfolio lens reuses buildPortfolio. The remaining honest gap to make traffic/search *real* = first-party visitor tracking + GA/GSC ingestion (V1.1).

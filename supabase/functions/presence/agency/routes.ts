@@ -42,8 +42,9 @@ async function loadSites(ids: string[]): Promise<SiteRow[]> {
   return r.json ?? [];
 }
 
-/* ── the fixed-cost gather: one batched query per table, any client count ── */
-async function gather(agencyId: string, nowIso: string): Promise<PortfolioInput> {
+/* ── the fixed-cost gather: one batched query per table, any client count ──
+ *  Exported so Analytics (AN-7) composes the SAME portfolio rollup — no duplicate aggregation. */
+export async function gather(agencyId: string, nowIso: string): Promise<PortfolioInput> {
   const linksQ = await svc(`presence_agency_clients?agency_id=eq.${agencyId}&select=site_id,status,tags,owner_email,assigned,notes,onboarded_at&limit=1000`);
   const links = (linksQ.json ?? []) as PortfolioInput['links'];
   const ids = links.map((l) => l.site_id);

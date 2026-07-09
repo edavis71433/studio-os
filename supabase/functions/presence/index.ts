@@ -42,6 +42,7 @@ import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
 import { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney, handleCoachMemory } from './routes/coach.ts';
+import { handleAnalyticsHome, handleAnalyticsCustomers, handleAnalyticsSearch, handleAnalyticsPortfolio } from './routes/analytics.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
@@ -164,6 +165,10 @@ serve(async (req) => {
     if (resp) return resp;
     return json({ error: 'not_found', message: `No admin route for ${method} ${route}.` }, 404, cors);
   }
+
+  // ── AN-7: agency-scope Analytics — an agency member owns no site, so this is
+  //    resolved from the JWT (portfolio rollup) BEFORE caller-site resolution.
+  if (route === '/analytics/portfolio' && method === 'GET') return handleAnalyticsPortfolio(jwt, cors);
 
   // 3. resolve the caller's site. Un-scoped: RLS confines to the caller's OWN
   //    site. Scoped (SC-1): an agency operator drilled into a client — the
@@ -430,6 +435,12 @@ serve(async (req) => {
       if (m[2] === '/disconnect' && method === 'POST') return handleConnectionDisconnect(site, m[1], principal, cors);
     }
   }
+  // ── AN-1: Analytics — plain-English understanding composed from stored signals
+  //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
+  if (route === '/analytics' && method === 'GET') return handleAnalyticsHome(req, site, cors);
+  if (route === '/analytics/customers' && method === 'GET') return handleAnalyticsCustomers(req, site, cors);
+  if (route === '/analytics/search' && method === 'GET') return handleAnalyticsSearch(req, site, cors);
+
   // ── M9.5E: the Growth Coach (observes, plans, prepares; never executes) ──
   if (route === '/coach/run' && method === 'POST') return handleCoachRun(site, cors);
   if (route === '/coach/health' && method === 'GET') return handleCoachHealth(site, cors);       // PT-6 Business Health Coach
