@@ -105,9 +105,10 @@ export async function signThumb(storagePath: string, mime: string, width = 320):
   if (!isImageMime(mime)) return null;
   try {
     const objectPath = storagePath.replace(`${BUCKET}/`, '');
-    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=3600`, {
+    // expiresIn MUST be in the body (the sign endpoint 400s on a query-string expiresIn)
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transform: { width, format: 'webp', quality: 72 } }),
+      body: JSON.stringify({ expiresIn: 3600, transform: { width, format: 'webp', quality: 72 } }),
     });
     const j = await r.json().catch(() => null);
     return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
@@ -120,13 +121,16 @@ export async function signThumb(storagePath: string, mime: string, width = 320):
 export async function signDownload(storagePath: string, filename?: string): Promise<string | null> {
   try {
     const objectPath = storagePath.replace(`${BUCKET}/`, '');
-    const dl = filename ? `&download=${encodeURIComponent(filename)}` : '';
-    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=600${dl}`, {
+    // expiresIn MUST be in the body; the friendly download filename rides the signed URL.
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-      body: '{}',
+      body: JSON.stringify({ expiresIn: 600 }),
     });
     const j = await r.json().catch(() => null);
-    return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+    if (!j?.signedURL) return null;
+    let url = `${SB_URL}/storage/v1${j.signedURL}`;
+    if (filename) url += (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(filename);
+    return url;
   } catch { return null; }
 }
 
