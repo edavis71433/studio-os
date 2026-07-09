@@ -48,4 +48,6 @@ Only agency roles with `bulk_publish` (owner/admin/account_manager) may drill in
 - **Financial customers?** Same: the tenant boundary is trustworthy; SOC-2-grade controls (access audit trails, change management) are org-level work beyond this mechanism.
 - **Would I personally ship this?** Yes — with one addition I'd want before a healthcare/finance launch: an **audit log of every scoped access** (operator → client, timestamp). It's not required for correctness (isolation holds without it) but it's required for *forensics and trust* at that tier. For general agencies, ship as-is.
 
+> **Fast-follow delivered — Phase SC-2.** The scoped-access audit log recommended above is now built: every drill-in (allowed and denied) is recorded in a dedicated `presence_scoped_access_events` table, readable via a staff-gated `/admin/scoped-access` trail, best-effort so it can never weaken this boundary. See [PHASE-SC2-SCOPED-ACCESS-AUDIT.md](PHASE-SC2-SCOPED-ACCESS-AUDIT.md).
+
 **Phase SC-1 — Secure Client Scope complete.**

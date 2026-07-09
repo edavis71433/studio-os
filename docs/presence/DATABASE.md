@@ -6,7 +6,7 @@ Postgres via Supabase. **Every `presence_*` table is deny-all RLS** (no permissi
 
 - **Deny-all + function-mediated.** Tables have RLS enabled with **no policies**, so direct client access returns nothing; all access is through the `presence` function, which resolves the caller's site via RLS (`resolveSite`) and scopes every query to `site_id`/`client_id`. This is tenant isolation — see [SECURITY](SECURITY.md).
 - **Sensitive material is out-of-row and encrypted.** Provider tokens live in `presence_connection_secrets` (AES-256-GCM ciphertext, never returned to a client); the connection row holds only a `secret_ref`.
-- **Audit ledgers are append-only** (`presence_change_events`, `presence_connection_events`) — trigger-protected; invariant INV-7 enforces their existence.
+- **Audit ledgers are append-only** (`presence_change_events`, `presence_connection_events`) — trigger-protected; invariant INV-7 enforces their existence. `presence_scoped_access_events` (SC-2) records every agency operator drill-in (allowed + denied) and is deny-all read (staff-only via `/admin/scoped-access`).
 - **Approval is a DB law.** Every plan table carries `requires_approval boolean not null default true check (requires_approval = true)`.
 
 ## Tables by subsystem (54)
@@ -20,7 +20,7 @@ Postgres via Supabase. **Every `presence_*` table is deny-all RLS** (no permissi
 **Connected Platform:** `presence_connections`, `presence_connection_secrets` (encrypted, out-of-row), `presence_connected_data` (normalized read cache, one-deep + `prev`), `presence_connection_events` (audit), `presence_connection_writes` (write plans).
 **Industry/Marketplace:** `presence_pack_installs`, `presence_pack_operations`.
 **Enterprise:** `presence_organizations`, `presence_regions`, `presence_org_config` (diffs only), `presence_org_operations`.
-**Agency:** `presence_agencies`, `presence_agency_members`, `presence_agency_clients`, `presence_agency_jobs`.
+**Agency:** `presence_agencies`, `presence_agency_members`, `presence_agency_clients`, `presence_agency_jobs`, `presence_scoped_access_events` (SC-2 operator drill-in audit; deny-all, staff-read).
 **Platform Services (infra):** `presence_infra_plans`, `presence_dns_zones`, `presence_dns_zone_history`, `presence_zone_snapshots`, `presence_monitor_connections`.
 **Commerce:** `presence_signups`, `presence_entitlements`, `presence_plan_notices`.
 

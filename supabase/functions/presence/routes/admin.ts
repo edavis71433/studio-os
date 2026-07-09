@@ -397,6 +397,46 @@ async function handleHealth(site: SiteRow, cors: Record<string, string>) {
   }, 200, cors);
 }
 
+// ═══ SC-2: scoped-access audit ledger (read) ════════════════════════════════
+// Staff-only (proven in index.ts). Read-only view over the operator drill-in
+// ledger. Filters: client (site_id), operator (user_id or email substring),
+// outcome (allowed|denied), since/until (ISO date), limit. Deliberately NOT a
+// dashboard — a plain, filterable, chronological trail for forensics.
+async function handleScopedAccessAudit(req: Request, cors: Record<string, string>) {
+  const url = new URL(req.url);
+  const q = url.searchParams;
+  const parts: string[] = ['select=id,operator_user_id,operator_email,agency_id,client_site_id,client_name,route,method,outcome,reason,request_id,ip,user_agent,created_at'];
+
+  const client = q.get('client') || '';
+  if (client) { if (!UUID_RE.test(client)) return json({ error: 'bad_request', message: 'client must be a site uuid.' }, 400, cors); parts.push(`client_site_id=eq.${client}`); }
+
+  const operator = q.get('operator') || '';
+  if (operator) {
+    if (UUID_RE.test(operator)) parts.push(`operator_user_id=eq.${operator}`);
+    else parts.push(`operator_email=ilike.*${encodeURIComponent(operator.slice(0, 254))}*`);
+  }
+
+  const outcome = q.get('outcome') || '';
+  if (outcome) { if (!['allowed', 'denied'].includes(outcome)) return json({ error: 'bad_request', message: 'outcome must be allowed or denied.' }, 400, cors); parts.push(`outcome=eq.${outcome}`); }
+
+  const agency = q.get('agency') || '';
+  if (agency) { if (!UUID_RE.test(agency)) return json({ error: 'bad_request', message: 'agency must be a uuid.' }, 400, cors); parts.push(`agency_id=eq.${agency}`); }
+
+  const isIso = (s: string) => /^\d{4}-\d{2}-\d{2}([T ].*)?$/.test(s);
+  const since = q.get('since') || '';
+  if (since) { if (!isIso(since)) return json({ error: 'bad_request', message: 'since must be an ISO date (YYYY-MM-DD).' }, 400, cors); parts.push(`created_at=gte.${encodeURIComponent(since)}`); }
+  const until = q.get('until') || '';
+  if (until) { if (!isIso(until)) return json({ error: 'bad_request', message: 'until must be an ISO date (YYYY-MM-DD).' }, 400, cors); parts.push(`created_at=lte.${encodeURIComponent(until)}`); }
+
+  const limit = Math.min(Math.max(parseInt(q.get('limit') || '100', 10) || 100, 1), 500);
+  parts.push(`order=created_at.desc`, `limit=${limit}`);
+
+  const r = await svc(`presence_scoped_access_events?${parts.join('&')}`);
+  const rows = Array.isArray(r.json) ? r.json : [];
+  const denied = rows.filter((x: any) => x.outcome === 'denied').length;
+  return json({ data: { count: rows.length, denied, allowed: rows.length - denied, events: rows } }, 200, cors);
+}
+
 // ═══ ROUTER ═══════════════════════════════════════════════════════════════════
 /** Dispatch /admin/* routes. Returns null when no admin route matches.
  *  Caller (index.ts) has already proven principal.kind === 'staff'. */
@@ -415,6 +455,10 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   //    profile of every provider (operator introspection; verifies one shared
   //    architecture, no drift).
   if (route === '/admin/connections' && method === 'GET') return json({ data: { summary: connInventorySummary(), providers: connInventory() } }, 200, cors);
+
+  // ── SC-2: scoped-access audit ledger — who (agency operator) reached which
+  //    client via drill-in, allowed AND denied. Staff-only accountability trail.
+  if (route === '/admin/scoped-access' && method === 'GET') return handleScopedAccessAudit(req, cors);
 
   // ── M13: agency provisioning (operator creates the agency + its owner seat) ──
   if (route === '/admin/agencies' && method === 'POST') {

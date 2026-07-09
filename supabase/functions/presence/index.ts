@@ -173,7 +173,14 @@ serve(async (req) => {
   let scopedName: string | null = null;
   const scopeReq = req.headers.get('x-dds-scope-site');
   if (scopeReq) {
-    const sc = await resolveScopedSite(jwt, scopeReq);
+    // SC-2: pass the operator identity + request metadata so the drill-in is
+    // recorded (allowed AND denied). No token, no body — resolveScopedSite logs
+    // only the fields it is handed, best-effort, without gating this decision.
+    const sc = await resolveScopedSite(jwt, scopeReq, {
+      operatorUserId: principal.userId, operatorEmail: principal.email,
+      route, method, requestId: principal.requestId,
+      ip: req.headers.get('x-forwarded-for') || '', userAgent: req.headers.get('user-agent') || '',
+    });
     if (!sc.ok) return json({ error: 'scope_denied', message: 'You don’t have access to that client.' }, sc.status, cors);
     site = sc.site; scopedName = sc.scoped.name;
   } else {

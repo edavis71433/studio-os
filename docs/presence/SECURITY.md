@@ -18,6 +18,8 @@ Every authed route requires a verified caller JWT (`x-dds-user-jwt`) in addition
 - **Tenant:** the caller's site is resolved from the JWT via RLS (`resolveSite(jwt)`), never from client input — a customer can address only their own `site_id`.
 - **Organization:** enterprise config/rollouts are scoped to the org; a location inherits only within its org tree.
 - **Agency:** rollups and approvals read only the agency's portfolio; cross-portfolio access is refused.
+- **Scoped drill-in (SC-1):** an agency operator may re-scope the shell to a client via `x-dds-scope-site`, but scope is a **request, never an authority** — re-validated server-side every request at the `resolveScopedSite` chokepoint and **fail-closed** (never falls back to another tenant). Authorization reuses the agency model; the pure `scopeDecision` is exhaustively attack-tested. See [SC-1](PHASE-SC1-SECURE-CLIENT-SCOPE.md).
+- **Scoped-access audit (SC-2):** every drill-in — allowed and denied — is recorded in the deny-all `presence_scoped_access_events` ledger (operator → client, outcome, reason, no tokens/bodies), readable via staff-gated `GET /admin/scoped-access`. The write is best-effort and orthogonal to the access decision, so it can never weaken the boundary. See [SC-2](PHASE-SC2-SCOPED-ACCESS-AUDIT.md).
 
 ## RLS
 
