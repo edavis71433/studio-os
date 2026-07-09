@@ -50,13 +50,15 @@ export const STUDIO_NAV = [
   ] },
   { key: 'customers', label: 'Customers', items: [{ key: 'customers', label: 'Customers', href: '/crm.html' }] },
   { key: 'files', label: 'Files', items: [
-    { key: 'files_photos', label: 'Photos', href: '/presence.html#media' },
+    { key: 'files_all', label: 'Files', href: '/files.html' },
     { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html' },
   ] },
+  { key: 'analytics', label: 'Analytics', items: [{ key: 'analytics', label: 'Analytics', href: '/analytics.html' }] },
   { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
-  { key: 'connections', label: 'Connections', items: [{ key: 'connect', label: 'Connections', href: '/connections.html' }] },
-  { key: 'settings', label: 'Settings', items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
-  { key: 'help', label: 'Help', items: [{ key: 'help', label: 'Help', href: '/help.html' }] },
+  // utilities — rendered in the profile/overflow menu, not the primary bar
+  { key: 'connections', label: 'Connections', utility: true, items: [{ key: 'connect', label: 'Connections', href: '/connections.html' }] },
+  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
+  { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html' }] },
 ];
 
 export const ALL_FEATURES = ['website', 'developer', 'forms', 'business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];

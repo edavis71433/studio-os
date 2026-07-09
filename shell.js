@@ -77,14 +77,19 @@
     return lbl;
   }
 
+  var UTILS = [];
   function render() {
     var nav = (CTX && CTX.nav) || [];
     var activeKey = activeItemKey(location.pathname, nav);
-    DESTS = flatten(nav);
+    DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
+    // Architecture v1.0: the primary bar is outcomes only; utility sections
+    // (Connections, Settings, Help) render in the profile/overflow menu.
+    var primary = nav.filter(function (s) { return !s.utility; });
+    UTILS = nav.filter(function (s) { return s.utility; });
     var ctxLabel = brandCtxLabel(nav, activeKey);
     var att = (CTX && CTX.attention_count) || 0;   // Phase FLOW: bell badge from context (no extra request)
 
-    var navHtml = nav.map(function (sec) {
+    var navHtml = primary.map(function (sec) {
       var single = sec.items.length === 1;
       var open = false;
       var isActive = sec.items.some(function (i) { return i.key === activeKey; });
@@ -164,12 +169,32 @@
     pal.classList.add('open'); var inp = pal.querySelector('input'); inp.value = ''; paintResults(''); setTimeout(function () { inp.focus(); }, 20);
   }
   function closePalette() { if (pal) pal.classList.remove('open'); }
+  function hasFiles() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'files'; }); }
+  var fileSearchTok = 0;
   function paintResults(q) {
     var qq = String(q || '').trim().toLowerCase();
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0; }) : DESTS;
     var box = pal.querySelector('.results');
-    if (!list.length) { box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
-    box.innerHTML = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
+    var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
+    box.innerHTML = navHtml || (qq ? '' : '');
+    // ── Files: search actual files by name/tag/description (reuses GET /assets?q=) ──
+    var tok = ++fileSearchTok;
+    if (qq.length >= 2 && hasFiles()) {
+      api('/assets?q=' + encodeURIComponent(qq) + '&limit=6').then(function (r) {
+        if (tok !== fileSearchTok) return; // a newer keystroke won
+        var files = (r.ok && r.body && r.body.data && r.body.data.assets) || [];
+        var cur = pal.querySelector('.results'); if (!cur) return;
+        var have = !!navHtml;
+        if (!files.length) { if (!have) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
+        var fhtml = files.map(function (a, i) {
+          var sub = a.in_use ? 'Files · on your site' : 'Files';
+          return '<a class="res' + (!have && i === 0 ? ' sel' : '') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>';
+        }).join('');
+        cur.innerHTML = navHtml + fhtml;
+      });
+    } else if (!list.length) {
+      box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>';
+    }
   }
 
   // ── notifications (lazy; reuses /portal/feed — no new system) ──
@@ -203,9 +228,10 @@
     var role = (CTX && CTX.site_role) || '';
     var edition = (CTX && CTX.edition) || '';
     var rows = '';
-    if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Agency portfolio</a>';
+    if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>';
     if (CTX && CTX.is_operator) rows += '<a class="row" href="/dds-studio-manage-9k2p.html">Admin & operator tools</a>';
-    rows += '<a class="row" href="/help.html">Help</a>';
+    // Architecture v1.0: utility destinations (Connections, Settings, Help) live here.
+    UTILS.forEach(function (sec) { sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + '</a>'; }); });
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;

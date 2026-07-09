@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Agency — Presence</title>
+<title>Studio — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <style>
   :root{
@@ -74,7 +74,7 @@ const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 function renderList(filter){
   const q=(filter||'').toLowerCase();
   const list=CLIENTS.filter(c=>!q||String(c.name||'').toLowerCase().includes(q));
-  let html=`<div class="top"><div class="brand">${esc(ME.agency||'Your agency')}<small>Agency workspace · Presence</small></div><span class="rolebadge">● ${esc(ME.role||'member')}</span></div>`;
+  let html=`<div class="top"><div class="brand">${esc(ME.agency||'Your agency')}<small>Studio</small></div><span class="rolebadge">● ${esc(ME.role||'member')}</span></div>`;
   html+=`<h1>Your clients</h1><p class="sub">${CLIENTS.length} ${CLIENTS.length===1?'business':'businesses'} in your portfolio. Pick one to focus on.</p>`;
   html+=`<input class="search" id="search" placeholder="Search clients…" value="${esc(filter||'')}">`;
   if(!list.length){html+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet — add businesses from your studio tools.'}</p></div>`;}

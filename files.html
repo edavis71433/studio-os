@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Files — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Every file for your business — photos, brand, documents, downloads — in one calm place.">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--danger:#a3423a;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--danger:#e08b83;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--danger:#a3423a}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--danger:#e08b83}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:26px 20px 90px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:0 0 .1em;letter-spacing:-.01em}
+  header .sub{color:var(--soft);font-size:15px}
+  .layout{display:grid;grid-template-columns:210px 1fr;gap:26px;margin-top:22px}
+  @media (max-width:720px){.layout{grid-template-columns:1fr;gap:16px}}
+
+  /* collections rail */
+  .rail{display:flex;flex-direction:column;gap:2px;position:sticky;top:64px;align-self:start}
+  @media (max-width:720px){.rail{position:static;flex-direction:row;overflow-x:auto;gap:8px;padding-bottom:4px;-webkit-overflow-scrolling:touch}}
+  .col{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;color:var(--soft);text-decoration:none;font-size:14.5px;font-weight:500;border:1px solid transparent;cursor:pointer;white-space:nowrap;background:none;text-align:left;width:100%;font-family:inherit}
+  .col:hover{background:var(--p-soft);color:var(--ink)}
+  .col.on{background:var(--p-soft);color:var(--p);border-color:var(--line);font-weight:600}
+  .col .ic{width:17px;height:17px;flex:none;opacity:.85}
+  .col .n{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .col.on .n{color:var(--p)}
+
+  /* toolbar */
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .search{flex:1;min-width:180px;position:relative}
+  .search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:14.5px;font-family:inherit}
+  .search input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .search svg{position:absolute;left:11px;top:11px;width:16px;height:16px;color:var(--faint)}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--p)}
+  .btn.primary{background:var(--p);color:#fff;border-color:var(--p)}
+  .btn.primary:hover{filter:brightness(1.06)}
+  select.sort{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;cursor:pointer}
+
+  /* health nudge */
+  .nudge{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:11px 15px;font-size:13.5px;margin-bottom:16px;display:flex;gap:10px;align-items:center;border:1px solid transparent}
+  .nudge b{font-weight:700}
+  .nudge button{margin-left:auto;background:none;border:none;color:var(--warn);font-weight:700;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:underline}
+
+  /* grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;text-align:left;padding:0;font-family:inherit;color:inherit;position:relative;transition:border-color .12s}
+  .tile:hover{border-color:var(--p)}
+  .tile .thumb{aspect-ratio:4/3;background:var(--p-soft) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--faint)}
+  .tile .thumb svg{width:34px;height:34px;opacity:.6}
+  .tile .meta{padding:10px 12px 12px}
+  .tile .nm{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tile .use{font-size:11.5px;color:var(--faint);margin-top:3px;display:flex;align-items:center;gap:5px}
+  .dot{width:6px;height:6px;border-radius:50%;flex:none}
+  .dot.live{background:var(--good)} .dot.used{background:var(--p)} .dot.un{background:var(--faint)}
+  .star{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.86);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--warn)}
+  @media (prefers-color-scheme:dark){.star{background:rgba(31,26,43,.82)}}
+  .star svg{width:15px;height:15px}
+  .badge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--good-soft);color:var(--good)}
+  .badge.doc{background:var(--p-soft);color:var(--p)}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--soft)}
+  .empty h2{font-family:var(--serif);font-weight:500;font-size:22px;color:var(--ink);margin-bottom:8px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:60px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin,.panel{animation:none}}
+
+  /* detail slide-over */
+  .scrim{position:fixed;inset:0;background:rgba(27,21,37,.42);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--bg);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .2s;z-index:41;overflow-y:auto;padding:20px 22px 60px}
+  .panel.on{transform:translateX(0)}
+  .panel .x{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;color:var(--soft);cursor:pointer;line-height:1}
+  .pv{border-radius:12px;overflow:hidden;background:var(--p-soft);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin:14px 0 16px}
+  .pv img{width:100%;height:100%;object-fit:contain}
+  .pv svg{width:48px;height:48px;color:var(--faint)}
+  .field{margin:14px 0}
+  .field label{display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:5px}
+  .field input,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font-size:14px;font-family:inherit}
+  .field textarea{resize:vertical;min-height:52px}
+  .field input:focus,.field textarea:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .where{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:14px 0}
+  .where .hl{font-size:14px;font-weight:600;margin-bottom:8px}
+  .where ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .where li{font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:8px}
+  .where li .dot{width:7px;height:7px}
+  .vrow{background:var(--warn-soft);border-radius:10px;padding:10px 13px;font-size:13px;color:var(--warn);margin:12px 0;display:flex;align-items:center;gap:8px}
+  .vrow button{margin-left:auto}
+  .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .acts .btn{padding:8px 12px;font-size:13px}
+  .btn.warn{color:var(--danger);border-color:transparent;background:none;padding-left:4px}
+  .btn.warn:hover{text-decoration:underline;border-color:transparent}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{font-size:12px;background:var(--p-soft);color:var(--p);padding:3px 9px;border-radius:999px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:all .2s;z-index:50}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .drop{border:2px dashed var(--p);border-radius:14px;background:var(--p-soft);color:var(--p);text-align:center;padding:22px;margin-bottom:16px;font-weight:600;display:none}
+  .drop.on{display:block}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Files</h1><p class="sub">Every file for your business — photos, brand, documents, downloads — in one place.</p></header>
+  <div id="root"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Studio OS · Files — your business library, safely organized.</footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="panel" id="panel" aria-label="File details" role="dialog" aria-modal="true"></aside>
+<div class="toast" id="toast"></div>
+<input type="file" id="picker" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden>
+<input type="file" id="replacer" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+let TOKEN="";
+async function api(method,path,body){
+  const o={method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()}};
+  if(body!==undefined)o.body=JSON.stringify(body);
+  const r=await fetch(FN+path,o);
+  return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status,body:await r.json().catch(()=>({}))};
+}
+const IC={
+  all:'<path d="M3 5h7l2 2h9v11a2 2 0 0 1-2 2H3z" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  photo:'<rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.7" fill="currentColor"/><path d="M4 18l5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  brand:'<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  doc:'<path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M14 3v4h4M9 13h6M9 16h6" stroke="currentColor" stroke-width="1.5" fill="none"/>',
+  tpl:'<rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 9h18M9 9v11" stroke="currentColor" stroke-width="1.5"/>',
+  dl:'<path d="M12 3v11m0 0l-4-4m4 4l4-4M4 19h16" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  star:'<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z" fill="currentColor"/>',
+  starO:'<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  arch:'<path d="M3 6h18v3H3zM5 9v11h14V9M9 13h6" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  search:'<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.8"/>'
+};
+const svg=(p,cls)=>`<svg class="${cls||''}" viewBox="0 0 24 24" fill="none">${p}</svg>`;
+
+// collections: label, icon, and the server filter it maps to (all reuse /assets)
+const COLS=[
+  {key:'all',label:'All files',ic:'all',f:{}},
+  {key:'fav',label:'Favorites',ic:'star',f:{},favs:true},
+  {key:'photos',label:'Photos',ic:'photo',f:{},kind:'image'},
+  {key:'brand',label:'Brand',ic:'brand',f:{brand:'true'}},
+  {key:'documents',label:'Documents',ic:'doc',f:{},kind:'document'},
+  {key:'templates',label:'Templates',ic:'tpl',f:{collection:'Templates'}},
+  {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
+  {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
+];
+let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null};
+
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
+
+async function loadContext(){
+  const c=await api('GET','/portal/context');
+  if(c.ok&&c.body.data){S.caps=c.body.data.capabilities||[];S.canEdit=S.caps.includes('edit');}
+}
+function qstr(){
+  const c=COLS.find(x=>x.key===S.col)||COLS[0];
+  const p=new URLSearchParams();
+  Object.entries(c.f).forEach(([k,v])=>p.set(k,v));
+  if(S.q.trim())p.set('q',S.q.trim());
+  p.set('limit','300');
+  return p.toString();
+}
+async function load(){
+  const [a,col,h]=await Promise.all([api('GET','/assets?'+qstr()),api('GET','/assets/collections'),api('GET','/assets/health')]);
+  if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>Files live in your full workspace.</h2><p>Your client view shows what you’ve chosen to share.</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
+  let rows=(a.ok&&a.body.data&&a.body.data.assets)||[];
+  const c=COLS.find(x=>x.key===S.col);
+  if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
+  if(c&&c.favs)rows=rows.filter(r=>r.favorite);
+  S.policy=(a.body.data&&a.body.data.policy)||'immediate';
+  S.assets=sortRows(rows);
+  S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];
+  S.counts=buildCounts((col.ok&&col.body.data)||[]);
+  render();
+}
+function buildCounts(collections){
+  const m={};collections.forEach(c=>{m[c.name]=c.count;});return m;
+}
+function sortRows(rows){
+  const r=[...rows];
+  if(S.sort==='name')r.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  else if(S.sort==='size')r.sort((a,b)=>(b.bytes||0)-(a.bytes||0));
+  else r.sort((a,b)=>Date.parse(b.created_at||0)-Date.parse(a.created_at||0));
+  return r;
+}
+function render(){
+  const rail=COLS.map(c=>{
+    const n=c.key==='templates'?(S.counts.Templates||0):c.key==='downloads'?(S.counts.Downloads||0):'';
+    return `<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}">${svg(IC[c.ic],'ic')}<span>${c.label}</span>${n?`<span class="n">${n}</span>`:''}</button>`;
+  }).join('');
+  const nudge=renderNudge();
+  const tiles=S.assets.length?S.assets.map(tile).join(''):`<div class="empty" style="grid-column:1/-1"><h2>${S.q?'No files match that search.':'Nothing here yet.'}</h2><p>${S.canEdit?'Drag files in, or use Add files above.':'Files your studio adds will appear here.'}</p></div>`;
+  $('root').innerHTML=`
+    <div class="layout">
+      <nav class="rail" id="rail">${rail}</nav>
+      <div>
+        <div class="bar">
+          <div class="search">${svg(IC.search)}<input id="q" type="search" placeholder="Search files — try “logo”" value="${esc(S.q)}" autocomplete="off"></div>
+          <select class="sort" id="sort"><option value="recent"${S.sort==='recent'?' selected':''}>Recent</option><option value="name"${S.sort==='name'?' selected':''}>Name</option><option value="size"${S.sort==='size'?' selected':''}>Largest</option></select>
+          ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
+        </div>
+        <div class="drop" id="drop">Drop to upload</div>
+        ${nudge}
+        <div class="grid">${tiles}</div>
+      </div>
+    </div>`;
+  wire();
+}
+function renderNudge(){
+  if(!S.health.length||S.col==='archive')return'';
+  const by={};S.health.forEach(f=>{by[f.kind]=(by[f.kind]||0)+1;});
+  const parts=[];
+  if(by.missing_alt)parts.push(`<b>${by.missing_alt}</b> need a description`);
+  if(by.unused)parts.push(`<b>${by.unused}</b> unused`);
+  if(by.oversized)parts.push(`<b>${by.oversized}</b> large`);
+  if(by.duplicate)parts.push(`<b>${by.duplicate}</b> look duplicated`);
+  if(!parts.length)return'';
+  return `<div class="nudge">A few files could use attention: ${parts.join(' · ')}.<button id="tidy">Review</button></div>`;
+}
+function tile(a){
+  const t=a.thumb?`style="background-image:url('${esc(a.thumb)}')"`:'';
+  const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
+  const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not used';
+  const badge=a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
+  const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
+  return `<button class="tile" data-open="${a.id}">
+    <div class="thumb" ${t}>${inner}</div>${badge}${star}
+    <div class="meta"><div class="nm">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
+  </button>`;
+}
+function wire(){
+  document.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';load();});
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDetail(b.dataset.open));
+  document.querySelectorAll('[data-fav]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();toggleFav(b.dataset.fav);});
+  const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load().then(()=>{const el=$('q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}});},280);};}
+  const sort=$('sort');if(sort)sort.onchange=()=>{S.sort=sort.value;S.assets=sortRows(S.assets);render();};
+  const add=$('add');if(add)add.onclick=()=>$('picker').click();
+  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';S.sort='recent';load();};
+}
+
+/* ── detail panel ── */
+async function openDetail(id){
+  const scrim=$('scrim'),panel=$('panel');
+  panel.innerHTML=`<button class="x" onclick="closeDetail()">×</button><div class="spin"></div>`;
+  scrim.classList.add('on');panel.classList.add('on');
+  const r=await api('GET','/assets/'+id);
+  if(!r.ok){panel.innerHTML=`<button class="x" onclick="closeDetail()">×</button><div class="empty"><h2>Couldn’t open that file.</h2></div>`;return;}
+  S.current=r.body.data;renderDetail();
+}
+function closeDetail(){$('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;}
+function renderDetail(){
+  const d=S.current,a=d.asset;const ed=S.canEdit;
+  const pv=a.thumb?`<img src="${esc(a.thumb)}" alt="${esc(a.alt_text||'')}">`:svg(a.kind==='document'?IC.doc:IC.photo);
+  const usage=(d.usage||[]).map(u=>`<li><span class="dot ${u.live?'live':'used'}"></span>${u.live?'Live — ':''}${esc(u.label)}</li>`).join('')||`<li><span class="dot un"></span>Not used on your site yet.</li>`;
+  const ver=d.versions&&d.versions.has_history?`<div class="vrow">Replaced a previous version.<button class="btn" onclick="rollback('${a.id}')">Undo replace</button></div>`:'';
+  const tags=(a.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('');
+  const meta=a.metadata||{};
+  $('panel').innerHTML=`
+    <button class="x" onclick="closeDetail()">×</button>
+    <div class="pv">${pv}</div>
+    <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}</div>
+    <div class="field"><label>Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
+    ${a.kind==='image'?`<div class="field"><label>Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers.">${esc(a.alt_text||'')}</textarea></div>`:''}
+    <div class="field"><label>Caption</label><input id="f-cap" value="${esc(meta.caption||'')}" ${ed?'':'disabled'}></div>
+    <div class="field"><label>Collection</label><input id="f-col" value="${esc(a.collection||'')}" placeholder="e.g. Brand, Contracts" ${ed?'':'disabled'}></div>
+    <div class="field"><label>Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
+    <div class="where"><div class="hl">Where it’s used</div><ul>${usage}</ul><div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div></div>
+    ${ver}
+    ${ed?`<div class="acts">
+      <button class="btn" onclick="saveDetail()">Save details</button>
+      <button class="btn" onclick="$('replacer').click()">Replace…</button>
+      <button class="btn" onclick="duplicate('${a.id}')">Duplicate</button>
+      <button class="btn" onclick="download('${a.id}')">Download</button>
+      ${a.asset_status==='archived'?`<button class="btn" onclick="status('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="status('${a.id}','archive')">Archive</button>`}
+      <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
+    </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
+}
+async function saveDetail(){
+  const a=S.current.asset;
+  const body={name:$('f-name').value,collection:$('f-col').value,caption:$('f-cap').value,tags:$('f-tags').value.split(',').map(s=>s.trim()).filter(Boolean)};
+  const alt=$('f-alt');if(alt)body.alt_text=alt.value;
+  const r=await api('PATCH','/assets/'+a.id,body);
+  if(r.ok){toast('Saved');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not save');
+}
+async function toggleFav(id){
+  const a=S.assets.find(x=>x.id===id);const next=!(a&&a.favorite);
+  const r=await api('PATCH','/assets/'+id,{favorite:next});
+  if(r.ok){if(a)a.favorite=next;render();}
+}
+async function status(id,action){
+  const r=await api('POST','/assets/'+id+'/status',{action});
+  if(r.ok){toast(action==='archive'?'Archived':'Restored');closeDetail();load();}else toast((r.body&&r.body.message)||'Not allowed');
+}
+async function duplicate(id){const r=await api('POST','/assets/'+id+'/duplicate');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
+async function download(id){const r=await api('GET','/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank');else toast('Could not prepare download');}
+async function rollback(id){if(!confirm('Restore the previous version? This puts the earlier file back everywhere it was used.'))return;const r=await api('POST','/assets/'+id+'/rollback');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
+async function del(id,inUse){
+  if(inUse){toast('This file is in use — remove it from the page or archive it first.');return;}
+  if(!confirm('Delete this file permanently? This cannot be undone.'))return;
+  const r=await api('DELETE','/assets/'+id);
+  if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');
+}
+
+/* ── upload (images + PDF), reuses /media/upload-url ── */
+async function dimsOf(file){
+  if(!file.type.startsWith('image/'))return{};
+  try{const bmp=await createImageBitmap(file);const d={width:bmp.width,height:bmp.height};bmp.close&&bmp.close();return d;}catch(_){return{};}
+}
+async function uploadFiles(files){
+  for(const file of files){
+    const isDoc=file.type==='application/pdf';
+    let name=(file.name||'file').replace(/\.[a-z0-9]+$/i,'');
+    let alt=name;
+    if(!isDoc){alt=prompt('Describe this photo (for search & accessibility):',name)||'';if(alt.trim().length<3){toast('Skipped — a short description is required.');continue;}}
+    const dims=await dimsOf(file);
+    const up=await api('POST','/media/upload-url',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});
+    if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');continue;}
+    const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
+    if(!put.ok){toast('Upload failed for '+file.name);continue;}
+    if(isDoc)await api('PATCH','/assets/'+up.body.data.media_id,{name});
+  }
+  toast('Uploaded');load();
+}
+$('picker').onchange=(e)=>{const f=[...e.target.files];e.target.value='';if(f.length)uploadFiles(f);};
+$('replacer').onchange=async(e)=>{
+  const file=e.target.files[0];e.target.value='';if(!file||!S.current)return;
+  const old=S.current.asset;
+  if(!confirm(`Replace “${old.name}” with ${file.name}?`+((S.current.usage&&S.current.usage.length)?` This updates it in ${S.current.usage.length} place(s) on your site.`:'')))return;
+  const isDoc=file.type==='application/pdf';const dims=await dimsOf(file);
+  const alt=isDoc?old.name:(old.alt_text||old.name);
+  const up=await api('POST','/media/upload-url',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height});
+  if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');return;}
+  const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
+  if(!put.ok){toast('Upload failed');return;}
+  const r=await api('POST','/assets/'+old.id+'/replace',{with:up.body.data.media_id});
+  if(r.ok){toast('Replaced'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Replace failed');
+};
+// drag & drop
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,(e)=>{if(!S.canEdit)return;e.preventDefault();const d=$('drop');if(d)d.classList.add('on');}));
+['dragleave','drop'].forEach(ev=>document.addEventListener(ev,(e)=>{if(e.relatedTarget&&ev==='dragleave')return;const d=$('drop');if(d&&(ev==='drop'||e.clientX<=0))d.classList.remove('on');}));
+document.addEventListener('drop',(e)=>{if(!S.canEdit)return;e.preventDefault();const d=$('drop');if(d)d.classList.remove('on');const f=[...(e.dataTransfer.files||[])].filter(x=>/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(x.type));if(f.length)uploadFiles(f);});
+$('scrim').onclick=closeDetail;
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeDetail();});
+// deep link: /files.html?focus=<id> (from ⌘K)
+function focusParam(){return new URLSearchParams(location.search).get('focus')||'';}
+
+function signedOut(){$('root').innerHTML=`<div class="empty"><h2>Sign in to see your files.</h2><p style="margin-top:14px"><a class="btn primary" href="/portal.html" style="text-decoration:none">Sign in →</a></p></div>`;}
+(async function(){
+  try{
+    const {data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    await loadContext();await load();
+    const fid=focusParam();if(fid)openDetail(fid);
+  }catch(_){$('root').innerHTML=`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>Refresh in a moment.</p></div>`;}
+})();
+</script>
+</body>
+</html>

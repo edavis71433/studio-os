@@ -32,11 +32,11 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#lnkVisual')).toBeHidden();
   });
 
-  test('the media section is called "Photos" everywhere (Phase PP terminology)', async ({ page }) => {
+  test('the media section is called "Files" everywhere (Architecture v1.0 terminology)', async ({ page }) => {
     await installApp(page, { api: { ...PRESENCE_API, '/portal/context': ctx(ALL_FEATURES) } });
     await page.goto('/presence.html');
-    await expect(page.locator('.navitem[data-view="media"]').first()).toHaveText('Photos');
-    await expect(page.locator('#view-media h1.doc')).toHaveText('Photos');
+    await expect(page.locator('.navitem[data-view="media"]').first()).toHaveText('Files');
+    await expect(page.locator('#view-media h1.doc')).toHaveText('Files');
   });
 
   test('hash deep-link #design opens the Design view (Phase OS)', async ({ page }) => {

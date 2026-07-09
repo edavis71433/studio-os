@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Your connections — Presence</title>
+<title>Connections — Studio OS</title>
 <meta name="description" content="Connect the services you already use — read-only, always with your approval, and yours to disconnect any time.">
 <style>
   :root{
@@ -67,7 +67,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Your connections</h1>
+    <h1>Connections</h1>
     <p class="sub" id="sub">Connect the services you already use. Everything is read-only, always with your approval, and yours to disconnect any time.</p>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
@@ -239,7 +239,7 @@ async function refresh(key, btn){
   toast('Couldn’t refresh just now — it may need a quick reconnect.'); btn.disabled=false; btn.textContent=old;
 }
 
-function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub" style="margin:8px auto 0">Your connections live with your presence — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub" style="margin:8px auto 0">Your connections live with your account — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
 function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your connections just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your services — this is only this page. Please refresh in a moment.</p></div>`; }
 
 async function reload(){

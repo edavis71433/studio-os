@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Today — Your Presence</title>
+<title>Today — Studio OS</title>
 <meta name="description" content="What needs you today — at most a few calm things, in plain words.">
 <style>
   :root{
@@ -139,7 +139,7 @@ function render(moments, features, feed, ctx){
       : 'Everything across your business is quiet, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.';
     const clearLinks = hasWebsite
       ? `<a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your leads</a>`
-      : `<a class="link" href="/crm.html">Open your relationships</a> <span style="color:var(--soft)">·</span> <a class="link" href="/connections.html">Your connections</a>`;
+      : `<a class="link" href="/crm.html">Open Customers</a> <span style="color:var(--soft)">·</span> <a class="link" href="/connections.html">Connections</a>`;
     html += `<div class="moment calm"><span class="tag">All clear</span>
       <h2>${hasWebsite ? 'Everything customers can see is current.' : 'Everything’s quiet across your business.'}</h2>
       <p>${clearBody}</p>
@@ -255,8 +255,8 @@ function trouble(){
 // of any edition orients silently (no false "upgrade" for a brand-new account).
 const FEATURE_LABEL = {
   website:'your website workspace', developer:'Developer Mode', forms:'website lead capture',
-  business_moments:'Business Moments', connected:'Connections', ai:'AI drafting & the Concierge',
-  relationship:'the relationship view', reports:'exports & reports', client_portal:'client sharing',
+  business_moments:'your daily updates', connected:'Connections', ai:'AI drafting & the Concierge',
+  relationship:'Customers', reports:'Analytics', client_portal:'client sharing',
   managed_service:'managed service', agency:'the agency portfolio', enterprise:'enterprise controls',
 };
 function orientationCard(c){

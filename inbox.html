@@ -69,7 +69,7 @@ function render(feed,leads){
 
   if(newLeads.length){h+=`<h2>New messages</h2>`;
     for(const l of newLeads){const who=esc(l.name||l.email||'Someone');
-      h+=`<a class="item lead" href="/leads.html"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open in your leads →</div></a>`;}}
+      h+=`<a class="item lead" href="/leads.html"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open in Messages →</div></a>`;}}
 
   const worth=[...notices,...moments];
   if(worth.length){h+=`<h2>Worth a look</h2>`;

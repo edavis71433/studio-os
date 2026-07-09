@@ -88,7 +88,7 @@ test.describe('Today', () => {
     await installApp(page, { api: { '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } }, '/moments': { data: [] } } });
     await page.goto('/today.html');
     await expect(page.getByText('Welcome to Studio OS')).toBeVisible();
-    await expect(page.getByText(/Business Moments/)).toBeVisible(); // a gained feature, named
+    await expect(page.getByText(/daily updates/)).toBeVisible(); // a gained feature, named (v1.0 outcome language)
     await page.getByRole('button', { name: 'Got it' }).click();
     await expect(page.getByText('Welcome to Studio OS')).toHaveCount(0);
     // and it does not return on reload (localStorage was advanced)

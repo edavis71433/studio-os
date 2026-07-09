@@ -8,7 +8,7 @@ test.describe('App shell', () => {
     await installApp(page);
     await page.goto('/today.html');
     const shell = page.locator('#dds-shell');
-    await expect(shell.locator('.dds-brand')).toContainText('Presence');
+    await expect(shell.locator('.dds-brand')).toContainText('Studio OS');
     await expect(shell.locator('.dds-nav')).toContainText('Website');
     await expect(shell.locator('.dds-nav')).toContainText('Customers');
     await expect(shell.locator('.dds-nav')).toContainText('Inbox');
@@ -43,6 +43,20 @@ test.describe('App shell', () => {
     await page.goto('/today.html');
     await page.locator('#dds-profile').click();
     await expect(page.locator('.dds-pop')).toContainText('Sign out');
+  });
+
+  test('Architecture v1.0: primary bar is outcomes; utilities live in the profile menu', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/today.html');
+    const nav = page.locator('#dds-shell .dds-nav');
+    await expect(nav).toContainText('Analytics');            // Analytics is first-class
+    await expect(nav).not.toContainText('Settings');         // utilities are NOT in the primary bar
+    await expect(nav).not.toContainText('Connections');
+    await page.locator('#dds-profile').click();
+    const pop = page.locator('.dds-pop');
+    await expect(pop).toContainText('Settings');             // …they live in the overflow menu
+    await expect(pop).toContainText('Connections');
+    await expect(pop).toContainText('Help');
   });
 
   test('no attention → no badge', async ({ page }) => {

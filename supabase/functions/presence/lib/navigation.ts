@@ -8,7 +8,11 @@ import type { SiteRole, SiteCapability } from './site_roles.ts';
 import { editionFlags, type EditionKey, type EditionFlags } from '../commerce/editions.ts';
 
 export interface NavItem { key: string; label: string; href: string; }
-export interface NavSection { key: string; label: string; items: NavItem[]; }
+// `utility: true` sections are the account/overflow items (Settings, Connections,
+// Help). They are composed the same way (Edition × Role) but the shell renders
+// them in the profile/overflow menu, keeping the PRIMARY bar to outcomes only
+// (Today · Website · Customers · Files · Analytics · Inbox). ⌘K still reaches them.
+export interface NavSection { key: string; label: string; items: NavItem[]; utility?: boolean; }
 
 export interface NavContext {
   role: SiteRole;
@@ -40,14 +44,16 @@ function reviewerNav(): NavSection[] {
 export function buildNav(c: NavContext): NavSection[] {
   if (c.role === 'client_reviewer') return reviewerNav();
 
-  // ── Architecture v1.0: customer-facing OUTCOME areas, composed from Edition ×
-  // Role. Areas: Today · Website · Customers · Files · Inbox · (Connections) ·
-  // (Studio) · Settings · Help. No CMS/CRM/DAM/portal words ever reach the UI;
-  // the internal routes are unchanged. A single-item section renders as a
-  // top-level button; multi-item sections render as a labelled group.
+  // ── Architecture v1.0 (frozen): the PRIMARY bar is OUTCOMES ONLY —
+  // Today · Website · Customers · Files · Analytics · Inbox · (Studio). Utilities
+  // (Connections, Settings, Help) are composed the same way but flagged `utility`
+  // so the shell renders them in the profile/overflow menu. No CMS/CRM/DAM/portal
+  // words ever reach the UI; the internal routes are unchanged. A single-item
+  // section renders as a top-level button; multi-item sections render as a group.
   const f = flagsOf(c);
   const sections: NavSection[] = [];
   const single = (key: string, label: string, href: string) => sections.push({ key, label, items: [{ key, label, href }] });
+  const utility = (key: string, label: string, href: string) => sections.push({ key, label, items: [{ key, label, href }], utility: true });
 
   // Today — the calm home
   if (f.hasBusinessOS) single('today', 'Today', '/today.html');
@@ -65,30 +71,36 @@ export function buildNav(c: NavContext): NavSection[] {
   // Customers — the relationship area (internally: the CRM). Leads fold in here + Inbox.
   if (f.hasRelationship) single('customers', 'Customers', '/crm.html');
 
-  // Files — the asset library (internally: the DAM). Photos + generated assets.
+  // Files — the business library (internally: the DAM). Photos, brand, documents,
+  //  downloads — plus AI-generated assets via Visual Studio.
   if (f.hasWebsite) {
-    const files: NavItem[] = [{ key: 'files_photos', label: 'Photos', href: '/presence.html#media' }];
+    const files: NavItem[] = [{ key: 'files_all', label: 'Files', href: '/files.html' }];
     if (canDraft(c)) files.push({ key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html' });
     sections.push({ key: 'files', label: 'Files', items: files });
   }
 
+  // Analytics — a first-class OUTCOME: plain-English understanding of the business
+  //  (internally: Analytics/reporting). Reserved home; the later phase enriches it.
+  if (f.hasReports) single('analytics', 'Analytics', '/analytics.html');
+
   // Inbox — ONE place for what needs you: messages, approvals, notifications, leads
   single('inbox', 'Inbox', '/inbox.html');
 
-  // Connections — integrations (the connected services)
-  if (f.hasConnected) single('connections', 'Connections', '/connections.html');
-
   // Studio — the agency scope (agency roles only); open a client to re-scope
   if (f.hasAgency && c.isAgency) single('studio', 'Studio', '/agency.html');
+
+  // ── Utilities — rendered in the profile/overflow menu, not the primary bar ──
+  // Connections — integrations (the connected services)
+  if (f.hasConnected) utility('connections', 'Connections', '/connections.html');
 
   // Settings — account, sharing/access, developer (Billing lives here, per the constitution)
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }];
   if (f.hasClientPortal && has(c, 'invite')) settings.push({ key: 'sharing', label: 'Sharing & access', href: '/sharing.html' });
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
-  sections.push({ key: 'settings', label: 'Settings', items: settings });
+  sections.push({ key: 'settings', label: 'Settings', items: settings, utility: true });
 
   // Help
-  single('help', 'Help', '/help.html');
+  utility('help', 'Help', '/help.html');
 
   return sections.filter((s) => s.items.length > 0);
 }

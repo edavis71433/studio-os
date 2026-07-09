@@ -12,16 +12,32 @@ import type { MediaManifestEntry } from './serializer.ts';
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 export const BUCKET = 'presence-media';
-export const MIME_ALLOW = new Set(['image/jpeg', 'image/png', 'image/webp']);
-export const MAX_BYTES = 10 * 1024 * 1024;
+// DAM-1 (Files): the ONE store now also holds documents. Images ride the transform
+// pipeline; documents (PDF) are stored + versioned + served as signed downloads,
+// never image-transformed or auto-embedded on the site.
+export const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+export const DOC_MIME = new Set(['application/pdf']);
+export const MIME_ALLOW = new Set([...IMAGE_MIME, ...DOC_MIME]);
+export const MAX_BYTES = 10 * 1024 * 1024;            // images: 10MB
+export const MAX_DOC_BYTES = 25 * 1024 * 1024;        // documents: 25MB
+export const isImageMime = (m: string) => IMAGE_MIME.has(m);
+export const isDocMime = (m: string) => DOC_MIME.has(m);
 
-const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
 
-/** Issue a signed upload URL + create the media row in one call (G1 §8). */
+/** Issue a signed upload URL + create the media row in one call (G1 §8).
+ *  Format-aware: images require alt text; documents require a name (stored in the
+ *  same alt_text column, which satisfies the a11y CHECK and doubles as the title). */
 export async function createUpload(siteId: string, req: { mime: string; bytes: number; alt_text: string; width?: number; height?: number }) {
-  if (!MIME_ALLOW.has(req.mime)) return { error: 'unsupported_type', message: 'Images must be JPEG, PNG, or WebP.' };
-  if (!req.bytes || req.bytes > MAX_BYTES) return { error: 'too_large', message: 'Images must be under 10MB.' };
-  if (!req.alt_text || req.alt_text.trim().length < 3) return { error: 'alt_required', message: 'Please describe the image (alt text) — it helps customers and search engines.' };
+  const isDoc = isDocMime(req.mime);
+  if (!MIME_ALLOW.has(req.mime)) return { error: 'unsupported_type', message: 'Files must be an image (JPEG, PNG, WebP) or a PDF document.' };
+  const cap = isDoc ? MAX_DOC_BYTES : MAX_BYTES;
+  if (!req.bytes || req.bytes > cap) return { error: 'too_large', message: isDoc ? 'Documents must be under 25MB.' : 'Images must be under 10MB.' };
+  if (!req.alt_text || req.alt_text.trim().length < 3) {
+    return isDoc
+      ? { error: 'name_required', message: 'Please give this document a name.' }
+      : { error: 'alt_required', message: 'Please describe the image (alt text) — it helps customers and search engines.' };
+  }
 
   const path = `${siteId}/${crypto.randomUUID()}.${EXT[req.mime]}`;
   const storagePath = `${BUCKET}/${path}`;
@@ -81,6 +97,53 @@ export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ f
     } catch { failed.push(`${m.storage_path} @${v.width}`); }
   })));
   return { files, failed };
+}
+
+/** DAM-1 (Files): a short-lived signed THUMBNAIL for one image (private bucket).
+ *  Reused by the Files grid + detail. Documents have no image thumbnail → null. */
+export async function signThumb(storagePath: string, mime: string, width = 320): Promise<string | null> {
+  if (!isImageMime(mime)) return null;
+  try {
+    const objectPath = storagePath.replace(`${BUCKET}/`, '');
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=3600`, {
+      method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transform: { width, format: 'webp', quality: 72 } }),
+    });
+    const j = await r.json().catch(() => null);
+    return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+  } catch { return null; }
+}
+
+/** DAM-1 (Files): a short-lived signed DOWNLOAD URL for the ORIGINAL object (no
+ *  transform) — used for "Download" and for previewing documents. Optionally sets
+ *  a friendly download filename. */
+export async function signDownload(storagePath: string, filename?: string): Promise<string | null> {
+  try {
+    const objectPath = storagePath.replace(`${BUCKET}/`, '');
+    const dl = filename ? `&download=${encodeURIComponent(filename)}` : '';
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=600${dl}`, {
+      method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const j = await r.json().catch(() => null);
+    return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+  } catch { return null; }
+}
+
+/** DAM-1 (Files): server-side COPY of a storage object (for "Duplicate"). Returns
+ *  the new storage_path or null. Reuses the same bucket + path convention. */
+export async function copyObject(siteId: string, fromStoragePath: string, mime: string): Promise<string | null> {
+  const ext = EXT[mime] || (fromStoragePath.split('.').pop() || 'bin');
+  const toObject = `${siteId}/${crypto.randomUUID()}.${ext}`;
+  const fromObject = fromStoragePath.replace(`${BUCKET}/`, '');
+  try {
+    const r = await fetch(`${SB_URL}/storage/v1/object/copy`, {
+      method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bucketId: BUCKET, sourceKey: fromObject, destinationKey: toObject }),
+    });
+    if (!r.ok) return null;
+    return `${BUCKET}/${toObject}`;
+  } catch { return null; }
 }
 
 /** PREVIEW: map each deterministic output path to a short-lived signed

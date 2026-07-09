@@ -76,6 +76,67 @@ export function detectDuplicates(assets: Asset[]): Array<{ key: string; ids: str
   return [...groups.entries()].filter(([, ids]) => ids.length > 1).map(([key, ids]) => ({ key, ids }));
 }
 
+// ── DAM-1 (Files): file kind + human display name ────────────────────────────
+export type FileKind = 'image' | 'document' | 'other';
+export function fileKind(mime: string | null | undefined): FileKind {
+  const m = (mime || '').toLowerCase();
+  if (m.startsWith('image/')) return 'image';
+  if (m === 'application/pdf') return 'document';
+  return 'other';
+}
+/** A customer-friendly name. Prefers the human title they set (metadata.title),
+ *  else a cleaned filename from the storage path, else a kind label. Pure. */
+export function displayName(a: Asset): string {
+  const title = String((a.metadata as Record<string, unknown> | null | undefined)?.title || '').trim();
+  if (title) return title.slice(0, 200);
+  const base = (a.storage_path || '').split('/').pop() || '';
+  const cleaned = base.replace(/\.[a-z0-9]+$/i, '').replace(/^[0-9a-f-]{20,}$/i, '');
+  if (cleaned) return cleaned.slice(0, 200);
+  return fileKind(a.mime) === 'document' ? 'Document' : fileKind(a.mime) === 'image' ? 'Photo' : 'File';
+}
+export function isFavorite(a: Asset): boolean {
+  return !!(a.metadata as Record<string, unknown> | null | undefined)?.favorite;
+}
+
+// ── DAM-1 (Files): "where used" — the website-awareness value-add ─────────────
+// A single, complete usage model mirroring exactly what the renderer serializes:
+// settings.logo_media_id, settings.og_media_id, offerings.media_id, posts.hero_
+// media_id. `live` = the asset is in the CURRENT live site (its id is in the live
+// snapshot's media_manifest). The route supplies the labelled refs + the live set.
+export interface UsageRef { surface: string; label: string; live: boolean }
+export interface UsageSummary { total: number; live: number; sensitive: boolean; headline: string }
+
+/** Summarize a file's usage into a calm, plain-English headline + a replace-risk
+ *  flag (brand logo / anything currently live is replace-sensitive). Pure. */
+export function usageSummary(refs: UsageRef[]): UsageSummary {
+  const total = refs.length;
+  const live = refs.filter((r) => r.live).length;
+  const sensitive = refs.some((r) => r.live || r.surface === 'brand');
+  let headline: string;
+  if (total === 0) headline = 'Not used anywhere yet.';
+  else if (total === 1) headline = `Used as ${refs[0].label}.`;
+  else headline = `Used in ${total} places${live ? ` — ${live} live on your site` : ''}.`;
+  return { total, live, sensitive, headline };
+}
+
+// ── DAM-1 (Files): replace carry-forward — a new version inherits the old file's
+//    organization so nothing is lost in a swap. Pure (returns a patch). ─────────
+export function carryForwardMetadata(oldAsset: Asset, newAsset: Asset): {
+  collection?: string; tags?: string[]; brand?: boolean; metadata?: Record<string, unknown>;
+} {
+  const patch: { collection?: string; tags?: string[]; brand?: boolean; metadata?: Record<string, unknown> } = {};
+  if (!(newAsset.collection || '').trim() && (oldAsset.collection || '').trim()) patch.collection = oldAsset.collection!;
+  const oldTags = (oldAsset.tags || []).map((t) => String(t).toLowerCase());
+  const newTags = (newAsset.tags || []).map((t) => String(t).toLowerCase());
+  const merged = [...new Set([...newTags, ...oldTags])].slice(0, 40);
+  if (merged.length > newTags.length) patch.tags = merged;
+  if (oldAsset.brand && !newAsset.brand) patch.brand = true;
+  const oldTitle = String((oldAsset.metadata as Record<string, unknown> | null)?.title || '').trim();
+  const newTitle = String((newAsset.metadata as Record<string, unknown> | null)?.title || '').trim();
+  if (oldTitle && !newTitle) patch.metadata = { ...(newAsset.metadata || {}), title: oldTitle };
+  return patch;
+}
+
 // ── DAM-11: usage — which assets are referenced by content (ids from the route) ─
 export function usageMap(assets: Asset[], referencedIds: Iterable<string>): Record<string, boolean> {
   const used = new Set(referencedIds);

@@ -25,7 +25,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
@@ -261,9 +261,18 @@ serve(async (req) => {
   if (route === '/assets/usage' && method === 'GET') return handleAssetsUsage(site, cors);
   {
     const ms = route.match(/^\/assets\/([0-9a-f-]{36})\/status$/);
-    if (ms && method === 'POST') return handleAssetStatus(req, site, ms[1], cors);
+    if (ms && method === 'POST') return handleAssetStatus(req, site, principal, ms[1], cors);
+    const mdl = route.match(/^\/assets\/([0-9a-f-]{36})\/download$/);
+    if (mdl && method === 'GET') return handleAssetDownload(site, mdl[1], cors);
+    const mr = route.match(/^\/assets\/([0-9a-f-]{36})\/replace$/);
+    if (mr && method === 'POST') return handleAssetReplace(req, site, principal, mr[1], cors);
+    const mb = route.match(/^\/assets\/([0-9a-f-]{36})\/rollback$/);
+    if (mb && method === 'POST') return handleAssetRollback(site, principal, mb[1], cors);
+    const mdup = route.match(/^\/assets\/([0-9a-f-]{36})\/duplicate$/);
+    if (mdup && method === 'POST') return handleAssetDuplicate(site, principal, mdup[1], cors);
     const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
-    if (m && method === 'PATCH') return handleAssetUpdate(req, site, m[1], cors);
+    if (m && method === 'GET') return handleAssetDetail(site, m[1], cors);
+    if (m && method === 'PATCH') return handleAssetUpdate(req, site, principal, m[1], cors);
     if (m && method === 'DELETE') return handleAssetDelete(site, principal, m[1], cors);
   }
 
