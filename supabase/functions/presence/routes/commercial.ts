@@ -10,6 +10,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { sendEmail } from '../commerce/account.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
 import { decideWritePlan } from '../connected/writestore.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import {
@@ -160,8 +161,9 @@ async function notifyOwnerOfLead(siteId: string, sub: { form_kind: string; name:
   const to = ident.json?.[0]?.email;
   if (!to) return;
   const who = [sub.name, sub.email, sub.phone].filter(Boolean).join(' · ');
+  const brand = await loadEmailBrand(siteId);   // BR-1: on the owner's brand
   await sendEmail(String(to), `New ${sub.form_kind} from your website`,
-    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p><p><a href="${siteBase()}/crm.html">See it in your workspace →</a></p>`);
+    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p><p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>`, brand);
 }
 
 // ═══ FD-3 · Approval → notify → one-tap approve ══════════════════════════════
@@ -184,15 +186,16 @@ export async function handleApproveSend(site: SiteRow, principal: Principal, cor
   ];
   if (!items.length) return json({ data: { ok: true, sent: 0, message: 'Nothing is waiting for approval.' } }, 200, cors);
 
+  const brand = await loadEmailBrand(site.id);   // BR-1: the approval email carries the studio/business brand
   const exp = Math.floor(Date.now() / 1000) + 7 * 86400; // one week
   let rows = '';
   for (const it of items) {
     const tok = await signApprovalToken({ site_id: site.id, kind: it.kind, plan_id: it.id, exp }, APPROVAL_SECRET);
     const link = `${siteBase()}/approve.html?token=${encodeURIComponent(tok)}`;
-    rows += `<div style="margin:14px 0;padding:14px;border:1px solid #eee;border-radius:10px"><b>${esc(it.title || 'A change is ready')}</b><br>${esc(it.summary || '')}<br><a href="${link}" style="display:inline-block;margin-top:8px;background:#5b3fa0;color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Review &amp; approve →</a></div>`;
+    rows += `<div style="margin:14px 0;padding:14px;border:1px solid #eee9e0;border-radius:10px"><b>${esc(it.title || 'A change is ready')}</b><br>${esc(it.summary || '')}<br><span class="cta"><a href="${link}" style="display:inline-block;margin-top:8px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Review &amp; approve →</a></span></div>`;
   }
   const sent = await sendEmail(String(to), 'Something is ready for your approval',
-    `<p>Your studio has ${items.length} ${items.length === 1 ? 'change' : 'changes'} ready. Tap to review and approve — nothing happens until you do.</p>${rows}`);
+    `<p>Your studio has ${items.length} ${items.length === 1 ? 'change' : 'changes'} ready. Tap to review and approve — nothing happens until you do.</p>${rows}`, brand);
   return json({ data: { ok: true, sent: items.length, delivered: sent, message: sent ? `Sent ${items.length} to ${to}.` : 'Prepared, but email isn’t configured on this environment.' } }, 200, cors);
 }
 

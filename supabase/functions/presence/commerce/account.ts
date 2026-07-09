@@ -7,6 +7,7 @@
 
 import { svc } from '../lib/db.ts';
 import { TENANT_ID } from '../../_shared/auth.ts';
+import { brandEmailShell, EMAIL_BRAND_DEFAULT, type EmailBrand } from '../lib/email_brand.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -84,13 +85,16 @@ export async function createContactAndClient(
 // A recovery/verify email link the customer can click. Uses Supabase's own
 // recover endpoint so the link is a real, signed one that lands on
 // set-password.html (the existing flow) — used here as "confirm it's you".
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email to', to); return false; }
   try {
+    // BR-1: every email flows through the ONE branded shell (Studio OS default, or
+    // the customer's Brand Kit when the caller passes it). No second email engine.
+    const wrapped = brandEmailShell(html, brand || EMAIL_BRAND_DEFAULT);
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: EMAIL_FROM, to, subject, html, reply_to: 'eric@davisdigitalstudio.com' }),
+      body: JSON.stringify({ from: EMAIL_FROM, to, subject, html: wrapped, reply_to: 'eric@davisdigitalstudio.com' }),
     });
     return r.ok;
   } catch { return false; }
