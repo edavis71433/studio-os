@@ -353,3 +353,23 @@ Website
 **Hard constraints — do NOT expose:** React components · JSON · template manifests · database schema · internal IDs · block IDs · the rendering pipeline · the deployment pipeline · Netlify implementation · snapshot internals. **Do NOT allow:** drag-and-drop page restructuring · editing the template hierarchy · reordering template sections (Phase 1). Strictly a client-facing navigation/orientation experience.
 
 **Reuse-first requirement.** The tree is a **read-only projection** of the existing template structure + structured content. It must NOT introduce a second content model, a second editor, a second rendering system, or duplicate business logic — everything reuses the existing deterministic CMS architecture (template manifest → block model → the one editor → the one render/publish pipeline).
+
+### CMS-UX-2 — Website Navigator Enhancements (FUTURE — follows CMS-UX-1; not started)
+**Sequencing:** follows [[CMS-UX-1]] (after the Content Tree is complete); AFTER the Phase 1 hardening work. Not part of Phase 1 / M1; does not modify the execution plan or milestone order. **Architecture spec only — do not build.**
+
+**Purpose.** Grow the Content Tree into a full **Website Navigator** — a high-level view of the website's health, publishing state, and editing progress that makes Studio OS feel like a professional website-management platform, not just a CMS. It answers, at a glance: what pages do I have · which are published · what still needs attention · where should I work next · how healthy is my website.
+
+**Features (all read-only projections over EXISTING systems):**
+- **Page health** — Published / Draft · Needs Review · Missing Required Content · Recently Updated · Never Published. Reuse existing validation + publishing metadata.
+- **Content completeness** — completion indicators like "5 of 5 required sections complete," Missing Hero image / business hours / FAQ answers / CTA / SEO description. Derived from `validateSnapshot` + the block model.
+- **SEO snapshot** — lightweight per-page summary (meta title present · meta description present · featured image assigned · URL configured). **Surface existing info only — NOT a full SEO auditor.**
+- **Last activity** — Last edited · Last published · Last viewed (future) · Draft updated. Reuse existing timestamps (`presence_publishes`, draft metadata, the M3 draft hash).
+- **Quick actions** — one-click Edit · Preview · Publish · View History, each deep-linking into the existing screen. No duplicate workflows.
+- **Search** — pages · sections · blog posts · services · gallery items · FAQs; navigates directly to the existing editor.
+- **Navigation tools** — Expand All · Collapse All · remembered expanded state · breadcrumbs · recently-edited shortcuts.
+
+**Future expansion.** Must naturally support multiple templates · landing pages · ecommerce · booking · memberships · AI-generated content · multi-language sites · white-label agencies — with **no hardcoded page names or structures**; everything generated from the active template + existing structured content.
+
+**Reuse-first requirement.** Must reuse existing editors · validation · publishing metadata · content model · routing · permissions. Must NOT create a second CMS, duplicate editors, duplicate validation logic, or duplicate navigation structures.
+
+**Decision filter.** Every enhancement must improve client confidence · improve discoverability · reduce clicks · increase transparency · reuse existing systems · keep the interface simple for non-technical users. Reject anything that adds unnecessary complexity or duplicates existing functionality.
