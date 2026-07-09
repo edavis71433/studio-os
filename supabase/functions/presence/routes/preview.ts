@@ -43,7 +43,7 @@ async function loadSnapshotFor(site: SiteRow, version: string, publishId: string
   } else {
     return null; // caller serializes the draft
   }
-  const s = await svc(`presence_snapshots?id=eq.${snapId}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
+  const s = await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
   const row = s.json?.[0];
   if (!row) return { error: 'not_restorable', message: 'That version is no longer available to view.', status: 410 };
   // degenerate pre-contract snapshots are retained in history but can't be shown

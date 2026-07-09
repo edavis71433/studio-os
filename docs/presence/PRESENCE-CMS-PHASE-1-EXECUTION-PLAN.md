@@ -41,7 +41,9 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M2 — Security audits (read-only findings)
+## M2 — Security audits (read-only findings)  ·  ✅ DONE (Jul 9 2026)
+> **Result:** no exploitable RLS-bypass found — every client route scopes request-supplied version ids to the caller's `site.id`. Applied 3 defense-in-depth `&site_id=eq.` hardenings on the request-id-driven snapshot fetches (preview / restore / restore-to-draft), matching the existing `admin.ts:326` precedent. Global sentinel confirmed operator-only. Added `tests/presence/tenant_isolation_test.mjs` (9/9, structural regression guard). presence 0 type-errors; 86/86 pure suites; deployed staging+prod. Record: [PHASE1-SECURITY-AUDIT.md].
+
 
 🎯 Establish security truth before touching data paths. Read-only; any fix that falls out is minimal + tested in place.
 📦 `svc()` id-scope audit · global-sentinel cross-tenant check.

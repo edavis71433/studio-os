@@ -145,7 +145,7 @@ export async function handleRestore(req: Request, site: SiteRow, principal: Prin
   if (!row) return json({ error: 'not_found', message: 'We couldn’t find that version.' }, 404, cors);
   if (!row.snapshot_id) return json({ error: 'not_restorable', message: 'That version is no longer restorable (older versions are kept for a limited time).' }, 410, cors);
 
-  const snap = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
+  const snap = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
   const s = snap.json?.[0];
   if (!s) return json({ error: 'not_restorable', message: 'That version is no longer restorable.' }, 410, cors);
 
