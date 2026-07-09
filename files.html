@@ -91,6 +91,7 @@
   .where ul{list-style:none;display:flex;flex-direction:column;gap:6px}
   .where li{font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:8px}
   .where li .dot{width:7px;height:7px}
+  .where li a.ulink{color:var(--soft);text-decoration:none} .where li a.ulink:hover{color:var(--p);text-decoration:underline}
   .vrow{background:var(--warn-soft);border-radius:10px;padding:10px 13px;font-size:13px;color:var(--warn);margin:12px 0;display:flex;align-items:center;gap:8px}
   .vrow button{margin-left:auto}
   .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
@@ -269,7 +270,11 @@ function closeDetail(){$('scrim').classList.remove('on');$('panel').classList.re
 function renderDetail(){
   const d=S.current,a=d.asset;const ed=S.canEdit;
   const pv=a.thumb?`<img src="${esc(a.thumb)}" alt="${esc(a.alt_text||'')}">`:svg(a.kind==='document'?IC.doc:IC.photo);
-  const usage=(d.usage||[]).map(u=>`<li><span class="dot ${u.live?'live':'used'}"></span>${u.live?'Live — ':''}${esc(u.label)}</li>`).join('')||`<li><span class="dot un"></span>Not used on your site yet.</li>`;
+  // EC-1 cohesion: each "where used" entry clicks through to the Website editor —
+  // the file's home and where it's edited/removed. Scope-aware for agency drill-in.
+  const siteHref=(hash)=>{const c=scope();return '/presence.html'+(hash||'')+(c?(hash&&hash.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c):'');};
+  const surfaceHash={brand:'#design',seo:'#business',services:'',blog:'#updates'};
+  const usage=(d.usage||[]).map(u=>`<li><span class="dot ${u.live?'live':'used'}"></span><a href="${esc(siteHref(surfaceHash[u.surface]||''))}" class="ulink">${u.live?'Live — ':''}${esc(u.label)}</a></li>`).join('')||`<li><span class="dot un"></span>Not used on your site yet.</li>`;
   const ver=d.versions&&d.versions.has_history?`<div class="vrow">Replaced a previous version.<button class="btn" onclick="rollback('${a.id}')">Undo replace</button></div>`:'';
   const tags=(a.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('');
   const meta=a.metadata||{};
