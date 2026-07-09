@@ -14,8 +14,21 @@
 import { json } from '../../_shared/http.ts';
 import { asUser, svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
+import { suggestedBlocksFor, suggestionNoteFor } from '../lib/vertical_presets.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+
+/** FD-T4: the content blocks recommended for this site's industry (read-only
+ *  guidance; the owner still adds + fills + approves). Reuses vertical_presets +
+ *  the stored industry_key — no duplicated mapping on the client. */
+export async function handleBlockSuggestions(site: SiteRow, cors: Record<string, string>) {
+  let industry = 'generic';
+  try {
+    const r = await svc(`presence_settings?site_id=eq.${site.id}&select=industry_key&limit=1`);
+    if (r.ok && Array.isArray(r.json) && r.json[0]?.industry_key) industry = String(r.json[0].industry_key);
+  } catch { /* fall back to generic */ }
+  return json({ data: { blocks: suggestedBlocksFor(industry), note: suggestionNoteFor(industry) } }, 200, cors);
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;

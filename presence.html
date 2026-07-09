@@ -2656,6 +2656,18 @@ const TYPE_PRESETS = [
   { key: "friendly", name: "Friendly rounded", tokens: { font_display: "'Avenir Next Rounded', 'Trebuchet MS', system-ui, sans-serif", font_body: "'Trebuchet MS', system-ui, sans-serif" } },
   { key: "typewriter", name: "Understated mono", tokens: { font_display: "'Courier New', ui-monospace, monospace", font_body: "system-ui, -apple-system, sans-serif" } },
 ];
+// FD-T3: complete "looks" — one tap sets a coordinated palette + type + shape
+// (all through the SAME token layer; every palette is contrast-checked). A look is
+// a variant of the one engine, not a new template (constitution Part 4).
+const STYLE_LOOKS = [
+  { key: "", name: "Original", tokens: {} },
+  { name: "Warm & inviting", tokens: { accent: "#8c3b2e", accent_dark: "#6f2e24", ink: "#241d1a", soft: "#6b5f58", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "18px", bg: "#faf6ee" } },
+  { name: "Clean & modern", tokens: { accent: "#2f5d8a", accent_dark: "#224566", ink: "#1b2530", soft: "#5a6570", font_display: "system-ui, -apple-system, 'Segoe UI', sans-serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "2px", bg: "#f3f5f7" } },
+  { name: "Bold & confident", tokens: { accent: "#37474f", accent_dark: "#263238", ink: "#1e262a", soft: "#5c686e", font_display: "Georgia, 'Times New Roman', serif", font_body: "system-ui, sans-serif", spacing_scale: "1.18" } },
+  { name: "Fresh & natural", tokens: { accent: "#23635a", accent_dark: "#17453f", ink: "#1c2430", soft: "#5b6572", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, sans-serif", bg: "#faf6ee" } },
+  { name: "Refined & elegant", tokens: { accent: "#5b3fa0", accent_dark: "#463079", ink: "#221e2c", soft: "#635d70", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "18px" } },
+];
+const LOOK_CLEAR = { accent: "", accent_dark: "", ink: "", soft: "", font_display: "", font_body: "", radius: "", bg: "", spacing_scale: "" };
 const SIZE_OPTS = [ ["Cozy","0.95"], ["Standard",""], ["Larger","1.08"] ];
 const CORNER_OPTS = [ ["Sharp","2px"], ["Soft",""], ["Round","18px"] ];
 const BG_OPTS = [ ["Bright",""], ["Warm","#faf6ee"], ["Cool","#f3f5f7"] ];
@@ -2705,6 +2717,8 @@ async function mountDesignCard() {
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Design studio"));
   const T = DESIGN_TOKENS;
+  // FD-T3: complete looks — a coordinated one-tap starting point (then fine-tune below)
+  pillRow(card, "Complete looks", STYLE_LOOKS, () => false, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " look"));
   // colors
   pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
     (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"));
@@ -2759,7 +2773,7 @@ const BLOCK_DEFS = [
     parse: (p) => ({ title: p[0] || "", text: p[1] || "" }), fmt: (o) => [o.title, o.text].filter(Boolean).join(" | ") },
   { type: "stats", name: "Numbers that build trust", field: "items", hint: "One per line:  Value | Label   (e.g.  15 | Years in business)",
     parse: (p) => ({ value: p[0] || "", label: p[1] || "" }), fmt: (o) => [o.value, o.label].filter(Boolean).join(" | ") },
-  { type: "team", name: "Team", field: "members", hint: "One per line:  Name | Role | short bio",
+  { type: "team", name: "Team", field: "members", structured: "team", hint: "Add each person, with an optional photo from your library.",
     parse: (p) => ({ name: p[0] || "", role: p[1] || "", bio: p[2] || "" }), fmt: (o) => [o.name, o.role, o.bio].filter(Boolean).join(" | ") },
   { type: "process", name: "How it works", field: "steps", hint: "One per line:  Step | detail",
     parse: (p) => ({ step: p[0] || "", detail: p[1] || "" }), fmt: (o) => [o.step, o.detail].filter(Boolean).join(" | ") },
@@ -2782,6 +2796,7 @@ function mediaThumb(id) {
   return wrap;
 }
 let BLOCKS_WORK = null;
+let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
 function currentBlocks() { return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : []; }
 function blockText(def, blk) {
   if (def.areasSimple) return (blk.areas || []).join("\n");
@@ -2817,6 +2832,8 @@ function mountBlocksCard() {
   const card = el("div", "field"); card.id = "blocksCard"; card.style.marginTop = "18px";
   host.appendChild(card);
   renderBlocksCard();
+  // FD-T4: industry-recommended blocks (server preset — no client duplication)
+  if (BLOCK_SUGGEST === null) api("GET", "/blocks/suggested").then((r) => { BLOCK_SUGGEST = r.data || false; renderBlocksCard(); }).catch(() => { BLOCK_SUGGEST = false; });
 }
 function renderBlocksCard() {
   const card = $("blocksCard"); if (!card) return; card.textContent = "";
@@ -2850,6 +2867,9 @@ function renderBlocksCard() {
     } else if (def.mediaKind) {
       renderMediaBlockBody(def, blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
+    } else if (def.structured === "team") {
+      renderTeamBlockBody(blk, idx, sub, ti);
+      sub.appendChild(el("div", "hint", def.hint));
     } else if (def.field || def.areasSimple) {
       const ta = el("textarea"); ta.value = blockText(def, blk);
       ta.rows = Math.max(3, ta.value.split("\n").length + 1);
@@ -2872,6 +2892,21 @@ function renderBlocksCard() {
       addWrap.appendChild(b);
     });
     card.appendChild(addWrap);
+  }
+  if (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.blocks)) {
+    const here = new Set(BLOCKS_WORK.map((b) => b.type));
+    const missing = BLOCK_SUGGEST.blocks.filter((t) => !here.has(t) && BLOCK_DEFS.some((d) => d.type === t));
+    if (missing.length) {
+      const sug = el("div"); sug.style.cssText = "margin-top:12px;padding:10px 12px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:10px";
+      const hd = el("div", null, "✨ Suggested for your business"); hd.style.cssText = "font-weight:600;font-size:12.5px"; sug.appendChild(hd);
+      if (BLOCK_SUGGEST.note) { const nt = el("div", "hint", BLOCK_SUGGEST.note); nt.style.margin = "2px 0 8px"; sug.appendChild(nt); }
+      sug.appendChild(el("div", "hint", missing.map((t) => (BLOCK_DEFS.find((d) => d.type === t) || {}).name).filter(Boolean).join(", ")));
+      const addb = el("button", null, "Add these sections"); addb.type = "button";
+      addb.style.cssText = "font:inherit;font-size:12px;margin-top:8px;padding:6px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
+      addb.addEventListener("click", () => { missing.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) BLOCKS_WORK.push(emptyBlock(d)); }); renderBlocksCard(); });
+      sug.appendChild(addb);
+      card.appendChild(sug);
+    }
   }
   const saveRow = el("div"); saveRow.style.cssText = "margin-top:14px;display:flex;gap:10px;align-items:center";
   const save = el("button", null, "Save content blocks"); save.type = "button";
@@ -2937,6 +2972,34 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
     add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].items = BLOCKS_WORK[idx].items || []).push({ before_id: "", after_id: "" }); renderBlocksCard(); });
     sub.appendChild(add);
   }
+}
+// FD-T18 structured team editor — name/role/bio + an optional photo per person.
+function renderTeamBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const members = Array.isArray(blk.members) ? blk.members : [];
+  members.forEach((m, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap";
+    const photo = el("div"); photo.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px";
+    if (m.media_id) photo.appendChild(mediaThumb(m.media_id));
+    const pb = el("button", null, m.media_id ? "Change photo" : "Add photo"); pb.type = "button"; pb.style.cssText = miniBtn;
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.members[k].media_id = id || undefined; renderBlocksCard(); }); });
+    photo.appendChild(pb);
+    const fields = el("div"); fields.style.cssText = "flex:1;min-width:180px";
+    const nm = el("input"); nm.type = "text"; nm.placeholder = "Name"; nm.value = m.name || ""; nm.style.cssText = inputCss;
+    const role = el("input"); role.type = "text"; role.placeholder = "Role (optional)"; role.value = m.role || ""; role.style.cssText = inputCss;
+    const bio = el("input"); bio.type = "text"; bio.placeholder = "Short bio (optional)"; bio.value = m.bio || ""; bio.style.cssText = inputCss;
+    const commit = () => { blk.members[k] = { name: nm.value.trim(), role: role.value.trim() || undefined, bio: bio.value.trim() || undefined, media_id: blk.members[k].media_id }; };
+    [nm, role, bio].forEach((inp) => inp.addEventListener("change", commit));
+    fields.append(nm, role, bio);
+    const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
+    rm.addEventListener("click", () => { commitTitle(); blk.members.splice(k, 1); renderBlocksCard(); });
+    row.append(photo, fields, rm); sub.appendChild(row);
+  });
+  const add = el("button", null, "+ Add person"); add.type = "button"; add.style.cssText = miniBtn;
+  add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].members = BLOCKS_WORK[idx].members || []).push({ name: "" }); renderBlocksCard(); });
+  sub.appendChild(add);
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
 const HOME_SECTION_DEFS = [ ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];
