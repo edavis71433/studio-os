@@ -222,3 +222,6 @@ All remaining Premium Experience items, reuse-first: PT-6 Business Health Coach 
 
 ### Phase PT-2C — Premium Experience Surface Completion ✅
 Surfaced the PT-2B capabilities (reuse-only, no duplicate systems): Health Coach UI on Today (one health experience, replaced search-only line), Customer Journey card, Admin Health Center (admin-health.html + operator-authed /admin/health-center), Concierge actively using AI memory (stage/season-aware), template preview gallery (fallback for future families), contextual hints across Design/Foundations/Search/Publish/Photos/CRM. concierge 30/30, premium_experience 21/21, regression green; deployed both envs; Playwright specs added.
+
+### Phase DAM — Studio Asset Library ✅
+Lens + lifecycle over presence_media (no duplicate store/pipeline). Mig 0063 (tags/collection/metadata/content_hash/brand/asset_status). Pure cores (dam.ts, 32/32): policy-based approval (solo/agency/enterprise), lifecycle transitions, duplicate detection, usage, safe delete, health, collections/tags, on-demand search. /assets/* API + Photos-view health line. Deployed both envs. Follow-up: fuller in-grid library UI (collections/tags/search chips + per-asset lifecycle).

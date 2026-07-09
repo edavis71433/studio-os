@@ -504,6 +504,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <section class="view" id="view-media">
         <h1 class="doc">Photos</h1>
         <p class="docsub">Your collection. Photos marked “on your site” are at work; the rest wait here, ready when you are.</p>
+        <div id="assetHealth" style="margin:2px 0 8px" hidden></div>
         <div style="display:flex;align-items:baseline;gap:20px">
           <button class="textact" id="btnUpload">＋ Add a photograph</button>
           <span class="whisper" id="save-media" style="font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2)"></span>
@@ -1748,8 +1749,24 @@ $("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
 
 /* ── photographs (identical media API) ── */
 async function loadMedia() {
-  try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); }
+  try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); loadAssetHealth(); }
   catch (err) { toast(err.message, true); }
+}
+// Phase DAM: the library's plain-English health — reuses /assets/health (DAM-13).
+async function loadAssetHealth() {
+  const host = $("assetHealth"); if (!host) return;
+  let f = [];
+  try { f = ((await api("GET", "/assets/health")).data || {}).findings || []; } catch (_) { host.hidden = true; return; }
+  const count = (k) => f.filter((x) => x.kind === k).length;
+  const bits = [];
+  if (count("missing_alt")) bits.push(count("missing_alt") + " could use a description");
+  if (count("unused")) bits.push(count("unused") + " not used yet");
+  if (count("oversized")) bits.push(count("oversized") + " large enough to slow a page");
+  if (count("duplicate")) bits.push(count("duplicate") + " look like duplicates");
+  const attn = bits.length > 0;
+  host.hidden = false;
+  host.style.cssText = "margin:2px 0 8px;padding:10px 16px;border-radius:11px;font-size:13.5px;border:1px solid " + (attn ? "#ecd9c6" : "#d6e8dc") + ";background:" + (attn ? "#fdf8f1" : "#f4faf6") + ";color:#3d4a42";
+  host.textContent = attn ? ("Your library: " + bits.join(" · ") + ".") : "✓ Your library looks healthy — everything described and in good shape.";
 }
 function renderMediaGrid(grid, manage, onPick) {
   grid.innerHTML = "";

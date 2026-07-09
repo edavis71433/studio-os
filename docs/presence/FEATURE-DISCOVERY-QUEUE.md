@@ -412,3 +412,7 @@ Note: a customer-facing UI for the Health Coach / Timeline / Admin Health Center
 ## Phase PT-2C — surface completion (all delivered + tested)
 Health Coach UI ✅ · Customer Journey ✅ · Admin Health Center (admin-health.html + /admin/health-center) ✅ · Concierge AI-memory integration ✅ · Template preview gallery ✅ · Contextual hints expansion ✅.
 Open (recommended, not built): a customer-facing Health Center is operator-only by design; "First visitor" milestone + a real search-visibility signal await analytics/GSC; template preview cards use CSS mini-mocks (live-thumbnail rendering is a V1.1 upgrade).
+
+## Phase DAM — Studio Asset Library (backend + cores delivered + tested)
+DAM-1..15 delivered as a lens/lifecycle over presence_media; dam_test 32/32; mig 0063; /assets/* deployed. Reuse ledger in PHASE-DAM-ASSET-LIBRARY.md.
+Follow-up (recommended): the in-grid library UI — make collections/tags/search first-class in the Photos view + the Universal Picker (backend fully supports it); content-hash population on upload (client-side hash) to strengthen duplicate detection beyond the size heuristic.

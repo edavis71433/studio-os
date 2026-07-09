@@ -23,6 +23,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, SPECS } from './routes/content.ts';
@@ -228,6 +229,21 @@ serve(async (req) => {
     const m = route.match(/^\/media\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleMediaDelete(site, principal, m[1], cors);
     if (m && method === 'PUT') return handleMediaUpdate(req, site, principal, m[1], cors);   // Phase O: edit alt text
+  }
+
+  // ── Phase DAM: the Studio Asset Library (lens + lifecycle over presence_media) ──
+  if (route === '/assets' && method === 'GET') return handleAssetsList(req, site, cors);
+  if (route === '/assets/collections' && method === 'GET') return handleAssetsCollections(site, cors);
+  if (route === '/assets/tags' && method === 'GET') return handleAssetsTags(site, cors);
+  if (route === '/assets/health' && method === 'GET') return handleAssetsHealth(site, cors);
+  if (route === '/assets/duplicates' && method === 'GET') return handleAssetsDuplicates(site, cors);
+  if (route === '/assets/usage' && method === 'GET') return handleAssetsUsage(site, cors);
+  {
+    const ms = route.match(/^\/assets\/([0-9a-f-]{36})\/status$/);
+    if (ms && method === 'POST') return handleAssetStatus(req, site, ms[1], cors);
+    const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') return handleAssetUpdate(req, site, m[1], cors);
+    if (m && method === 'DELETE') return handleAssetDelete(site, principal, m[1], cors);
   }
 
   // ── AI Visual Studio (V1): brand-aware image generation, approval before use ──
