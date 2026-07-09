@@ -57,6 +57,8 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 
 ---
 
+> **Phase PT (design):** the certification's #1 competitive gap — a **second template family** — is now CLOSED. Editorial family shipped + tested + deployed (editorial 18/18), plus 12 premium palettes and ~53 industries. Remaining PT items (visual polish, contextual onboarding, health coach, customer timeline, admin health center, AI memory) are quality-additive, not launch-gating.
+
 ## 🟢 CAN WAIT UNTIL v1.1
 *Real, but not gating a confident launch.*
 

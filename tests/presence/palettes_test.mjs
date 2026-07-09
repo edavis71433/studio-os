@@ -24,7 +24,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
 const PAPERS = ['#f7f7f5' /* business-classic */, '#faf6ef' /* restaurant-classic */];
 
 // ═══ 1. every palette: valid tokens + real contrast ═══
-ok('6 curated palettes', PALETTES.length === 6);
+ok('12 curated palettes (6 core + 6 premium)', PALETTES.length === 12);
 for (const p of PALETTES) {
   const v = validateThemeTokens(p.tokens);
   ok(`${p.key}: all tokens pass devmode validation`, v.rejected.length === 0 && Object.keys(v.tokens).length === 4);

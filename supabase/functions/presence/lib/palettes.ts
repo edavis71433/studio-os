@@ -20,6 +20,13 @@ export const PALETTES: Palette[] = [
   { key: 'plum',       name: 'Quiet plum',      tokens: { accent: '#5b3fa0', accent_dark: '#463079', ink: '#221e2c', soft: '#635d70' } },
   { key: 'espresso',   name: 'Espresso',        tokens: { accent: '#5d4037', accent_dark: '#43302a', ink: '#25201d', soft: '#6d625c' } },
   { key: 'slate',      name: 'Modern slate',    tokens: { accent: '#37474f', accent_dark: '#263238', ink: '#1e262a', soft: '#5c686e' } },
+  // Phase PT — premium editorial/luxury range (each still contrast-validated by test)
+  { key: 'claret',     name: 'Claret',          tokens: { accent: '#6d232a', accent_dark: '#4f181d', ink: '#241a1b', soft: '#6b5a5c' } },
+  { key: 'ink-navy',   name: 'Ink navy',        tokens: { accent: '#26324d', accent_dark: '#1a2438', ink: '#1b2230', soft: '#5a6472' } },
+  { key: 'forest',     name: 'Deep forest',     tokens: { accent: '#2f4a34', accent_dark: '#213620', ink: '#1b241d', soft: '#5b665d' } },
+  { key: 'aubergine',  name: 'Aubergine',       tokens: { accent: '#5a2d4d', accent_dark: '#3f1f36', ink: '#241b21', soft: '#665c63' } },
+  { key: 'graphite',   name: 'Graphite',        tokens: { accent: '#33383d', accent_dark: '#24282c', ink: '#1e2124', soft: '#5f666c' } },
+  { key: 'oxide',      name: 'Burnt oxide',     tokens: { accent: '#8a3b1e', accent_dark: '#6a2c15', ink: '#241c18', soft: '#6b5d55' } },
 ];
 
 export function paletteByKey(key: string): Palette | null {

@@ -7,6 +7,8 @@ import { render as restaurantClassic_1_0_0 } from '../templates/restaurant-class
 import manifest_rc_1_0_0 from '../templates/restaurant-classic/1.0.0/manifest.json' with { type: 'json' };
 import { render as businessClassic_1_0_0 } from '../templates/business-classic/1.0.0/render.ts';
 import manifest_bc_1_0_0 from '../templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
+import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.ts';
+import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
 
 const REGISTRY: Record<string, Record<string, { render: RenderFn; manifest: TemplateManifest }>> = {
   'restaurant-classic': {
@@ -14,6 +16,9 @@ const REGISTRY: Record<string, Record<string, { render: RenderFn; manifest: Temp
   },
   'business-classic': {   // Phase T3: the neutral, vocabulary-driven production default
     '1.0.0': { render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest },
+  },
+  'editorial': {          // Phase PT: a second premium family — a serif, print-inspired design language
+    '1.0.0': { render: editorial_1_0_0, manifest: manifest_ed_1_0_0 as unknown as TemplateManifest },
   },
 };
 

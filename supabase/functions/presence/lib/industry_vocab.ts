@@ -86,8 +86,32 @@ const VOCAB: Record<string, IndustryVocab> = {
   real_estate: services('RealEstateAgent', 'Get in touch'),
   photography: services('ProfessionalService', 'Book a session'),
   videography: services('ProfessionalService', 'Book a session'),
-  // retail
+  // food (Phase PT — more of the menu family)
+  bakery: food('Bakery'),
+  catering: food('Caterer'),
+  brewery: food('Brewery'),
+  winery: food('Winery'),
+  // retail (Phase PT — the product family, each with a correct storefront schema)
   retail: store('Store'),
+  florist: store('Florist'),
+  jewelry: store('JewelryStore'),
+  boutique: store('ClothingStore'),
+  bookstore: store('BookStore'),
+  furniture: store('FurnitureStore'),
+  // beauty & wellness (Phase PT)
+  nail_salon: services('BeautySalon'),
+  massage: services('HealthAndBeautyBusiness'),
+  // home & auto (Phase PT)
+  auto_repair: services('AutoRepair', 'Get a quote'),
+  auto_detailing: services('AutoWash', 'Book'),
+  moving: services('MovingCompany', 'Get a quote'),
+  pest_control: services('HomeAndConstructionBusiness', 'Get a quote'),
+  pet_grooming: services('LocalBusiness', 'Book'),
+  // professional & care (Phase PT)
+  childcare: services('ChildCare', 'Get in touch'),
+  tutoring: services('EducationalOrganization', 'Get in touch'),
+  event_planning: services('ProfessionalService', 'Get in touch'),
+  interior_design: services('ProfessionalService', 'Book a consultation'),
   // community
   nonprofit: { ...GENERIC, schemaType: 'NGO', offeringLabel: 'Programs', offeringLabelSingular: 'Program', offeringPath: '/programs/', primaryAction: 'Donate' },
   church: { ...GENERIC, schemaType: 'Church', offeringLabel: 'Programs', offeringLabelSingular: 'Program', offeringPath: '/programs/', primaryAction: 'Visit' },

@@ -213,3 +213,6 @@ Audited CMS / Business-OS / Studio-OS editions as standalone products. Model is 
 
 ### Phase PP — Product Polish & Launch Refinements ✅ (implemented)
 Consolidation: PP-1 lead-notice lifecycle fix; PP-2/CP-3.1 annual renewal heads-up (mig 0062); Section 3 merged FD-CRM2/INF4/FLOW2 into one Agency Portfolio Status; Section 4 client-portal "needs you"; PP-5 CRM empty-state; PP-6 Studio-OS upgrade welcome; terminology sweep (Photos, sections-sheet vocab, workspace prose). Regression green; deployed both envs. Open: FD-PP1 consolidate workspace nav labels; FD-SKU2 per-edition first-run copy; post-Playwright CP-7 + SD-5.
+
+### Phase PT — Premium Template System & Design Excellence (design core ✅; PT-4–PT-9 continuing)
+DELIVERED + TESTED: PT-1 Editorial second template family (18/18, distinct design language, same engine, auto-surfaced in the Design Studio chooser, deployed both envs); PT-2 six premium palettes (12 total, WCAG-validated, 64/64); PT-3 ~18 more industries (~53 total). Closes the certification's #1 gap (two templates). REMAINING (scoped, not stubbed): PT-4 visual polish, PT-5 contextual onboarding, PT-6 plain-English Health Coach (largely exists via Growth Coach+Moments), PT-7 Customer Timeline, PT-8 Admin Health Center (extend /system/health), PT-9 AI memory.
