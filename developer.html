@@ -85,7 +85,7 @@
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Presence · Developer Mode — customize safely. Every change publishes through your normal approval flow, is versioned, and can be rolled back.</footer>
+  <footer>Studio OS · Developer Mode — customize safely. Every change publishes through your normal approval flow, is versioned, and can be rolled back.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -165,7 +165,7 @@ function htmlEditor(){
     <textarea id="html" spellcheck="false" placeholder="<p class=&quot;note&quot;>Family-owned since 1998.</p>">${esc(STATE.cust.custom_html||'')}</textarea>${previewBlock()}${approvalBlock()}`;
 }
 function assetView(){
-  return `<div class="readonly"><h2>Assets</h2><div class="box">Media (logos, photos) is managed in your library. <a class="link" href="/presence.html#media">Open media →</a><br><br>Developer Mode styles what the template does with those assets; it doesn't replace the media library.</div></div>`;
+  return `<div class="readonly"><h2>Assets</h2><div class="box">Your photos and documents are managed in Files. <a class="link" href="/files.html">Open Files →</a><br><br>Developer Mode styles what the template does with those files; it doesn't replace Files.</div></div>`;
 }
 function readonlyView(path){
   return `<div class="readonly"><h2>Read-only — render code</h2>

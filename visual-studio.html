@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Visual Studio — Studio OS</title>
-<meta name="description" content="Make brand-aware images for your presence — you approve every one before it's saved. Your own photos always work too.">
+<meta name="description" content="Make brand-aware images for your website — you approve every one before it's saved. Your own photos always work too.">
 <style>
   :root{
     --bg:#f6f4ef;--card:#fffdf9;--ink:#221f1a;--soft:#6b6459;--line:#e7e1d6;
@@ -67,7 +67,7 @@
 <div class="wrap">
   <header>
     <h1>Visual Studio</h1>
-    <p class="sub">Make images for your presence — a page banner, a social post, a link preview — shaped by your brand. You see a few options and approve the one you want. Nothing is saved until you do.</p>
+    <p class="sub">Make images for your website — a page banner, a social post, a link preview — shaped by your brand. You see a few options and approve the one you want. Nothing is saved until you do.</p>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
@@ -122,7 +122,7 @@ function planView(plan){
   if(plan.status === 'stored'){
     return `<div class="plan"><span class="tag">Saved</span>
       <h2>${esc(plan.title)}</h2>
-      <p class="meta">This image is in your library now — it’s yours to use anywhere. Nothing goes live until you publish.</p>
+      <p class="meta">This image is in Files now — it’s yours to use anywhere. Nothing goes live until you publish.</p>
       <div style="margin-top:16px"><button class="primary" id="again">Make another</button></div></div>`;
   }
   const vars = (plan.variations||[]).filter(v=>v.preview_url);
@@ -210,7 +210,7 @@ async function discard(){
   $('planhost').innerHTML=''; CURRENT=null; toast('Discarded.');
 }
 
-function signedOut(){ $('main').innerHTML = `<div class="center"><h2>Sign in to use the Visual Studio.</h2><p class="muted">Your images live with your presence.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function signedOut(){ $('main').innerHTML = `<div class="center"><h2>Sign in to use the Visual Studio.</h2><p class="muted">Your images live in Files.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
 function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t open the Visual Studio just now.</h2><p class="muted">Nothing’s wrong — please refresh in a moment.</p></div>`; }
 
 (async function init(){

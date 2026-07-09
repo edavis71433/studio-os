@@ -75,7 +75,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="eyebrow" id="eyebrow">Your presence</div>
+    <div class="eyebrow" id="eyebrow">Your business</div>
     <h1 id="greeting">Today</h1>
     <p class="sub" id="sub">A calm look at what — if anything — needs you.</p>
   </header>
@@ -140,7 +140,7 @@ function render(moments, features, feed, ctx){
       ? 'Your website matches what you’ve told us, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.'
       : 'Everything across your business is quiet, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.';
     const clearLinks = hasWebsite
-      ? `<a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your leads</a>`
+      ? `<a class="link" href="/presence.html">Open your website</a> <span style="color:var(--soft)">·</span> <a class="link" href="/leads.html">See your messages</a>`
       : `<a class="link" href="/crm.html">Open Customers</a> <span style="color:var(--soft)">·</span> <a class="link" href="/connections.html">Connections</a>`;
     html += `<div class="moment calm"><span class="tag">All clear</span>
       <h2>${hasWebsite ? 'Everything customers can see is current.' : 'Everything’s quiet across your business.'}</h2>
@@ -173,7 +173,7 @@ function render(moments, features, feed, ctx){
       <div class="chips">${feats.map(f=>`<span class="chip">${esc(f)}</span>`).join('')}</div></div>`;
   }
   // the Concierge — a knowledgeable partner, not a chatbot
-  html += `<div class="ask"><h3>Have a question about your presence?</h3>
+  html += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
     <div class="answer" id="askAns" hidden></div></div>`;
@@ -222,7 +222,7 @@ function signedOut(){
   $('sub').textContent = '';
   $('main').innerHTML = `<div class="center"><h2>Welcome back.</h2>
     <p class="muted">Sign in to see what — if anything — needs you today.</p>
-    <p style="margin-top:22px"><a class="link" href="/portal.html">Sign in to your presence →</a></p></div>`;
+    <p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;
 }
 function trouble(){
   $('main').innerHTML = `<div class="center"><h2>We couldn’t load your day just now.</h2>

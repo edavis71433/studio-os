@@ -155,8 +155,8 @@ function card(e){
       <p><b>What we read:</b></p><ul>${reads || '<li>your public details</li>'}</ul>
       <p><b>What we never change:</b> nothing — this is read-only. We never post, edit, or remove anything on ${esc(e.label)}, and nothing on your own website changes.</p>
       <p><b>Approval:</b> ${esc(e.approval || 'You approve access on the service’s own screen, and can revoke it any time.')}</p>
-      <p><b>Who owns it:</b> you do. It’s your account and your permission — Presence just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>
-      <p><b>If you don’t connect:</b> nothing changes. Presence keeps working with what it already sees — connecting simply lets it be more sure and more helpful. You can connect any time later.</p>
+      <p><b>Who owns it:</b> you do. It’s your account and your permission — Studio OS just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>
+      <p><b>If you don’t connect:</b> nothing changes. Studio OS keeps working with what it already sees — connecting simply lets it be more sure and more helpful. You can connect any time later.</p>
     </div></details>
   </article>`;
 }
@@ -178,7 +178,7 @@ function render(surface){
   html += `<section class="group" style="margin-top:40px">
     <h2>Questions about connecting</h2>
     <div class="svc">
-      <p class="purpose" style="margin-top:0">Ask anything — why connect a service, what it helps with, whether Presence can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
+      <p class="purpose" style="margin-top:0">Ask anything — why connect a service, what it helps with, whether Studio OS can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
       <div class="row"><input id="cq" type="text" placeholder="e.g. why would I connect my Google listing?" aria-label="Ask about connecting" style="flex:1;min-width:200px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="primary" id="cask">Ask</button></div>
       <div class="answer" id="cans" style="display:none;margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap"></div>
     </div></section>`;
