@@ -38,7 +38,9 @@ try {
   ok('home: composes REAL inquiry count (≥3 this week)', !!inq && inq.number >= 3);
   ok('home: inquiry sentence is plain English mentioning the count', /inquir(y|ies) this week/.test(inq.sentence));
   ok('home: unread inquiries surfaced honestly', /waiting for a reply/.test(inq.detail || ''));
-  ok('home: NEVER fabricates traffic — honest "not measured" card present', (d.not_measured || []).some((c) => c.key === 'traffic' && c.number === null));
+  // AN-2 retired the traffic "not measured" card (traffic is first-party now); the
+  // only honest "not measured" left is Search/GSC. Never a fabricated number anywhere.
+  ok('home: honest "not measured" (search/GSC), never a fabricated number', (d.not_measured || []).some((c) => c.key === 'search') && (d.not_measured || []).every((c) => c.number === null));
   ok('home: publishing insight present (real signal)', (d.insights || []).some((i) => i.key === 'publishing'));
 
   const cRes = await handleAnalyticsCustomers(new Request('http://x/analytics/customers?period=week'), site, cors);

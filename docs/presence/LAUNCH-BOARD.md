@@ -89,3 +89,21 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 - **AN-3 Search Performance** — Google Search Console composed into Analytics by reusing the shared `signals` table (no new store/AI). Honest + auto-activating: renders real Google impressions/clicks/position in plain English the instant data exists, honest "connect Search Console" until then; agency sees who's growing/falling/not-connected. ⚠ Structural: no GSC data flows yet — presence-native GSC ingestion (OAuth app + cron + dimensions) is the owner-gated follow-up (AN-3.1) that turns this ready layer live.
 - **DAM-2 Files Approval** — approval-before-publish for in-use files (logo/hero/PDF/menu), reusing the one approval spine (asset_status + Inbox/Today feed + audit + agency portfolio). Staged-replace keeps the live site safe: unapproved files never referenced; approve repoints live, reject discards. Reviewer approves in the same place as everything else. Completes the Files experience.
 - **Architecture v1.0 Migration — COMPLETE** — final terminology sweep done (Media→Files, Relationship→Customers, Leads→Messages, Presence→Studio OS brand). Zero forbidden terms remain customer-facing; single-ownership verified; all templates architecture-compliant. Handed to the next phases: Design-System QA (layout/token cohesion) + Integration & Cohesion Audit.
+
+## INT-1 — Integration Fix Pass (result)
+Systematic verification of the cross-system flows. All green; the only fix needed was a stale test assertion (the 2 real integration bugs — approval-feed scope leak + reviewer {decision} field — were already fixed in the DAM-2 gap-check).
+| Flow | Status | Evidence |
+|---|---|---|
+| Website → Customers | ✅ | CRM timeline reads presence_form_submissions |
+| Website → Files | ✅ | files_integration 16/16; presence.html#media deep-links to /files.html |
+| Website → Analytics | ✅ | visits_integration 10/10 (tracker→/px→compose). Note: sites published before AN-2 get the tracker on their next publish |
+| Website → Inbox | ✅ | infra plans → pending_approvals (existing) |
+| Customers → Inbox | ✅ | inbox reads /forms/inbox → "New messages" |
+| Files → Website | ✅ | files_integration + dam2 (replace repoints → publish pipeline) |
+| Files → Inbox approvals | ✅ (fixed earlier) | dam2_integration 10/10; feed link now scope-forwarded |
+| Analytics → Website | ✅ | publishing insight → /presence.html |
+| Analytics → Customers | ✅ | inquiries insight → /leads.html (Messages) |
+| Studio → client scope | ✅ (fixed earlier) | scope 14/14 + scoped_access_audit 17/17; feed links scoped |
+| Reviewer approvals | ✅ (fixed earlier) | reviewerAllowed + {decision} accepted + reviewer restricted to approve/reject |
+
+Live integration suites: dam2 10/10, files 16/16, analytics 8/8, visits 10/10, search_perf 8/8. Documented-not-broken: shell bell dropdown links to landing (Inbox/Today carry the real per-item links); a new lead shows in Inbox immediately (bell badge counts it via the lead-waiting notice). No production code changes needed this pass.
