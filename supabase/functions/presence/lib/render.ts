@@ -11,33 +11,72 @@ import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.t
 import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 
-const REGISTRY: Record<string, Record<string, { render: RenderFn; manifest: TemplateManifest }>> = {
-  'restaurant-classic': {
-    '1.0.0': { render: restaurantClassic_1_0_0, manifest: manifest_rc_1_0_0 as unknown as TemplateManifest },
-  },
-  'business-classic': {   // Phase T3: the neutral, vocabulary-driven production default
-    '1.0.0': { render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest },
-  },
-  'editorial': {          // Phase PT: a second premium family — a serif, print-inspired design language
-    '1.0.0': { render: editorial_1_0_0, manifest: manifest_ed_1_0_0 as unknown as TemplateManifest },
-  },
+// ── FD-T2: indexed, lazy-ready template registry ─────────────────────────────
+// slug → version → LOADER. Render resolution goes through this ONE boundary and is
+// memoized, so: (a) the catalog/index is metadata-first, (b) integrity is guardable
+// at scale, and (c) a future switch to per-version code-splitting is a change to the
+// loaders ALONE. Static imports are kept (blueprint §2: shipping a version = deploying
+// the function), so getTemplate stays SYNCHRONOUS — the frozen render contract and the
+// sync renderSnapshot path (publish/preview) are untouched. Enabling true dynamic-import
+// code-splitting is FD-T2.1 (staged: it would make renderSnapshot async and needs a
+// live-publish bundling validation).
+interface TemplateEntry { render: RenderFn; manifest: TemplateManifest }
+const LOADERS: Record<string, Record<string, () => TemplateEntry>> = {
+  'restaurant-classic': { '1.0.0': () => ({ render: restaurantClassic_1_0_0, manifest: manifest_rc_1_0_0 as unknown as TemplateManifest }) },
+  'business-classic': { '1.0.0': () => ({ render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest }) },  // Phase T3 production default
+  'editorial': { '1.0.0': () => ({ render: editorial_1_0_0, manifest: manifest_ed_1_0_0 as unknown as TemplateManifest }) },               // Phase PT premium family
 };
+const _entryCache = new Map<string, TemplateEntry>();
 
-export function getTemplate(slug: string, version: string): { render: RenderFn; manifest: TemplateManifest } | null {
-  return REGISTRY[slug]?.[version] ?? null;
+export function getTemplate(slug: string, version: string): TemplateEntry | null {
+  const key = `${slug}@${version}`;
+  const cached = _entryCache.get(key);
+  if (cached) return cached;
+  const loader = LOADERS[slug]?.[version];
+  if (!loader) return null;
+  const entry = loader();
+  _entryCache.set(key, entry);
+  return entry;
 }
 
-/** Phase CP-1: the newest version of a template (registry keys sorted). */
+export interface TemplateIndexEntry { slug: string; name: string; versions: string[]; latest: string; content_contract_version: number }
+let _index: TemplateIndexEntry[] | null = null;
+/** The template catalog — computed once, metadata-first (no repeated scanning). */
+export function templateIndex(): TemplateIndexEntry[] {
+  if (_index) return _index;
+  _index = Object.entries(LOADERS).map(([slug, vs]) => {
+    const versions = Object.keys(vs).sort();
+    const latest = versions[versions.length - 1];
+    const m = getTemplate(slug, latest)!.manifest;
+    return { slug, name: m.name, versions, latest, content_contract_version: m.content_contract_version };
+  });
+  return _index;
+}
+
+/** Phase CP-1: the newest version of a template (via the index). */
 export function latestTemplateVersion(slug: string): string | null {
-  const versions = Object.keys(REGISTRY[slug] ?? {});
-  return versions.sort().at(-1) ?? null;
+  const e = templateIndex().find((x) => x.slug === slug);
+  return e ? e.latest : null;
 }
 /** The switchable-template catalog (slug, name, latest version). */
 export function listTemplates(): Array<{ slug: string; name: string; version: string }> {
-  return Object.entries(REGISTRY).map(([slug, vs]) => {
-    const version = Object.keys(vs).sort().at(-1)!;
-    return { slug, name: vs[version].manifest.name, version };
-  });
+  return templateIndex().map((e) => ({ slug: e.slug, name: e.name, version: e.latest }));
+}
+
+/** Registry integrity — every entry loads and its manifest matches its keys. Pure;
+ *  the guard test runs this so a mis-keyed template can't ship silently at scale. */
+export function registryIntegrity(): { ok: boolean; problems: string[] } {
+  const problems: string[] = [];
+  for (const [slug, vs] of Object.entries(LOADERS)) {
+    for (const version of Object.keys(vs)) {
+      const t = getTemplate(slug, version);
+      if (!t) { problems.push(`${slug}@${version}: not loadable`); continue; }
+      if (t.manifest.slug !== slug) problems.push(`${slug}@${version}: manifest.slug=${t.manifest.slug}`);
+      if (t.manifest.version !== version) problems.push(`${slug}@${version}: manifest.version=${t.manifest.version}`);
+      if (typeof t.manifest.content_contract_version !== 'number') problems.push(`${slug}@${version}: missing content_contract_version`);
+    }
+  }
+  return { ok: problems.length === 0, problems };
 }
 
 // ── Phase B1: the ONE render pipeline, Developer-Mode-aware ──────────────────
