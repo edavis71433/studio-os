@@ -48,13 +48,13 @@ Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Cl
 | P2 | **Cookie Policy + consent flow** | 🤖🔒 | Public-launch legal baseline |
 | P3 | **DPA + sub-processor list** (Supabase, Netlify, Stripe, connected providers) | 🧑🔒 | Hard enterprise blocker |
 | P4 | **Connected-provider consent copy** in the connect flow (what's read/written, revocation) | 🤖 | Trust + legal at the moment of connection |
-| P5 | **Operator/agency auth path** for the Marketplace/Enterprise management surfaces (real privileged caller, not service-role→public) | 🤖 | Those surfaces can't be operated cleanly today |
+| ~~P5~~ | ✅ **ENGINEERING DONE (Jul 9 2026)** — dedicated `OPERATOR_SECRET` (`x-operator-secret` header) resolves to a system-kind operator principal; fail-closed, server-to-server, NOT the service-role. Marketplace/enterprise routes already accept it. operator_auth 7/7. Owner sets the secret when a programmatic operator caller is wired. | 🤖 | Now has a clean privileged caller. |
 | P6 | **Fresh WCAG 2.2 AA pass** on templates + portal + any new UI (keyboard, zoom, VoiceOver/TalkBack, forms) | 🤖 | The bar moved; new surfaces unreviewed |
 | P7 | **Measure real p95** of `/observe` + full pipeline on a large live site; check edge cold-start & bundle size | 🤖 | Backend is fast in the pure tests; verify under real load |
 | P8 | **Consolidate redundant marketing pages**; let Industry Packs earn the industry pages | 🤖 | Overlap + maintenance drag |
 | ~~P9~~ | ✅ **CLOSED (activation)** — `pg_cron` LIVE on both envs (15-min cadence hitting `/system/run`, Vault-stored secret). Scheduled ops no longer need external triggering. | 🧑🤖 | Was stale on this board; done during owner activation. |
 | P10 | **Customer help / KB** + agency + enterprise onboarding guides | 🤖 | Docs serve engineers, not customers yet |
-| P11 | **Retire or rename `opt_dormant`** (stop emitting evidence only to suppress it) | 🤖 | Generate-to-suppress is dead weight |
+| ~~P11~~ | ✅ **DONE (Jul 9 2026)** — opt_dormant rule retired; the 5 generate-to-suppress observations no longer emitted; `analytics.not_connected` kept (real consumer) + documented. optimization 32/32 + engine 18/18 + judgment 14/14. | 🤖 | Generate-to-suppress removed. |
 | P12 | **Scope decision**: keep Marketplace/Enterprise/Agency behind an operator flag until they have UI | 🧑 | Ship value, not surface |
 
 ---
