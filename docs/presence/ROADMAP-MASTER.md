@@ -318,3 +318,37 @@ Verified-clean in the same sweep: no exposed secret keys in any HTML, no broken 
 ### P5 / P11 (from the Launch-Board Should-Fix list) — ENGINEERING COMPLETE Jul 9 2026
 - **P5 — operator/agency auth path:** ✅ dedicated `OPERATOR_SECRET` (`x-operator-secret` header) → system-kind principal tagged role 'operator'; mirrors SCHEDULER_SECRET / x-commerce-secret; server-to-server, fail-closed, NOT the service-role. Marketplace/enterprise routes already accept it. Registered in /system health. operator_auth 7/7. **Owner-config remainder:** set `OPERATOR_SECRET` when a programmatic operator caller is actually wired.
 - **P11 — retire opt_dormant:** ✅ suppression rule removed; 5 dead generate-to-suppress observations no longer emitted (emitters + catalog entries + the reputation provider gone); `analytics.not_connected` KEPT (real consumer: analytics_connected) and documented as intentionally unmatched. optimization 32/32 + engine 18/18 + judgment 14/14.
+
+### CMS-UX-1 — Client Content Tree (FUTURE — after Phase 1 hardening; not started)
+**Sequencing:** a future Presence CMS UX improvement scheduled AFTER the Phase 1 hardening work (M1–M10 in [PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md]). Does NOT reorder or join M1. Do not build yet.
+
+**Goal:** a simplified, client-facing content tree so a client can see how their website is organized by page and section — similar in spirit to Adobe/AEM's content tree, but with zero implementation detail exposed. Orientation + navigation, not a builder.
+
+**Example shape (illustrative, not hardcoded):**
+```
+Website
+├─ Home
+│   ├─ Hero
+│   ├─ Services
+│   ├─ Testimonials
+│   └─ FAQ
+├─ About
+├─ Services
+├─ Gallery
+├─ Blog
+├─ Contact
+├─ SEO
+├─ Images
+└─ Publish
+```
+
+**Rules (hard constraints):**
+- Client-facing navigation/orientation tool only.
+- Do NOT expose: React components · JSON · template manifests · database IDs · internal block IDs.
+- No drag-and-drop page restructuring in Phase 1.
+- Clicking a page or section navigates the client to the matching editor area (deep-link into the existing editor; no new editor).
+- The tree reflects the **active template's structure + available content sections** — it is derived from the template manifest/block model at render time, never a hardcoded restaurant layout.
+- Empty/incomplete sections show status indicators.
+- Must support future templates without hardcoding one layout (data-driven from the manifest).
+
+**Reuse-first note (for when it's built):** derive the tree from the existing template manifest + `presence_settings.blocks` (the structured content already drives render); deep-link each node to the existing editor surfaces. No second content model, no new editor, no exposure of the underlying structures — a read-only projection of what already exists.
