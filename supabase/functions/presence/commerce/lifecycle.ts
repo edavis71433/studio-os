@@ -15,6 +15,7 @@ import { rdapLookup, daysUntil } from '../lib/rdap.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -228,8 +229,9 @@ export async function runDomainWatch(limit = 10): Promise<{ checked: number; war
         warned++;
         const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`);
         if (cl.json?.[0]?.email) {
+          const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
           await sendEmail(cl.json[0].email, `Your domain ${site.custom_domain} ${when}`,
-            `<p><strong>${site.custom_domain}</strong> ${when}${info?.registrar ? ` at <strong>${info.registrar}</strong>` : ''}.</p><p>Renewing at your registrar (auto-renew is the calm option) keeps your website and email answering. Nothing is needed on our side — this is just the reminder registrars are quiet about.</p>`);
+            `<p><strong>${site.custom_domain}</strong> ${when}${info?.registrar ? ` at <strong>${info.registrar}</strong>` : ''}.</p><p>Renewing at your registrar (auto-renew is the calm option) keeps your website and email answering. Nothing is needed on our side — this is just the reminder registrars are quiet about.</p>`, brand);
         }
         if (soon) {
           const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
@@ -270,7 +272,10 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
       nudged++;
       const ident = await svc(`presence_identity?site_id=eq.${lead.site_id}&select=email&limit=1`);
       const owner = ident.json?.[0]?.email;
-      if (owner) sendEmail(String(owner), copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p><a href="${base}/leads.html">Reply now →</a> A quick response keeps them warm.</p>`).catch(() => {});
+      if (owner) {
+        const brand = await loadEmailBrand(lead.site_id);   // BR-1: on the owner's brand
+        sendEmail(String(owner), copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p class="cta"><a href="${base}/leads.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Reply now →</a></p><p style="color:#938ba3;font-size:13px">A quick response keeps them warm.</p>`, brand).catch(() => {});
+      }
     }
   }
   return { nudged };

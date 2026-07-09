@@ -299,6 +299,40 @@
   };
   window.ddsScanHints = scanHints;
 
+  // ── BR-1: shared state helpers — one empty / loading / error / success set for
+  //    every surface. Additive; pages opt in. Markup uses the canonical shell
+  //    classes above, so it's theme-aware and consistent everywhere it's used.
+  function sEsc(s) { var d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+  function hostOf(h) { return typeof h === 'string' ? document.querySelector(h) : h; }
+  window.ddsEmpty = function (host, opts) {
+    host = hostOf(host); if (!host) return; opts = opts || {};
+    var act = opts.actionLabel ? '<div class="act"><button type="button" class="primary" data-dds-act>' + sEsc(opts.actionLabel) + '</button></div>' : '';
+    host.innerHTML = '<div class="dds-empty">' + (opts.icon ? '<div class="ico">' + sEsc(opts.icon) + '</div>' : '') +
+      '<h3>' + sEsc(opts.title || 'Nothing here yet') + '</h3>' +
+      (opts.body ? '<p>' + sEsc(opts.body) + '</p>' : '') + act + '</div>';
+    if (opts.onAction) { var b = host.querySelector('[data-dds-act]'); if (b) b.addEventListener('click', opts.onAction); }
+  };
+  window.ddsSkeleton = function (host, rows) {
+    host = hostOf(host); if (!host) return;
+    var n = rows || 3, out = '';
+    for (var i = 0; i < n; i++) out += '<div class="dds-skeleton" style="height:14px;width:' + (100 - (i % 3) * 12) + '%"></div>';
+    host.innerHTML = out;
+  };
+  window.ddsError = function (host, message, onRetry) {
+    host = hostOf(host); if (!host) return;
+    host.innerHTML = '<div class="dds-error"><span class="ico">!</span><span>' + sEsc(message || 'Something went wrong.') + '</span>' +
+      (onRetry ? '<button type="button" class="retry" data-dds-retry>Try again</button>' : '') + '</div>';
+    if (onRetry) { var b = host.querySelector('[data-dds-retry]'); if (b) b.addEventListener('click', onRetry); }
+  };
+  window.ddsToast = function (message, kind) {
+    var t = el('<div class="dds-toast ' + (kind === 'err' ? 'err' : 'ok') + '" role="status" aria-live="polite"><span class="ico">' + (kind === 'err' ? '!' : '✓') + '</span><span class="t"></span></div>');
+    t.querySelector('.t').textContent = String(message == null ? '' : message);
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('show'); });
+    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, kind === 'err' ? 5200 : 3200);
+    return t;
+  };
+
   function boot() {
     mountFrame();
     scanHints();
