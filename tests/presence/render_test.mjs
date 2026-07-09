@@ -214,6 +214,91 @@ const h = renderSnapshot(hostile, SITE);
   ok('perf: inline JS < 10KB budget', String(out['index.html']).match(/<script>([\s\S]*?)<\/script>/)[1].length < 10240);
 }
 
+// ═══ 9. golden + hostile across the OTHER registered templates (Phase 1 M1) ═══
+// restaurant-classic is covered in full above. Every template@version must hold
+// two universal guarantees: byte-identical golden output, and hostile content
+// escaped (never executable markup). This extends the SAME golden + hostile
+// mechanism to business-classic and editorial — no second harness, no second
+// renderer. Adding a template = add it to this list + commit its golden baseline.
+const OTHER_TEMPLATES = ['business-classic', 'editorial'];
+const HOSTILE_PAYLOADS = [
+  '<script>alert(1)</script>',
+  '" onmouseover="alert(1)" x="',
+  'javascript:alert(1)',
+  '<img src=x onerror=alert(1)>',
+  '<iframe src="https://evil.example"></iframe>',
+  'data:text/html,<script>alert(1)</script>',
+];
+let _hp = 0;
+// Structural identifiers are validated to a safe charset by validateSnapshot
+// BEFORE anything renders/publishes (slugs build file paths + internal links),
+// so a hostile slug is unreachable in production — keep them valid here, exactly
+// as prod does, to test the real threat (hostile DISPLAY content) not a fiction.
+const STRUCTURAL_KEYS = new Set(['slug']);
+// deep-replace every non-structural STRING leaf with a rotating hostile payload;
+// structure (keys, arrays, numbers) is preserved so the template still renders.
+// The snapshot envelope (template_slug/version/contract) is untouched.
+const hostilify = (v, key) => {
+  if (typeof v === 'string') return STRUCTURAL_KEYS.has(key) ? v : HOSTILE_PAYLOADS[(_hp++) % HOSTILE_PAYLOADS.length];
+  if (Array.isArray(v)) return v.map((x) => hostilify(x, key));
+  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) o[k] = hostilify(v[k], k); return o; }
+  return v;
+};
+for (const slug of OTHER_TEMPLATES) {
+  const fx = JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
+
+  // determinism: render twice → byte-identical
+  const r1 = renderSnapshot(fx, SITE), r2 = renderSnapshot(fx, SITE);
+  {
+    const k1 = Object.keys(r1).sort(), k2 = Object.keys(r2).sort();
+    let same = k1.length === k2.length && k1.every((k, i) => k === k2[i]);
+    if (same) for (const k of k1) if (r1[k] !== r2[k]) { same = false; break; }
+    ok(`determinism [${slug}]: render twice → identical`, same, `${k1.length} files`);
+  }
+
+  // golden baseline (path → sha256), same approval mechanism as restaurant
+  const gPath = new URL(`tests/presence/golden/${slug}-1.0.0.json`, ROOT);
+  const dg = {};
+  for (const k of Object.keys(r1).sort()) dg[k] = await sha(String(r1[k]));
+  if (UPDATE) {
+    await Deno.writeTextFile(gPath, JSON.stringify(dg, null, 1) + '\n');
+    console.log(`golden updated [${slug}]: ${Object.keys(dg).length} files`);
+  } else {
+    let g = null;
+    try { g = JSON.parse(await Deno.readTextFile(gPath)); } catch { /* absent */ }
+    if (!g) ok(`golden [${slug}]: baseline exists`, false, 'run with --update-golden once');
+    else {
+      const gk = Object.keys(g).sort(), dk = Object.keys(dg).sort();
+      const sameSet = gk.length === dk.length && gk.every((k, i) => k === dk[i]);
+      const drift = sameSet ? gk.filter((k) => g[k] !== dg[k]) : ['<file set changed>'];
+      ok(`golden [${slug}]: output matches committed baseline`, sameSet && drift.length === 0, drift.slice(0, 3).join(', '));
+    }
+  }
+
+  // hostile: every content string is a hostile payload; no LIVE dangerous markup
+  // may survive (escaped forms like &lt;script&gt; are fine and expected).
+  const hSnap = structuredClone(fx);
+  _hp = 0;
+  hSnap.content = hostilify(fx.content, 'content');
+  const hr = renderSnapshot(hSnap, SITE);
+  {
+    let bad = [], sawEscaped = false;
+    for (const [k, v] of Object.entries(hr)) {
+      if (!k.endsWith('.html')) continue;
+      const s = String(v);
+      if (s.includes('&lt;script&gt;')) sawEscaped = true;
+      if (s.includes('<script>alert(1)')) bad.push(`${k}: live <script>`);
+      if (s.includes('<img src=x onerror')) bad.push(`${k}: live onerror <img>`);
+      if (s.includes('<iframe src="https://evil.example"')) bad.push(`${k}: live <iframe>`);
+      if (s.includes(' onmouseover="alert(1)"')) bad.push(`${k}: live handler attribute`);
+      if (/(?:href|src)\s*=\s*"javascript:/i.test(s)) bad.push(`${k}: javascript: URL`);
+      if (/(?:href|src)\s*=\s*"data:text\/html/i.test(s)) bad.push(`${k}: data:text/html URL`);
+    }
+    ok(`hostile [${slug}]: no script/handler/js-url/iframe survives in any page`, bad.length === 0, bad.slice(0, 3).join(' | '));
+    ok(`hostile [${slug}]: hostile markup present but escaped (proves escaping ran)`, sawEscaped, 'expected &lt;script&gt; in output');
+  }
+}
+
 const fails = results.filter((r) => !r.p);
 console.log(`\n════ RENDERER SUITE: ${results.length - fails.length}/${results.length} PASSED ════`);
 if (fails.length) { for (const f of fails) console.log(' FAIL:', f.n); Deno.exit(1); }

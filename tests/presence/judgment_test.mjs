@@ -28,8 +28,12 @@ const byRule = (r) => Object.fromEntries(r.judgments.map((j) => [j.rule, j]));
   let overlap = 0;
   for (const r of RULES) for (const t of r.types) { if (owners.has(t)) overlap++; owners.set(t, r.key); }
   ok('rules: no evidence type is claimed by two rules (grouping is unambiguous)', overlap === 0);
-  const orphans = Object.keys(CATALOG).filter((t) => !owners.has(t));
-  ok('rules: every catalog evidence type has a judging rule (no silent gaps)', orphans.length === 0, orphans.join(',') || `${owners.size} types across ${RULES.length} rules`);
+  // analytics.not_connected is intentionally rule-less (P11): a real internal
+  // signal consumed directly (analytics_connected in services.ts/launch.ts), not
+  // a customer judgment — it lands in unmatched_types by design, never surfaced.
+  const INTENTIONAL_UNMATCHED = new Set(['analytics.not_connected']);
+  const orphans = Object.keys(CATALOG).filter((t) => !owners.has(t) && !INTENTIONAL_UNMATCHED.has(t));
+  ok('rules: every catalog evidence type has a judging rule (no silent gaps, save the documented intentional exception)', orphans.length === 0, orphans.join(',') || `${owners.size} types across ${RULES.length} rules`);
 }
 
 // ═══ 2. healthy site → nothing critical, mostly suppressed/low ═══

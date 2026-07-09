@@ -1,0 +1,45 @@
+name: CI (Deno pure suite + typecheck)
+
+# The automated regression gate for the edge functions and the deterministic
+# render pipeline (Presence CMS Phase 1, M1). Runs the pure test sweep
+# (no network, no live Supabase) and typechecks all three functions. The
+# integration-tier suites that need live Supabase credentials are skipped here;
+# they run against staging separately. The golden render suite is part of the
+# sweep, so a renderer change that alters output fails CI until the golden
+# baseline is intentionally updated and committed.
+#
+# To make this a REQUIRED gate: Settings → Branches → protect `main` and add
+# "test" (this job) as a required status check.
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - "supabase/functions/**"
+      - "tests/presence/**"
+      - "scripts/ci-pure-tests.sh"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/**"
+      - "tests/presence/**"
+      - "scripts/ci-pure-tests.sh"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.9.1"
+      - name: Typecheck edge functions
+        run: |
+          deno check supabase/functions/presence/index.ts
+          deno check supabase/functions/clever-api/index.ts
+          deno check supabase/functions/stripe-webhook/index.ts
+      - name: Pure test sweep (+ golden render)
+        run: bash scripts/ci-pure-tests.sh
