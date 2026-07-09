@@ -59,6 +59,28 @@ export function nextAssetStatus(from: string, action: 'submit' | 'approve' | 'pu
   }
 }
 
+// ── DAM-2: Files Approval — does replacing this file need approval first? Pure.
+//  Only an IN-USE file (one that affects the live site) can need approval — an
+//  unused/private/temporary file never does (don't over-approve). Under 'required'
+//  it always does; under 'optional' only when the owner asks; 'immediate' never. */
+export function replaceNeedsApproval(policy: ApprovalPolicy, inUse: boolean, submitRequested: boolean): boolean {
+  if (!inUse) return false;
+  if (policy === 'required') return true;
+  if (policy === 'optional') return submitRequested;
+  return false; // immediate
+}
+
+/** DAM-2: the customer-facing state badge for a file. Pure. */
+export type FileState = 'pending' | 'live' | 'approved' | 'draft' | 'archived';
+export function fileState(status: string | null | undefined, inUse: boolean, pendingReplace: boolean): FileState {
+  const s = status || 'approved';
+  if (s === 'archived') return 'archived';
+  if (s === 'pending' || pendingReplace) return 'pending';
+  if (inUse) return 'live';
+  if (s === 'draft') return 'draft';
+  return 'approved';
+}
+
 // ── DAM-8: duplicate detection — content hash when present, else a size/dim
 //    heuristic (server never sees bytes on signed-URL uploads). Pure. ──────────
 export function dupKey(a: Asset): string {

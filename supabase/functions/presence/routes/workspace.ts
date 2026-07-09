@@ -20,6 +20,7 @@ import { nextPlanUp } from '../commerce/catalog.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc } from '../lib/db.ts';
+import { displayName } from '../lib/dam.ts';
 import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
@@ -30,6 +31,7 @@ export function reviewerAllowed(route: string, method: string): boolean {
   if (method === 'GET' && (route === '/portal/context' || route === '/portal/feed')) return true;
   if (method === 'POST' && /^\/foundations\/plans\/[0-9a-f-]{36}\/decide$/.test(route)) return true;   // approve an infra plan
   if (method === 'POST' && /^\/connections\/[a-z0-9_]+\/write\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // approve a connected write
+  if (method === 'POST' && /^\/assets\/[0-9a-f-]{36}\/status$/.test(route)) return true; // DAM-2: approve/reject a file (action-restricted in the handler)
   return false;
 }
 
@@ -83,12 +85,14 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     const seesFull = siteCan(role, 'view_all');
     const showApprovals = visibleTo(role, 'approvals');
     const none = Promise.resolve({ ok: true, json: [] as any[] });
-    const [nQ, iQ, wQ] = await Promise.all([
+    const [nQ, iQ, wQ, fQ] = await Promise.all([
       seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id`) : none,
       showApprovals ? svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
       showApprovals ? svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
+      showApprovals ? svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,metadata`) : none, // DAM-2: files awaiting approval
     ]);
-    attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0);
+    const filesPending = ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length;
+    attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0) + filesPending;
   } catch { /* the badge is best-effort — never block the shell on it */ }
 
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey };
@@ -133,12 +137,13 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
   const shares = await loadShares(site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
-  const [momQ, pubQ, infraQ, writeQ, noticeQ] = await Promise.all([
+  const [momQ, pubQ, infraQ, writeQ, noticeQ, fileQ] = await Promise.all([
     svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id,title,summary,risk&limit=10`),
     svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id,provider_key,title,summary&limit=10`),
     seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,headline,body,created_at&order=created_at.desc&limit=10`) : Promise.resolve({ ok: true, json: [] as any[] }),
+    svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,storage_path,alt_text,metadata&limit=10`), // DAM-2: files awaiting approval
   ]);
   const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
@@ -146,6 +151,8 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   const pending = showApprovals ? [
     ...(((infraQ.ok && infraQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'infrastructure', title: p.title, summary: p.summary, decide_path: `/foundations/plans/${p.id}/decide` })),
     ...(((writeQ.ok && writeQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'connected', provider: p.provider_key, title: p.title, summary: p.summary, decide_path: `/connections/${p.provider_key}/write/${p.id}/decide` })),
+    // DAM-2: a file replacement waiting for approval — same feed, links into Files
+    ...(((fileQ.ok && fileQ.json) || []) as any[]).filter((m) => (m.metadata || {}).pending_replace).map((m) => ({ id: m.id, kind: 'file', title: `Replace ${displayName(m)}`, summary: 'A file replacement is waiting for your OK before it goes live.', decide_path: `/assets/${m.id}/status`, href: `/files.html?focus=${m.id}` })),
   ] : [];
   const last = (pubQ.ok && pubQ.json?.[0]) || null;
   // Phase FLOW: the notices rail joins the ONE global feed the shell bell reads,

@@ -1,6 +1,6 @@
 // ── Phase DAM-1: Files — pure logic (kinds, names, where-used, versions, PDF) ──
 //   deno run --allow-read --allow-env tests/presence/files_test.mjs
-import { fileKind, displayName, isFavorite, usageSummary, carryForwardMetadata } from '../../supabase/functions/presence/lib/dam.ts';
+import { fileKind, displayName, isFavorite, usageSummary, carryForwardMetadata, replaceNeedsApproval, fileState } from '../../supabase/functions/presence/lib/dam.ts';
 import { IMAGE_MIME, DOC_MIME, MIME_ALLOW, isDocMime, isImageMime } from '../../supabase/functions/presence/lib/media.ts';
 
 const results = [];
@@ -50,6 +50,19 @@ ok('media: PDF is an allowed document type', isDocMime('application/pdf') && MIM
 ok('media: PDF is NOT treated as an image (no transform path)', !isImageMime('application/pdf'));
 ok('media: no stray types leaked into the allow-list', [...MIME_ALLOW].every((m) => IMAGE_MIME.has(m) || DOC_MIME.has(m)));
 
+// ── DAM-2: approval gating (don't over-approve) ──
+ok('approval: required policy + in-use → needs approval', replaceNeedsApproval('required', true, false) === true);
+ok('approval: required policy + UNUSED file → no approval (don’t over-approve)', replaceNeedsApproval('required', false, false) === false);
+ok('approval: optional policy needs an explicit submit', replaceNeedsApproval('optional', true, false) === false && replaceNeedsApproval('optional', true, true) === true);
+ok('approval: immediate (solo owner) never needs approval', replaceNeedsApproval('immediate', true, true) === false);
+
+// ── DAM-2: file state badge ──
+ok('state: pending_replace → pending', fileState('approved', true, true) === 'pending');
+ok('state: pending status → pending', fileState('pending', false, false) === 'pending');
+ok('state: in-use approved → live', fileState('approved', true, false) === 'live');
+ok('state: approved, unused → approved', fileState('approved', false, false) === 'approved');
+ok('state: draft → draft; archived → archived', fileState('draft', false, false) === 'draft' && fileState('archived', true, false) === 'archived');
+
 const passed = results.filter((r) => r.p).length;
-console.log(`\n════ FILES (DAM-1): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
+console.log(`\n════ FILES (DAM-1/2): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

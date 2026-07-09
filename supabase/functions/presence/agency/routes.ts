@@ -52,7 +52,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     return { sites: [], links: [], clientNames: {}, moments: [], evidence: [], opportunities: [], plans: [], drafts: [], connections: [], reviewReports: [], brandReports: [], lastChange: {}, nowIso };
   }
   const IN = `site_id=in.(${ids.join(',')})`;
-  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ] = await Promise.all([
+  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ, filesQ] = await Promise.all([
     svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at&limit=1000`),
     svc(`presence_moments?${IN}&status=eq.active&select=site_id,moment_key,moment_type,headline&limit=1000`),
     svc(`presence_growth_opportunities?${IN}&status=eq.open&select=site_id,area,opportunity,timing_ends,created_at&limit=1000`),
@@ -65,7 +65,12 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     svc(`presence_evidence_runs?${IN}&finished_at=not.is.null&error_text=is.null&select=id,site_id,started_at&order=started_at.desc&limit=500`),
     svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=site_id&limit=2000`),   // Section 3: leads waiting
     svc(`presence_plan_notices?${IN}&status=eq.active&select=site_id,kind&limit=2000`),             // Section 3: attention + billing
+    svc(`presence_media?${IN}&asset_status=eq.pending&deleted_at=is.null&select=site_id,metadata&limit=2000`), // DAM-2: files awaiting approval
   ]);
+  const filesPending: Record<string, number> = {};
+  for (const m of ((filesQ.json ?? []) as Array<{ site_id: string; metadata: any }>)) {
+    if ((m.metadata || {}).pending_replace) filesPending[m.site_id] = (filesPending[m.site_id] || 0) + 1;
+  }
   // latest change per site + latest run per site (reduce, not re-query)
   const lastChange: Record<string, string> = {};
   for (const e of (evtQ.json ?? []) as Array<{ site_id: string; created_at: string }>) {
@@ -99,6 +104,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     connections: connQ.json ?? [], reviewReports: revQ.json ?? [], brandReports: brandQ.json ?? [],
     leads: (leadsQ.json ?? []) as Array<{ site_id: string }>,
     notices: (noticesQ.json ?? []) as Array<{ site_id: string; kind: string }>,
+    filesPending,
     billingBySite,
     lastChange, nowIso,
   };

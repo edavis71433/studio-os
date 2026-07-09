@@ -64,7 +64,7 @@ function render(feed,leads){
   if(!total){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div>`;$('main').innerHTML=h;return;}
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
-    for(const p of approvals){const href=p.kind==='connected'?'/connections.html':'/presence.html#foundations';
+    for(const p of approvals){const href=p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations';
       h+=`<a class="item approve" href="${href}"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go">Review &amp; approve →</div></a>`;}}
 
   if(newLeads.length){h+=`<h2>New messages</h2>`;

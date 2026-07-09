@@ -29,8 +29,9 @@ import { editionFromPlan, editionFromSite } from '../commerce/editions.ts';
 import {
   searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
-  fileKind, isFavorite, type Asset, type ApprovalPolicy, type UsageRef,
+  fileKind, isFavorite, replaceNeedsApproval, fileState, type Asset, type ApprovalPolicy, type UsageRef,
 } from '../lib/dam.ts';
+import { resolveSiteRole } from '../lib/workspace.ts';
 
 const ASSET_COLS = 'id,storage_path,alt_text,width,height,bytes,mime,tags,collection,metadata,content_hash,brand,asset_status,focal_x,focal_y,created_at';
 const LIST_THUMB_CAP = 160;   // sign at most this many thumbnails per list call (bounded latency)
@@ -92,6 +93,7 @@ async function policyFor(site: SiteRow): Promise<ApprovalPolicy> {
 
 /** Shape one asset for the UI (calm, customer-facing fields). */
 function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null } = {}) {
+  const meta = (a.metadata || {}) as Record<string, unknown>;
   return {
     ...a,
     name: displayName(a),
@@ -99,6 +101,9 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null } = {
     favorite: isFavorite(a),
     in_use: opts.in_use,
     thumb: opts.thumb ?? undefined,
+    // DAM-2: approval state + who/when, from reused metadata (no new columns)
+    state: fileState(a.asset_status, !!opts.in_use, !!meta.pending_replace),
+    approval: { approved_by: meta.approved_by || null, approved_at: meta.approved_at || null, submitted_by: meta.submitted_by || null, submitted_at: meta.submitted_at || null, pending_replace: !!meta.pending_replace },
   };
 }
 
@@ -210,13 +215,45 @@ export async function handleAssetStatus(req: Request, site: SiteRow, principal: 
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
   const action = ['submit', 'approve', 'reject', 'publish', 'archive', 'restore'].includes(b.action) ? b.action : null;
   if (!action) return json({ error: 'bad_request', message: 'Choose submit, approve, reject, publish, archive, or restore.' }, 400, cors);
-  const cur = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=asset_status&limit=1`);
-  const from = arr(cur)[0]?.asset_status;
-  if (!from) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  // DAM-2: a client reviewer may ONLY approve or reject (never submit/publish/archive)
+  const role = await resolveSiteRole(principal.jwt || '', site.id, principal.kind);
+  if (role === 'client_reviewer' && !['approve', 'reject'].includes(action)) {
+    return json({ error: 'forbidden', message: 'A reviewer can approve or ask for changes — nothing else.' }, 403, cors);
+  }
+  const cur = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=asset_status,metadata&limit=1`);
+  const row = arr(cur)[0];
+  if (!row) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  const from = row.asset_status;
+  const meta = (row.metadata || {}) as Record<string, unknown>;
   const policy = await policyFor(site);
+  const now = new Date().toISOString();
+  const who = principal.email || principal.userId || '';
+
+  // ── DAM-2: approving/rejecting a STAGED replacement completes or discards it ──
+  if (meta.pending_replace && (action === 'approve' || action === 'reject')) {
+    const oldId = String(meta.replaces || '');
+    if (action === 'approve') {
+      // now the approved version goes live: repoint references, retire the old one
+      const affected = oldId ? await repointReferences(site, oldId, id) : [];
+      if (oldId) { const oldA = await loadAsset(site.id, oldId, true); await svc(`presence_media?id=eq.${oldId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: now, metadata: { ...((oldA?.metadata as any) || {}), replaced_by: id, replaced_at: now } }) }); }
+      const { pending_replace: _pr, ...rest } = meta;
+      await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ asset_status: 'approved', metadata: { ...rest, approved_by: who, approved_at: now } }) });
+      await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: `Approved and applied a replacement`, principal, provenance: 'human', fields: ['asset_status', 'storage_path'] });
+      return json({ data: { ok: true, status: 'approved', applied: true, affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
+    }
+    // reject: discard the proposed replacement; the old version stays live untouched
+    const { pending_replace: _pr, ...rest } = meta;
+    await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ asset_status: 'archived', metadata: { ...rest, rejected_by: who, rejected_at: now } }) });
+    await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: `Declined a proposed replacement`, principal, provenance: 'human', fields: ['asset_status'] });
+    return json({ data: { ok: true, status: 'archived', applied: false } }, 200, cors);
+  }
+
+  // ── ordinary lifecycle (DAM-1) ──
   const to = nextAssetStatus(from, action, policy);
   if (!to) return json({ error: 'not_allowed', message: `Can’t ${action} a file that’s ${from}.` }, 409, cors);
-  const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ asset_status: to }) });
+  const stamp: Record<string, unknown> = { asset_status: to };
+  if (action === 'approve') stamp.metadata = { ...meta, approved_by: who, approved_at: now };
+  const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(stamp) });
   if (!(r.ok && arr(r)[0])) return json({ error: 'write_failed', message: 'That didn’t save — try again.' }, 502, cors);
   await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: `File ${action} → ${to}`, principal, provenance: 'human', fields: ['asset_status'] });
   return json({ data: { ok: true, status: to, policy } }, 200, cors);
@@ -255,18 +292,34 @@ export async function handleAssetReplace(req: Request, site: SiteRow, principal:
   const now = new Date().toISOString();
   // carry the old file's organization forward onto the new version
   const cf = carryForwardMetadata(oldA, newA);
-  const newMeta = { ...(newA.metadata || {}), ...(cf.metadata || {}), replaces: id };
-  const newPatch: Record<string, unknown> = { metadata: newMeta };
+  const newMeta: Record<string, unknown> = { ...(newA.metadata || {}), ...(cf.metadata || {}), replaces: id };
+  const newPatch: Record<string, unknown> = {};
   if (cf.collection) newPatch.collection = cf.collection;
   if (cf.tags) newPatch.tags = cf.tags;
   if (cf.brand) newPatch.brand = cf.brand;
-  await svc(`presence_media?id=eq.${withId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(newPatch) });
-  // repoint every live/draft reference from old → new
+
+  // ── DAM-2: does this replacement need approval before it can go live? ──
+  const refMap = await referencedRefs(site);
+  const inUse = refsSet(refMap).has(id);
+  const policy = await policyFor(site);
+  if (replaceNeedsApproval(policy, inUse, b.submit_for_approval === true)) {
+    // STAGED: the old (approved) version stays live; the new one waits as pending.
+    // References are NOT repointed until an approver says yes — so the live site
+    // never shows an unapproved file, and the publish pipeline is untouched.
+    newMeta.pending_replace = true;
+    newMeta.submitted_at = now;
+    newMeta.submitted_by = principal.email || principal.userId || '';
+    await svc(`presence_media?id=eq.${withId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ ...newPatch, metadata: newMeta, asset_status: 'pending' }) });
+    await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: withId, action: 'update', summary: `Submitted a replacement for ${displayName(oldA)} — awaiting approval`, principal, provenance: 'human', fields: ['asset_status'] });
+    return json({ data: { ok: true, pending: true, status: 'pending_approval', replaces: displayName(oldA), message: 'Sent for approval — it goes live once someone approves it.' } }, 200, cors);
+  }
+
+  // IMMEDIATE: repoint now (solo owner, or an unused file, or optional-not-submitted)
+  await svc(`presence_media?id=eq.${withId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ ...newPatch, metadata: newMeta }) });
   const affected = await repointReferences(site, id, withId);
-  // retain the old file as the prior version (soft-deleted, linked)
   await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: now, metadata: { ...(oldA.metadata || {}), replaced_by: withId, replaced_at: now } }) });
   await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: withId, action: 'update', summary: `Replaced ${displayName(oldA)}`, principal, provenance: 'human', fields: ['storage_path'] });
-  return json({ data: { ok: true, replaced: displayName(oldA), affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
+  return json({ data: { ok: true, pending: false, replaced: displayName(oldA), affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
 }
 
 export async function handleAssetRollback(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {

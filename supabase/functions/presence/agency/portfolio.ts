@@ -25,6 +25,7 @@ export interface PortfolioInput {
   plans: PlanLite[]; drafts: DraftLite[]; connections: ConnLite[];
   reviewReports: ReportLite[]; brandReports: ReportLite[];
   leads?: LeadLite[]; notices?: NoticeLite[];   // PP/Section-3: waiting leads + active notices
+  filesPending?: Record<string, number>;         // DAM-2: site_id → files awaiting approval
   billingBySite?: Record<string, string>;       // site_id → entitlement status (active|paused|lapsed)
   lastChange: Record<string, string>;      // site_id → latest change event at
   nowIso: string;
@@ -72,10 +73,11 @@ export function buildPortfolio(i: PortfolioInput) {
       plans_waiting: plansWaiting,
       drafts_waiting: (drafts.get(s.id) || []).filter((d) => d.status === 'proposed').length,
       leads_waiting: (leads.get(s.id) || []).length,
+      files_pending: (i.filesPending || {})[s.id] || 0,   // DAM-2: files awaiting approval
       search_issues,
       billing_issue,
-      // one number the agency scans: things actively asking for someone (active notices + approvals + waiting leads)
-      attention: noticeRows.length + plansWaiting + (leads.get(s.id) || []).length,
+      // one number the agency scans: things actively asking for someone (active notices + approvals + waiting leads + files)
+      attention: noticeRows.length + plansWaiting + (leads.get(s.id) || []).length + ((i.filesPending || {})[s.id] || 0),
       review_open: (reviews.get(s.id) || []).some((r) => r.status === 'open' && r.open_count > 0)
         || (brands.get(s.id) || []).some((r) => r.status === 'open' && r.open_count > 0),
       migration: (conns.get(s.id) || [])[0]?.readiness?.state || null,

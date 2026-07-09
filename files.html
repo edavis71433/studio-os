@@ -62,6 +62,10 @@
   .star svg{width:15px;height:15px}
   .badge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--good-soft);color:var(--good)}
   .badge.doc{background:var(--p-soft);color:var(--p)}
+  .badge.pend{background:var(--warn-soft);color:var(--warn)}
+  .sbadge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin:4px 0}
+  .sbadge.live{background:var(--good-soft);color:var(--good)} .sbadge.pending{background:var(--warn-soft);color:var(--warn)} .sbadge.approved{background:var(--p-soft);color:var(--p)} .sbadge.draft,.sbadge.archived{background:var(--line);color:var(--soft)}
+  .amuted{font-size:12.5px;color:var(--faint);margin-top:4px}
 
   .empty{text-align:center;padding:60px 20px;color:var(--soft)}
   .empty h2{font-family:var(--serif);font-weight:500;font-size:22px;color:var(--ink);margin-bottom:8px}
@@ -235,7 +239,7 @@ function tile(a){
   const t=a.thumb?`style="background-image:url('${esc(a.thumb)}')"`:'';
   const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
   const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not used';
-  const badge=a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
+  const badge=a.state==='pending'?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
   const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
   return `<button class="tile" data-open="${a.id}">
     <div class="thumb" ${t}>${inner}</div>${badge}${star}
@@ -269,9 +273,15 @@ function renderDetail(){
   const ver=d.versions&&d.versions.has_history?`<div class="vrow">Replaced a previous version.<button class="btn" onclick="rollback('${a.id}')">Undo replace</button></div>`:'';
   const tags=(a.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('');
   const meta=a.metadata||{};
+  const st=a.state||(a.in_use?'live':'approved');const ap=a.approval||{};
+  const stateLbl={live:'Live on your site',pending:'Waiting for approval',approved:'Approved',draft:'Draft',archived:'Archived'}[st]||st;
+  const stateBadge=`<span class="sbadge ${st}">${stateLbl}</span>`;
+  const approvedLine=ap.approved_by?`<div class="amuted">Approved by ${esc(ap.approved_by)}${ap.approved_at?' · '+when(ap.approved_at):''}</div>`:(ap.submitted_by&&st==='pending'?`<div class="amuted">Submitted by ${esc(ap.submitted_by)}${ap.submitted_at?' · '+when(ap.submitted_at):''}</div>`:'');
+  const approveCtrls=(st==='pending'&&ed)?`<div class="vrow" style="background:var(--warn-soft);color:var(--warn)">This replacement is waiting to go live.<span style="margin-left:auto;display:flex;gap:8px"><button class="btn" onclick="decideFile('${a.id}','approve')">Approve</button><button class="btn warn" onclick="decideFile('${a.id}','reject')">Ask for changes</button></span></div>`:'';
   $('panel').innerHTML=`
     <button class="x" onclick="closeDetail()">×</button>
     <div class="pv">${pv}</div>
+    <div>${stateBadge}</div>${approvedLine}${approveCtrls}
     <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}</div>
     <div class="field"><label>Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
     ${a.kind==='image'?`<div class="field"><label>Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers.">${esc(a.alt_text||'')}</textarea></div>`:''}
@@ -308,6 +318,13 @@ async function status(id,action){
 async function duplicate(id){const r=await api('POST','/assets/'+id+'/duplicate');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
 async function download(id){const r=await api('GET','/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank');else toast('Could not prepare download');}
 async function rollback(id){if(!confirm('Restore the previous version? This puts the earlier file back everywhere it was used.'))return;const r=await api('POST','/assets/'+id+'/rollback');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
+function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
+async function decideFile(id,action){
+  if(action==='reject'&&!confirm('Ask for changes? This keeps the current version live and sets the proposed replacement aside.'))return;
+  const r=await api('POST','/assets/'+id+'/status',{action});
+  if(r.ok){toast(action==='approve'?('Approved'+(r.body.data&&r.body.data.requires_publish?' — publish to go live':'')):'Sent back for changes');closeDetail();load();}
+  else toast((r.body&&r.body.message)||'Could not do that');
+}
 async function del(id,inUse){
   if(inUse){toast('This file is in use — remove it from the page or archive it first.');return;}
   if(!confirm('Delete this file permanently? This cannot be undone.'))return;
@@ -347,7 +364,7 @@ $('replacer').onchange=async(e)=>{
   const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
   if(!put.ok){toast('Upload failed');return;}
   const r=await api('POST','/assets/'+old.id+'/replace',{with:up.body.data.media_id});
-  if(r.ok){toast('Replaced'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Replace failed');
+  if(r.ok){toast(r.body.data&&r.body.data.pending?'Sent for approval — it goes live once approved':('Replaced'+(r.body.data.requires_publish?' — publish to go live':'')));closeDetail();load();}else toast((r.body&&r.body.message)||'Replace failed');
 };
 // drag & drop
 ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,(e)=>{if(!S.canEdit)return;e.preventDefault();const d=$('drop');if(d)d.classList.add('on');}));
