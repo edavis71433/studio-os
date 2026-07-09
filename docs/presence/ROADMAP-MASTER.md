@@ -219,3 +219,6 @@ DELIVERED + TESTED: PT-1 Editorial second template family (18/18, distinct desig
 
 ### Phase PT-2B — Premium Experience Completion ✅ (PT-4–PT-9)
 All remaining Premium Experience items, reuse-first: PT-6 Business Health Coach (/coach/health, no scores), PT-7 Customer Timeline (/coach/journey), PT-8 Admin Health Center (in /system/health, one read, no duplicate monitoring), PT-9 AI Business Memory (/coach/memory + concierge grounding, one loader, existing data), PT-5 contextual onboarding (declarative shell hints, show-once), PT-4 skeleton/micro-interaction polish. premium_experience 21/21 + regression green; deployed both envs. Phase PT (design core) + PT-2B together complete the Premium Experience roadmap.
+
+### Phase PT-2C — Premium Experience Surface Completion ✅
+Surfaced the PT-2B capabilities (reuse-only, no duplicate systems): Health Coach UI on Today (one health experience, replaced search-only line), Customer Journey card, Admin Health Center (admin-health.html + operator-authed /admin/health-center), Concierge actively using AI memory (stage/season-aware), template preview gallery (fallback for future families), contextual hints across Design/Foundations/Search/Publish/Photos/CRM. concierge 30/30, premium_experience 21/21, regression green; deployed both envs; Playwright specs added.

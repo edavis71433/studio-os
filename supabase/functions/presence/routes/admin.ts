@@ -26,6 +26,7 @@ import {
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
 import { describeEngine } from '../optimization/engine.ts';
+import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -408,6 +409,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   //    it can make. Derived live from the registry + catalog, so it can never
   //    drift from what actually runs.
   if (route === '/admin/optimization' && method === 'GET') return json({ data: describeEngine() }, 200, cors);
+  if (route === '/admin/health-center' && method === 'GET') return json({ data: await computeHealthCenter() }, 200, cors); // PT-2C: operator-authed Health Center
 
   // ── L4.0: Connected Platform inventory — the living, generated-from-registry
   //    profile of every provider (operator introspection; verifies one shared

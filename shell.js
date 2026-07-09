@@ -225,22 +225,36 @@
   // Declarative + reuses the shell: any page marks a `.dds-hint[data-hint]`
   // element (hidden) next to the thing it explains. We reveal unseen ones with a
   // "Got it", remember the dismissal, and never show it again. No tour, no steps.
+  function hintsSeen() { try { return JSON.parse(localStorage.getItem('dds-hints') || '{}'); } catch (_) { return {}; } }
+  function markHint(k) { try { var s = hintsSeen(); s[k] = 1; localStorage.setItem('dds-hints', JSON.stringify(s)); } catch (_) { /* */ } }
+  function attachDismiss(node, key) {
+    var x = document.createElement('button');
+    x.className = 'x'; x.type = 'button'; x.setAttribute('aria-label', 'Dismiss tip'); x.textContent = 'Got it';
+    x.addEventListener('click', function () { markHint(key); node.classList.remove('show'); setTimeout(function () { node.remove(); }, 200); });
+    node.appendChild(x);
+    requestAnimationFrame(function () { node.classList.add('show'); });
+  }
+  // declarative page-level hints (marked in the HTML). One at a time; never intrusive.
   function scanHints() {
-    var seen; try { seen = JSON.parse(localStorage.getItem('dds-hints') || '{}'); } catch (_) { seen = {}; }
-    Array.prototype.forEach.call(document.querySelectorAll('.dds-hint[data-hint]'), function (node) {
+    var seen = hintsSeen();
+    Array.prototype.forEach.call(document.querySelectorAll('.dds-hint[data-hint]:not(.dds-live)'), function (node) {
       var key = node.getAttribute('data-hint');
       if (!key || seen[key]) { node.remove(); return; }
-      node.hidden = false;
-      var x = document.createElement('button');
-      x.className = 'x'; x.type = 'button'; x.setAttribute('aria-label', 'Dismiss tip'); x.textContent = 'Got it';
-      x.addEventListener('click', function () {
-        try { seen[key] = 1; localStorage.setItem('dds-hints', JSON.stringify(seen)); } catch (_) { /* */ }
-        node.classList.remove('show'); setTimeout(function () { node.remove(); }, 200);
-      });
-      node.appendChild(x);
-      requestAnimationFrame(function () { node.classList.add('show'); });
+      if (document.querySelector('.dds-hint.show')) return;   // only one hint visible at once
+      node.classList.add('dds-live'); node.hidden = false; attachDismiss(node, key);
     });
   }
+  // imperative: teach the moment a context opens (a Studio-OS view, a desk).
+  window.ddsHint = function (key, html) {
+    var seen = hintsSeen();
+    if (!key || seen[key]) return false;
+    if (document.querySelector('.dds-hint.show')) return false;   // never stack
+    var bar = el('<div class="dds-hint dds-live" role="note"><span class="t"></span></div>');
+    bar.querySelector('.t').innerHTML = html;
+    document.body.appendChild(bar); attachDismiss(bar, key);
+    return true;
+  };
+  window.ddsScanHints = scanHints;
 
   function boot() {
     mountFrame();

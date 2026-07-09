@@ -50,4 +50,19 @@ test.describe('CMS workspace', () => {
     await page.goto('/presence.html#business');
     await expect(page.locator('#view-business')).toBeVisible();
   });
+
+  test('Design shows a preview gallery card per template family (PT-2C)', async ({ page }) => {
+    await installApp(page, { api: {
+      ...PRESENCE_API, '/portal/context': ctx(ALL_FEATURES),
+      '/site/templates': { data: { current: { slug: 'business-classic', version: '1.0.0' }, templates: [
+        { slug: 'business-classic', name: 'Business Classic', version: '1.0.0' },
+        { slug: 'editorial', name: 'Editorial', version: '1.0.0' },
+      ] } },
+    } });
+    await page.goto('/presence.html#design');
+    await expect(page.locator('#lookSeg button[data-look="business-classic"]')).toBeVisible();
+    await expect(page.locator('#lookSeg button[data-look="editorial"]')).toBeVisible();
+    await expect(page.locator('#lookSeg')).toContainText('Editorial');
+    await expect(page.locator('#lookSeg')).toContainText('print serif'); // the family's swatch tag
+  });
 });

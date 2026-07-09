@@ -203,6 +203,18 @@ if (SB && SR && ANON) {
   console.log('      (SB/SR_KEY/ANON not set — staging integration tier skipped)');
 }
 
+// ═══ PT-2C: the concierge ACTIVELY uses the AI Business Memory ═══
+{
+  const seasonal = { ...G, businessMemory: { industry: 'Restaurant', tone: 'warm and local', goals: [], priorities: ['Reply to inquiries quickly.'], seasonality: 'Holidays and patio season tend to drive interest.', stage: 'established' } };
+  const setup = { ...G, moments: [], businessMemory: { industry: 'Plumber', tone: 'plain', goals: [], priorities: ['Get the website live so customers can find it.'], seasonality: 'Winter freezes spike calls.', stage: 'setting_up' } };
+  const withMem = answer({ question: 'what should I do first?' }, seasonal);
+  const noMem = answer({ question: 'what should I do first?' }, G);
+  ok('memory: established business gets a season-aware line', /patio season|Holidays/.test(withMem.text) && /restaurant/i.test(withMem.text));
+  ok('memory: setting-up business gets a stage-aware "get live" nudge', /getting set up/.test(answer({ question: 'what should I do first?' }, setup).text) && /get the website live/i.test(answer({ question: 'what should I do first?' }, setup).text));
+  ok('memory: absent → answer is unchanged (only ever enriches)', !/keep in mind|getting set up/.test(noMem.text));
+  ok('memory: still grounded + no engineering jargon', withMem.grounded && !/endpoint|API|token|migration|schema/i.test(withMem.text));
+}
+
 const fails = results.filter((r) => !r.p);
 console.log(`\n════ CONCIERGE: ${results.length - fails.length}/${results.length} PASSED ════`);
 if (fails.length) Deno.exit(1);

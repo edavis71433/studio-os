@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health Center — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="One operational read: cron, domains, billing, AI, email, usage, errors, alerts, backups.">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;
+    --ok:#3f7a5a;--ok-soft:#e7f1ea;--attn:#8a6d3b;--attn-soft:#f3ead9;--off:#7a7280;--off-soft:#eeecef;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--serif:"Iowan Old Style",Palatino,Georgia,serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--ok:#8bbf9f;--ok-soft:#1f2a24;--attn:#d3ac6e;--attn-soft:#2a2316;--off:#9a92a6;--off-soft:#232030}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:34px 20px 90px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 .1em}
+  header .sub{color:var(--soft);font-size:15px}
+  .overall{margin:22px 0 8px;padding:14px 18px;border-radius:13px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .overall.ok{background:var(--ok-soft);color:var(--ok)} .overall.attention{background:var(--attn-soft);color:var(--attn)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:14px}
+  .area{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);border-left:3px solid var(--line)}
+  .area.ok{border-left-color:var(--ok)} .area.attention{border-left-color:var(--attn)} .area.off{border-left-color:var(--off)}
+  .area .lbl{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .area .n{font-weight:600;font-size:15px} .area .dt{color:var(--soft);font-size:13.5px;margin-top:6px}
+  .pill{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+  .pill.ok{color:var(--ok);background:var(--ok-soft)} .pill.attention{color:var(--attn);background:var(--attn-soft)} .pill.off{color:var(--off);background:var(--off-soft)}
+  .center{text-align:center;padding:56px 20px} .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin-bottom:8px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  .foot{margin-top:26px;color:var(--faint);font-size:12.5px}
+  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Health Center</h1><p class="sub">One operational read — no second monitoring system.</p></header>
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="";
+async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN}});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const WORD={ok:'OK',attention:'Needs a look',off:'Off'};
+
+function render(hc){
+  if(!hc||!Array.isArray(hc.areas)){$('main').innerHTML='<div class="center"><h2>No health data.</h2><p class="sub">The read came back empty — try again shortly.</p></div>';return;}
+  let h='<div class="overall '+esc(hc.overall)+'">'+(hc.overall==='ok'?'✓ Everything is running normally.':'⚠ Some areas need a look.')+'</div><div class="grid">';
+  for(const a of hc.areas){
+    h+='<div class="area '+esc(a.state)+'"><div class="lbl"><span class="n">'+esc(a.label)+'</span><span class="pill '+esc(a.state)+'">'+esc(WORD[a.state]||a.state)+'</span></div><div class="dt">'+esc(a.detail)+'</div></div>';
+  }
+  h+='</div><p class="foot">Aggregated from what the platform already produces — activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, active notices.</p>';
+  $('main').innerHTML=h;
+}
+function signedOut(){$('main').innerHTML='<div class="center"><h2>Sign in as an operator.</h2><p style="margin-top:16px"><a class="link" href="/portal.html">Sign in →</a></p></div>';}
+function notOperator(){$('main').innerHTML='<div class="center"><h2>Operators only.</h2><p class="sub">This page shows platform-wide operations and needs an operator account.</p></div>';}
+function trouble(){$('main').innerHTML='<div class="center"><h2>Couldn’t load the Health Center.</h2><p class="sub">A brief hiccup — refresh in a moment.</p></div>';}
+async function load(){
+  const r=await api('/admin/health-center');
+  if(r.status===401){signedOut();return;}
+  if(r.status===403){notOperator();return;}
+  if(!r.ok){trouble();return;}
+  render(r.body&&r.body.data);
+}
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>

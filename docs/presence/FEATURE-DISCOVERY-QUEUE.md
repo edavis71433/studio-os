@@ -408,3 +408,7 @@ Runtime + empty states are edition-correct; the remaining piece is first-run wor
 - PT-8 Admin Health Center — folded into /system/health (no duplicate monitoring) ✅
 - PT-9 AI Business Memory — /coach/memory + concierge grounding, one loader over existing data ✅
 Note: a customer-facing UI for the Health Coach / Timeline / Admin Health Center endpoints is the natural next surface (endpoints + pure cores are done + tested; the HTML views can consume them).
+
+## Phase PT-2C — surface completion (all delivered + tested)
+Health Coach UI ✅ · Customer Journey ✅ · Admin Health Center (admin-health.html + /admin/health-center) ✅ · Concierge AI-memory integration ✅ · Template preview gallery ✅ · Contextual hints expansion ✅.
+Open (recommended, not built): a customer-facing Health Center is operator-only by design; "First visitor" milestone + a real search-visibility signal await analytics/GSC; template preview cards use CSS mini-mocks (live-thumbnail rendering is a V1.1 upgrade).

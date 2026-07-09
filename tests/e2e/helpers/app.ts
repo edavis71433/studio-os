@@ -88,6 +88,13 @@ function defaults(): Record<string, Json> {
     '/moments': { data: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', tone: 'reminder', dismissable: true }] },
     '/marketplace/features': { data: { features: ['Online menu', 'Booking link'], note: 'These come with your kind of business.' } },
     '/search/health': { data: { verification: { ok: true }, seo_fields: { title: 'Set', description: 'Set' }, links: [] } },
+    '/coach/health': { data: { status: 'attention', headline: 'One thing could help.', suggestions: [{ text: 'Someone’s waiting for a reply.', href: '/leads.html' }] } },
+    '/coach/journey': { data: { milestones: [
+      { key: 'created', label: 'Your presence began', achieved: true, at: '2026-01-01T00:00:00Z', note: 'Your workspace was created — the journey starts here.' },
+      { key: 'published', label: 'First published', achieved: true, at: '2026-02-01T00:00:00Z', note: 'Your website went live for the first time. 🎉' },
+      { key: 'first_inquiry', label: 'First inquiry', achieved: false, at: null, note: 'Your first message from a visitor will land here.' },
+    ], latestCelebration: { key: 'published', label: 'First published', achieved: true, at: '2026-02-01T00:00:00Z', note: 'Your website went live for the first time. 🎉' } } },
+    '/coach/memory': { data: { memory: { industry: 'Restaurant', tone: 'warm and local', goals: [], priorities: ['Reply quickly.'], seasonality: 'Holidays drive interest.', stage: 'established' }, sentence: 'I know Restaurant — established, and I keep the tone warm and local.' } },
     '/forms/inbox': { data: { submissions: [
       { id: 'l1', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', source_page: '/contact/', status: 'new', created_at: '2026-07-07T00:00:00Z' },
       { id: 'l2', form_kind: 'contact', name: 'Dana Lee', email: 'dana@example.com', phone: '', message: 'Loved the work!', source_page: '/contact/', status: 'read', created_at: '2026-07-02T00:00:00Z' },

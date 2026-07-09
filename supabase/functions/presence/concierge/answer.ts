@@ -146,6 +146,18 @@ const lowConf = (ev: Grounding['evidence']) => ev.length > 0 && Math.min(...ev.m
 const uniq = <T>(a: T[]) => [...new Set(a)];
 const listWords = (ws: string[]) => ws.length > 1 ? ws.slice(0, -1).join(', ') + ' and ' + ws[ws.length - 1] : (ws[0] || '');
 
+// PT-2C: the concierge actively uses the AI Business Memory (assembled from
+// existing data) to make guidance stage- and season-aware. Graceful when memory
+// is absent (returns '') so it only ever enriches, never breaks.
+const lower1 = (s: string) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+function memoryNudge(g: Grounding): string {
+  const m = g.businessMemory;
+  if (!m) return '';
+  if (m.stage === 'setting_up' && m.priorities.length) return ` And since you’re still getting set up, the simplest win is this: ${lower1(m.priorities[0])}`;
+  if (m.seasonality) return ` One thing I keep in mind for a ${m.industry.toLowerCase()}: ${lower1(m.seasonality)}`;
+  return '';
+}
+
 const HONEST_LOW_CONF = ' A note of honesty: part of this is judgment rather than hard measurement, so treat it as a nudge, not a certainty.';
 const HONEST_NO_EVIDENCE = 'I can only speak to what’s actually been measured about your presence, and I don’t have anything on that — I’d rather say so than guess.';
 
@@ -176,14 +188,14 @@ export function answer(ask: Ask, g: Grounding): ConciergeAnswer {
 
   // ── L3.3 cross-moment guidance — prioritization works with or without a topic ──
   if (intent === 'what_first') {
-    if (!g.moments.length) return base('explain', `Nothing’s waiting for you to start on — when something’s worth your time, it’ll show up here.`, null, [], []);
+    if (!g.moments.length) return base('explain', `Nothing’s waiting for you to start on — when something’s worth your time, it’ll show up here.${memoryNudge(g)}`, null, [], []);
     const top = g.moments[0];
     const topRecs = recsFor(top, g);
     const dims = uniq(topRecs.flatMap((r) => r.value_dimensions)).map((d) => DIM_PHRASE[d]).filter(Boolean);
     let text = `If you only do one thing, start with “${top.headline}”`;
     text += dims.length ? ` — it’s the one that most touches ${listWords(dims.slice(0, 2))}.` : `.`;
     if (g.moments.length > 1) text += ` The rest can follow in any order, and none is waiting on the others.`;
-    return base('guide', text, top, topRecs, []);
+    return base('guide', text + memoryNudge(g), top, topRecs, []);
   }
   if (intent === 'how_important_relative') {
     const t = topic || g.moments[0] || null;

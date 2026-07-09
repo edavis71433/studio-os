@@ -17,6 +17,24 @@ test.describe('Today', () => {
     await expect(page.getByRole('button', { name: 'Not now' })).toBeVisible();
   });
 
+  test('the ONE health experience is the Business Health Coach (PT-2C)', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/today.html');
+    await expect(page.getByText('One thing could help.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/leads.html');
+  });
+
+  test('the Customer Journey celebrates milestones, never a score', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/today.html');
+    await expect(page.getByText('Your journey')).toBeVisible();
+    await expect(page.getByText('Your website went live for the first time.')).toBeVisible();
+    await expect(page.getByText('Your presence began')).toBeVisible();
+    // no numeric score anywhere in the journey card
+    const journeyText = await page.locator('div', { hasText: 'Your journey' }).last().innerText();
+    expect(journeyText).not.toMatch(/\b\d+\s*(\/|%|points|score|out of)/i);
+  });
+
   test('attention is consistent — Today card count equals the bell badge', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');

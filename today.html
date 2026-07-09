@@ -245,6 +245,7 @@ function trouble(){
     orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);
     healthLine();
+    journeyStrip();
   }catch(_){ trouble(); }
 })();
 
@@ -286,25 +287,47 @@ function orientationCard(c){
 // ── Phase P: "what you own" + the honest upsell — quiet, at the bottom, never a
 // dead end. Shown only when the platform says there IS a next rung (owners only;
 // the server computes gains from featureDelta so this can never overpromise).
-// ── CP-3: the health rollup — one calm sentence answering "is everything okay?" ──
+// ── PT-2C: the ONE health experience — the Business Health Coach (PT-6).
+//    Replaces the old search-only line; composes every signal into one read. ──
 async function healthLine(){
-  let h = null;
-  try { h = (await apiGet('/search/health')).data; } catch(_) { return; }
-  if (!h) return;
-  const issues = [];
-  if (!(h.seo_fields && h.seo_fields.title && h.seo_fields.description)) issues.push({ t: 'your search headline isn\u2019t set', href: '/presence.html#business' });
-  (h.links || []).forEach((l) => { if (l.ok === false) issues.push({ t: 'your ' + String(l.kind).replace('social:', '') + ' link isn\u2019t answering', href: '/presence.html#business' }); });
+  let r = null;
+  try { r = (await apiGet('/coach/health')).data; } catch(_) { return; }
+  if (!r) return;
+  const attn = r.status === 'attention' || r.status === 'quiet';
   const host = document.querySelector('main') || document.body;
   const line = document.createElement('div');
-  line.style.cssText = 'max-width:860px;margin:10px auto 0;padding:12px 20px;border-radius:12px;font-size:14px;border:1px solid ' + (issues.length ? '#ecd9c6' : '#d6e8dc') + ';background:' + (issues.length ? '#fdf8f1' : '#f4faf6') + ';color:#3d4a42';
-  if (!issues.length) {
-    line.textContent = '\u2713 Everything looks healthy \u2014 site, links, and search setup are all in order.';
+  line.style.cssText = 'max-width:860px;margin:10px auto 0;padding:12px 20px;border-radius:12px;font-size:14px;border:1px solid ' + (attn ? '#ecd9c6' : '#d6e8dc') + ';background:' + (attn ? '#fdf8f1' : '#f4faf6') + ';color:#3d4a42';
+  const sugg = (r.suggestions || [])[0];
+  if (!sugg) {
+    line.textContent = '✓ ' + (r.headline || 'Everything looks healthy.');
   } else {
-    const a = issues[0];
-    line.innerHTML = 'One thing could use you: ' + a.t + '. <a href="' + a.href + '" style="color:#5b3fa0">Take a look \u2192</a>' + (issues.length > 1 ? ' <span style="color:#8a8172">(+' + (issues.length - 1) + ' more inside)</span>' : '');
+    line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(sugg.href) + '" style="color:#5b3fa0;font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:#8a8172">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
   }
   host.insertBefore(line, host.firstChild ? host.firstChild.nextSibling : null);
 }
+
+// ── PT-2C: the Customer Journey (PT-7) — celebrate milestones, never a score ──
+async function journeyStrip(){
+  let j = null;
+  try { j = (await apiGet('/coach/journey')).data; } catch(_) { return; }
+  if (!j || !Array.isArray(j.milestones)) return;
+  const host = document.querySelector('main') || document.body;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'max-width:860px;margin:28px auto 0;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--card)';
+  let html = '<div style="font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:14px">Your journey</div>';
+  if (j.latestCelebration && j.latestCelebration.note) html += '<div style="font-family:var(--serif);font-size:19px;margin-bottom:16px;color:var(--ink)">' + esc(j.latestCelebration.note) + '</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:9px">';
+  for (const m of j.milestones){
+    const mark = m.achieved ? '✓' : '○';
+    const col = m.achieved ? 'var(--good)' : 'var(--faint)';
+    const note = String(m.note || '').replace('🎉','').trim();
+    html += '<div style="display:flex;gap:11px;align-items:baseline;font-size:14px"><span style="color:' + col + ';font-weight:700;flex:0 0 auto">' + mark + '</span><span style="' + (m.achieved ? '' : 'color:var(--soft)') + '"><strong>' + esc(m.label) + '</strong>' + (note ? ' — ' + esc(note) : '') + '</span></div>';
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
+  host.appendChild(wrap);
+}
+
 function planCard(c){
   if(!c || !c.edition_name) return;
   const host = document.querySelector('main') || document.body;

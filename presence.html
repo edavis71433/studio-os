@@ -733,8 +733,19 @@ function go(view) {
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
   if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
+  contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
   try { history.replaceState(null, "", "#" + view); } catch (_) {}
+}
+// PT-2C: one-time contextual education per surface (reuses the shell hint system).
+const VIEW_HINTS = {
+  design: ["design-palettes", "Every palette here is contrast-checked for you — pick a look; publishing stays approval-first."],
+  media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
+  business: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
+};
+function contextHint(view) {
+  const h = VIEW_HINTS[view];
+  if (h && window.ddsHint) setTimeout(() => window.ddsHint(h[0], h[1]), 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
 const HASH_VIEWS = { today: "today", business: "business", settings: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
@@ -1507,6 +1518,7 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
   }, "Keep this answer"));
 // ── M12: Platform Services — the technical side, in plain words ──
 async function openFoundationsDesk() {
+  if (window.ddsHint) setTimeout(() => window.ddsHint("foundations", "The technical side — domain, email, security — is handled with plans you approve. Nothing changes on its own."), 400);
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
   $("deskTitle").textContent = "The technical side, handled";
   $("deskSub").textContent = "Domain, DNS, security certificate, email protection, hosting — what’s true right now, in plain words. Any change arrives as a plan you approve first.";
@@ -2114,20 +2126,41 @@ function renderWelcome() {
 const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null, template: "" };
 // ── Phase CP-1 (FD-T8): try another look — preview-only until "Use this look" ──
 let LOOKS = null;   // { current: {slug}, templates: [{slug,name,version}] }
+// PT-2C: each family's visual signature for the preview cards. Unknown/future
+// families fall back to a neutral swatch derived from the platform accent.
+const LOOK_SWATCH = {
+  "business-classic": { bg: "#f7f7f5", ink: "#1c2430", accent: "#23635a", font: "system-ui,-apple-system,sans-serif", tag: "Modern · clean cards" },
+  "restaurant-classic": { bg: "#fbf7f0", ink: "#2a2018", accent: "#9c4a2f", font: "Georgia,'Times New Roman',serif", tag: "Warm · hospitality" },
+  "editorial": { bg: "#f6f3ec", ink: "#1a1a1c", accent: "#6d232a", font: "'Iowan Old Style',Palatino,Georgia,serif", tag: "Editorial · print serif" },
+};
+function lookSwatch(slug) { return LOOK_SWATCH[slug] || { bg: "#f2f0f5", ink: "#2a2536", accent: "#5b3fa0", font: "system-ui,sans-serif", tag: "Template family" }; }
 async function mountLookSeg() {
   const seg = $("lookSeg"); if (!seg) return;
   try { if (!LOOKS) LOOKS = (await api("GET", "/site/templates")).data; } catch (_) { return; }
   if (!LOOKS || (LOOKS.templates || []).length < 2) return;   // one look → no chooser
+  // PT-2C: a visual preview gallery — each family shows a mini-mock of its look.
+  // Data-driven from /site/templates, with a graceful fallback for future families.
   seg.innerHTML = "";
-  seg.appendChild(Object.assign(el("span", null, "Look:"), { style: "font-size:12px;color:rgba(255,253,248,.55);padding:8px 4px 0 0" }));
+  const cards = el("div"); cards.style.cssText = "display:flex;gap:12px;flex-wrap:wrap;align-items:stretch";
   LOOKS.templates.forEach((t) => {
-    const b = el("button", null, t.name);
-    b.dataset.look = t.slug;
+    const sw = lookSwatch(t.slug);
     const active = (PV.template || LOOKS.current.slug) === t.slug;
-    if (active) b.classList.add("on");
-    b.addEventListener("click", () => { PV.template = t.slug === LOOKS.current.slug ? "" : t.slug; mountLookSeg(); loadPreview(); });
-    seg.appendChild(b);
+    const card = el("button"); card.dataset.look = t.slug;
+    card.style.cssText = "cursor:pointer;text-align:left;padding:0;border:2px solid " + (active ? "var(--plum,#5b3fa0)" : "rgba(0,0,0,.12)") + ";border-radius:12px;overflow:hidden;background:#fff;width:154px;font-family:inherit;transition:border-color .15s ease,transform .15s ease";
+    card.onmouseenter = () => { if (!active) card.style.borderColor = "rgba(91,63,160,.45)"; };
+    card.onmouseleave = () => { if (!active) card.style.borderColor = "rgba(0,0,0,.12)"; };
+    card.innerHTML =
+      '<span style="display:block;height:80px;background:' + sw.bg + ';padding:11px 13px">'
+      + '<span style="display:block;height:4px;width:34px;background:' + sw.accent + ';border-radius:2px"></span>'
+      + '<span style="display:block;margin-top:9px;font-family:' + sw.font + ';color:' + sw.ink + ';font-size:20px;font-weight:600;line-height:1">Aa</span>'
+      + '<span style="display:block;margin-top:7px;height:3px;width:70%;background:rgba(0,0,0,.14);border-radius:2px"></span>'
+      + '<span style="display:block;margin-top:4px;height:3px;width:52%;background:rgba(0,0,0,.1);border-radius:2px"></span></span>'
+      + '<span style="display:block;padding:9px 13px 11px"><span style="display:block;font-weight:600;font-size:13.5px;color:var(--ink,#1b1525)">' + String(t.name) + (active ? " ✓" : "") + '</span>'
+      + '<span style="display:block;font-size:11px;color:var(--muted,#8a8172);margin-top:2px">' + sw.tag + '</span></span>';
+    card.addEventListener("click", () => { PV.template = t.slug === LOOKS.current.slug ? "" : t.slug; mountLookSeg(); loadPreview(); });
+    cards.appendChild(card);
   });
+  seg.appendChild(cards);
   if (PV.template) {
     const use = el("button", null, "Use this look");
     use.style.cssText = "font-weight:700";
@@ -2195,6 +2228,7 @@ function openRitual() {
   $("ritualWrap").classList.add("on"); document.body.style.overflow = "hidden";
   $("btnRitualBack").focus();
   loadRitual();
+  if (window.ddsHint) setTimeout(() => window.ddsHint("publish-atomic", "Publishing goes live all at once — never halfway — and every version is kept, so anything can come back."), 400);
 }
 function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);

@@ -125,18 +125,24 @@ async function health(): Promise<any> {
     failures24h = (fails.ok && Array.isArray(fails.json)) ? fails.json.length : 0;
   } catch { /* dbOk stays false */ }
   const ok = secrets.ok && dbOk;
-  const health_center = await buildHealthCenter(lastCycle, failures24h).catch(() => null);
+  const health_center = await computeHealthCenter().catch(() => null);
   return { ok, secrets, db_ok: dbOk, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
 }
 
 // ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).
 // Aggregates signals the platform already produces into one status per area.
-async function buildHealthCenter(lastCycle: any, failedRuns: number): Promise<any> {
+// Self-contained so it also powers the operator-authenticated /admin/health-center.
+export async function computeHealthCenter(): Promise<any> {
   const nowIso = new Date().toISOString();
   const period = nowIso.slice(0, 7);
   const soon = new Date(Date.now() + 30 * 86400_000).toISOString();
   const since = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const since24 = new Date(Date.now() - 24 * 3600_000).toISOString();
   const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []);
+  const cronQ = await svc('presence_scheduled_runs?run_type=eq.cycle&order=created_at.desc&select=status,started_at,finished_at&limit=1');
+  const lastCycle = arr(cronQ)[0] || null;
+  const failQ = await svc(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}&select=id`);
+  const failedRuns = arr(failQ).length;
   const [live, doms, domsSoon, ents, aiUse, notices, failPub] = await Promise.all([
     svc('presence_sites?status=eq.live&select=id'),
     svc('presence_sites?custom_domain=not.is.null&select=id'),
