@@ -17,3 +17,4 @@ node_modules/
 
 # Machine-local Claude Code settings
 .claude/settings.local.json
+deno.lock
