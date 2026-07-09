@@ -38,6 +38,7 @@ import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
+import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { resolveSiteRole } from './lib/workspace.ts';
@@ -323,6 +324,14 @@ serve(async (req) => {
   // ── FD-T10: Stock Library — browse a royalty-free source + import into Files ──
   if (route === '/stock/search' && method === 'GET') return handleStockSearch(req, cors);
   if (route === '/stock/import' && method === 'POST') return handleStockImport(req, site, principal, cors);
+
+  // ── CL-1: Content Library — reusable structured blocks (one block model) ──
+  if (route === '/content-library' && method === 'GET') return handleContentLibraryList(site, cors);
+  if (route === '/content-library' && method === 'POST') return handleContentLibrarySave(req, site, principal, cors);
+  {
+    const m = route.match(/^\/content-library\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleContentLibraryDelete(site, principal, m[1], cors);
+  }
 
   // ── Phase DAM: the Studio Asset Library (lens + lifecycle over presence_media) ──
   if (route === '/assets' && method === 'GET') return handleAssetsList(req, site, cors);

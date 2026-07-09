@@ -2937,6 +2937,23 @@ function mediaThumb(id) {
 }
 let BLOCKS_WORK = null;
 let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
+let CL_ITEMS = null;        // CL-1: saved content-library items (null = not loaded)
+let CL_SHOW = false;
+function clSave(idx) {   // CL-1: save a crafted section to the reusable library
+  const blk = BLOCKS_WORK[idx]; const def = BLOCK_DEFS.find((d) => d.type === blk.type);
+  const name = prompt("Name this saved section:", blk.title || (def && def.name) || "Saved section");
+  if (name === null) return;
+  api("POST", "/content-library", { name, block: blk }).then(() => { CL_ITEMS = null; toast("Saved to your content library"); }).catch((err) => toast(err.message, true));
+}
+function clInsert(block) {   // CL-1: insert a saved block into the SAME editor (no second editor)
+  if (!block || !block.type) return;
+  const def = BLOCK_DEFS.find((d) => d.type === block.type);
+  const copy = JSON.parse(JSON.stringify(block));
+  const at = BLOCKS_WORK.findIndex((b) => b.type === block.type);
+  if (at >= 0) { if (!confirm("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?")) return; BLOCKS_WORK[at] = copy; }
+  else BLOCKS_WORK.push(copy);
+  CL_SHOW = false; renderBlocksCard(); toast("Inserted — Save content blocks to keep it");
+}
 function currentBlocks() { return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : []; }
 function blockText(def, blk) {
   if (def.areasSimple) return (blk.areas || []).join("\n");
@@ -2993,7 +3010,9 @@ function renderBlocksCard() {
     up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; renderBlocksCard(); });
     dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; renderBlocksCard(); });
     rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
-    head.append(nm, up, dn, rm); sub.appendChild(head);
+    const sv = el("button", null, "Save"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
+    sv.addEventListener("click", () => clSave(idx));   // CL-1
+    head.append(nm, sv, up, dn, rm); sub.appendChild(head);
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Section heading (optional)"; ti.value = blk.title || ""; ti.style.cssText = inputCss;
     ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; });
     sub.appendChild(ti);
@@ -3047,6 +3066,30 @@ function renderBlocksCard() {
       sug.appendChild(addb);
       card.appendChild(sug);
     }
+  }
+  // CL-1: reuse saved sections from the content library (same block model + editor)
+  {
+    const libRow = el("div"); libRow.style.cssText = "margin-top:12px";
+    const libBtn = el("button", null, CL_SHOW ? "Hide content library" : "Insert from content library"); libBtn.type = "button";
+    libBtn.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+    libBtn.addEventListener("click", async () => { CL_SHOW = !CL_SHOW; if (CL_SHOW && CL_ITEMS === null) { try { CL_ITEMS = (await api("GET", "/content-library")).data || []; } catch (_) { CL_ITEMS = []; } } renderBlocksCard(); });
+    libRow.appendChild(libBtn);
+    if (CL_SHOW) {
+      const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
+      if (!(CL_ITEMS && CL_ITEMS.length)) list.appendChild(el("div", "hint", "Your content library is empty. Use “Save” on any section to reuse it later — here, in a launch, or after a rebuild."));
+      else CL_ITEMS.forEach((it) => {
+        const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
+        row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;font-size:12.5px" }));
+        row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
+        const ins = el("button", null, "Insert"); ins.type = "button"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+        ins.addEventListener("click", () => clInsert(it.block));
+        const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+        del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(err.message, true); } });
+        row.append(ins, del); list.appendChild(row);
+      });
+      libRow.appendChild(list);
+    }
+    card.appendChild(libRow);
   }
   const saveRow = el("div"); saveRow.style.cssText = "margin-top:14px;display:flex;gap:10px;align-items:center";
   const save = el("button", null, "Save content blocks"); save.type = "button";

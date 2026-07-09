@@ -39,7 +39,7 @@ export function featureForRoute(route: string, method: string): EditionFeature |
     case 'publish': case 'restore': case 'publishes': case 'launches':
     case 'preview': case 'redirects': case 'search':
     case 'brand': case 'writer': case 'editor': case 'review':
-    case 'visual': case 'assets': case 'media': case 'stock':
+    case 'visual': case 'assets': case 'media': case 'stock': case 'content-library':
     case 'offerings': case 'testimonials': case 'faqs': case 'posts':
       return 'website';
     case 'site':
