@@ -162,7 +162,7 @@
         },
         body: JSON.stringify(payload)
       });
-    } catch(e){ console.log("survey save err:", e); }
+    } catch { /* save is best-effort; the survey still submits */ }
 
     // Notify Eric by email via the existing Edge Function.
     var notifyOk = false;
@@ -183,7 +183,7 @@
       });
       var jr = {}; try { jr = await resp.json(); } catch(e){}
       notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
-    } catch(e){ console.log("notify err:", e); notifyOk = false; }
+    } catch { notifyOk = false; }
 
     // Branch the experience on rating
     document.getElementById("surveyForm").classList.add("hidden");

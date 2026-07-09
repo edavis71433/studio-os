@@ -23,11 +23,25 @@
 <body>
   <div class="card">
     <div class="mark">✓</div>
-    <h1>Payment received. Thank you.</h1>
+    <h1 id="h">Payment received. Thank you.</h1>
     <p>Your payment went through securely via Stripe, and a receipt is on its way to your email.</p>
-    <p>On my side, everything updates automatically — your invoice is already marked paid, and your project keeps moving.</p>
-    <a class="btn" href="https://davisdigitalstudio.com/portal">Back to your portal →</a>
-    <a class="plain" href="https://davisdigitalstudio.com">davisdigitalstudio.com</a>
+    <p id="sub">On my side, everything updates automatically — your invoice is already marked paid, and your project keeps moving.</p>
+    <a class="btn" id="cta" href="https://davisdigitalstudio.com/portal">Back to your portal →</a>
+    <a class="plain" id="plain" href="https://davisdigitalstudio.com">davisdigitalstudio.com</a>
   </div>
+  <script>
+    // Audit buyers arrive with ?kind=audit and aren't portal clients — swap the
+    // invoice/project copy for what actually happens next with an audit order.
+    (function () {
+      if (new URLSearchParams(location.search).get('kind') !== 'audit') return;
+      document.getElementById('h').textContent = 'Payment received — your audit is booked.';
+      document.getElementById('sub').textContent = 'Eric personally reviews your site and emails your report to the address you just used — anywhere from 24 hours to 7 business days, depending on the tier you chose.';
+      var cta = document.getElementById('cta');
+      cta.textContent = 'Back to Davis Digital Studio →';
+      cta.href = 'https://davisdigitalstudio.com';
+      var plain = document.getElementById('plain');
+      if (plain) plain.style.display = 'none';
+    })();
+  </script>
 </body>
 </html>

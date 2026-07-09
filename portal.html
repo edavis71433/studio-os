@@ -1625,7 +1625,7 @@ async function fetchClientRow(email) {
     var to = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error("clients query timeout")); }, 6000); });
     var r = await Promise.race([q, to]);
     return (r && r.data) ? r.data : null;
-  } catch (e) { console.log("[portal] fetchClientRow failed:", e.message); return null; }
+  } catch { return null; }
 }
 
 // On page load, restore an existing session (like the admin does). Simple and
@@ -4005,7 +4005,7 @@ if (_svcModalEl) _svcModalEl.addEventListener("click", function(e) {
   }
 
   whenLoggedIn(function(){
-    try { consolidateNav(); } catch(e){ console.log("[portal] nav consolidate skipped:", e.message); }
+    try { consolidateNav(); } catch { /* nav consolidation is cosmetic */ }
     buildAi();
   });
 
@@ -4104,13 +4104,6 @@ async function loadGrowth(){
     console.error('loadGrowth gp_workspace error:', errMsg);
   }
   GP_WS = ws;
-
-  // Tell the developer console exactly what happened (helps diagnose "no Growth").
-  try {
-    var sess = await sb.auth.getSession();
-    var email = sess && sess.data && sess.data.session && sess.data.session.user ? sess.data.session.user.email : '(no session)';
-    console.log('[Growth] signed in as:', email, '| partnership found:', !!ws, errMsg ? ('| error: '+errMsg) : '');
-  } catch(_){}
 
   if(!ws){
     // No partnership for THIS login. The Growth nav stays hidden (correct for a

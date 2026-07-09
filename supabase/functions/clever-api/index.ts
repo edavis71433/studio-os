@@ -1366,17 +1366,17 @@ const EBV_VERSIONS = {
   v2: { weights:{impact:0.25,risk_if_ignored:0.19,confidence:0.14,urgency:0.13,time_to_value:0.10,unblocks:0.08,effort:0.05,goal_fit:0.06}, flags:{severityFloor:true,effortSuppress:true,clamp:true,criticalCoherentScore:true} },
 };
 const EBV_ACTIVE = 'v2';
-const _LV={none:0,low:0.33,medium:0.66,high:1};
-const _TTV={immediate:1,fast:0.8,weeks:0.55,month:0.35,quarter:0.15};
-const _EFF={tiny:1,low:0.8,medium:0.5,high:0.25,heavy:0.1};
+const _LV:Record<string,number>={none:0,low:0.33,medium:0.66,high:1};
+const _TTV:Record<string,number>={immediate:1,fast:0.8,weeks:0.55,month:0.35,quarter:0.15};
+const _EFF:Record<string,number>={tiny:1,low:0.8,medium:0.5,high:0.25,heavy:0.1};
 const _CRIT=new Set(['outage','security','bug']);
-const _CRANK={outage:3,bug:2,security:1};
-const _FLAB={impact:'high business impact',risk_if_ignored:'real loss if it waits',confidence:'high confidence',urgency:'time-sensitive',time_to_value:'fast results',unblocks:'unblocks future work',effort:'low effort to deliver',goal_fit:'fits their goals'};
-const _CLINE={outage:'the site is down — nothing converts until this is fixed',bug:'leads are silently vanishing through a broken form',security:'an exposed security hole needs to be closed now'};
+const _CRANK:Record<string,number>={outage:3,bug:2,security:1};
+const _FLAB:Record<string,string>={impact:'high business impact',risk_if_ignored:'real loss if it waits',confidence:'high confidence',urgency:'time-sensitive',time_to_value:'fast results',unblocks:'unblocks future work',effort:'low effort to deliver',goal_fit:'fits their goals'};
+const _CLINE:Record<string,string>={outage:'the site is down — nothing converts until this is fixed',bug:'leads are silently vanishing through a broken form',security:'an exposed security hole needs to be closed now'};
 
-function ebvScore(rec, client, fieldAvg) {
-  const cfg = EBV_VERSIONS[EBV_ACTIVE], W = cfg.weights, F = cfg.flags;
-  const f = {
+function ebvScore(rec: any, client: any, fieldAvg?: any) {
+  const cfg = EBV_VERSIONS[EBV_ACTIVE], W: Record<string, number> = cfg.weights, F: Record<string, boolean> = cfg.flags;
+  const f: Record<string, number> = {
     impact:_LV[rec.impact]??0, risk_if_ignored:_LV[rec.risk]??0, confidence:(rec.confidence??50)/100,
     urgency:_LV[rec.urgency]??0, time_to_value:_TTV[rec.ttv]??0.5, unblocks:Math.min((rec.unblocks??0)/3,1),
     effort:_EFF[rec.effort]??0.5, goal_fit:_LV[rec.goal_fit]??0,
@@ -1406,7 +1406,7 @@ function ebvScore(rec, client, fieldAvg) {
 // ── Map a raw recommendation row → EBV input shape ──
 // The recs table stores impact/effort/confidence/why/depends; we infer type,
 // urgency, ttv, unblocks, goal_fit defensively with sensible fallbacks.
-function recToEbvInput(r) {
+function recToEbvInput(r: any) {
   const cat = String(r.category || r.ai_bucket || '').toLowerCase();
   let type = 'content';
   if (/outage|down|offline/.test(cat + ' ' + (r.title||''))) type = 'outage';
@@ -1434,9 +1434,9 @@ function recToEbvInput(r) {
 }
 
 // ── Build an Insight-contract object from a scored rec (Level-4 only) ──
-function recToInsight(r, scored) {
+function recToInsight(r: any, scored: any) {
   // predicted outcome WITH CONTEXT (never a naked number)
-  const impactMap = { high:{range:'15-25%', basis:['past lifts for similar work','current ranking trends','site health']},
+  const impactMap: Record<string, { range: string; basis: string[] }> = { high:{range:'15-25%', basis:['past lifts for similar work','current ranking trends','site health']},
                       medium:{range:'8-15%', basis:['historical client improvements','current traffic trend']},
                       low:{range:'3-8%', basis:['general benchmarks']} };
   const im = impactMap[r.impact || 'medium'] || impactMap.medium;
@@ -1993,7 +1993,7 @@ async function persistScores(svc: Record<string,string>, clientId: string, partn
 }
 
 // ===== PORTFOLIO INTELLIGENCE: attention signals =====
-const ATTENTION_SIGNALS = {
+const ATTENTION_SIGNALS: Record<string, { weight: number; kind: string }> = {
   revenue_at_risk:   { weight: 100, kind: 'risk' },   // overdue invoice on an active client
   churn_risk:        { weight: 95,  kind: 'risk' },    // health dropping / gone quiet
   blocked_approval:  { weight: 80,  kind: 'unblock' }, // a rec/work blocked on client sign-off Eric can chase
@@ -4799,9 +4799,9 @@ serve(async (req) => {
       if (!url) return json({ error: 'No URL provided' }, 400);
       const strategy = body.strategy === 'desktop' ? 'desktop' : 'mobile';
       const ALLOWED_CATS = ['performance', 'seo', 'accessibility', 'best-practices'];
-      let cats = Array.isArray(body.categories) ? body.categories.filter((c) => ALLOWED_CATS.includes(c)) : [];
+      let cats = Array.isArray(body.categories) ? body.categories.filter((c: string) => ALLOWED_CATS.includes(c)) : [];
       if (cats.length === 0) cats = ['performance', 'seo', 'accessibility'];
-      const catParams = cats.map((c) => `&category=${c}`).join('');
+      const catParams = cats.map((c: string) => `&category=${c}`).join('');
       const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}${catParams}&key=${PSI_KEY}`;
       try {
         const psiRes = await fetch(psiUrl, { signal: AbortSignal.timeout(90000) });
@@ -5783,7 +5783,7 @@ serve(async (req) => {
         }
 
         // churn risk — gone quiet (last message > 21d) on an active client
-        const msgs = msgByClient[cid] || [];
+        const msgs: any[] = msgByClient[cid] || [];
         if (msgs.length) {
           const lastDays = Math.floor((now - new Date(msgs[0].created_at).getTime()) / DAY);
           if (lastDays > 21) signals.push({ type: 'churn_risk', changed: `no contact in ${lastDays} days`, why: 'silence often precedes churn', action: 'Send a value-add check-in', impact: c.monthly_amount ? `$${c.monthly_amount}/mo relationship` : 'retention', confidence: 'medium' });
@@ -5792,7 +5792,7 @@ serve(async (req) => {
         }
 
         // blocked approval — pending approval Eric can chase
-        const apprs = apprByClient[cid] || [];
+        const apprs: any[] = apprByClient[cid] || [];
         if (apprs.length) {
           const oldest = Math.floor((now - new Date(apprs[0].created_at).getTime()) / DAY);
           signals.push({ type: 'blocked_approval', changed: `${apprs.length} approval${apprs.length > 1 ? 's' : ''} pending ${oldest}d`, why: 'queued work is blocked until they sign off', action: 'Nudge them to approve', impact: 'unblocks delivery', confidence: 'high' });
@@ -6206,7 +6206,25 @@ serve(async (req) => {
         if (!r.ok) throw new Error((j && j.error && j.error.message) || `stripe ${r.status}`);
         return j;
       };
+      const svcH = { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' };
+      const tierKey = String(body.tier).toLowerCase();
       try {
+        // 1) Record the order FIRST (status pending) so there is a durable row the
+        //    webhook flips to paid and the admin panel reads. This is the exact
+        //    contract stripe-webhook fulfils via metadata.order_id — the piece the
+        //    fast first cut was missing (it only stuffed Stripe metadata).
+        let orderId = '';
+        try {
+          const ins = await fetch(`${SB_URL}/rest/v1/audit_orders`, {
+            method: 'POST', headers: { ...svcH, 'Prefer': 'return=representation' },
+            body: JSON.stringify({ name, email, website: website || null, notes: notes || null, tier: tierKey, amount: t.cents / 100, status: 'pending' }),
+          });
+          const rows = ins.ok ? await ins.json() : [];
+          orderId = (Array.isArray(rows) && rows[0]?.id) ? String(rows[0].id) : '';
+        } catch { orderId = ''; }
+
+        // 2) Stripe checkout — order_id is the fulfilment key the webhook reads on
+        //    checkout.session.completed; kind=audit lets the success page adapt.
         const params: Record<string, string> = {
           'mode': 'payment',
           'line_items[0][price_data][currency]': 'usd',
@@ -6214,15 +6232,23 @@ serve(async (req) => {
           'line_items[0][price_data][unit_amount]': String(t.cents),
           'line_items[0][quantity]': '1',
           'customer_email': email,
-          'success_url': `${SITE_URL}/payment-success.html`,
-          'cancel_url': `${SITE_URL}/buy-audit.html?tier=${encodeURIComponent(String(body.tier).toLowerCase())}`,
+          'success_url': `${SITE_URL}/payment-success.html?kind=audit`,
+          'cancel_url': `${SITE_URL}/buy-audit.html?tier=${encodeURIComponent(tierKey)}`,
           'metadata[kind]': 'audit',
-          'metadata[tier]': String(body.tier).toLowerCase(),
+          'metadata[tier]': tierKey,
           'metadata[name]': name,
           'metadata[website]': website,
           'metadata[notes]': notes,
         };
+        if (orderId) params['metadata[order_id]'] = orderId;
         const session = await stripeReq('checkout/sessions', params);
+        // 3) Stamp the session id on the order (best-effort; parity with invoice_paylink).
+        if (orderId && session?.id) {
+          await fetch(`${SB_URL}/rest/v1/audit_orders?id=eq.${encodeURIComponent(orderId)}`, {
+            method: 'PATCH', headers: { ...svcH, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ stripe_session_id: session.id }),
+          }).catch(() => {});
+        }
         return json({ ok: true, url: session.url }, 200, reqCors);
       } catch (e) {
         return json({ error: 'stripe_error', detail: String((e as Error).message || e) }, 200, reqCors);
@@ -6362,7 +6388,7 @@ serve(async (req) => {
       const clientId = String(body.clientId || body.id || '');
       if (!clientId) return json({ error:'clientId required' }, 400, reqCors);
       const svc = { apikey:SB_SERVICE, Authorization:`Bearer ${SB_SERVICE}` };
-      const read = async (p) => { try { const r = await fetch(`${SB_URL}/rest/v1/${p}`, { headers:svc }); return r.ok ? await r.json() : []; } catch(_) { return []; } };
+      const read = async (p: string) => { try { const r = await fetch(`${SB_URL}/rest/v1/${p}`, { headers:svc }); return r.ok ? await r.json() : []; } catch(_) { return []; } };
 
       const clientRows = await read(`clients?id=eq.${encodeURIComponent(clientId)}&deleted_at=is.null&select=*&limit=1`);
       const client = Array.isArray(clientRows) && clientRows.length ? clientRows[0] : null;
@@ -6414,7 +6440,7 @@ serve(async (req) => {
       // field averages for distinctive explanations
       const pre = ebvInputs.map(x=>ebvScore(x.input, clientCtx, null));
       const fkeys = pre.length?Object.keys(pre[0].factors):[];
-      const favg={}; fkeys.forEach(k=>{ favg[k]=pre.reduce((s,p)=>s+p.factors[k],0)/(pre.length||1); });
+      const favg: Record<string, number> = {}; fkeys.forEach(k=>{ favg[k]=pre.reduce((s: number,p: any)=>s+p.factors[k],0)/(pre.length||1); });
       const ranked = ebvInputs.map(x=>{ const s=ebvScore(x.input, clientCtx, favg); return { raw:x.raw, scored:s }; })
         .sort((a,b)=> b.scored.tier-a.scored.tier || b.scored.critRank-a.scored.critRank || b.scored.score-a.scored.score);
 
@@ -6437,7 +6463,7 @@ serve(async (req) => {
       if (growthScore!=null && growthScore < -10) risks.push({ level:'watch', headline:'Engagement is trending down', why:growthWhy, suggestion:'a proactive check-in or a fresh growth play could reverse it before they notice' });
       const overdueR=inv.filter(i=>i.status&&i.status!=='paid'&&_isOverdue(i));
       if (overdueR.length) risks.push({ level:'attention', headline:'Payment is slipping', why:`${overdueR.length} invoice${overdueR.length>1?'s'              :''} past due`, suggestion:'a gentle nudge now avoids an awkward conversation later' });
-      const lastMsgDays = (Array.isArray(messages)&&messages.length) ? Math.floor((Date.now()-new Date(messages[0].created_at))/86400000) : null;
+      const lastMsgDays = (Array.isArray(messages)&&messages.length) ? Math.floor((Date.now()-new Date(messages[0].created_at).getTime())/86400000) : null;
       if (lastMsgDays!=null && lastMsgDays>21) risks.push({ level:'watch', headline:`Quiet for ${lastMsgDays} days`, why:'no contact in three weeks', suggestion:'silence often precedes churn — a quick value-add message keeps the relationship warm' });
 
       // ── ai insight (one line, derived) ──
@@ -11222,7 +11248,7 @@ if (type === 'rec_generate') {
     goals: goals.ok ? goals.data : [],
     health_trend: health.ok ? health.data : [],
     site_check: siteCheck,
-    existing_recs: recent.ok ? (recent.data || []).map((x: any) => x.title) : [],
+    existing_recs: recent.ok ? ((recent as any).data || []).map((x: any) => x.title) : [],
   };
 
   const system = `You are the strategist inside Davis Digital Studio's platform, helping Eric Davis spot what's worth doing next for a specific client's website and online presence. You are given a real data snapshot. Surface 3 to 5 SPECIFIC, plain-English opportunities a small-business owner would understand. Think like a digital strategist, not a chatbot. Do NOT repeat anything already in existing_recs. Do NOT invent data not supported by the snapshot; if data is thin, base recs on the segment and goals. No em dashes.
@@ -11339,8 +11365,8 @@ if (type === 'review_draft') {
     segment: part.segment,
     month: per,
     work_done: work.ok ? work.data : [],
-    health_this_month: health.ok && health.data?.[0] ? health.data[0] : null,
-    health_last_month: health.ok && health.data?.[1] ? health.data[1] : null,
+    health_this_month: health.ok && (health.data as any[])?.[0] ? (health.data as any[])[0] : null,
+    health_last_month: health.ok && (health.data as any[])?.[1] ? (health.data as any[])[1] : null,
     recommendations: recs.ok ? recs.data : [],
   };
 
@@ -11541,8 +11567,8 @@ if (type === 'gp_workspace') {
   // ════ GROWTH HEADLINE — the one thing that matters in the partnership now ════
   // Same benchmark as Analytics/HQ: lead with what's most important, in priority
   // order. Client-action-needed > active-work > next-suggestion > reassurance.
-  const recsList = recs.ok ? (recs.data || []) : [];
-  const cTasksList = cTasks.ok ? (cTasks.data || []) : [];
+  const recsList = (recs.ok ? (recs.data || []) : []) as any[];
+  const cTasksList = (cTasks.ok ? (cTasks.data || []) : []) as any[];
   let gpHeadline: { text: string; kind: string; ref?: string } | null = null;
   {
     const awaitingClient = recsList.find((r: any) => r.status === 'shared' && r.needs_client_input);
@@ -11861,7 +11887,7 @@ if (type === 'gp_quote_respond') {
       if (to) {
         await sendEmail(to, `Your quote from Davis Digital Studio`,
           notifyShell('Here is your quote',
-            [patch.amount ? `Price: ${patch.amount}` : '', patch.eric_note || ''].filter(Boolean),
+            [patch.amount ? `Price: ${patch.amount}` : '', patch.eric_note || ''].filter(Boolean) as string[],
             { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
       }
     }
@@ -11927,7 +11953,7 @@ if (type === 'rec_ai_evaluate') {
 
   const snapshot = {
     business: part.client_name, segment: part.segment, site: part.primary_site,
-    completed_work: (work.ok ? work.data : []).map((w: any) => w.title),
+    completed_work: ((work.ok ? work.data : []) as any[]).map((w: any) => w.title),
     health: health.ok ? health.data : [],
     recommendations: recList.map((r: any) => ({ id: r.id, category: r.category, title: r.title, detail: r.detail, why: r.why, effort: r.effort, impact: r.impact })),
   };

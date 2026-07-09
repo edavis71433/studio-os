@@ -145,7 +145,7 @@
         },
         body: JSON.stringify(payload)
       });
-    } catch(e){ console.log("intake save err:", e); }
+    } catch { /* intake save is best-effort; submission still proceeds */ }
 
     // Email Eric a heads-up via the existing Edge Function.
     // Track whether the notify actually succeeded so we don't show a full
@@ -170,7 +170,7 @@
       var jr = {}; try { jr = await resp.json(); } catch(e){}
       // ok:true means handled; emailed reflects the Eric notify actually sending
       notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
-    } catch(e){ console.log("notify err:", e); notifyOk = false; }
+    } catch { notifyOk = false; }
 
     document.getElementById("intakeForm").classList.add("hidden");
     var doneCard = document.getElementById("done");
