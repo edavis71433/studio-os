@@ -8,6 +8,13 @@
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
+// P5: the first-class OPERATOR credential for the marketplace/enterprise
+// management surfaces. A dedicated server-to-server shared secret (same shape as
+// SCHEDULER_SECRET and the stripe-webhook x-commerce-secret) — NEVER the
+// service-role key, never sent to a browser. This is the clean privileged caller
+// the operator lifecycle was missing; the service-role deliberately still
+// resolves to `public` (defense-in-depth: a leaked service key is not an operator).
+const OPERATOR_SECRET = Deno.env.get('OPERATOR_SECRET') || '';
 
 export const TENANT_ID = '00000000-0000-0000-0000-000000000001'; // DDS = tenant #1
 
@@ -140,6 +147,15 @@ export async function resolvePrincipal(req: Request, body: any): Promise<Princip
     // system: a valid scheduler/webhook shared secret in the body (run_scheduled_jobs, gsc_ingest, pi_weekly)
     if (body && typeof body.secret === 'string' && body.secret && SCHEDULER_SECRET && body.secret === SCHEDULER_SECRET) {
       return { ...pub, kind: 'system' };
+    }
+    // operator (P5): a dedicated programmatic operator credential via header —
+    // server-to-server only, works on GETs, not carried in a loggable body.
+    // Resolves to a system-kind principal (which the operator routes already
+    // accept) but tagged role 'operator' so the audit actor is honest. Distinct
+    // from the cron secret; fail-closed — with no OPERATOR_SECRET set, no bypass.
+    const opSecret = req.headers.get('x-operator-secret') || '';
+    if (opSecret && OPERATOR_SECRET && opSecret === OPERATOR_SECRET) {
+      return { ...pub, kind: 'system', role: 'operator' };
     }
     const jwt = req.headers.get('x-dds-user-jwt') || '';
     if (!jwt) return pub; // no token => public, zero I/O

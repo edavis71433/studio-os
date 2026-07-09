@@ -52,6 +52,9 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
   approvals: [
     { name: 'APPROVAL_SECRET', required: false, enables: 'one-tap client approval links (falls back to SCHEDULER_SECRET; without either: /approve/send returns 503)' },
   ],
+  operator: [
+    { name: 'OPERATOR_SECRET', required: false, enables: 'the programmatic operator caller (x-operator-secret header) for marketplace/enterprise management (without it: those surfaces are operable only by an interactive staff login)' },
+  ],
   ai: [
     { name: 'ANTHROPIC_KEY', required: false, enables: 'AI drafting / concierge / coach (without it: honest "AI unavailable", never filler)' },
     { name: 'VISUAL_MODEL_KEY', required: false, enables: 'AI Visual Studio image generation (gated off without it)' },
@@ -89,6 +92,7 @@ export function validateSecrets() {
     publishing: has('NETLIFY_AUTH_TOKEN'),
     scheduled_publishing: has('SCHEDULER_SECRET'), // + an external cron actually calling /system/run
     one_tap_approvals: has('APPROVAL_SECRET') || has('SCHEDULER_SECRET'),
+    operator_management: has('OPERATOR_SECRET'), // marketplace/enterprise via x-operator-secret
     ai: has('ANTHROPIC_KEY'),
     visual_studio: has('VISUAL_MODEL_KEY'),
     connected_platform: has('GOOGLE_CLIENT_ID') && has('GOOGLE_CLIENT_SECRET') && has('CONNECTION_ENC_KEY'),

@@ -112,9 +112,6 @@ const run1 = (names) => runProviders(BASE, OPTIMIZATION_PROVIDERS.filter((p) => 
   const perf = run1(['performance_deep']).items.map((i) => i.type);
   ok('performance_deep: no compression + no cache headers + slow response', perf.includes('performance.compression_missing') && perf.includes('performance.cache_headers_missing') && perf.includes('performance.slow_response'));
 
-  const rep = run1(['reputation']).items.map((i) => i.type);
-  ok('reputation: slowing testimonial velocity observed', rep.includes('reviews.velocity_slowing'));
-
   const ana = run1(['analytics']).items.map((i) => i.type);
   ok('analytics: honest absence observation, nothing invented', ana.length === 1 && ana[0] === 'analytics.not_connected');
 
@@ -122,7 +119,7 @@ const run1 = (names) => runProviders(BASE, OPTIMIZATION_PROVIDERS.filter((p) => 
   ok('trust_deep: empty story → team info missing', trust.includes('trust.team_info_missing'));
 
   const vis = run1(['visual_assets']).items.map((i) => i.type);
-  ok('visual_assets: og:image missing + duplicate upload; imagery exists so no imagery_none', vis.includes('media.og_image_missing') && vis.includes('media.duplicate_image') && !vis.includes('media.imagery_none'));
+  ok('visual_assets: og:image missing; imagery exists so no imagery_none', vis.includes('media.og_image_missing') && !vis.includes('media.imagery_none'));
 
   const kn = run1(['knowledge']).items;
   ok('knowledge: document item not on site → item_unlisted', kn.some((i) => i.type === 'knowledge.item_unlisted' && i.facts.name === 'Duck Confit'));
@@ -154,9 +151,9 @@ const run1 = (names) => runProviders(BASE, OPTIMIZATION_PROVIDERS.filter((p) => 
 
 // ═══ 6. composability + failure isolation ═══
 {
-  ok('composability: the ONE registry now runs 33 providers (15 + 13 + connected + 4 industry packs)', PROVIDERS.length === 33, `providers=${PROVIDERS.length}`);
+  ok('composability: the ONE registry now runs 32 providers (15 + 12 + connected + 4 industry packs; reputation retired in P11)', PROVIDERS.length === 32, `providers=${PROVIDERS.length}`);
   const full = runProviders(BASE, PROVIDERS);
-  ok('composability: M9.0 and M10 providers run together, all recorded', full.record.length === 33 && full.record.every((r) => r.ok));
+  ok('composability: M9.0 and M10 providers run together, all recorded', full.record.length === 32 && full.record.every((r) => r.ok));
   const bomb = { name: 'bomb', provide() { throw new Error('boom'); } };
   const mixed = runProviders(BASE, [OPTIMIZATION_PROVIDERS[0], bomb, OPTIMIZATION_PROVIDERS[10]]);
   ok('failure isolation: a throwing provider contributes nothing and poisons nothing',

@@ -289,17 +289,15 @@ export const RULES: Rule[] = [
     dimensions: ['business_accuracy', 'customer_trust'], impactNote: 'domain/DNS/email/security foundations; the studio holds these on our editions',
     customerImpact: 'foundations that, unattended, can take a site or its email down', priority: bySeverity('critical', 'high', 'low') },
 
-  // ── Dormant (a feature that doesn’t exist yet — nobody, ever, until it ships) ──
-  { key: 'opt_dormant', category: 'platform', audience: 'none', timing: 'none', ttlDays: 90,
-    // Integrations not shipped + L3.4 low-value cuts (observed for migration
-    // readiness / future analytics, surfaced to no one): a slowing testimonial
-    // stream (engagement-nudge, not insight), a location term the heuristic often
-    // gets wrong, duplicate uploads (housekeeping), and Twitter/X cards (near-zero
-    // SMB value).
-    types: ['analytics.not_connected', 'local_presence.apple_business_unconnected',
-            'reviews.velocity_slowing', 'aeo.location_terms_missing', 'media.duplicate_image', 'seo.twitter_card_missing'],
-    dimensions: ['business_accuracy'], impactNote: 'integrations not shipped + low-value observations; emitted for completeness, surfaced to no one',
-    customerImpact: 'none — nothing to act on, or too low-value to interrupt for', priority: () => 'informational' },
+  // ── (P11, Jul 9 2026) opt_dormant RETIRED. It existed only to generate-then-
+  //    suppress low-value signals; those 5 observations (apple_business_unconnected,
+  //    reviews.velocity_slowing, aeo.location_terms_missing, media.duplicate_image,
+  //    seo.twitter_card_missing) are no longer emitted at all. The one exception,
+  //    `analytics.not_connected`, is STILL emitted because it is a real internal
+  //    signal consumed directly (services.ts / launch.ts derive `analytics_connected`
+  //    from the presence/absence of that evidence type). It intentionally matches no
+  //    judgment rule now, so it lands in `unmatched_types` — visibility, not failure —
+  //    and never surfaces to a customer.
 
   // ── L4.1/L4.2: connected-provider reads enter the pipeline HERE (no bypass).
   //    Pure summaries stay observed-only (the customer sees these numbers

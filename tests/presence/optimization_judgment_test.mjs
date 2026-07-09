@@ -13,7 +13,7 @@ import { TEMPLATES } from '../../supabase/functions/presence/moments/rules.ts';
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 
-const OPT_RULE_KEYS = ['opt_ai_search', 'opt_details_everywhere', 'opt_menu_reconcile', 'opt_photos', 'opt_story', 'opt_search_hygiene', 'opt_technical_access', 'opt_speed', 'opt_foundations', 'opt_dormant']; // opt_reputation removed in L3.4
+const OPT_RULE_KEYS = ['opt_ai_search', 'opt_details_everywhere', 'opt_menu_reconcile', 'opt_photos', 'opt_story', 'opt_search_hygiene', 'opt_technical_access', 'opt_speed', 'opt_foundations']; // opt_reputation removed in L3.4; opt_dormant retired in P11
 const ruleByKey = new Map(RULES.map((r) => [r.key, r]));
 const OPT_TYPES = OPT_RULE_KEYS.flatMap((k) => ruleByKey.get(k).types);
 
@@ -24,7 +24,7 @@ const OPT_TYPES = OPT_RULE_KEYS.flatMap((k) => ruleByKey.get(k).types);
   ok('classification: every optimization observation belongs to exactly one rule', multi.length === 0, multi.map((t) => `${t}→[${owners(t)}]`).join(', '));
   const roadmap = ruleByKey.get('platform_roadmap');
   ok('classification: no optimization type is parked on platform_roadmap anymore', OPT_TYPES.every((t) => !roadmap.types.includes(t)));
-  ok('classification: 40+ optimization observations collapse to ~11 business-task rules (grouping, not one-per)', OPT_TYPES.length >= 38 && OPT_RULE_KEYS.length <= 12, `${OPT_TYPES.length} types → ${OPT_RULE_KEYS.length} rules`);
+  ok('classification: 30+ optimization observations collapse to ~9 business-task rules (grouping, not one-per; opt_dormant retired in P11)', OPT_TYPES.length >= 34 && OPT_RULE_KEYS.length <= 11, `${OPT_TYPES.length} types → ${OPT_RULE_KEYS.length} rules`);
 }
 
 // ═══ 2. edition matrix: same evidence, audience shifts by plan ═══
@@ -36,13 +36,11 @@ const EVIDENCE = [
   ev('local_presence.nap_inconsistent'),          // opt_details_everywhere (knowledge)
   ev('knowledge.price_mismatch'),                 // opt_menu_reconcile (knowledge)
   ev('media.imagery_none'),                       // opt_photos (knowledge)
-  ev('reviews.velocity_slowing', 'info'),         // opt_dormant now (L3.4 cut — suppressed)
   ev('trust.team_info_missing', 'info'),          // opt_story (knowledge)
   ev('seo.noindex'),                              // opt_search_hygiene (platform)
   ev('accessibility.form_label_missing'),         // opt_technical_access (platform)
   ev('performance.slow_response'),                // opt_speed (platform)
   ev('infrastructure.dmarc_missing'),             // opt_foundations (infra)
-  ev('analytics.not_connected', 'info'),          // opt_dormant (dormant)
 ];
 const judgeFor = (plan) => {
   const { judgments } = judge(EVIDENCE, { siteId: 's', now: '2027-01-20T00:00:00Z', previous: {}, plan });
@@ -66,9 +64,6 @@ const aud = (m, key) => m.get(key)?.audience;
   ok('Managed: the studio takes the optimization work; only true business knowledge reaches the customer',
     aud(G, 'opt_ai_search') === 'operator' && aud(G, 'opt_menu_reconcile') === 'customer' && aud(G, 'opt_search_hygiene') === 'none');
 
-  // dormant never reaches anyone
-  ok('dormant: never anyone, any edition', aud(M, 'opt_dormant') === 'none' && aud(P, 'opt_dormant') === 'none' && aud(G, 'opt_dormant') === 'none');
-
   // THE LADDER LAW: customer interruptions decrease as Studio OS owns more
   const customerCount = (m) => [...m.values()].filter((j) => j.audience === 'customer' && j.status === 'active').length;
   const cM = customerCount(M), cP = customerCount(P), cG = customerCount(G);
@@ -81,7 +76,6 @@ const aud = (m, key) => m.get(key)?.audience;
   const P = judgeFor('presence');
   ok('silent: platform rules are recorded but suppressed (auditable, not deleted)',
     ['opt_search_hygiene', 'opt_technical_access', 'opt_speed'].every((k) => P.get(k)?.status === 'suppressed' && P.get(k)?.suppression_reason === 'no_audience'));
-  ok('silent: dormant suppressed too', judgeFor('presence').get('opt_dormant')?.status === 'suppressed');
 }
 
 // ═══ 4. no jargon, no scores in any customer-facing template ═══

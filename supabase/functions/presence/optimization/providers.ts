@@ -86,10 +86,6 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
       const robots = (p.html.match(/<meta\s+name="robots"\s+content="([^"]*)"/i) || [])[1] || '';
       if (/noindex/i.test(robots)) emit('seo.noindex', 'render', p.path, { page: p.path });
     }
-    // L3 — Twitter/X cards: the home page lacks the tags that make a shared link
-    // render as a rich card on X (and several other readers that honor them)
-    const home = i.pages.find((p) => p.path === '/');
-    if (home && !/name="twitter:card"/i.test(home.html)) emit('seo.twitter_card_missing', 'render', '/', { page: '/' });
   } },
 
   { name: 'aeo', provide(i, emit) {
@@ -118,13 +114,6 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
       const hasHours = (loc?.hours || []).some((d) => !d.closed && (d.intervals || []).length);
       if (hasHours && !/\d{1,2}(:\d{2})?\s*(am|pm|–|-)/i.test(bodyText(text))) missing.push('hours');
       if (missing.length) emit('aeo.citation_facts_incomplete', 'render', '/', { missing: missing.join(', ') });
-    }
-    const desc = String(i.draft.identity?.description || '');
-    const city = String(i.draft.locations?.[0]?.city || '');
-    const area = String(i.draft.identity?.service_area || '');
-    if (desc.split(/\s+/).length >= 15 && (city || area)) {
-      const hit = (city && desc.toLowerCase().includes(city.toLowerCase())) || (area && desc.toLowerCase().includes(area.toLowerCase()));
-      if (!hit) emit('aeo.location_terms_missing', 'draft', 'description');
     }
   } },
 
@@ -175,10 +164,6 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
   } },
 
   { name: 'local_presence_deep', provide(i, emit) {
-    // L3 — Apple Business Connect: observation of absence, exactly like the GBP
-    // profile signal. No Apple integration exists yet; when one does, this
-    // provider grows listing observations under the same contract.
-    emit('local_presence.apple_business_unconnected', 'destinations', '');
     // NAP consistency: the phone rendered anywhere must be THE phone
     const draftPhone = digitsOnly(String(i.draft.identity?.phone || ''));
     if (!draftPhone) return;
@@ -189,14 +174,6 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
         emit('local_presence.nap_inconsistent', 'render', p.path, { field: 'phone', a: draftPhone, b: stranger });
         break;
       }
-    }
-  } },
-
-  { name: 'reputation', provide(i, emit) {
-    const dated = (i.draft.testimonials || []).map((t) => t.quote_date).filter(Boolean).sort().reverse() as string[];
-    if (dated.length >= 3) {
-      const gap = daysBetween(dated[0], dated[1]);
-      if (gap >= 180) emit('reviews.velocity_slowing', 'content', '', { gap, threshold: 180 });
     }
   } },
 
@@ -214,14 +191,6 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
     if (!i.mediaRows.length) { emit('media.imagery_none', 'media', ''); return; }
     const home = i.pages.find((p) => p.path === '/');
     if (home && !/property="og:image"/i.test(home.html)) emit('media.og_image_missing', 'render', '/', { page: '/' });
-    const sig = new Map<string, number>();
-    for (const m of i.mediaRows) {
-      if (m.bytes == null || m.width == null) continue;
-      const k = `${m.bytes}|${m.width}|${m.height}`;
-      sig.set(k, (sig.get(k) || 0) + 1);
-    }
-    const dupes = [...sig.values()].filter((n) => n > 1).length;
-    if (dupes) emit('media.duplicate_image', 'media', '', { count: dupes });
   } },
 
   { name: 'knowledge', provide(i, emit) {

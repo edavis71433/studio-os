@@ -75,10 +75,6 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Remove the noindex tag if the page should be found.',
     human: (f) => `The page ${s(f.page)} tells search engines not to list it — it won’t appear in results.`,
     tech: (f) => `${s(f.page)}: meta robots contains "noindex".` },
-  'seo.twitter_card_missing': { category: 'seo', severity: 'info', confidence: 0.9,
-    next_action: 'Add Twitter/X card tags so shared links show a rich preview.',
-    human: () => `Links shared on X show as plain text — the page has no card tags for a rich preview.`,
-    tech: (f) => `No <meta name="twitter:card"> on ${s(f.page)}.` },
 
   // ── AI search (AEO) ──
   'aeo.faq_schema_missing': { category: 'aeo', severity: 'info', confidence: 0.9,
@@ -97,10 +93,6 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Get name, address, phone, and hours all onto the homepage.',
     human: (f) => `AI search can’t cite the basics — the homepage is missing ${s(f.missing)}.`,
     tech: (f) => `Citation fields absent from rendered home: ${s(f.missing)}.` },
-  'aeo.location_terms_missing': { category: 'aeo', severity: 'info', confidence: 0.75,
-    next_action: 'Mention the city or neighborhood in the description.',
-    human: () => `The description never says where the business is — location queries can’t match it.`,
-    tech: () => `Neither city nor service_area terms appear in identity.description.` },
 
   // ── accessibility depth ──
   'accessibility.form_label_missing': { category: 'accessibility', severity: 'warning', confidence: 0.9,
@@ -147,16 +139,7 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Make name, address, and phone identical everywhere.',
     human: (f) => `The ${s(f.field)} differs between pages — directories and AI search punish disagreement.`,
     tech: (f) => `NAP field ${s(f.field)}: "${s(f.a)}" vs "${s(f.b)}" across rendered pages/draft.` },
-  'local_presence.apple_business_unconnected': { category: 'local_presence', severity: 'info', confidence: 1,
-    next_action: 'Claim the business on Apple Business Connect when available.',
-    human: () => `Apple Maps and Siri aren’t connected — people using Apple devices can’t find the business there yet.`,
-    tech: () => `No Apple Business Connect destination configured for this site.` },
 
-  // ── reputation ──
-  'reviews.velocity_slowing': { category: 'reviews', severity: 'info', confidence: 0.8,
-    next_action: 'Ask a recent happy customer for a fresh word.',
-    human: (f) => `Kind words used to arrive steadily; the newest two are ${s(f.gap)} days apart.`,
-    tech: (f) => `Gap between two newest testimonial dates: ${s(f.gap)}d (threshold ${s(f.threshold)}d).` },
 
   // ── analytics (observation of ABSENCE — no analytics integration exists) ──
   'analytics.not_connected': { category: 'analytics', severity: 'info', confidence: 1,
@@ -179,10 +162,6 @@ export const OPT_CATALOG: Record<string, CatalogEntry> = {
     next_action: 'Set a social-sharing image.',
     human: () => `Shared links show no picture — the site has no social-preview image.`,
     tech: (f) => `No og:image meta on ${s(f.page)}.` },
-  'media.duplicate_image': { category: 'media', severity: 'info', confidence: 0.75,
-    next_action: 'Remove one of the identical uploads.',
-    human: (f) => `Two uploads appear to be the same image (${s(f.count)} duplicates found).`,
-    tech: (f) => `${s(f.count)} media pairs share identical bytes+dimensions.` },
 
   // ── business knowledge import ──
   'knowledge.item_unlisted': { category: 'knowledge', severity: 'info', confidence: 0.8,

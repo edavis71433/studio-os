@@ -48,11 +48,6 @@ const emit = (name, input) => runProviders(input, PROVIDERS.filter((p) => p.name
     emit('technical_seo', mk({ pages: [page('/', CLEAN_HOME), noindexPage] })).includes('seo.noindex') &&
     !emit('technical_seo', mk()).includes('seo.noindex'));
 
-  // SEO: twitter card
-  ok('seo.twitter_card_missing: home without a twitter card is observed; with one, not',
-    emit('technical_seo', mk({ pages: [page('/', '<html><head><title>t</title></head><body></body></html>')] })).includes('seo.twitter_card_missing') &&
-    !emit('technical_seo', mk()).includes('seo.twitter_card_missing'));
-
   // Performance: CDN absent
   const noCdn = (o) => ({ homeProbe: { ...mk().opt.homeProbe, server: 'nginx', cdnHint: '', ...o } });
   ok('performance.cdn_absent: no CDN headers/server → observed; a CDN → not',
@@ -80,13 +75,10 @@ const emit = (name, input) => runProviders(input, PROVIDERS.filter((p) => p.name
     !emit('accessibility_deep', mk({ pages: [headerTable] })).includes('accessibility.table_structure') &&
     !emit('accessibility_deep', mk({ pages: [layoutTable] })).includes('accessibility.table_structure'));
 
-  // Local: Apple Business Connect
-  ok('local_presence.apple_business_unconnected: observed (honest absence, like GBP)',
-    emit('local_presence_deep', mk()).includes('local_presence.apple_business_unconnected'));
 }
 
 // ═══ 2. evidence-only + pipeline compatibility ═══
-const NEW_TYPES = ['seo.noindex', 'seo.twitter_card_missing', 'performance.cdn_absent', 'performance.lazy_loading_missing', 'infrastructure.caa_missing', 'accessibility.table_structure', 'local_presence.apple_business_unconnected'];
+const NEW_TYPES = ['seo.noindex', 'performance.cdn_absent', 'performance.lazy_loading_missing', 'infrastructure.caa_missing', 'accessibility.table_structure'];
 {
   // every new type is in the catalog and renders both plain sentences
   ok('catalog: every new type has an entry with human + tech sentences',
