@@ -320,16 +320,18 @@ Verified-clean in the same sweep: no exposed secret keys in any HTML, no broken 
 - **P11 — retire opt_dormant:** ✅ suppression rule removed; 5 dead generate-to-suppress observations no longer emitted (emitters + catalog entries + the reputation provider gone); `analytics.not_connected` KEPT (real consumer: analytics_connected) and documented as intentionally unmatched. optimization 32/32 + engine 18/18 + judgment 14/14.
 
 ### CMS-UX-1 — Client Content Tree (FUTURE — after Phase 1 hardening; not started)
-**Sequencing:** a future Presence CMS UX improvement scheduled AFTER the Phase 1 hardening work (M1–M10 in [PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md]). Does NOT reorder or join M1. Do not build yet.
+**Sequencing:** a future Presence CMS UX improvement scheduled AFTER the Phase 1 hardening work (M1–M10 in [PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md]). Does NOT reorder, join, or move into Phase 1 / M1. **Architecture spec only — do not build.**
 
-**Goal:** a simplified, client-facing content tree so a client can see how their website is organized by page and section — similar in spirit to Adobe/AEM's content tree, but with zero implementation detail exposed. Orientation + navigation, not a builder.
+**Purpose.** A client-friendly content tree that helps users understand the organization AND health of their website without exposing any implementation detail — the clarity of Adobe Experience Manager's content tree, but much simpler and tailored to small businesses. At a glance a client always knows: what pages exist · how they're organized · what sections belong to each page · what content still needs attention · where to edit each section · what's published vs. still in draft. This is an **orientation and navigation tool, not a developer tool.**
 
-**Example shape (illustrative, not hardcoded):**
+**Design principles.** The tree must be: read-only in Phase 1 · generated from the active template · automatically adaptive to future templates · easy for non-technical users · fast to navigate · mobile-friendly · consistent across every website.
+
+**Example structure (illustrative ONLY — the real tree is always generated dynamically from the active template):**
 ```
 Website
 ├─ Home
 │   ├─ Hero
-│   ├─ Services
+│   ├─ Featured Services
 │   ├─ Testimonials
 │   └─ FAQ
 ├─ About
@@ -339,16 +341,15 @@ Website
 ├─ Contact
 ├─ SEO
 ├─ Images
-└─ Publish
+└─ Publish History
 ```
 
-**Rules (hard constraints):**
-- Client-facing navigation/orientation tool only.
-- Do NOT expose: React components · JSON · template manifests · database IDs · internal block IDs.
-- No drag-and-drop page restructuring in Phase 1.
-- Clicking a page or section navigates the client to the matching editor area (deep-link into the existing editor; no new editor).
-- The tree reflects the **active template's structure + available content sections** — it is derived from the template manifest/block model at render time, never a hardcoded restaurant layout.
-- Empty/incomplete sections show status indicators.
-- Must support future templates without hardcoding one layout (data-driven from the manifest).
+**Status indicators.** Every page and editable section may show an optional status indicator — e.g. *Complete · Draft Changes · Needs Review · Missing Required Content · Published*. Status is calculated automatically wherever possible from **existing** signals: `validateSnapshot` (missing required content / needs review), the draft-version hash vs. the live snapshot (draft changes — the M3 hash), and publishing metadata (`presence_publishes` / `last_published_at` for published state). No new state store.
 
-**Reuse-first note (for when it's built):** derive the tree from the existing template manifest + `presence_settings.blocks` (the structured content already drives render); deep-link each node to the existing editor surfaces. No second content model, no new editor, no exposure of the underlying structures — a read-only projection of what already exists.
+**Deep linking.** Selecting any page or section opens the corresponding **existing** editor screen at the right location (e.g. Home → Hero, Home → Testimonials, About → Company Story, Services → Pricing, Gallery, SEO). No duplicate editors, no duplicate content model, no duplicate navigation — reuse the existing editor and deep-link into the correct location.
+
+**Future compatibility.** The tree must work automatically for new templates · new industries · additional page types · landing pages · blogs · ecommerce · booking · memberships · AI-generated sections. It must **never** require hardcoded page names; it is always derived from the template manifest + the existing structured content model (`presence_settings.blocks`).
+
+**Hard constraints — do NOT expose:** React components · JSON · template manifests · database schema · internal IDs · block IDs · the rendering pipeline · the deployment pipeline · Netlify implementation · snapshot internals. **Do NOT allow:** drag-and-drop page restructuring · editing the template hierarchy · reordering template sections (Phase 1). Strictly a client-facing navigation/orientation experience.
+
+**Reuse-first requirement.** The tree is a **read-only projection** of the existing template structure + structured content. It must NOT introduce a second content model, a second editor, a second rendering system, or duplicate business logic — everything reuses the existing deterministic CMS architecture (template manifest → block model → the one editor → the one render/publish pipeline).
