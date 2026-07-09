@@ -4,6 +4,8 @@ One prioritized plan consolidating every fix from the L5.8 Launch Readiness Revi
 
 Legend — Owner: 🧑 = requires the human owner (Eric); 🤖 = buildable by Claude; 🔒 = external (registrar/provider/legal counsel).
 
+> **🧭 Two-App Law (permanent — constitution amendment 6):** Studio OS ships exactly **two** user-facing apps — the **Studio App** (Freelancer/Agency; modules by edition) and the **Client App** (one role-appropriate experience). CMS/CRM/DAM/Analytics/etc. are **modules, not applications**; no third customer-facing app without an explicit amendment. The current Admin Tool + Client Portal are transitional (retired on release; functionality migrated into the two apps; services unchanged). Enforced server-side (`middleware/feature.ts`, Phase FE-1).
+
 > **⚠️ Note (current):** the tiers below are the original L5.8 review and are partly historical — much of MUST-FIX-BEFORE-BETA has since shipped (portal/Moments front door, one shell, CI logic, etc.). The **live** launch gate is the block immediately below.
 
 ---

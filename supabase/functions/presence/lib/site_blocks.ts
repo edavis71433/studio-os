@@ -14,33 +14,48 @@
 import type {
   SiteBlock, SiteBlockType, SiteBlockFeatures, SiteBlockStats, SiteBlockTeam,
   SiteBlockProcess, SiteBlockPricing, SiteBlockCertifications, SiteBlockServiceAreas, SiteBlockCtaBanner,
+  SiteBlockGallery, SiteBlockBeforeAfter, SiteBlockVideo, MediaRef,
 } from './render_types.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'features', 'stats', 'team', 'process', 'pricing', 'certifications', 'service_areas', 'cta',
+  'gallery', 'before_after', 'video',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too.
-const MAX_BLOCKS = 12;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8 };
+const MAX_BLOCKS = 14;
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8 };
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const arr = (x: unknown): any[] => (Array.isArray(x) ? x : []);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uid = (x: unknown): string => { const v = String(x ?? '').trim(); return UUID_RE.test(v) ? v : ''; };
+
+// ── Stored (pre-resolution) shapes for media blocks — carry media by ID; the
+//    serializer's resolveBlockMedia() turns IDs into MediaRefs (reusing ref()). ──
+interface StoredTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media_id?: string }> }
+interface StoredGallery { type: 'gallery'; title?: string; image_ids: string[] }
+interface StoredBeforeAfter { type: 'before_after'; title?: string; items: Array<{ before_id: string; after_id: string; caption?: string }> }
+interface StoredVideo { type: 'video'; title?: string; url: string; caption?: string; poster_id?: string }
+export type StoredBlock =
+  | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
+  | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
+  | StoredGallery | StoredBeforeAfter | StoredVideo;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
  *  type (a site has one Team section, one Pricing section…), preserves owner order.
  *  This is the authoritative boundary — the render trusts only what this returns. */
-export function validateBlocks(raw: unknown): SiteBlock[] {
-  const out: SiteBlock[] = [];
+export function validateBlocks(raw: unknown): StoredBlock[] {
+  const out: StoredBlock[] = [];
   const seen = new Set<string>();
   for (const b of arr(raw)) {
     if (!b || typeof b !== 'object') continue;
     const type = String((b as any).type || '');
     if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || seen.has(type)) continue;
     const title = s((b as any).title, 80) || undefined;
-    let block: SiteBlock | null = null;
+    let block: StoredBlock | null = null;
     switch (type as SiteBlockType) {
       case 'features': {
         const items = arr((b as any).items).map((it) => ({ title: s(it?.title, 80), text: s(it?.text, 240) || undefined })).filter((it) => it.title).slice(0, CAP.features);
@@ -53,8 +68,12 @@ export function validateBlocks(raw: unknown): SiteBlock[] {
         break;
       }
       case 'team': {
-        const members = arr((b as any).members).map((m) => ({ name: s(m?.name, 80), role: s(m?.role, 80) || undefined, bio: s(m?.bio, 300) || undefined })).filter((m) => m.name).slice(0, CAP.team);
-        if (members.length) block = { type: 'team', title, members } as SiteBlockTeam;
+        const members = arr((b as any).members).map((m) => {
+          const mem: StoredTeam['members'][number] = { name: s(m?.name, 80), role: s(m?.role, 80) || undefined, bio: s(m?.bio, 300) || undefined };
+          const mid = uid(m?.media_id); if (mid) mem.media_id = mid;
+          return mem;
+        }).filter((m) => m.name).slice(0, CAP.team);
+        if (members.length) block = { type: 'team', title, members };
         break;
       }
       case 'process': {
@@ -85,11 +104,78 @@ export function validateBlocks(raw: unknown): SiteBlock[] {
         if (text) block = { type: 'cta', text, button: s((b as any).button, 40) || undefined, url: s((b as any).url, 300) || undefined } as SiteBlockCtaBanner;
         break;
       }
+      case 'gallery': {
+        const image_ids = arr((b as any).image_ids).map(uid).filter(Boolean).slice(0, CAP.gallery);
+        if (image_ids.length) block = { type: 'gallery', title, image_ids };
+        break;
+      }
+      case 'before_after': {
+        const items = arr((b as any).items).map((it) => ({ before_id: uid(it?.before_id), after_id: uid(it?.after_id), caption: s(it?.caption, 120) || undefined }))
+          .filter((it) => it.before_id && it.after_id).slice(0, CAP.beforeAfter);
+        if (items.length) block = { type: 'before_after', title, items };
+        break;
+      }
+      case 'video': {
+        const url = s((b as any).url, 400);
+        // Only http(s) links — the block renders a poster + link-out (never an
+        // external iframe: constitution Part 4 requires zero external origins).
+        if (/^https?:\/\//i.test(url)) {
+          block = { type: 'video', title, url, caption: s((b as any).caption, 160) || undefined };
+          const pid = uid((b as any).poster_id); if (pid) (block as StoredVideo).poster_id = pid;
+        }
+        break;
+      }
     }
     if (block) { out.push(block); seen.add(type); }
     if (out.length >= MAX_BLOCKS) break;
   }
   return out;
+}
+
+/** Resolve stored media IDs → MediaRefs using the serializer's ref() (which also
+ *  registers them in the media manifest, so variants are generated — the ONE media
+ *  pipeline, reused). A media block whose media can't resolve is dropped; a team
+ *  keeps its text even without photos. StoredBlock[] → render-facing SiteBlock[]. */
+export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null): SiteBlock[] {
+  const out: SiteBlock[] = [];
+  for (const b of blocks) {
+    switch (b.type) {
+      case 'team':
+        out.push({ type: 'team', title: b.title, members: b.members.map((m) => ({ name: m.name, role: m.role, bio: m.bio, media: m.media_id ? ref(m.media_id) : null })) });
+        break;
+      case 'gallery': {
+        const images = b.image_ids.map((id) => ref(id)).filter((x): x is MediaRef => !!x);
+        if (images.length) out.push({ type: 'gallery', title: b.title, images });
+        break;
+      }
+      case 'before_after': {
+        const items: SiteBlockBeforeAfter['items'] = [];
+        for (const it of b.items) {
+          const before = ref(it.before_id), after = ref(it.after_id);
+          if (before && after) items.push({ before, after, ...(it.caption ? { caption: it.caption } : {}) });
+        }
+        if (items.length) out.push({ type: 'before_after', title: b.title, items });
+        break;
+      }
+      case 'video':
+        out.push({ type: 'video', title: b.title, url: b.url, caption: b.caption, poster: b.poster_id ? ref(b.poster_id) : null });
+        break;
+      default:
+        out.push(b);
+    }
+  }
+  return out;
+}
+
+/** Deterministic <img> from a resolved MediaRef — mirrors each template's img():
+ *  responsive srcset, lazy, alt, focal crop. Zero external origins. */
+function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => string, sizes: string): string {
+  const v = m.variants || {};
+  const srcset = ['w400', 'w800', 'w1600'].filter((k) => v[k]).map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
+  const src = v.w800 || v.w400 || Object.values(v)[0]; if (!src) return '';
+  const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
+  const focal = m.focal ? ` style="object-position:${m.focal.x}% ${m.focal.y}%"` : '';
+  return `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt || '')}"${dims} loading="lazy" decoding="async"${focal}>`;
 }
 
 // ── Render context: the escapers + safe-href a template already has, injected so
@@ -130,7 +216,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         break;
       case 'team':
         html = `<section class="block wrap block-team">${h2(b.title, 'Meet the team')}<div class="cards">${b.members.map((m) =>
-          `<div class="card"><div class="nm">${esc(m.name)}</div>${m.role ? `<div class="pr">${esc(m.role)}</div>` : ''}${m.bio ? `<p class="ds">${esc(m.bio)}</p>` : ''}</div>`).join('')}</div></section>`;
+          `<div class="card team-card">${m.media ? `<div class="team-photo">${blockImg(m.media, esc, attr, '(max-width:640px) 100vw, 220px')}</div>` : ''}<div class="nm">${esc(m.name)}</div>${m.role ? `<div class="pr">${esc(m.role)}</div>` : ''}${m.bio ? `<p class="ds">${esc(m.bio)}</p>` : ''}</div>`).join('')}</div></section>`;
         ld = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: b.members.map((m, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Person', name: m.name, jobTitle: m.role || undefined } })) };
         break;
       case 'process':
@@ -158,6 +244,27 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         html = `<section class="block alt block-cta"><div class="wrap cta-inner"><p class="cta-text">${esc(b.text)}</p>${href ? `<a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Get started')}</a>` : ''}</div></section>`;
         break;
       }
+      case 'gallery':
+        html = `<section class="block wrap block-gallery">${h2(b.title, 'Gallery')}<div class="gallery">${b.images.map((m) =>
+          `<figure class="ga">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}${m.alt ? `<figcaption>${esc(m.alt)}</figcaption>` : ''}</figure>`).join('')}</div></section>`;
+        break;
+      case 'before_after':
+        html = `<section class="block alt block-ba"><div class="wrap">${h2(b.title, 'Before &amp; after')}${b.items.map((it) =>
+          `<div class="ba-pair">${['Before', 'After'].map((lab, k) => { const m = k ? it.after : it.before; return `<figure class="ba-fig"><span class="ba-lab">${lab}</span>${blockImg(m, esc, attr, '(max-width:640px) 100vw, 340px')}</figure>`; }).join('')}${it.caption ? `<p class="ba-cap">${esc(it.caption)}</p>` : ''}</div>`).join('')}</div></section>`;
+        break;
+      case 'video': {
+        // Poster + link-out — NEVER an external iframe (constitution Part 4: zero
+        // external origins on the published site). The link opens the video.
+        const href = safeHref(b.url);
+        if (href) {
+          const label = b.caption || b.title || 'Watch the video';
+          const inner = b.poster
+            ? `<span class="v-poster">${blockImg(b.poster, esc, attr, '(max-width:900px) 100vw, 820px')}<span class="v-play" aria-hidden="true">▶</span></span>`
+            : `<span class="v-textlink">▶ ${esc(label)}</span>`;
+          html = `<section class="block wrap block-video">${h2(b.title, 'Video')}<a class="v-link" href="${attr(href)}" rel="noopener" aria-label="${attr('Watch: ' + label)}">${inner}</a>${b.caption ? `<p class="v-cap">${esc(b.caption)}</p>` : ''}</section>`;
+        }
+        break;
+      }
     }
     if (html) out.push({ key: `block_${b.type}`, type: b.type, html, ...(ld ? { ld } : {}) });
   }
@@ -177,4 +284,22 @@ ul.tier-feats li,ul.certs li{margin:4px 0}
 ul.areas{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px}
 ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radius:999px;font-size:.92rem}
 .block-cta .cta-inner{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.block-cta .cta-text{font-size:1.2rem;font-weight:700;margin:0}`;
+.block-cta .cta-text{font-size:1.2rem;font-weight:700;margin:0}
+.team-card .team-photo{margin:-2px 0 10px}
+.team-card .team-photo img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;display:block}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.gallery .ga{margin:0}
+.gallery .ga img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block}
+.gallery .ga figcaption{font-size:.85rem;color:var(--soft);margin-top:5px}
+.ba-pair{margin-top:12px}
+.ba-pair .ba-fig{position:relative;margin:0 0 10px}
+.ba-pair .ba-lab{position:absolute;top:8px;left:8px;background:var(--ink,#222);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+.ba-pair .ba-fig img{width:100%;border-radius:10px;display:block}
+.ba-cap{color:var(--soft);font-size:.95rem;margin-top:4px}
+@media(min-width:620px){.ba-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ba-pair .ba-cap{grid-column:1/-1}}
+.v-link{display:block;text-decoration:none;color:inherit;margin-top:6px}
+.v-poster{position:relative;display:block}
+.v-poster img{width:100%;border-radius:12px;display:block}
+.v-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px}
+.v-textlink{display:inline-block;font-weight:700;color:var(--accent-dark,var(--accent));border:2px solid var(--accent);border-radius:999px;padding:10px 20px}
+.v-cap{color:var(--soft);font-size:.95rem;margin-top:8px}`;

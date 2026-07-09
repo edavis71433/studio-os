@@ -4,7 +4,7 @@
 // coerces + dedupes; rendering is deterministic, escaped, JS-free, emits correct
 // schema.org + a11y; the engine only realizes blocks the catalog declares; and the
 // business-classic template surfaces them (and stays byte-stable with none).
-import { validateBlocks, renderSiteBlocks, REALIZED_BLOCK_TYPES } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { COMPONENTS } from '../../supabase/functions/presence/lib/site_components.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 import { render as businessClassic } from '../../supabase/functions/presence/templates/business-classic/1.0.0/render.ts';
@@ -86,6 +86,38 @@ const ctx = { esc, attr, safeHref };
   ok('blocks appear on the home page', home.includes('block-team') && home.includes('Sam Rivera') && home.includes('block-process'));
   ok('block JSON-LD is injected (HowTo + Person)', home.includes('"@type":"HowTo"') && home.includes('"@type":"Person"'));
   ok('block CSS shipped in the stylesheet', out[Object.keys(out).find((k) => k.endsWith('.css'))].includes('ol.process'));
+}
+
+// ═══ 5. media blocks (FD-T17) — validation, resolution, render, zero-iframe ═══
+{
+  const G = "11111111-1111-1111-1111-111111111111", H = "22222222-2222-2222-2222-222222222222", MISS = "99999999-9999-9999-9999-999999999999";
+  const REF = (id) => id === MISS ? null : { alt: "Our work", variants: { w400: "/img/a-400.webp", w800: "/img/a-800.webp", w1600: "/img/a-1600.webp" }, width: 800, height: 600 };
+
+  ok("gallery keeps only valid UUID image ids", (() => { const g = validateBlocks([{ type: "gallery", image_ids: [G, "not-a-uuid", H] }])[0]; return g.image_ids.length === 2 && g.image_ids[0] === G; })());
+  ok("video requires http(s); rejects javascript:", validateBlocks([{ type: "video", url: "javascript:alert(1)" }]).length === 0 && validateBlocks([{ type: "video", url: "https://youtu.be/x" }]).length === 1);
+  ok("before_after requires both ids per pair", validateBlocks([{ type: "before_after", items: [{ before_id: G, after_id: H }, { before_id: G }] }])[0].items.length === 1);
+  ok("team keeps a valid media_id", validateBlocks([{ type: "team", members: [{ name: "Sam", media_id: G }] }])[0].members[0].media_id === G);
+
+  const resolved = resolveBlockMedia(validateBlocks([
+    { type: "gallery", title: "Work", image_ids: [G, MISS, H] },
+    { type: "before_after", items: [{ before_id: G, after_id: H, caption: "Deck rebuild" }, { before_id: G, after_id: MISS }] },
+    { type: "video", title: "Tour", url: "https://youtu.be/x", poster_id: G, caption: "A quick tour" },
+    { type: "team", members: [{ name: "Sam", role: "Owner", media_id: G }, { name: "Val" }] },
+  ]), REF);
+  const gal = resolved.find((b) => b.type === "gallery"), ba = resolved.find((b) => b.type === "before_after"), vid = resolved.find((b) => b.type === "video"), tm = resolved.find((b) => b.type === "team");
+  ok("gallery resolves ids→MediaRef, drops unresolved", gal.images.length === 2 && !!gal.images[0].variants.w800);
+  ok("before_after drops a pair with an unresolvable image", ba.items.length === 1 && !!ba.items[0].before.variants && ba.items[0].caption === "Deck rebuild");
+  ok("video resolves its poster; keeps the url", !!vid.poster && !!vid.poster.variants.w800 && vid.url === "https://youtu.be/x");
+  ok("team resolves a member photo; a member without one keeps text (media null)", !!tm.members[0].media && tm.members[1].media === null);
+
+  const r = renderSiteBlocks(resolved, ctx);
+  const gh = r.find((b) => b.type === "gallery").html, bh = r.find((b) => b.type === "before_after").html, vh = r.find((b) => b.type === "video").html, th = r.find((b) => b.type === "team").html;
+  ok("gallery renders figures with images + alt", gh.includes("<figure") && gh.includes("/img/a-800.webp") && gh.includes('alt="Our work"'));
+  ok("before_after labels Before + After", bh.includes("Before") && bh.includes("After") && bh.includes("Deck rebuild"));
+  ok("video renders poster + link-out, NEVER an iframe (zero external origins)", vh.includes("/img/a-800.webp") && vh.includes('href="https://youtu.be/x"') && !vh.includes("<iframe"));
+  ok("team photo renders inside the card", th.includes("team-photo") && th.includes("/img/a-800.webp"));
+  ok("media blocks stay presentational (no extra page-level schema)", !r.find((b) => b.type === "gallery").ld && !r.find((b) => b.type === "before_after").ld && !r.find((b) => b.type === "video").ld);
+  ok("every media block type is catalog-declared", ["gallery", "before_after", "video"].every((t) => COMPONENTS.some((c) => c.key === t)));
 }
 
 const passed = results.filter((r) => r.p).length;

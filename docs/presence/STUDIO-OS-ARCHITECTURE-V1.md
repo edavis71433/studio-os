@@ -5,12 +5,12 @@
 ## Locked principles
 One login · one shell · one navigation · one command palette (⌘K) · one Inbox (notification center) · one design language · one permission model. Navigation is **composed automatically from Edition × Role** — never hand-listed per persona (unchanged). The agency is not a separate app: **Studio → open a client → the shell re-scopes**, breadcrumb always shows *whose* data. Reviewers get one focused surface. Editions and the Edition×Role model are **unchanged**.
 
-### Two apps (FE-1 correction)
-From the user's point of view there are **exactly two web apps**, never three:
-1. **Freelancer / Studio App** — the operator (Eric) manages clients; opening a client re-scopes the one shell. Access is bounded by the **client's entitlement**.
-2. **Client App** — the client reviews, approves, messages, uploads, sees progress — and **only what their role/package allows** (`client_reviewer` = the shared feed + approvals; a real server boundary).
+### The Two-App Law (permanent — constitution amendment 6)
+Studio OS consists of **exactly two user-facing applications**. There is never a third.
+1. **Studio App (Freelancer / Agency App)** — the operator's workspace. Contains **modules** shown by the operator's (or, scoped into a client, that client's) edition: Website (CMS) · Customers (CRM) · Files (DAM) · Analytics · Inbox · Studio Management · AI tools · Publishing · Billing · Settings. Buy only CMS → only Website modules; buy Business OS → only those; buy Studio OS → everything. **The modules change; the application does not.**
+2. **Client App** — the client's single experience. Never a second portal / customer OS / reviewer app / CMS / CRM / DAM app. Surfaces only role-appropriate capabilities (Approvals, Website preview, Messages, shared Files, Reports, permitted Analytics, Billing when appropriate). **Always one experience.**
 
-CMS / CRM / DAM / Analytics are **internal systems / sellable editions**, surfaced *inside* these two apps by Edition × Role — never as separate apps. **Feature boundaries are enforced server-side** (`middleware/feature.ts` · `requireFeature`/`featureForRoute`), mirroring `buildNav`; nav-hiding is **not** the control. See [PHASE-FE-1-FEATURE-ENFORCEMENT-AND-TWO-APP-MODEL](PHASE-FE-1-FEATURE-ENFORCEMENT-AND-TWO-APP-MODEL.md).
+**Product rule:** CMS / CRM / DAM / Analytics / Inbox / AI / Publishing / Billing are **modules, not applications** — never referred to, designed, or introduced as separate products; no new customer-facing application without an explicit architecture amendment. Composed from **Edition × Role** (`buildNav`); **enforced server-side** (`middleware/feature.ts` · `requireFeature`/`featureForRoute`), never by nav-hiding. The current Admin Tool + Client Portal are transitional — retired on release, functionality migrated into the two apps, services unchanged. See [constitution/10-amendment-6-two-app-law](constitution/10-amendment-6-two-app-law.md) + [PHASE-FE-1-FEATURE-ENFORCEMENT-AND-TWO-APP-MODEL](PHASE-FE-1-FEATURE-ENFORCEMENT-AND-TWO-APP-MODEL.md).
 
 ## The canonical vocabulary (internal name → what the customer sees)
 | Internal system (stays) | Customer-facing label | Where it lives |

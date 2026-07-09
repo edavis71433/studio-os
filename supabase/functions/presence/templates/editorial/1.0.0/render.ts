@@ -11,6 +11,7 @@
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
+import { renderSiteBlocks, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
@@ -142,7 +143,8 @@ footer.site h2{font-family:var(--font-display,Georgia,serif);font-size:1.3rem}
 .credit{margin-top:34px;padding-top:20px;border-top:1px solid var(--line);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);display:flex;gap:16px;flex-wrap:wrap}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
-@media (max-width:640px){.hero{padding:56px 0 40px}.block{padding:46px 0}}`;
+@media (max-width:640px){.hero{padding:56px 0 40px}.block{padding:46px 0}}
+${BLOCK_CSS}`;
 
 const CRITICAL = `:root{--ink:#1a1a1c;--soft:#5f5a52;--paper:var(--bg,#f6f3ec);--accent:#6d232a;--line:#ddd6c8}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Iowan Old Style",Palatino,Georgia,serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:17px}h1{font-size:clamp(2.6rem,7vw,4.6rem);line-height:1.1;font-family:var(--font-display,Georgia,serif);font-weight:600}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 26px}header.site{border-top:3px double var(--ink)}.nav{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 0 0;border-bottom:1px solid var(--line)}.brand{font-family:var(--font-display,Georgia,serif);font-weight:600;font-size:1.9rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap;justify-content:center;padding:8px 0 12px}nav.primary a{display:inline-block;padding:6px 14px;text-decoration:none;color:#5f5a52;font-weight:600;font-size:.74rem;letter-spacing:.16em;text-transform:uppercase}.hero{padding:84px 0 56px;text-align:center}`;
 
@@ -299,14 +301,15 @@ ${o.body}
 
 // Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
 const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
-function homeSectionOrder(c: SnapshotContent): string[] {
+function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[] {
+  const all = [...HOME_SECTIONS, ...blockKeys];
   const hidden = new Set(c.settings?.sections?.hidden || []);
-  const chosen = (c.settings?.sections?.order || []).filter((k) => HOME_SECTIONS.includes(k));
-  const rest = HOME_SECTIONS.filter((k) => !chosen.includes(k));
+  const chosen = (c.settings?.sections?.order || []).filter((k) => all.includes(k));
+  const rest = all.filter((k) => !chosen.includes(k));
   return [...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
-function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>): string {
+function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>, blocks: RenderedBlock[] = []): string {
   const i = c.identity;
   const hero = bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || c.settings?.logo || null;
   const featured = bySort(c.offerings).slice(0, 6);
@@ -355,7 +358,8 @@ ${(() => {
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
   };
-  return homeSectionOrder(c).map((k) => parts[k]).join('');
+  for (const b of blocks) parts[b.key] = b.html;   // Phase T-BLOCKS
+  return homeSectionOrder(c, blocks.map((b) => b.key)).map((k) => parts[k] || '').join('');
 })()}`;
 }
 
@@ -475,8 +479,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     files[file] = html;
   };
 
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref });   // Phase T-BLOCKS
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
-  page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site)], ogImage: ogImg, active: 'home', body: homeBody(c, site, v) });
+  page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
   page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });
   if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
   page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });

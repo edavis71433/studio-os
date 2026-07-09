@@ -9,7 +9,7 @@
 import { svc } from './db.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
-import { validateBlocks } from './site_blocks.ts';
+import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -106,8 +106,10 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
         hidden: Array.isArray(settings.sections_hidden) ? settings.sections_hidden.map(String).slice(0, 24) : [],
         order: Array.isArray(settings.sections_order) ? settings.sections_order.map(String).slice(0, 24) : [],
       },
-      // Phase T-BLOCKS: validated + capped structured blocks (authoritative boundary).
-      blocks: validateBlocks(settings.blocks),
+      // Phase T-BLOCKS: validated + capped structured blocks (authoritative boundary);
+      // FD-T17 resolves any block media IDs → MediaRefs via the SAME ref() (so block
+      // photos land in the media manifest and get variants — one media pipeline).
+      blocks: resolveBlockMedia(validateBlocks(settings.blocks), ref),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],

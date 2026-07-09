@@ -2748,6 +2748,195 @@ async function mountDesignCard() {
   }
   host.appendChild(card);
   mountSectionsCard();
+  mountBlocksCard();
+}
+// ── Phase T-BLOCKS (FD-T15): content blocks — structured sections you turn on + fill.
+//    Writes the SAME /settings blocks array the server validates + the template renders
+//    (one storage, one pipeline). Local working copy → explicit Save, so a half-filled
+//    block isn't stripped mid-edit. Media blocks (FD-T17) render read-only notes here. ──
+const BLOCK_DEFS = [
+  { type: "features", name: "Features / highlights", field: "items", hint: "One per line:  Title | short description",
+    parse: (p) => ({ title: p[0] || "", text: p[1] || "" }), fmt: (o) => [o.title, o.text].filter(Boolean).join(" | ") },
+  { type: "stats", name: "Numbers that build trust", field: "items", hint: "One per line:  Value | Label   (e.g.  15 | Years in business)",
+    parse: (p) => ({ value: p[0] || "", label: p[1] || "" }), fmt: (o) => [o.value, o.label].filter(Boolean).join(" | ") },
+  { type: "team", name: "Team", field: "members", hint: "One per line:  Name | Role | short bio",
+    parse: (p) => ({ name: p[0] || "", role: p[1] || "", bio: p[2] || "" }), fmt: (o) => [o.name, o.role, o.bio].filter(Boolean).join(" | ") },
+  { type: "process", name: "How it works", field: "steps", hint: "One per line:  Step | detail",
+    parse: (p) => ({ step: p[0] || "", detail: p[1] || "" }), fmt: (o) => [o.step, o.detail].filter(Boolean).join(" | ") },
+  { type: "pricing", name: "Pricing / packages", field: "tiers", hint: "One tier per line:  Name | price | feature; feature; feature",
+    parse: (p) => ({ name: p[0] || "", price_text: p[1] || "", features: (p[2] || "").split(";").map((s) => s.trim()).filter(Boolean) }),
+    fmt: (o) => [o.name, o.price_text, (o.features || []).join("; ")].filter(Boolean).join(" | ") },
+  { type: "certifications", name: "Certifications / licenses", field: "items", hint: "One per line:  Name | issuer",
+    parse: (p) => ({ name: p[0] || "", issuer: p[1] || "" }), fmt: (o) => [o.name, o.issuer].filter(Boolean).join(" | ") },
+  { type: "service_areas", name: "Areas we serve", areasSimple: true, hint: "One area per line" },
+  { type: "cta", name: "Call-to-action banner", ctaSimple: true, hint: "" },
+  // FD-T17 media blocks — pick from your photo library (one media pipeline).
+  { type: "gallery", name: "Photo gallery", mediaKind: "gallery", hint: "A grid of photos from your library." },
+  { type: "before_after", name: "Before & after", mediaKind: "ba", hint: "Pairs of photos that show your work." },
+  { type: "video", name: "Video", mediaKind: "video", hint: "A poster image that links out to your video — nothing external loads on your site." },
+];
+function mediaThumb(id) {
+  const m = (S.media || []).find((x) => x.id === id);
+  const wrap = el("span"); wrap.style.cssText = "display:inline-block;width:52px;height:52px;border-radius:8px;overflow:hidden;background:var(--wash,#eee);vertical-align:middle";
+  if (m && m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block"; wrap.appendChild(img); }
+  return wrap;
+}
+let BLOCKS_WORK = null;
+function currentBlocks() { return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : []; }
+function blockText(def, blk) {
+  if (def.areasSimple) return (blk.areas || []).join("\n");
+  return (blk[def.field] || []).map(def.fmt).join("\n");
+}
+function textToBlock(def, title, text) {
+  const b = { type: def.type }; if (title) b.title = title;
+  if (def.areasSimple) { b.areas = text.split("\n").map((s) => s.trim()).filter(Boolean); return b; }
+  b[def.field] = text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => def.parse(l.split("|").map((s) => s.trim())));
+  return b;
+}
+function emptyBlock(def) {
+  const b = { type: def.type };
+  if (def.ctaSimple) { b.text = ""; return b; }
+  if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
+  if (def.mediaKind === "video") { b.url = ""; return b; }
+  if (def.mediaKind === "ba") { b.items = []; return b; }
+  if (def.areasSimple) { b.areas = []; return b; }
+  b[def.field] = []; return b;
+}
+async function saveBlocks() {
+  try {
+    const r = await api("PUT", "/settings", { blocks: BLOCKS_WORK });
+    S.settings = r.data || { ...S.settings, blocks: BLOCKS_WORK };
+    BLOCKS_WORK = currentBlocks();
+    renderBlocksCard();
+    toast("Content blocks saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
+  } catch (err) { toast(err.message, true); }
+}
+function mountBlocksCard() {
+  const host = $("designHost"); if (!host || $("blocksCard")) return;
+  BLOCKS_WORK = currentBlocks();
+  const card = el("div", "field"); card.id = "blocksCard"; card.style.marginTop = "18px";
+  host.appendChild(card);
+  renderBlocksCard();
+}
+function renderBlocksCard() {
+  const card = $("blocksCard"); if (!card) return; card.textContent = "";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const miniBtn = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  card.appendChild(el("label", null, "Content blocks"));
+  card.appendChild(el("div", "hint", "Add ready-made sections to your home page and fill them in — no design needed. Reorder or hide them under “Your home page”. Publish to apply."));
+  BLOCKS_WORK.forEach((blk, idx) => {
+    const def = BLOCK_DEFS.find((d) => d.type === blk.type); if (!def) return;
+    const sub = el("div"); sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
+    const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
+    const nm = el("div", null, def.name + (blk.mediaNote ? "  ·  " + blk.mediaNote : "")); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
+    const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
+    [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
+    up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
+    if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
+    up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; renderBlocksCard(); });
+    rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
+    head.append(nm, up, dn, rm); sub.appendChild(head);
+    const ti = el("input"); ti.type = "text"; ti.placeholder = "Section heading (optional)"; ti.value = blk.title || ""; ti.style.cssText = inputCss;
+    ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; });
+    sub.appendChild(ti);
+    if (def.ctaSimple) {
+      const t = el("input"), bt = el("input"), u = el("input");
+      t.placeholder = "Banner text"; t.value = blk.text || ""; bt.placeholder = "Button label (optional)"; bt.value = blk.button || ""; u.placeholder = "Button link URL (optional)"; u.value = blk.url || "";
+      [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
+      [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
+      sub.append(t, bt, u);
+    } else if (def.mediaKind) {
+      renderMediaBlockBody(def, blk, idx, sub, ti);
+      sub.appendChild(el("div", "hint", def.hint));
+    } else if (def.field || def.areasSimple) {
+      const ta = el("textarea"); ta.value = blockText(def, blk);
+      ta.rows = Math.max(3, ta.value.split("\n").length + 1);
+      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.5;box-sizing:border-box";
+      ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = textToBlock(def, t2, ta.value); });
+      sub.appendChild(ta);
+      sub.appendChild(el("div", "hint", def.hint));
+    }
+    card.appendChild(sub);
+  });
+  const present = new Set(BLOCKS_WORK.map((b) => b.type));
+  const addable = BLOCK_DEFS.filter((d) => !present.has(d.type));
+  if (addable.length) {
+    const addWrap = el("div"); addWrap.style.cssText = "margin-top:12px;display:flex;gap:7px;flex-wrap:wrap;align-items:center";
+    addWrap.appendChild(Object.assign(el("span", null, "Add a block:"), { style: "font-size:12px;font-weight:600" }));
+    addable.forEach((d) => {
+      const b = el("button", null, "+ " + d.name); b.type = "button";
+      b.style.cssText = "font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;border:2px solid var(--line,#ddd);background:transparent;cursor:pointer";
+      b.addEventListener("click", () => { BLOCKS_WORK.push(emptyBlock(d)); renderBlocksCard(); });
+      addWrap.appendChild(b);
+    });
+    card.appendChild(addWrap);
+  }
+  const saveRow = el("div"); saveRow.style.cssText = "margin-top:14px;display:flex;gap:10px;align-items:center";
+  const save = el("button", null, "Save content blocks"); save.type = "button";
+  save.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  save.addEventListener("click", saveBlocks);
+  saveRow.appendChild(save);
+  saveRow.appendChild(el("span", "hint", "Empty blocks won’t appear on your site."));
+  card.appendChild(saveRow);
+}
+// FD-T17 media block editors — pick photos from your library (openPicker → media id).
+function renderMediaBlockBody(def, blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  if (def.mediaKind === "gallery") {
+    const ids = Array.isArray(blk.image_ids) ? blk.image_ids : [];
+    const grid = el("div"); grid.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px";
+    ids.forEach((id, k) => {
+      const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
+      chip.appendChild(mediaThumb(id));
+      const x = el("button", null, "×"); x.type = "button"; x.title = "Remove";
+      x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#a3423a;color:#fff;cursor:pointer;font-size:13px;line-height:1";
+      x.addEventListener("click", () => { commitTitle(); blk.image_ids.splice(k, 1); renderBlocksCard(); });
+      chip.appendChild(x); grid.appendChild(chip);
+    });
+    sub.appendChild(grid);
+    const add = el("button", null, "+ Add photo"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].image_ids = BLOCKS_WORK[idx].image_ids || []).push(id); renderBlocksCard(); } }); });
+    sub.appendChild(add);
+  } else if (def.mediaKind === "video") {
+    const url = el("input"); url.type = "text"; url.placeholder = "Video link (YouTube, Vimeo…)"; url.value = blk.url || ""; url.style.cssText = inputCss;
+    const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = blk.caption || ""; cap.style.cssText = inputCss;
+    const commit = () => { BLOCKS_WORK[idx] = { type: "video", title: ti.value.trim(), url: url.value.trim(), caption: cap.value.trim(), poster_id: BLOCKS_WORK[idx].poster_id || undefined }; };
+    url.addEventListener("change", commit); cap.addEventListener("change", commit);
+    sub.append(url, cap);
+    const posterRow = el("div"); posterRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:4px";
+    if (blk.poster_id) posterRow.appendChild(mediaThumb(blk.poster_id));
+    const pick = el("button", null, blk.poster_id ? "Change poster" : "Add poster image"); pick.type = "button"; pick.style.cssText = miniBtn;
+    pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].poster_id = id || undefined; renderBlocksCard(); }); });
+    posterRow.appendChild(pick); sub.appendChild(posterRow);
+  } else if (def.mediaKind === "ba") {
+    const items = Array.isArray(blk.items) ? blk.items : [];
+    items.forEach((pair, k) => {
+      const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
+      const pics = el("div"); pics.style.cssText = "display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap";
+      ["before_id", "after_id"].forEach((key, j) => {
+        const cell = el("div"); cell.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px";
+        cell.appendChild(el("span", "hint", j ? "After" : "Before"));
+        if (pair[key]) cell.appendChild(mediaThumb(pair[key]));
+        const pb = el("button", null, pair[key] ? "Change" : "Choose"); pb.type = "button"; pb.style.cssText = miniBtn;
+        pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { blk.items[k][key] = id; renderBlocksCard(); } }); });
+        cell.appendChild(pb); pics.appendChild(cell);
+      });
+      row.appendChild(pics);
+      const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = pair.caption || ""; cap.style.cssText = inputCss + ";margin-top:8px";
+      cap.addEventListener("change", () => { blk.items[k].caption = cap.value.trim(); });
+      row.appendChild(cap);
+      const rm = el("button", null, "Remove pair"); rm.type = "button"; rm.style.cssText = miniBtn;
+      rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+      row.appendChild(rm); sub.appendChild(row);
+    });
+    const add = el("button", null, "+ Add a pair"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].items = BLOCKS_WORK[idx].items || []).push({ before_id: "", after_id: "" }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
 const HOME_SECTION_DEFS = [ ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];

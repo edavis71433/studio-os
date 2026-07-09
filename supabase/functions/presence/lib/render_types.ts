@@ -106,15 +106,20 @@ export function snapshotContentUsable(c: any): boolean {
 // in v1 (no media plumbing), typed + capped, so the render stays deterministic.
 export interface SiteBlockFeatures { type: 'features'; title?: string; items: Array<{ title: string; text?: string }> }
 export interface SiteBlockStats { type: 'stats'; title?: string; items: Array<{ value: string; label: string }> }
-export interface SiteBlockTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string }> }
+export interface SiteBlockTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media?: MediaRef | null }> }
 export interface SiteBlockProcess { type: 'process'; title?: string; steps: Array<{ step: string; detail?: string }> }
 export interface SiteBlockPricing { type: 'pricing'; title?: string; tiers: Array<{ name: string; price_text?: string; features: string[] }> }
 export interface SiteBlockCertifications { type: 'certifications'; title?: string; items: Array<{ name: string; issuer?: string }> }
 export interface SiteBlockServiceAreas { type: 'service_areas'; title?: string; areas: string[] }
 export interface SiteBlockCtaBanner { type: 'cta'; text: string; button?: string; url?: string }
+// FD-T17 media-bearing blocks (render-facing: media already resolved to MediaRef via the serializer's ref()).
+export interface SiteBlockGallery { type: 'gallery'; title?: string; images: MediaRef[] }
+export interface SiteBlockBeforeAfter { type: 'before_after'; title?: string; items: Array<{ before: MediaRef; after: MediaRef; caption?: string }> }
+export interface SiteBlockVideo { type: 'video'; title?: string; url: string; caption?: string; poster?: MediaRef | null }
 export type SiteBlock =
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
-  | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner;
+  | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
+  | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo;
 export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */
