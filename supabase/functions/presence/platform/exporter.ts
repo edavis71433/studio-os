@@ -8,6 +8,8 @@
 import { svc } from '../lib/db.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
+import { brandFromKit } from '../lib/email_brand.ts';
+import { exportCoverHtml } from '../lib/export_cover.ts';
 import type { SiteRow } from '../lib/site.ts';
 
 export interface SiteExport {
@@ -21,6 +23,7 @@ export interface SiteExport {
   brand_profile: unknown | null;
   knowledge_docs: Array<{ filename: string; content_text: string }>;
   website: Record<string, string> | null; // the rendered site: path → HTML/CSS, hostable anywhere
+  cover_html: string;                     // BR-1: a branded cover (Brand Kit), openable in any browser
 }
 
 export async function buildExport(site: SiteRow): Promise<SiteExport> {
@@ -45,7 +48,12 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
     for (const [k, v] of Object.entries(fm)) if (typeof v === 'string') website[k] = v;
   } catch { website = null; }
 
-  const content = snapshot.content as { redirects?: unknown };
+  const content = snapshot.content as { redirects?: unknown; identity?: { business_name?: string }; settings?: { brand_kit?: { primary?: string } } };
+  // BR-1: derive the brand from the SAME source as the emails (the Brand Kit), and
+  // build a branded cover for this ownership document — reuses the export pipeline.
+  const brand = brandFromKit(content?.settings?.brand_kit, content?.identity?.business_name);
+  const pages = website ? Object.keys(website).filter((k) => k.endsWith('.html')).length : 0;
+  const cover_html = exportCoverHtml(brand, { exportedAt: now, pages, photos: (mediaQ.json ?? []).length, hasBrand: !!brandQ.json?.[0], domain: site.custom_domain });
   return {
     format: 'studio-os-export/1',
     exported_at: now,
@@ -57,5 +65,6 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
     brand_profile: brandQ.json?.[0] ?? null,
     knowledge_docs: docsQ.json ?? [],
     website,
+    cover_html,
   };
 }
