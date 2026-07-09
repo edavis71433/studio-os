@@ -66,10 +66,12 @@ async function sendInviteLink(email: string, siteId: string): Promise<void> {
   if (!link) link = await gen('magiclink');  // existing user → magic link
   if (!link) return;
   const { sendEmail } = await import('../commerce/account.ts');
+  const { loadEmailBrand } = await import('./email_brand.ts');
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
   const name = String(bn.json?.[0]?.business_name || 'a business on Studio OS');
+  const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand
   await sendEmail(email, `You’ve been invited to help run ${name}`,
-    `<p>You’ve been invited to help run <strong>${name}</strong> on Studio OS.</p><p><a href="${link}">Tap here to sign in</a> — no code to type. You can set a password afterwards from your portal.</p>`).catch(() => {});
+    `<p>You’ve been invited to help run <strong>${name}</strong> on Studio OS.</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type. You can set a password afterwards from your portal.</p>`, brand).catch(() => {});
 }
 
 export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string }> {
