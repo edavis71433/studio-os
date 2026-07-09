@@ -18,6 +18,7 @@ import type { SiteRole } from '../lib/site_roles.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
 import { svc } from '../lib/db.ts';
 import { ALLOWED_TOKENS, buildCustomization, projectFiles, validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from '../lib/devmode.ts';
+import { sanitizeBrandKit, deriveBrandTokens } from '../lib/brand_kit.ts';
 
 /** Access rule (route logic — the role model is NOT modified): the operator, or
  *  a member with `use_developer_mode`. Pure + exported for tests. */
@@ -67,6 +68,47 @@ export async function handleDevCustomizationGet(jwt: string, site: SiteRow, prin
     updated_at: row?.updated_at ?? null,
     updated_by: row?.updated_by ?? null,
   } }, 200, cors);
+}
+
+// ── FD-T9: Brand Kit — one source of truth → the EXISTING dev-token layer ─────
+// Owner-or-developer (designAllowed). Stores the kit on settings and DERIVES the
+// same theme tokens Design Studio writes, so buttons/forms/links (all var(--accent))
+// rebrand at once. No second theme engine; publishes through the normal flow.
+export async function handleBrandKitGet(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  if (!designAllowed(role, principal.kind)) return json({ error: 'forbidden', message: 'Design is available to the account owner or a developer.' }, 403, cors);
+  const r = await svc(`presence_settings?site_id=eq.${site.id}&select=brand_kit&limit=1`);
+  return json({ data: { brand_kit: (r.ok && r.json?.[0]?.brand_kit) || null } }, 200, cors);
+}
+
+export async function handleBrandKitPut(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  if (!designAllowed(role, principal.kind)) return json({ error: 'forbidden', message: 'Design is available to the account owner or a developer.' }, 403, cors);
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const kit = sanitizeBrandKit(body?.brand_kit ?? body);
+  if (!kit) return json({ error: 'bad_brand_kit', message: 'A brand colour is required (e.g. #2f5d8a).' }, 422, cors);
+  // same-site guard on the logo reference; drop it if it isn't in this library
+  if (kit.logo_media_id) {
+    const m = await svc(`presence_media?id=eq.${kit.logo_media_id}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`);
+    if (!(Array.isArray(m.json) && m.json.length)) delete kit.logo_media_id;
+  }
+  // 1) persist the kit (the source of truth) on the settings row
+  const s = await svc(`presence_settings?on_conflict=site_id`, {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ site_id: site.id, brand_kit: kit, ...(kit.logo_media_id ? { logo_media_id: kit.logo_media_id } : {}) }),
+  });
+  if (!s.ok) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  // 2) derive tokens and merge into the ONE dev-token layer (owner tier: tokens only)
+  const derived = deriveBrandTokens(kit);
+  const existing = await svc(`presence_dev_customizations?site_id=eq.${site.id}&select=theme_tokens,custom_css,custom_html&limit=1`);
+  const cur = (existing.ok && existing.json?.[0]) || {};
+  const clean = buildCustomization({ theme_tokens: { ...(cur.theme_tokens || {}), ...derived }, custom_css: cur.custom_css || '', custom_html: cur.custom_html || '' });
+  const w = await svc(`presence_dev_customizations?on_conflict=site_id`, {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ site_id: site.id, theme_tokens: clean.theme_tokens, custom_css: clean.custom_css, custom_html: clean.custom_html, updated_by: principal.userId || 'owner', updated_at: new Date().toISOString() }),
+  });
+  if (!w.ok) return json({ error: 'write_failed', message: 'The brand was saved but couldn’t be applied — please try again.' }, 502, cors);
+  return json({ data: { ok: true, brand_kit: kit, applied_tokens: clean.theme_tokens, message: 'Brand kit saved and applied. Publish through your normal approval flow to take it live.' } }, 200, cors);
 }
 
 export async function handleDevCustomizationPut(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

@@ -32,6 +32,7 @@ export function reviewerAllowed(route: string, method: string): boolean {
   if (method === 'POST' && /^\/foundations\/plans\/[0-9a-f-]{36}\/decide$/.test(route)) return true;   // approve an infra plan
   if (method === 'POST' && /^\/connections\/[a-z0-9_]+\/write\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // approve a connected write
   if (method === 'POST' && /^\/assets\/[0-9a-f-]{36}\/status$/.test(route)) return true; // DAM-2: approve/reject a file (action-restricted in the handler)
+  if (method === 'POST' && /^\/launches\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // FD-T7: approve/reject a staged launch
   return false;
 }
 

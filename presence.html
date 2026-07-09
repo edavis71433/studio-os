@@ -538,6 +538,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <section class="view" id="view-history">
         <h1 class="doc">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
+        <div id="launchBox"></div>
         <div id="pubList"></div>
       </section>
 
@@ -2140,7 +2141,7 @@ function renderWelcome() {
 }
 
 /* ── the proofing desk (identical /preview calls) ── */
-const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null, template: "" };
+const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null, template: "", launchId: null };
 // ── Phase CP-1 (FD-T8): try another look — preview-only until "Use this look" ──
 let LOOKS = null;   // { current: {slug}, templates: [{slug,name,version}] }
 // PT-2C: each family's visual signature for the preview cards. Unknown/future
@@ -2195,7 +2196,7 @@ async function mountLookSeg() {
 }
 async function openPreview(ver) {
   if (ver) PV.ver = ver;
-  PV.publishId = null;
+  PV.publishId = null; PV.launchId = null;
   mountLookSeg();
   $("verSeg").style.display = "";
   syncStageChrome();
@@ -2203,8 +2204,14 @@ async function openPreview(ver) {
   localStorage.setItem("presence-previewed", "1");
   await loadPreview();
 }
+async function openLaunchPreview(launchId) {   // FD-T7: preview a staged launch
+  PV.launchId = launchId; PV.publishId = null; PV.template = "";
+  $("verSeg").style.display = "none";
+  openStage();
+  await loadPreview();
+}
 async function openPublishPreview(publishId) {
-  PV.publishId = publishId;
+  PV.publishId = publishId; PV.launchId = null;
   $("verSeg").style.display = "none";
   openStage();
   await loadPreview();
@@ -2230,7 +2237,7 @@ async function loadPreview() {
   const frame = $("previewFrame");
   frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Proofing your ${PV.publishId ? "kept version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
   try {
-    const q = (PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`) + (PV.template ? `&template=${encodeURIComponent(PV.template)}` : "");
+    const q = (PV.launchId ? `launch_id=${PV.launchId}&page=${encodeURIComponent(PV.page)}` : PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`) + (PV.template ? `&template=${encodeURIComponent(PV.template)}` : "");
     let html = await apiHtml(`/preview?${q}`);
     html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
     frame.srcdoc = html;
@@ -2375,7 +2382,50 @@ function showReceipt(firstPublish) {
 }
 
 /* ── history journal (identical /publishes + /restore-to-draft) ── */
+// FD-T7: Launches — stage a redesign as a named release, preview/approve, then go
+// live in one step (all through the existing publish pipeline). Live keeps running.
+async function renderLaunches() {
+  const box = $("launchBox"); if (!box) return;
+  let launches = [];
+  try { launches = (await api("GET", "/launches")).data || []; } catch (_) { box.innerHTML = ""; return; }
+  box.innerHTML = "";
+  const card = el("div", "field"); card.style.marginBottom = "18px";
+  card.appendChild(el("label", null, "Launches"));
+  card.appendChild(el("div", "hint", "Stage a redesign as a named launch, preview and approve it, then go live in one step. Your current site keeps running until you launch."));
+  const stage = el("button", null, "Stage a launch from your current draft"); stage.type = "button";
+  stage.style.cssText = "font:inherit;font-size:12.5px;margin:8px 0;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  stage.addEventListener("click", async () => {
+    const name = prompt("Name this launch (e.g. Spring refresh):", "");
+    if (name === null) return;
+    try { await api("POST", "/launches", { name }); toast("Launch staged — preview and approve it below"); renderLaunches(); }
+    catch (err) { toast(err.message, true); }
+  });
+  card.appendChild(stage);
+  const act = async (path, okmsg, body) => { try { await api("POST", path, body || {}); toast(okmsg); renderLaunches(); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } };
+  launches.filter((l) => l.status !== "canceled" && l.status !== "rolled_back").forEach((l) => {
+    const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
+    const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+    top.appendChild(Object.assign(el("strong", null, l.name), { style: "font-size:13.5px" }));
+    top.appendChild(Object.assign(el("span", null, l.status_label + (l.scheduled_for ? " · " + new Date(l.scheduled_for).toLocaleString() : "")), { style: "font-size:12px;color:var(--soft,#666)" }));
+    row.appendChild(top);
+    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
+    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
+    mk("Preview", () => openLaunchPreview(l.id));
+    if (l.status === "draft") mk("Approve", () => act(`/launches/${l.id}/decide`, "Approved", { decision: "approve" }), true);
+    if (l.status === "draft" || l.status === "approved") mk("Update from draft", () => act(`/launches/${l.id}/recapture`, "Refreshed from your current draft"));
+    if (l.status === "approved") {
+      mk("Launch now", () => { if (confirm("Launch “" + l.name + "”? This replaces your live site with the staged version.")) act(`/launches/${l.id}/promote`, "Launching — this usually takes under a minute"); }, true);
+      mk("Schedule", () => { const when = prompt("Launch at (ISO time, e.g. 2026-08-01T09:00):", ""); if (when) { const iso = new Date(when).toString() === "Invalid Date" ? null : new Date(when).toISOString(); if (iso) act(`/launches/${l.id}/schedule`, "Scheduled", { scheduled_for: iso }); else toast("Couldn’t read that time.", true); } });
+    }
+    if (l.status === "published") mk("Roll back", () => { if (confirm("Roll back “" + l.name + "” to the previous version?")) act(`/launches/${l.id}/rollback`, "Rolling back…"); });
+    if (l.status === "draft" || l.status === "approved" || l.status === "scheduled") mk("Cancel", () => act(`/launches/${l.id}/cancel`, "Canceled"));
+    row.appendChild(acts);
+    card.appendChild(row);
+  });
+  box.appendChild(card);
+}
 async function loadHistory() {
+  renderLaunches();   // FD-T7: staged launches sit above the version journal
   const list = $("pubList");
   list.innerHTML = `<div class="loadline"><div class="lq">Opening the journal…</div><div class="shimmer"></div></div>`;
   try {
@@ -2710,10 +2760,65 @@ function pillRow(host, label, opts, isOn, onPick) {
   wrapEl.appendChild(rowEl); host.appendChild(wrapEl);
   return rowEl;
 }
+// FD-T9: Brand Kit — one source of truth. Sets the site logo + brand colour +
+// type, PUTs /dev/brand-kit (server derives the SAME dev tokens), then the
+// granular Design Studio below fine-tunes. No second theme engine on the client.
+function normHexJs(x) { let h = String(x || "").trim().toLowerCase().replace(/^#/, ""); if (/^[0-9a-f]{3}$/.test(h)) h = h.replace(/(.)/g, "$1$1"); return /^[0-9a-f]{6}$/.test(h) ? "#" + h : null; }
+async function mountBrandKitCard() {
+  const host = $("designHost"); if (!host || $("brandKitCard")) return;
+  let kit = null;
+  try { kit = (await api("GET", "/dev/brand-kit")).data.brand_kit; } catch (_) { return; } // not owner/dev → no card
+  const T = DESIGN_TOKENS || {};
+  const st = {
+    logo_media_id: (kit && kit.logo_media_id) || (S.settings && S.settings.logo_media_id) || null,
+    primary: normHexJs((kit && kit.primary) || T.accent) || "#5b3fa0",
+    heading_font: (kit && kit.heading_font) || "", body_font: (kit && kit.body_font) || "", corner: (kit && kit.corner) || "",
+  };
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const card = el("div", "field"); card.id = "brandKitCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Brand kit"));
+  card.appendChild(el("div", "hint", "One brand, everywhere. Set your logo and colour once — buttons, links and forms follow. A coordinated starting point; fine-tune below."));
+  // logo
+  const logoRow = el("div"); logoRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:8px";
+  const logoWrap = el("span"); const paintLogo = () => { logoWrap.textContent = ""; if (st.logo_media_id) logoWrap.appendChild(mediaThumb(st.logo_media_id)); };
+  paintLogo();
+  const logoBtn = el("button", null, st.logo_media_id ? "Change logo" : "Choose logo"); logoBtn.type = "button"; logoBtn.style.cssText = miniBtn;
+  logoBtn.addEventListener("click", () => openPicker((id) => { st.logo_media_id = id || null; paintLogo(); logoBtn.textContent = id ? "Change logo" : "Choose logo"; }));
+  logoRow.append(logoWrap, logoBtn); card.appendChild(logoRow);
+  // brand colour
+  const colorRow = el("div"); colorRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:10px";
+  colorRow.appendChild(Object.assign(el("span", null, "Brand colour"), { style: "font-size:12px;font-weight:600" }));
+  const colorInput = el("input"); colorInput.type = "color"; colorInput.value = st.primary; colorInput.style.cssText = "width:44px;height:32px;border:1px solid var(--line,#ddd);border-radius:8px;background:none;cursor:pointer";
+  const hexInput = el("input"); hexInput.type = "text"; hexInput.value = st.primary; hexInput.style.cssText = "width:110px;padding:7px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
+  colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; st.primary = colorInput.value; });
+  hexInput.addEventListener("change", () => { const h = normHexJs(hexInput.value); if (h) { st.primary = h; colorInput.value = h; hexInput.value = h; } });
+  colorRow.append(colorInput, hexInput); card.appendChild(colorRow);
+  // type (reuse TYPE_PRESETS: a preset sets heading + body as raw stacks) + corners
+  const typeOpts = [{ key: "", name: "Keep current" }].concat(TYPE_PRESETS.filter((t) => t.key));
+  pillRow(card, "Headings & text", typeOpts, (t) => (t.key ? st.heading_font === (t.tokens && t.tokens.font_display) : !st.heading_font),
+    (t) => { st.heading_font = (t.tokens && t.tokens.font_display) || ""; st.body_font = (t.tokens && t.tokens.font_body) || ""; const c = $("brandKitCard"); if (c) c.remove(); mountBrandKitCard(); });
+  pillRow(card, "Corners", CORNER_OPTS, (o) => String(st.corner) === o[1], (o) => { st.corner = o[1]; });
+  // apply
+  const apply = el("button", null, "Build & apply brand kit"); apply.type = "button";
+  apply.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:14px;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  apply.addEventListener("click", async () => {
+    const brand_kit = { logo_media_id: st.logo_media_id, primary: st.primary, heading_font: st.heading_font || undefined, body_font: st.body_font || undefined, corner: st.corner };
+    try {
+      const r = await api("PUT", "/dev/brand-kit", { brand_kit });
+      DESIGN_TOKENS = (r.data && r.data.applied_tokens) || DESIGN_TOKENS;
+      if (st.logo_media_id) S.settings = { ...(S.settings || {}), logo_media_id: st.logo_media_id };
+      const c = $("designCard"); if (c) c.remove(); mountDesignCard();
+      toast("Brand kit applied — publish to take it live"); scheduleChangesRefresh(); refreshDesignPreview();
+    } catch (err) { toast(err.message, true); }
+  });
+  card.appendChild(apply);
+  host.appendChild(card);
+}
 async function mountDesignCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
   try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
   catch (_) { return; } // not an owner/developer on this site → no card
+  await mountBrandKitCard();   // FD-T9: brand kit is the source of truth, above the granular controls
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Design studio"));
   const T = DESIGN_TOKENS;

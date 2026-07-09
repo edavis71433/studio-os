@@ -19,10 +19,15 @@ import type { SiteRow } from '../lib/site.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function loadSnapshotFor(site: SiteRow, version: string, publishId: string | null):
+async function loadSnapshotFor(site: SiteRow, version: string, publishId: string | null, launchId: string | null):
   Promise<{ snapshot: Snapshot; mediaManifest: any[] } | { error: string; message: string; status: number } | null> {
   let snapId: string | null = null;
-  if (publishId && UUID_RE.test(publishId)) {
+  if (launchId && UUID_RE.test(launchId)) {
+    // FD-T7: preview a staged Launch through the SAME renderer (no new path)
+    const l = await svc(`presence_launches?id=eq.${launchId}&site_id=eq.${site.id}&select=snapshot_id&limit=1`);
+    snapId = l.json?.[0]?.snapshot_id ?? null;
+    if (!snapId) return { error: 'not_restorable', message: 'That launch is no longer available to view.', status: 410 };
+  } else if (publishId && UUID_RE.test(publishId)) {
     const p = await svc(`presence_publishes?id=eq.${publishId}&site_id=eq.${site.id}&select=snapshot_id&limit=1`);
     snapId = p.json?.[0]?.snapshot_id ?? null;
     if (!snapId) return { error: 'not_restorable', message: 'That version is no longer available to view.', status: 410 };
@@ -49,6 +54,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
   const page = url.searchParams.get('page') || '/';
   const version = url.searchParams.get('version') || 'draft';
   const publishId = url.searchParams.get('publish_id');
+  const launchId = url.searchParams.get('launch_id');
 
   const t = getTemplate(site.template_slug, site.template_version);
   if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
@@ -56,7 +62,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
   let snapshot: Snapshot, mediaManifest: any[];
   let blockers = 0, warnings = 0;
 
-  const loaded = await loadSnapshotFor(site, version, publishId);
+  const loaded = await loadSnapshotFor(site, version, publishId, launchId);
   if (loaded && 'error' in loaded) return json({ error: loaded.error, message: loaded.message }, loaded.status, cors);
   if (loaded) {
     ({ snapshot, mediaManifest } = loaded);

@@ -156,13 +156,15 @@ const COLS=[
   {key:'all',label:'All files',ic:'all',f:{}},
   {key:'fav',label:'Favorites',ic:'star',f:{},favs:true},
   {key:'photos',label:'Photos',ic:'photo',f:{},kind:'image'},
+  {key:'stock',label:'Stock Library',ic:'photo',stock:true},   // FD-T10: browse + import royalty-free photos
   {key:'brand',label:'Brand',ic:'brand',f:{brand:'true'}},
   {key:'documents',label:'Documents',ic:'doc',f:{},kind:'document'},
   {key:'templates',label:'Templates',ic:'tpl',f:{collection:'Templates'}},
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
-let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null};
+let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null,
+  stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
 function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
@@ -180,6 +182,7 @@ function qstr(){
   return p.toString();
 }
 async function load(){
+  if(S.col==='stock'){ if(S.stockState==null) return loadStock(); return renderStock(); }   // FD-T10: stock has its own surface
   const [a,col,h]=await Promise.all([api('GET','/assets?'+qstr()),api('GET','/assets/collections'),api('GET','/assets/health')]);
   if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>Files live in your full workspace.</h2><p>Your client view shows what you’ve chosen to share.</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
   let rows=(a.ok&&a.body.data&&a.body.data.assets)||[];
@@ -194,6 +197,46 @@ async function load(){
 }
 function buildCounts(collections){
   const m={};collections.forEach(c=>{m[c.name]=c.count;});return m;
+}
+// ── FD-T10: Stock Library — browse a royalty-free source, import into Files. The
+//    imported image becomes an ordinary asset (same storage/variants/publish). ──
+function railHtml(){
+  return COLS.map(c=>`<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}">${svg(IC[c.ic],'ic')}<span>${c.label}</span></button>`).join('');
+}
+function stockTile(im){
+  return `<figure class="tile" style="margin:0"><img src="${esc(im.thumb)}" alt="${esc(im.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block">`+
+    `<figcaption style="font-size:11px;color:#8a8172;padding:4px 2px 6px">${esc(im.credit||'')}</figcaption>`+
+    `<button class="btn" data-stock-add="${esc(im.id)}" data-alt="${esc(im.alt)}" data-credit="${esc(im.credit||'')}" style="width:100%">Add to my files</button></figure>`;
+}
+function renderStock(){
+  const grid = S.stockState==='unavailable'
+    ? `<div class="empty" style="grid-column:1/-1"><h2>The stock library isn’t turned on yet.</h2><p>Your studio can enable it. Once on, browse professional royalty-free photos and add them straight to your Files — hosted on your own site.</p></div>`
+    : S.stockState==='loading' ? `<div class="empty" style="grid-column:1/-1"><h2>Searching…</h2></div>`
+    : (S.stockResults||[]).length ? S.stockResults.map(stockTile).join('')
+    : `<div class="empty" style="grid-column:1/-1"><h2>${S.stockQ?'No photos match that search.':'Find a professional photo.'}</h2><p>Try “office”, “coffee”, “construction”, “salon”…</p></div>`;
+  const note = S.stockLicense ? `Royalty-free from ${esc(S.stockProvider)} · ${esc(S.stockLicense)} · added to your Files and hosted on your own site.` : 'Professional royalty-free photos, added straight to your Files.';
+  $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail">${railHtml()}</nav><div>
+    <div class="bar"><div class="search">${svg(IC.search)}<input id="sq" type="search" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div></div>
+    <p style="margin:2px 0 12px;color:#8a8172;font-size:12.5px">${note}</p>
+    <div class="grid">${grid}</div></div></div>`;
+  document.querySelectorAll('#rail .col').forEach(b=>b.addEventListener('click',()=>{S.col=b.dataset.col;load();}));
+  const sq=$('sq'); if(sq){ sq.focus(); sq.addEventListener('keydown',e=>{if(e.key==='Enter'){S.stockQ=sq.value.trim();loadStock();}}); }
+  document.querySelectorAll('[data-stock-add]').forEach(b=>b.addEventListener('click',()=>addStock(b.dataset.stockAdd,b.dataset.alt,b.dataset.credit,b)));
+}
+async function loadStock(){
+  S.stockState='loading'; renderStock();
+  const r=await api('GET','/stock/search?q='+encodeURIComponent(S.stockQ||'')+'&page=1');
+  if(r.status===503){S.stockState='unavailable';return renderStock();}
+  if(r.ok&&r.body.data){S.stockResults=r.body.data.images||[];S.stockProvider=r.body.data.provider||'';S.stockLicense=(r.body.data.license&&r.body.data.license.name)||'';}
+  else{S.stockResults=[];}
+  S.stockState='ok'; renderStock();
+}
+async function addStock(id,alt,credit,btn){
+  if(btn){btn.disabled=true;btn.textContent='Adding…';}
+  const r=await api('POST','/stock/import',{stock_id:id,alt_text:alt,credit:credit});
+  if(r.ok){toast('Added to your Files');if(btn){btn.textContent='Added ✓';}}
+  else if(r.status===503){toast('Stock library isn’t enabled yet');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
+  else{toast((r.body&&r.body.message)||'Could not add that photo');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
 }
 function sortRows(rows){
   const r=[...rows];

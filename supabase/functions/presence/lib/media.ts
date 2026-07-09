@@ -60,6 +60,25 @@ export async function createUpload(siteId: string, req: { mime: string; bytes: n
   return { media_id: row.json[0].id, upload_url: `${SB_URL}/storage/v1${j.url}`, storage_path: storagePath };
 }
 
+/** FD-T10: import already-fetched image bytes into this site's library — the SAME
+ *  pipeline (createUpload issues the row + signed URL; we PUT the bytes server-side
+ *  via the service role). Optionally tag a collection + provenance metadata. Once
+ *  here it's an ordinary asset (variants, usage, publish, tagging all unchanged).
+ *  Rolls the row back if the byte upload fails, so a failure leaves nothing dangling. */
+export async function importImage(siteId: string, bytes: Uint8Array, mime: string, alt: string, extra?: { width?: number; height?: number; collection?: string; metadata?: Record<string, unknown> }) {
+  const res = await createUpload(siteId, { mime, bytes: bytes.byteLength, alt_text: alt, width: extra?.width, height: extra?.height });
+  if ('error' in res) return res;
+  const put = await fetch(res.upload_url, { method: 'PUT', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': mime, 'x-upsert': 'true' }, body: bytes as unknown as BodyInit });
+  if (!put.ok) {
+    await svc(`presence_media?id=eq.${res.media_id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
+    return { error: 'upload_failed', message: 'That image couldn’t be imported — please try another.' };
+  }
+  if (extra?.collection || extra?.metadata) {
+    await svc(`presence_media?id=eq.${res.media_id}`, { method: 'PATCH', body: JSON.stringify({ ...(extra.collection ? { collection: extra.collection } : {}), ...(extra.metadata ? { metadata: extra.metadata } : {}) }) });
+  }
+  return { media_id: res.media_id, storage_path: res.storage_path };
+}
+
 /** Delete: refuse while referenced (names the blockers); soft-delete row + remove object. */
 export async function deleteMedia(siteId: string, mediaId: string) {
   const [off, posts] = await Promise.all([

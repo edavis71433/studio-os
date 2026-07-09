@@ -36,10 +36,10 @@ export function featureForRoute(route: string, method: string): EditionFeature |
 
   switch (top) {
     // ── Website / CMS — authoring, hosting, publishing, the site's own AI ──────
-    case 'publish': case 'restore': case 'publishes':
+    case 'publish': case 'restore': case 'publishes': case 'launches':
     case 'preview': case 'redirects': case 'search':
     case 'brand': case 'writer': case 'editor': case 'review':
-    case 'visual': case 'assets': case 'media':
+    case 'visual': case 'assets': case 'media': case 'stock':
     case 'offerings': case 'testimonials': case 'faqs': case 'posts':
       return 'website';
     case 'site':

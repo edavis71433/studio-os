@@ -26,6 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
+import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
@@ -34,7 +35,8 @@ import { handleCollection, handleLocation, handleVoice, handleSettings, handleBl
 import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
-import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut } from './routes/dev.ts';
+import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
+import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { resolveSiteRole } from './lib/workspace.ts';
@@ -234,7 +236,7 @@ serve(async (req) => {
   //    Publishing concepts don't exist for them — the platform never writes
   //    to a website it doesn't host. Everything else (profile, studio,
   //    coach, concierge) prepares guidance and stays available.
-  if (site.edition === 'monitor' && (route === '/publish' || route === '/restore') && method === 'POST') {
+  if (site.edition === 'monitor' && (route === '/publish' || route === '/restore' || route.startsWith('/launches')) && method === 'POST') {
     return json({ error: 'edition_monitor', message: 'Your website stays exactly where it is — this plan observes and guides, it never publishes. Upgrading adds hosting and publishing whenever you’re ready.' }, 403, cors);
   }
 
@@ -279,6 +281,22 @@ serve(async (req) => {
   if (route === '/publish' && method === 'POST') return handlePublish(site, principal, cors);
   if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
+  // ── FD-T7: Launches — named staged releases through the ONE pipeline ──
+  if (route === '/launches' && method === 'GET') return handleLaunchList(site, cors);
+  if (route === '/launches' && method === 'POST') return handleLaunchCreate(req, site, principal, cors);
+  {
+    const m = route.match(/^\/launches\/([0-9a-f-]{36})(\/recapture|\/decide|\/schedule|\/promote|\/rollback|\/cancel)?$/);
+    if (m) {
+      const lid = m[1], act = m[2];
+      if (!act && method === 'GET') return handleLaunchGet(site, lid, cors);
+      if (act === '/recapture' && method === 'POST') return handleLaunchRecapture(site, principal, lid, cors);
+      if (act === '/decide' && method === 'POST') return handleLaunchDecide(req, jwt, site, principal, lid, cors);
+      if (act === '/schedule' && method === 'POST') return handleLaunchSchedule(req, site, principal, lid, cors);
+      if (act === '/promote' && method === 'POST') return handleLaunchPromote(site, principal, lid, cors);
+      if (act === '/rollback' && method === 'POST') return handleLaunchRollback(site, principal, lid, cors);
+      if (act === '/cancel' && method === 'POST') return handleLaunchCancel(site, principal, lid, cors);
+    }
+  }
   {
     const m = route.match(/^\/publishes\/([0-9a-f-]{36})\/label$/);
     if (m && method === 'POST') return handleVersionLabel(req, site, principal, m[1], cors);   // Phase AA FD-7
@@ -289,6 +307,10 @@ serve(async (req) => {
     if (m && method === 'DELETE') return handleMediaDelete(site, principal, m[1], cors);
     if (m && method === 'PUT') return handleMediaUpdate(req, site, principal, m[1], cors);   // Phase O: edit alt text
   }
+
+  // ── FD-T10: Stock Library — browse a royalty-free source + import into Files ──
+  if (route === '/stock/search' && method === 'GET') return handleStockSearch(req, cors);
+  if (route === '/stock/import' && method === 'POST') return handleStockImport(req, site, principal, cors);
 
   // ── Phase DAM: the Studio Asset Library (lens + lifecycle over presence_media) ──
   if (route === '/assets' && method === 'GET') return handleAssetsList(req, site, cors);
@@ -356,6 +378,8 @@ serve(async (req) => {
   if (route === '/dev/files' && method === 'GET') return handleDevFiles(jwt, site, principal, cors);
   if (route === '/dev/customization' && method === 'GET') return handleDevCustomizationGet(jwt, site, principal, cors);
   if (route === '/dev/customization' && method === 'PUT') return handleDevCustomizationPut(req, jwt, site, principal, cors);
+  if (route === '/dev/brand-kit' && method === 'GET') return handleBrandKitGet(jwt, site, principal, cors);      // FD-T9
+  if (route === '/dev/brand-kit' && method === 'PUT') return handleBrandKitPut(req, jwt, site, principal, cors);  // FD-T9
 
   // ── Phase C: the Client Relationship Center (CRM) — aggregates existing
   //    signals into one calm per-client view + relationship notes. Audience is
