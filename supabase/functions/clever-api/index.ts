@@ -6173,6 +6173,62 @@ serve(async (req) => {
       }
     }
 
+    // ── Public audit checkout — the paid-audit tiers on buy-audit.html go
+    //    straight to Stripe. The PRICE is set HERE (server-side) per tier, so a
+    //    tampered browser can't change what's charged. Same Stripe pattern as
+    //    invoice_paylink above; no new payment engine.
+    if (type === 'public_audit_checkout') {
+      const STRIPE_SECRET = Deno.env.get('STRIPE_SECRET') || '';
+      const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+      if (!STRIPE_SECRET) return json({ error: 'stripe_not_configured', detail: 'Add the STRIPE_SECRET edge function secret first.' }, 200, reqCors);
+      // honeypot — a filled hidden "company" field means a bot; answer softly.
+      if (String(body.company || '').trim()) return json({ error: 'invalid', detail: 'Please try again.' }, 200, reqCors);
+      const AUDIT_TIERS: Record<string, { cents: number; label: string }> = {
+        starter:     { cents: 9900,  label: 'Starter Audit' },
+        health:      { cents: 49900, label: 'Digital Health Check' },
+        competitive: { cents: 89900, label: 'Competitive Intelligence' },
+      };
+      const t = AUDIT_TIERS[String(body.tier || '').toLowerCase()];
+      if (!t) return json({ error: 'bad_tier', detail: 'Please choose an audit tier.' }, 200, reqCors);
+      const name = String(body.name || '').trim().slice(0, 120);
+      const email = String(body.email || '').trim().slice(0, 200);
+      const website = String(body.website || '').trim().slice(0, 300);
+      const notes = String(body.notes || '').trim().slice(0, 1000);
+      if (!name) return json({ error: 'name_required', detail: 'Please add your name or business name.' }, 200, reqCors);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'bad_email', detail: 'Please add a valid email — your audit is delivered there.' }, 200, reqCors);
+      const stripeReq = async (path: string, params: Record<string, string>) => {
+        const r = await fetch(`https://api.stripe.com/v1/${path}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(params).toString(),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error((j && j.error && j.error.message) || `stripe ${r.status}`);
+        return j;
+      };
+      try {
+        const params: Record<string, string> = {
+          'mode': 'payment',
+          'line_items[0][price_data][currency]': 'usd',
+          'line_items[0][price_data][product_data][name]': `Davis Digital Studio — ${t.label}`,
+          'line_items[0][price_data][unit_amount]': String(t.cents),
+          'line_items[0][quantity]': '1',
+          'customer_email': email,
+          'success_url': `${SITE_URL}/payment-success.html`,
+          'cancel_url': `${SITE_URL}/buy-audit.html?tier=${encodeURIComponent(String(body.tier).toLowerCase())}`,
+          'metadata[kind]': 'audit',
+          'metadata[tier]': String(body.tier).toLowerCase(),
+          'metadata[name]': name,
+          'metadata[website]': website,
+          'metadata[notes]': notes,
+        };
+        const session = await stripeReq('checkout/sessions', params);
+        return json({ ok: true, url: session.url }, 200, reqCors);
+      } catch (e) {
+        return json({ error: 'stripe_error', detail: String((e as Error).message || e) }, 200, reqCors);
+      }
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  ROUTE: reasoning_query — THE QUERYABLE BRAIN
     //  The single interface every module uses to ask the intelligence layer a

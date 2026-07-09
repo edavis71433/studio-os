@@ -96,7 +96,6 @@
   </div>
 <script>
 var FN = "https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api";
-var ANON = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE"; // same anon key the portal uses
 
 // Tier catalog for DISPLAY only — the SERVER sets the real price. Changing a
 // number or line here does NOT change what someone is charged; it only changes
@@ -180,7 +179,7 @@ async function startCheckout() {
   try {
     var r = await fetch(FN, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ANON },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "public_audit_checkout",
         tier: TIER,
