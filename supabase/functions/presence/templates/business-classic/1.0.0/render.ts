@@ -9,6 +9,7 @@
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
+import { renderSiteBlocks, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
@@ -132,7 +133,8 @@ footer.site h2{font-size:1.1rem}
 .credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:.88rem;color:#9aa5a0;display:flex;gap:14px;flex-wrap:wrap}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
-@media (max-width:640px){.hero{padding:52px 0 36px}.block{padding:40px 0}}`;
+@media (max-width:640px){.hero{padding:52px 0 36px}.block{padding:40px 0}}
+${BLOCK_CSS}`;
 
 const CRITICAL = `:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--accent:#23635a;--line:#e2e4e1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.15;letter-spacing:-.015em}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1000px;margin:0 auto;padding:0 22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:#5b6572;font-weight:600}.hero{padding:72px 0 48px}`;
 
@@ -288,15 +290,18 @@ ${o.body}
 // ═════════ page bodies ═════════
 
 // Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
+// Phase T-BLOCKS: enabled structured blocks (block_<type>) join the same order/
+// visibility machinery — they default after the core sections, reorderable/hideable.
 const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
-function homeSectionOrder(c: SnapshotContent): string[] {
+function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[] {
+  const all = [...HOME_SECTIONS, ...blockKeys];
   const hidden = new Set(c.settings?.sections?.hidden || []);
-  const chosen = (c.settings?.sections?.order || []).filter((k) => HOME_SECTIONS.includes(k));
-  const rest = HOME_SECTIONS.filter((k) => !chosen.includes(k));
+  const chosen = (c.settings?.sections?.order || []).filter((k) => all.includes(k));
+  const rest = all.filter((k) => !chosen.includes(k));
   return [...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
-function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>): string {
+function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>, blocks: RenderedBlock[] = []): string {
   const i = c.identity;
   const hero = bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || c.settings?.logo || null;
   const featured = bySort(c.offerings).slice(0, 6);
@@ -345,7 +350,8 @@ ${(() => {
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
   };
-  return homeSectionOrder(c).map((k) => parts[k]).join('');
+  for (const b of blocks) parts[b.key] = b.html;   // Phase T-BLOCKS: enabled structured blocks
+  return homeSectionOrder(c, blocks.map((b) => b.key)).map((k) => parts[k] || '').join('');
 })()}`;
 }
 
@@ -465,8 +471,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     files[file] = html;
   };
 
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref });   // Phase T-BLOCKS
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
-  page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site)], ogImage: ogImg, active: 'home', body: homeBody(c, site, v) });
+  page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
   page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });
   if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
   page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });

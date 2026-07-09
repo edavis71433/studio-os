@@ -62,6 +62,10 @@ export interface SnapshotContent {
     pages_noindex?: string[];
     /** Phase SD: per-page search headline/description overrides, keyed by page. */
     page_seo?: Record<string, { title?: string; description?: string }>;
+    /** Phase T-BLOCKS: optional structured content blocks the owner turned on and
+     *  filled (validated + capped at serialize time). Rendered deterministically as
+     *  home sections; each carries its own schema.org + a11y. Never free-form HTML. */
+    blocks?: SiteBlock[];
   };
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
@@ -96,6 +100,22 @@ export function snapshotContentUsable(c: any): boolean {
   return !!(c && typeof c === 'object' && c.identity && typeof c.identity === 'object'
     && typeof c.identity.business_name === 'string' && c.identity.business_name.trim());
 }
+
+// ── Phase T-BLOCKS: structured content blocks (data only; logic in lib/site_blocks.ts) ──
+// Each block is a chosen-and-filled entry from the site_components catalog. Text-only
+// in v1 (no media plumbing), typed + capped, so the render stays deterministic.
+export interface SiteBlockFeatures { type: 'features'; title?: string; items: Array<{ title: string; text?: string }> }
+export interface SiteBlockStats { type: 'stats'; title?: string; items: Array<{ value: string; label: string }> }
+export interface SiteBlockTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string }> }
+export interface SiteBlockProcess { type: 'process'; title?: string; steps: Array<{ step: string; detail?: string }> }
+export interface SiteBlockPricing { type: 'pricing'; title?: string; tiers: Array<{ name: string; price_text?: string; features: string[] }> }
+export interface SiteBlockCertifications { type: 'certifications'; title?: string; items: Array<{ name: string; issuer?: string }> }
+export interface SiteBlockServiceAreas { type: 'service_areas'; title?: string; areas: string[] }
+export interface SiteBlockCtaBanner { type: 'cta'; text: string; button?: string; url?: string }
+export type SiteBlock =
+  | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
+  | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner;
+export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */
 export interface MediaRef {

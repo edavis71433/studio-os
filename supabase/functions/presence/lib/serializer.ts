@@ -9,6 +9,7 @@
 import { svc } from './db.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
+import { validateBlocks } from './site_blocks.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -102,9 +103,11 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       hero_layout: String(settings.hero_layout || ''),
       nav_style: String(settings.nav_style || ''),
       sections: {
-        hidden: Array.isArray(settings.sections_hidden) ? settings.sections_hidden.map(String).slice(0, 12) : [],
-        order: Array.isArray(settings.sections_order) ? settings.sections_order.map(String).slice(0, 12) : [],
+        hidden: Array.isArray(settings.sections_hidden) ? settings.sections_hidden.map(String).slice(0, 24) : [],
+        order: Array.isArray(settings.sections_order) ? settings.sections_order.map(String).slice(0, 24) : [],
       },
+      // Phase T-BLOCKS: validated + capped structured blocks (authoritative boundary).
+      blocks: validateBlocks(settings.blocks),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],
