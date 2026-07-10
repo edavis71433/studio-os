@@ -722,6 +722,19 @@ function restart() {
 
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+
+// A11y: the quiz options are click-only <div>s. Make every .opt keyboard-operable
+// (role=button, focusable, Enter/Space activates) without editing each one.
+(function(){
+  function enable(){
+    document.querySelectorAll('.opt').forEach(function(o){
+      if(o.getAttribute('data-kb')) return; o.setAttribute('data-kb','1');
+      o.setAttribute('role','button'); if(!o.hasAttribute('tabindex')) o.setAttribute('tabindex','0');
+      o.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); o.click(); } });
+    });
+  }
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', enable); else enable();
+})();
 </script>
 
 

@@ -382,8 +382,10 @@ body{}
     <div class="q-num">Question 6 of 6</div>
     <h2>Last one, what's your business name and city?</h2>
     <p>So I can personalize your results. No spam, ever.</p>
-    <input type="text" class="text-input" id="q6_name" placeholder="Business name (e.g. your business)" oninput="checkQ6()">
-    <input type="text" class="text-input" id="q6_city" placeholder="City (e.g. Los Angeles, CA)" oninput="checkQ6()" style="margin-top:10px;">
+    <label for="q6_name" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Business name</label>
+    <input type="text" class="text-input" id="q6_name" placeholder="Business name (e.g. your business)" aria-label="Business name" oninput="checkQ6()">
+    <label for="q6_city" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">City</label>
+    <input type="text" class="text-input" id="q6_city" placeholder="City (e.g. Los Angeles, CA)" aria-label="City" oninput="checkQ6()" style="margin-top:10px;">
     <div class="nav-btns">
       <button class="back-btn" onclick="prevStep(6)">Back</button>
       <button class="next-btn" id="q6next" onclick="showResults()" disabled>See my score</button>
@@ -774,6 +776,18 @@ function restart() {
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+
+// A11y: make the click-only .opt <div>s keyboard-operable (Enter/Space activates).
+(function(){
+  function enable(){
+    document.querySelectorAll('.opt').forEach(function(o){
+      if(o.getAttribute('data-kb')) return; o.setAttribute('data-kb','1');
+      o.setAttribute('role','button'); if(!o.hasAttribute('tabindex')) o.setAttribute('tabindex','0');
+      o.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); o.click(); } });
+    });
+  }
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', enable); else enable();
+})();
 </script>
 
 
