@@ -59,6 +59,13 @@ async function dealEvent(siteId: string, dealId: string, kind: string, principal
     body: JSON.stringify({ deal_id: dealId, site_id: siteId, kind, actor, actor_kind, ...extra }) }).catch(() => {});
 }
 
+/** R1: auto-advance the deal stage AND record the stage_change (pipeline history
+ *  no longer jumps silently). Guarded to `from` stages; only emits when a row moved. */
+async function advanceStage(siteId: string, dealId: string, to: Stage, from: Stage[], principal: Principal) {
+  const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&stage=in.(${from.join(',')})&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: to }) }).catch(() => ({ json: [] } as any));
+  if (rows(up)[0]) await dealEvent(siteId, dealId, 'stage_change', principal, { to_stage: to }); // only when a row actually moved
+}
+
 // ═══ CONTACTS ═══
 export async function handleSalesContacts(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
@@ -121,7 +128,7 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     const ins = await svc('presence_deals', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ site_id: site.id, contact_id: contactId, title, stage: 'lead',
         source: clean(b.source, 40) || (srcSub ? 'website_form' : 'manual'), source_submission_id: srcSub,
-        expected_value_cents: Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0),
+        expected_value_cents: Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0)), // R6: bounded like line items
         expected_close: closeDate || null, notes: clean(b.notes, 2000) }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
     const deal = rows(ins)[0];
@@ -154,7 +161,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     const patch: Record<string, unknown> = {};
     if (b.title !== undefined) patch.title = clean(b.title, 200);
     if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
-    if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0);
+    if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0));
     if (b.expected_close !== undefined) { const cd = b.expected_close ? clean(b.expected_close, 10) : ''; if (cd && !DATE_RE.test(cd)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors); patch.expected_close = cd || null; }
     if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
@@ -215,8 +222,8 @@ export async function handleSalesProposalSend(req: Request, site: SiteRow, princ
   const token = secret ? await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret) : null;
   const url = token ? `${fnBase()}/functions/v1/presence/sales/p/${token}` : null;
   await dealEvent(site.id, p.deal_id, 'proposal_sent', principal, { detail: { proposal_id: id } });
-  // move the deal to 'proposal' if it's earlier (best-effort, guarded)
-  await svc(`presence_deals?id=eq.${p.deal_id}&site_id=eq.${site.id}&stage=in.(lead,qualified)`, { method: 'PATCH', body: JSON.stringify({ stage: 'proposal' }) }).catch(() => {});
+  // move the deal to 'proposal' if it's earlier (guarded; records the stage change)
+  await advanceStage(site.id, p.deal_id, 'proposal', ['lead', 'qualified'], principal);
   return json({ data: rows(up)[0], url }, 200, cors);
 }
 
@@ -241,7 +248,7 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'proposal-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'proposal-decide' } as Principal;
   await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision } });
-  if (decision === 'accepted') await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&stage=in.(lead,qualified,proposal)`, { method: 'PATCH', body: JSON.stringify({ stage: 'contract' }) }).catch(() => {});
+  if (decision === 'accepted') await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
   return json({ data: { status: decision } }, 200, cors);
 }
 
@@ -297,14 +304,14 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const signerName = clean(b.signer_name, 120);
   const signerEmail = clean(b.signer_email, 160).toLowerCase();
   if (!signerName) return json({ error: 'validation', message: 'Please type your name to sign.' }, 422, cors);
-  const evidence = { hash: c.content_hash, at: nowIso(), token_exp: tok.exp };
+  const evidence = { hash: c.content_hash, at: nowIso(), token_exp: tok.exp, ip_hash: await hmacHex(secret, clientIp(req)) }; // R3: hashed signer IP for legal signing evidence
   const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&content_hash=eq.${c.content_hash}&select=deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: nowIso(), signed_evidence: evidence }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'This agreement changed — reload and sign again.' }, 409, cors); // hash guard in WHERE = version integrity
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
-  await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&stage=in.(lead,qualified,proposal)`, { method: 'PATCH', body: JSON.stringify({ stage: 'contract' }) }).catch(() => {});
+  await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
   return json({ data: { status: 'signed' } }, 200, cors);
 }
 

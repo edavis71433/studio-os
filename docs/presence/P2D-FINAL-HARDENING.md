@@ -58,11 +58,11 @@ Function deployed **staging + prod**. Migration `0079` applied to **staging**; *
 - Data is disposable.
 
 ## Roadmap items closed (from `P2D-DEEP-AUDIT.md`)
-✅ §A architecture disconnect (bridge + handoff + UI trigger) · ✅ multi-client visibility · ✅ §B B1–B6 · ✅ §D D1–D3 · ✅ §C orphaned client UI (client.html), notifications↔Inbox/bell unification. **Still open (lower value, queued):** §C "Messages" label disambiguation across leads/CRM/project; §E refinements R1 (auto-advance stage events), R3 (`ip_hash`), R4/R5 (event-log fidelity on later visibility flips + field edits), R6 (`expected_value_cents` cap), R7 (handoff lost-claim 409).
+✅ §A architecture disconnect (bridge + handoff + UI trigger) · ✅ multi-client visibility · ✅ §B B1–B6 · ✅ §D D1–D3 · ✅ §C orphaned client UI (client.html), notifications↔Inbox/bell unification, "Messages" label disambiguation (leads → "Website enquiries") · ✅ §E R1 (auto-advance stage events via `advanceStage`), R3 (`ip_hash` in signing evidence), R6 (`expected_value_cents` cap), R7 (handoff lost-claim now 409 via `ensureProjectForDeal`). ✅ **Studio support-triage + survey-review UI** added to `projects.html`. **Still open (lowest value, queued):** §E R4/R5 (event-log fidelity on later visibility flips + a few field edits — cosmetic activity-feed completeness).
 
 ## Remaining before P2-E
 1. **Owner applies migrations `0075`–`0079` to prod** (routes dormant until then).
-2. **Phase 6 Gold Master** human QA of the surfaces (`client.html`, `projects.html`, `inbox.html`, `pipeline.html`) + the Studio support-triage / survey-review UI (APIs complete).
-3. §C/§E queued refinements — as capacity allows.
+2. **Phase 6 Gold Master** human browser/mobile/keyboard/screen-reader QA of the surfaces (`client.html`, `projects.html`, `inbox.html`, `pipeline.html`, `leads.html`).
+3. §E R4/R5 event-log fidelity — as capacity allows (non-blocking).
 
 Do not begin P2-E without explicit approval.

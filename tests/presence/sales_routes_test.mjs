@@ -65,6 +65,10 @@ ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan 
   ok('refine: expected_close is date-validated (422, not a 502)', /DATE_RE\.test\(closeDate\)/.test(sales) && /DATE_RE = \//.test(sales));
   ok('refine: convert edition is selectable (whitelist, default presence)', /pickPlan\(cb\.plan\)/.test(sales) && /CONVERT_PLANS = new Set/.test(sales));
   ok('refine: pipeline shows ONLY valid next stages (bounded transitions mirror)', /const NEXT=\{lead:\['qualified','lost'\]/.test(pipe));
+  // deep-audit refinements
+  ok('R1: auto-advanced stages record a stage_change event (advanceStage, only when a row moved)', /async function advanceStage/.test(sales) && /if \(rows\(up\)\[0\]\) await dealEvent\(siteId, dealId, 'stage_change'/.test(sales) && (sales.match(/advanceStage\(/g) || []).length >= 4);
+  ok('R3: contract signing evidence captures a hashed signer IP (ip_hash)', /ip_hash: await hmacHex\(secret, clientIp\(req\)\)/.test(sales));
+  ok('R6: expected_value_cents is bounded (min 0, max 1_000_000_00) like line items', (sales.match(/Math\.min\(1_000_000_00, Math\.max\(0, Math\.trunc\(Number\(b\.expected_value_cents\)\)/g) || []).length >= 2);
 }
 
 // ── convert reuses the ONE provisioning path (no second provisioner) ──

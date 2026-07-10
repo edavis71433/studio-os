@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Messages — Studio OS</title>
+<title>Website enquiries — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Messages people sent through your website — in one place.">
 <style>
@@ -72,8 +72,8 @@ const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 function render(){
   const unread=ALL.filter(l=>l.status==='new').length;
   const rows=ALL.filter(l=>FILTER==='open'?l.status!=='archived':FILTER==='new'?l.status==='new':true);
-  let h=`<div class="rolebadge">● Messages</div>
-    <header><h1>Messages</h1><p class="sub">${unread?unread+' new · ':''}Everyone who reached out through your website.</p></header>
+  let h=`<div class="rolebadge">● Website enquiries</div>
+    <header><h1>Website enquiries</h1><p class="sub">${unread?unread+' new · ':''}Everyone who reached out through your website.</p></header>
     <div class="filters">
       <button data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
       <button data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
