@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
 <meta name="theme-color" content="#5b3fa0">
-<meta property="og:title" content="Website ROI Calculator. Davis Digital Studio">
+<meta property="og:title" content="Website ROI Calculator — Davis Digital Studio">
 <meta property="og:description" content="Find out how much a better website could be worth to your business. Free, instant, no signup.">
 <meta property="og:locale" content="en_US">
 <meta property="og:type" content="website">
@@ -114,7 +114,7 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
 @media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
 </style>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebApplication","name":"Website ROI Calculator","url":"https://davisdigitalstudio.com/roi-calculator","applicationCategory":"BusinessApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Calculate how much a better website could be worth to your small business. Free and instant.","provider":{"@type":"Person","name":"Eric Davis","url":"https://davisdigitalstudio.com"}}
+{"@context":"https://schema.org","@type":"WebApplication","name":"Website ROI Calculator","url":"https://davisdigitalstudio.com/roi-calculator","applicationCategory":"BusinessApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Calculate how much a better website could be worth to your small business. Free and instant.","provider":{"@type":"ProfessionalService","name":"Davis Digital Studio","legalName":"Davis Digital Studio LLC","url":"https://davisdigitalstudio.com/","founder":{"@type":"Person","name":"Eric Davis"}}}
 </script>
 <link rel="stylesheet" href="/enhance.css">
 </head>
@@ -135,7 +135,7 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
         <a href="services.html">All services<small>Pricing and the full picture</small></a>
         <a href="web-design.html">Web design<small>Strategy-led sites that convert</small></a>
         <a href="seo-strategy.html">SEO strategy<small>Get found by people searching</small></a>
-        <a href="monthly-retainer.html">Ongoing care<small>Keep your site working after launch</small></a>
+        <a href="monthly-retainer.html">Growth Partnership<small>Keep your site working after launch</small></a>
       </span></span>
     <a href="industries.html">Industries</a>
     <a href="about.html">About</a>
@@ -154,7 +154,7 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
     <div>
       <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; ROI Calculator</div>
       <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">What's a better website <em style="color:var(--p);font-style:italic;">worth to you?</em></h1>
-      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Adjust the sliders to see the potential return on a web design investment based on your actual business numbers.</p>
+      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Most small businesses have no idea what an underperforming website is quietly costing them in lost customers. Adjust the sliders to see, in your own numbers, what a better one could actually be worth.</p>
     </div>
     <div style="background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);" aria-hidden="true">
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:18px;">Example</div>
@@ -237,6 +237,29 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
     </div>
   </div>
 
+  <!-- Lead capture (Master Plan §14): instant value is shown above with nothing
+       asked; this is one optional, benefit-framed email step that routes the
+       visitor's numbers + email into the CRM as a qualified lead, with the same
+       clever-api lead_intake + Formspree fallback used site-wide. -->
+  <div class="calc-card" id="leadCard" style="border:1px solid rgba(91,63,160,0.18)">
+    <form id="leadForm" onsubmit="return submitLead(event,'roi_calculator','ROI Calculator')" novalidate>
+      <h2 style="font-family:var(--serif);font-weight:400;font-size:22px;margin-bottom:8px;">Want this sent to you &mdash; with the fixes that move it most?</h2>
+      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:18px;">Drop your email and I'll personally send this breakdown, plus the two or three changes most likely to move your number. No spam, no obligation &mdash; just a useful, honest read.</p>
+      <label class="label" for="leadEmail">Email address</label>
+      <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+      <label class="label" for="leadBiz">Business name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input id="leadBiz" type="text" autocomplete="organization" placeholder="Your business" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+      <div id="leadError" role="alert" style="display:none;color:#c0392b;font-size:13px;margin-bottom:12px;"></div>
+      <button type="submit" class="btn btn-primary" id="leadSubmit">Send it to me &rarr;</button>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:12px;">I reply personally, usually within one business day. Your email is only used to send this and follow up &mdash; never sold, never spammed.</p>
+    </form>
+    <div id="leadThanks" style="display:none;" role="status">
+      <h2 id="leadThanksHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:22px;margin-bottom:8px;">On its way &mdash; thank you.</h2>
+      <p style="font-size:15px;color:var(--muted);line-height:1.6;">I've got your numbers. I'll follow up personally, usually within one business day, with your breakdown and the highest-impact next steps for your site.</p>
+      <p style="font-size:15px;margin-top:14px;"><a href="contact.html" style="color:var(--p);">Prefer to talk now? Book a free call &rarr;</a></p>
+    </div>
+  </div>
+
   <div class="assumptions">
     <h2>How this is calculated</h2>
     <ul>
@@ -310,9 +333,9 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
 <div class="wrap">
   <div class="fwrap">
     <div>
-      <div class="brand serif">Davis Digital Studio</div>
+      <div class="brand serif">Davis Digital Studio LLC</div>
       <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
-      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.4)">Los Angeles &middot; working with businesses nationwide</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.55)">Burbank, California &middot; working with businesses nationwide</p>
     </div>
     <div class="fcol">
       <p class="fcol-h">Studio</p>
@@ -331,7 +354,7 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
     </div>
   </div>
   <div class="fbase">
-    <span>&copy; 2026 Davis Digital Studio &middot; Eric Davis</span>
+    <span>&copy; 2026 Davis Digital Studio LLC &middot; Eric Davis</span>
     <span style="display:flex;gap:18px">
       <a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="accessibility.html">Accessibility</a>
     </span>
@@ -386,6 +409,51 @@ function calc(){
   if(typeof gtag==='function'){
     gtag('event','roi_calculator_used',{event_category:'engagement',event_label:label,value:Math.round(annualGain)});
   }
+}
+
+// ── Lead capture → CRM (existing architecture: clever-api lead_intake +
+//    Formspree fallback, same as contact.html). anon key is public by design. ──
+var SB_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+var LEAD_FORMSPREE="https://formspree.io/f/mvznevlo";
+function getLeadSummary(){
+  return 'ROI Calculator — Monthly revenue '+document.getElementById('revenue-val').textContent
+    +'; % from online '+document.getElementById('web-pct-val').textContent
+    +'; expected improvement '+document.getElementById('improvement-val').textContent
+    +'; investment '+document.getElementById('package-val').textContent
+    +'. Result: +'+document.getElementById('res-monthly').textContent+'/mo, +'+document.getElementById('res-annual').textContent+'/yr, '
+    +document.getElementById('res-roi').textContent+' first-year ROI, '+document.getElementById('res-payback').textContent+'.';
+}
+function submitLead(ev, source, toolName){
+  ev.preventDefault();
+  var email=(document.getElementById('leadEmail').value||'').trim();
+  var biz=(document.getElementById('leadBiz').value||'').trim();
+  var err=document.getElementById('leadError');
+  var btn=document.getElementById('leadSubmit');
+  err.style.display='none';
+  if(!email||email.indexOf('@')===-1){ err.textContent='Please enter a valid email so I can send this to you.'; err.style.display='block'; return false; }
+  var summary=(typeof getLeadSummary==='function')?getLeadSummary():'';
+  var original=btn.innerHTML; btn.disabled=true; btn.textContent='Sending…';
+  function done(){
+    document.getElementById('leadForm').style.display='none';
+    var t=document.getElementById('leadThanks'); t.style.display='block';
+    var h=document.getElementById('leadThanksHeading'); if(h){ try{ h.focus(); }catch(e){} }
+    if(typeof gtag==='function'){ gtag('event','generate_lead',{event_category:'lead',event_label:source}); }
+  }
+  fetch(SB_URL+"/functions/v1/clever-api",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY},
+    body:JSON.stringify({type:"lead_intake",source:source,name:(biz||email),email:email,subject:"New Website Enquiry — "+toolName+(biz?" ("+biz+")":""),message:summary})
+  })
+  .then(function(r){ return r.json().catch(function(){return{};}).then(function(j){return{ok:r.ok,j:j};}); })
+  .then(function(res){ if(res.ok&&res.j&&res.j.ok){ done(); } else { throw new Error('crm'); } })
+  .catch(function(){
+    fetch(LEAD_FORMSPREE,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({_subject:'New Website Enquiry — '+toolName+(biz?' ('+biz+')':''),_replyto:email,email:email,business:biz||'Not provided',message:summary,source:source})})
+    .then(function(r){ if(r.ok){done();} else {throw new Error('fs');} })
+    .catch(function(){ btn.disabled=false; btn.innerHTML=original; err.innerHTML='Something went wrong sending that &mdash; please try again, or email me at <a href="mailto:eric@davisdigitalstudio.com" style="color:#c0392b;text-decoration:underline">eric@davisdigitalstudio.com</a>.'; err.style.display='block'; });
+  });
+  return false;
 }
 
 (function(){
