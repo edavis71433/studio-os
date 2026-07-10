@@ -511,6 +511,7 @@ const PUBLIC_ROUTES = new Set([
   'gsc_ingest',                  // self-gated inside: staff JWT or scheduler secret
   'quote_view',                  // client-facing quote page; gated by a 36-hex CSPRNG token in the link
   '_resolver_probe',             // additive: read-only echo of the caller's own resolved principal (pipeline seam verification)
+  'public_audit_checkout',       // AUD-1: anonymous visitor buys a paid audit (buy-audit.html); price set server-side + honeypot + email/tier validation inside the handler
 ]);
 
 // ── NOTIFY RELAY ALLOWLIST (closes the catch-all bypass) ──
