@@ -31,7 +31,7 @@ Davis Digital Studio speaks as **one person: Eric.** First-person singular ("I d
   - **Growth Partnership** (the ongoing relationship — *never* "Ongoing care", "ongoing partnership", "monthly retainer", or "maintenance")
   - **Services** (the hub — *never* "Solutions" as the page title/label)
 - **The relationship:** "you work directly with me," "from the first call onward," "I stay on," "one person, paying attention."
-- **The experience/portal (benefit words):** "one organized place," "your private space," "always know where things stand," "track progress," "approve work," "see invoices," "find your files," "get reports in plain English," "just ask."
+- **The experience/portal (benefit words):** "one organized place," **"your project workspace"** (the canonical name for the client space — use this exact phrase everywhere; *never* "your private space," "client portal," or "dashboard"), "always know where things stand," "track progress," "approve work," "see invoices," "find your files," "get reports in plain English," "just ask."
 - **Proof words (once earned):** the real credential, the real result, the real testimonial. Specific numbers only when true and permissioned.
 
 ## 5. Words to avoid
@@ -63,7 +63,7 @@ Davis Digital Studio speaks as **one person: Eric.** First-person singular ("I d
 - **Frame:** a benefit of working with Eric — *"one organized place to see everything."* Describe **what the client can do and feel**, never how it's built.
 - **Say:** "Track your project. Approve work. See invoices. Find your files. Get reports in plain English. Request changes — you just ask. Everything in one calm, private space, included with every project."
 - **Never say:** "our platform," "our software," "CMS," "portal product," "login system we built," "dashboard you get access to as a subscription," or explain the technology.
-- **Prefer:** "your private space" / "one organized place" over the label "Client Portal" as a product name.
+- **Prefer:** **"your project workspace"** (canonical) / "one organized place" over the label "Client Portal" as a product name. Do not use "your private space" — superseded on 2026-07-10 by "your project workspace" for a stronger, more descriptive noun.
 - Show it with tasteful, real screenshots framed as *"this is what you see when you log in."*
 
 ## 9. How to describe AI

@@ -17,7 +17,7 @@
 - *Studio*: How we work · Services · Industries · Results · About
 - *Free tools*: **Free site review** (→ audit) · **Free tools** (→ tools hub) — two distinct labels, never both "Free tools".
 - *Company*: Contact · Privacy · Terms · Accessibility
-- One canonical NAP (resolve Burbank vs Los Angeles) + real social `sameAs` links.
+- One canonical NAP — **RESOLVED 2026-07-10: the studio's location is "Burbank, California"** everywhere (it is the real registered LLC address; NAP must match citations/GBP). "Los Angeles" survives only as an *areaServed* market, never as the studio's location; "nationwide" is the served reach. Apply on every page + all JSON-LD. Plus real social `sameAs` links.
 
 **Fence rule:** no public marketing page may link into `help.html`, `pricing.html`, `signup.html`, or `studio-os-demo.html` (all `noindex`, all part of the platform-behind-the-curtain surface).
 
