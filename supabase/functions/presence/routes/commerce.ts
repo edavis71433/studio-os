@@ -20,7 +20,7 @@ import { resolveSite } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import {
   PLANS, planByKey, isPlanKey, isTerm, displayPrice, priceCents, grantFounder,
-  stripeInterval, editionFor, evaluateChange, FOUNDERS_OPEN,
+  stripeInterval, editionFor, FOUNDERS_OPEN,
 } from '../commerce/catalog.ts';
 import type { PlanKey, Term } from '../commerce/catalog.ts';
 import { supportFor } from '../commerce/support.ts';
