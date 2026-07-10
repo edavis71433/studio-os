@@ -26,6 +26,7 @@ export interface EntitlementView {
   trial_ends_at?: string | null;
   stripe_subscription_id?: string | null;
   updated_at?: string | null;
+  grace_until?: string | null;          // L4: past-due grace anchor; enforced when it passes
 }
 
 export const WIND_DOWN_DAYS = 60;       // the written policy: site stays live this long after lapse
@@ -115,11 +116,11 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
 }
 
 // ── the impure runner (called from /system/run) ──────────────────────────────
-export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: number; notices: number; emails: number; wound_down: number }> {
+export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: number; notices: number; emails: number; wound_down: number; grace_lapsed: number }> {
   const nowIso = new Date().toISOString();
-  let expired = 0, notices = 0, emails = 0, wound_down = 0;
+  let expired = 0, notices = 0, emails = 0, wound_down = 0, grace_lapsed = 0;
 
-  const ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=client_id,status,trial_ends_at,stripe_subscription_id,updated_at&limit=${limit * 4}`);
+  const ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=client_id,status,trial_ends_at,stripe_subscription_id,updated_at,grace_until&limit=${limit * 4}`);
   const rows: EntitlementView[] = Array.isArray(ents.json) ? ents.json : [];
 
   for (const e of rows.slice(0, limit * 4)) {
@@ -129,6 +130,17 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
         method: 'PATCH', body: JSON.stringify({ status: 'lapsed' }),
       });
       if (up.ok) { expired++; e.status = 'lapsed'; }
+    }
+    // L4 — ENFORCE the grace clock. A past-due account stays full+live during the
+    // 14-day grace (banner, not lockout), but when the anchored grace_until passes
+    // it must lapse — otherwise a card that never recovers keeps full access
+    // forever. Reconcile runs earlier in the tick, so a recovered customer has
+    // already had grace_until cleared; only the genuinely-delinquent remain.
+    if (e.status === 'active' && e.grace_until && Date.parse(e.grace_until) < Date.parse(nowIso)) {
+      const up = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(e.client_id)}&product=eq.presence&status=eq.active`, {
+        method: 'PATCH', body: JSON.stringify({ status: 'lapsed' }),
+      });
+      if (up.ok) { grace_lapsed++; e.status = 'lapsed'; }
     }
     const events = lifecycleEventsFor({ ...e, status: e.status }, nowIso)
       .filter((k) => k !== 'trial_ended' || expired > 0 || e.status === 'lapsed'); // trial_ended notice rides the flip
@@ -190,7 +202,7 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
       }
     }
   }
-  return { expired_trials: expired, notices, emails, wound_down };
+  return { expired_trials: expired, notices, emails, wound_down, grace_lapsed };
 }
 
 // ── Phase CP-3 (CP-5): the weekly owner digest — the Monday routine, automated ──

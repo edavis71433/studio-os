@@ -19,15 +19,28 @@ const enc = encodeURIComponent;
  *  Detects lapsed/paused → active reactivation and fires a one-per-month
  *  welcome-back (best-effort, never blocks the billing write). */
 export async function applyEntitlementPatch(clientId: string, patch: EntitlementPatch): Promise<boolean> {
-  // CP-3: reactivation detection — lapsed/paused → active gets a welcome-back
-  let priorStatus = '';
-  try { const pr = await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence&select=status&limit=1`); priorStatus = String(pr.json?.[0]?.status || ''); } catch { /* */ }
+  // CP-3: reactivation detection — lapsed/paused → active gets a welcome-back.
+  // L4: also read the prior grace_until to ANCHOR the grace clock (below).
+  let priorStatus = '', priorGrace: string | null = null;
+  try {
+    const pr = await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence&select=status,grace_until&limit=1`);
+    priorStatus = String(pr.json?.[0]?.status || '');
+    priorGrace = pr.json?.[0]?.grace_until ?? null;
+  } catch { /* */ }
   const body: Record<string, unknown> = { status: patch.status };
   const carry: (keyof EntitlementPatch)[] = [
     'plan', 'term', 'founder', 'trial_ends_at', 'stripe_customer_id', 'stripe_subscription_id',
     'current_period_end', 'cancel_at_period_end', 'canceled_at', 'grace_until',
   ];
   for (const k of carry) if (patch[k] !== undefined) body[k] = patch[k] as unknown;
+  // L4 — ANCHOR the grace clock to the FIRST past-due event. entitlementPatch-
+  // FromSubscription resets grace_until to now+14 on EVERY past_due event, so the
+  // 14-day window would slide forward forever and never expire. If we're still in
+  // grace (incoming grace_until set) and an earlier anchor exists, keep the
+  // earlier one so the window actually ends and enforcement can fire.
+  if (patch.grace_until && priorGrace && Date.parse(priorGrace) < Date.parse(patch.grace_until)) {
+    body['grace_until'] = priorGrace;
+  }
   const r = await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence`, {
     method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body),
   });

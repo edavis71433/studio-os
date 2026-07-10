@@ -26,7 +26,7 @@ ok('winddown: gated on lapsed AND past the written window (WIND_DOWN_DAYS)', /e\
 ok('winddown: only touches still-hosted sites (idempotent — archived is skipped)', /status=in\.\(live,paused,ready\)&select=id,netlify_site_id/.test(life));
 ok('winddown: removes hosting then archives the workspace (recoverable, not purged)', /deleteSite\(site\.netlify_site_id\)[\s\S]*?status: 'archived', netlify_site_id: null/.test(life));
 ok('winddown: NO hard delete of workspace/content (export + resubscribe survive)', !/presence_sites[^\n]*method: 'DELETE'/.test(life));
-ok('winddown: counted + surfaced in the sweep result (observable)', /wound_down\+\+/.test(life) && /wound_down: number/.test(life) && /return \{ expired_trials: expired, notices, emails, wound_down \}/.test(life));
+ok('winddown: counted + surfaced in the sweep result (observable)', /wound_down\+\+/.test(life) && /wound_down: number/.test(life) && /return \{ expired_trials: expired, notices, emails, wound_down/.test(life));
 
 // ── wiring: the sweep runs every cron tick (owner scheduler) ──
 ok('wiring: runLifecycleSweep is in the default cron cycle', /const lifecycle = await runLifecycleSweep\(limit\)/.test(system) && /lifecycle,/.test(system));

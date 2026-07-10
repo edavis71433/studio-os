@@ -210,9 +210,12 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const cycle = await runOperationsCycle({ limit });
       const scheduled = await runDuePublishes(limit);
       const reconcile = await runReconcileStuckPublishes(50);   // M5: finalize stuck publishes every tick (no owner cron change)
+      // P2-E: reconcile billing BEFORE the lifecycle sweep so grace-clock
+      // enforcement (W9) acts on Stripe-fresh state (a recovered customer already
+      // had grace_until cleared) rather than possibly-stale data.
+      const reconcile_billing = await runBillingReconcile(30);   // P2-E W7: correct any entitlement drift vs Stripe (missed webhooks)
       const lifecycle = await runLifecycleSweep(limit);   // Phase RL: one cron tick covers the revenue lifecycle too
       const deletion = await runDeletionSweep(25);        // P2-E W2: complete eligible account deletions (past cooling-off)
-      const reconcile_billing = await runBillingReconcile(30);   // P2-E W7: correct any entitlement drift vs Stripe (missed webhooks)
       const digest = await runWeeklyDigest();             // CP-3: the Monday routine, automated (7-day dedupe)
       const domains = await runDomainWatch(10);           // INF: RDAP expiry+registrar, 24h per-domain dedupe
       const leads = await runLeadFollowups(20);            // CRM: nudge un-replied leads (1–7d old), once per lead
