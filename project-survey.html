@@ -187,7 +187,10 @@
 
     // Branch the experience on rating
     document.getElementById("surveyForm").classList.add("hidden");
-    if(rating >= 4){
+    // Only show the Google-review prompt when a REAL Place ID is configured —
+    // otherwise a happy client would be sent to a broken review link.
+    var reviewReady = rating >= 4 && GOOGLE_REVIEW_URL.indexOf("YOUR_PLACE_ID") === -1;
+    if(reviewReady){
       document.getElementById("googleReviewLink").href = GOOGLE_REVIEW_URL;
       document.getElementById("reviewPrompt").classList.remove("hidden");
     } else {

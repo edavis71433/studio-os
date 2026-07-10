@@ -118,7 +118,7 @@ async function openProject(id){
   if(!d.ok){toast('That project isn’t available.');return load();}
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
   let html=`<p><a class="link" href="/client.html">← Your projects</a></p><header><h1>${esc(p.name)}</h1><p class="sub">Status: ${esc((p.status||'').replace('_',' '))}</p></header>`;
-  if(s) html+=`<div class="status"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${s.open_client_actions} action${s.open_client_actions===1?'':'s'} for you</div>`;
+  if(s&&s.progress&&s.milestones) html+=`<div class="status"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${(s.open_client_actions||0)} action${s.open_client_actions===1?'':'s'} for you</div>`;
   // approvals that need the client
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
   if(aps.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}" data-d="approved">Approve</button><button data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}" data-d="changes_requested">Request changes</button></div></div>`;}html+=`</section>`;}
@@ -175,7 +175,7 @@ async function load(){
   // Agency–Client Bridge: does this customer have linked delivery? If so, that IS their home.
   const proj=await api('/client/projects');
   const projects=(proj.ok&&proj.body.data)||[];
-  if(projects.length){const n=await api('/client/notifications').catch(()=>null);renderProjects(projects,(n&&n.body&&n.body.data&&n.body.unread_count)||(n&&n.body&&n.body.unread_count)||0);appendBilling();api('/client/notifications/read','POST',{});return;}
+  if(projects.length){const n=await api('/client/notifications').catch(()=>null);const nb=(n&&n.body)||{};const unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);renderProjects(projects,unread);appendBilling();api('/client/notifications/read','POST',{});return;}
   if(c.sees_full_workspace){ownerNote();return;}     // owner with no linked delivery
   const feed=await api('/portal/feed');
   if(!feed.ok){trouble();return;}

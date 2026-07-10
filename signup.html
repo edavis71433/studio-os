@@ -107,6 +107,9 @@ async function loadPlan(){
     const plans = (j.data && j.data.plans) || [];
     PLAN = plans.find(p => p.key === PLAN_KEY) || null;
     if (!PLAN || !PLAN.self_serve){ location.href = "/pricing.html" + (qs.get('env')==='staging'?'?env=staging':''); return; }
+    // Only show trial UI when the plan is ACTUALLY trial-eligible — otherwise the
+    // page promised "free trial" but submit routed to paid checkout (bait-and-switch).
+    if (TRIAL && !PLAN.trial_eligible) TRIAL = false;
     document.getElementById('planName').textContent = PLAN.name;
     document.getElementById('planTag').textContent = PLAN.tagline;
     document.getElementById('changePlan').href = "/pricing.html" + (qs.get('env')==='staging'?'?env=staging':'');
@@ -124,6 +127,7 @@ async function loadPlan(){
 
 async function submitForm(e){
   e.preventDefault();
+  if (!PLAN){ showMsg('Just a moment — still loading your plan. Try again in a second.', 'err'); return; }
   const btn = document.getElementById('submitBtn');
   const business = document.getElementById('business').value.trim();
   const email = document.getElementById('email').value.trim().toLowerCase();

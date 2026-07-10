@@ -1705,12 +1705,15 @@ async function initPortal() {
   var tbC = document.getElementById("topbarClient"); if (tbC) tbC.textContent = CLIENT.name;
   var tbS = document.getElementById("topbarStatus"); if (tbS) tbS.textContent = CLIENT.project_status;
 
+  // Read the "last visit" stamp FIRST — loadHQ() writes a fresh stamp (now), so
+  // reading after it defeats every "new since your last visit" diff. Read → render → (loadHQ writes new).
+  try { await readVisitStamp(); } catch(e){} // server stamp BEFORE loadHQ overwrites it
+
   // ── DIGITAL HEADQUARTERS: the new Home. Loads the five-band experience. ──
   try { await loadHQ(); } catch(e){ console.error("loadHQ:", e); renderHQFallback(); }
 
   // Each step is independently guarded so one failing query or undefined
   // helper can never stop the portal from loading. These feed the OTHER views.
-  try { await readVisitStamp(); } catch(e){} // server stamp BEFORE rooms fetch
   try { await loadAll(); } catch(e){ console.error("loadAll:", e); }
   try { await loadGrowth(); } catch(e){ console.error("loadGrowth:", e); }
   // (Project spine card was replaced by the Digital HQ; its loader is no longer called.)
@@ -3416,7 +3419,7 @@ var allFeedback = [];
 function setPriority(p) {
   fbPriority = p;
   ["low","medium","high"].forEach(function(x) {
-    var el = document.getElementById("pri-"+x);
+    var el = document.getElementById("fb-"+x);   // buttons are id="fb-*", not "pri-*"
     if (el) el.classList.toggle("active", x === p);
   });
 }
@@ -4628,6 +4631,9 @@ function hqSourceNav(kind){
     default:         return null;
   }
 }
+// hqSourceNav only MAPS a source kind to a nav key — it never navigates. The Home
+// CTAs/doors must call this wrapper so the click actually goes somewhere.
+function hqGo(kind){ var dest=hqSourceNav(kind); nav(dest||'work'); }
 // Render the small "see the real thing" link beneath an interpreted answer.
 function hqSourceLink(src){
   if(!src || src.kind==='none') return '';
@@ -4685,7 +4691,7 @@ function renderHQ(b){
   function door(src, extra){
     if(!src||!src.kind) return '';
     var lbl=fEsc(src.label||'Open');
-    return '<button class="lg-door" onclick="hqSourceNav(\''+fAttr(String(src.kind))+'\')">'+lbl+' \u2192</button>'+(extra||'');
+    return '<button class="lg-door" onclick="hqGo(\''+fAttr(String(src.kind))+'\')">'+lbl+' \u2192</button>'+(extra||'');
   }
   function entry(margin, bodyHtml, cls){
     return '<div class="lg-entry hq-anim'+(cls?' '+cls:'')+'"><div class="lg-date">'+margin+'</div><div class="lg-body">'+bodyHtml+'</div></div>';
@@ -4714,7 +4720,7 @@ function renderHQ(b){
   if(hasNeed){
     var t0=todo[0];
     var cta = t0.source && t0.source.kind
-      ? '<button class="lg-cta" onclick="hqSourceNav(\''+fAttr(String(t0.source.kind))+'\')">'+fEsc((t0.source.label||'Review and decide'))+' \u2192</button>'
+      ? '<button class="lg-cta" onclick="hqGo(\''+fAttr(String(t0.source.kind))+'\')">'+fEsc((t0.source.label||'Review and decide'))+' \u2192</button>'
       : '<button class="lg-cta" onclick="nav(\'work\')">Review and decide \u2192</button>';
     html+=entry('Today',
       '<div class="lg-t">'+fEsc(t0.text)+'</div>'
