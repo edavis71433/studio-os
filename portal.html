@@ -5404,5 +5404,19 @@ button:focus-visible, a:focus-visible, .nav-item:focus-visible{ outline:2px soli
 
 <script src="/dp-mode.js"></script>
 <script>DPMode.init({ app: "portal", url: "https://qksstlqzbhesadrrofgn.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo" });</script>
+<script>
+/* A11y enhancer (inlined; same as shell.js) — keyboard-operability for click
+   handlers + Tab focus-trap for visible dialogs. Additive + delegated. */
+(function () { 'use strict';
+  if (window.__ddsA11y) return; window.__ddsA11y = true;
+  function enhance(){ var els=document.querySelectorAll('[onclick]:not(button):not(a):not(input):not(select):not(textarea):not([data-kbd])'); for(var i=0;i<els.length;i++){ var el=els[i]; el.setAttribute('data-kbd','1'); if(el.isContentEditable)continue; if(!el.getAttribute('role'))el.setAttribute('role','button'); if(!el.hasAttribute('tabindex'))el.setAttribute('tabindex','0'); } }
+  var pending=false; function schedule(){ if(pending)return; pending=true; (window.requestAnimationFrame||setTimeout)(function(){pending=false;enhance();}); }
+  document.addEventListener('keydown',function(e){ if(e.key!=='Enter'&&e.key!==' '&&e.key!=='Spacebar')return; var t=e.target; if(!t||!t.matches)return; if(t.isContentEditable||t.matches('button,a,input,select,textarea'))return; if(t.hasAttribute('onclick')||t.getAttribute('role')==='button'){ e.preventDefault(); t.click(); } });
+  document.addEventListener('keydown',function(e){ if(e.key!=='Tab')return; var mm=document.querySelectorAll('[aria-modal="true"],[role="dialog"]'),modal=null; for(var i=0;i<mm.length;i++){ if(mm[i].offsetParent!==null)modal=mm[i]; } if(!modal)return; var f=modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'); f=Array.prototype.filter.call(f,function(el){return el.offsetParent!==null;}); if(!f.length)return; var first=f[0],last=f[f.length-1]; if(!modal.contains(document.activeElement)){ e.preventDefault(); first.focus(); } else if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); } });
+  var mo=(typeof MutationObserver!=='undefined')?new MutationObserver(schedule):null;
+  function start(){ enhance(); if(mo&&document.body)mo.observe(document.body,{childList:true,subtree:true}); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
 </body>
 </html>

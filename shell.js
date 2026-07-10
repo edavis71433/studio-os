@@ -356,3 +356,52 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
+
+/* ── A11y enhancer (shared) ───────────────────────────────────────────────────
+   The single most common a11y defect across the app is a clickable <div>/<span>/
+   <tr> with an onclick but no keyboard support. This makes every such element
+   keyboard-operable (role=button + tabindex + Enter/Space activates) and traps
+   Tab inside a visible modal. Additive + delegated, so it survives the constant
+   innerHTML re-renders. Included automatically wherever shell.js loads; the two
+   standalone big surfaces (portal, admin console) inline the same block. */
+(function () {
+  'use strict';
+  if (window.__ddsA11y) return; window.__ddsA11y = true;
+  function enhance() {
+    var els = document.querySelectorAll('[onclick]:not(button):not(a):not(input):not(select):not(textarea):not([data-kbd])');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      el.setAttribute('data-kbd', '1');
+      if (el.isContentEditable) continue;
+      if (!el.getAttribute('role')) el.setAttribute('role', 'button');
+      if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    }
+  }
+  var pending = false;
+  function schedule() { if (pending) return; pending = true; (window.requestAnimationFrame || setTimeout)(function () { pending = false; enhance(); }); }
+  // Enter/Space activates a click-handler element (delegated → covers re-renders).
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    var t = e.target;
+    if (!t || !t.matches) return;
+    if (t.isContentEditable || t.matches('button,a,input,select,textarea')) return;
+    if (t.hasAttribute('onclick') || t.getAttribute('role') === 'button') { e.preventDefault(); t.click(); }
+  });
+  // Tab focus-trap for a visible dialog; pulls focus in on the first Tab.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab') return;
+    var mm = document.querySelectorAll('[aria-modal="true"],[role="dialog"]'), modal = null;
+    for (var i = 0; i < mm.length; i++) { if (mm[i].offsetParent !== null) modal = mm[i]; }
+    if (!modal) return;
+    var f = modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    f = Array.prototype.filter.call(f, function (el) { return el.offsetParent !== null; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  var mo = (typeof MutationObserver !== 'undefined') ? new MutationObserver(schedule) : null;
+  function start() { enhance(); if (mo && document.body) mo.observe(document.body, { childList: true, subtree: true }); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();

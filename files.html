@@ -286,14 +286,14 @@ function tile(a){
   const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not used';
   const badge=a.state==='pending'?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
   const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
-  return `<button class="tile" data-open="${a.id}">
+  return `<div class="tile" data-open="${a.id}" role="button" tabindex="0" aria-label="Open ${esc(a.name)}">
     <div class="thumb" ${t}>${inner}</div>${badge}${star}
     <div class="meta"><div class="nm">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
-  </button>`;
+  </div>`;
 }
 function wire(){
   document.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';load();});
-  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDetail(b.dataset.open));
+  document.querySelectorAll('[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});
   document.querySelectorAll('[data-fav]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();toggleFav(b.dataset.fav);});
   const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load().then(()=>{const el=$('q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}});},280);};}
   const sort=$('sort');if(sort)sort.onchange=()=>{S.sort=sort.value;S.assets=sortRows(S.assets);render();};
