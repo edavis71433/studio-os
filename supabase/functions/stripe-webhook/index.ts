@@ -55,6 +55,20 @@ const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 // customer.subscription.created / updated / deleted.
 const BILLING_SYNC_SECRET = Deno.env.get('BILLING_SYNC_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
 
+// W4 (L3) — livemode guard. A test-mode event must never mutate live billing (or
+// vice-versa). Expected mode is derived from the Stripe secret key prefix
+// (sk_live_ / sk_test_) or set explicitly via STRIPE_EXPECT_LIVEMODE=true|false.
+// If neither is known we FAIL OPEN (process) but log — never silently drop money.
+function expectedLivemode(): boolean | null {
+  const explicit = (Deno.env.get('STRIPE_EXPECT_LIVEMODE') || '').trim().toLowerCase();
+  if (explicit === 'true') return true;
+  if (explicit === 'false') return false;
+  const key = Deno.env.get('STRIPE_SECRET') || Deno.env.get('STRIPE_SECRET_KEY') || '';
+  if (key.startsWith('sk_live_') || key.startsWith('rk_live_')) return true;
+  if (key.startsWith('sk_test_') || key.startsWith('rk_test_')) return false;
+  return null;
+}
+
 // Forward a Stripe object to presence /commerce/billing-sync. Best-effort with
 // an honest failure: a non-2xx returns false so the caller can 500 → Stripe
 // retries (the sync is idempotent). Never throws.
@@ -116,6 +130,19 @@ async function db(path: string, method: string, payload: unknown): Promise<boole
   return r.ok;
 }
 
+// POST returning the inserted rows (or [] if a unique/PK conflict was ignored).
+async function dbInsertReturning(path: string, payload: unknown, prefer: string): Promise<any[]> {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+      method: 'POST',
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: prefer },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) return [];
+    return await r.json().catch(() => []);
+  } catch { return []; }
+}
+
 async function dbGet(path: string): Promise<any[]> {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
@@ -133,16 +160,40 @@ async function dbGet(path: string): Promise<any[]> {
 // best-effort: a failed observability insert is logged loudly but never
 // blocks or fails the money truth (the invoice flip), because a 500 here
 // would make Stripe retry an already-applied payment for a logging hiccup.
-async function recordEvent(eventId: string, type: string) {
-  if (!eventId) return;
-  const ok = await db('stripe_webhook_events', 'POST', { event_id: eventId, type, received_at: new Date().toISOString() });
-  if (!ok) console.error(`[stripe-webhook] could not record event ${eventId} in stripe_webhook_events (non-fatal)`);
+// W4 — CLAIM-FIRST idempotency. Try to INSERT the event row atomically (PK on
+// event_id). Outcomes:
+//   'claimed'   → we own this event, process it, then mark it done.
+//   'done'      → a prior delivery already applied it; acknowledge, skip.
+//   'processing'→ another in-flight delivery owns it; acknowledge (if it fails,
+//                 its own 500 makes Stripe retry, which will find 'failed').
+//   'retry'     → a prior attempt errored (status 'failed'); re-process (safe —
+//                 every downstream action is idempotent).
+async function claimEvent(eventId: string, type: string, livemode: boolean | null): Promise<'claimed' | 'done' | 'processing' | 'retry'> {
+  if (!eventId) return 'claimed'; // no id to dedupe on — process (best-effort)
+  const inserted = await dbInsertReturning('stripe_webhook_events',
+    { event_id: eventId, type, received_at: new Date().toISOString(), status: 'processing', livemode },
+    'return=representation,resolution=ignore-duplicates');
+  if (Array.isArray(inserted) && inserted.length > 0) return 'claimed';
+  // conflict: a row already exists — decide by its status
+  const rows = await dbGet(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=status&limit=1`);
+  const status = Array.isArray(rows) && rows.length ? String(rows[0].status || 'done') : 'done';
+  if (status === 'failed') return 'retry';
+  if (status === 'processing') return 'processing';
+  return 'done';
 }
 
-async function alreadyProcessed(eventId: string): Promise<boolean> {
-  if (!eventId) return false;
-  const rows = await dbGet(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=event_id&limit=1`);
-  return Array.isArray(rows) && rows.length > 0;
+// Mark a claimed/retried event done once its side effects have been applied.
+async function markEventDone(eventId: string, type: string) {
+  if (!eventId) return;
+  const ok = await db(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`, 'PATCH',
+    { type, status: 'done', processed_at: new Date().toISOString() });
+  if (!ok) console.error(`[stripe-webhook] could not mark event ${eventId} done (non-fatal)`);
+}
+
+// Mark a claim failed so a Stripe retry re-processes it (and it's operator-visible).
+async function markEventFailed(eventId: string) {
+  if (!eventId) return;
+  await db(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`, 'PATCH', { status: 'failed' }).catch(() => {});
 }
 
 async function recordPayment(session: any, md: Record<string, string>, status: string) {
@@ -181,11 +232,23 @@ Deno.serve(async (req: Request) => {
   const eventId = String(event?.id || '');
   const obj = event?.data?.object || {};
   const eventTime = event?.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString();
+  const livemode = typeof event?.livemode === 'boolean' ? event.livemode : null;
 
-  // idempotency: Stripe retries and can deliver duplicates; a seen event id
-  // is acknowledged without re-processing
-  if (await alreadyProcessed(eventId)) {
-    console.log(`[stripe-webhook] duplicate event ${eventId} (${type}) — already processed, acknowledged`);
+  // L3 — live/test guard: a signature can be valid yet come from the wrong mode
+  // (a test event delivered to the live endpoint). Never mutate billing across
+  // the mode boundary. Acknowledge 200 (not 400) so Stripe stops retrying.
+  const expect = expectedLivemode();
+  if (expect !== null && livemode !== null && livemode !== expect) {
+    console.error(`[stripe-webhook] LIVEMODE MISMATCH event ${eventId} (${type}) livemode=${livemode}, expected ${expect} — ignored, nothing touched`);
+    return new Response('ignored (livemode mismatch)', { status: 200 });
+  }
+
+  // W4 — claim-first idempotency (atomic on the event_id PK). Stripe retries and
+  // can deliver duplicates concurrently; only the delivery that wins the INSERT
+  // processes. A completed/in-flight duplicate is acknowledged without re-running.
+  const claim = await claimEvent(eventId, type, livemode);
+  if (claim === 'done' || claim === 'processing') {
+    console.log(`[stripe-webhook] duplicate event ${eventId} (${type}) — ${claim}, acknowledged without re-processing`);
     return new Response('ok', { status: 200 });
   }
 
@@ -200,72 +263,67 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { status: 200 });
   };
 
-  try {
-    if (type === 'checkout.session.completed') {
-      const md = obj.metadata || {};
-      await recordPayment(obj, md, String(obj.payment_status || 'paid') === 'paid' ? 'paid' : String(obj.payment_status || ''));
-      // L1: a self-serve subscription purchase → provision via billing-sync.
-      if (String(obj.mode || '') === 'subscription' || md.kind === 'subscription') {
+  // Dispatch returns the Response; the claim is settled ONCE afterward — done on
+  // 200, failed on anything else — so a Stripe retry of a failed event re-runs
+  // (claim === 'retry') instead of being swallowed as a duplicate.
+  const dispatch = async (): Promise<Response> => {
+    try {
+      if (type === 'checkout.session.completed') {
+        const md = obj.metadata || {};
+        await recordPayment(obj, md, String(obj.payment_status || 'paid') === 'paid' ? 'paid' : String(obj.payment_status || ''));
+        // L1: a self-serve subscription purchase → provision via billing-sync.
+        if (String(obj.mode || '') === 'subscription' || md.kind === 'subscription') {
+          const ok = await forwardBillingSync(type, obj);
+          if (!ok) { console.error(`[stripe-webhook] ${type} subscription sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+          console.log(`[stripe-webhook] ${type} → subscription provisioned (client ${md.client_id || '?'}, plan ${md.plan || '?'})`);
+          return new Response('ok', { status: 200 });
+        }
+        if (md.invoice_id) return await markInvoicePaid(String(md.invoice_id), 'checkout.session metadata');
+        if (md.order_id) {
+          const wrote = await db(`audit_orders?id=eq.${encodeURIComponent(String(md.order_id))}`, 'PATCH', { status: 'paid', paid_at: eventTime });
+          if (!wrote) { console.error(`[stripe-webhook] ${type} FAILED to mark audit order ${md.order_id} paid`); return new Response('db write failed', { status: 500 }); }
+          console.log(`[stripe-webhook] ${type} → audit order ${md.order_id} paid`);
+          return new Response('ok', { status: 200 });
+        }
+        console.log(`[stripe-webhook] ${type} with no invoice_id/order_id metadata (session ${obj.id || '?'}) — payment recorded, nothing to flip`);
+        return new Response('ok', { status: 200 });
+      }
+
+      if (type === 'payment_intent.succeeded') {
+        const md = obj.metadata || {};
+        if (md.invoice_id) return await markInvoicePaid(String(md.invoice_id), 'payment_intent metadata');
+        console.log(`[stripe-webhook] ${type} with no invoice metadata (${obj.id || '?'}) — acknowledged`);
+        return new Response('ok', { status: 200 });
+      }
+
+      if (type === 'payment_intent.payment_failed') {
+        const md = obj.metadata || {};
+        await recordPayment(obj, md, 'failed');
+        console.error(`[stripe-webhook] payment FAILED${md.invoice_id ? ` for invoice ${md.invoice_id}` : ''} (${obj.id || '?'}): ${obj.last_payment_error?.message || 'no detail'} — invoice state unchanged`);
+        return new Response('ok', { status: 200 });
+      }
+
+      // L1: subscription lifecycle → entitlement sync (renewal, past-due grace,
+      // voluntary pause, cancellation). Delegated to billing-sync; a failed sync
+      // returns 500 so Stripe retries the (idempotent) event.
+      if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
         const ok = await forwardBillingSync(type, obj);
-        if (!ok) { console.error(`[stripe-webhook] ${type} subscription sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
-        console.log(`[stripe-webhook] ${type} → subscription provisioned (client ${md.client_id || '?'}, plan ${md.plan || '?'})`);
-        await recordEvent(eventId, type);
+        if (!ok) { console.error(`[stripe-webhook] ${type} sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+        console.log(`[stripe-webhook] ${type} → entitlement synced (sub ${obj.id || '?'}, status ${obj.status || '?'})`);
         return new Response('ok', { status: 200 });
       }
-      if (md.invoice_id) {
-        const res = await markInvoicePaid(String(md.invoice_id), 'checkout.session metadata');
-        if (res.status === 200) await recordEvent(eventId, type);
-        return res;
-      }
-      if (md.order_id) {
-        const wrote = await db(`audit_orders?id=eq.${encodeURIComponent(String(md.order_id))}`, 'PATCH', { status: 'paid', paid_at: eventTime });
-        if (!wrote) { console.error(`[stripe-webhook] ${type} FAILED to mark audit order ${md.order_id} paid`); return new Response('db write failed', { status: 500 }); }
-        console.log(`[stripe-webhook] ${type} → audit order ${md.order_id} paid`);
-        await recordEvent(eventId, type);
-        return new Response('ok', { status: 200 });
-      }
-      console.log(`[stripe-webhook] ${type} with no invoice_id/order_id metadata (session ${obj.id || '?'}) — payment recorded, nothing to flip`);
-      await recordEvent(eventId, type);
-      return new Response('ok', { status: 200 });
-    }
 
-    if (type === 'payment_intent.succeeded') {
-      const md = obj.metadata || {};
-      if (md.invoice_id) {
-        const res = await markInvoicePaid(String(md.invoice_id), 'payment_intent metadata');
-        if (res.status === 200) await recordEvent(eventId, type);
-        return res;
-      }
-      console.log(`[stripe-webhook] ${type} with no invoice metadata (${obj.id || '?'}) — acknowledged`);
-      await recordEvent(eventId, type);
+      // unhandled event types are acknowledged, never errored
+      console.log(`[stripe-webhook] ignoring event type ${type}`);
       return new Response('ok', { status: 200 });
+    } catch (e) {
+      console.error(`[stripe-webhook] unexpected error on ${type}: ${String(e)} — 500 so Stripe retries`);
+      return new Response('error', { status: 500 });
     }
+  };
 
-    if (type === 'payment_intent.payment_failed') {
-      const md = obj.metadata || {};
-      await recordPayment(obj, md, 'failed');
-      console.error(`[stripe-webhook] payment FAILED${md.invoice_id ? ` for invoice ${md.invoice_id}` : ''} (${obj.id || '?'}): ${obj.last_payment_error?.message || 'no detail'} — invoice state unchanged`);
-      await recordEvent(eventId, type);
-      return new Response('ok', { status: 200 });
-    }
-
-    // L1: subscription lifecycle → entitlement sync (renewal, past-due grace,
-    // voluntary pause, cancellation). Delegated to billing-sync; a failed sync
-    // returns 500 so Stripe retries the (idempotent) event.
-    if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
-      const ok = await forwardBillingSync(type, obj);
-      if (!ok) { console.error(`[stripe-webhook] ${type} sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
-      console.log(`[stripe-webhook] ${type} → entitlement synced (sub ${obj.id || '?'}, status ${obj.status || '?'})`);
-      await recordEvent(eventId, type);
-      return new Response('ok', { status: 200 });
-    }
-
-    // unhandled event types are acknowledged, never errored
-    console.log(`[stripe-webhook] ignoring event type ${type}`);
-    await recordEvent(eventId, type);
-    return new Response('ok', { status: 200 });
-  } catch (e) {
-    console.error(`[stripe-webhook] unexpected error on ${type}: ${String(e)} — 500 so Stripe retries`);
-    return new Response('error', { status: 500 });
-  }
+  const res = await dispatch();
+  if (res.status === 200) await markEventDone(eventId, type);
+  else await markEventFailed(eventId);   // release the claim so the retry re-processes
+  return res;
 });
