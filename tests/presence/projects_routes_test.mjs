@@ -58,7 +58,7 @@ ok('validation: client_action_required implies client_visible', /client_action_r
 // ── FEATURE GATE + REVIEWER BOUNDARY ──
 ok('gate: authed /projects gated to the relationship edition (like /crm, /sales)', /case 'projects':[\s\S]{0,40}return 'relationship'/.test(feat));
 ok('reviewer: client_reviewer may READ its visible projects (GET /projects + GET /projects/:id)', /route === '\/projects'\) return true/.test(wsp) && /\^\\\/projects\\\/\[0-9a-f-\]\{36\}\$\/\.test\(route\)\) return true/.test(wsp));
-ok('reviewer: writes are NOT in the reviewer allowlist (no POST/PATCH /projects)', !/POST[\s\S]{0,40}\/projects/.test(wsp.match(/export function reviewerAllowed[\s\S]*?\n\}/)?.[0] || ''));
+ok('reviewer: cannot create/modify projects, tasks, milestones, or project status (only read + reply + decide + download)', (() => { const fn = wsp.match(/export function reviewerAllowed[\s\S]*?\n\}/)?.[0] || ''; return !fn.includes('/tasks') && !fn.includes('/milestones') && !/projects[\s\S]{0,60}status/.test(fn) && !/method === 'POST' && route === '\/projects'/.test(fn); })());
 
 // ── WIRING ──
 ok('wiring: /projects dispatched after the feature gate + reviewer boundary', idx.includes("route === '/projects') return handleProjects") && idx.indexOf('featureForRoute(route, method)') < idx.indexOf("route === '/projects'"));

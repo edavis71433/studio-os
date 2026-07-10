@@ -29,6 +29,7 @@ import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handle
 import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesPublicView } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
+import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -452,7 +453,13 @@ serve(async (req) => {
     if (m && method === 'POST') return handleApprovalsCreate(req, jwt, site, principal, m[1], cors);
     m = route.match(/^\/approvals\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleApprovalDecide(req, jwt, site, principal, m[1], cors);
+    // P2-D-3: project messages
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/messages$/);
+    if (m && (method === 'GET' || method === 'POST')) return handleMessages(req, jwt, site, principal, m[1], cors);
   }
+  // P2-D-3: notifications (derived from the activity log + a per-reader last-seen)
+  if (route === '/notifications' && method === 'GET') return handleNotifications(req, jwt, site, principal, cors);
+  if (route === '/notifications/read' && method === 'POST') return handleNotificationsRead(req, jwt, site, principal, cors);
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);

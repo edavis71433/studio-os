@@ -33,6 +33,9 @@ export function reviewerAllowed(route: string, method: string): boolean {
   if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}$/.test(route)) return true;               // P2-D: a client-visible project's status (handler filters visibility)
   if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}\/deliverables\/[0-9a-f-]{36}\/download$/.test(route)) return true; // P2-D-2: download a shared deliverable
   if (method === 'POST' && /^\/approvals\/[0-9a-f-]{36}\/decide$/.test(route)) return true;      // P2-D-2: the client decides an approval put to them
+  if ((method === 'GET' || method === 'POST') && /^\/projects\/[0-9a-f-]{36}\/messages$/.test(route)) return true; // P2-D-3: client reads + replies to the shared thread
+  if (method === 'GET' && route === '/notifications') return true;                               // P2-D-3: client notifications (derived, visibility-filtered)
+  if (method === 'POST' && route === '/notifications/read') return true;                          // P2-D-3: mark notifications seen
   if (method === 'POST' && /^\/foundations\/plans\/[0-9a-f-]{36}\/decide$/.test(route)) return true;   // approve an infra plan
   if (method === 'POST' && /^\/connections\/[a-z0-9_]+\/write\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // approve a connected write
   if (method === 'POST' && /^\/assets\/[0-9a-f-]{36}\/status$/.test(route)) return true; // DAM-2: approve/reject a file (action-restricted in the handler)
