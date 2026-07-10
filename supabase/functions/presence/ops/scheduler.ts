@@ -11,6 +11,7 @@
 
 import { svc } from '../lib/db.ts';
 import { runPipeline } from '../routes/publish.ts';
+import { reconcileOnePublish, RECONCILE_STALE_MS, type InflightPublish } from '../lib/deploy_reconcile.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
@@ -73,6 +74,25 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const failures = results.filter((r) => !r.ok).length;
   if (failures > 0) await alertFailures('scheduled-publish', failures, results.length, results.filter((r) => !r.ok));
   return { ok: failures === 0, run_type: 'scheduled-publish', considered: rows.length, ran: results.length, failures, results };
+}
+
+// ── M5: reconcile STUCK publishes — the recovery process for publishes left
+// in-flight (queued/deploying) past the in-request poll window. Reads Netlify's
+// authoritative state per record and finalizes it (live/failed), or fails a
+// publish interrupted before it ever deployed. NEVER re-deploys → idempotent,
+// history-safe. Global (all sites), oldest first, bounded per tick. Reuses the
+// SAME reconcileOnePublish the GET /publishes lazy path uses (no second impl).
+export async function runReconcileStuckPublishes(limit = 50): Promise<{ ok: true; run_type: 'reconcile'; scanned: number; live: number; failed: number; abandoned: number; pending: number }> {
+  const now = Date.now();
+  const staleBefore = new Date(now - RECONCILE_STALE_MS).toISOString();
+  const q = await svc(`presence_publishes?status=in.(queued,deploying)&created_at=lte.${encodeURIComponent(staleBefore)}&select=id,site_id,netlify_deploy_id,created_at&order=created_at.asc&limit=${Math.max(1, Math.min(200, limit))}`);
+  const rows: InflightPublish[] = Array.isArray(q.json) ? q.json : [];
+  const tally = { ok: true as const, run_type: 'reconcile' as const, scanned: rows.length, live: 0, failed: 0, abandoned: 0, pending: 0 };
+  for (const p of rows) {
+    const r = await reconcileOnePublish(p, now);
+    tally[r] += 1;
+  }
+  return tally;
 }
 
 // Run one site through the observation pipeline, isolated. Evidence gates the

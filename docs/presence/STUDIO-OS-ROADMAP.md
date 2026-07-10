@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M5 — Deploy robustness.** (M4 publish idempotency + cooldown ✅ done Jul 9 — cooldown live; idempotency pending owner migration 0073.) Everything above it is complete; everything below is queued in execution order.
+**Current active milestone:** **Phase 1 · M6 — Media hardening.** (M5 deploy robustness ✅ done Jul 9 — fully live. M4 ✅ — cooldown live; idempotency pending owner migration 0073.) Everything above it is complete; everything below is queued in execution order.
 
 ---
 
@@ -26,8 +26,8 @@ Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CM
 - ✅ **M2** — Security hardening (tenant isolation)
 - ✅ **M3** — Draft-version hash
 - ✅⏳ **M4** — Publish reliability (idempotency + cooldown) — *implementation complete; cooldown LIVE; idempotency implemented but awaiting owner migration 0073 activation*
-- ⏳ **M5 — Deploy robustness** (timeout · reconcile cron · ceiling · telemetry) *(next active)*
-- ⏳ **M6** — Media hardening (magic-byte · EXIF · quota · cleanup)
+- ✅ **M5** — Deploy robustness (timeout · reconcile cron · ceiling · telemetry) *(fully live)*
+- ⏳ **M6 — Media hardening** (magic-byte · EXIF · quota · cleanup) *(next active)*
 - ⏳ **M7** — Snapshot management (retention · GC)
 - ⏳ **M8** — Preview hardening (cache · signed links · watermark)
 - ⏳ **M9** — Client safety (optimistic lock · shared components · what-will-change)

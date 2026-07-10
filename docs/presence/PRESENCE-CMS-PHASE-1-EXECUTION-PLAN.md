@@ -11,12 +11,12 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**4 of 10 implemented (40%).** Next active engineering milestone: **M5 — Deploy robustness.**
-**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**.
+**5 of 10 implemented (50%).** Next active engineering milestone: **M6 — Media hardening.**
+**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**. (M5 has no such dependency — fully live.)
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ✅⏳ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
@@ -24,7 +24,8 @@ Each milestone is independently shippable, gated by the full pure regression + g
 - ✅ **M2 — Security audits** — DONE (Jul 9 2026). Committed, tested, verified, deployed. `svc()` tenant/site-scope audit, global-sentinel audit, request-id review, 3 defense-in-depth `site_id` hardenings, tenant-isolation regression tests (9/9), audit record ([PHASE1-SECURITY-AUDIT.md]).
 - ✅ **M3 — Draft-version hash** — DONE (Jul 9 2026). Committed, tested (10/10), deployed. Pure `lib/draft_hash.ts` reuses the ONE serializer; compute-on-read, no migration, no publish change; `draft_hash` on `/site`.
 - ✅⏳ **M4 — Publish idempotency + cooldown** — **Implementation ✅ COMPLETE · Activation ⏳ PENDING** (Jul 9 2026). *Complete:* publish cooldown, publish guard, idempotency implementation, tests (guard 21/21 + tenant-isolation 11/11), regression (88/88), documentation, deployment. **Cooldown is LIVE.** *Pending activation:* idempotency is **implemented but awaiting activation** — the owner must apply migration `0073_publish_idempotency.sql` to staging + prod. Until then: cooldown active, idempotency pending migration activation.
-- ⏳ **M5–M10** — remaining, in the approved order below (M5 is next active).
+- ✅ **M5 — Deploy robustness** — DONE (Jul 9 2026). Committed, tested (deploy_reconcile 21/21), deployed — **fully live, no owner dependency**. Deterministic configurable poll timeout (`DEPLOY_POLL_MS`); reconcile of stuck publishes (shared `lib/deploy_reconcile.ts` — reused by GET /publishes AND folded into the default cron cycle, never re-deploys, recovers interrupted-before-deploy rows); global concurrent-deploy ceiling (`MAX_CONCURRENT_DEPLOYS`, default 8, fail-open, additive to the one-in-flight index); per-stage telemetry via structured logging (no migration, no new monitoring). 89/89 pure sweep.
+- ⏳ **M6–M10** — remaining, in the approved order below (M6 is next active).
 
 ## Execution order (dependency-sorted)
 
@@ -33,8 +34,8 @@ M1  ✅ CI + golden safety net          (DONE — no runtime change; SAFEST FIRS
 M2  ✅ Security audits                  (DONE — tenant-isolation audit + hardening)
 M3  ✅ Draft-version hash                (DONE — compute-on-read; unlocks M4/M8/M9)
 M4  ✅⏳ Publish idempotency + cooldown   (IMPLEMENTED — cooldown live; idempotency awaiting mig 0073)
-M5  ⏳ Deploy robustness                 (NEXT — poll timeout · reconcile cron · ceiling · telemetry)
-M6  Media hardening                   (magic-byte · EXIF-at-upload · quota · GC)
+M5  ✅ Deploy robustness                 (DONE — poll timeout · reconcile cron · ceiling · telemetry; fully live)
+M6  ⏳ Media hardening                   (NEXT — magic-byte · EXIF-at-upload · quota · GC)
 M7  Snapshot retention GC             (data hygiene)
 M8  Preview hardening                 (cache · signed links · watermark)
 M9  Client UX safety                  (optimistic lock · shared state · what-will-change)
@@ -105,7 +106,9 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M5 — Deploy robustness
+## M5 — Deploy robustness  ·  ✅ DONE (Jul 9 2026) — fully live, no owner dependency
+> **Design:** (1) **Poll timeout** — `deployFileMap`'s bounded poll made configurable (`DEPLOY_POLL_MS`, default 30s); on timeout the record stays `deploying` (never ambiguous) and reconcile finalizes it. (2) **Reconcile** — new `lib/deploy_reconcile.ts` `reconcileOnePublish` reads Netlify's authoritative state and finalizes the record (live/failed) or fails a publish interrupted *before* it deployed (`ABANDON_MS`); it **never re-deploys** (idempotent, history-safe). `reconcileSitePublishes` is reused by GET /publishes (replacing the old inline logic — one implementation) and `runReconcileStuckPublishes` is **folded into the default `/system/run` cron cycle** so it runs every tick **with no owner cron-config change** (+ a dedicated `task:'reconcile'`). (3) **Ceiling** — `runPipeline` counts global `deploying` publishes; over `MAX_CONCURRENT_DEPLOYS` (default 8) it sheds load with a retryable **503** before creating any record — additive to (never replacing) the per-site one-in-flight index; **fail-open** (count hiccup never blocks); count is a bare number → no tenant leak. (4) **Telemetry** — per-stage timings (snapshot/record/render/images/deploy + total) emitted as one structured `publish_stages` log line at the terminal outcome (success or `failed:<stage>`) — reuses the logging floor, **no new monitoring, no migration**. All other publish callers unchanged (shared `runPipeline`). Tests: deploy_reconcile 21/21 (pure decision helpers + structural wiring); 89/89 pure sweep; 3 functions 0 type-errors; deployed staging+prod. **No migration, no owner activation.**
+
 
 🎯 A slow or flaky Netlify never blocks a request, strands a publish, or overwhelms the API.
 📦 Deploy-poll timeout · reconcile cron for stuck deploys · global concurrent-deploy ceiling · per-stage telemetry.

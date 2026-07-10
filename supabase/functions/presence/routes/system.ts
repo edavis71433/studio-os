@@ -7,7 +7,7 @@
 //   GET  /system/health  ?secret=…   (or x-system-secret header)
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { runOperationsCycle, retryFailedRuns, runDuePublishes } from '../ops/scheduler.ts';
+import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes } from '../ops/scheduler.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runRenewalReminders } from '../commerce/lifecycle.ts';
@@ -195,18 +195,20 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'retry') return json({ data: await retryFailedRuns(limit) }, 200, cors);
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);
       if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
+      if (task === 'reconcile') return json({ data: await runReconcileStuckPublishes(limit) }, 200, cors); // M5: finalize stuck publishes
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
       if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
       // default cycle ALSO fires any due scheduled publishes, so a single cron tick covers both
       const cycle = await runOperationsCycle({ limit });
       const scheduled = await runDuePublishes(limit);
+      const reconcile = await runReconcileStuckPublishes(50);   // M5: finalize stuck publishes every tick (no owner cron change)
       const lifecycle = await runLifecycleSweep(limit);   // Phase RL: one cron tick covers the revenue lifecycle too
       const digest = await runWeeklyDigest();             // CP-3: the Monday routine, automated (7-day dedupe)
       const domains = await runDomainWatch(10);           // INF: RDAP expiry+registrar, 24h per-domain dedupe
       const leads = await runLeadFollowups(20);            // CRM: nudge un-replied leads (1–7d old), once per lead
       const renewals = await runRenewalReminders(50);      // PP-2: annual renewal heads-up (30d + 7d, once per window)
       const retention = await runRetentionSweep();          // keep analytics detail tables bounded (visits 180d, search terms 13mo)
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, lifecycle, digest, domains, leads, renewals, retention } }, 200, cors);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, lifecycle, digest, domains, leads, renewals, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

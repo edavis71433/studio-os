@@ -10,11 +10,12 @@ import { getTemplate, renderSnapshot } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
-import { deployFileMap, deployState, netlifyConfigured } from '../lib/netlify.ts';
+import { deployFileMap, netlifyConfigured } from '../lib/netlify.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
 import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/publish_guard.ts';
+import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -41,6 +42,27 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const actorKind = principal.kind === 'staff' ? 'staff' : 'client';
   let snapshotId = snapshotArg.snapshotId;
 
+  // ── M5: per-stage telemetry via structured logging (reuses the logging floor —
+  //    no new monitoring system, no DB migration). `st` holds cumulative ms from
+  //    t0 per stage; emitted once at the terminal outcome (success or fail). ──
+  const t0 = performance.now();
+  const st: Record<string, number> = {};
+  const at = (k: string) => { st[k] = Math.round(performance.now() - t0); };
+
+  // ── M5: global concurrent-deploy ceiling — an operational safeguard ON TOP OF
+  //    (never replacing) the per-site one-in-flight index. Counts deploys currently
+  //    uploading to Netlify across ALL sites; over the ceiling we shed load with a
+  //    retryable 503 BEFORE any snapshot/record is created. Fail-OPEN: a count
+  //    hiccup never blocks publishing. The count is a bare number → no tenant leak.
+  const ceiling = deployCeiling();
+  if (ceiling > 0) {
+    const dq = await svc(`presence_publishes?status=eq.deploying&select=id&limit=${ceiling + 1}`);
+    if (dq.ok && Array.isArray(dq.json) && deployCeilingExceeded(dq.json.length, ceiling)) {
+      console.log(JSON.stringify({ evt: 'deploy_ceiling', site_id: site.id, kind, deploying: dq.json.length, ceiling }));
+      return json({ error: 'deploy_busy', message: 'The publishing system is briefly at capacity — please try again in a moment.', retry_after: 10 }, 503, { ...cors, 'Retry-After': '10' });
+    }
+  }
+
   // persist snapshot (publish only; restore reuses the retained one)
   if (!snapshotId) {
     const ins = await svc('presence_snapshots', {
@@ -56,6 +78,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     if (!ins.ok || !ins.json?.[0]?.id) return json({ error: 'snapshot_failed', message: CALM }, 502, cors);
     snapshotId = ins.json[0].id as string;
   }
+  at('snapshot');
 
   // publish record — the partial unique index IS the race-safe one-in-flight gate.
   // M4: when an idempotency key is present it is stored here, and a second partial
@@ -78,7 +101,15 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   }
   if (!rec.ok || !rec.json?.[0]?.id) return json({ error: 'record_failed', message: CALM }, 502, cors);
   const pubId = rec.json[0].id as string;
+  at('record');
+  // M5: one structured telemetry line per publish at its terminal outcome —
+  // stage timings + total; never throws (telemetry must not break a publish).
+  const logStages = (outcome: string) => {
+    try { console.log(JSON.stringify({ evt: 'publish_stages', pub_id: pubId, site_id: site.id, kind, outcome, ms: st, total_ms: Math.round(performance.now() - t0) })); } catch { /* */ }
+  };
   const fail = async (stage: string, detail: string) => {
+    at(stage);
+    logStages('failed:' + stage);
     await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', error_text: `${stage}: ${detail}`.slice(0, 1000), completed_at: new Date().toISOString() }) });
     return json({ error: 'publish_failed', message: CALM }, 502, cors);
   };
@@ -101,13 +132,16 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   };
   let fileMap: Record<string, string | Uint8Array>;
   try { fileMap = renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
+  at('render');
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
   Object.assign(fileMap, images);
+  at('images');
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });
   if (!dep.ok) return await fail('deploy', dep.error || 'unknown');
+  at('deploy');
 
   const live = dep.state === 'ready';
   await svc(`presence_publishes?id=eq.${pubId}`, {
@@ -117,6 +151,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: new Date().toISOString() }) });
 
   await writeChangeEvent({ siteId: site.id, entityType: kind, entityId: null, action: kind, summary, principal, provenance: 'human' });
+  logStages(live ? 'live' : 'deploying');   // M5: terminal telemetry (deploying = handed to reconcile)
 
   return json({
     data: {
@@ -214,18 +249,9 @@ export async function handleRestore(req: Request, site: SiteRow, principal: Prin
 
 /** GET /publishes — plain-language history; lazily reconciles pending deploys. */
 export async function handlePublishHistory(site: SiteRow, cors: Record<string, string>) {
-  // reconcile anything left 'deploying' (⟐1 status-driven)
-  const pend = await svc(`presence_publishes?site_id=eq.${site.id}&status=in.(queued,deploying)&select=id,netlify_deploy_id,created_at`);
-  for (const p of Array.isArray(pend.json) ? pend.json : []) {
-    if (!p.netlify_deploy_id) continue;
-    const st = await deployState(p.netlify_deploy_id);
-    if (st === 'ready') {
-      await svc(`presence_publishes?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', completed_at: new Date().toISOString() }) });
-      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: new Date().toISOString() }) });
-    } else if (st === 'error') {
-      await svc(`presence_publishes?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', error_text: 'deploy: netlify reported error (reconciled)', completed_at: new Date().toISOString() }) });
-    }
-  }
+  // M5: reconcile anything left in-flight — the SAME reconcileOnePublish the cron
+  // uses (one implementation, never re-deploys). Was inlined here; now shared.
+  await reconcileSitePublishes(site.id);
 
   const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,version_label,created_at,completed_at,snapshot_id&order=created_at.desc&limit=30`);
   const rows = Array.isArray(r.json) ? r.json : [];

@@ -84,8 +84,10 @@ export async function deployFileMap(netlifySiteId: string, fileMap: Record<strin
     need.delete(digest); // identical files share a digest; one upload satisfies all
   }
 
-  // 4. brief poll — the publish record reconciles anything still pending (⟐1)
-  const deadline = Date.now() + (opts.pollMs ?? 30_000);
+  // 4. bounded poll (M5: deterministic timeout, configurable via DEPLOY_POLL_MS).
+  // On timeout the record stays `deploying` and the reconcile process finalizes
+  // it — never an ambiguous status. Not an error: still deploying.
+  const deadline = Date.now() + (opts.pollMs ?? (Number(Deno.env.get('DEPLOY_POLL_MS')) || 30_000));
   let state = 'uploading';
   while (Date.now() < deadline) {
     const d = await nf(`/deploys/${deployId}`);
