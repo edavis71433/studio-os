@@ -1,5 +1,7 @@
 # Studio OS — Master Roadmap (Reconciled)
 
+> **📍 The consolidated FORWARD roadmap (single source of truth) now lives in [STUDIO-OS-ROADMAP.md](STUDIO-OS-ROADMAP.md)** — 8 phases, current active milestone, and the Jul 9 review refinements folded in. **This file (ROADMAP-MASTER) remains the detailed phase-by-phase history + per-item completion record.**
+
 *Reconciles the attached **Studio OS Master Roadmap (Current)** with the actual completion state and the suggestions from the operational review. Additions are marked **➕ ADDED**, overlaps with already-completed work **⚠️ REDUNDANT**, and items needing scoping **🔍 EXPAND**. The intent is one honest source that doesn't imply re-doing finished work.*
 
 > **Reality check up front:** engineering is effectively complete and green, but **nothing is live to a customer yet** — the edge function is deployed to staging + prod, but every frontend page is **committed-not-pushed** behind the go-live gate, and owner activation (keys/cron) isn't done. So "98% of the V1 roadmap" is true for *engineering*; the remaining ~2% (activation, human QA, front door, the push itself) is what stands between "built" and "a customer can pay for and use it." Treat that last mile as the real work, not a rounding error.
