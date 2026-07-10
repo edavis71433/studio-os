@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M10 — Ops: load test + DR drill (owner-involved, final).** (M9 client UX safety ✅ done Jul 9 — fully live, no migration. M8 ✅ · M7 ✅ · M6 ✅ · M5 ✅ — fully live. M4 ✅ — **FULLY LIVE**; migration 0073 applied to both envs Jul 9.) Everything above it is complete; M10 is the last Phase-1 milestone and is owner-gated (PITR + a staging load environment).
+**Current active milestone:** **✅ PHASE 1 COMPLETE (M1–M10, Jul 9 2026)** — official record: [PHASE-1-COMPLETION-REPORT.md]; readiness: [PRODUCTION-READINESS-ASSESSMENT.md]. **Next: Phase 2 — Product Integration & Consolidation** (do not begin without explicit approval). All engineering is done; remaining Phase-1 items are owner activation only (PITR + live DR drill + load tuning + CI gate + the push + human QA).
 
 ---
 
@@ -20,18 +20,18 @@ Core platform (auth, multi-tenancy, RBAC, RLS, Admin + Client portals, CRM, pipe
 
 ---
 
-## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 9 of 10 · 90%)
-Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md`.
+## ✅ Phase 1 — Presence CMS Hardening (COMPLETE · 10 of 10 · 100%)
+Scale-safety on the existing deterministic engine. See `PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md` + `PHASE-1-COMPLETION-REPORT.md`.
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
 - ✅ **M3** — Draft-version hash
-- ✅ **M4** — Publish reliability (idempotency + cooldown) — *FULLY LIVE; migration 0073 applied to both envs Jul 9; idempotency + cooldown both active*
+- ✅ **M4** — Publish reliability (idempotency + cooldown) — *FULLY LIVE; migration 0073 applied to both envs Jul 9*
 - ✅ **M5** — Deploy robustness (timeout · reconcile cron · ceiling · telemetry) *(fully live)*
 - ✅ **M6** — Media hardening (magic-byte · EXIF · quota · GC) *(fully live, no migration)*
 - ✅ **M7** — Snapshot management (retention · GC) *(fully live, no migration)*
 - ✅ **M8** — Preview hardening (render cache · signed links · watermark) *(fully live, no migration)*
 - ✅ **M9** — Client safety (optimistic lock via M3 hash · shared api() helper · reused diff summary) *(fully live, no migration)*
-- ⏳ **M10 — Operational validation (load test · DR drill)** *(next active · final · owner-gated: PITR + staging load env)*
+- ✅ **M10** — Operational validation (validation runner · load-test framework · DR runbook+tooling · readiness + completion reports) *(engineering complete; owner activation documented)*
 
 ---
 

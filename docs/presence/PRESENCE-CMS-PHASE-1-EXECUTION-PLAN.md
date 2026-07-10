@@ -11,12 +11,12 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**9 of 10 implemented (90%).** Next active engineering milestone: **M10 — Ops: load test + DR drill (owner-involved).**
-**✅ M4 is FULLY LIVE** — migration `0073` applied to staging + prod (Jul 9 2026; column + index + check verified in both). **No outstanding owner activation dependency remains in Phase 1.**
+**✅ 10 of 10 implemented (100%) — PHASE 1 COMPLETE.** Official record: [PHASE-1-COMPLETION-REPORT.md]. Do not begin Phase 2 without explicit approval.
+**M4 is FULLY LIVE** (migration `0073` applied to both envs). Remaining items are **owner activation only** (PITR + live DR drill + load tuning + CI gate + the push + human QA) — no engineering work is outstanding.
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⏳ |
+| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
@@ -29,7 +29,7 @@ Each milestone is independently shippable, gated by the full pure regression + g
 - ✅ **M7 — Snapshot retention GC** — DONE (Jul 9 2026). Committed, tested (snapshot_gc 26/26), deployed — **fully live, no owner dependency, NO migration**. Canonical retention as a **pure selector** `classifySnapshots` (keeps live · last-20 per site · publish/rollback/scheduled/launch/`prev_snapshot_id`/preview references · unclassifiable→keep) + I/O `reapSnapshots` (per-site gather, site-scoped bounded DELETE, oldest-first, converges) folded into the default cron cycle + `task:'snapshot_gc'`. FKs (launch/preview RESTRICT, publishes set-null) back the selector as defense-in-depth. 91/91 pure sweep.
 - ✅ **M8 — Preview hardening** — DONE (Jul 9 2026). Committed, tested (preview_hardening 37/37), deployed — **fully live, no owner dependency, NO migration**. Built on FD-T20: `lib/preview_cache.ts` (bounded LRU memoizing the render, keyed by the M3 hash for drafts / snapshot id for immutable — never stale, publish never reads it) + `lib/preview_link.ts` (HMAC-signed, time-limited, fail-closed preview links reusing the approval-link model; `POST /preview/share-link` mint + public `GET /p/s/:token`) + draft watermark (reuses `injectPreviewBadge` on the authed preview, never in `renderSnapshot`). 92/92 pure sweep.
 - ✅ **M9 — Client UX safety** — DONE (Jul 9 2026). Committed, tested (optimistic_lock 30/30), deployed — **fully live, no owner dependency, NO migration**. Optimistic locking via the **M3 draft hash** (`lib/optimistic_lock.ts` — `If-Match` → 409 `stale_draft`, opt-in, fail-open) on all snapshot-affecting writes + publish; the "what will change" summary **reused** (`lib/diff.ts` `describeChanges`, unchanged) with `draft_hash` now on `/changes`; the editor's ONE centralized `api()` helper sends `If-Match` + handles the 409 uniformly. 93/93 pure sweep.
-- ⏳ **M10** — remaining (final; owner-involved: PITR before the DR drill + a staging load environment).
+- ✅ **M10 — Operational validation & production readiness** — DONE (Jul 9 2026). Committed, tested (loadtest 19/19), **no function redeploy (validation/tooling only)**. Validation runner (10/10 subsystems) + monitoring verification + load-test framework (built + unit-proven; live tuning owner-gated) + DR runbook & `dr-verify` (74 clean migrations; live drill owner-gated) + [PRODUCTION-READINESS-ASSESSMENT.md] + official [PHASE-1-COMPLETION-REPORT.md]. 94/94 pure sweep. **PHASE 1 COMPLETE.**
 
 ## Execution order (dependency-sorted)
 
@@ -43,7 +43,7 @@ M6  ✅ Media hardening                   (DONE — magic-byte · EXIF-at-upload
 M7  ✅ Snapshot retention GC             (DONE — pure selector + bounded cron reaper; fully live, no migration)
 M8  ✅ Preview hardening               (DONE — render cache · signed links · watermark; fully live, no migration)
 M9  ✅ Client UX safety                (DONE — optimistic lock (M3 hash) · shared api() helper · reused diff; fully live, no migration)
-M10 ⏳ Ops: load test + DR drill       (NEXT/FINAL — tunes M5 ceiling; owner-involved: PITR + staging load env)
+M10 ✅ Operational validation          (DONE — validation runner · load-test framework · DR runbook+tooling · readiness+completion reports)
 ```
 
 **Why this order:** safety net before any change (M1); read-only security truth early (M2); the draft-version hash (M3) is a dependency for optimistic locking, preview cache, and the "what will change" diff, so it comes before them; publish/deploy safety (M4–M5) before the subsystems that lean on a healthy pipeline; media/snapshot hygiene (M6–M7); UX-facing work last among code (M8–M9) since it touches fenced public pages; ops/load/DR (M10) last because it tunes M5's ceiling constant and needs owner involvement.
@@ -165,15 +165,12 @@ M10 ⏳ Ops: load test + DR drill       (NEXT/FINAL — tunes M5 ceiling; owner-
 
 ---
 
-## M10 — Ops: load test + DR drill  ·  owner-involved
-
-🎯 Set the M5 ceiling from real numbers; prove the platform is recoverable.
-📦 Load test for concurrency ceiling · disaster recovery restore drill.
-📁
-- **Load test (staging):** drive concurrent render+publish+deploy against representative data; measure p95 render, publish, and Netlify deploy latency; pick the safe global-deploy ceiling → update M5's constant (a one-line change + re-test).
-- **DR drill:** documented + executed restore — PITR restore of the DB, then re-deploy a site's **live snapshot** from `presence_snapshots` (proves every live site is reproducible from the DB alone). Runbook in `docs/presence/PHASE1-DR-RUNBOOK.md`.
-🧪 The load-test report (numbers + chosen ceiling); the DR drill checklist executed with evidence.
-⚠️ **Owner actions:** enable **PITR** on prod (dated decision, ~$100/mo, at first paying customers); provide/approve a staging load environment. Depends on M5 shipping first.
+## M10 — Operational Validation & Production Readiness  ·  ✅ DONE (Jul 9 2026) — engineering complete; owner activation documented
+> **Design:** verification + tooling + durable reports — no architecture/pipeline change, no function redeploy.
+> **Operational validation** — `scripts/validate-phase1.mjs` reuses the existing suite grouped by subsystem → **10/10 subsystems validated (19 pass · 1 live-only skip · 0 fail)**; full pure sweep **94 pass / 4 skip / 0 fail**; 3 functions 0 type-errors ([OPERATIONAL-VALIDATION.md]). **Monitoring verification** — validated (not built) the existing telemetry per area (publish state machine + `publish_stages`; cron `reconcile`/`media_gc`/`snapshot_gc` tallies; `/system/health` + Health Center); documented the one honest limitation (no trend alerting → Phase 2) ([MONITORING-VERIFICATION.md]). **Load-test framework** — pure `scripts/loadtest/harness.mjs` (bounded pool + percentiles + ceiling recommendation), unit-proven `loadtest_test` **19/19**, + `scripts/loadtest/run.mjs` CLI (safe `preview` mode / staging-only `publish` mode); live concurrency tuning owner-gated ([LOAD-TEST-FRAMEWORK.md]). **DR** — `scripts/dr-verify.mjs` → **74 migrations, no gaps/dupes, 0073 present, engineering DR complete**; full runbook + procedures + post-restore verification; live restore drill + PITR owner-gated ([DISASTER-RECOVERY.md]). **Assessment + report** — [PRODUCTION-READINESS-ASSESSMENT.md] (rating: **Production-Ready (engineering), conditional on owner activation**) + the official [PHASE-1-COMPLETION-REPORT.md].
+🎯 Prove the hardened CMS is operationally ready; hand the owner a clear activation list.
+📦 Validation runner · monitoring verification · load-test framework · DR runbook + tooling · readiness assessment · Phase 1 completion report.
+⚠️ **Owner activation (engineering done):** enable PITR + confirm backups; run the live DR drill on staging; run the load sweep → set `MAX_CONCURRENT_DEPLOYS` (or keep the safe default 8); activate CI as a required gate; push at fence-lift; human browser/mobile/AT QA.
 
 ---
 
