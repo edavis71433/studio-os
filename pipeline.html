@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipeline — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Your sales pipeline — from first inquiry through onboarding.">
+<!-- P2-C: Studio App sales pipeline on the ONE shared shell + shared state helpers. -->
+<link rel="stylesheet" href="/shell.css">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
+  .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
+  h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:4px}
+  .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn:disabled{opacity:.5;pointer-events:none}
+  .spacer{flex:1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .card:hover{border-color:var(--p)}
+  .card .t{font-weight:600}
+  .card .m{color:var(--soft);font-size:13px;margin-top:2px}
+  .stage{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .stage.won{background:var(--good-soft);color:var(--good)}
+  .val{font-variant-numeric:tabular-nums;color:var(--soft);font-size:13px}
+  dialog{border:none;border-radius:16px;padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
+  .dbody{padding:18px 20px;max-height:64vh;overflow:auto}
+  .sec{margin-top:16px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px}
+  .steps{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+  label{font-size:12.5px;color:var(--soft);display:block;margin:8px 0 3px}
+  .mut{color:var(--soft);font-size:13px}
+  a{color:var(--p)}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pipeline</h1>
+  <div class="sub">From first inquiry through onboarding — one deal at a time.</div>
+  <div class="bar" id="filters" role="tablist" aria-label="Filter by stage"></div>
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span></div>
+  <div id="list" aria-live="polite"></div>
+</div>
+
+<dialog id="detail" aria-label="Deal detail"><div id="detailInner"></div></dialog>
+
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
+const STAGES=['lead','qualified','proposal','contract','won','lost'];
+let TOKEN="",FILTER="",DEALS=[];
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+
+async function api(path,method,body){
+  const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
+  let b={}; try{b=await r.json();}catch(_){}
+  if(!r.ok){const e=new Error((b&&b.message)||'That didn’t go through.');e.status=r.status;e.body=b;throw e;}
+  return b;
+}
+
+function renderFilters(){
+  const opts=[['','All'],...STAGES.map(s=>[s,s[0].toUpperCase()+s.slice(1)])];
+  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
+  $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;renderFilters();load();});
+}
+
+async function load(){
+  if(window.ddsSkeleton) window.ddsSkeleton($('list'),4);
+  try{
+    const q=FILTER?('?stage='+FILTER):'';
+    const res=await api('/sales/deals'+q);
+    DEALS=res.data||[];
+    if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New inquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:newDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
+    $('list').innerHTML=DEALS.map(d=>`<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div></div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(d.stage)}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`).join('');
+    $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
+  }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
+}
+
+function newDeal(){
+  const title=prompt('Deal title (e.g. “Acme website”)'); if(!title)return;
+  const email=prompt('Client email (optional)')||'';
+  (async()=>{
+    try{
+      let contactId=null;
+      if(email){ const c=await api('/sales/contacts','POST',{email,name:email.split('@')[0]}); contactId=c.data&&c.data.id; }
+      await api('/sales/deals','POST',{title,contact_id:contactId});
+      toast('Deal added'); load();
+    }catch(e){ toast(e.message,true); }
+  })();
+}
+$('newDeal').onclick=newDeal;
+
+async function openDeal(id){
+  history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
+  const dlg=$('detail'); $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; dlg.showModal();
+  try{
+    const {data}=await api('/sales/deals/'+id);
+    const d=data.deal, c=data.contact;
+    const nextStages=STAGES.filter(s=>s!=='won'&&s!==d.stage);
+    const stepBtns=nextStages.map(s=>`<button class="btn ghost" data-stage="${s}">${esc(s)}</button>`).join('');
+    const props=(data.proposals||[]).map(p=>`<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} · ${esc(p.status)}</span>${p.status==='draft'?`<button class="btn ghost" data-send-proposal="${p.id}">Send</button>`:''}</div>`).join('')||'<div class="mut">No proposals yet.</div>';
+    const cons=(data.contracts||[]).map(k=>`<div class="row2"><span class="mut">${esc(k.title||'Agreement')} · ${esc(k.status)}${k.signer_name?(' — signed by '+esc(k.signer_name)):''}</span>${k.status==='draft'?`<button class="btn ghost" data-send-contract="${k.id}">Send</button>`:''}</div>`).join('')||'<div class="mut">No agreement yet.</div>';
+    const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
+    $('detailInner').innerHTML=`
+      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(d.title||'Deal')}</div>
+        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · <span class="stage${d.stage==='won'?' won':''}">${esc(d.stage)}</span></div></div>
+        <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
+      <div class="dbody">
+        <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Converted ✓</span>':stepBtns||'<span class="mut">—</span>'}</div></div>
+        <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button></div></div>
+        <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button></div></div>
+        <div class="sec"><h3>Convert to customer</h3>
+          ${d.converted_client_id?`<div class="mut">Converted — workspace <code>${esc(d.converted_site_id||'')}</code>. The customer was welcomed into onboarding.</div>`:
+            `<button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert & provision workspace':'Sign the agreement first'}</button>`}
+        </div>
+      </div>`;
+    $('closeD').onclick=()=>{dlg.close();history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():''));};
+    $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+b.dataset.stage);openDeal(id);load();}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.url?' — link copied':''));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});toast('Agreement sent'+(r.url?' — link copied':''));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
+    const addProp=$('addProp'); if(addProp) addProp.onclick=async()=>{const label=prompt('Line item label');if(!label)return;const price=Math.round(parseFloat(prompt('Price (USD)')||'0')*100);try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:[{label,qty:1,unit_cents:price}]});toast('Proposal drafted');openDeal(id);}catch(e){toast(e.message,true);}};
+    const addCon=$('addCon'); if(addCon) addCon.onclick=async()=>{const body=prompt('Agreement text');if(!body)return;try{await api('/sales/deals/'+id+'/contracts','POST',{body});toast('Agreement drafted');openDeal(id);}catch(e){toast(e.message,true);}};
+    const conv=$('convert'); if(conv) conv.onclick=async()=>{if(!confirm('Convert this deal to a customer and provision their workspace?'))return;conv.disabled=true;try{const r=await api('/sales/deals/'+id+'/convert','POST',{});toast('Converted — workspace provisioned'+(r.data&&r.data.idempotent?' (already done)':''));openDeal(id);load();}catch(e){toast(e.message,true);conv.disabled=false;}};
+  }catch(e){ $('detailInner').innerHTML='<div class="dbody mut">'+esc(e.message)+'</div>'; }
+}
+
+(async function(){
+  try{
+    const {data}=await sb.auth.getSession();
+    TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/portal.html">sign in</a> to see your pipeline.</p>'; return; }
+    renderFilters(); await load();
+    const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
+  }catch(_){ $('list').innerHTML='<p class="mut">We couldn’t load your pipeline just now.</p>'; }
+})();
+</script>
+</body>
+</html>

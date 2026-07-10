@@ -68,8 +68,13 @@ export function buildNav(c: NavContext): NavSection[] {
     sections.push({ key: 'website', label: 'Website', items: website });
   }
 
-  // Customers — the relationship area (internally: the CRM). Leads fold in here + Inbox.
-  if (f.hasRelationship) single('customers', 'Customers', '/crm.html');
+  // Customers — the relationship area (internally: the CRM). Leads + the P2-C
+  // sales Pipeline fold in here as sub-items (the primary bar stays outcomes-only).
+  if (f.hasRelationship) {
+    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/crm.html' }];
+    customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });
+    sections.push({ key: 'customers', label: 'Customers', items: customers });
+  }
 
   // Files — the business library (internally: the DAM). Photos, brand, documents,
   //  downloads — plus AI-generated assets via Visual Studio.

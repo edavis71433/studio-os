@@ -57,6 +57,10 @@ export function featureForRoute(route: string, method: string): EditionFeature |
     case 'crm':
       return 'relationship';
 
+    // ── Sales & Customer Lifecycle (P2-C) — part of the relationship area ─────
+    case 'sales':
+      return 'relationship';   // authed /sales/* only; public token actions are pre-auth
+
     // ── Business Moments — the daily intelligence surface ─────────────────────
     case 'moments':
       return 'business_moments';

@@ -41,7 +41,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 // ── buildNav is the ONE nav, separating every surface (no rebuild — verify) ──
 {
   const nav = read('supabase/functions/presence/lib/navigation.ts');
-  ok('nav: Client work surface (Today/Customers/Analytics/Inbox)', /'today', 'Today'/.test(nav) && /'customers', 'Customers'/.test(nav) && /'analytics', 'Analytics'/.test(nav) && /'inbox', 'Inbox'/.test(nav));
+  ok('nav: Client work surface (Today/Customers/Analytics/Inbox)', /'today', 'Today'/.test(nav) && /key: 'customers', label: 'Customers'/.test(nav) && /'analytics', 'Analytics'/.test(nav) && /'inbox', 'Inbox'/.test(nav));
   ok('nav: Website-management surface → presence.html', /key: 'website'/.test(nav) && /\/presence\.html/.test(nav));
   ok('nav: Account/Settings surface is utility (profile menu), billing lives here', /key: 'settings'.*utility: true|utility\('|settings.*Settings/.test(nav) && /Billing lives here/.test(nav));
   ok('nav: Studio-operations surface gated to agency', /'studio', 'Studio'.*\/agency\.html/.test(nav) && /c\.isAgency/.test(nav));

@@ -26,6 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
+import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesPublicView } from './routes/sales.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -122,6 +123,16 @@ serve(async (req) => {
   }
   if (route === '/approve' && method === 'GET') return handleApproveGet(req, cors);
   if (route === '/approve' && method === 'POST') return handleApprovePost(req, cors);
+  // ── P2-C: PUBLIC proposal/contract review + accept/sign, authorized ONLY by a
+  //    signed link (site_id is inside the token) — pre-auth, tenant-safe. ──
+  {
+    let m = route.match(/^\/sales\/(?:p|c|view)\/(.+)$/);
+    if (m && method === 'GET') return handleSalesPublicView(req, m[1], cors);
+    m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/decide$/);
+    if (m && method === 'POST') return handleSalesProposalDecide(req, m[1], cors);
+    m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/sign$/);
+    if (m && method === 'POST') return handleSalesContractSign(req, m[1], cors);
+  }
   // ── M8: the SIGNED, time-limited preview link — pre-auth, authorized ONLY by
   //    a valid unexpired HMAC signature over {site_id, exp}. Matched before the
   //    opaque door (its token carries a '.' + non-hex, so they never collide). ──
@@ -388,6 +399,26 @@ serve(async (req) => {
     if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
   }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
+  // ── P2-C: Sales & Customer Lifecycle (authed, site-scoped). One coherent
+  //    /sales/* resource surface. Public token actions are handled pre-auth above. ──
+  if (route === '/sales/contacts') return handleSalesContacts(req, site, principal, cors);
+  if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
+  {
+    let m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})$/);
+    if (m) return handleSalesDeal(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/stage$/);
+    if (m && method === 'POST') return handleSalesDealStage(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/proposals$/);
+    if (m && method === 'POST') return handleSalesProposalCreate(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/contracts$/);
+    if (m && method === 'POST') return handleSalesContractCreate(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/convert$/);
+    if (m && method === 'POST') return handleSalesConvert(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/send$/);
+    if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/send$/);
+    if (m && method === 'POST') return handleSalesContractSend(req, site, principal, m[1], cors);
+  }
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);
