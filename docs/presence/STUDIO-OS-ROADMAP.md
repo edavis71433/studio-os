@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M3 — Draft-Version Hash.** Everything above it is complete; everything below is queued in execution order.
+**Current active milestone:** **Phase 1 · M4 — Publish reliability (idempotency + cooldown).** (M3 draft-version hash ✅ done Jul 9.) Everything above it is complete; everything below is queued in execution order.
 
 ---
 
@@ -24,8 +24,8 @@ Core platform (auth, multi-tenancy, RBAC, RLS, Admin + Client portals, CRM, pipe
 Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md`.
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
-- ⏳ **M3 — Draft-version hash** *(next active)*
-- ⏳ **M4** — Publish reliability (idempotency + cooldown)
+- ✅ **M3** — Draft-version hash
+- ⏳ **M4 — Publish reliability** (idempotency + cooldown) *(next active)*
 - ⏳ **M5** — Deploy robustness (timeout · reconcile cron · ceiling · telemetry)
 - ⏳ **M6** — Media hardening (magic-byte · EXIF · quota · cleanup)
 - ⏳ **M7** — Snapshot management (retention · GC)

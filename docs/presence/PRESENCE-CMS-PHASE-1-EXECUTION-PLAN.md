@@ -11,23 +11,24 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**2 of 10 milestones complete (20%).** Next active milestone: **M3 — Draft-version hash.**
+**3 of 10 milestones complete (30%).** Next active milestone: **M4 — Publish idempotency + cooldown.**
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
 
 - ✅ **M1 — CI + golden safety net** — DONE (Jul 9 2026). Committed, tested, verified; CI runner + hostile-string golden across all 3 templates; one-in-flight index verified.
 - ✅ **M2 — Security audits** — DONE (Jul 9 2026). Committed, tested, verified, deployed. `svc()` tenant/site-scope audit, global-sentinel audit, request-id review, 3 defense-in-depth `site_id` hardenings, tenant-isolation regression tests (9/9), audit record ([PHASE1-SECURITY-AUDIT.md]).
-- ⏳ **M3–M10** — remaining, in the approved order below (M3 is next active).
+- ✅ **M3 — Draft-version hash** — DONE (Jul 9 2026). Committed, tested (10/10), deployed. Pure `lib/draft_hash.ts` (`computeDraftHash`/`canonicalize`/`draftHashForSite`) reuses the ONE serializer; **compute-on-read, no migration, no publish change**; exposed as `draft_hash` on `/site` (fail-soft). Foundation for M4/M8/M9.
+- ⏳ **M4–M10** — remaining, in the approved order below (M4 is next active).
 
 ## Execution order (dependency-sorted)
 
 ```
 M1  ✅ CI + golden safety net          (DONE — no runtime change; SAFEST FIRST)
 M2  ✅ Security audits                  (DONE — tenant-isolation audit + hardening)
-M3  ⏳ Draft-version hash                (NEXT — foundational: unlocks M4/M8/M9)
-M4  Publish idempotency + cooldown    (publish safety)
+M3  ✅ Draft-version hash                (DONE — compute-on-read; unlocks M4/M8/M9)
+M4  ⏳ Publish idempotency + cooldown    (NEXT — publish safety)
 M5  Deploy robustness                 (poll timeout · reconcile cron · ceiling · telemetry)
 M6  Media hardening                   (magic-byte · EXIF-at-upload · quota · GC)
 M7  Snapshot retention GC             (data hygiene)
@@ -69,7 +70,9 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M3 — Draft-version hash (foundational)
+## M3 — Draft-version hash (foundational)  ·  ✅ DONE (Jul 9 2026)
+> **Result:** `lib/draft_hash.ts` — `computeDraftHash(snapshot)` hashes the **canonical serialized draft content minus the capture timestamp** (SHA-256 over a key-sorted / array-order-preserving canonical JSON), reusing the ONE `serializeDraft` (no second content model). `draftHashForSite(site)` serializes + hashes; surfaced as `draft_hash` on `/site` GET (concurrent, **fail-soft** → null on any hiccup, never blocks the view). **Design: compute-on-read — NO migration, NO per-save wiring, publishing unchanged**; a settings-only column would be incomplete (misses content-table edits) and serialize-on-every-write would be heavier — a cached column can be added in M9 if If-Match perf needs it. Verified: same content → same hash · timestamp excluded · object-key reorder stable · array reorder (semantic) changes it · content/dev-layer/template changes move it. Tests 10/10; 87/87 pure sweep; 0 type-errors; deployed staging+prod. **No downstream feature built (M8/M9 consume this later).**
+
 
 🎯 A cheap, deterministic content hash of the draft — the key for optimistic locking (M9), preview cache (M8), and the publish diff (M9).
 📦 Draft-version hash.

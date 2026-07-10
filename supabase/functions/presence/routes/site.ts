@@ -7,6 +7,7 @@ import { json } from '../../_shared/http.ts';
 import { asUser, svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { listTemplates, latestTemplateVersion, getTemplate } from '../lib/render.ts';
+import { draftHashForSite } from '../lib/draft_hash.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -46,7 +47,7 @@ export async function handleGetSite(jwt: string, site: SiteRow, cors: Record<str
   // Everything the home view needs runs in ONE concurrent batch: the three
   // singletons under the caller's JWT (RLS proves ownership), the five counts,
   // and the two draft-status probes. One round-trip depth, not three.
-  const [ident, loc, voice, nOff, nTes, nFaq, nPos, nMed, evR, pubR] = await Promise.all([
+  const [ident, loc, voice, nOff, nTes, nFaq, nPos, nMed, evR, pubR, draftHash] = await Promise.all([
     asUser(jwt, `presence_identity?site_id=eq.${site.id}&select=business_name,tagline,description,phone,email,service_area,booking_url,ordering_url,social,seo_title,seo_description&limit=1`),
     asUser(jwt, `presence_locations?site_id=eq.${site.id}&select=address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note&limit=1`),
     // M9.5G: voice now lives in the Brand Profile (one canonical source);
@@ -61,6 +62,9 @@ export async function handleGetSite(jwt: string, site: SiteRow, cors: Record<str
     // publishes are default-deny to clients).
     svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.desc&limit=1`),
+    // M3: the canonical draft-version hash (compute-on-read from the ONE serializer).
+    // Fail-soft — a serialize hiccup returns null and never blocks the home view.
+    draftHashForSite(site).catch(() => null),
   ]);
   const counts = { offerings: nOff, testimonials: nTes, faqs: nFaq, posts: nPos, media: nMed };
   const lastEvent = Array.isArray(evR.json) && evR.json.length ? evR.json[0].created_at : null;
@@ -78,6 +82,10 @@ export async function handleGetSite(jwt: string, site: SiteRow, cors: Record<str
       counts,
       last_published_at: site.last_published_at,
       has_unpublished_changes: hasUnpublishedChanges,
+      // M3: canonical draft fingerprint. Foundation for M8/M9 + unpublished-changes
+      // detection + publish summaries — surfaced here, consumed later. Null only if
+      // the template is unavailable. Does NOT change has_unpublished_changes above.
+      draft_hash: draftHash,
     },
   }, 200, cors);
 }
