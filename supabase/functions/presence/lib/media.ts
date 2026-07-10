@@ -109,13 +109,15 @@ export async function importImage(siteId: string, bytes: Uint8Array, mime: strin
 
 /** Delete: refuse while referenced (names the blockers); soft-delete row + remove object. */
 export async function deleteMedia(siteId: string, mediaId: string) {
-  const [off, posts] = await Promise.all([
+  const [off, posts, deliverables] = await Promise.all([
     svc(`presence_offerings?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=name`),
     svc(`presence_posts?site_id=eq.${siteId}&hero_media_id=eq.${mediaId}&deleted_at=is.null&select=title`),
+    svc(`presence_deliverables?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=title`), // P2-D: a shared deliverable protects its file
   ]);
   const refs = [
     ...(Array.isArray(off.json) ? off.json.map((o: any) => `menu item “${o.name}”`) : []),
     ...(Array.isArray(posts.json) ? posts.json.map((p: any) => `post “${p.title}”`) : []),
+    ...(Array.isArray(deliverables.json) ? deliverables.json.map((d: any) => `deliverable “${d.title || 'file'}”`) : []),
   ];
   if (refs.length) return { error: 'in_use', message: `That image is used by ${refs.join(' and ')} — remove it there first.` };
 

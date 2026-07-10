@@ -28,6 +28,7 @@ import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesPublicView } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
+import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -438,6 +439,19 @@ serve(async (req) => {
     if (m && method === 'POST') return handleMilestonesCreate(req, jwt, site, principal, m[1], cors);
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/milestones\/([0-9a-f-]{36})$/);
     if (m && method === 'PATCH') return handleMilestone(req, jwt, site, principal, m[1], m[2], cors);
+    // P2-D-2: deliverables (files overlay) + approvals
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/deliverables\/upload-url$/);
+    if (m && method === 'POST') return handleDeliverableUploadUrl(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/deliverables$/);
+    if (m && method === 'POST') return handleDeliverablesCreate(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/deliverables\/([0-9a-f-]{36})\/download$/);
+    if (m && method === 'GET') return handleDeliverableDownload(req, jwt, site, principal, m[1], m[2], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/deliverables\/([0-9a-f-]{36})$/);
+    if (m && (method === 'PATCH' || method === 'DELETE')) return handleDeliverable(req, jwt, site, principal, m[1], m[2], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/approvals$/);
+    if (m && method === 'POST') return handleApprovalsCreate(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/approvals\/([0-9a-f-]{36})\/decide$/);
+    if (m && method === 'POST') return handleApprovalDecide(req, jwt, site, principal, m[1], cors);
   }
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);

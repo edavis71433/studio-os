@@ -31,19 +31,19 @@ const dateOrNull = (v: unknown): { ok: true; v: string | null } | { ok: false } 
  *  site owner (a solo business owner managing their own delivery), an operator, or
  *  an agency member drilled in. A client_reviewer (the customer's read-only portal
  *  audience) is the client side. Role-based, so a solo owner is never locked out. */
-async function isStudioSide(jwt: string, site: SiteRow, principal: Principal): Promise<boolean> {
+export async function isStudioSide(jwt: string, site: SiteRow, principal: Principal): Promise<boolean> {
   if (principal.kind === 'staff' || principal.kind === 'system') return true;
   try { return (await resolveSiteRole(jwt, site.id, principal.kind)) !== 'client_reviewer'; } catch { return false; }
 }
-const studioDenied = (cors: Record<string, string>) =>
+export const studioDenied = (cors: Record<string, string>) =>
   json({ error: 'forbidden', message: 'Only your studio can change service-delivery records.' }, 403, cors);
 
-async function projectEvent(siteId: string, projectId: string, kind: string, principal: Principal, clientVisible: boolean, detail: Record<string, unknown> = {}) {
+export async function projectEvent(siteId: string, projectId: string, kind: string, principal: Principal, clientVisible: boolean, detail: Record<string, unknown> = {}) {
   await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ project_id: projectId, site_id: siteId, kind, actor: principal.email || principal.userId || 'system', actor_kind: principal.kind, client_visible: clientVisible, detail }) }).catch(() => {});
 }
 
-async function loadProject(siteId: string, id: string) {
+export async function loadProject(siteId: string, id: string) {
   const r = await svc(`presence_projects?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=*&limit=1`);
   return rows(r)[0] || null;
 }
@@ -118,18 +118,23 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
   if (!project || (!studio && !project.client_visible)) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
 
   if (req.method === 'GET') {
-    const [ms, ts, ev] = await Promise.all([
+    const [ms, ts, ev, dl, ap] = await Promise.all([
       svc(`presence_milestones?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,due_date,sort_order,client_visible,completed_at&order=sort_order.asc`),
       svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,detail,status,priority,client_visible,client_action_required,assigned_to,milestone_id,due_date,sort_order,completed_at&order=sort_order.asc&limit=500`),
       svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${site.id}&select=kind,detail,actor,client_visible,created_at&order=created_at.desc&limit=50`),
+      svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,note,status,client_visible,media_id,created_at&order=created_at.desc&limit=200`),
+      svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,subject_type,subject_id,title,summary,content_hash,status,client_visible,requested_at,decided_at,decision_note&order=created_at.desc&limit=100`),
     ]);
     const now = nowIso();
     const milestones = forViewer(rows(ms), studio).sort(compareOrder);
     const tasksAll = rows(ts);
     const tasks = forViewer(tasksAll, studio).sort(compareOrder).map((t) => ({ ...t, derived: deriveTaskState(t, now) }));
     const events = forViewer(rows(ev), studio);
+    // for the client side, deliverables are only visible when shared; approvals only when client_visible
+    const deliverables = (studio ? rows(dl) : rows(dl).filter((d) => d.client_visible === true && d.status === 'shared'));
+    const approvals = forViewer(rows(ap), studio);
     const progress = progressOf(studio ? tasksAll : tasksAll.filter((t) => t.client_visible === true));
-    return json({ data: { project, milestones, tasks, events, progress, is_studio_view: studio } }, 200, cors);
+    return json({ data: { project, milestones, tasks, events, deliverables, approvals, progress, is_studio_view: studio } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     if (!studio) return studioDenied(cors);
