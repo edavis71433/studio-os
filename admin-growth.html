@@ -296,6 +296,9 @@ async function api(type, payload = {}) {
   });
   let j = {}; try { j = await res.json(); } catch (_) {}
   if (j && j.error) { if (res.status === 401) showGate(); if (res.status === 403) { throw new Error('forbidden'); } throw new Error(j.error); }
+  // A non-2xx with a non-JSON body (e.g. a 500 HTML page) would otherwise slip
+  // through as {} and crash the caller's deref outside its try. Fail loudly.
+  if (!res.ok) { if (res.status === 401) showGate(); if (res.status === 403) throw new Error('forbidden'); throw new Error('http_' + res.status); }
   return j;
 }
 
@@ -522,7 +525,7 @@ async function saveNewPartnership(btn){
     plan_label: $('#np_plan',bg).value.trim()||undefined,
     monthly_amount: $('#np_amount',bg).value?Number($('#np_amount',bg).value):undefined,
     primary_site: $('#np_site',bg).value.trim()||undefined,
-    renews_at: $('#np_renews',bg).value?new Date($('#np_renews',bg).value).toISOString():undefined,
+    renews_at: $('#np_renews',bg).value?new Date($('#np_renews',bg).value+'T12:00:00').toISOString():undefined,
   };
   btn.disabled=true; btn.textContent='Creating…';
   try {
@@ -572,7 +575,7 @@ function elHeader(title, sub, actions){
 }
 function errorPane(which, e){
   if(String(e.message)==='no session') return;
-  $('#main').innerHTML = `<div class="card card-pad"><div class="empty"><div class="ei">Couldn't load ${esc(which)}</div><p>${e.message==='forbidden'?'Your account doesn\'t have access to this. Ask Eric to grant staff access.':'Give it a moment and try again.'}</p><button class="btn mt-s" onclick="route()">Try again</button></div></div>`;
+  $('#main').innerHTML = `<div class="card card-pad"><div class="empty"><div class="ei">Couldn't load ${esc(which)}</div><p>${e.message==='forbidden'?'Your account doesn\'t have access to this. Ask Eric to grant staff access.':'Give it a moment and try again.'}</p><button class="btn mt-s" onclick="${STATE.detail?'refreshDetail()':'route()'}">Try again</button></div></div>`;
 }
 function modal(title, sub, innerHTML, actions){
   const bg = el('div',{class:'modal-bg',onclick:(e)=>{ if(e.target===bg) bg.remove(); }});
@@ -942,7 +945,7 @@ async function saveModal(bg, type, base, btn, okMsg){
     let v=i.value;
     if(i.type==='checkbox') v=i.checked;
     else if(i.type==='number') v=v===''?undefined:Number(v);
-    else if(i.dataset.iso && v) v=new Date(v).toISOString();
+    else if(i.dataset.iso && v) v=new Date(/^\d{4}-\d{2}-\d{2}$/.test(v)?v+'T12:00:00':v).toISOString();  // anchor bare dates to local noon (avoid UTC-midnight off-by-one)
     else if(v==='') v=undefined;
     if(v!==undefined) payload[k]=v;
   });
