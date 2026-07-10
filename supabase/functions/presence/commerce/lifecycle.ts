@@ -11,6 +11,7 @@
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc } from '../lib/db.ts';
+import { deleteSite } from '../lib/netlify.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
@@ -114,9 +115,9 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
 }
 
 // ── the impure runner (called from /system/run) ──────────────────────────────
-export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: number; notices: number; emails: number }> {
+export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: number; notices: number; emails: number; wound_down: number }> {
   const nowIso = new Date().toISOString();
-  let expired = 0, notices = 0, emails = 0;
+  let expired = 0, notices = 0, emails = 0, wound_down = 0;
 
   const ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=client_id,status,trial_ends_at,stripe_subscription_id,updated_at&limit=${limit * 4}`);
   const rows: EntitlementView[] = Array.isArray(ents.json) ? ents.json : [];
@@ -140,6 +141,26 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
     const email = clientQ.json?.[0]?.email || '';
     const bizName = clientQ.json?.[0]?.name || '';
     if (!siteId) continue;
+
+    // H4 — ENFORCE the written wind-down, don't just warn about it. A site lapsed
+    // past WIND_DOWN_DAYS comes down: hosting is removed and the workspace is
+    // archived. The DB content is untouched, so /export and resubscribe-and-
+    // republish both still work. Idempotent: the status filter (only live/paused/
+    // ready sites) means an already-archived site is never touched again.
+    if (e.status === 'lapsed') {
+      const lapsedAt = e.updated_at ? Date.parse(e.updated_at) : NaN;
+      const lapsedDays = Number.isFinite(lapsedAt) ? (Date.parse(nowIso) - lapsedAt) / 86400_000 : 0;
+      if (lapsedDays >= WIND_DOWN_DAYS) {
+        const hosted = await svc(`presence_sites?client_id=eq.${encodeURIComponent(e.client_id)}&status=in.(live,paused,ready)&select=id,netlify_site_id&limit=5`);
+        for (const site of (Array.isArray(hosted.json) ? hosted.json : [])) {
+          if (site.netlify_site_id) await deleteSite(site.netlify_site_id).catch(() => {});
+          const up = await svc(`presence_sites?id=eq.${encodeURIComponent(site.id)}`, {
+            method: 'PATCH', body: JSON.stringify({ status: 'archived', netlify_site_id: null, custom_domain: null }),
+          });
+          if (up.ok) wound_down++;
+        }
+      }
+    }
 
     // Phase SD: the search-setup nudge — published site, no verification code, once ever
     if (e.status === 'active') {
@@ -169,7 +190,7 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
       }
     }
   }
-  return { expired_trials: expired, notices, emails };
+  return { expired_trials: expired, notices, emails, wound_down };
 }
 
 // ── Phase CP-3 (CP-5): the weekly owner digest — the Monday routine, automated ──

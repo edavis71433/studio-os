@@ -3,10 +3,13 @@
 // allowed to use this feature"). Reads presence_entitlements with the service
 // role (a system table, default-deny to clients).
 //
-//   staff        -> full   (admin bypass; unchanged)
-//   active       -> full
-//   paused       -> readonly (writes 403, reads ok)
-//   lapsed/none  -> denied (friendly 403)
+//   staff          -> full   (admin bypass; unchanged)
+//   active         -> full
+//   paused         -> readonly (writes 403, reads ok)
+//   lapsed         -> readonly (M3: view your workspace + export any time; paid
+//                     editing/publishing/AI stay off. Billing routes are dispatched
+//                     BEFORE this gate, so payment can still be fixed to recover.)
+//   deleted/none   -> denied (friendly 403; export still allowed by the caller)
 import { svc } from '../lib/db.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -21,5 +24,8 @@ export async function checkEntitlement(principal: Principal, clientId: string | 
 
   if (status === 'active') return { mode: 'full', message: '' };
   if (status === 'paused') return { mode: 'readonly', message: 'Your Presence subscription is paused — you can view your site but editing is turned off.' };
+  // M3: lapsed keeps read-only workspace + export (so "download from your workspace
+  // any time" is true); editing/publishing/AI stay off. Update payment to recover.
+  if (status === 'lapsed') return { mode: 'readonly', message: 'Your Presence subscription ended — you can still view and download everything. Update your payment to turn editing and publishing back on.' };
   return { mode: 'denied', message: 'Your Presence subscription isn’t active. Reach out to get it turned back on.' };
 }
