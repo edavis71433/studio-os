@@ -56,6 +56,23 @@ export async function deleteAuthUser(id: string): Promise<void> {
   try { await fetch(`${SB_URL}/auth/v1/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders }); } catch { /* best-effort rollback */ }
 }
 
+// P2-C: a real, signed set-password link for a customer the STUDIO created (they
+// never chose a password). Uses the admin generate_link (recovery) so the link is
+// GoTrue-signed and lands on set-password.html; we email it ourselves (branded,
+// via Resend) rather than relying on the project's auth-email config. Returns the
+// action_link or null (caller degrades to a plain welcome).
+export async function generateSetPasswordLink(email: string, redirectTo: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${SB_URL}/auth/v1/admin/generate_link`, {
+      method: 'POST', headers: authHeaders,
+      body: JSON.stringify({ type: 'recovery', email, redirect_to: redirectTo }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) return null;
+    return (j?.action_link || j?.properties?.action_link || null) as string | null;
+  } catch { return null; }
+}
+
 // Create contacts + clients for a freshly-created auth user. Rolls the contact
 // back if the client insert fails; the caller rolls back the auth user if this
 // returns an error. Returns the ids on success.

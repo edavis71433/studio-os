@@ -11,6 +11,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 const sales = read('supabase/functions/presence/routes/sales.ts');
 const idx = read('supabase/functions/presence/index.ts');
 const mig = read('supabase/migrations/0074_p2c_sales_lifecycle.sql');
+const feat = read('supabase/functions/presence/middleware/feature.ts');
 
 // ── TENANT ISOLATION: every authed table access is site-scoped ──
 {
@@ -39,6 +40,13 @@ ok('idempotent: DB unique index on converted_client_id', /presence_deals_convert
 ok('idempotent: proposal-send returns existing when already sent', /already_sent: true/.test(sales));
 ok('integrity: contract sign guards content_hash in the WHERE (version integrity)', /status=eq\.sent&content_hash=eq\.\$\{c\.content_hash\}/.test(sales));
 ok('integrity: stage move guards the prior stage in WHERE (no lost update)', /stage=eq\.\$\{deal\.stage\}/.test(sales) && /canTransition\(deal\.stage, to\)/.test(sales));
+
+// ── feature-gate + public rate limits (gap-check refinements) ──
+ok('feature-gate: authed /sales gated to the relationship edition (like /crm)', /case 'sales':[\s\S]{0,80}return 'relationship'/.test(feat));
+ok('rate-limit: public decide/sign/view are per-IP rate-limited', /rateAllow\(`sales_decide/.test(sales) && /rateAllow\(`sales_sign/.test(sales) && /rateAllow\(`sales_view/.test(sales));
+ok('access: convert gives the customer a real login (auth user + set-password invite)', /createAuthUser\(/.test(sales) && /createContactAndClient\(/.test(sales) && /generateSetPasswordLink\(/.test(sales));
+ok('access: convert reuses an existing account by email (no duplicate customer)', /findClientByEmail\(email\)/.test(sales));
+ok('access: convert rolls back only what it created on provision failure', /if \(createdContactChain\)/.test(sales) && /deleteAuthUser\(createdAuthId\)/.test(sales));
 
 // ── convert reuses the ONE provisioning path (no second provisioner) ──
 ok('convert: reuses provisionForSignup (idempotent)', /provisionForSignup\(\{ clientId/.test(sales));

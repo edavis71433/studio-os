@@ -7,8 +7,9 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { sendEmail } from '../commerce/account.ts';
+import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
+import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
@@ -214,6 +215,7 @@ export async function handleSalesProposalSend(req: Request, site: SiteRow, princ
 /** Public (token) OR authed proposal decision. */
 export async function handleSalesProposalDecide(req: Request, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  if (!(await rateAllow(`sales_decide:${clientIp(req)}`, 20, 60))) return tooMany(cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const decision = b.decision === 'accepted' ? 'accepted' : b.decision === 'declined' ? 'declined' : null;
   if (!decision) return json({ error: 'bad_decision' }, 422, cors);
@@ -271,6 +273,7 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
 /** Public (token) contract signing — version-integrity enforced. */
 export async function handleSalesContractSign(req: Request, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  if (!(await rateAllow(`sales_sign:${clientIp(req)}`, 20, 60))) return tooMany(cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const secret = linkSecret();
   if (!secret) return json({ error: 'unavailable' }, 503, cors);
@@ -299,6 +302,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
 
 // ═══ PUBLIC VIEW (token) — a prospect reviews the proposal/contract before acting ═══
 export async function handleSalesPublicView(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
+  if (!(await rateAllow(`sales_view:${clientIp(req)}`, 60, 60))) return tooMany(cors);
   const secret = linkSecret();
   if (!secret) return json({ error: 'unavailable' }, 503, cors);
   const tok = await verifySalesToken(token, secret, Math.floor(Date.now() / 1000));
@@ -329,18 +333,39 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const contact = deal.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=name,email,company&limit=1`))[0] : null;
   const businessName = clean((contact?.company || contact?.name || deal.title), 120) || 'New customer';
   const email = clean(contact?.email, 160).toLowerCase();
-  const plan = 'presence'; // full edition; billing formalized in P2-E
+  const plan = 'presence'; // full edition; billing formalized in P2-E (active access, unbilled — a deliberate P2-C decision)
 
-  // 1) create the client account (no auth user yet — access follows the email link + set-password flow)
-  const cIns = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) });
-  const clientId = rows(cIns)[0]?.id;
-  if (!cIns.ok || !clientId) return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors);
+  // 1) resolve/create the customer ACCOUNT so they can actually LOG IN. When we
+  //    create a fresh login the customer never chose a password, so we email a
+  //    signed set-password link (below). Track what WE created for clean rollback.
+  let clientId: string | null = null;
+  let createdAuthId: string | null = null, createdContactChain = false, isNewLogin = false;
+  if (email) {
+    const existing = await findClientByEmail(email);
+    if (existing) { clientId = existing.id; }                       // reuse — never duplicate a customer
+    else {
+      const auth = await createAuthUser(email, crypto.randomUUID() + 'Aa1!');
+      if ('id' in auth) {
+        createdAuthId = auth.id;
+        const chain = await createContactAndClient(auth.id, email, businessName);
+        if ('error' in chain) { await deleteAuthUser(auth.id); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
+        clientId = chain.clientId; createdContactChain = true; isNewLogin = true;
+      } else if (auth.error === 'account_exists') {                 // they already sign in; link a client by email if missing
+        clientId = (await findClientByEmail(email))?.id || null;
+        if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; }
+      } else return json({ error: 'auth_failed', message: 'We couldn’t set up the customer’s login — please try again.' }, 502, cors);
+    }
+  } else {
+    // no email on the deal → a studio-managed workspace (no self-serve login yet; invite later)
+    const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, status: 'active' }) });
+    clientId = rows(ci)[0]?.id || null;
+  }
+  if (!clientId) return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors);
 
   // 2) reuse the ONE idempotent provisioning path (entitlement + site + hosting + seeds + first-run)
   const prov = await provisionForSignup({ clientId, businessName, plan, patch: { status: 'active' } as any, actorEmail: principal.email });
   if (!prov.ok) {
-    await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); // roll back the account on provision failure
+    if (createdContactChain) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created
     const msg = prov.error === 'hosting_unconfigured' ? 'The account was created but hosting isn’t available in this environment.' : 'We created the account but hit a snag provisioning the workspace.';
     return json({ error: 'provision_incomplete', message: msg }, 502, cors);
   }
@@ -357,10 +382,23 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: prov.siteId } });
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
-  // 4) onboarding handoff — welcome the customer into the EXISTING guided first-run
-  if (email) sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
-    `<p>Welcome! Your workspace is set up and ready.</p><p>Get started here: <a href="${siteUrl()}/get-started.html">open your workspace</a>. You can sign in any time at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
-  ).catch(() => {});
+  // 4) ACCESS + onboarding handoff. A brand-new login gets a signed set-password
+  //    link (they never chose a password); an existing login just gets a welcome.
+  //    Both land in the EXISTING guided first-run. Best-effort (email may no-op).
+  let invited = false;
+  if (email) {
+    if (isNewLogin) {
+      const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html`);
+      invited = !!link;
+      sendEmail(email, 'Welcome to Studio OS — set up your login',
+        `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — then you’ll land in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
+      ).catch(() => {});
+    } else {
+      sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
+        `<p>Welcome! Your workspace is set up and ready.</p><p>Sign in at <a href="${siteUrl()}/portal.html">your portal</a>, then open <a href="${siteUrl()}/get-started.html">your guided setup</a>.</p>`,
+      ).catch(() => {});
+    }
+  }
 
-  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, hosted: prov.hosted, onboarding: '/get-started.html' } }, 200, cors);
+  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, hosted: prov.hosted, invited, onboarding: '/get-started.html' } }, 200, cors);
 }

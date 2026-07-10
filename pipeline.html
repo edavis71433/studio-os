@@ -23,6 +23,7 @@
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
   .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.danger{background:var(--warn)}
   .btn:disabled{opacity:.5;pointer-events:none}
   .spacer{flex:1}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -39,8 +40,11 @@
   .sec{margin-top:16px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px}
   .steps{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
   .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-  input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
-  label{font-size:12.5px;color:var(--soft);display:block;margin:8px 0 3px}
+  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+  form.mini .grid{display:flex;gap:8px;flex-wrap:wrap}
+  input,textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+  textarea{min-height:90px;resize:vertical}
+  label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
@@ -56,6 +60,17 @@
   <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span></div>
   <div id="list" aria-live="polite"></div>
 </div>
+
+<dialog id="formDlg" aria-label="New deal">
+  <form id="dealForm" class="dbody" style="max-height:none">
+    <div style="font-family:var(--serif);font-size:20px;margin-bottom:12px">New deal</div>
+    <label for="f-title">Deal title</label>
+    <input id="f-title" required maxlength="200" placeholder="e.g. Acme website" autocomplete="off">
+    <label for="f-email" style="margin-top:10px">Client email <span class="mut">(optional — enables their login on convert)</span></label>
+    <input id="f-email" type="email" maxlength="160" placeholder="name@business.com" autocomplete="off">
+    <div class="row2" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn ghost" id="f-cancel">Cancel</button><button type="submit" class="btn">Create deal</button></div>
+  </form>
+</dialog>
 
 <dialog id="detail" aria-label="Deal detail"><div id="detailInner"></div></dialog>
 
@@ -89,28 +104,50 @@ function renderFilters(){
 async function load(){
   if(window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
-    const q=FILTER?('?stage='+FILTER):'';
-    const res=await api('/sales/deals'+q);
+    const res=await api('/sales/deals'+(FILTER?('?stage='+FILTER):''));
     DEALS=res.data||[];
-    if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New inquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:newDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
+    if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New inquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
     $('list').innerHTML=DEALS.map(d=>`<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div></div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(d.stage)}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
 }
 
-function newDeal(){
-  const title=prompt('Deal title (e.g. “Acme website”)'); if(!title)return;
-  const email=prompt('Client email (optional)')||'';
-  (async()=>{
-    try{
-      let contactId=null;
-      if(email){ const c=await api('/sales/contacts','POST',{email,name:email.split('@')[0]}); contactId=c.data&&c.data.id; }
-      await api('/sales/deals','POST',{title,contact_id:contactId});
-      toast('Deal added'); load();
-    }catch(e){ toast(e.message,true); }
-  })();
+// ── new deal: an accessible in-dialog form (no prompt) ──
+function openNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
+$('newDeal').onclick=openNewDeal;
+$('f-cancel').onclick=()=>$('formDlg').close();
+$('dealForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const title=$('f-title').value.trim(); if(!title){toast('A deal needs a title.',true);return;}
+  const email=$('f-email').value.trim();
+  const btn=e.submitter; if(btn)btn.disabled=true;
+  try{
+    let contactId=null;
+    if(email){ const c=await api('/sales/contacts','POST',{email,name:email.split('@')[0]}); contactId=c.data&&c.data.id; }
+    await api('/sales/deals','POST',{title,contact_id:contactId});
+    $('formDlg').close(); toast('Deal added'); load();
+  }catch(err){ toast(err.message,true); } finally{ if(btn)btn.disabled=false; }
+};
+
+// ── an inline mini-form helper (replaces prompt) ──
+function miniForm(host, fields, onSubmit){
+  host.innerHTML='';
+  const f=document.createElement('form'); f.className='mini';
+  const inputs={};
+  fields.forEach(fl=>{
+    const lab=document.createElement('label'); lab.textContent=fl.label; lab.htmlFor='mf-'+fl.name; f.appendChild(lab);
+    const el=document.createElement(fl.type==='textarea'?'textarea':'input'); el.id='mf-'+fl.name;
+    if(fl.type&&fl.type!=='textarea') el.type=fl.type; if(fl.placeholder)el.placeholder=fl.placeholder; if(fl.step)el.step=fl.step;
+    f.appendChild(el); inputs[fl.name]=el;
+  });
+  const row=document.createElement('div'); row.className='row2'; row.style.justifyContent='flex-end';
+  const cancel=document.createElement('button'); cancel.type='button'; cancel.className='btn ghost'; cancel.textContent='Cancel';
+  const save=document.createElement('button'); save.type='submit'; save.className='btn'; save.textContent='Save';
+  row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
+  cancel.onclick=()=>host.innerHTML='';
+  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{await onSubmit(Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()])));}catch(err){toast(err.message,true);save.disabled=false;}};
+  setTimeout(()=>{const first=f.querySelector('input,textarea'); if(first)first.focus();},20);
 }
-$('newDeal').onclick=newDeal;
 
 async function openDeal(id){
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
@@ -129,20 +166,25 @@ async function openDeal(id){
         <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
       <div class="dbody">
         <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Converted ✓</span>':stepBtns||'<span class="mut">—</span>'}</div></div>
-        <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button></div></div>
-        <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button></div></div>
+        <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button></div><div id="propForm"></div></div>
+        <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button></div><div id="conForm"></div></div>
         <div class="sec"><h3>Convert to customer</h3>
-          ${d.converted_client_id?`<div class="mut">Converted — workspace <code>${esc(d.converted_site_id||'')}</code>. The customer was welcomed into onboarding.</div>`:
-            `<button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert & provision workspace':'Sign the agreement first'}</button>`}
+          ${d.converted_client_id?`<div class="mut">Converted — workspace <code>${esc(d.converted_site_id||'')}</code>. The customer was invited to set their login and welcomed into onboarding.</div>`:
+            `<div id="convWrap"><button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert & provision workspace':'Sign the agreement first'}</button></div>`}
         </div>
       </div>`;
     $('closeD').onclick=()=>{dlg.close();history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():''));};
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+b.dataset.stage);openDeal(id);load();}catch(e){toast(e.message,true);}});
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.url?' — link copied':''));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});toast('Agreement sent'+(r.url?' — link copied':''));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
-    const addProp=$('addProp'); if(addProp) addProp.onclick=async()=>{const label=prompt('Line item label');if(!label)return;const price=Math.round(parseFloat(prompt('Price (USD)')||'0')*100);try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:[{label,qty:1,unit_cents:price}]});toast('Proposal drafted');openDeal(id);}catch(e){toast(e.message,true);}};
-    const addCon=$('addCon'); if(addCon) addCon.onclick=async()=>{const body=prompt('Agreement text');if(!body)return;try{await api('/sales/deals/'+id+'/contracts','POST',{body});toast('Agreement drafted');openDeal(id);}catch(e){toast(e.message,true);}};
-    const conv=$('convert'); if(conv) conv.onclick=async()=>{if(!confirm('Convert this deal to a customer and provision their workspace?'))return;conv.disabled=true;try{const r=await api('/sales/deals/'+id+'/convert','POST',{});toast('Converted — workspace provisioned'+(r.data&&r.data.idempotent?' (already done)':''));openDeal(id);load();}catch(e){toast(e.message,true);conv.disabled=false;}};
+    const addProp=$('addProp'); if(addProp) addProp.onclick=()=>miniForm($('propForm'),[{name:'label',label:'Line item',placeholder:'Website design'},{name:'price',label:'Price (USD)',type:'number',step:'0.01',placeholder:'2500'}],async(v)=>{if(!v.label){toast('Add a label.',true);return;}await api('/sales/deals/'+id+'/proposals','POST',{line_items:[{label:v.label,qty:1,unit_cents:Math.round(parseFloat(v.price||'0')*100)}]});toast('Proposal drafted');openDeal(id);});
+    const addCon=$('addCon'); if(addCon) addCon.onclick=()=>miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…'}],async(v)=>{if(!v.body){toast('Add the agreement text.',true);return;}await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});toast('Agreement drafted');openDeal(id);});
+    const conv=$('convert'); if(conv) conv.onclick=()=>{
+      // two-step confirm (no confirm() dialog)
+      const wrap=$('convWrap'); wrap.innerHTML=`<div class="mut" style="margin-bottom:8px">This creates the customer’s account + workspace and invites them to sign in. Continue?</div><div class="row2"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, convert</button></div>`;
+      $('convNo').onclick=()=>openDeal(id);
+      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const r=await api('/sales/deals/'+id+'/convert','POST',{});toast('Converted — workspace provisioned'+(r.data&&r.data.idempotent?' (already done)':(r.data&&r.data.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(e.message,true);$('convYes').disabled=false;}};
+    };
   }catch(e){ $('detailInner').innerHTML='<div class="dbody mut">'+esc(e.message)+'</div>'; }
 }
 

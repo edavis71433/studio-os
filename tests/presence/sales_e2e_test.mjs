@@ -64,6 +64,7 @@ if (conSent.body?.url) {
 const conv = await call(`/sales/deals/${dealId}/convert`, 'POST', {});
 ok('7. deal converted once', conv.ok && conv.body?.data?.converted);
 ok('8. a customer + workspace/site was created', !!conv.body?.data?.client_id && !!conv.body?.data?.site_id);
+ok('9. the customer receives access (invited to set a login)', conv.body?.data?.invited === true || conv.body?.data?.idempotent === true);
 ok('10. lands in the existing onboarding', conv.body?.data?.onboarding === '/get-started.html' || conv.body?.data?.idempotent);
 
 // 11. retry convert → no duplicate
