@@ -286,6 +286,7 @@ interface AskAIOpts {
   requestId?: string;
   tenantId?: string | null;
   harden?: boolean;                                // prepend injection-hardening to system (default true)
+  temperature?: number;                            // optional sampling temperature (omit → provider default)
 }
 interface AskAIResult {
   ok: boolean;
@@ -352,7 +353,7 @@ async function askAI(opts: AskAIOpts): Promise<AskAIResult> {
           // opt into prompt caching on the pinned api version (harmless if GA)
           ...(cacheSystem ? { 'anthropic-beta': 'prompt-caching-2024-07-31' } : {}),
         },
-        body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: turns }),
+        body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: turns, ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}) }),
         signal: AbortSignal.timeout(timeoutMs),
       });
       const j = await res.json();
@@ -711,6 +712,105 @@ function notifyShell(heading: string, lines: string[], cta?: { label: string; hr
 }
 
 // ── DEEP AUDIT ─────────────────────────────────────────────────────────────
+// ── SSRF protection for the public site-fetching tools (audit / AI review) ──
+// These tools fetch a visitor-supplied URL server-side. Without this guard a
+// crafted URL — or a redirect from a public site — could point the fetch at
+// localhost, a private range, or the cloud-metadata endpoint. We validate the
+// initial URL AND every redirect target, and fail safely (a block reads as
+// "unreachable" to the caller). Legitimate public sites are unaffected.
+function _ipv4Blocked(ip: string): boolean {
+  const p = ip.split('.').map((n) => Number(n));
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const [a, b] = p;
+  if (a === 0 || a === 127) return true;              // this-host / loopback
+  if (a === 10) return true;                          // private
+  if (a === 172 && b >= 16 && b <= 31) return true;   // private
+  if (a === 192 && b === 168) return true;            // private
+  if (a === 169 && b === 254) return true;            // link-local incl. 169.254.169.254 metadata
+  if (a === 100 && b >= 64 && b <= 127) return true;  // CGNAT
+  if (a >= 224) return true;                          // multicast / reserved
+  return false;
+}
+function _ipBlocked(host: string): boolean {
+  const s = host.toLowerCase().replace(/^\[|\]$/g, '');
+  if (s.includes(':')) {                              // IPv6
+    if (s === '::1' || s === '::') return true;
+    if (/^fe[89ab]/.test(s)) return true;             // link-local fe80::/10
+    if (s.startsWith('fc') || s.startsWith('fd')) return true; // unique-local fc00::/7
+    const m = s.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/); // IPv4-mapped ::ffff:a.b.c.d
+    if (m) return _ipv4Blocked(m[1]);
+    return false;
+  }
+  return _ipv4Blocked(s);
+}
+function _isIpLiteral(host: string): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':');
+}
+async function assertPublicHttpUrl(raw: string): Promise<URL> {
+  const u = new URL(raw);
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('blocked_scheme');
+  const host = u.hostname.toLowerCase().replace(/\.$/, '');
+  if (!host) throw new Error('blocked_host');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
+      host.endsWith('.internal') || host === 'metadata' || host === 'metadata.google.internal') {
+    throw new Error('blocked_host');
+  }
+  if (_isIpLiteral(host)) {
+    if (_ipBlocked(host)) throw new Error('blocked_ip');
+    return u;
+  }
+  // Hostname: resolve and reject if it maps to a private/loopback address (blocks
+  // DNS-rebinding-to-internal). Best-effort — if resolution is unavailable in this
+  // runtime, the literal checks above (localhost / private-IP / metadata) still hold.
+  const resolveDns = (Deno as unknown as { resolveDns?: (h: string, t: string) => Promise<string[]> }).resolveDns;
+  if (typeof resolveDns === 'function') {
+    try {
+      const [a, aaaa] = await Promise.all([
+        resolveDns(host, 'A').catch(() => [] as string[]),
+        resolveDns(host, 'AAAA').catch(() => [] as string[]),
+      ]);
+      const ips = [...(a || []), ...(aaaa || [])];
+      if (ips.length && ips.some((ip) => _ipBlocked(ip))) throw new Error('blocked_resolved');
+    } catch (e) {
+      if (e instanceof Error && e.message === 'blocked_resolved') throw e;
+      // transient DNS error: let the fetch attempt proceed / fail naturally
+    }
+  }
+  return u;
+}
+
+// Best-effort audit-lead capture with de-duplication: reuse a recent row for the
+// same tool+url instead of inserting a duplicate, and let a later step (e.g. the
+// visitor asking for the emailed report) patch fields like client_email onto it.
+async function recordAuditLead(
+  row: { tool: string; url?: string | null; business_name?: string | null; business_type?: string | null; city?: string | null; client_email?: string | null; findings?: unknown },
+  opts?: { windowMin?: number },
+): Promise<void> {
+  const key = SB_SERVICE || Deno.env.get('SUPABASE_ANON_KEY') || '';
+  if (!key) return;
+  const H = { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
+  const windowMin = opts?.windowMin ?? 30;
+  try {
+    const payload: Record<string, unknown> = {};
+    for (const k of ['tool', 'url', 'business_name', 'business_type', 'city', 'client_email', 'findings'] as const) {
+      const v = (row as Record<string, unknown>)[k];
+      if (v !== undefined && v !== null) payload[k] = v;
+    }
+    let existingId: string | null = null;
+    if (row.url) {
+      const since = new Date(Date.now() - windowMin * 60000).toISOString();
+      const q = `${SB_URL}/rest/v1/audit_leads?tool=eq.${encodeURIComponent(row.tool)}&url=eq.${encodeURIComponent(row.url)}&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=1&select=id`;
+      const r = await fetch(q, { headers: H });
+      if (r.ok) { const rows = await r.json().catch(() => []); if (Array.isArray(rows) && rows[0] && rows[0].id != null) existingId = String(rows[0].id); }
+    }
+    if (existingId) {
+      await fetch(`${SB_URL}/rest/v1/audit_leads?id=eq.${encodeURIComponent(existingId)}`, { method: 'PATCH', headers: { ...H, 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
+    } else {
+      await fetch(`${SB_URL}/rest/v1/audit_leads`, { method: 'POST', headers: { ...H, 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
+    }
+  } catch (_) { /* best-effort: never block the tool on logging */ }
+}
+
 async function deepAudit(targetUrl: string) {
   const out: any = {
     url: targetUrl, domain: '', https: false, fetchedHtml: false,
@@ -734,15 +834,30 @@ async function deepAudit(targetUrl: string) {
   const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   let html = '';
   try {
-    const res = await fetch(normalized, {
-      headers: { 'User-Agent': BROWSER_UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
-      signal: AbortSignal.timeout(9000), redirect: 'follow',
-    });
-    if (res.ok) {
+    let current = normalized;
+    let res: Response | null = null;
+    for (let hop = 0; hop < 5; hop++) {
+      await assertPublicHttpUrl(current);              // SSRF: validate initial URL + every redirect target
+      const r = await fetch(current, {
+        headers: { 'User-Agent': BROWSER_UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+        signal: AbortSignal.timeout(9000), redirect: 'manual',
+      });
+      if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+        const loc = new URL(r.headers.get('location') as string, current).toString();
+        try { await r.body?.cancel(); } catch (_e) { /* */ }
+        current = loc;
+        continue;                                       // re-validated at the top of the next iteration
+      }
+      res = r;
+      break;
+    }
+    if (res && res.ok) {
       html = (await res.text()).slice(0, 600000);
       out.fetchedHtml = true;
+      out.url = current;
+      try { const fu = new URL(current); out.domain = fu.hostname; out.https = fu.protocol === 'https:'; } catch (_e) { /* */ }
     }
-  } catch (_) { /* ignore */ }
+  } catch (_) { /* blocked or unreachable → html stays empty → caller returns 'unreachable' */ }
 
   if (html) {
     const lc = html.toLowerCase();
@@ -1107,7 +1222,7 @@ OUTPUT: respond with ONLY valid JSON (no markdown, no preamble) in EXACTLY this 
   ],
   "next_steps": ["3 to 5 short, prioritized, plain-English actions, highest impact first"]
 }
-Give 5 to 7 blocks. Always include at least one "win". Every block MUST have an "evidence" field grounded in the provided facts.`;
+Give 5 to 7 blocks (fewer is fine if the facts do not support more — never pad to hit a number). Each block must cover a DISTINCT issue: do not repeat the same recommendation or the same evidence in two blocks, and if several facts point to one fix, combine them into a single block. Do not contradict yourself across blocks. Always include at least one "win". Every block MUST have an "evidence" field grounded in the provided facts.`;
 
 // Structural enforcement of "cite the evidence source" + a usable shape: the
 // gateway retries if the model omits evidence on any finding.
@@ -1150,6 +1265,7 @@ async function analyzeWebsite(opts: {
     system: WEBSITE_ANALYSIS_SYSTEM, input,
     schema: WEBSITE_ANALYSIS_SCHEMA,
     maxTokens: opts.maxTokens ?? 2000, timeoutMs: 45000,
+    temperature: 0.4,   // evidence-constrained analytical task → lower temp for consistency; different facts still yield different findings
     requestId: opts.requestId, tenantId: opts.tenantId ?? null,
   });
   if (!r.ok) return { ok: false, error: r.error || 'analysis_failed' };
@@ -10068,20 +10184,15 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
         const data = await aiCritique(url, businessType || 'a small business', goal || 'getting more customers');
         if (data.error) return json({ error: data.error, message: data.message || null });
         try {
-          const key = SB_SERVICE || Deno.env.get('SUPABASE_ANON_KEY') || '';
-          if (key) {
-            await fetch(`${SB_URL}/rest/v1/audit_leads`, {
-              method: 'POST',
-              headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-              body: JSON.stringify({
-                tool: 'ai_critique',
-                business_name: (data && data.domain) ? data.domain : null,
-                url: url || null,
-                business_type: businessType || null,
-                findings: { goal: goal || null, summary: (data && data.summary) ? data.summary : null },
-              }),
-            });
-          }
+          // De-duplicated capture: reuse a recent row for the same url instead of
+          // inserting a duplicate on repeat runs (frontend also guards double-clicks).
+          await recordAuditLead({
+            tool: 'ai_critique',
+            business_name: (data && data.domain) ? data.domain : null,
+            url: url || null,
+            business_type: businessType || null,
+            findings: { goal: goal || null, summary: (data && data.summary) ? data.summary : null },
+          });
         } catch (_) { /* never block the review on logging */ }
         return json({ data });
       } catch (e) {
@@ -10093,6 +10204,17 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       const { email, url, result } = body;
       if (!email || !result) return json({ error: 'email and result required' }, 400);
       const domain = (result && result.domain) ? result.domain : (url || 'your site');
+      // Persist the requested email onto the existing AI-review lead (reuses the
+      // audit_leads row from the run via recordAuditLead's dedup) — mirrors the
+      // Report Card pattern; no parallel CRM flow.
+      try {
+        await recordAuditLead({
+          tool: 'ai_critique',
+          url: url || null,
+          business_name: (result && result.domain) ? result.domain : null,
+          client_email: email,
+        });
+      } catch (_) { /* best-effort: attach the email to the existing lead */ }
       try {
         const visitorEmailed = await emailOk(email, `Your free website review for ${domain}`, critiqueEmailHtml(domain, result), CLIENT_OPTS);
         const ericEmailed = await emailOk(ERIC, `New AI review run: ${domain}`, notifyShell(
