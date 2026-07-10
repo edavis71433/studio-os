@@ -365,7 +365,11 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   //    create a fresh login the customer never chose a password, so we email a
   //    signed set-password link (below). Track what WE created for clean rollback.
   let clientId: string | null = null;
-  let createdAuthId: string | null = null, createdContactChain = false, isNewLogin = false;
+  // `createdClient` = WE inserted the clients row on THIS convert (any of the three
+  // creation paths below) → safe to delete on rollback. It is NEVER set for a REUSED
+  // existing customer (findClientByEmail hit), so rollback can never delete someone
+  // else's account. `createdAuthId` separately gates deleting a login we minted.
+  let createdAuthId: string | null = null, createdClient = false, isNewLogin = false;
   if (email) {
     const existing = await findClientByEmail(email);
     if (existing) { clientId = existing.id; }                       // reuse — never duplicate a customer
@@ -375,23 +379,23 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
         createdAuthId = auth.id;
         const chain = await createContactAndClient(auth.id, email, businessName);
         if ('error' in chain) { await deleteAuthUser(auth.id); await unclaim(); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
-        clientId = chain.clientId; createdContactChain = true; isNewLogin = true;
+        clientId = chain.clientId; createdClient = true; isNewLogin = true;
       } else if (auth.error === 'account_exists') {                 // they already sign in; link a client by email if missing
         clientId = (await findClientByEmail(email))?.id || null;
-        if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; }
+        if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true; }
       } else { await unclaim(); return json({ error: 'auth_failed', message: 'We couldn’t set up the customer’s login — please try again.' }, 502, cors); }
     }
   } else {
     // no email on the deal → a studio-managed workspace (no self-serve login yet; invite later)
     const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, status: 'active' }) });
-    clientId = rows(ci)[0]?.id || null;
+    clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true;
   }
   if (!clientId) { await unclaim(); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
 
   // 2) reuse the ONE idempotent provisioning path (entitlement + site + hosting + seeds + first-run)
   const prov = await provisionForSignup({ clientId, businessName, plan, patch: { status: 'active' } as any, actorEmail: principal.email });
   if (!prov.ok) {
-    if (createdContactChain) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created (cascade drops site+entitlement)
+    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created (cascade drops site+entitlement)
     await unclaim();
     const msg = prov.error === 'hosting_unconfigured' ? 'The account was created but hosting isn’t available in this environment.' : 'We created the account but hit a snag provisioning the workspace.';
     return json({ error: 'provision_incomplete', message: msg }, 502, cors);
@@ -404,7 +408,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   if (!up.ok || !rows(up)[0]) {
     // stamp failed (e.g. this customer is already linked to another deal). Roll back
     // ONLY what WE created (never a reused existing customer); release the claim.
-    if (createdContactChain) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); }
+    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); }
     await unclaim();
     const fresh = await loadDeal(site.id, dealId);
     if (fresh?.converted_client_id) return json({ data: { converted: true, client_id: fresh.converted_client_id, site_id: fresh.converted_site_id, idempotent: true } }, 200, cors);
