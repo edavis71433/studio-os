@@ -173,5 +173,22 @@ Per the Platform Secrecy Rule, the public site must never expose the CMS/Studio 
 
 ---
 
+---
+
+## RESOLUTION LOG (fixes applied 2026-07-10)
+
+Committed in 8 reviewable waves (app pages are local, under the fence).
+
+- **Wave 1 — secrecy + high correctness:** `noindex` on 12 internal/app pages (fetchable, not searchable); presence duplicate `shell.js`; signup trial bait-and-switch; connections-callback XSS; get-started await; client unread + null-guard; portal dead Home CTAs + feedback-ID + visit-stamp order; 3 legal pages' wrong metadata; client-archive-ui CSS paths; project-survey placeholder Place ID.
+- **Wave 2 — systemic stale-token:** `onAuthStateChange` across `shell.js` + 12 app pages (sessions no longer die after ~1h).
+- **Wave 3 — announce dynamic regions:** `role=alert`/`aria-live` on signup, set-password, and the 4 public calculators' result/error regions.
+- **Wave 4 — dark-mode + dead CSS:** today.html `--faint` + hardcoded colors; removed dead `.appnav` CSS (connections, visual-studio).
+- **Wave 5 — success-on-failure + data:** ai-critique email only confirms on real success; report-card sends businessType + records newsletter; files.html download `noopener`.
+- **Wave 6 — audit.html:** hang-safety (deepCall signal + allSettled `.catch`); double-submit guard; FAQ keyboard-operable; FCP threshold (s→ms); email-HTML XSS escaping.
+- **Wave 7 — public calculators:** pricing-estimator + local-visibility options keyboard-operable; local-visibility Q6 labels.
+- **Wave 8 — admin-growth:** `res.ok` guard; dead "Try again"; date off-by-one (local-noon anchor).
+
+**Remaining (catalogued above, not yet applied):** the long tail — most §2 modal focus-traps + clickable-`<div>` rows across portal/files/admin; the 19k console's shared-helper/`callEdge` refactor + per-keystroke re-render/debounce/dead-module cleanup (needs careful staging); §3 SEO/meta additions across the marketing pages; §5 naming consolidation; §6 legal completeness (owner/counsel); §7 remaining dead-code/retirement. These are safe to do incrementally; none block the fixes above.
+
 ## Cross-cutting strengths worth preserving
 Consistent `esc()`-before-`innerHTML` across app pages (no injection found in presence/portal); per-invoice Stripe links (no shared link); optimistic-message reconcile (portal); the RLS verification harness; native `<dialog>` in pipeline/projects; reduced-motion + dark-mode handled throughout the app; `withScope` UUID-guarded `?client=`; open-redirect whitelist in `set-password.html`.
