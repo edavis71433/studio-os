@@ -86,6 +86,7 @@ const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABA
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
 const STAGES=['lead','qualified','proposal','contract','won','lost'];
 let TOKEN="",FILTER="",DEALS=[];
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 
 async function api(path,method,body){

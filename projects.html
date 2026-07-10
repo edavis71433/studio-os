@@ -105,6 +105,7 @@ const P_NEXT={active:['on_hold','complete','archived'],on_hold:['active','comple
 const T_NEXT={todo:['in_progress','blocked','done'],in_progress:['todo','blocked','done'],blocked:['todo','in_progress'],done:['todo','in_progress']};
 const STATUSES=['active','on_hold','complete','archived'];
 let TOKEN="",FILTER="",STUDIO=true;
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 
 async function api(path,method,body){
