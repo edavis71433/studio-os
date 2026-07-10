@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **✅ PHASE 1 COMPLETE (M1–M10, Jul 9 2026)** — official record: [PHASE-1-COMPLETION-REPORT.md]; readiness: [PRODUCTION-READINESS-ASSESSMENT.md]. **Next: Phase 2 — Product Integration & Consolidation** (do not begin without explicit approval). All engineering is done; remaining Phase-1 items are owner activation only (PITR + live DR drill + load tuning + CI gate + the push + human QA).
+**Current active milestone:** **Phase 2 · P2-B — App Shells, Navigation & Shared Foundations** (P2-A ✅ done Jul 9 — the frozen capability classification + rebuild list; see `PHASE-2-EXECUTION-PLAN.md`). Phase 1 ✅ COMPLETE ([PHASE-1-COMPLETION-REPORT.md]); its remaining items are owner activation only. Phase 2 = rebuild worthy capabilities multi-tenant + optimize (DoD) + retire `clever-api` after verified parity (data is disposable). Do not begin P2-B implementation without explicit approval.
 
 ---
 
@@ -35,14 +35,17 @@ Scale-safety on the existing deterministic engine. See `PRESENCE-CMS-PHASE-1-EXE
 
 ---
 
-## 🚧 Phase 2 — Product Integration & Consolidation
-Functional seamlessness first (visual polish → the live pass).
-- **WS1 — Two-App Consolidation.** Collapse ~28 signed-in pages into Studio App + Client App; preserve every capability; deep-link + navigation continuity.
-  - **⟐ Sub-workstream + top risk: `clever-api` sunset.** The transitional pages are backed by the 12k-line legacy `clever-api`; they can't be removed until their live features are migrated onto the presence-function modules. This is the single biggest technical-debt sub-project — plan + risk-manage it explicitly, not as a cleanup bullet.
-- **WS2 — Platform Cohesion.** Functional continuity Public ↔ Studio ↔ Client; end-to-end workflow verification (the lifecycle handoff table); shared terminology + navigation.
-- **WS3 — Trust Layer.** Publishing confirmations · validation messaging · progress indicators · content/website health · publish-history visibility.
-- **WS4 — Client Experience.** Guided workflows · onboarding · CMS navigation · discoverability · reduced friction.
-- **⟐ QA is continuous, not deferred to Phase 6** — each workstream gets its own QA pass (these touch huge UI surface).
+## 🚧 Phase 2 — Capability Rebuild, Optimization & Legacy Retirement (ACTIVE)
+**Approved direction (Jul 9 2026):** rebuild the capabilities worth keeping using the correct **multi-tenant** architecture, **optimize as part of Definition of Done**, verify parity, then retire `clever-api` + its **disposable** fake data. **Not a data migration, not a code transplant** — legacy is a functional reference. Full plan + the frozen A/B/C/D/E capability classification: `PHASE-2-EXECUTION-PLAN.md`. QA + optimization are per-milestone, never deferred.
+Consolidated into the fewest end-to-end milestones (each delivers a complete workflow):
+- ✅ **P2-A — Product Boundary & Legacy Freeze** — classification frozen (Keep/Rebuild/Internal/Remove/Future) + rebuild list + retirement toggles. *(done Jul 9)*
+- ⏳ **P2-B — App Shells, Navigation & Shared Foundations** *(next active · safest first code)* — Studio + Client shells on one realm (`shell.js`), server `buildNav`, design-system adoption, retire duplicate shells (`portal.html`/`portal-workspace.html`).
+- ⏳ **P2-C — Sales & Customer Lifecycle** — leads · CRM · pipeline · proposals/quotes · contracts · convert→provisioned Client App · onboarding (multi-tenant, end-to-end).
+- ⏳ **P2-D — Projects, Communication & Service Delivery** — projects · tasks · milestones · files · messaging · notifications · surveys · approvals · support · reporting.
+- ⏳ **P2-E — Billing, Entitlements & Account Lifecycle** — invoices · payments · subscriptions · entitlements · **dunning · cancellation · refunds · account deletion · Terms** (reuse the ONE Stripe infra; absorbs the former Phase-4 billing-lifecycle items).
+- ⏳ **P2-F — Website, CMS, Analytics & AI Integration** — integrate the Phase-1 CMS/analytics/audits/AI/connections into the two-app experience + cross-surface deep links. *(Do not rebuild Phase 1.)*
+- ⏳ **P2-G — Legacy Retirement & Capability-Parity Verification** — verified parity → staged removal of disposable data, obsolete pages/routes/tables (dependency-checked), unused secrets/jobs; final retirement report.
+- **Deferred to Future (Phase 8):** Growth Partnership (productized) · advanced signals/reasoning BI · cold-outreach prospecting · signals-driven opportunity automation. **Kept internal (isolated) meanwhile:** DDS admin-DB console · Calendly · revenue/practice BI.
 
 ---
 
@@ -52,12 +55,10 @@ Functional seamlessness first (visual polish → the live pass).
 ---
 
 ## 🚧 Phase 4 — SaaS Packaging
-Final pricing · founder pricing · support tiers · AI usage limits · entitlements · subscription validation · upgrade paths · billing lifecycle.
-- **⟐ Dunning / failed-payment recovery** — the Stripe webhook already sees `payment_intent.payment_failed`; nothing acts on it. Add retry/grace → churn prevention (where SaaS revenue leaks).
-- **⟐ Self-serve cancellation + refund flow.**
-- **⟐ Self-serve account deletion + Terms of Service** — R1 from the data-governance audit; account deletion is often a legal (GDPR/CCPA) requirement for public self-serve.
+Final pricing · founder pricing · support tiers · AI usage limits · upgrade paths.
 - **⟐ Customer help center / KB** — "support tiers" needs a support *mechanism* (P10 from the gap analysis).
 - **⟐ Confirm a hard per-tenant AI cost ceiling** before public self-serve (partly there via capacity enforcement) — one abusive account shouldn't run up the model bill.
+- *(Moved to Phase 2 · P2-E: dunning/failed-payment recovery · self-serve cancellation + refund · self-serve account deletion + Terms — they belong in the end-to-end billing/account-lifecycle workflow rebuilt with the ONE Stripe infra.)*
 
 ---
 
