@@ -32,6 +32,7 @@ import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPor
 import { requestDeletion, cancelDeletion, coolingOffDays } from '../commerce/deletion.ts';
 import { recordAcceptance } from '../commerce/terms.ts';
 import { applyEntitlementPatch } from '../commerce/entitlement_sync.ts';
+import { checkAiCeiling } from '../commerce/metering.ts';
 
 const TRIAL_DAYS = 14;
 
@@ -200,11 +201,23 @@ async function handleSubscription(jwt: string, cors: Record<string, string>) {
   const ent = r.json?.[0];
   if (!ent) return json({ error: 'no_subscription', message: 'No subscription found for this account.' }, 404, cors);
   const def = planByKey(String(ent.plan));
+  // The customer's AI position for the month — a calm true/false, NEVER a number
+  // or a dollar figure (Law 13). Lets the billing surface say "AI generation for
+  // this month is used up — resets next month" honestly.
+  const ceiling = await checkAiCeiling(site.client_id);
+  const aiPooled = ceiling.ceiling_usd == null;   // pooled-by-contract plan → no hard cap
+  const aiAtLimit = ceiling.allowed === false;
+  // Does this customer ALSO have agency SERVICE billing (invoices), which is
+  // billed SEPARATELY from this software subscription? Keep the two distinct.
+  const invCount = (await svc(`invoices?client_id=eq.${encodeURIComponent(site.client_id)}&deleted_at=is.null&select=id&limit=1`)).json;
   return json({ data: {
+    billing_type: 'saas',   // this is the Studio OS SOFTWARE subscription (distinct from agency service invoices)
     plan: ent.plan, plan_name: def?.name || ent.plan, status: ent.status, term: ent.term,
     founder: ent.founder === true, trial_ends_at: ent.trial_ends_at, current_period_end: ent.current_period_end,
     cancel_at_period_end: ent.cancel_at_period_end === true, in_grace: !!ent.grace_until, grace_until: ent.grace_until,
     can_manage_billing: !!ent.plan && (def?.selfServe ?? false),
+    ai_pooled: aiPooled, ai_at_limit: aiAtLimit,   // calm position, no numbers
+    has_service_billing: Array.isArray(invCount) && invCount.length > 0,   // → see /client/billing
   } }, 200, cors);
 }
 

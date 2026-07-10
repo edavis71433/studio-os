@@ -123,7 +123,25 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
     const deliverables = (studio ? rows(dl) : rows(dl).filter((d) => d.client_visible === true && d.status === 'shared'));
     const approvals = forViewer(rows(ap), studio);
     const progress = progressOf(studio ? tasksAll : tasksAll.filter((t) => t.client_visible === true));
-    return json({ data: { project, milestones, tasks, events, deliverables, approvals, progress, is_studio_view: studio } }, 200, cors);
+    // W11 — on the STUDIO side, surface the customer's authoritative SaaS
+    // subscription status (read-only). This is the customer's Studio OS SOFTWARE
+    // state, NOT something the agency bills — so the studio knows at a glance
+    // whether their customer's product is live/lapsed. Explicitly distinct from
+    // the service invoices the agency issues (presence project work).
+    let customer_saas: Record<string, unknown> | null = null;
+    if (studio) {
+      const link = rows(await svc(`presence_service_links?project_id=eq.${id}&select=customer_client_id&limit=1`))[0];
+      const custId = link?.customer_client_id;
+      if (custId) {
+        const ent = rows(await svc(`presence_entitlements?client_id=eq.${custId}&product=eq.presence&select=plan,status,cancel_at_period_end,grace_until,current_period_end&limit=1`))[0];
+        if (ent) customer_saas = {
+          billing_type: 'saas', plan: ent.plan, status: ent.status,
+          in_grace: !!ent.grace_until, cancel_at_period_end: ent.cancel_at_period_end === true,
+          current_period_end: ent.current_period_end, managed_by_customer: true,   // the agency views, never edits it
+        };
+      }
+    }
+    return json({ data: { project, milestones, tasks, events, deliverables, approvals, progress, is_studio_view: studio, customer_saas } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     if (!studio) return studioDenied(cors);

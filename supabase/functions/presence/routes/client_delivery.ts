@@ -30,6 +30,33 @@ async function clientEvent(agencySiteId: string, projectId: string, kind: string
     body: JSON.stringify({ project_id: projectId, site_id: agencySiteId, kind, actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail }) }).catch(() => {});
 }
 
+// ═══ SERVICE BILLING (the customer's invoices FROM the agency) ═══
+// This is billed SEPARATELY from the Studio OS software subscription (which is
+// /commerce/subscription): these invoices are the agency's project/service work.
+// Read-only here; scoped to the caller's own client_id. No numbers are hidden —
+// service invoices DO show amounts (unlike the AI usage surface), because they
+// are explicit human-agreed charges the customer must be able to see and pay.
+export async function handleClientBilling(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const me = customerOf(site);
+  if (!me) return json({ data: { billing_type: 'service', invoices: [], summary: { open_count: 0, paid_count: 0 } }, message: 'No service billing is linked to your account yet.' }, 200, cors);
+  const r = await svc(`invoices?client_id=eq.${me}&deleted_at=is.null&select=id,name,description,amount,status,due_date,paid_at,stripe_url,created_at&order=created_at.desc&limit=200`);
+  const list = rows(r).map((i) => ({
+    id: i.id, name: clean(i.name, 200), description: clean(i.description, 1000),
+    amount: i.amount, status: i.status, due_date: i.due_date, paid_at: i.paid_at,
+    // only expose a pay link for something that isn't already paid
+    pay_url: (i.status !== 'paid' && i.stripe_url) ? i.stripe_url : null,
+    created_at: i.created_at,
+  }));
+  const open = list.filter((i) => i.status !== 'paid' && i.status !== 'void' && i.status !== 'canceled');
+  const paid = list.filter((i) => i.status === 'paid');
+  return json({ data: {
+    billing_type: 'service',   // agency project work — SEPARATE from the software subscription
+    note: 'These are invoices from your studio for project and service work. Your Studio OS software subscription is billed separately.',
+    invoices: list,
+    summary: { open_count: open.length, paid_count: paid.length },
+  } }, 200, cors);
+}
+
 // ═══ PROJECTS (list + bundle + report) ═══
 export async function handleClientProjects(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const me = customerOf(site);

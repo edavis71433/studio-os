@@ -31,7 +31,7 @@ import { handleProjects, handleProject, handleProjectReport, handleProjectStatus
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
-import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage } from './routes/client_delivery.ts';
+import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling } from './routes/client_delivery.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -483,6 +483,7 @@ serve(async (req) => {
   //    Bridge). The customer is on THEIR OWN site; every action resolves their
   //    client + verifies a service_link before touching agency-site data. ──
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
+  if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
   if (route === '/client/notifications' && method === 'GET') return handleClientNotifications(req, site, principal, cors);
   if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
