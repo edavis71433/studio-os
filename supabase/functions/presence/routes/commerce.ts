@@ -27,11 +27,11 @@ import { supportFor } from '../commerce/support.ts';
 import { validEmail, passwordProblem, findClientByEmail, createAuthUser, deleteAuthUser, createContactAndClient, sendEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
-import { lifecycleCopy } from '../commerce/lifecycle.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
 import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPortal } from '../commerce/stripe.ts';
 import { requestDeletion, cancelDeletion, coolingOffDays } from '../commerce/deletion.ts';
 import { recordAcceptance } from '../commerce/terms.ts';
+import { applyEntitlementPatch } from '../commerce/entitlement_sync.ts';
 
 const TRIAL_DAYS = 14;
 
@@ -312,40 +312,6 @@ async function handleFirstRunDismiss(jwt: string, cors: Record<string, string>) 
 // already dedups by event id, and provisioning itself is rerunnable.
 const BILLING_SYNC_SECRET = Deno.env.get('BILLING_SYNC_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
 
-// PATCH only the defined keys of a patch onto an existing entitlement row.
-async function applyEntitlementPatch(clientId: string, patch: EntitlementPatch): Promise<boolean> {
-  // CP-3: reactivation detection — lapsed/paused → active gets a welcome-back
-  let priorStatus = '';
-  try { const pr = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(clientId)}&product=eq.presence&select=status&limit=1`); priorStatus = String(pr.json?.[0]?.status || ''); } catch { /* */ }
-  const body: Record<string, unknown> = { status: patch.status };
-  const carry: (keyof EntitlementPatch)[] = [
-    'plan', 'term', 'founder', 'trial_ends_at', 'stripe_customer_id', 'stripe_subscription_id',
-    'current_period_end', 'cancel_at_period_end', 'canceled_at', 'grace_until',
-  ];
-  for (const k of carry) if (patch[k] !== undefined) body[k] = patch[k] as unknown;
-  const r = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(clientId)}&product=eq.presence`, {
-    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body),
-  });
-  const applied = r.ok && Array.isArray(r.json) && r.json.length > 0;
-  if (applied && patch.status === 'active' && (priorStatus === 'lapsed' || priorStatus === 'paused')) {
-    try {
-      const [siteQ, clQ] = await Promise.all([
-        svc(`presence_sites?client_id=eq.${encodeURIComponent(clientId)}&select=id&limit=1`),
-        svc(`clients?id=eq.${encodeURIComponent(clientId)}&select=email,name&limit=1`),
-      ]);
-      const copy = lifecycleCopy('welcome_back', String(clQ.json?.[0]?.name || ''));
-      if (siteQ.json?.[0]?.id) {
-        await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-          method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
-          body: JSON.stringify({ site_id: siteQ.json[0].id, client_id: clientId, kind: 'welcome_back', period: new Date().toISOString().slice(0, 7), headline: copy.headline, body: copy.body, status: 'active' }),
-        });
-      }
-      if (clQ.json?.[0]?.email) sendEmail(clQ.json[0].email, copy.subject, copy.html).catch(() => {});
-    } catch { /* welcome-back is best-effort, never blocks billing truth */ }
-  }
-  return applied;
-}
-
 async function businessNameFor(clientId: string): Promise<string> {
   const r = await svc(`clients?id=eq.${encodeURIComponent(clientId)}&select=name&limit=1`);
   return String(r.json?.[0]?.name || '').slice(0, 120);
@@ -378,9 +344,14 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
       };
       const businessName = await businessNameFor(clientId);
       const prov = await provisionForSignup({ clientId, businessName, plan, patch, actorEmail: obj.customer_details?.email || obj.customer_email || null });
-      if (!prov.ok) return json({ error: 'provision_failed', detail: prov.error }, 502, cors);
+      if (!prov.ok) {
+        // M5 — make the failure LOUD and specific, not just a 502 the webhook echoes.
+        console.error(`[billing-sync] provision FAILED client=${clientId} plan=${plan} sub=${subscription || '?'}: ${prov.error || 'unknown'}`);
+        return json({ error: 'provision_failed', detail: prov.error }, 502, cors);
+      }
       // mark the signup provisioned (by session id, best-effort)
       if (obj.id) await svc(`presence_signups?stripe_session_id=eq.${encodeURIComponent(String(obj.id))}`, { method: 'PATCH', body: JSON.stringify({ status: 'provisioned', site_id: prov.siteId, stripe_customer_id: customer }) });
+      console.log(`[billing-sync] provisioned client=${clientId} plan=${plan} site=${prov.siteId}`);
       return json({ data: { provisioned: true, site_id: prov.siteId } }, 200, cors);
     }
 
@@ -393,7 +364,7 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
         const r = await svc(`presence_entitlements?stripe_subscription_id=eq.${encodeURIComponent(patch.stripe_subscription_id)}&select=client_id&limit=1`);
         clientId = String(r.json?.[0]?.client_id || '');
       }
-      if (!clientId) return json({ data: { ignored: true, reason: 'no_client' } }, 200, cors);
+      if (!clientId) { console.error(`[billing-sync] ${type} could not resolve a client (sub=${patch.stripe_subscription_id || '?'}) — ignored`); return json({ data: { ignored: true, reason: 'no_client' } }, 200, cors); }
       const applied = await applyEntitlementPatch(clientId, patch);
       let reprovisioned = false;
       if (patch.plan && isPlanKey(patch.plan)) {
@@ -416,6 +387,7 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
           }
         }
       }
+      console.log(`[billing-sync] ${type} client=${clientId} → status=${patch.status}${patch.plan ? ` plan=${patch.plan}` : ''}${reprovisioned ? ' reprovisioned' : ''}`);
       return json({ data: { synced: true, status: patch.status, reprovisioned } }, 200, cors);
     }
 

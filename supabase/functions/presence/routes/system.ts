@@ -14,6 +14,7 @@ import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runRenewalReminders } from '../commerce/lifecycle.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
+import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
@@ -203,6 +204,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'snapshot_gc') return json({ data: await reapSnapshots(limit ?? 200) }, 200, cors); // M7: prune old unreferenced snapshots
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
+      if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
       if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
       // default cycle ALSO fires any due scheduled publishes, so a single cron tick covers both
       const cycle = await runOperationsCycle({ limit });
@@ -210,6 +212,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const reconcile = await runReconcileStuckPublishes(50);   // M5: finalize stuck publishes every tick (no owner cron change)
       const lifecycle = await runLifecycleSweep(limit);   // Phase RL: one cron tick covers the revenue lifecycle too
       const deletion = await runDeletionSweep(25);        // P2-E W2: complete eligible account deletions (past cooling-off)
+      const reconcile_billing = await runBillingReconcile(30);   // P2-E W7: correct any entitlement drift vs Stripe (missed webhooks)
       const digest = await runWeeklyDigest();             // CP-3: the Monday routine, automated (7-day dedupe)
       const domains = await runDomainWatch(10);           // INF: RDAP expiry+registrar, 24h per-domain dedupe
       const leads = await runLeadFollowups(20);            // CRM: nudge un-replied leads (1–7d old), once per lead
@@ -217,7 +220,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const retention = await runRetentionSweep();          // keep analytics detail tables bounded (visits 180d, search terms 13mo)
       const media_gc = await reapMedia(100);                 // M6: reap soft-deleted (past retention) + never-uploaded orphan media
       const snapshot_gc = await reapSnapshots(200);          // M7: prune OLD unreferenced snapshots (keep live/last-20/referenced), bounded per tick
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, digest, domains, leads, renewals, retention } }, 200, cors);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, renewals, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }
