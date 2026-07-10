@@ -14,10 +14,13 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:site" content="@davisdigitalstudio">
 <meta property="og:url" content="https://davisdigitalstudio.com/pricing-estimator">
-<meta property="og:title" content="Free Pricing Estimator · Davis Digital Studio">
+<meta property="og:title" content="Web Design Pricing Estimator — Davis Digital Studio">
 <meta property="og:description" content="What will your web design project actually cost? Answer 5 questions and get a real price range in under a minute. No signup required.">
 <meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Web Design Pricing Estimator — Davis Digital Studio">
+<meta name="twitter:description" content="What will your web design project actually cost? Answer 5 questions and get a real price range in under a minute. No signup required.">
+<meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#5b3fa0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -155,6 +158,15 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
 @media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
 </style>
 <link rel="stylesheet" href="/enhance.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Web Design Pricing Estimator","url":"https://davisdigitalstudio.com/pricing-estimator","applicationCategory":"BusinessApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Answer five quick questions for an honest ballpark price on your web design project. Free and instant.","provider":{"@type":"ProfessionalService","name":"Davis Digital Studio","legalName":"Davis Digital Studio LLC","url":"https://davisdigitalstudio.com/","founder":{"@type":"Person","name":"Eric Davis"}}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+{"@type":"ListItem","position":1,"name":"Home","item":"https://davisdigitalstudio.com/"},
+{"@type":"ListItem","position":2,"name":"Free tools","item":"https://davisdigitalstudio.com/tools"},
+{"@type":"ListItem","position":3,"name":"Pricing Estimator","item":"https://davisdigitalstudio.com/pricing-estimator"}]}
+</script>
 </head>
 <body data-page="pricing-estimator">
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -191,7 +203,7 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <div>
       <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; Pricing Estimator</div>
       <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">What will your project <em style="color:var(--p);font-style:italic;">actually cost?</em></h1>
-      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Answer 5 questions and get a real price range in under a minute. No signup, no sales call unless you want one.</p>
+      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Not knowing what a website should cost is what keeps a lot of good businesses stuck — guessing, over-paying, or putting it off for another year. Answer five quick questions for an honest range in under a minute. No signup, no sales call unless you want one.</p>
     </div>
     <div style="background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);" aria-hidden="true">
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">Example &middot; 5 quick questions</div>
@@ -295,7 +307,7 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
       </div>
       <div class="opt" onclick="pick(3,'squarespace')" id="q3_squarespace">
         <div class="opt-icon">🟦</div>
-        <div class="opt-text"><h3>Squarespace or Wix</h3><p>Easy to update yourself, monthly platform fee</p></div>
+        <div class="opt-text"><h3>Squarespace or Wix</h3><p>Easy to update yourself, with a monthly fee</p></div>
       </div>
       <div class="opt" onclick="pick(3,'wordpress')" id="q3_wordpress">
         <div class="opt-icon">🔵</div>
@@ -379,7 +391,8 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
   </div>
 
   <!-- Results -->
-  <div class="results" id="peResults" role="region" aria-live="polite">
+  <div class="results" id="peResults" role="region" aria-label="Your estimate" aria-live="polite">
+    <h2 id="peResultsHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:22px;color:var(--ink);margin-bottom:16px;outline:none;">Here's your estimate.</h2>
     <div id="tierCard"></div>
 
     <div class="addons-note" id="addonsNote" style="display:none;">
@@ -389,6 +402,42 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
 
     <div class="disclaimer">
       This is a ballpark range based on your answers, not a quote. Final price depends on design complexity, content, and scope confirmed in a free discovery call. Every paid audit fee ($99+) is credited toward your project.
+    </div>
+
+    <!-- Trust + education (consultative, not salesy): explain what actually moves
+         the number and what happens next, so the estimate reads as advice. -->
+    <div style="background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:16px;padding:24px;margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">What can change this number</div>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 12px;">A ballpark is honest about being a ballpark. What moves the real number &mdash; up or down &mdash; is usually one of these, and it's exactly what a discovery call is for:</p>
+      <ul style="list-style:none;margin:0;padding:0;display:grid;gap:9px;">
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>How much content is ready.</strong> Finished copy and photos speed things up; needing them written or shot adds scope.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>How custom the design needs to be.</strong> Applying a brand you already have vs. building one from scratch.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>Special functionality.</strong> Booking, e-commerce, or a custom tool built around how your business actually runs.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>Timeline.</strong> A tight deadline compresses the work and can add a rush fee; a flexible one keeps costs lower.</li>
+      </ul>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:14px 0 0;">Every business is different &mdash; that's the point. On a short call I turn this range into a confirmed number in writing, with no surprises after.</p>
+    </div>
+
+    <!-- Lead capture (Master Plan §14, same architecture as the ROI Calculator):
+         value delivered first; optional email step routes the full estimate +
+         answers into clever-api lead_intake with a Formspree fallback. -->
+    <div id="leadCard" style="background:#fff;border:1px solid rgba(91,63,160,0.18);border-radius:16px;padding:24px;margin-bottom:20px;">
+      <form id="leadForm" onsubmit="return submitLead(event,'pricing_estimator','Pricing Estimator')" novalidate>
+        <h3 style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;">Want this estimate emailed to you?</h3>
+        <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 16px;">I'll send your estimate along with a short, plain-English note on what would actually make sense for your project &mdash; so you have it to think over, share, or bring to a call. No spam, no obligation.</p>
+        <label for="leadEmail" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Email address</label>
+        <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+        <label for="leadBiz" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Business name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input id="leadBiz" type="text" autocomplete="organization" placeholder="Your business" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+        <div id="leadError" role="alert" style="display:none;color:#c0392b;font-size:13px;margin-bottom:12px;"></div>
+        <button type="submit" class="btn btn-primary" id="leadSubmit">Email me my estimate &rarr;</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:12px;">I reply personally, usually within one business day. Your email is only used to send this and follow up &mdash; never sold, never spammed.</p>
+      </form>
+      <div id="leadThanks" style="display:none;" role="status">
+        <h3 id="leadThanksHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;outline:none;">On its way &mdash; thank you.</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.7;">I've got your answers and your estimate. I'll follow up personally, usually within one business day, with a plain-English note on what would make sense for your project.</p>
+        <p style="font-size:14px;margin-top:12px;"><a href="contact.html" style="color:var(--p);">Prefer to talk it through now? Book a free call &rarr;</a></p>
+      </div>
     </div>
 
     <div style="text-align:center;margin-bottom:20px;">
@@ -700,8 +749,68 @@ function showResults() {
   document.querySelectorAll('.q-card').forEach(function(el) { el.classList.remove('active'); });
   document.getElementById('peResults').style.display = 'block';
 
+  // Capture a plain-language summary of the whole estimate for the CRM lead.
+  window.__peSummary = 'Pricing Estimator — Project: ' + typeLabel + '; Pages: ' + pageLabel +
+    '; Platform: ' + platformLabel + '; Timeline: ' + timelineLabel +
+    (addons.length ? ('; Add-ons: ' + addons.join(', ')) : '; Add-ons: none') +
+    '. Recommended: ' + t.name + ' (' + t.range + ')' + (rush ? ' [rush pricing applied]' : '') + '.';
+
+  // Move focus to the results heading so SR/keyboard users land on the outcome.
+  var ph = document.getElementById('peResultsHeading'); if (ph) { try { ph.focus(); } catch(e) {} }
+
   if (typeof gtag === 'function') gtag('event', 'pricing_estimate', { event_category: 'tools', event_label: tier });
 }
+
+// ── Lead capture → CRM (existing architecture: clever-api lead_intake + Formspree
+//    fallback, identical to the ROI Calculator + contact.html). anon key is public. ──
+var SB_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+var LEAD_FORMSPREE="https://formspree.io/f/mvznevlo";
+function getLeadSummary(){ return window.__peSummary || 'Pricing Estimator — visitor requested their estimate by email (no estimate captured).'; }
+function submitLead(ev, source, toolName){
+  ev.preventDefault();
+  var email=(document.getElementById('leadEmail').value||'').trim();
+  var biz=(document.getElementById('leadBiz').value||'').trim();
+  var err=document.getElementById('leadError');
+  var btn=document.getElementById('leadSubmit');
+  err.style.display='none';
+  if(!email||email.indexOf('@')===-1){ err.textContent='Please enter a valid email so I can send this to you.'; err.style.display='block'; return false; }
+  var summary=(typeof getLeadSummary==='function')?getLeadSummary():'';
+  var original=btn.innerHTML; btn.disabled=true; btn.textContent='Sending…';
+  function done(){
+    document.getElementById('leadForm').style.display='none';
+    document.getElementById('leadThanks').style.display='block';
+    var h=document.getElementById('leadThanksHeading'); if(h){ try{ h.focus(); }catch(e){} }
+    if(typeof gtag==='function'){ gtag('event','generate_lead',{event_category:'lead',event_label:source}); }
+  }
+  fetch(SB_URL+"/functions/v1/clever-api",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY},
+    body:JSON.stringify({type:"lead_intake",source:source,name:(biz||email),email:email,subject:"New Website Enquiry — "+toolName+(biz?" ("+biz+")":""),message:summary})
+  })
+  .then(function(r){ return r.json().catch(function(){return{};}).then(function(j){return{ok:r.ok,j:j};}); })
+  .then(function(res){ if(res.ok&&res.j&&res.j.ok){ done(); } else { throw new Error('crm'); } })
+  .catch(function(){
+    fetch(LEAD_FORMSPREE,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({_subject:'New Website Enquiry — '+toolName+(biz?' ('+biz+')':''),_replyto:email,email:email,business:biz||'Not provided',message:summary,source:source})})
+    .then(function(r){ if(r.ok){done();} else {throw new Error('fs');} })
+    .catch(function(){ btn.disabled=false; btn.innerHTML=original; err.innerHTML='Something went wrong sending that &mdash; please try again, or email me at <a href="mailto:eric@davisdigitalstudio.com" style="color:#c0392b;text-decoration:underline">eric@davisdigitalstudio.com</a>.'; err.style.display='block'; });
+  });
+  return false;
+}
+
+// Keyboard operability for the option cards (they are click-only <div>s): expose
+// them as buttons and activate on Enter/Space so the estimator is fully usable
+// without a mouse.
+(function(){
+  Array.prototype.forEach.call(document.querySelectorAll('.opt'), function(o){
+    o.setAttribute('role','button');
+    if(!o.hasAttribute('tabindex')) o.setAttribute('tabindex','0');
+    o.addEventListener('keydown', function(e){
+      if(e.key==='Enter' || e.key===' ' || e.key==='Spacebar'){ e.preventDefault(); o.click(); }
+    });
+  });
+})();
 
 function restart() {
   ans = {};
