@@ -11,12 +11,12 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**5 of 10 implemented (50%).** Next active engineering milestone: **M6 — Media hardening.**
-**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**. (M5 has no such dependency — fully live.)
+**6 of 10 implemented (60%).** Next active engineering milestone: **M7 — Snapshot retention GC.**
+**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**. (M5 and M6 have no such dependency — fully live, no migration.)
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅⏳ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ✅⏳ | ✅ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
@@ -25,7 +25,8 @@ Each milestone is independently shippable, gated by the full pure regression + g
 - ✅ **M3 — Draft-version hash** — DONE (Jul 9 2026). Committed, tested (10/10), deployed. Pure `lib/draft_hash.ts` reuses the ONE serializer; compute-on-read, no migration, no publish change; `draft_hash` on `/site`.
 - ✅⏳ **M4 — Publish idempotency + cooldown** — **Implementation ✅ COMPLETE · Activation ⏳ PENDING** (Jul 9 2026). *Complete:* publish cooldown, publish guard, idempotency implementation, tests (guard 21/21 + tenant-isolation 11/11), regression (88/88), documentation, deployment. **Cooldown is LIVE.** *Pending activation:* idempotency is **implemented but awaiting activation** — the owner must apply migration `0073_publish_idempotency.sql` to staging + prod. Until then: cooldown active, idempotency pending migration activation.
 - ✅ **M5 — Deploy robustness** — DONE (Jul 9 2026). Committed, tested (deploy_reconcile 21/21), deployed — **fully live, no owner dependency**. Deterministic configurable poll timeout (`DEPLOY_POLL_MS`); reconcile of stuck publishes (shared `lib/deploy_reconcile.ts` — reused by GET /publishes AND folded into the default cron cycle, never re-deploys, recovers interrupted-before-deploy rows); global concurrent-deploy ceiling (`MAX_CONCURRENT_DEPLOYS`, default 8, fail-open, additive to the one-in-flight index); per-stage telemetry via structured logging (no migration, no new monitoring). 89/89 pure sweep.
-- ⏳ **M6–M10** — remaining, in the approved order below (M6 is next active).
+- ✅ **M6 — Media hardening** — DONE (Jul 9 2026). Committed, tested (media_hardening 40/40), deployed — **fully live, no owner dependency, NO migration**. Pure `lib/media_guard.ts` (magic-byte signature validation, safe segment-level JPEG EXIF/GPS strip, per-site quota math) wired into `createUpload` (quota, pre-URL) + `importImage` (magic-byte + EXIF); `lib/media_gc.ts` `reapMedia` (soft-deleted past 7-day retention + never-uploaded HEAD-404 orphans) folded into the default cron cycle + `task:'media_gc'`. Published/preview output stays EXIF-free + orientation-safe via the existing render transform (one pipeline, unchanged). 90/90 pure sweep.
+- ⏳ **M7–M10** — remaining, in the approved order below (M7 is next active).
 
 ## Execution order (dependency-sorted)
 
@@ -35,8 +36,8 @@ M2  ✅ Security audits                  (DONE — tenant-isolation audit + hard
 M3  ✅ Draft-version hash                (DONE — compute-on-read; unlocks M4/M8/M9)
 M4  ✅⏳ Publish idempotency + cooldown   (IMPLEMENTED — cooldown live; idempotency awaiting mig 0073)
 M5  ✅ Deploy robustness                 (DONE — poll timeout · reconcile cron · ceiling · telemetry; fully live)
-M6  ⏳ Media hardening                   (NEXT — magic-byte · EXIF-at-upload · quota · GC)
-M7  Snapshot retention GC             (data hygiene)
+M6  ✅ Media hardening                   (DONE — magic-byte · EXIF-at-upload · quota · GC; fully live, no migration)
+M7  ⏳ Snapshot retention GC             (NEXT — data hygiene)
 M8  Preview hardening                 (cache · signed links · watermark)
 M9  Client UX safety                  (optimistic lock · shared state · what-will-change)
 M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
@@ -122,16 +123,13 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M6 — Media hardening
+## M6 — Media hardening  ·  ✅ DONE (Jul 9 2026) — fully live, no owner dependency, NO migration
+> **Design:** New pure `lib/media_guard.ts` + I/O `lib/media_gc.ts`; wired into the existing upload/cron paths — no new content model, no second store, no new client workflow.
+> **(1) Magic-byte validation** — `sniffType`/`magicMatchesMime` check the binary signature (JPEG `FFD8FF`, PNG, WebP `RIFF…WEBP`, PDF `%PDF-`), rejecting malformed files and polyglots regardless of declared MIME or extension. Applied in `importImage` — the ONE path where the function holds the raw bytes (client uploads go **direct to storage** via a signed URL, so the function isn't in their byte path; those are validated at publish by the render transform, which decodes → non-images fail and any polyglot payload is dropped in the clean WebP re-encode). **(2) EXIF stripping** — `stripJpegExif` removes the JPEG APP1 segment (EXIF/GPS/XMP + camera metadata) at the **segment level — it never decodes or touches the compressed image data, so it can't corrupt the picture**; applied to the stored JPEG original in `importImage`. Published/preview output is **independently** EXIF-free via the `render/image` transform, which is also the **orientation-safe** path (it auto-orients then strips) — so client-upload originals stay untouched (orientation preserved) and their published output is always clean. **(3) Per-site quota** — `mediaQuota`/`quotaExceeded` (configurable `MAX_MEDIA_FILES` default 1000, `MAX_MEDIA_BYTES` default 1 GB) enforced in `createUpload` **before** a signed URL or row is created, over one site-scoped usage query (count = row count, usage = bytes sum); a clear `quota_exceeded` message; never touches existing media. **(4) Media GC** — `lib/media_gc.ts` `reapMedia` runs two deterministic, bounded classes: soft-deleted rows past a 7-day retention window (already reference-checked at deletion by `deleteMedia`; live sites ship **baked** variants so removing the stored original can't break a published site), and never-uploaded orphans (row present but a storage **HEAD proves the object is 404** — errs toward *keep* on any unverifiable case). Folded into the default `/system/run` cron cycle (**no owner cron change**) + a dedicated `task:'media_gc'`; per-row isolated, idempotent. Tests: `media_hardening_test` 40/40 (magic-byte accept/reject/polyglot, EXIF strip on a synthetic JPEG with data-preservation + idempotency, quota boundaries, GC eligibility, tenant-scope + wiring); 90/90 pure sweep; 0 type-errors; deployed staging+prod. **No schema change** (reuses `bytes`/`deleted_at`/`created_at`/`site_id`).
 
 🎯 Close upload risks and bound storage cost at thousands of sites.
 📦 Magic-byte upload sniffing · EXIF stripping at upload · per-site media quota · media GC.
-📁
-- **`lib/media.ts`** (`createUpload` + first server touch / variant path): sniff magic bytes vs. declared MIME (reject polyglots); strip EXIF/GPS at upload (defense-in-depth alongside the existing publish-time strip); enforce a per-site quota (count + total bytes) with a clear cap error.
-- **`routes/system.ts`** cron: media-GC task reaping `presence_media WHERE deleted_at IS NOT NULL` (objects + rows) and orphaned uploads (row created, object never uploaded, >24h).
-- **Schema:** optional `presence_media` index for the GC scan; quota config on `presence_sites` or a constant. Migration `00xx_media_gc.sql` if needed.
-🧪 `tests/presence/media_test.mjs` (extend): disguised-file rejection (magic-byte), quota enforcement at cap, GC selects only soft-deleted/orphaned (never live-referenced).
-⚠️ EXIF-at-upload must not change published bytes (publish-time strip already deterministic). No fence impact (API/storage). Migration ritual if schema touched.
+⚠️ **Architectural note (honest):** client uploads are direct-to-storage (not redesigned per the milestone constraint), so the *stored original's* EXIF/magic-byte hardening applies to the server-side import path; every client upload's **published + preview output** is guaranteed clean + correctly-oriented by the render transform, and the private bucket is never publicly served. No fence impact (API/storage only).
 
 ---
 

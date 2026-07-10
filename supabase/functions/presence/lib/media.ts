@@ -8,6 +8,7 @@
 // wrapper the contract allows).
 import { svc } from './db.ts';
 import type { MediaManifestEntry } from './serializer.ts';
+import { magicMatchesMime, stripJpegExif, mediaQuota, quotaExceeded } from './media_guard.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -39,6 +40,23 @@ export async function createUpload(siteId: string, req: { mime: string; bytes: n
       : { error: 'alt_required', message: 'Please describe the image (alt text) — it helps customers and search engines.' };
   }
 
+  // M6: per-site media quota — count + storage usage, enforced BEFORE we issue a
+  // URL or create a row (never touches existing media). One query over the live
+  // rows; array length is the file count, the bytes sum is the storage usage.
+  const limits = mediaQuota();
+  const usage = await svc(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=bytes`);
+  if (usage.ok && Array.isArray(usage.json)) {
+    const files = usage.json.length;
+    const used = usage.json.reduce((s: number, r: any) => s + (Number(r.bytes) || 0), 0);
+    const q = quotaExceeded(files, used, req.bytes, limits);
+    if (q.exceeded) return {
+      error: 'quota_exceeded',
+      message: q.reason === 'count'
+        ? `This site has reached its media limit of ${limits.maxFiles} files. Remove a few you no longer need, then try again.`
+        : `This site is out of media storage. Remove a few files you no longer need to free up space, then try again.`,
+    };
+  }
+
   const path = `${siteId}/${crypto.randomUUID()}.${EXT[req.mime]}`;
   const storagePath = `${BUCKET}/${path}`;
 
@@ -66,9 +84,19 @@ export async function createUpload(siteId: string, req: { mime: string; bytes: n
  *  here it's an ordinary asset (variants, usage, publish, tagging all unchanged).
  *  Rolls the row back if the byte upload fails, so a failure leaves nothing dangling. */
 export async function importImage(siteId: string, bytes: Uint8Array, mime: string, alt: string, extra?: { width?: number; height?: number; collection?: string; metadata?: Record<string, unknown> }) {
-  const res = await createUpload(siteId, { mime, bytes: bytes.byteLength, alt_text: alt, width: extra?.width, height: extra?.height });
+  // M6: this is the ONE path where the function holds the raw bytes, so validate
+  // + sanitize here. (1) Magic-byte check — the binary signature must match the
+  // declared type, rejecting malformed files and polyglots before they enter the
+  // store. (2) Strip EXIF/GPS from the stored JPEG original (segment-level, never
+  // touches image data). Published/preview output is independently EXIF-free via
+  // the render transform, which is also what preserves orientation.
+  if (isImageMime(mime) && !magicMatchesMime(bytes, mime)) {
+    return { error: 'invalid_image', message: 'That file isn’t a valid image — please try another.' };
+  }
+  const clean = mime === 'image/jpeg' ? stripJpegExif(bytes) : bytes;
+  const res = await createUpload(siteId, { mime, bytes: clean.byteLength, alt_text: alt, width: extra?.width, height: extra?.height });
   if ('error' in res) return res;
-  const put = await fetch(res.upload_url, { method: 'PUT', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': mime, 'x-upsert': 'true' }, body: bytes as unknown as BodyInit });
+  const put = await fetch(res.upload_url, { method: 'PUT', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': mime, 'x-upsert': 'true' }, body: clean as unknown as BodyInit });
   if (!put.ok) {
     await svc(`presence_media?id=eq.${res.media_id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
     return { error: 'upload_failed', message: 'That image couldn’t be imported — please try another.' };

@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M6 — Media hardening.** (M5 deploy robustness ✅ done Jul 9 — fully live. M4 ✅ — cooldown live; idempotency pending owner migration 0073.) Everything above it is complete; everything below is queued in execution order.
+**Current active milestone:** **Phase 1 · M7 — Snapshot retention GC.** (M6 media hardening ✅ done Jul 9 — fully live, no migration. M5 ✅ — fully live. M4 ✅ — cooldown live; idempotency pending owner migration 0073.) Everything above it is complete; everything below is queued in execution order.
 
 ---
 
@@ -20,15 +20,15 @@ Core platform (auth, multi-tenancy, RBAC, RLS, Admin + Client portals, CRM, pipe
 
 ---
 
-## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 2 of 10 · 20%)
+## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 6 of 10 · 60%)
 Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md`.
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
 - ✅ **M3** — Draft-version hash
 - ✅⏳ **M4** — Publish reliability (idempotency + cooldown) — *implementation complete; cooldown LIVE; idempotency implemented but awaiting owner migration 0073 activation*
 - ✅ **M5** — Deploy robustness (timeout · reconcile cron · ceiling · telemetry) *(fully live)*
-- ⏳ **M6 — Media hardening** (magic-byte · EXIF · quota · cleanup) *(next active)*
-- ⏳ **M7** — Snapshot management (retention · GC)
+- ✅ **M6** — Media hardening (magic-byte · EXIF · quota · GC) *(fully live, no migration)*
+- ⏳ **M7 — Snapshot management (retention · GC)** *(next active)*
 - ⏳ **M8** — Preview hardening (cache · signed links · watermark)
 - ⏳ **M9** — Client safety (optimistic lock · shared components · what-will-change)
 - ⏳ **M10** — Operational validation (load test · DR drill) — **⟐ depends on owner enabling PITR first**
