@@ -16,6 +16,9 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@davisdigitalstudio">
+<meta name="twitter:title" content="Free AI Website Review | Davis Digital Studio">
+<meta name="twitter:description" content="A free, honest review of your website in under a minute. No signup.">
+<meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <meta property="og:url" content="https://davisdigitalstudio.com/ai-critique">
 <meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <meta name="theme-color" content="#5b3fa0">
@@ -255,21 +258,19 @@ a{color:inherit;}
 <script type="application/ld+json">
 {
   "@context":"https://schema.org",
-  "@type":"Service",
-  "name":"Website Audit",
+  "@type":"WebApplication",
+  "name":"Free AI Website Review",
+  "url":"https://davisdigitalstudio.com/ai-critique",
+  "applicationCategory":"BusinessApplication",
+  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+  "description":"A free, AI-assisted first-pass review of your website — plain-English feedback on what's working, what's quietly costing you business, and what to fix first. Informational only, not a guarantee of results.",
   "provider":{
     "@type":"ProfessionalService",
     "name":"Davis Digital Studio",
-    "url":"https://davisdigitalstudio.com"
-  },
-  "description":"full website audit covering Lighthouse performance scores, mobile usability, search visibility, and local presence. Includes a prioritized fix list delivered as a 6-page branded report within 5 business days.",
-  "areaServed":{"@type":"Country","name":"United States"},
-  "offers":[
-    {"@type":"Offer","name":"Essential Audit","price":"99","priceCurrency":"USD","description":"Core site audit with prioritized fix list, 5 business day turnaround."},
-    {"@type":"Offer","name":"Growth Audit","price":"499","priceCurrency":"USD","description":"Full audit plus keyword analysis, competitor benchmark, and content recommendations."},
-    {"@type":"Offer","name":"Studio Audit","price":"899","priceCurrency":"USD","description":"Complete audit with implementation roadmap and 30 minutes of strategy consultation."}
-  ],
-  "serviceType":["Website Audit","SEO Audit","Performance Audit","Site Score Analysis"]
+    "legalName":"Davis Digital Studio LLC",
+    "url":"https://davisdigitalstudio.com/",
+    "founder":{"@type":"Person","name":"Eric Davis"}
+  }
 }
 </script>
 <link rel="stylesheet" href="/enhance.css">
@@ -723,10 +724,13 @@ a{color:inherit;}
   $('runCrit').addEventListener('click', runCritique);
 
   var loadTimers = [];
+  var running = false;
   function clearLoadTimers(){ loadTimers.forEach(clearTimeout); loadTimers = []; }
 
   function runCritique(){
-    if(!state.goal) return;
+    if(!state.goal || running) return;   // in-flight guard: no duplicate model calls / lead rows on repeat clicks
+    running = true;
+    var runBtn = $('runCrit'); if(runBtn) runBtn.disabled = true;
     $('critCard').closest('.crit-hero').hidden = true;
     $('critResults').hidden = true;
     $('critLoading').hidden = false;
@@ -754,6 +758,7 @@ a{color:inherit;}
     .then(function(r){ return r.json(); })
     .then(function(res){
       clearLoadTimers();
+      running = false;
       if(res && res.error){ return fail(res.error, res.message); }
       var data = (res && res.data) ? res.data : res;
       if(!data || !data.blocks || !data.blocks.length){ return fail('empty'); }
@@ -763,11 +768,15 @@ a{color:inherit;}
     })
     .catch(function(err){
       clearLoadTimers();
+      running = false;
       fail('network', String(err));
     });
   }
 
   function fail(code, msg){
+    running = false;
+    var rb = $('runCrit'); if(rb) rb.disabled = false;   // let them retry after a failure
+    if(typeof gtag === 'function'){ gtag('event','ai_review_error',{ tool:'ai_critique', code: code }); }
     $('critLoading').hidden = true;
     var hero = $('critCard').closest('.crit-hero');
     hero.hidden = false;
