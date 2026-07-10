@@ -57,6 +57,18 @@ for (const [f, name, re] of BOUNDARY) {
     referencing.every((f) => ALLOWED.some((a) => f.endsWith(a))), referencing.join(', '));
 }
 
+// ── M4: idempotency-key lookups on presence_publishes must be site-scoped, so
+//    one tenant's Idempotency-Key can NEVER resolve another tenant's publish.
+//    (The partial unique index is per (site_id, key); these lookups must match.)
+{
+  const src = read('supabase/functions/presence/routes/publish.ts');
+  const lits = src.split('`').filter((_, i) => i % 2 === 1);
+  const idemQ = lits.filter((l) => /presence_publishes\?/.test(l) && /idempotency_key=eq\./.test(l));
+  ok('M4: idempotency-key lookups exist (handlePublish + runPipeline)', idemQ.length >= 2, `found ${idemQ.length}`);
+  const unscoped = idemQ.filter((l) => !/site_id=eq\.\$\{site\.id\}/.test(l));
+  ok('M4: every idempotency-key lookup is scoped to the caller site', unscoped.length === 0, unscoped.map((l) => l.slice(0, 70)).join(' | '));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ TENANT ISOLATION (M2): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

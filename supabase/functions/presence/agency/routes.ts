@@ -514,7 +514,7 @@ async function runBulk(action: string, ids: string[], principal: Principal): Pro
       else if (action === 'readiness') { const r = await computeReadiness(site); results.push({ site_id: site.id, ok: !!r, note: r ? 'readiness refreshed' : 'no verified connection' }); }
       else if (action === 'publish') {
         if (site.edition === 'monitor') { results.push({ site_id: site.id, ok: false, note: 'monitor sites never publish' }); continue; }
-        const resp = await handlePublish(site, principal, {});
+        const resp = await handlePublish(null, site, principal, {}); // M4: agency bulk — no client idempotency/cooldown per site
         results.push({ site_id: site.id, ok: resp.status === 200, note: resp.status === 200 ? 'published through the one pipeline' : `refused (${resp.status})` });
       }
     } catch (e) {

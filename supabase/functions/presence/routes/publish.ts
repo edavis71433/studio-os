@@ -14,6 +14,7 @@ import { deployFileMap, deployState, netlifyConfigured } from '../lib/netlify.ts
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
+import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/publish_guard.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -36,7 +37,7 @@ export async function changeSummary(siteId: string): Promise<string> {
 /** Core pipeline shared by publish and restore — ONE path, ever.
  *  Exported for the admin operations (force publish / retry / restore-snapshot),
  *  which are the SAME pipeline with a staff actor — never a second path. */
-export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>) {
+export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>, idempotencyKey?: string) {
   const actorKind = principal.kind === 'staff' ? 'staff' : 'client';
   let snapshotId = snapshotArg.snapshotId;
 
@@ -56,12 +57,25 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     snapshotId = ins.json[0].id as string;
   }
 
-  // publish record — the partial unique index IS the race-safe one-in-flight gate
+  // publish record — the partial unique index IS the race-safe one-in-flight gate.
+  // M4: when an idempotency key is present it is stored here, and a second partial
+  // unique index on (site_id, idempotency_key) makes a racing same-key insert 409.
   const rec = await svc('presence_publishes', {
     method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, snapshot_id: snapshotId, kind, actor: principal.userId, actor_kind: actorKind, change_summary: summary }),
+    body: JSON.stringify({ site_id: site.id, snapshot_id: snapshotId, kind, actor: principal.userId, actor_kind: actorKind, change_summary: summary, ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}) }),
   });
-  if (rec.status === 409) return json({ error: 'publish_in_progress', message: 'A publish is already in progress — give it a moment to finish.' }, 409, cors);
+  if (rec.status === 409) {
+    // Distinguish the two per-site unique gates. With a key, a 409 is (almost
+    // always) the idempotency index racing an identical retry → replay the
+    // existing publish (never a second deploy). Otherwise it's the one-in-flight
+    // gate. The lookup is site-scoped, so one tenant's key can't reach another's.
+    if (idempotencyKey) {
+      const ex = await svc(`presence_publishes?site_id=eq.${site.id}&idempotency_key=eq.${encodeURIComponent(idempotencyKey)}&select=status,change_summary&limit=1`);
+      const row = ex.json?.[0];
+      if (row) return json({ data: replayData(row) }, 200, cors);
+    }
+    return json({ error: 'publish_in_progress', message: 'A publish is already in progress — give it a moment to finish.' }, 409, cors);
+  }
   if (!rec.ok || !rec.json?.[0]?.id) return json({ error: 'record_failed', message: CALM }, 502, cors);
   const pubId = rec.json[0].id as string;
   const fail = async (stage: string, detail: string) => {
@@ -113,7 +127,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   }, 200, cors);
 }
 
-export async function handlePublish(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handlePublish(req: Request | null, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   // lifecycle guard (M6 §4): archived/deleting sites never publish; a site the
   // studio paused publishes only via an operator (staff), not the client
   if (PUBLISH_BLOCKED_STATES.includes(site.status)) {
@@ -122,6 +136,50 @@ export async function handlePublish(site: SiteRow, principal: Principal, cors: R
   if (site.status === 'paused' && principal.kind !== 'staff') {
     return json({ error: 'site_paused', message: 'Your site is currently paused. Contact your studio to resume publishing.' }, 409, cors);
   }
+
+  // ── M4: idempotency + cooldown apply to the CLIENT HTTP /publish path ONLY.
+  //    Internal callers (admin force-publish, agency bulk) pass req=null and are
+  //    NOT cooldown-gated — they are authoritative/operator actions (requirement
+  //    #11: admin behavior unchanged). Concurrency is still guarded for them by
+  //    the race-safe one-in-flight index in runPipeline. Precedence (below the
+  //    lifecycle guards): replay(same key) → in-flight(409) → cooldown(429). ──
+  let idemKey: string | null = null;
+  if (req) {
+    const parsed = parseIdempotencyKey(req.headers.get('Idempotency-Key'));
+    if (!parsed.ok) return json({ error: 'bad_idempotency_key', message: 'That request couldn’t be processed — please try again.' }, 400, cors);
+    idemKey = parsed.key;
+
+    // (a) idempotent replay — same key on this site returns the existing result,
+    //     creating NO new snapshot/deploy and bypassing the cooldown. Site-scoped.
+    if (idemKey) {
+      const ex = await svc(`presence_publishes?site_id=eq.${site.id}&idempotency_key=eq.${encodeURIComponent(idemKey)}&select=status,change_summary&limit=1`);
+      const row = ex.json?.[0];
+      if (row) return json({ data: replayData(row) }, 200, cors);
+    }
+
+    // (b) in-flight fast-path — if a publish is already queued/deploying, "in
+    //     progress" (409) is more accurate than "cooldown" and takes precedence,
+    //     so the one-in-flight semantics are unchanged. The race-safe partial
+    //     unique index in runPipeline remains the ultimate concurrency gate.
+    const inflight = await svc(`presence_publishes?site_id=eq.${site.id}&status=in.(queued,deploying)&select=id&limit=1`);
+    if (Array.isArray(inflight.json) && inflight.json.length) {
+      return json({ error: 'publish_in_progress', message: 'A publish is already in progress — give it a moment to finish.' }, 409, cors);
+    }
+
+    // (c) 60-second per-site cooldown — authoritative persisted timestamp
+    //     (multi-instance safe). Applies to NEW publishes only (a same-key replay
+    //     already returned above). Never weakens the one-in-flight protection.
+    const remaining = cooldownRemainingMs(site.last_published_at, Date.now());
+    if (remaining > 0) {
+      const secs = Math.ceil(remaining / 1000);
+      return json(
+        { error: 'cooldown', message: `Just a moment — you can publish again in about ${secs} second${secs === 1 ? '' : 's'}.`, retry_after: secs },
+        429,
+        { ...cors, 'Retry-After': String(secs) },
+      );
+    }
+  }
+
   const t = getTemplate(site.template_slug, site.template_version);
   if (!t) return json({ error: 'template_missing', message: CALM }, 500, cors);
 
@@ -132,7 +190,7 @@ export async function handlePublish(site: SiteRow, principal: Principal, cors: R
   if (!v.ok) return json({ error: 'validation_failed', message: 'A few things need fixing before your site can publish.', fields: v.blockers, warnings: v.warnings }, 422, cors);
 
   const summary = await changeSummary(site.id);
-  return runPipeline(site, principal, 'publish', { snapshot, mediaManifest }, summary, cors);
+  return runPipeline(site, principal, 'publish', { snapshot, mediaManifest }, summary, cors, idemKey ?? undefined);
 }
 
 export async function handleRestore(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {

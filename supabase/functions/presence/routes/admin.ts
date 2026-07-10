@@ -569,7 +569,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     // FORCE PUBLISH: staff actor, the same ONE pipeline (validation included) —
     // works even when the client's entitlement is paused (operator judgment)
     if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: `The site is ${site.status}; reactivate it before publishing.` }, 409, cors);
-    return handlePublish(site, principal, cors);
+    return handlePublish(null, site, principal, cors); // M4: operator force-publish — no client idempotency/cooldown (authoritative action)
   }
   if (sub === '/retry' && method === 'POST') return handleRetry(req, site, principal, cors);
   if (sub === '/cancel' && method === 'POST') return handleCancel(site, principal, cors);

@@ -291,7 +291,7 @@ serve(async (req) => {
   if (route === '/preview/publish' && method === 'POST') return handlePreviewPublish(site, principal, cors);
   if (route === '/preview/promote' && method === 'POST') return handlePreviewPromote(site, principal, cors);
   if (route === '/preview/settings' && method === 'POST') return handlePreviewSettings(req, site, principal, cors);
-  if (route === '/publish' && method === 'POST') return handlePublish(site, principal, cors);
+  if (route === '/publish' && method === 'POST') return handlePublish(req, site, principal, cors);
   if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
   // ── FD-T7: Launches — named staged releases through the ONE pipeline ──
