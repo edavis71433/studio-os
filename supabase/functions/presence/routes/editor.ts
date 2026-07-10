@@ -12,7 +12,7 @@ import type { EditRequest } from '../writer/editor.ts';
 import type { EditorKind } from '../writer/contract.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { loadPlan, draftingDenial } from '../commerce/enforce.ts';
-import { meterModel } from '../commerce/metering.ts';
+import { meterModel, checkAiCeiling, ceilingDenial } from '../commerce/metering.ts';
 
 const KINDS: EditorKind[] = ['edit_identity', 'edit_faq', 'edit_offering', 'edit_post', 'edit_document', 'site_polish'];
 
@@ -21,6 +21,11 @@ export async function handleEditorImprove(req: Request, site: SiteRow, cors: Rec
   const plan = await loadPlan(site.client_id);
   const denied = draftingDenial(plan, cors);
   if (denied) return denied;
+
+  // Hard AI cost ceiling (P2-E H2) — the editor IS a paid generative action with
+  // no free fallback, so a tenant over the ceiling is turned away like the writer.
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
 
   const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'editor' });
   if (!model) return json({ error: 'editor_unavailable', message: 'Editing help isn’t switched on right now. Everything can still be edited by hand — it always can.' }, 503, cors);

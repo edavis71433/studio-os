@@ -13,11 +13,13 @@ const mig = read('supabase/migrations/0083_webhook_idempotency_claim.sql');
 // ── M1: claim-first atomicity replaces SELECT-then-INSERT ──
 ok('claim: idempotency is a claim-first INSERT (ignore-duplicates, return=representation)', /dbInsertReturning\('stripe_webhook_events'[\s\S]*?resolution=ignore-duplicates/.test(wh));
 ok('claim: the old SELECT-then-process race is GONE (no alreadyProcessed gate)', !/alreadyProcessed/.test(wh));
-ok('claim: a won INSERT → claimed; a conflict is resolved by the row status', /return 'claimed'/.test(wh) && /if \(status === 'failed'\) return 'retry'/.test(wh) && /if \(status === 'processing'\) return 'processing'/.test(wh));
+ok('claim: a won INSERT → claimed; a conflict is resolved by the row status', /return 'claimed'/.test(wh) && /if \(status === 'failed'\) return 'retry'/.test(wh) && /if \(status === 'processing'\)/.test(wh));
 ok('claim: done/processing duplicates are acknowledged WITHOUT re-processing', /claim === 'done' \|\| claim === 'processing'\)[\s\S]*?acknowledged without re-processing/.test(wh));
 ok('settle: success marks the event done; failure releases the claim for retry', /if \(res\.status === 200\) await markEventDone/.test(wh) && /else await markEventFailed/.test(wh));
 ok('settle: a failed prior attempt (status=failed) re-processes on Stripe retry', /claimEvent[\s\S]*?'retry'/.test(wh) && /'failed'\) return 'retry'/.test(wh));
-ok('resilient: falls back to legacy schema if 0083 columns not applied yet (deploy-order safe)', /ins\.code >= 400 \|\| ins\.code === 0/.test(wh) && /received_at: receivedAt \}/.test(wh) && /legacy row already exists/.test(wh));
+ok('resilient: falls back to legacy schema if 0083 columns not applied yet (deploy-order safe)', /ins\.code >= 400 \|\| ins\.code === 0/.test(wh) && /received_at: receivedAt \}/.test(wh) && /legacy\.code >= 200 && legacy\.code < 300\) return 'done'/.test(wh));
+ok('resilient: a hard DB error PROCESSES (never drops) — no lost provisioning', /processing anyway to avoid dropping the event/.test(wh) && /return 'claimed';\s*\n\s*\}\s*\n\s*\/\/ 2xx \+ empty/.test(wh));
+ok('resilient: a STALE processing claim is reclaimable (crash mid-processing)', /ageMs > 5 \* 60 \* 1000 \? 'retry' : 'processing'/.test(wh));
 
 // ── L3: livemode guard ──
 ok('livemode: expected mode derived from the key prefix or STRIPE_EXPECT_LIVEMODE', /function expectedLivemode\(\)[\s\S]*?STRIPE_EXPECT_LIVEMODE[\s\S]*?sk_live_/.test(wh));

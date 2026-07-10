@@ -74,9 +74,18 @@ export async function applyEntitlementPatch(clientId: string, patch: Entitlement
 function driftsFrom(stored: any, patch: EntitlementPatch): string[] {
   const diffs: string[] = [];
   const norm = (v: unknown) => (v === undefined || v === null ? null : String(v));
+  // grace_until is compared by PRESENCE, not exact value: the anchor (an earlier
+  // date) is preserved by applyEntitlementPatch, so we only care that "in grace"
+  // vs "not in grace" agrees with Stripe. This is the load-bearing check — if a
+  // recovery webhook was missed, Stripe now reports active (patch.grace_until =
+  // null) while the stored row still has a stale anchor; without this the
+  // reconciler sees no drift and the lifecycle sweep would LAPSE a paying
+  // customer when that stale anchor passes.
+  const graceState = (v: unknown) => (v === undefined || v === null ? '' : 'in_grace');
   if (norm(stored.status) !== norm(patch.status)) diffs.push(`status ${stored.status}→${patch.status}`);
   if (patch.plan && norm(stored.plan) !== norm(patch.plan)) diffs.push(`plan ${stored.plan}→${patch.plan}`);
   if (norm(stored.cancel_at_period_end) !== norm(patch.cancel_at_period_end)) diffs.push('cancel_at_period_end');
+  if (graceState(stored.grace_until) !== graceState(patch.grace_until)) diffs.push('grace_until');
   // period end can legitimately advance on renewal — treat only a value change as drift
   if (norm(stored.current_period_end) !== norm(patch.current_period_end)) diffs.push('current_period_end');
   return diffs;
@@ -90,7 +99,7 @@ export interface ReconcileResult { checked: number; corrected: number; errors: n
 export async function runBillingReconcile(limit = 40): Promise<ReconcileResult> {
   if (!stripeConfigured()) return { checked: 0, corrected: 0, errors: 0, skipped_no_stripe: true };
   const now = new Date();
-  const q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=client_id,status,plan,current_period_end,cancel_at_period_end,stripe_subscription_id&order=updated_at.asc&limit=${Math.max(1, Math.min(100, limit))}`);
+  const q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=client_id,status,plan,current_period_end,cancel_at_period_end,grace_until,stripe_subscription_id&order=updated_at.asc&limit=${Math.max(1, Math.min(100, limit))}`);
   const rows: any[] = Array.isArray(q.json) ? q.json : [];
   let checked = 0, corrected = 0, errors = 0;
   for (const row of rows) {

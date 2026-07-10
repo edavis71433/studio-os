@@ -9,7 +9,7 @@
 // AI toggle exists (Law 24). (2) verifyPolish — any invention → fall back to
 // the deterministic answer. polish() never throws and never blocks.
 import { verifyPolish } from './verify.ts';
-import { recordUsage, type MeterCtx } from '../commerce/metering.ts';
+import { recordUsage, checkAiCeiling, type MeterCtx } from '../commerce/metering.ts';
 
 const POLISH_SYSTEM = `You edit a short note from a business concierge to a small-business owner.
 Rules, absolute:
@@ -23,6 +23,10 @@ export async function polish(text: string, groundingText: string, meter?: MeterC
   if ((Deno.env.get('CONCIERGE_POLISH') || '').toLowerCase() !== 'on') return { text, polished: false };
   const key = Deno.env.get('ANTHROPIC_KEY') || '';
   if (!key) return { text, polished: false };
+  // P2-E H2: polish is an OPTIONAL paid enhancement over an already-good
+  // deterministic answer — a tenant over the hard AI ceiling simply gets the
+  // unpolished answer (no spend, no error).
+  if (meter && !(await checkAiCeiling(meter.clientId)).allowed) return { text, polished: false };
   const MODEL = 'claude-haiku-4-5-20251001';
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {

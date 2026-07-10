@@ -8,7 +8,7 @@ import { svc } from '../lib/db.ts';
 import { buildFactSheet } from '../writer/facts.ts';
 import { packFor } from '../writer/pack.ts';
 import { anthropicModel } from '../writer/model.ts';
-import { meterModel } from '../commerce/metering.ts';
+import { meterModel, checkAiCeiling } from '../commerce/metering.ts';
 import { deterministicFindings, sanitizeModelFindings, mergeFindings, resetFindingSeq, MODEL_CATEGORIES } from './rules.ts';
 import type { Finding } from './rules.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -34,10 +34,14 @@ export async function runReview(site: SiteRow, scope: ReviewScope): Promise<Revi
     resetFindingSeq();
     const det = deterministicFindings(facts, scope);
 
-    // optional model tier — AI-1: metered with real token counts (was unmetered)
+    // optional model tier — AI-1: metered with real token counts (was unmetered).
+    // P2-E H2: a tenant over the hard AI cost ceiling keeps the FREE deterministic
+    // review but the paid model critique is skipped (graceful, no 429 — there's a
+    // real free tier here, unlike the writer/editor).
     let modelFindings: Finding[] = [];
     let modelName = '';
-    const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'reviewer' });
+    const ceilingClear = (await checkAiCeiling(site.client_id)).allowed;
+    const model = ceilingClear ? meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'reviewer' }) : null;
     if (model) {
       // context: voice, pack, active recommendations (awareness, never invention),
       // and recent proposal outcomes (don't re-suggest what was rejected)

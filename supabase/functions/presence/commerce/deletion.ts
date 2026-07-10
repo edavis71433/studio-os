@@ -16,16 +16,18 @@ const enc = encodeURIComponent;
 /** Cooling-off window (days). Env override; the customer-facing copy reads it. */
 export function coolingOffDays(): number { const n = Number(Deno.env.get('ACCOUNT_DELETION_DAYS')); return Number.isFinite(n) && n >= 0 ? n : 30; }
 
-/** Record (or refresh) a deletion request — idempotent per client. */
-export async function requestDeletion(clientId: string, siteId: string, requestedBy: string): Promise<{ ok: boolean; scheduled_for: string }> {
+/** Record (or refresh) a deletion request — idempotent per client. `created` is
+ *  true only when a NEW open request was inserted, so the caller can send the
+ *  confirmation email once rather than on every (idempotent) re-request. */
+export async function requestDeletion(clientId: string, siteId: string, requestedBy: string): Promise<{ ok: boolean; scheduled_for: string; created: boolean }> {
   const scheduled = new Date(Date.now() + coolingOffDays() * 86400_000).toISOString();
   // reactivate a canceled one or create fresh; never duplicate an open request
   const open = rows(await svc(`presence_account_deletions?client_id=eq.${enc(clientId)}&status=in.(pending,executing)&select=id,scheduled_for&limit=1`))[0];
-  if (open) return { ok: true, scheduled_for: open.scheduled_for };
+  if (open) return { ok: true, scheduled_for: open.scheduled_for, created: false };
   const ins = await svc('presence_account_deletions', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ client_id: clientId, site_id: siteId, requested_by: requestedBy, requested_at: nowIso(), scheduled_for: scheduled, status: 'pending' }) });
   await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence`, { method: 'PATCH', body: JSON.stringify({ deletion_requested_at: nowIso() }) }).catch(() => {}); // compat
-  return { ok: !!rows(ins)[0], scheduled_for: rows(ins)[0]?.scheduled_for || scheduled };
+  return { ok: !!rows(ins)[0], scheduled_for: rows(ins)[0]?.scheduled_for || scheduled, created: !!rows(ins)[0] };
 }
 
 /** Cancel a pending deletion during the cooling-off window. */
@@ -40,11 +42,14 @@ export async function cancelDeletion(clientId: string): Promise<boolean> {
 async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
   const clientId = d.client_id;
   try {
-    // 1) revoke access immediately (the entitlement STATUS gate denies everything but export/legal)
-    await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence&select=stripe_subscription_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'deleted' }) });
+    // 1) STOP BILLING FIRST (keep the Stripe customer + past invoices for tax/audit).
+    //    Ordering matters: if we revoked access before a failing cancel, a retry
+    //    loop would leave the customer locked out AND still billed. Cancelling
+    //    first means a cancel failure just retries with access intact.
     const ent = rows(await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence&select=stripe_subscription_id&limit=1`))[0] || {};
-    // 2) stop billing (keep the Stripe customer + past invoices for tax/audit)
     if (ent.stripe_subscription_id) { const c = await cancelSubscription(ent.stripe_subscription_id); if (!c.ok) return { ok: false, error: `stripe_cancel: ${c.error}` }; }
+    // 2) revoke access (the entitlement STATUS gate denies everything but export/legal)
+    await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence`, { method: 'PATCH', body: JSON.stringify({ status: 'deleted' }) });
     // 3) take the hosted site(s) down + soft-delete the workspace row(s) (staged, recoverable)
     const sites = rows(await svc(`clients?id=eq.${enc(clientId)}&select=id`)).length
       ? rows(await svc(`presence_sites?client_id=eq.${enc(clientId)}&select=id,netlify_site_id,status`))

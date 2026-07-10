@@ -20,7 +20,13 @@ const mig = (rel) => Deno.readTextFileSync(new URL(`../../supabase/migrations/${
 // ═══ INVARIANT 1 — Nothing bypasses Evidence ═══
 {
   const owners = (t) => RULES.filter((r) => r.types.includes(t)).length;
-  const orphans = Object.keys(CATALOG).filter((t) => owners(t) === 0);
+  // analytics.not_connected is an intentional internal signal consumed directly
+  // (optimization/catalog + providers → services/launch derive analytics_connected),
+  // never judged — the opt_dormant rule was retired in P11. It lands in
+  // unmatched_types by design (visibility, not a bypass). Matches the sister
+  // assertion in judgment_test.mjs (INTENTIONAL_UNMATCHED).
+  const INTENTIONAL_UNMATCHED = new Set(['analytics.not_connected']);
+  const orphans = Object.keys(CATALOG).filter((t) => owners(t) === 0 && !INTENTIONAL_UNMATCHED.has(t));
   const doubles = Object.keys(CATALOG).filter((t) => owners(t) > 1);
   ok('INV-1: every evidence type is judged by exactly one rule (nothing bypasses Evidence)', orphans.length === 0 && doubles.length === 0, [...orphans, ...doubles].join(','));
 }

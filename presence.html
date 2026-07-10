@@ -2610,23 +2610,61 @@ async function refreshAll() {
   mountAnnouncementCard();
   mountDesignCard();
   mountSearchCard();
+  mountBillingCard();
   mountDeletionCard();
+}
+// ── P2-E: billing & subscription — status + the door to Stripe's portal ──
+// This is the payment-recovery path the entitlement gate + lifecycle emails
+// promise ("update your card in the billing portal"). Without it, a paused/
+// lapsed customer had no in-app way to fix payment.
+async function mountBillingCard() {
+  const host = $("view-business"); if (!host || $("billingCard")) return;
+  let s = null;
+  try { s = (await api("GET", "/commerce/subscription")).data; } catch (_) { return; } // no subscription → nothing to manage
+  if (!s) return;
+  const card = el("div", "field"); card.id = "billingCard"; card.style.marginTop = "18px";
+  card.appendChild(el("label", null, "Your plan & billing"));
+  const statusWord = { active: "Active", paused: "Paused — payment needs attention", lapsed: "Ended — update payment to reactivate", deleted: "Closed" }[s.status] || s.status;
+  const line = el("div", "hint", `${s.plan_name || s.plan || "Your plan"} · ${statusWord}${s.current_period_end ? " · renews " + new Date(s.current_period_end).toLocaleDateString() : ""}${s.in_grace ? " · a payment didn’t go through — your site stays up while you fix it" : ""}`);
+  card.appendChild(line);
+  if (s.can_manage_billing) {
+    const b = el("button", null, (s.status === "paused" || s.status === "lapsed") ? "Update payment" : "Manage billing");
+    b.type = "button"; b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--accent,#5b3fa0);color:var(--accent,#5b3fa0);background:transparent;cursor:pointer";
+    b.addEventListener("click", async () => {
+      b.disabled = true; const t = b.textContent; b.textContent = "Opening…";
+      try { const r = await api("POST", "/commerce/portal", {}); if (r.data && r.data.url) location.href = r.data.url; else { toast("Billing management isn’t available right now.", true); b.disabled = false; b.textContent = t; } }
+      catch (err) { toast(err.message || "Couldn’t open billing.", true); b.disabled = false; b.textContent = t; }
+    });
+    card.appendChild(b);
+  } else if (s.has_service_billing) {
+    card.appendChild(el("div", "hint", "Invoices for project work from your studio are billed separately."));
+  }
+  host.appendChild(card);
 }
 // ── CP-10: leaving for good — honest, calm, reversible until executed ──
 function mountDeletionCard() {
   const host = $("view-business"); if (!host || $("deleteCard")) return;
   const d = el("details"); d.id = "deleteCard"; d.style.cssText = "margin-top:26px";
   d.appendChild(Object.assign(el("summary", null, "Leaving for good? Delete your account"), { style: "cursor:pointer;font-size:12.5px;color:var(--ink-2,#777)" }));
-  const p = el("p", "hint", "This asks us to delete your account and everything in it within 30 days. Your published site comes down, and this can’t be undone once completed. Download everything you own first — that door stays open until deletion.");
+  const p = el("p", "hint", "This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first — that door stays open until deletion.");
   const b = el("button", null, "Request deletion");
   b.type = "button";
   b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid #b3261e;color:#b3261e;background:transparent;cursor:pointer";
+  // Shown after a request is recorded — the cancel affordance the copy promises.
+  const cancelBtn = el("button", null, "Cancel deletion request");
+  cancelBtn.type = "button"; cancelBtn.hidden = true;
+  cancelBtn.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;margin-left:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--accent,#5b3fa0);color:var(--accent,#5b3fa0);background:transparent;cursor:pointer";
+  const showRequested = (days) => { b.disabled = true; b.textContent = days ? `Scheduled — completes in ${days} day${days === 1 ? "" : "s"}` : "Request recorded — check your email"; cancelBtn.hidden = false; };
   b.addEventListener("click", async () => {
     if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Are you sure? Click again to confirm"; setTimeout(() => { delete b.dataset.armed; b.textContent = "Request deletion"; }, 6000); return; }
-    try { await api("POST", "/commerce/delete-request", {}); b.disabled = true; b.textContent = "Request recorded — check your email"; toast("Deletion requested — we emailed you the details"); }
+    try { const r = await api("POST", "/commerce/delete-request", {}); showRequested(r.data && r.data.completes_within_days); toast(r.data && r.data.already_pending ? "You already have a deletion request pending" : "Deletion requested — we emailed you the details"); }
     catch (err) { toast(err.message, true); }
   });
-  d.append(p, b);
+  cancelBtn.addEventListener("click", async () => {
+    try { const r = await api("POST", "/commerce/delete-cancel", {}); cancelBtn.hidden = true; b.disabled = false; b.textContent = "Request deletion"; delete b.dataset.armed; toast((r.data && r.data.message) || "Deletion request canceled."); }
+    catch (err) { toast(err.message, true); }
+  });
+  d.append(p, b, cancelBtn);
   host.appendChild(d);
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──

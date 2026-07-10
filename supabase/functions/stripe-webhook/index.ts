@@ -186,14 +186,26 @@ async function claimEvent(eventId: string, type: string, livemode: boolean | nul
       { event_id: eventId, type, received_at: receivedAt },
       'return=representation,resolution=ignore-duplicates');
     if (legacy.rows.length > 0) return 'claimed';   // fresh row → we own it
-    // legacy row already exists (no status column to consult) → treat as done
-    return 'done';
+    if (legacy.code >= 200 && legacy.code < 300) return 'done';   // 2xx empty = genuine conflict → already recorded
+    // Both inserts HARD-failed (transient DB error, code 0/4xx): we can't dedupe.
+    // PROCESS rather than drop — dropping a checkout.session.completed here would
+    // silently lose a paid signup's provisioning (reconcile only repairs EXISTING
+    // entitlements). Downstream is idempotent, so a rare double-process is safe.
+    console.error(`[stripe-webhook] claim insert failed for ${eventId} (codes ${ins.code}/${legacy.code}) — processing anyway to avoid dropping the event`);
+    return 'claimed';
   }
   // 2xx + empty = a genuine PK conflict; decide by the existing row's status.
-  const rows = await dbGet(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=status&limit=1`);
-  const status = Array.isArray(rows) && rows.length ? String(rows[0].status || 'done') : 'done';
+  const rows = await dbGet(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=status,received_at&limit=1`);
+  const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+  const status = row ? String(row.status || 'done') : 'done';
   if (status === 'failed') return 'retry';
-  if (status === 'processing') return 'processing';
+  if (status === 'processing') {
+    // Reclaim a STALE in-flight claim: a prior isolate likely died after claiming
+    // but before settling. Without this, retries read 'processing' forever and the
+    // event is never applied. 5-min window >> normal processing time.
+    const ageMs = row?.received_at ? (Date.now() - Date.parse(String(row.received_at))) : 0;
+    return ageMs > 5 * 60 * 1000 ? 'retry' : 'processing';
+  }
   return 'done';
 }
 

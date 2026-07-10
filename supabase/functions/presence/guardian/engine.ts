@@ -8,7 +8,7 @@
 import { svc } from '../lib/db.ts';
 import { buildFactSheet } from '../writer/facts.ts';
 import { anthropicModel } from '../writer/model.ts';
-import { meterModel } from '../commerce/metering.ts';
+import { meterModel, checkAiCeiling } from '../commerce/metering.ts';
 import { guardianFindings, sanitizeGuardianFindings, observeLearning, resetGuardianSeq, GUARDIAN_CATEGORIES } from './rules.ts';
 import type { BrandProfile, GuardianFinding, VisualInput } from './rules.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -56,7 +56,10 @@ export async function runBrandReview(site: SiteRow, scope: { kind: 'site' | 'sec
 
     let modelFindings: GuardianFinding[] = [];
     let modelName = '';
-    const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'guardian' });   // AI-1: metered (was unmetered)
+    // P2-E H2: over the hard AI ceiling → keep the free deterministic brand review,
+    // skip the paid model tier (graceful, no 429).
+    const ceilingClear = (await checkAiCeiling(site.client_id)).allowed;
+    const model = ceilingClear ? meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'guardian' }) : null;   // AI-1: metered (was unmetered)
     if (model && scope.kind === 'site') {
       const content = {
         identity: { tagline: facts.tagline, description: facts.description, story: facts.story },
