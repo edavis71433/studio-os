@@ -70,7 +70,6 @@ export async function createSubscriptionCheckout(p: CheckoutParams): Promise<{ i
     'line_items[0][quantity]': '1',
     'success_url': `${p.successUrl || `${SITE_URL}/welcome.html`}?session_id={CHECKOUT_SESSION_ID}`,
     'cancel_url': p.cancelUrl || `${SITE_URL}/pricing.html`,
-    'customer_email': p.email,
     'client_reference_id': p.signupId,
     'metadata[client_id]': p.clientId,
     'metadata[plan]': p.plan,
@@ -83,7 +82,18 @@ export async function createSubscriptionCheckout(p: CheckoutParams): Promise<{ i
     'subscription_data[metadata][term]': p.term,
     'subscription_data[metadata][founder]': p.founder ? 'true' : 'false',
   };
-  const session = await stripeReq('checkout/sessions', params, `signup-${p.signupId}-${p.plan}-${p.term}`);
+  // L1 — reuse the existing Stripe customer for this email instead of minting a
+  // duplicate on every checkout (duplicates fragment billing history and can
+  // point the billing portal at the wrong subscription). Pass `customer` when we
+  // have one; otherwise let Stripe create it from `customer_email`.
+  const existingCustomer = await findCustomerIdByEmail(p.email);
+  if (existingCustomer) params['customer'] = existingCustomer;
+  else params['customer_email'] = p.email;
+  // L2 — the idempotency key must include the client: without a signup row the
+  // caller passes 'nosignup', so two different customers checking out the same
+  // plan/term would collide on one key. clientId is unique per customer.
+  const idem = `signup-${p.signupId}-${p.clientId}-${p.plan}-${p.term}`;
+  const session = await stripeReq('checkout/sessions', params, idem);
   return { id: String(session.id), url: String(session.url) };
 }
 
