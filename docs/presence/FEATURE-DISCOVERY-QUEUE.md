@@ -6,6 +6,19 @@
 
 > **A9 triage (complete):** the Product Review Board reviewed every item — decisions (Approve-future / Merge / Defer / Reject) are in [PRODUCT-REVIEW-BOARD-A9.md](PRODUCT-REVIEW-BOARD-A9.md). **Top-3 to build next:** FD-1 (scheduled publish), FD-2 (lead capture), FD-3 (notify-to-approve) — plus the non-feature launch prerequisites (front door / positioning, guided onboarding). Rejected: Task surface (FD-14), Workspace Personalization, Business-Reports-as-dashboards (Law 13). Merged into "global chrome": FD-8 + FD-13 + Universal Search + Command Palette + notifications. Merged into "operator console": FD-9 + Internal Support Console + Audit Center.
 
+## Post-P2-E Deep Audit (2026-07-10) — verified, out-of-scope items queued
+*Full report + fixed-this-session items: [POST-P2E-DEEP-AUDIT.md](POST-P2E-DEEP-AUDIT.md). The P2-E-correctness + payment-recovery items were fixed in-session; the below are verified but outside billing/lifecycle scope, awaiting A9 triage.*
+
+- **FD-AUD1 · 🔴 High (data loss)** — `lib/media.ts` deleteMedia in-use guard misses `presence_settings` logo/OG/cover + `blocks` media IDs → deleting your logo/gallery photo succeeds silently → dropped from every published page → permanently lost after media_gc. **Fix before broad launch.**
+- **FD-AUD2 · Med** — `serializer.ts` `Number(null)=0` finite → images without an explicit focal serialize `focal:{0,0}` → top-left crop in split-hero/gallery/team/before-after. Gate on `focal_x != null`.
+- **FD-AUD3 · Med** — restore of a version whose media was reaped fails with a generic 502 (no "images no longer available" hint).
+- **FD-AUD4 · Med** — connected token refresh (`adapters.ts:129`) wipes `scopes_granted` (→[]) and resets `connected_at` on every refresh → corrupted consent/connection record.
+- **FD-AUD5 · Med** — connected writes are at-least-once: a crash between provider POST and outcome record can double-post publicly (gbp_post). Needs an in-flight marker / provider idempotency key.
+- **FD-AUD6 · Med** — satellite pages (today/client/connections/visual-studio) capture the JWT once, never refresh → stale-token 401s after ~1h (today.html → blank dashboard, no re-auth).
+- **FD-AUD7 · Med** — in-workspace notice card renders only 5 of ~12 notice kinds → the rest inflate the bell but dead-end (no href/dismiss).
+- **FD-AUD8 · Med** — lapse/wind-down clock rides mutable `updated_at`; a reconcile re-patch resets the 60-day clock. Fix: dedicated `lapsed_at` (small migration). Bounded impact.
+- **FD-AUD9..17 · Low** — SCHEDULER_SECRET via query string (log exposure); offering noun hardcoded "menu item" (Phase-T regression); template-switch missing ccv check; writer numeric guard substring false-negatives; concierge caveat-drift; verifyState fails open; devmode unquoted-scheme sanitizer gap; uncapped visual subject/instruction; dead import `writeConfigured`. See report.
+
 ### FD-M1 · Auto-draft the starter site at first-run — ✅ IMPLEMENTED (Phase I)
 **Built:** `get-started.html` guided first-run — a 2-question intake (industry + smart-default services + one line) → the EXISTING `starter_site` writer (`/writer/generate`) → auto-apply the single option to the DRAFT (never published) → review/preview/publish through the existing approval-first flow; graceful "set it up together" fallback when AI is off. Wired from signup + welcome. Pure core `lib/onboarding.ts` (onboarding_test 18/18). See [PHASE-I-GUIDED-ONBOARDING](PHASE-I-GUIDED-ONBOARDING.md). **Disposition:** Done (needs `ANTHROPIC_KEY` active + browser QA).
 
