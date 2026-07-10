@@ -7,6 +7,9 @@
 <title>Website — Studio OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- P2-B: adopt the ONE shared shell (top bar · ⌘K · notifications · account · sign-out) + shared state helpers. Additive + non-invasive; the editor SPA below is unchanged. -->
+<link rel="stylesheet" href="/shell.css">
+<script src="/shell.js" defer></script>
 <style>
 /* ═══ The Client Room · Direction A — paper, ink, one plum accent (M7.5) ═══
    Room-scoped tokens; the portal's tokens.css is deliberately not loaded.   */
@@ -42,6 +45,12 @@ nav.rooms{display:flex;flex-direction:column}
 .rail .foot{margin-top:auto;font-size:12.5px}
 .rail .foot a{color:var(--ink-2)}
 .rail .foot a:hover{color:var(--ink)}
+/* P2-B: reconcile the editor's left rail with the shared shell top bar. The
+   shell (fixed, --dds-shell-h) offsets the body; hide the rail's duplicate
+   wordmark (the shell owns the brand) and keep the sticky rail within the
+   viewport below the bar. Functional JS untouched. */
+html.dds-has-shell .rail{height:calc(100vh - var(--dds-shell-h, 52px))}
+html.dds-has-shell .rail .wordmark{display:none}
 
 .main{flex:1;min-width:0}
 .topbar{display:flex;align-items:center;gap:16px;padding:26px 56px 0;max-width:860px}
@@ -675,6 +684,10 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 function toast(msg, bad) {
+  // P2-B: prefer the ONE shared toast (success/error/conflict) from the shell;
+  // fall back to the local toast if the shell hasn't loaded. Same call sites,
+  // including the M9 stale-draft conflict path — now a consistent shared state.
+  if (typeof window.ddsToast === "function") { window.ddsToast(msg, bad ? "err" : "ok"); return; }
   const t = el("div", "toast" + (bad ? " bad" : ""), msg);
   $("toasts").appendChild(t);
   setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
