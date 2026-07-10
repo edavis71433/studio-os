@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M8 — Preview hardening.** (M7 snapshot retention GC ✅ done Jul 9 — fully live, no migration. M6 ✅ · M5 ✅ — fully live. M4 ✅ — **FULLY LIVE**; migration 0073 applied to both envs Jul 9.) Everything above it is complete; everything below is queued in execution order.
+**Current active milestone:** **Phase 1 · M9 — Client UX safety.** (M8 preview hardening ✅ done Jul 9 — fully live, no migration. M7 ✅ · M6 ✅ · M5 ✅ — fully live. M4 ✅ — **FULLY LIVE**; migration 0073 applied to both envs Jul 9.) Everything above it is complete; everything below is queued in execution order.
 
 ---
 
@@ -20,7 +20,7 @@ Core platform (auth, multi-tenancy, RBAC, RLS, Admin + Client portals, CRM, pipe
 
 ---
 
-## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 7 of 10 · 70%)
+## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 8 of 10 · 80%)
 Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md`.
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
@@ -29,8 +29,8 @@ Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CM
 - ✅ **M5** — Deploy robustness (timeout · reconcile cron · ceiling · telemetry) *(fully live)*
 - ✅ **M6** — Media hardening (magic-byte · EXIF · quota · GC) *(fully live, no migration)*
 - ✅ **M7** — Snapshot management (retention · GC) *(fully live, no migration)*
-- ⏳ **M8 — Preview hardening (cache · signed links · watermark)** *(next active)*
-- ⏳ **M9** — Client safety (optimistic lock · shared components · what-will-change)
+- ✅ **M8** — Preview hardening (render cache · signed links · watermark) *(fully live, no migration)*
+- ⏳ **M9 — Client safety (optimistic lock · shared components · what-will-change)** *(next active)*
 - ⏳ **M10** — Operational validation (load test · DR drill) — **⟐ depends on owner enabling PITR first**
 
 ---

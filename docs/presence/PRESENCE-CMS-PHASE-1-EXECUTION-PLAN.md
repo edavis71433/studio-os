@@ -11,12 +11,12 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**7 of 10 implemented (70%).** Next active engineering milestone: **M8 — Preview hardening.**
-**✅ M4 is now FULLY LIVE** — migration `0073` applied to staging + prod (Jul 9 2026; column + index + check verified in both). Idempotency and cooldown both active. **No outstanding owner activation dependency remains in Phase 1.**
+**8 of 10 implemented (80%).** Next active engineering milestone: **M9 — Client UX safety.**
+**✅ M4 is FULLY LIVE** — migration `0073` applied to staging + prod (Jul 9 2026; column + index + check verified in both). **No outstanding owner activation dependency remains in Phase 1.**
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⏳ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⏳ | ⏳ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
@@ -27,7 +27,8 @@ Each milestone is independently shippable, gated by the full pure regression + g
 - ✅ **M5 — Deploy robustness** — DONE (Jul 9 2026). Committed, tested (deploy_reconcile 21/21), deployed — **fully live, no owner dependency**. Deterministic configurable poll timeout (`DEPLOY_POLL_MS`); reconcile of stuck publishes (shared `lib/deploy_reconcile.ts` — reused by GET /publishes AND folded into the default cron cycle, never re-deploys, recovers interrupted-before-deploy rows); global concurrent-deploy ceiling (`MAX_CONCURRENT_DEPLOYS`, default 8, fail-open, additive to the one-in-flight index); per-stage telemetry via structured logging (no migration, no new monitoring). 89/89 pure sweep.
 - ✅ **M6 — Media hardening** — DONE (Jul 9 2026). Committed, tested (media_hardening 40/40), deployed — **fully live, no owner dependency, NO migration**. Pure `lib/media_guard.ts` (magic-byte signature validation, safe segment-level JPEG EXIF/GPS strip, per-site quota math) wired into `createUpload` (quota, pre-URL) + `importImage` (magic-byte + EXIF); `lib/media_gc.ts` `reapMedia` (soft-deleted past 7-day retention + never-uploaded HEAD-404 orphans) folded into the default cron cycle + `task:'media_gc'`. Published/preview output stays EXIF-free + orientation-safe via the existing render transform (one pipeline, unchanged). 90/90 pure sweep.
 - ✅ **M7 — Snapshot retention GC** — DONE (Jul 9 2026). Committed, tested (snapshot_gc 26/26), deployed — **fully live, no owner dependency, NO migration**. Canonical retention as a **pure selector** `classifySnapshots` (keeps live · last-20 per site · publish/rollback/scheduled/launch/`prev_snapshot_id`/preview references · unclassifiable→keep) + I/O `reapSnapshots` (per-site gather, site-scoped bounded DELETE, oldest-first, converges) folded into the default cron cycle + `task:'snapshot_gc'`. FKs (launch/preview RESTRICT, publishes set-null) back the selector as defense-in-depth. 91/91 pure sweep.
-- ⏳ **M8–M10** — remaining, in the approved order below (M8 is next active).
+- ✅ **M8 — Preview hardening** — DONE (Jul 9 2026). Committed, tested (preview_hardening 37/37), deployed — **fully live, no owner dependency, NO migration**. Built on FD-T20: `lib/preview_cache.ts` (bounded LRU memoizing the render, keyed by the M3 hash for drafts / snapshot id for immutable — never stale, publish never reads it) + `lib/preview_link.ts` (HMAC-signed, time-limited, fail-closed preview links reusing the approval-link model; `POST /preview/share-link` mint + public `GET /p/s/:token`) + draft watermark (reuses `injectPreviewBadge` on the authed preview, never in `renderSnapshot`). 92/92 pure sweep.
+- ⏳ **M9–M10** — remaining, in the approved order below (M9 is next active).
 
 ## Execution order (dependency-sorted)
 
@@ -39,8 +40,8 @@ M4  ✅ Publish idempotency + cooldown    (FULLY LIVE — mig 0073 applied both 
 M5  ✅ Deploy robustness                 (DONE — poll timeout · reconcile cron · ceiling · telemetry; fully live)
 M6  ✅ Media hardening                   (DONE — magic-byte · EXIF-at-upload · quota · GC; fully live, no migration)
 M7  ✅ Snapshot retention GC             (DONE — pure selector + bounded cron reaper; fully live, no migration)
-M8  ⏳ Preview hardening               (NEXT — cache · signed links · watermark)
-M9  Client UX safety                  (optimistic lock · shared state · what-will-change)
+M8  ✅ Preview hardening               (DONE — render cache · signed links · watermark; fully live, no migration)
+M9  ⏳ Client UX safety                (NEXT — optimistic lock · shared state · what-will-change)
 M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 ```
 
@@ -143,16 +144,13 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M8 — Preview hardening
+## M8 — Preview hardening  ·  ✅ DONE (Jul 9 2026) — fully live, no owner dependency, NO migration
+> **Design:** built ON the existing FD-T20 preview system (opaque `/p/:token` share, `injectPreviewBadge`, render-through-the-one-engine) — nothing rebuilt.
+> **(1) Preview cache** — new `lib/preview_cache.ts`: a bounded in-memory **LRU** (`PREVIEW_CACHE_MAX` 64, `PREVIEW_CACHE_TTL_MS` 5m) that memoizes the deterministic **render** (`renderSnapshot`'s fileMap + media manifest), keyed content-addressed: the authed `/preview` keys on the **M3 hash of the FINAL snapshot** (`computeDraftHash` — captures content + template-override + dev layer, so any draft edit → new key → automatic invalidation, never stale), and the public shared preview keys on the **immutable snapshot id** (so a link viewed by many people renders once). It caches ONLY the render — freshly-signed image URLs, link-rewriting and the badge are re-applied per request, so a cache hit **never** carries an expired signed URL. **Publish never reads this cache** (published rendering untouched). **(2) Signed preview links** — new pure `lib/preview_link.ts`: `signPreviewToken`/`verifyPreviewToken` over `{site_id, exp, scope}` reusing the **same HMAC-SHA256 model as the one-tap approval links** (`_shared/hmac.ts`) — not a second auth system. Verify is timing-safe and **fails closed** on missing secret / bad signature / tampered payload / expiry; a swapped `site_id` breaks the signature (cross-tenant blocked). Secret resolves from existing config (`PREVIEW_LINK_SECRET`→`APPROVAL_SECRET`→`STATE_SIGNING_SECRET`→`SCHEDULER_SECRET`) — **no new required secret** (prod's `SCHEDULER_SECRET` makes it live). Authed **`POST /preview/share-link`** mints a link (TTL clamped [1m, 7d], default 24h) site-scoped to the caller; public **`GET /p/s/:token`** verifies + renders that site's current preview via the SAME shared cached renderer. **(3) Draft watermark** — reuses `injectPreviewBadge` (already on the public preview) and now also on the authed `/preview` for **draft/preview versions only**; injected in the preview wrapper, **never inside `renderSnapshot`**, so it can never reach a published deploy (explicit live/publish comparison views stay clean). Tests: `preview_hardening` 37/37 (cache keying/hit/miss/TTL/LRU/per-site-invalidation, sign/verify/expiry/tamper/site-scope/malformed, TTL clamp, secret fallback, watermark-never-in-publish-renderer, wiring); 92/92 pure sweep; 0 type-errors; deployed staging+prod. **No schema change** (cache in-memory; links stateless; watermark reuses the existing badge).
 
 🎯 Faster, safely shareable previews that can never be mistaken for live.
-📦 Preview cache by draft hash · optional signed/expiring preview share links · draft watermark.
-📁
-- **`lib/preview_env.ts` / `lib/staging.ts` / preview handlers** (`handlePreview`): cache the rendered preview keyed by the M3 draft hash (recompute only when the draft changes).
-- **Signed links:** reuse the existing signed-state pattern (HMAC over `site_id + draft_hash + exp`, `STATE_SIGNING_SECRET` in `_shared/auth.ts`); a read-only render route that verifies the token. Off by default, opt-in per site.
-- **Watermark:** a "DRAFT — not published" chrome band in the preview view (portal-side, `presence.html`/client preview).
-🧪 Pure: signed-link verify + expiry. Integration: same draft hash → cache hit; watermark present; expired token → 403.
-⚠️ **Fence:** the watermark/preview UI touches portal pages → committed local, not pushed. Reuses `renderSnapshot` (no second renderer). Signed link is opt-in (no new default attack surface).
+📦 Preview cache by draft hash · signed/expiring preview share links · draft watermark.
+⚠️ **Fence:** no public-site page changed — the signed link is an API endpoint + the watermark is server-injected into preview responses (no portal/marketing page touched). Reuses `renderSnapshot` (no second renderer) + the FD-T20 preview system + the approval-link HMAC model (no second authz model).
 
 ---
 

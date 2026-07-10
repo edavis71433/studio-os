@@ -14,6 +14,9 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
+import { computeDraftHash } from '../lib/draft_hash.ts';
+import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
+import { injectPreviewBadge } from '../lib/preview_env.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 
@@ -92,11 +95,28 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
     snapshot = { ...snapshot, template_slug: tryTemplate, template_version: v! };
   }
 
-  let fileMap;
+  // M8: cache the deterministic render keyed by the M3 content hash of the FINAL
+  // snapshot (captures content + template override + dev layer). Any draft edit
+  // changes the hash → a different key → automatic invalidation (never stale).
+  // The render is the only cached step; signed image URLs are re-applied per
+  // request below, so a cache hit never carries an expired URL. Publish never
+  // reads this cache. A cache MISS on a served draft also records blockers/warnings.
+  let fileMap: Record<string, string | Uint8Array>;
+  let cacheHit = false;
   try {
-    // Phase B1: same renderSnapshot as publish/restore — preview is pixel-identical
-    // to production for the same snapshot (incl. the Developer-Mode layer).
-    fileMap = renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' });
+    const hash = await computeDraftHash(snapshot);
+    const key = previewCacheKey(site.id, 'draft', hash);
+    const cached = previewCache.get(key);
+    if (cached) {
+      fileMap = cached.fileMap;
+      if (loaded === null) { blockers = cached.blockers; warnings = cached.warnings; }
+      cacheHit = true;
+    } else {
+      // Phase B1: same renderSnapshot as publish/restore — preview is pixel-identical
+      // to production for the same snapshot (incl. the Developer-Mode layer).
+      fileMap = renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' });
+      previewCache.set(key, { fileMap, mediaManifest, blockers, warnings });
+    }
   } catch (e) {
     console.error('preview render failed:', (e as Error)?.message);
     return json({ error: 'render_failed', message: 'We couldn’t draw this preview. Your content is safe — your concierge has been notified.' }, 500, cors);
@@ -113,6 +133,15 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
   const cssKey = Object.keys(fileMap).find((k) => k.startsWith('assets/') && k.endsWith('.css'));
   if (cssKey) html = html.replace(/<link rel="stylesheet" href="[^"]*">/, `<style>${fileMap[cssKey]}</style>`);
 
+  // M8: draft watermark — visible "this is a preview, not the live site" badge on
+  // DRAFT/PREVIEW content only. Injected here in the preview wrapper, NEVER inside
+  // renderSnapshot → it can never reach a published deploy. (Explicit live/publish
+  // comparison views stay clean so the operator sees the true published look.)
+  if (version === 'draft' || version === 'preview') {
+    const bizName = (snapshot.content as any)?.identity?.business_name || '';
+    html = injectPreviewBadge(html!, bizName);
+  }
+
   return new Response(html, {
     status: 200,
     headers: {
@@ -122,6 +151,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
       'X-Presence-Draft-Blockers': String(blockers),
       'X-Presence-Draft-Warnings': String(warnings),
       'X-Presence-Preview-Version': loaded ? (publishId ? 'publish' : 'live') : 'draft',
+      'X-Presence-Preview-Cache': cacheHit ? 'hit' : 'miss',
     },
   });
 }

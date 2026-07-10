@@ -14,10 +14,13 @@ import { renderSnapshot } from '../lib/render.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
 import { injectPreviewBadge, hashPreviewPassword, newPreviewToken, shapePreviewStatus } from '../lib/preview_env.ts';
+import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
+import { signPreviewToken, verifyPreviewToken, previewLinkSecret, clampTtlSeconds } from '../lib/preview_link.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+const nowSec = () => Math.floor(Date.now() / 1000);
 
 async function previewRow(siteId: string) {
   const r = await svc(`presence_site_preview?site_id=eq.${siteId}&select=site_id,snapshot_id,token,password_hash,updated_at&limit=1`);
@@ -82,9 +85,51 @@ export async function handlePreviewSettings(req: Request, site: SiteRow, princip
   return json({ data: { ok: true, url: `${fnBase()}/functions/v1/presence/p/${token}`, has_password: !!patch.password_hash } }, 200, cors);
 }
 
+// ── shared render core for BOTH public preview doors (opaque + signed) ────────
+// M8: cache the deterministic render keyed by the (immutable) snapshot id, so a
+// shared link viewed by many people renders once. Per-request bits (freshly
+// signed image URLs, link rewrite, badge) are always re-applied → a cache hit
+// never serves an expired signed URL. `linkPfx` keeps in-preview navigation on
+// the same door the visitor arrived through.
+async function renderStagedPreview(req: Request, siteId: string, snapshotId: string, linkPfx: string, cors: Record<string, string>): Promise<Response> {
+  const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
+  const url = new URL(req.url);
+
+  const key = previewCacheKey(siteId, 'snap', snapshotId);
+  let hit = previewCache.get(key);
+  if (!hit) {
+    const loaded = await loadStagedSnapshot(snapshotId);
+    if (!loaded || !snapshotContentUsable(loaded.snapshot.content)) return htmlResp(shell('This preview can’t be shown.'), 410);
+    const site = await svc(`presence_sites?id=eq.${siteId}&select=custom_domain,netlify_site_id&limit=1`);
+    const s = site.json?.[0] || {};
+    const baseUrl = s.custom_domain ? `https://${s.custom_domain}` : (s.netlify_site_id ? `https://${s.netlify_site_id}.netlify.app` : 'https://preview.invalid');
+    let fileMap: Record<string, string | Uint8Array>;
+    try { fileMap = renderSnapshot(loaded.snapshot, { baseUrl }); } catch { return htmlResp(shell('We couldn’t draw this preview.'), 500); }
+    hit = { fileMap, mediaManifest: loaded.mediaManifest, blockers: 0, warnings: 0, businessName: (loaded.snapshot.content as any)?.identity?.business_name || '' };
+    previewCache.set(key, hit);
+  }
+
+  const page = url.searchParams.get('page') || '/';
+  const filePath = page === '/' ? 'index.html' : `${page.replace(/^\/|\/$/g, '')}/index.html`;
+  let html = hit.fileMap[filePath] as string | undefined;
+  if (!html) return htmlResp(shell('No page at that address in this preview.'), 404);
+
+  // signed images (private bucket, fresh per request) + inline the hashed stylesheet
+  const urls = await previewUrlMap(hit.mediaManifest as any[]);
+  for (const [outPath, signed] of Object.entries(urls)) html = html!.replaceAll(`"${outPath}"`, `"${signed}"`);
+  const cssKey = Object.keys(hit.fileMap).find((k) => k.startsWith('assets/') && k.endsWith('.css'));
+  if (cssKey) html = html!.replace(/<link rel="stylesheet" href="[^"]*">/, `<style>${hit.fileMap[cssKey]}</style>`);
+  // keep navigation INSIDE the preview (same door the visitor arrived through)
+  html = html!.replace(/href="\/(?!\/)([^"#?]*)"/g, (_m, p1) => `href="${linkPfx}?page=/${p1}"`);
+  // noindex + the honest preview badge (the draft watermark)
+  html = html!.replace('</head>', `<meta name="robots" content="noindex,nofollow"></head>`);
+  html = injectPreviewBadge(html!, hit.businessName || '');
+  return htmlResp(html!);
+}
+
 // ── GET /p/:token — the PUBLIC, shareable preview URL (pre-auth) ──────────────
-// Resolved by the token; optional password gate; rendered through the ONE engine
-// with a preview badge + noindex; internal links stay inside the preview.
+// Resolved by the opaque token; optional password gate; rendered through the ONE
+// engine (shared cached renderer) with a preview badge + noindex.
 export async function handlePublicPreview(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
   const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
   if (!/^[0-9a-f]{16,80}$/i.test(token)) return htmlResp(shell('This preview link isn’t valid.'), 404);
@@ -92,41 +137,45 @@ export async function handlePublicPreview(req: Request, token: string, cors: Rec
   const row = r.ok && r.json?.[0];
   if (!row || !row.snapshot_id) return htmlResp(shell('This preview isn’t available.'), 404);
 
-  const url = new URL(req.url);
   // password gate (only when set)
   if (row.password_hash) {
-    const pw = url.searchParams.get('pw') || '';
+    const pw = new URL(req.url).searchParams.get('pw') || '';
     const given = pw ? await hashPreviewPassword(pw) : '';
     if (given !== row.password_hash) return htmlResp(passwordForm(token, !!pw), 200);
   }
+  return renderStagedPreview(req, row.site_id, row.snapshot_id, `${fnBase()}/functions/v1/presence/p/${token}`, cors);
+}
 
-  const loaded = await loadStagedSnapshot(row.snapshot_id);
-  if (!loaded || !snapshotContentUsable(loaded.snapshot.content)) return htmlResp(shell('This preview can’t be shown.'), 410);
+// ── GET /p/s/:token — the SIGNED, time-limited preview link (pre-auth) ────────
+// Cryptographically-signed, expiring pointer to a site's current preview. Same
+// render path as the opaque door; authorized ONLY by a valid, unexpired
+// signature over {site_id, exp}. Fails closed on a missing secret, bad signature,
+// tampered payload, or expiry. Site-scoped by the signed site_id.
+export async function handleSignedPreview(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
+  const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
+  const secret = previewLinkSecret();
+  if (!secret) return htmlResp(shell('This preview link isn’t available.'), 404); // fail closed (no signing secret configured)
+  const v = await verifyPreviewToken(token, secret, nowSec());
+  if (!v.ok) return htmlResp(shell(v.error === 'expired' ? 'This preview link has expired — ask for a fresh one.' : 'This preview link isn’t valid.'), v.error === 'expired' ? 410 : 404);
+  const pv = await svc(`presence_site_preview?site_id=eq.${v.payload.site_id}&select=snapshot_id&limit=1`);
+  const snapId = pv.ok && pv.json?.[0]?.snapshot_id;
+  if (!snapId) return htmlResp(shell('This preview isn’t available yet.'), 404);
+  return renderStagedPreview(req, v.payload.site_id, snapId, `${fnBase()}/functions/v1/presence/p/s/${token}`, cors);
+}
 
-  const site = await svc(`presence_sites?id=eq.${row.site_id}&select=custom_domain,netlify_site_id&limit=1`);
-  const s = site.json?.[0] || {};
-  const baseUrl = s.custom_domain ? `https://${s.custom_domain}` : (s.netlify_site_id ? `https://${s.netlify_site_id}.netlify.app` : 'https://preview.invalid');
-  let fileMap: Record<string, string | Uint8Array>;
-  try { fileMap = renderSnapshot(loaded.snapshot, { baseUrl }); } catch { return htmlResp(shell('We couldn’t draw this preview.'), 500); }
-
-  const page = url.searchParams.get('page') || '/';
-  const filePath = page === '/' ? 'index.html' : `${page.replace(/^\/|\/$/g, '')}/index.html`;
-  let html = fileMap[filePath] as string | undefined;
-  if (!html) return htmlResp(shell('No page at that address in this preview.'), 404);
-
-  // signed images (private bucket) + inline the hashed stylesheet
-  const urls = await previewUrlMap(loaded.mediaManifest);
-  for (const [outPath, signed] of Object.entries(urls)) html = html!.replaceAll(`"${outPath}"`, `"${signed}"`);
-  const cssKey = Object.keys(fileMap).find((k) => k.startsWith('assets/') && k.endsWith('.css'));
-  if (cssKey) html = html!.replace(/<link rel="stylesheet" href="[^"]*">/, `<style>${fileMap[cssKey]}</style>`);
-  // keep navigation INSIDE the preview: rewrite internal links to /p/:token?page=…
-  const pfx = `${fnBase()}/functions/v1/presence/p/${token}`;
-  html = html!.replace(/href="\/(?!\/)([^"#?]*)"/g, (_m, p1) => `href="${pfx}?page=/${p1}"`);
-  // noindex + the honest preview badge
-  html = html!.replace('</head>', `<meta name="robots" content="noindex,nofollow"></head>`);
-  const bizName = (loaded.snapshot.content as any)?.identity?.business_name || '';
-  html = injectPreviewBadge(html!, bizName);
-  return htmlResp(html!);
+// ── POST /preview/share-link — mint a signed, time-limited link (authed) ──────
+// Site-scoped to the caller's site; TTL clamped to [1min, 7d] (default 24h).
+export async function handlePreviewShareLink(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const secret = previewLinkSecret();
+  if (!secret) return json({ error: 'unavailable', message: 'Shareable preview links aren’t configured yet.' }, 503, cors);
+  const p = await previewRow(site.id);
+  if (!p || !p.snapshot_id) return json({ error: 'no_preview', message: 'Update your preview first, then you can share a timed link.' }, 409, cors);
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const ttl = clampTtlSeconds(body?.ttl_seconds ?? (body?.ttl_hours ? Number(body.ttl_hours) * 3600 : undefined));
+  const exp = nowSec() + ttl;
+  const token = await signPreviewToken({ site_id: site.id, exp, scope: 'preview' }, secret);
+  await writeChangeEvent({ siteId: site.id, entityType: 'preview', entityId: null, action: 'update', summary: 'Created a timed preview link', principal, provenance: 'human' });
+  return json({ data: { ok: true, url: `${fnBase()}/functions/v1/presence/p/s/${token}`, expires_at: new Date(exp * 1000).toISOString(), ttl_seconds: ttl } }, 200, cors);
 }
 
 function shell(msg: string): string {

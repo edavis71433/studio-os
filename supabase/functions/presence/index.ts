@@ -25,7 +25,7 @@ import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/
 import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
-import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview } from './routes/preview_env.ts';
+import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -122,6 +122,13 @@ serve(async (req) => {
   }
   if (route === '/approve' && method === 'GET') return handleApproveGet(req, cors);
   if (route === '/approve' && method === 'POST') return handleApprovePost(req, cors);
+  // ── M8: the SIGNED, time-limited preview link — pre-auth, authorized ONLY by
+  //    a valid unexpired HMAC signature over {site_id, exp}. Matched before the
+  //    opaque door (its token carries a '.' + non-hex, so they never collide). ──
+  {
+    const m = route.match(/^\/p\/s\/(.+)$/);
+    if (m && method === 'GET') return handleSignedPreview(req, m[1], cors);
+  }
   // ── FD-T20: the PUBLIC, shareable preview URL — pre-auth, authorized by the
   //    token itself (+ optional password); rendered through the ONE engine. ──
   {
@@ -291,6 +298,7 @@ serve(async (req) => {
   if (route === '/preview/publish' && method === 'POST') return handlePreviewPublish(site, principal, cors);
   if (route === '/preview/promote' && method === 'POST') return handlePreviewPromote(site, principal, cors);
   if (route === '/preview/settings' && method === 'POST') return handlePreviewSettings(req, site, principal, cors);
+  if (route === '/preview/share-link' && method === 'POST') return handlePreviewShareLink(req, site, principal, cors); // M8: mint a signed, time-limited link
   if (route === '/publish' && method === 'POST') return handlePublish(req, site, principal, cors);
   if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
