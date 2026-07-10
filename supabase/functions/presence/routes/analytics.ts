@@ -273,5 +273,34 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   if (counts.falling) searchInsightsAgency.push({ key: 'search_falling', title: 'Losing visibility', sentence: `${counts.falling} ${counts.falling === 1 ? 'client is' : 'clients are'} being seen less on Google — worth a fresh update.`, number: counts.falling, tone: 'attention' });
   if (counts.not_connected) searchInsightsAgency.push({ key: 'search_not_connected', title: 'Search not connected', sentence: `${counts.not_connected} of ${siteIds.length} ${counts.not_connected === 1 ? 'client hasn’t' : 'clients haven’t'} connected Google Search Console — so their search numbers aren’t available yet.`, number: counts.not_connected, tone: 'neutral' });
 
-  return json({ data: { headline, insights: [...insights, ...searchInsightsAgency], client_count: siteIds.length } }, 200, cors);
+  // P2-F G4 — Studio WEBSITE OVERSIGHT (§2). Coarse per-client website health for
+  // the agency, at the already-authorized site scope. Two bounded queries; reads
+  // live (no customer data duplicated into the agency workspace); billing shown
+  // only at the coarse plan-status level (never payment details).
+  const siteToClient = new Map(sites.map((s: any) => [String(s.id), String(s.client_id)]));
+  const failed7 = new Set(arr(await svc(`presence_publishes?site_id=in.(${siteIds.join(',')})&status=eq.failed&completed_at=gte.${sinceIso}&select=site_id&limit=2000`)).map((r: any) => String(r.site_id)));
+  const entRows = clientIds.length ? arr(await svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status`)) : [];
+  const planStatus = new Map(entRows.map((e: any) => [String(e.client_id), String(e.status)]));
+  const websites = (portfolio || []).map((c: any) => {
+    const cid = siteToClient.get(String(c.site_id)) || '';
+    const plan = planStatus.get(cid) || 'unknown';
+    const pubFailed = failed7.has(String(c.site_id));
+    return {
+      name: c.name,
+      draft_live: c.last_published_at ? 'live' : 'draft',
+      last_published_at: c.last_published_at || null,
+      unpublished_changes: !!c.unpublished_changes,
+      leads_waiting: c.leads_waiting || 0,
+      publish_failed: pubFailed,
+      plan_status: plan,   // coarse SaaS blocker (active|paused|lapsed|…), never payment details
+      needs_attention: !!c.attention || pubFailed || plan === 'paused' || plan === 'lapsed',
+    };
+  });
+  const websiteInsights: any[] = [];
+  const failedCount = websites.filter((w: any) => w.publish_failed).length;
+  const blockedCount = websites.filter((w: any) => w.plan_status === 'paused' || w.plan_status === 'lapsed').length;
+  if (failedCount) websiteInsights.push({ key: 'publish_failed', title: 'A publish needs attention', sentence: `${failedCount} ${failedCount === 1 ? 'client site' : 'client sites'} had a publish fail recently — worth a look.`, number: failedCount, tone: 'attention' });
+  if (blockedCount) websiteInsights.push({ key: 'plan_blocked', title: 'A subscription needs attention', sentence: `${blockedCount} ${blockedCount === 1 ? 'client’s software subscription is' : 'clients’ software subscriptions are'} paused or ended — editing/publishing is limited until it’s resolved.`, number: blockedCount, tone: 'attention' });
+
+  return json({ data: { headline, insights: [...insights, ...searchInsightsAgency, ...websiteInsights], websites, client_count: siteIds.length } }, 200, cors);
 }
