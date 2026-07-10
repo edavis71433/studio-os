@@ -30,6 +30,7 @@ import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDeal
 import { handleProjects, handleProject, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
+import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -456,6 +457,21 @@ serve(async (req) => {
     // P2-D-3: project messages
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/messages$/);
     if (m && (method === 'GET' || method === 'POST')) return handleMessages(req, jwt, site, principal, m[1], cors);
+    // P2-D-4: project surveys
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/surveys$/);
+    if (m && (method === 'GET' || method === 'POST')) return handleProjectSurveys(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/surveys\/([0-9a-f-]{36})$/);
+    if (m && method === 'GET') return handleSurvey(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/surveys\/([0-9a-f-]{36})\/respond$/);
+    if (m && method === 'POST') return handleSurveyRespond(req, jwt, site, principal, m[1], cors);
+  }
+  // P2-D-4: support
+  if (route === '/support' && (method === 'GET' || method === 'POST')) return handleSupport(req, jwt, site, principal, cors);
+  {
+    let m = route.match(/^\/support\/([0-9a-f-]{36})$/);
+    if (m && (method === 'GET' || method === 'PATCH')) return handleSupportOne(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/support\/([0-9a-f-]{36})\/messages$/);
+    if (m && method === 'POST') return handleSupportMessage(req, jwt, site, principal, m[1], cors);
   }
   // P2-D-3: notifications (derived from the activity log + a per-reader last-seen)
   if (route === '/notifications' && method === 'GET') return handleNotifications(req, jwt, site, principal, cors);

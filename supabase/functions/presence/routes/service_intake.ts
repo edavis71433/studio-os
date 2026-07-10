@@ -1,0 +1,178 @@
+// ── Surveys & Support routes (Presence CMS Phase 2, P2-D-4) ──────────────────
+// A small fixed survey (stable questions, one idempotent submission per
+// respondent) + the smallest coherent support workflow (submit → triage →
+// respond → resolve → reopen). Site-scoped; the studio manages, the client
+// submits/replies. Project-linked items feed the ONE activity log. No form
+// builder, no helpdesk, no parallel systems.
+import { json } from '../../_shared/http.ts';
+import { svc } from '../lib/db.ts';
+import { isStudioSide, studioDenied, loadProject, projectEvent } from './projects.ts';
+import { clampLimit, clampOffset } from '../lib/service_delivery.ts';
+import {
+  normalizeQuestions, normalizeAnswers,
+  isSupportStatus, canSupportTransition, isSupportPriority,
+} from '../lib/intake.ts';
+import type { SiteRow } from '../lib/site.ts';
+import type { Principal } from '../../_shared/auth.ts';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
+const nowIso = () => new Date().toISOString();
+const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
+const readerKey = (p: Principal) => String(p.userId || p.email || 'anon');
+
+// ═══ SURVEYS ═══
+export async function handleProjectSurveys(req: Request, jwt: string, site: SiteRow, principal: Principal, projectId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(projectId)) return json({ error: 'bad_request' }, 400, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  const project = await loadProject(site.id, projectId);
+  if (!project || (!studio && !project.client_visible)) return json({ error: 'not_found' }, 404, cors);
+  if (req.method === 'GET') {
+    let path = `presence_surveys?project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,client_visible,created_at&order=created_at.desc&limit=100`;
+    if (!studio) path += `&client_visible=is.true&status=eq.active`;
+    const r = await svc(path);
+    return r.ok ? json({ data: rows(r), is_studio_view: studio }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
+  }
+  if (req.method === 'POST') {
+    if (!studio) return studioDenied(cors);
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    const title = clean(b.title, 200);
+    if (!title) return json({ error: 'validation', message: 'A survey needs a title.' }, 422, cors);
+    const norm = normalizeQuestions(b.questions);
+    if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
+    const ins = await svc('presence_surveys', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ site_id: site.id, project_id: projectId, title, questions: norm.questions, status: 'active', client_visible: b.client_visible === false ? false : true }) });
+    if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
+    const s = rows(ins)[0];
+    await projectEvent(site.id, projectId, 'survey_requested', principal, s.client_visible, { survey_id: s.id, title });
+    return json({ data: s }, 201, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+export async function handleSurvey(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  const survey = rows(await svc(`presence_surveys?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
+  if (!survey || (!studio && !(survey.client_visible && survey.status === 'active'))) return json({ error: 'not_found' }, 404, cors);
+  if (studio) {
+    const resp = rows(await svc(`presence_survey_responses?survey_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,respondent,answers,status,submitted_at&order=created_at.desc&limit=200`));
+    return json({ data: { survey, responses: resp, is_studio_view: true } }, 200, cors);
+  }
+  const mine = rows(await svc(`presence_survey_responses?survey_id=eq.${id}&site_id=eq.${site.id}&respondent=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,answers,status,submitted_at&limit=1`))[0] || null;
+  return json({ data: { survey: { id: survey.id, title: survey.title, questions: survey.questions, status: survey.status }, my_response: mine, is_studio_view: false } }, 200, cors);
+}
+
+export async function handleSurveyRespond(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const survey = rows(await svc(`presence_surveys?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,questions,status,client_visible&limit=1`))[0];
+  if (!survey || survey.status !== 'active') return json({ error: 'not_found', message: 'That survey isn’t open.' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const norm = normalizeAnswers(b.answers, survey.questions || []);
+  if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
+  const respondent = readerKey(principal);
+  // idempotent: one submitted response per (survey, respondent) — the unique index enforces it
+  const existing = rows(await svc(`presence_survey_responses?survey_id=eq.${id}&site_id=eq.${site.id}&respondent=eq.${encodeURIComponent(respondent)}&status=eq.submitted&select=id&limit=1`))[0];
+  if (existing) return json({ data: { id: existing.id, status: 'submitted' }, already: true }, 200, cors);
+  const ins = await svc('presence_survey_responses', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, survey_id: id, project_id: survey.project_id, respondent, answers: norm.answers, status: 'submitted', submitted_at: nowIso() }) });
+  if (!ins.ok || !rows(ins)[0]) { // unique-violation race → treat as already submitted
+    const race = rows(await svc(`presence_survey_responses?survey_id=eq.${id}&site_id=eq.${site.id}&respondent=eq.${encodeURIComponent(respondent)}&status=eq.submitted&select=id&limit=1`))[0];
+    if (race) return json({ data: { id: race.id, status: 'submitted' }, already: true }, 200, cors);
+    return json({ error: 'write_failed' }, 502, cors);
+  }
+  if (survey.project_id) await projectEvent(site.id, survey.project_id, 'survey_submitted', principal, false, { survey_id: id });
+  return json({ data: { id: rows(ins)[0].id, status: 'submitted' } }, 201, cors);
+}
+
+// ═══ SUPPORT ═══
+export async function handleSupport(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const studio = await isStudioSide(jwt, site, principal);
+  if (req.method === 'GET') {
+    const u = new URL(req.url);
+    const status = u.searchParams.get('status');
+    const q = clean(u.searchParams.get('q'), 80);
+    const limit = clampLimit(u.searchParams.get('limit'));
+    const offset = clampOffset(u.searchParams.get('offset'));
+    let path = `presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&select=id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
+    if (!studio) path += `&requester=eq.${encodeURIComponent(readerKey(principal))}`;   // the client sees only its own
+    if (status && isSupportStatus(status)) path += `&status=eq.${status}`;
+    if (q) path += `&subject.ilike.*${encodeURIComponent(q)}*`;
+    const r = await svc(path);
+    return r.ok ? json({ data: rows(r), limit, offset, is_studio_view: studio }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
+  }
+  if (req.method === 'POST') {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    const subject = clean(b.subject, 200);
+    if (!subject) return json({ error: 'validation', message: 'A support request needs a subject.' }, 422, cors);
+    let projectId: string | null = UUID_RE.test(b.project_id || '') ? b.project_id : null;
+    if (projectId && !(await loadProject(site.id, projectId))) projectId = null;
+    const priority = isSupportPriority(b.priority) ? b.priority : 'normal';
+    const ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ site_id: site.id, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind }) });
+    if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
+    const req0 = rows(ins)[0];
+    if (projectId) await projectEvent(site.id, projectId, 'support_opened', principal, true, { request_id: req0.id, subject });
+    return json({ data: req0 }, 201, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+async function loadSupport(site: SiteRow, id: string, studio: boolean, principal: Principal) {
+  const r = rows(await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
+  if (!r) return null;
+  if (!studio && r.requester !== readerKey(principal)) return null;   // the client sees only its own
+  return r;
+}
+
+export async function handleSupportOne(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  const reqRow = await loadSupport(site, id, studio, principal);
+  if (!reqRow) return json({ error: 'not_found', message: 'That request isn’t here.' }, 404, cors);
+  if (req.method === 'GET') {
+    const msgs = rows(await svc(`presence_support_messages?request_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,body,author,author_kind,attachment_media_id,created_at&order=created_at.asc&limit=200`));
+    return json({ data: { request: reqRow, messages: msgs, is_studio_view: studio } }, 200, cors);
+  }
+  if (req.method === 'PATCH') { // triage/resolve — studio only
+    if (!studio) return studioDenied(cors);
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    const patch: Record<string, unknown> = {};
+    let resolvedNow = false;
+    if (b.priority !== undefined) { if (!isSupportPriority(b.priority)) return json({ error: 'validation', message: 'Invalid priority.' }, 422, cors); patch.priority = b.priority; }
+    if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
+    if (b.resolution !== undefined) patch.resolution = clean(b.resolution, 2000);
+    if (b.status !== undefined) {
+      if (!isSupportStatus(b.status)) return json({ error: 'bad_status' }, 422, cors);
+      if (b.status !== reqRow.status && !canSupportTransition(reqRow.status, b.status)) return json({ error: 'invalid_transition', message: `A request can’t move from ${reqRow.status} to ${b.status}.` }, 409, cors);
+      patch.status = b.status;
+      patch.resolved_at = b.status === 'resolved' ? nowIso() : (b.status === 'open' ? null : reqRow.resolved_at);
+      resolvedNow = b.status === 'resolved' && reqRow.status !== 'resolved';
+    }
+    if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
+    const up = await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+    if (resolvedNow && reqRow.project_id) await projectEvent(site.id, reqRow.project_id, 'support_resolved', principal, true, { request_id: id });
+    return json({ data: rows(up)[0] }, 200, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+export async function handleSupportMessage(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  const reqRow = await loadSupport(site, id, studio, principal);
+  if (!reqRow) return json({ error: 'not_found' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const body = clean(b.body, 5000);
+  if (!body) return json({ error: 'validation', message: 'Write a message first.' }, 400, cors);
+  let attachment: string | null = UUID_RE.test(b.attachment_media_id || '') ? b.attachment_media_id : null;
+  if (attachment) { const m = rows(await svc(`presence_media?id=eq.${attachment}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`))[0]; if (!m) attachment = null; }
+  const ins = await svc('presence_support_messages', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, request_id: id, body, author: readerKey(principal), author_kind: principal.kind, attachment_media_id: attachment }) });
+  if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
+  // a studio reply on an open request bumps it to in_progress (best-effort, guarded)
+  if (studio && reqRow.status === 'open') await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}&status=eq.open`, { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) }).catch(() => {});
+  if (reqRow.project_id) await projectEvent(site.id, reqRow.project_id, 'support_message', principal, true, { request_id: id });
+  return json({ data: rows(ins)[0] }, 201, cors);
+}

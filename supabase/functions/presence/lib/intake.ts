@@ -1,0 +1,64 @@
+// ── Surveys & Support — pure logic (Presence CMS Phase 2, P2-D-4) ────────────
+// Survey question/answer normalization + the support status ladder. Pure (no DB,
+// no network) so the intake rules are deterministic + unit-testable. This is a
+// SMALL, fixed survey (stable questions + one submission) — not a form builder.
+
+// ── surveys ──
+export type SurveyStatus = 'draft' | 'active' | 'closed';
+export const SURVEY_STATUSES: SurveyStatus[] = ['draft', 'active', 'closed'];
+export function isSurveyStatus(s: unknown): s is SurveyStatus {
+  return typeof s === 'string' && (SURVEY_STATUSES as string[]).includes(s);
+}
+export interface Question { key: string; label: string; type: 'text' | 'rating' | 'choice'; choices?: string[]; }
+/** Validate + normalize a STABLE question set (max 30). Keys are unique + slugged. Pure. */
+export function normalizeQuestions(raw: unknown): { ok: true; questions: Question[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: 'A survey needs at least one question.' };
+  if (raw.length > 30) return { ok: false, error: 'A survey can have at most 30 questions.' };
+  const out: Question[] = []; const seen = new Set<string>();
+  for (let i = 0; i < raw.length; i++) {
+    const r = raw[i] as any;
+    const label = String(r?.label || '').trim().slice(0, 300);
+    if (!label) return { ok: false, error: `Question ${i + 1} needs a label.` };
+    const type = (r?.type === 'rating' || r?.type === 'choice') ? r.type : 'text';
+    let key = String(r?.key || label).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || `q${i + 1}`;
+    while (seen.has(key)) key = `${key}_${i}`;
+    seen.add(key);
+    const q: Question = { key, label, type };
+    if (type === 'choice') { const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c).slice(0, 120)).filter(Boolean).slice(0, 20) : []; if (!choices.length) return { ok: false, error: `Question “${label}” needs choices.` }; q.choices = choices; }
+    out.push(q);
+  }
+  return { ok: true, questions: out };
+}
+/** Answers are a { key: value } map restricted to the survey's question keys. Pure. */
+export function normalizeAnswers(raw: unknown, questions: Question[]): { ok: true; answers: Record<string, string> } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object') return { ok: false, error: 'Answers must be provided.' };
+  const keys = new Set(questions.map((q) => q.key));
+  const answers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!keys.has(k)) continue;                                     // ignore stray keys (stable schema)
+    answers[k] = String(v ?? '').slice(0, 2000);
+  }
+  if (!Object.keys(answers).length) return { ok: false, error: 'Please answer at least one question.' };
+  return { ok: true, answers };
+}
+
+// ── support ──
+export type SupportStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export const SUPPORT_STATUSES: SupportStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
+const SUPPORT_NEXT: Record<SupportStatus, SupportStatus[]> = {
+  open: ['in_progress', 'resolved', 'closed'],
+  in_progress: ['open', 'resolved', 'closed'],
+  resolved: ['open', 'closed'],       // reopen or close
+  closed: ['open'],                   // reopen
+};
+export function isSupportStatus(s: unknown): s is SupportStatus {
+  return typeof s === 'string' && (SUPPORT_STATUSES as string[]).includes(s);
+}
+export function canSupportTransition(from: SupportStatus, to: SupportStatus): boolean {
+  if (from === to) return false;
+  return (SUPPORT_NEXT[from] || []).includes(to);
+}
+export type SupportPriority = 'low' | 'normal' | 'high' | 'urgent';
+export function isSupportPriority(p: unknown): p is SupportPriority {
+  return p === 'low' || p === 'normal' || p === 'high' || p === 'urgent';
+}
