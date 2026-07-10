@@ -64,12 +64,12 @@ Customer (clients.id + presence_sites.id, from P2-C convert)
 
 ---
 
-## Foundation-first build sequence (each increment: migration+lib+routes+tests, validate, then next)
-1. **P2-D-1 — Project foundation (this increment):** `presence_projects` + `presence_milestones` + `presence_tasks` + `presence_project_events`; pure `lib/service_delivery.ts` (status ladders, task state, overdue/blocked derivation, deterministic ordering, pagination); `routes/projects.ts` (projects·tasks·milestones·events, site-scoped, `client_visible`); convert→create-project hook; feature-gate `service`→relationship; nav. Pure + structural + live e2e + tenant-isolation tests.
-2. **P2-D-2 — Deliverables (files overlay) + Approvals:** deliverable overlay on `presence_media` (client-visible, delete-protected) + `presence_approvals` (spine + `content_hash`).
-3. **P2-D-3 — Communication:** project messages (audience grammar) + relationship-notes `project_id` + notification read-state layer over `/portal/feed`.
-4. **P2-D-4 — Surveys + Support** on the forms substrate.
-5. **P2-D-5 — Client reporting** composed read; **Studio App + Client App** surfaces on the shared shell.
-6. **P2-D-6 — Full-lifecycle validation** (the 16-step gate) + performance + legacy parity/deprecation map + completion report.
+## Foundation-first build sequence — ✅ ALL COMPLETE (Jul 10 2026)
+1. ✅ **P2-D-1 — Project foundation:** `presence_projects`/`_milestones`/`_tasks`/`_project_events` (`0075`); `lib/service_delivery.ts`; `routes/projects.ts`; convert→project handoff; feature-gate `projects`→relationship; nav.
+2. ✅ **P2-D-2 — Deliverables + Approvals:** deliverable overlay on `presence_media` (delete-protected) + `presence_approvals` (content_hash version-integrity) (`0076`); bucket PDF fix; Business-OS relationship-gated upload.
+3. ✅ **P2-D-3 — Communication:** project messages (audience internal/client) + notifications derived from the ONE event log + `presence_activity_reads` read-state (`0077`).
+4. ✅ **P2-D-4 — Surveys + Support** (`0078`): idempotent survey submission + support submit→triage→resolve→reopen.
+5. ✅ **P2-D-5 — Client reporting** (composed, no store) + `projects.html` on the shared shell + Projects nav.
+6. ✅ **P2-D-6 — Full 16-step lifecycle gate (16/16 live, two tenants)** + legacy parity/deprecation map + completion report (`P2D-COMPLETION-REPORT.md`).
 
-Human browser/mobile/keyboard/screen-reader certification stays in **Phase 6 Gold Master** (not claimed here). P2-D is **not** complete until the full-lifecycle gate (step 6) passes.
+**P2-D engineering COMPLETE.** Human browser/mobile/keyboard/screen-reader certification stays in **Phase 6 Gold Master** (not claimed here). Prod migrations `0075`–`0078` are an owner launch-time apply.

@@ -14,10 +14,12 @@ const haveCreds = !!(env.SALES_E2E_TARGET && env.SALES_E2E_ANON && env.SALES_E2E
 const haveTwoTenant = haveCreds && !!env.SALES_E2E_JWT2;
 
 const GROUPS = [
-  ['Data model + rules (pure — always)', ['service_delivery'], 'offline'],
-  ['API tenant/visibility/idempotency (structural — always)', ['projects_routes'], 'offline'],
-  ['Project lifecycle runtime e2e (staging)', ['projects_e2e'], 'live'],
-  ['Project tenant isolation, two workspaces (staging)', ['projects_isolation_e2e'], 'live'],
+  ['Pure rules (always): delivery · approvals · notifications · intake', ['service_delivery', 'approvals', 'notifications', 'intake'], 'offline'],
+  ['Structural security (always): projects · deliverables/approvals · comms · surveys/support · UI', ['projects_routes', 'project_delivery_routes', 'project_comms_routes', 'service_intake_routes', 'projects_ui'], 'offline'],
+  ['Foundation runtime + isolation (staging)', ['projects_e2e', 'projects_isolation_e2e'], 'live'],
+  ['Deliverables/approvals + communication + surveys/support (staging)', ['project_delivery_e2e', 'project_comms_e2e', 'service_intake_e2e'], 'live'],
+  ['Client reporting (staging)', ['project_report_e2e'], 'live'],
+  ['FULL 16-step service lifecycle (staging, two tenants)', ['service_lifecycle_e2e'], 'live'],
 ];
 
 const runOne = async (name) => {
@@ -37,15 +39,18 @@ console.log('\n══════ P2-D — Service Delivery (foundation) — Val
 console.log(`staging creds: ${haveCreds ? 'present' : 'ABSENT (live steps will skip)'}   ·   two-tenant creds: ${haveTwoTenant ? 'present' : 'absent'}\n`);
 let fail = 0; const liveOk = new Set();
 for (const [label, names, kind] of GROUPS) {
-  const rows = await Promise.all(names.map(runOne));
+  // live suites share ONE staging account → run them sequentially so concurrent
+  // event-creation can't pollute another suite's read/unread assertions. Offline
+  // suites are independent and can run in parallel.
+  const rows = kind === 'live' ? await (async () => { const out = []; for (const nm of names) out.push(await runOne(nm)); return out; })() : await Promise.all(names.map(runOne));
   const bad = rows.some((r) => r.state === 'fail');
   const mark = bad ? '❌' : rows.every((r) => r.state === 'pass') ? '✅' : '⏳';
   console.log(`${mark} ${label}`);
   for (const r of rows) { console.log(`     ${r.state === 'pass' ? 'pass' : r.state === 'skip' ? 'skip' : 'FAIL'}  ${r.name}_test  (${r.counts})`); if (r.state === 'fail') fail++; if (kind === 'live' && r.state === 'pass') liveOk.add(r.name); }
   console.log('');
 }
-const liveGreen = liveOk.has('projects_e2e') && liveOk.has('projects_isolation_e2e');
+const liveGreen = liveOk.has('service_lifecycle_e2e');
 console.log('───────────────────────────────────────────────────────────');
-console.log(`VERDICT: ${fail === 0 ? (liveGreen ? '✅ foundation gate green (offline + live)' : '⏳ offline checks green; apply 0075 + set creds to run the live gate') : '❌ ATTENTION — a check failed'}`);
-console.log('NOTE: P2-D is NOT complete — this is the FOUNDATION increment (P2-D-1). Later increments add deliverables/approvals/messaging/notifications/surveys/support/reporting/UI + the full 16-step lifecycle gate.\n');
+console.log(`VERDICT: ${fail === 0 ? (liveGreen ? '✅ P2-D engineering gate GREEN (offline + full 16-step lifecycle live)' : '⏳ offline checks green; apply 0075-0078 + set creds (incl. JWT2) to run the live gate') : '❌ ATTENTION — a check failed'}`);
+console.log('NOTE: human browser/mobile/keyboard/screen-reader QA of the surfaces is Phase 6 Gold Master (not claimed here).\n');
 if (fail !== 0) Deno.exit(1);
