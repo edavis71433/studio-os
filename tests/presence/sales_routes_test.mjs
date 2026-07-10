@@ -47,6 +47,11 @@ ok('rate-limit: public decide/sign/view are per-IP rate-limited', /rateAllow\(`s
 ok('access: convert gives the customer a real login (auth user + set-password invite)', /createAuthUser\(/.test(sales) && /createContactAndClient\(/.test(sales) && /generateSetPasswordLink\(/.test(sales));
 ok('access: convert reuses an existing account by email (no duplicate customer)', /findClientByEmail\(email\)/.test(sales));
 ok('access: convert rolls back only what it created on provision failure', /if \(createdContactChain\)/.test(sales) && /deleteAuthUser\(createdAuthId\)/.test(sales));
+// deep-review fixes:
+ok('concurrency: convert CLAIMS the deal (converted_at) BEFORE creating any account/workspace', (() => { const claimAt = sales.indexOf('converted_client_id=is.null&converted_at=is.null&select=id'); const provAt = sales.indexOf('provisionForSignup({ clientId'); return claimAt > 0 && provAt > 0 && claimAt < provAt && /const claimBody = \(\) => JSON\.stringify\(\{ converted_at: nowIso\(\) \}\)/.test(sales); })());
+ok('concurrency: a stale claim (>5min) is reclaimable (self-healing)', /converted_at=lt\.\$\{encodeURIComponent\(staleBefore\)\}/.test(sales));
+ok('concurrency: releases the claim (unclaim) on every failure path after claiming', (sales.match(/await unclaim\(\)/g) || []).length >= 3);
+ok('safety: NEVER deletes a reused existing customer — both rollback DELETEs are guarded by createdContactChain', (() => { const dels = sales.match(/svc\(`clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}\)/g) || []; const guarded = sales.match(/if \(createdContactChain\) \{ await svc\(`clients\?id=eq\.\$\{clientId\}`/g) || []; return dels.length >= 2 && dels.length === guarded.length; })());
 
 // ── convert reuses the ONE provisioning path (no second provisioner) ──
 ok('convert: reuses provisionForSignup (idempotent)', /provisionForSignup\(\{ clientId/.test(sales));

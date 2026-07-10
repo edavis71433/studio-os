@@ -329,6 +329,24 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   if (outcome === 'blocked_lost') return json({ error: 'lost', message: 'A lost deal can’t be converted.' }, 409, cors);
   if (outcome === 'blocked_stage') return json({ error: 'not_ready', message: 'Sign the agreement before converting this deal to a customer.' }, 409, cors);
 
+  // CLAIM the deal atomically BEFORE any account/provisioning work, so two
+  // concurrent converts can NEVER double-create a customer or workspace. A prior
+  // claim that never finished (>5 min stale) is reclaimable → a failed attempt
+  // self-heals. `converted_at` is the claim marker; `converted_client_id` is the
+  // completion marker (checked by convertOutcome above).
+  const claimBody = () => JSON.stringify({ converted_at: nowIso() });
+  let claim = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&converted_client_id=is.null&converted_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: claimBody() });
+  if (!rows(claim)[0]) {
+    const staleBefore = new Date(Date.now() - 5 * 60_000).toISOString();
+    claim = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&converted_client_id=is.null&converted_at=lt.${encodeURIComponent(staleBefore)}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: claimBody() });
+  }
+  if (!rows(claim)[0]) { // another convert holds the claim (or it just finished)
+    const fresh = await loadDeal(site.id, dealId);
+    if (fresh?.converted_client_id) return json({ data: { converted: true, client_id: fresh.converted_client_id, site_id: fresh.converted_site_id, idempotent: true } }, 200, cors);
+    return json({ error: 'conversion_in_progress', message: 'This deal is already being converted — refresh in a moment.' }, 409, cors);
+  }
+  const unclaim = () => svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&converted_client_id=is.null`, { method: 'PATCH', body: JSON.stringify({ converted_at: null }) }).catch(() => {});
+
   // resolve the customer's business name + email (from the contact, or the deal)
   const contact = deal.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=name,email,company&limit=1`))[0] : null;
   const businessName = clean((contact?.company || contact?.name || deal.title), 120) || 'New customer';
@@ -348,36 +366,41 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
       if ('id' in auth) {
         createdAuthId = auth.id;
         const chain = await createContactAndClient(auth.id, email, businessName);
-        if ('error' in chain) { await deleteAuthUser(auth.id); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
+        if ('error' in chain) { await deleteAuthUser(auth.id); await unclaim(); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
         clientId = chain.clientId; createdContactChain = true; isNewLogin = true;
       } else if (auth.error === 'account_exists') {                 // they already sign in; link a client by email if missing
         clientId = (await findClientByEmail(email))?.id || null;
         if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; }
-      } else return json({ error: 'auth_failed', message: 'We couldn’t set up the customer’s login — please try again.' }, 502, cors);
+      } else { await unclaim(); return json({ error: 'auth_failed', message: 'We couldn’t set up the customer’s login — please try again.' }, 502, cors); }
     }
   } else {
     // no email on the deal → a studio-managed workspace (no self-serve login yet; invite later)
     const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, status: 'active' }) });
     clientId = rows(ci)[0]?.id || null;
   }
-  if (!clientId) return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors);
+  if (!clientId) { await unclaim(); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
 
   // 2) reuse the ONE idempotent provisioning path (entitlement + site + hosting + seeds + first-run)
   const prov = await provisionForSignup({ clientId, businessName, plan, patch: { status: 'active' } as any, actorEmail: principal.email });
   if (!prov.ok) {
-    if (createdContactChain) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created
+    if (createdContactChain) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created (cascade drops site+entitlement)
+    await unclaim();
     const msg = prov.error === 'hosting_unconfigured' ? 'The account was created but hosting isn’t available in this environment.' : 'We created the account but hit a snag provisioning the workspace.';
     return json({ error: 'provision_incomplete', message: msg }, 502, cors);
   }
 
-  // 3) stamp the chain onto the deal (idempotent gate: converted_client_id UNIQUE). Guard on not-yet-converted.
+  // 3) stamp the chain onto the deal (we hold the claim; converted_client_id UNIQUE
+  //    also blocks a client already converted from ANOTHER deal).
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&converted_client_id=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ converted_client_id: clientId, converted_site_id: prov.siteId, converted_at: nowIso(), stage: 'won' }) });
+    body: JSON.stringify({ converted_client_id: clientId, converted_site_id: prov.siteId, stage: 'won' }) });
   if (!up.ok || !rows(up)[0]) {
-    // a concurrent convert won the race — return the existing result, don't duplicate
+    // stamp failed (e.g. this customer is already linked to another deal). Roll back
+    // ONLY what WE created (never a reused existing customer); release the claim.
+    if (createdContactChain) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); }
+    await unclaim();
     const fresh = await loadDeal(site.id, dealId);
-    await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {});
-    return json({ data: { converted: true, client_id: fresh?.converted_client_id, site_id: fresh?.converted_site_id, idempotent: true } }, 200, cors);
+    if (fresh?.converted_client_id) return json({ data: { converted: true, client_id: fresh.converted_client_id, site_id: fresh.converted_site_id, idempotent: true } }, 200, cors);
+    return json({ error: 'convert_conflict', message: 'That customer is already linked to another deal.' }, 409, cors);
   }
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: prov.siteId } });
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
