@@ -88,7 +88,8 @@ function render(){
       <div class="contact">${l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:''}${l.email&&l.phone?' · ':''}${l.phone?`<a href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''}</div>
       ${l.message?`<div class="msg">${esc(l.message)}</div>`:''}
       <div class="acts">
-        ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">Call</a>`:'')}
+        ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">Call</a>`:''}
+        <button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this inquiry">→ Deal</button>
         ${l.status==='new'?`<button data-read="${esc(l.id)}">Mark read</button>`:''}
         <button data-arch="${esc(l.id)}">Archive</button>
       </div></div>`;
@@ -110,9 +111,26 @@ function wire(){
   document.querySelectorAll('[data-arch]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-arch'),'archived')));
   // replying to a lead auto-marks it read — no manual bookkeeping
   document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&l.status==='new')setStatus(id,'read',true);}));
+  document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
 }
 async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();}}else if(!silent)toast('That didn’t update.');}
+// P2-C (Seam 3): promote a captured inquiry into a pipeline deal — no re-typing.
+// Reuses the existing form submission as the deal's source (source_submission_id).
+async function createDeal(id){
+  const l=ALL.find(x=>x.id===id); if(!l)return;
+  const title=(l.name||l.email||'New inquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
+  try{
+    let contactId=null;
+    if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
+    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id});
+    if(!d.ok){toast(d.status===403?'Pipeline is part of Business OS.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
+    if(l.status==='new')setStatus(id,'read',true);
+    toast('Added to your pipeline.');
+    const dealId=d.body&&d.body.data&&d.body.data.id, sc=new URLSearchParams(location.search).get('client')||'';
+    if(dealId)setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},800);
+  }catch(_){toast('Couldn’t start that deal.');}
+}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your messages.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your messages just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){const r=await api('/forms/inbox');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Messages live in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}ALL=(r.body.data&&r.body.data.submissions)||[];render();}

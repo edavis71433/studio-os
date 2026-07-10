@@ -10,6 +10,8 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
+import { resolveAgencyMember } from '../agency/auth.ts';
+import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
@@ -19,6 +21,9 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
+const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
+const pickPlan = (p: unknown): PlanKey => (typeof p === 'string' && CONVERT_PLANS.has(p) ? p : 'presence') as PlanKey;
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
 const nowIso = () => new Date().toISOString();
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
@@ -110,11 +115,13 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     }
     let srcSub: string | null = UUID_RE.test(b.source_submission_id || '') ? b.source_submission_id : null;
     if (srcSub) { const s = await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${site.id}&select=id&limit=1`); if (!rows(s)[0]) srcSub = null; }
+    const closeDate = b.expected_close ? clean(b.expected_close, 10) : '';
+    if (closeDate && !DATE_RE.test(closeDate)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors);
     const ins = await svc('presence_deals', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ site_id: site.id, contact_id: contactId, title, stage: 'lead',
         source: clean(b.source, 40) || (srcSub ? 'website_form' : 'manual'), source_submission_id: srcSub,
         expected_value_cents: Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0),
-        expected_close: b.expected_close ? clean(b.expected_close, 10) : null, notes: clean(b.notes, 2000) }) });
+        expected_close: closeDate || null, notes: clean(b.notes, 2000) }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
     const deal = rows(ins)[0];
     await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead' });
@@ -147,7 +154,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (b.title !== undefined) patch.title = clean(b.title, 200);
     if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
     if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0);
-    if (b.expected_close !== undefined) patch.expected_close = b.expected_close ? clean(b.expected_close, 10) : null;
+    if (b.expected_close !== undefined) { const cd = b.expected_close ? clean(b.expected_close, 10) : ''; if (cd && !DATE_RE.test(cd)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors); patch.expected_close = cd || null; }
     if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     const up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
@@ -320,6 +327,7 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══
 export async function handleSalesConvert(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  let cb: any = {}; try { cb = await req.json(); } catch { /* body optional */ }
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   const outcome = convertOutcome({ stage: deal.stage, converted_client_id: deal.converted_client_id });
@@ -351,7 +359,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const contact = deal.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=name,email,company&limit=1`))[0] : null;
   const businessName = clean((contact?.company || contact?.name || deal.title), 120) || 'New customer';
   const email = clean(contact?.email, 160).toLowerCase();
-  const plan = 'presence'; // full edition; billing formalized in P2-E (active access, unbilled — a deliberate P2-C decision)
+  const plan = pickPlan(cb.plan); // selectable edition (default 'presence'); billing formalized in P2-E (active access, unbilled — a deliberate P2-C decision)
 
   // 1) resolve/create the customer ACCOUNT so they can actually LOG IN. When we
   //    create a fresh login the customer never chose a password, so we email a
@@ -405,16 +413,32 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: prov.siteId } });
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
+  // Seam 1: if the converting operator runs an AGENCY, add the new customer to
+  // their managed portfolio (presence_agency_clients) so the Studio App can
+  // service it via scope-switching — completing the Studio→Client loop. Idempotent
+  // (site_id PK). Best-effort; a solo (non-agency) owner simply skips this.
+  let managed = false;
+  try {
+    if (principal.jwt) {
+      const am = await resolveAgencyMember(principal.jwt);
+      if (am) {
+        const link = await svc('presence_agency_clients?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ site_id: prov.siteId, agency_id: am.agency_id, status: 'active', owner_email: email || am.email }) });
+        managed = link.ok;
+      }
+    }
+  } catch { /* portfolio link is best-effort */ }
+
   // 4) ACCESS + onboarding handoff. A brand-new login gets a signed set-password
-  //    link (they never chose a password); an existing login just gets a welcome.
-  //    Both land in the EXISTING guided first-run. Best-effort (email may no-op).
+  //    link (they never chose a password) that lands them straight in the EXISTING
+  //    guided first-run (via ?next=); an existing login gets a welcome. Best-effort.
   let invited = false;
   if (email) {
     if (isNewLogin) {
-      const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html`);
+      const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html?next=/get-started.html`);
       invited = !!link;
       sendEmail(email, 'Welcome to Studio OS — set up your login',
-        `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — then you’ll land in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
+        `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
       ).catch(() => {});
     } else {
       sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
@@ -423,5 +447,5 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     }
   }
 
-  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, hosted: prov.hosted, invited, onboarding: '/get-started.html' } }, 200, cors);
+  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, hosted: prov.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }

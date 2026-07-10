@@ -53,6 +53,19 @@ ok('concurrency: a stale claim (>5min) is reclaimable (self-healing)', /converte
 ok('concurrency: releases the claim (unclaim) on every failure path after claiming', (sales.match(/await unclaim\(\)/g) || []).length >= 3);
 ok('safety: NEVER deletes a reused existing customer — both rollback DELETEs are guarded by createdContactChain', (() => { const dels = sales.match(/svc\(`clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}\)/g) || []; const guarded = sales.match(/if \(createdContactChain\) \{ await svc\(`clients\?id=eq\.\$\{clientId\}`/g) || []; return dels.length >= 2 && dels.length === guarded.length; })());
 
+// ── cohesion seams + refinements (deep-sweep follow-ups) ──
+{
+  const leads = read('leads.html');
+  const pipe = read('pipeline.html');
+  const sp = read('set-password.html');
+  ok('Seam1: convert links an agency operator’s new customer into their portfolio', /resolveAgencyMember\(principal\.jwt\)/.test(sales) && /presence_agency_clients\?on_conflict=site_id/.test(sales));
+  ok('Seam2: the invite lands in guided onboarding (?next=/get-started.html) + set-password honors it', /set-password\.html\?next=\/get-started\.html/.test(sales) && /params\.get\("next"\)/.test(sp));
+  ok('Seam3: leads.html promotes an inquiry into a deal (source_submission_id, no re-typing)', /function createDeal\(/.test(leads) && /source_submission_id:id/.test(leads) && /data-deal=/.test(leads));
+  ok('refine: expected_close is date-validated (422, not a 502)', /DATE_RE\.test\(closeDate\)/.test(sales) && /DATE_RE = \//.test(sales));
+  ok('refine: convert edition is selectable (whitelist, default presence)', /pickPlan\(cb\.plan\)/.test(sales) && /CONVERT_PLANS = new Set/.test(sales));
+  ok('refine: pipeline shows ONLY valid next stages (bounded transitions mirror)', /const NEXT=\{lead:\['qualified','lost'\]/.test(pipe));
+}
+
 // ── convert reuses the ONE provisioning path (no second provisioner) ──
 ok('convert: reuses provisionForSignup (idempotent)', /provisionForSignup\(\{ clientId/.test(sales));
 ok('convert: rolls back the client on provision failure', /clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}/.test(sales));
