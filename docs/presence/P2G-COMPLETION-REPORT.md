@@ -45,7 +45,7 @@
 | Duplicate routes | **None** — every route file in `routes/*` is imported/wired; the only repeated route strings are method-differentiated (GET/PATCH on the same path). |
 | Duplicate models | **None** — one content model, one renderer, one publish pipeline, one AI-usage ledger + ceiling, one notification/notice model, one entitlement writer (`entitlement_sync.ts`). |
 | Orphaned tables | Within `presence`: none. `clever-api`'s tables are **live**, not orphaned. |
-| Unreachable code | No orphan route files. Client-side dead code is catalogued in `HTML-DEEP-AUDIT.md`; the clever-api-internal dead paths retire with clever-api. |
+| Unreachable code | No orphan route files. **Module-level scan (Jul 10):** every `presence/**/*.ts` module was checked for inbound imports. All are wired **except two Presence-native forward modules that no route reaches yet** — `connected/maturity.ts` (provider-maturity summary) and `lib/palettes.ts` (premium palette set, Phase-PT design). Both are tested (`platform_spine_test`, `palettes_test`) and intentional; they are **retained, not deleted** — they own tested behaviour and are staged forward work, not clever-api legacy (deleting them would discard planned capability, which P2-G forbids). Flagged here for an explicit owner decision (wire or drop) rather than silent removal. Client-side dead code is catalogued in `HTML-DEEP-AUDIT.md`; clever-api-internal dead paths retire with clever-api. |
 | Dead navigation | The one confirmed orphan page (`client-archive-ui.html`) removed. |
 | Legacy dependencies | `presence` has **no** dependency on `clever-api`. `clever-api` remains an independent, live agency stack. |
 
@@ -57,6 +57,13 @@
 - **Maintenance reduction:** the *product* (`presence`) is confirmed single-spine, invariant-locked, fully tested — no duplicate systems to maintain. Two clean stacks with a clear boundary (product vs agency-ops) rather than one tangled one.
 - **Technical debt eliminated (this session, feeding P2-G's "cleanest architecture" goal):** P2-E billing/lifecycle correctness; P2-F integration seams (forms→CRM, unified notices, oversight); 14 waves of HTML fixes (systemic stale-token, XSS, a11y keyboard/focus, SEO, dark-mode, dead CSS). See `HTML-DEEP-AUDIT.md` resolution log.
 - **Remaining technical debt (documented, deferred with justification):** (a) the `clever-api` monolith retires at the DDS→Studio-OS migration; (b) the 19k operator-console structural refactor (shared `esc`/`callEdge`, dead-module removal) needs a staging harness; (c) legal-completeness (terms/privacy) needs counsel; (d) the HTML long-tail (per-page modal ARIA, remaining SEO). None block Phase 2 closure.
+
+## 6b. Recommendations before beginning Phase 3
+1. **Treat `clever-api` as the current agency runtime, not a retirement target** — Phase 3 (the DDS website) runs on it. Its retirement is a *later* step: it happens *when* Phase 3's output (the migrated agency site) plus a Studio-OS-runs-the-agency milestone make it redundant. Sequence, not cleanup.
+2. **Honor the Platform Secrecy Rule in all Phase-3 copy/screenshots** — public pages present platform capability only as *Davis Digital Studio service benefits*; no Studio OS / CMS / SaaS / platform / white-label / licensing / agency-edition / platform-pricing language until DDS runs on the platform in production. (`[[platform-secrecy-rule]]`)
+3. **Owner launch-time items remain open and unchanged** — prod migrations `0075–0085` apply at launch; production OAuth/consent screens; Stripe test-mode checks; push the local commit backlog at fence-lift; Phase-6 human browser/mobile/WCAG QA.
+4. **Decide on the two unwired forward modules** (`maturity.ts`, `palettes.ts`) — wire them into a route or drop them; today they're maintained-but-dormant.
+5. **The 19k operator console** wants a staging harness before its structural refactor (shared `esc`/`callEdge`, dead-module removal) — do it during agency-tooling work, not blind.
 
 ## 7. Simplified dependency graph
 ```
