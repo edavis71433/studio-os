@@ -133,6 +133,8 @@ CI + a one-command test task · reconcile migration history · monitoring/alerti
 
 ## Final Launch Checklist
 
+- [x] **Stripe production config — DONE (Jul 9 2026):** live `STRIPE_SECRET` (`rk_live_` restricted key) set in prod; production checkout verified (`cs_live_` URL); a routing bug (`public_audit_checkout` unregistered) found + fixed + deployed. See LAUNCH-BOARD B1.
+- [ ] Remaining Stripe (OWNER pre-launch, not engineering): webhook **test event** → 200 · **publish** buy-audit/audit/payment-success · one **test-mode subscription signup** · one **test-mode invoice payment**
 - [ ] Prices confirmed by owner; Stripe subscription events registered; nav links added; **commits pushed**
 - [ ] Portal surfaces Moments + Concierge; connect flow + callback page (if connected launches)
 - [ ] Cookie Policy, DPA + sub-processor list, in-product AI disclosure, connected-consent copy
