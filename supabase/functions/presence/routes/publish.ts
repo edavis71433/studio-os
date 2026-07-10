@@ -16,6 +16,8 @@ import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
 import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/publish_guard.ts';
 import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
+import { computeDraftHash } from '../lib/draft_hash.ts';
+import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -220,6 +222,20 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
 
   const now = new Date().toISOString();
   const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
+
+  // M9 optimistic lock: if the caller reviewed a specific draft (If-Match), make
+  // sure THAT is what publishes — refuse if the draft moved on since the review.
+  // Reuses the snapshot just serialized (no extra work); opt-in, internal callers
+  // (req === null) skip it.
+  if (req) {
+    const ifMatch = readIfMatch(req);
+    if (ifMatch !== null && ifMatch !== '' && ifMatch !== '*') {
+      const current = await computeDraftHash(snapshot);
+      if (preconditionOutcome(ifMatch, current) === 'stale') {
+        return json({ ...staleConflictBody(current), message: 'Your draft changed since you reviewed it — refresh the change list, take another look, then publish.' }, 409, { ...cors, ETag: `"${current}"` });
+      }
+    }
+  }
 
   const v = validateSnapshot(snapshot, t.manifest);
   if (!v.ok) return json({ error: 'validation_failed', message: 'A few things need fixing before your site can publish.', fields: v.blockers, warnings: v.warnings }, 422, cors);

@@ -11,12 +11,12 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**8 of 10 implemented (80%).** Next active engineering milestone: **M9 — Client UX safety.**
+**9 of 10 implemented (90%).** Next active engineering milestone: **M10 — Ops: load test + DR drill (owner-involved).**
 **✅ M4 is FULLY LIVE** — migration `0073` applied to staging + prod (Jul 9 2026; column + index + check verified in both). **No outstanding owner activation dependency remains in Phase 1.**
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⏳ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
@@ -28,7 +28,8 @@ Each milestone is independently shippable, gated by the full pure regression + g
 - ✅ **M6 — Media hardening** — DONE (Jul 9 2026). Committed, tested (media_hardening 40/40), deployed — **fully live, no owner dependency, NO migration**. Pure `lib/media_guard.ts` (magic-byte signature validation, safe segment-level JPEG EXIF/GPS strip, per-site quota math) wired into `createUpload` (quota, pre-URL) + `importImage` (magic-byte + EXIF); `lib/media_gc.ts` `reapMedia` (soft-deleted past 7-day retention + never-uploaded HEAD-404 orphans) folded into the default cron cycle + `task:'media_gc'`. Published/preview output stays EXIF-free + orientation-safe via the existing render transform (one pipeline, unchanged). 90/90 pure sweep.
 - ✅ **M7 — Snapshot retention GC** — DONE (Jul 9 2026). Committed, tested (snapshot_gc 26/26), deployed — **fully live, no owner dependency, NO migration**. Canonical retention as a **pure selector** `classifySnapshots` (keeps live · last-20 per site · publish/rollback/scheduled/launch/`prev_snapshot_id`/preview references · unclassifiable→keep) + I/O `reapSnapshots` (per-site gather, site-scoped bounded DELETE, oldest-first, converges) folded into the default cron cycle + `task:'snapshot_gc'`. FKs (launch/preview RESTRICT, publishes set-null) back the selector as defense-in-depth. 91/91 pure sweep.
 - ✅ **M8 — Preview hardening** — DONE (Jul 9 2026). Committed, tested (preview_hardening 37/37), deployed — **fully live, no owner dependency, NO migration**. Built on FD-T20: `lib/preview_cache.ts` (bounded LRU memoizing the render, keyed by the M3 hash for drafts / snapshot id for immutable — never stale, publish never reads it) + `lib/preview_link.ts` (HMAC-signed, time-limited, fail-closed preview links reusing the approval-link model; `POST /preview/share-link` mint + public `GET /p/s/:token`) + draft watermark (reuses `injectPreviewBadge` on the authed preview, never in `renderSnapshot`). 92/92 pure sweep.
-- ⏳ **M9–M10** — remaining, in the approved order below (M9 is next active).
+- ✅ **M9 — Client UX safety** — DONE (Jul 9 2026). Committed, tested (optimistic_lock 30/30), deployed — **fully live, no owner dependency, NO migration**. Optimistic locking via the **M3 draft hash** (`lib/optimistic_lock.ts` — `If-Match` → 409 `stale_draft`, opt-in, fail-open) on all snapshot-affecting writes + publish; the "what will change" summary **reused** (`lib/diff.ts` `describeChanges`, unchanged) with `draft_hash` now on `/changes`; the editor's ONE centralized `api()` helper sends `If-Match` + handles the 409 uniformly. 93/93 pure sweep.
+- ⏳ **M10** — remaining (final; owner-involved: PITR before the DR drill + a staging load environment).
 
 ## Execution order (dependency-sorted)
 
@@ -41,8 +42,8 @@ M5  ✅ Deploy robustness                 (DONE — poll timeout · reconcile cr
 M6  ✅ Media hardening                   (DONE — magic-byte · EXIF-at-upload · quota · GC; fully live, no migration)
 M7  ✅ Snapshot retention GC             (DONE — pure selector + bounded cron reaper; fully live, no migration)
 M8  ✅ Preview hardening               (DONE — render cache · signed links · watermark; fully live, no migration)
-M9  ⏳ Client UX safety                (NEXT — optimistic lock · shared state · what-will-change)
-M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
+M9  ✅ Client UX safety                (DONE — optimistic lock (M3 hash) · shared api() helper · reused diff; fully live, no migration)
+M10 ⏳ Ops: load test + DR drill       (NEXT/FINAL — tunes M5 ceiling; owner-involved: PITR + staging load env)
 ```
 
 **Why this order:** safety net before any change (M1); read-only security truth early (M2); the draft-version hash (M3) is a dependency for optimistic locking, preview cache, and the "what will change" diff, so it comes before them; publish/deploy safety (M4–M5) before the subsystems that lean on a healthy pipeline; media/snapshot hygiene (M6–M7); UX-facing work last among code (M8–M9) since it touches fenced public pages; ops/load/DR (M10) last because it tunes M5's ceiling constant and needs owner involvement.
@@ -154,16 +155,13 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M9 — Client UX safety
+## M9 — Client UX safety  ·  ✅ DONE (Jul 9 2026) — fully live, no owner dependency, NO migration
+> **Design:** reuse-max — the "what will change" engine and the shared client state helpers already existed; the only genuinely new piece is optimistic locking.
+> **(1) Optimistic locking** — new pure `lib/optimistic_lock.ts` reuses the **M3 draft hash** as the version token (no second versioning system, no column): `readIfMatch` (parses the standard `If-Match` header, strips `W/`/quotes), `preconditionOutcome` (skip/match/stale — **fails open** when there's no header, a wildcard, or an uncomputable hash, so a legitimate save is never blocked), `staleConflictBody` (the 409 payload, carries the current hash). `guardStaleDraft` serializes the draft **once, only when the caller opted in**, and returns a clear **409 `stale_draft`** (+ current hash as `ETag`) when the draft moved on — never a silent overwrite. Wired into every snapshot-affecting write: `content.ts` collections (offerings/testimonials/faqs/posts create·update·delete) + the settings/location singleton PUT, and `identity.ts` PUT. (Voice is not in the published snapshot → not guarded.) Publish also accepts `If-Match` (reusing the snapshot it already serializes) so you **publish exactly the draft you reviewed**. **(2) Shared state components** — routed through the ONE existing centralized client helper: `presence.html`'s `api()` now sends `If-Match: <held draft hash>` on every write and handles a `stale_draft` 409 uniformly (reload latest via the shared toast + `scheduleChangesRefresh`, then let the user reapply) — one code path, no duplicated per-call UI logic; consistent behavior across every save. The held hash seeds from `/changes` and is marked unknown after each successful write (prevents a rapid same-user burst from self-conflicting). **(3) "What will change" publish summary** — **already existed** as `lib/diff.ts` `describeChanges` (diffs draft-vs-live snapshot content, deterministic, plain-language, no second render) feeding `/changes`; M9 reuses it and adds `draft_hash` to the `/changes` response so review→publish is tied to one exact draft version. Tests: `optimistic_lock` 30/30 (header parse, precondition matrix, 409 shape, the reused diff engine on real add/remove/rename/identity changes + determinism, tenant scope, wiring); 93/93 pure sweep; 0 type-errors; deployed staging+prod. **No schema change** (reuses the M3 hash + the existing diff engine + the existing client helper).
 
 🎯 Prevent silent overwrites and make a live change legible before it ships.
-📦 Optimistic locking on save · adopt shared state components · "what will change" publish summary.
-📁
-- **Settings/block-save handlers:** accept `If-Match: <draft_hash>` (M3); mismatch → `409 stale` with a "refresh — this changed" payload.
-- **New pure helper:** `lib/block_diff.ts` — `diffBlocks(liveSnapshotBlocks, draftBlocks)` → a plain-language change list for the publish confirm.
-- **Portal UI** (`portal.html`/`client.html`/`presence.html`): adopt `ddsEmpty`/`ddsError`/`ddsToast`/`.dds-skeleton` (already in `shell.css`/`shell.js`) for the CMS module's empty/loading/error/success states; render the diff summary on publish.
-🧪 Pure: `block_diff` cases. Integration: stale save → 409; concurrent editors don't clobber.
-⚠️ **Fence:** portal pages → local commit only. No new UI framework (reuses shell components). No editor redesign (behavior-only additions).
+📦 Optimistic locking (If-Match / M3 hash) · shared client state helper adoption · reused "what will change" summary (+`draft_hash` on /changes).
+⚠️ **Fence:** the only front-end touch is `presence.html` (the app, committed local — not the public/marketing site); backend is additive + opt-in (no `If-Match` → unchanged). No editor/publish/preview redesign; no second versioning or diff system.
 
 ---
 

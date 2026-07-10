@@ -6,6 +6,7 @@ import { json } from '../../_shared/http.ts';
 import { asUser } from '../lib/db.ts';
 import { validateIdentity } from '../lib/validate.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
+import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -19,6 +20,9 @@ export async function handleGetIdentity(jwt: string, site: SiteRow, cors: Record
 }
 
 export async function handlePutIdentity(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  // M9 optimistic lock: identity is part of the published snapshot (opt-in).
+  const stale = await guardStaleDraft(req, site, cors);
+  if (stale) return stale;
   let payload: any = null;
   try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
 

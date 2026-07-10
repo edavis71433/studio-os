@@ -11,6 +11,7 @@ import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { describeChanges } from '../lib/diff.ts';
+import { computeDraftHash } from '../lib/draft_hash.ts';
 import { deriveHealth } from '../lib/health.ts';
 import { ensureAndListNotes, resolveNote } from '../lib/notes.ts';
 import { applySnapshotToDraft } from '../lib/draft_writer.ts';
@@ -25,6 +26,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 interface RoomState {
   draftContent: SnapshotContent;
   liveContent: SnapshotContent | null;
+  draftHash: string;               // M9: the M3 version token for optimistic locking
   blockers: number; warnings: number;
   changes: ReturnType<typeof describeChanges>;
   lastLive: { id: string; created_at: string; completed_at: string | null; actor_kind: string } | null;
@@ -56,6 +58,7 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
 
   const v = validateSnapshot(snapshot, t.manifest);
   const changes = describeChanges(snapshot.content, liveContent);
+  const draftHash = await computeDraftHash(snapshot); // M9: reuse THIS serialize (no extra work)
 
   // oldest change event since the last live publish (staleness signal)
   let oldest: string | null = null;
@@ -74,7 +77,7 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
     if (!liveDomain && nf.ok && nf.site) liveDomain = nf.site.default_domain ?? null;
   }
 
-  return { draftContent: snapshot.content, liveContent, blockers: v.blockers.length, warnings: v.warnings.length, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
+  return { draftContent: snapshot.content, liveContent, draftHash, blockers: v.blockers.length, warnings: v.warnings.length, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
 }
 
 export async function handleHealth(site: SiteRow, cors: Record<string, string>) {
@@ -130,6 +133,7 @@ export async function handleChanges(site: SiteRow, cors: Record<string, string>)
       first_publish: st.changes.first_publish,
       changes: st.changes.changes,
       blockers: st.blockers, warnings: st.warnings,
+      draft_hash: st.draftHash,   // M9: review these changes, then publish with If-Match this hash
     },
   }, 200, cors);
 }

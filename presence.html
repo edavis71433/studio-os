@@ -686,14 +686,32 @@ async function api(method, route, body) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
   if (!jwt) { showGate("Please sign in", "Your room uses the same sign-in as your portal. Sign in there and come straight back.", true); throw new Error("no-session"); }
+  // M9 optimistic locking: echo the draft version (M3 hash) on writes so a stale
+  // edit is refused, never silently overwriting a newer one. One place → every
+  // save is protected consistently, no duplicated logic.
+  const mut = method !== "GET";
   const r = await fetch(FN + route, {
     method,
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') },
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
+      ...(mut && S.draftHash ? { "If-Match": S.draftHash } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await r.text();
   let j = null; try { j = JSON.parse(text); } catch {}
-  if (!r.ok) { const e = new Error((j && j.message) || "Nothing was lost — that just didn’t go through. Try once more."); e.status = r.status; e.body = j; throw e; }
+  if (!r.ok) {
+    if (r.status === 409 && j && j.error === "stale_draft") {
+      // someone else (or another tab) changed this site — reload the latest and
+      // let the user reapply; never overwrite the newer edit.
+      S.draftHash = (j && j.current_hash) || null;
+      scheduleChangesRefresh();
+      const e = new Error("This site changed since you opened it — I reloaded the latest just now. Please reapply that change so nothing is lost."); e.status = 409; e.stale = true; throw e;
+    }
+    const e = new Error((j && j.message) || "Nothing was lost — that just didn’t go through. Try once more."); e.status = r.status; e.body = j; throw e;
+  }
+  // after a successful write our held hash is stale (the draft moved); mark it
+  // unknown until the next /changes refresh restores it (prevents self-conflicts
+  // during a rapid burst of the SAME user's edits).
+  if (mut) S.draftHash = null;
   return j;
 }
 async function apiHtml(route) {
@@ -708,7 +726,8 @@ async function apiHtml(route) {
 /* ── state ── */
 const S = { site: null, identity: null, location: null, settings: null,
   offerings: [], faqs: [], testimonials: [], posts: [], media: [],
-  changes: null, health: null, publishes: [], restoreTarget: null, pendingFile: null };
+  changes: null, health: null, publishes: [], restoreTarget: null, pendingFile: null,
+  draftHash: null /* M9: current M3 draft version, sent as If-Match on writes */ };
 const DAYS = [["mon","Monday"],["tue","Tuesday"],["wed","Wednesday"],["thu","Thursday"],["fri","Friday"],["sat","Saturday"],["sun","Sunday"]];
 const changedIds = () => new Set((S.changes?.changes || []).map((c) => c.entity_id).filter(Boolean));
 
@@ -1916,6 +1935,7 @@ async function loadToday() {
       showMoments ? api("GET", "/moments").catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
     ]);
     S.health = h.data; S.changes = c.data; S.moments = mo.data || [];
+    if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash;   // M9: seed the optimistic-lock version
     renderStatement(); renderFactsProse();
     if (showMoments && S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
     renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
@@ -2100,7 +2120,7 @@ function renderPublishButton() {
 }
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await api("GET", "/changes"); S.changes = c.data; renderPublishButton(); renderBizWaiting();
+    try { const c = await api("GET", "/changes"); S.changes = c.data; if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash; renderPublishButton(); renderBizWaiting();
       if ($("view-today").classList.contains("on")) renderRecent(); }
     catch { /* quiet */ }
   }, 1200);
@@ -2264,7 +2284,8 @@ async function loadRitual() {
   $("ritBody").innerHTML = `<div class="shimmer"></div>`; $("ritBlockers").innerHTML = ""; $("ritActions").innerHTML = "";
   try {
     const c = (await api("GET", "/changes")).data;
-    S.changes = c; renderPublishButton();
+    S.changes = c; if (c && c.draft_hash) S.draftHash = c.draft_hash;   // M9: publish exactly what you reviewed (If-Match)
+    renderPublishButton();
     const body = $("ritBody"); body.innerHTML = "";
     if (c.first_publish) {
       $("ritTitle").textContent = "This is the moment your website goes live.";

@@ -127,6 +127,26 @@ async function renderStagedPreview(req: Request, siteId: string, snapshotId: str
   return htmlResp(html!);
 }
 
+// ── The TWO public preview doors — why both exist (M9 Part-1 clarification) ───
+// They are DELIBERATELY different tools that share ONE render path
+// (renderStagedPreview) — not duplicates, and neither supersedes the other:
+//
+//   • GET /p/:token   (FD-T20, opaque)  — a PERSISTENT, revocable share link.
+//       The token is a random value stored on presence_site_preview; it does NOT
+//       expire, can be password-protected, and is revoked by REGENERATING it
+//       (POST /preview/settings {regenerate_token}). For a stable link a client
+//       bookmarks and returns to over the life of a project.
+//
+//   • GET /p/s/:token (M8, signed)      — an EPHEMERAL, self-expiring link.
+//       The token is a stateless HMAC signature over {site_id, exp}; it carries
+//       its own expiry, needs no DB row, and cannot be individually revoked (it
+//       simply stops working at `exp`). For time-boxed sharing ("good for 24h").
+//
+// Both are intended to coexist permanently (persistent+revocable+password vs.
+// expiring+stateless). A FUTURE, post-launch consolidation into a single
+// preview-sharing surface that mints EITHER kind is tracked in
+// STUDIO-OS-ROADMAP.md (Phase 7 · Post-Launch Product Evolution) — not done now.
+
 // ── GET /p/:token — the PUBLIC, shareable preview URL (pre-auth) ──────────────
 // Resolved by the opaque token; optional password gate; rendered through the ONE
 // engine (shared cached renderer) with a preview badge + noindex.

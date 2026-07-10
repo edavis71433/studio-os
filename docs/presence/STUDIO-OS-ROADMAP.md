@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M9 — Client UX safety.** (M8 preview hardening ✅ done Jul 9 — fully live, no migration. M7 ✅ · M6 ✅ · M5 ✅ — fully live. M4 ✅ — **FULLY LIVE**; migration 0073 applied to both envs Jul 9.) Everything above it is complete; everything below is queued in execution order.
+**Current active milestone:** **Phase 1 · M10 — Ops: load test + DR drill (owner-involved, final).** (M9 client UX safety ✅ done Jul 9 — fully live, no migration. M8 ✅ · M7 ✅ · M6 ✅ · M5 ✅ — fully live. M4 ✅ — **FULLY LIVE**; migration 0073 applied to both envs Jul 9.) Everything above it is complete; M10 is the last Phase-1 milestone and is owner-gated (PITR + a staging load environment).
 
 ---
 
@@ -20,7 +20,7 @@ Core platform (auth, multi-tenancy, RBAC, RLS, Admin + Client portals, CRM, pipe
 
 ---
 
-## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 8 of 10 · 80%)
+## 🚧 Phase 1 — Presence CMS Hardening (ACTIVE · 9 of 10 · 90%)
 Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CMS-PHASE-1-EXECUTION-PLAN.md`.
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
@@ -30,8 +30,8 @@ Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CM
 - ✅ **M6** — Media hardening (magic-byte · EXIF · quota · GC) *(fully live, no migration)*
 - ✅ **M7** — Snapshot management (retention · GC) *(fully live, no migration)*
 - ✅ **M8** — Preview hardening (render cache · signed links · watermark) *(fully live, no migration)*
-- ⏳ **M9 — Client safety (optimistic lock · shared components · what-will-change)** *(next active)*
-- ⏳ **M10** — Operational validation (load test · DR drill) — **⟐ depends on owner enabling PITR first**
+- ✅ **M9** — Client safety (optimistic lock via M3 hash · shared api() helper · reused diff summary) *(fully live, no migration)*
+- ⏳ **M10 — Operational validation (load test · DR drill)** *(next active · final · owner-gated: PITR + staging load env)*
 
 ---
 
@@ -84,6 +84,7 @@ Desktop · mobile · cross-browser · WCAG 2.2 AA · performance · final regres
 - **CMS-UX-1 — Client Content Tree** (dynamic page/section tree · status + health indicators · deep linking).
 - **CMS-UX-2 — Website Navigator** (search · page health · SEO snapshot · activity history · quick actions · breadcrumbs · expand/collapse).
 - **Enhancements:** per-model AI cost dashboard (TD-1 #3) · paid-audit notifications (AUD-1 optional) · weekly client digest · shareable preview links · named snapshots + version comparison · published-site uptime monitoring · public API · advanced per-page SEO.
+- **⟐ Preview-link consolidation (from M9 Part-1 review).** Two public preview doors coexist by design: `/p/:token` (FD-T20 — persistent, revocable, optionally password-protected) and `/p/s/:token` (M8 — stateless, HMAC-signed, self-expiring). They share ONE render path and are intentionally different tools; **neither supersedes the other.** *Future* (not now): unify them behind a single "Share preview" surface that mints EITHER a persistent or an expiring link from one UI + one route family, so future developers maintain one sharing model. Purely a consolidation/DX item — no capability gap today. See the doc-comment in `routes/preview_env.ts`.
 
 ---
 

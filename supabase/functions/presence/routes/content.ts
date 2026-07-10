@@ -14,6 +14,7 @@
 import { json } from '../../_shared/http.ts';
 import { asUser, svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
+import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import { suggestedBlocksFor, suggestionNoteFor } from '../lib/vertical_presets.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -163,6 +164,14 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
   if (!spec) return null;
   const method = req.method.toUpperCase();
 
+  // M9 optimistic lock: refuse a mutation whose If-Match no longer matches the
+  // current draft (opt-in; no header → unchanged). These entities are all part
+  // of the published snapshot, so the M3 draft hash is the right version token.
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+    const stale = await guardStaleDraft(req, site, cors);
+    if (stale) return stale;
+  }
+
   if (method === 'GET' && !id) {
     const r = await asUser(jwt, `${spec.table}?site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}&order=${spec.order}`);
     if (!r.ok) return json({ error: 'read_failed', message: `We couldn’t load your ${spec.noun}s just now.` }, 502, cors);
@@ -239,6 +248,9 @@ async function singleton(req: Request, jwt: string, site: SiteRow, principal: Pr
     return json({ data: r.json?.[0] ?? null }, 200, cors);
   }
   if (method === 'PUT') {
+    // M9 optimistic lock (location + settings are part of the published snapshot)
+    const stale = await guardStaleDraft(req, site, cors);
+    if (stale) return stale;
     let payload: Record<string, unknown> = {};
     try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
     const v = validateFields(payload, cfg.fields, false);
