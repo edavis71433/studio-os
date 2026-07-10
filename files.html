@@ -365,7 +365,7 @@ async function status(id,action){
   if(r.ok){toast(action==='archive'?'Archived':'Restored');closeDetail();load();}else toast((r.body&&r.body.message)||'Not allowed');
 }
 async function duplicate(id){const r=await api('POST','/assets/'+id+'/duplicate');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
-async function download(id){const r=await api('GET','/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank');else toast('Could not prepare download');}
+async function download(id){const r=await api('GET','/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('Could not prepare download');}
 async function rollback(id){if(!confirm('Restore the previous version? This puts the earlier file back everywhere it was used.'))return;const r=await api('POST','/assets/'+id+'/rollback');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 async function decideFile(id,action){

@@ -784,7 +784,7 @@ function submitReportCard() {
       fetch('https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'report_card', name: name, email: email, city: city, url: url })
+        body: JSON.stringify({ type: 'report_card', name: name, businessType: type, email: email, city: city, url: url })
       }).catch(function(){});
 
     } else {
@@ -801,8 +801,15 @@ function submitReportCard() {
 }
 
 function subscribeNL(){
-  var email=document.getElementById('nlEmail').value;
+  var email=document.getElementById('nlEmail').value.trim();
   if(!email||!email.includes('@'))return;
+  // Actually record the subscription (was validating + saying "you're in" but
+  // sending nowhere). Best-effort; the thank-you shows regardless so it never
+  // blocks the reader, but the email is no longer silently discarded.
+  fetch('https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ type:'newsletter_signup', email: email, source:'report_card' })
+  }).catch(function(){});
   document.getElementById('nlThanks').style.display='block';
   document.getElementById('nlWrap').style.display='none';
   if(typeof gtag==='function'){gtag('event','newsletter_signup',{event_category:'engagement',event_label:'report_card_success'});}

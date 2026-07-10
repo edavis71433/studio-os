@@ -553,6 +553,7 @@ a{color:inherit;}
         <button class="crit-next" id="sendEmail">Send it</button>
       </div>
       <p class="crit-email-done" id="emailDone" hidden>Sent. Check your inbox in a minute or two.</p>
+      <p class="crit-email-err" id="emailErr" role="alert" hidden style="color:#a83440;font-size:13px;margin-top:6px"></p>
     </div>
 
     <button class="crit-restart" id="restart">Review a different site</button>
@@ -828,8 +829,8 @@ a{color:inherit;}
       $('critEmail').focus();
       return;
     }
-    $('sendEmail').disabled = true;
-    $('sendEmail').textContent = 'Sending…';
+    var btn = $('sendEmail'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Sending…';
     fetch(EDGE_FN, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
@@ -841,12 +842,15 @@ a{color:inherit;}
         goal: state.goal,
         result: state.result
       })
-    }).then(function(r){ return r.json(); }).then(function(){
+    }).then(function(r){ if(!r.ok) throw new Error('send_failed'); return r.json(); }).then(function(){
       $('emailRow').hidden = true;
-      $('emailDone').hidden = false;
+      $('emailDone').hidden = false;   // only on a genuine success
     }).catch(function(){
-      $('emailRow').hidden = true;
-      $('emailDone').hidden = false;
+      // don't claim "sent" when it failed — let them retry
+      btn.disabled = false; btn.textContent = label;
+      $('critEmail').style.borderColor = '#a83440';
+      $('critEmail').setAttribute('aria-invalid','true');
+      var m = $('emailErr'); if(m){ m.textContent = 'That didn’t send — please try again in a moment.'; m.hidden = false; }
     });
   });
 
