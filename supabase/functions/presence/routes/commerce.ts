@@ -31,6 +31,7 @@ import { lifecycleCopy } from '../commerce/lifecycle.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
 import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPortal } from '../commerce/stripe.ts';
 import { requestDeletion, cancelDeletion, coolingOffDays } from '../commerce/deletion.ts';
+import { recordAcceptance } from '../commerce/terms.ts';
 
 const TRIAL_DAYS = 14;
 
@@ -103,6 +104,15 @@ async function handleSignup(req: Request, cors: Record<string, string>) {
     await deleteAuthUser(au.id); // nothing half-made
     return json({ error: 'signup_failed', message: 'We couldn’t finish setting up your account. Please try again.' }, 502, cors);
   }
+
+  // M4 — capture durable clickwrap evidence (which version, when, from where).
+  // Best-effort: it must never cost a customer their just-created account.
+  await recordAcceptance({
+    clientId: chain.clientId, email, ip: clientIp(req),
+    userAgent: req.headers.get('user-agent') || '',
+    presentedTermsVersion: typeof body?.terms_version === 'string' ? body.terms_version : '',
+    method: 'clickwrap_signup', context: isTrial ? 'signup_trial' : 'signup_paid',
+  });
 
   const verifyToken = crypto.randomUUID();
   const founder = grantFounder();

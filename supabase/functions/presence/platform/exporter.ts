@@ -24,6 +24,7 @@ export interface SiteExport {
   knowledge_docs: Array<{ filename: string; content_text: string }>;
   website: Record<string, string> | null; // the rendered site: path → HTML/CSS, hostable anywhere
   cover_html: string;                     // BR-1: a branded cover (Brand Kit), openable in any browser
+  terms_acceptances: Array<{ terms_version: string; privacy_version: string; accepted_at: string; method: string; context: string }>; // M4: the customer's own consent record, portable
 }
 
 export async function buildExport(site: SiteRow): Promise<SiteExport> {
@@ -35,6 +36,11 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
     svc(`presence_brand_profile?site_id=eq.${site.id}&select=mission,vision,core_values,personality,voice_characteristics,preferred_vocabulary,words_prefer,words_avoid,never_claims,reading_level,industry_terminology,taglines,elevator_pitch,target_audience,brand_promise,selling_points&limit=1`),
     svc(`presence_knowledge_docs?site_id=eq.${site.id}&deleted_at=is.null&select=filename,content_text&limit=20`),
   ]);
+  // M4: include the customer's own consent evidence (no IP/UA — that's internal
+  // audit data, not part of what they "own and take with them").
+  const acceptQ = site.client_id
+    ? await svc(`presence_terms_acceptances?client_id=eq.${encodeURIComponent(site.client_id)}&select=terms_version,privacy_version,accepted_at,method,context&order=accepted_at.desc&limit=50`)
+    : { json: [] as any[] };
 
   // the rendered site — portable, framework-free HTML through the ONE renderer
   let website: Record<string, string> | null = null;
@@ -66,5 +72,6 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
     knowledge_docs: docsQ.json ?? [],
     website,
     cover_html,
+    terms_acceptances: acceptQ.json ?? [],
   };
 }

@@ -90,6 +90,9 @@ const FN = ENV.url + "/functions/v1/presence";
 const envSuffix = qs.get('env') === 'staging' ? '&env=staging' : '';
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
 
+// The terms/privacy version shown on this page — sent with signup so we record
+// the exact version the customer accepted (M4). Keep in sync with terms.html.
+const TERMS_VERSION = '2026-07-01';
 const PLAN_KEY = qs.get('plan') || '';
 let TERM = qs.get('term') || 'monthly';
 let PLAN = null, TRIAL = qs.get('trial') === '1';
@@ -127,7 +130,7 @@ async function submitForm(e){
   const password = document.getElementById('password').value;
   btn.disabled = true; const label = btn.textContent; btn.innerHTML = '<span class="spinner"></span>Setting things up…';
   try{
-    const payload = { email, password, business_name: business, plan: PLAN_KEY };
+    const payload = { email, password, business_name: business, plan: PLAN_KEY, terms_version: TERMS_VERSION };
     if (TRIAL && PLAN.trial_eligible) payload.trial = true; else payload.term = TERM;
     const r = await fetch(FN + "/commerce/signup", { method:'POST', headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
     const j = await r.json();
