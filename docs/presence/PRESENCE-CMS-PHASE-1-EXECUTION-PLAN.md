@@ -9,12 +9,24 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ---
 
+## Phase 1 progress
+
+**2 of 10 milestones complete (20%).** Next active milestone: **M3 — Draft-version hash.**
+
+| M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
+|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| ✅ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
+
+- ✅ **M1 — CI + golden safety net** — DONE (Jul 9 2026). Committed, tested, verified; CI runner + hostile-string golden across all 3 templates; one-in-flight index verified.
+- ✅ **M2 — Security audits** — DONE (Jul 9 2026). Committed, tested, verified, deployed. `svc()` tenant/site-scope audit, global-sentinel audit, request-id review, 3 defense-in-depth `site_id` hardenings, tenant-isolation regression tests (9/9), audit record ([PHASE1-SECURITY-AUDIT.md]).
+- ⏳ **M3–M10** — remaining, in the approved order below (M3 is next active).
+
 ## Execution order (dependency-sorted)
 
 ```
-M1  CI + golden safety net            (no runtime change — SAFEST FIRST)
-M2  Security audits (read-only)       (highest security value, no behavior change)
-M3  Draft-version hash                (foundational: unlocks M4/M8/M9)
+M1  ✅ CI + golden safety net          (DONE — no runtime change; SAFEST FIRST)
+M2  ✅ Security audits                  (DONE — tenant-isolation audit + hardening)
+M3  ⏳ Draft-version hash                (NEXT — foundational: unlocks M4/M8/M9)
 M4  Publish idempotency + cooldown    (publish safety)
 M5  Deploy robustness                 (poll timeout · reconcile cron · ceiling · telemetry)
 M6  Media hardening                   (magic-byte · EXIF-at-upload · quota · GC)
@@ -28,7 +40,8 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M1 — CI + golden safety net  ·  SAFEST FIRST
+## M1 — CI + golden safety net  ·  SAFEST FIRST  ·  ✅ DONE (Jul 9 2026)
+> **Result:** CI runner (`.github/workflows/ci.yml` + `scripts/ci-pure-tests.sh`, Deno 2.9.1) typechecks all three functions + runs the pure sweep on push/PR. Extended `render_test.mjs` with golden + hostile-string escape across all three templates (business-classic + editorial baselines added). One-in-flight publish index verified correct (predicate `status IN ('queued','deploying')`). The new gate immediately exposed + fixed 2 masked failures. 86/86 pure suites. **Owner action to activate: push + add the `test` job as a required check.**
 
 🎯 Make every subsequent change automatically gated. Zero production runtime change.
 📦 CI runner · hostile-string golden render test · verify one-in-flight partial index.
