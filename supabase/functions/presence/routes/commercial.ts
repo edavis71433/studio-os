@@ -128,7 +128,17 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 export async function handleFormInbox(site: SiteRow, cors: Record<string, string>) {
   const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,phone,message,source_page,status,created_at&order=created_at.desc&limit=100`);
   const rows = Array.isArray(r.json) ? r.json : [];
-  return json({ data: { submissions: rows, unread: rows.filter((s: any) => s.status === 'new').length } }, 200, cors);
+  // P2-F G1 — link each website enquiry to the CRM deal it became (if any), so the
+  // inbox can show "converted → view deal" and disable a second conversion. One
+  // bounded query over the deals already linked by source_submission_id.
+  const ids = rows.map((s: any) => s.id);
+  const dealMap = new Map<string, string>();
+  if (ids.length) {
+    const dq = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&source_submission_id=in.(${ids.join(',')})&select=id,source_submission_id`);
+    for (const d of (Array.isArray(dq.json) ? dq.json : [])) if (d.source_submission_id) dealMap.set(String(d.source_submission_id), String(d.id));
+  }
+  const submissions = rows.map((s: any) => ({ ...s, deal_id: dealMap.get(String(s.id)) || null, converted: s.status === 'converted' || dealMap.has(String(s.id)) }));
+  return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length } }, 200, cors);
 }
 
 export async function handleFormStatus(req: Request, site: SiteRow, id: string, cors: Record<string, string>) {

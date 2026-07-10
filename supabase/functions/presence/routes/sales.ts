@@ -123,6 +123,13 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     }
     let srcSub: string | null = UUID_RE.test(b.source_submission_id || '') ? b.source_submission_id : null;
     if (srcSub) { const s = await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${site.id}&select=id&limit=1`); if (!rows(s)[0]) srcSub = null; }
+    // P2-F G1 — DEDUPE conversion: a website enquiry becomes at most ONE deal.
+    // A second "add to pipeline" click (or a retry) returns the existing deal
+    // instead of creating a duplicate.
+    if (srcSub) {
+      const existing = rows(await svc(`presence_deals?site_id=eq.${site.id}&source_submission_id=eq.${srcSub}&deleted_at=is.null&select=id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at&limit=1`))[0];
+      if (existing) return json({ data: existing, already_converted: true }, 200, cors);
+    }
     const closeDate = b.expected_close ? clean(b.expected_close, 10) : '';
     if (closeDate && !DATE_RE.test(closeDate)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors);
     const ins = await svc('presence_deals', { method: 'POST', headers: { Prefer: 'return=representation' },
@@ -132,7 +139,10 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
         expected_close: closeDate || null, notes: clean(b.notes, 2000) }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
     const deal = rows(ins)[0];
-    await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead' });
+    // Mark the originating website enquiry converted (system status) so the leads
+    // inbox reflects it and it can't be converted again.
+    if (srcSub) await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }).catch(() => {});
+    await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', source_submission_id: srcSub });
     return json({ data: deal }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
