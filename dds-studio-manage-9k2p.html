@@ -4937,7 +4937,7 @@ function oppxMatches(r, f){
   return true;
 }
 function oppxSetFilter(f){ OPPX.filter=f; oppxRender(); }
-function oppxSearch(v){ OPPX.q=String(v||'').toLowerCase(); oppxRender(); }
+function oppxSearch(v){ OPPX.q=String(v||'').toLowerCase(); clearTimeout(window.__sd_oppx); window.__sd_oppx=setTimeout(oppxRender,160); }
 
 var OPPX_EMPTY = {
   all:  { h:'Nothing open right now.', s:'Opportunities arrive from four places: your free review tool, the contact form, the signals the studio measures nightly on existing clients, and happy survey responses. You can also point the AI Review tool at any business yourself.' },
@@ -12854,7 +12854,7 @@ function anEngineNote(eng){
       +body
       +footer;
   }
-  window.ivxSearch=function(v){ IVX.q=v; IVX.page=1; ivxRender(); };
+  window.ivxSearch=function(v){ IVX.q=v; IVX.page=1; clearTimeout(window.__sd_ivx); window.__sd_ivx=setTimeout(ivxRender,160); };
   window.ivxPage=function(d){ IVX.page+=d; ivxRender(); };
   window.ivxSel=function(id,on){ if(on)IVX.sel[id]=1; else delete IVX.sel[id]; ivxRender(); };
   window.ivxSelPage=function(on,ids){ ids.split(',').forEach(function(id){ if(!id)return; if(on)IVX.sel[id]=1; else delete IVX.sel[id]; }); ivxRender(); };
@@ -13420,7 +13420,7 @@ function anEngineNote(eng){
     rhxRender();
   }
 
-  window.rhxQ=function(v){ RHX.q=v; RHX.page=1; rhxRender(); };
+  window.rhxQ=function(v){ RHX.q=v; RHX.page=1; clearTimeout(RHX._t); RHX._t=setTimeout(rhxRender, 160); };  // debounce the full-list re-render
   window.rhxHf=function(v){ RHX.hf=v; RHX.page=1; rhxRender(); };
   window.rhxSf=function(v){ RHX.sf=v; RHX.page=1; rhxRender(); };
   window.rhxPg=function(d){ RHX.page+=d; rhxRender(); };
@@ -13432,7 +13432,10 @@ function anEngineNote(eng){
     // warm the canonical health cache in the background, then repaint once —
     // the engine score supersedes the local formula wherever it lands.
     window._ddsHealthWarm = window._ddsHealthWarm || {};
-    (function(){ var pending=rows.slice(0,40); var done=0; if(!pending.length) return;
+    // Only warm clients NOT already cached — previously this re-fetched all 40 on
+    // every keystroke and re-rendered in a loop (40 network calls per keypress).
+    // Once warmed, `pending` is empty so renders become instant + call-free.
+    (function(){ var pending=rows.slice(0,40).filter(function(c){ return !window._ddsHealthWarm[String(c.id)]; }); var done=0; if(!pending.length) return;
       pending.forEach(function(c){
         if(typeof ddsHealth!=='function'){ return; }
         ddsHealth(c.id).then(function(v){ if(v) window._ddsHealthWarm[String(c.id)]=v; done++;
@@ -14895,7 +14898,7 @@ function anEngineNote(eng){
     msxStartPoll();
     setTimeout(function(){ var t=document.getElementById('msxStream'); if(t) t.scrollTop=t.scrollHeight; },50); };
   window.msxTab=function(t){ MSX.tab=t; msxRender(); };
-  window.msxQ=function(v){ MSX.q=v; msxRender(); };
+  window.msxQ=function(v){ MSX.q=v; clearTimeout(window.__sd_msx); window.__sd_msx=setTimeout(msxRender,160); };
   window.msxMode=function(m){ MSX.mode=m; msxRender(); };
   window.msxQuick=function(txt){ var ta=document.getElementById('msxTa'); if(ta){ ta.value=(ta.value?ta.value+' ':'')+txt; ta.focus(); } };
 
@@ -15142,7 +15145,7 @@ function anEngineNote(eng){
 
   window.fsxCl=function(cid){ FSX.cid=cid; FSX.sel=null; fsxRender(); };
   window.fsxType=function(t){ FSX.type=t; fsxRender(); };
-  window.fsxQ=function(v){ FSX.q=v; fsxRender(); };
+  window.fsxQ=function(v){ FSX.q=v; clearTimeout(window.__sd_fsx); window.__sd_fsx=setTimeout(fsxRender,160); };
   window.fsxSort=function(v){ FSX.sort=v; fsxRender(); };
   window.fsxSel=function(id){ FSX.sel=(FSX.sel===id?null:id); fsxRender(); };
   window.fsxPick=function(){
@@ -15589,7 +15592,7 @@ function anEngineNote(eng){
   window.apxTab=function(t){ APX.tab=t; apxRender(); };
   window.apxSel=function(k){ APX.sel=k; apxRender(); };
   window.apxNewToggle=function(){ APX.showNew=!APX.showNew; apxRender(); };
-  window.apxQ=function(v){ APX.q=v; apxRender(); };
+  window.apxQ=function(v){ APX.q=v; clearTimeout(window.__sd_apx); window.__sd_apx=setTimeout(apxRender,160); };
 
   // turnaround days for one decided item; median typical decision time per client
   function apxTurn(it){
@@ -15931,7 +15934,7 @@ function anEngineNote(eng){
   window.tsxSel=function(k){ TSX.sel=(TSX.sel===k?null:k); tsxRender(); };
   window.tsxNewToggle=function(){ TSX.showNew=!TSX.showNew; tsxRender(); };
   window.tsxSort=function(v){ TSX.sort=v; tsxRender(); };
-  window.tsxQ2=function(v){ TSX.q=v; tsxRender(); };
+  window.tsxQ2=function(v){ TSX.q=v; clearTimeout(window.__sd_tsx); window.__sd_tsx=setTimeout(tsxRender,160); };
 
   function partClient(pid){ var p=TSX.parts.find(function(x){return String(x.id)===String(pid);}); return p?p.client_id:null; }
 
@@ -17151,7 +17154,7 @@ window.ddsFilesCard=async function(mountId, clientId){
     var made=Array.isArray(row)&&row[0]; if(made) RPX.sel=String(made.id);
     rpxLoad();
   };
-  window.rpxQ=function(v){ RPX.q=String(v||'').toLowerCase(); rpxRender(); };
+  window.rpxQ=function(v){ RPX.q=String(v||'').toLowerCase(); clearTimeout(window.__sd_rpx); window.__sd_rpx=setTimeout(rpxRender,160); };
   window.rpxSel=function(id){ RPX.sel=id; rpxRender(); };
   window.rpxNewToggle=function(){ RPX.showNew=!RPX.showNew; rpxRender(); };
 
@@ -17786,7 +17789,7 @@ window.ddsCommOpen=function(tid,cid){
 
   window.tpxSel=function(id){ TPX.sel=String(id); TPX.mode='preview'; TPX.recent=[String(id)].concat(TPX.recent.filter(function(x){return x!==String(id);})).slice(0,5); tpxRender(); };
   window.tpxCat=function(c){ TPX.cat=c; tpxRender(); };
-  window.tpxQ=function(v){ TPX.q=String(v||'').toLowerCase(); tpxRender(); };
+  window.tpxQ=function(v){ TPX.q=String(v||'').toLowerCase(); clearTimeout(window.__sd_tpx); window.__sd_tpx=setTimeout(tpxRender,160); };
   window.tpxMode=function(m){ if(TPX.mode==='edit'&&m!=='edit') tpxCapture(); TPX.mode=m; tpxRender(); };
   window.tpxDev=function(d){ TPX.dev=d; tpxRender(); };
   window.tpxDark=function(){ TPX.dark=!TPX.dark; tpxRender(); };
@@ -18103,7 +18106,7 @@ window.ddsCommOpen=function(tid,cid){
   function cur(){ return CX.people.find(function(p){ return p.key===CX.sel; })||null; }
   window.cxSel=function(k){ CX.sel=k; CX.tab='ov'; cxRender(); cxDetailFill(); };
   window.cxType=function(t){ CX.type=t; cxRender(); };
-  window.cxQ=function(v){ CX.q=String(v||'').toLowerCase(); cxRender(); };
+  window.cxQ=function(v){ CX.q=String(v||'').toLowerCase(); clearTimeout(window.__sd_cx); window.__sd_cx=setTimeout(cxRender,160); };
   window.cxTab=function(t){ CX.tab=t; cxRender(); cxDetailFill(); };
 
   // health label for non-clients: recency-based, always explained
