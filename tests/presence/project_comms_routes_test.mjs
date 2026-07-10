@@ -35,7 +35,8 @@ ok('attach: attachment_media_id validated to belong to the site', /presence_medi
 ok('migration: message attachment references presence_media', /attachment_media_id uuid references public\.presence_media/.test(mig));
 
 // reviewer boundary: client reads + replies + notifications
-ok('reviewer: client may read/post the shared thread + read/mark notifications', wsp.includes('/messages$/.test(route)) return true') && wsp.includes("route === '/notifications') return true") && wsp.includes("route === '/notifications/read') return true"));
+ok('bridge: the client thread + notifications are served via /client/* (not the reviewer path)', idx.includes('handleClientMessages(') && idx.includes('handleClientNotifications('));
+ok('B3: support activity folds into notifications (project-less tickets still notify)', /presence_support_requests\?site_id=eq\.\$\{site\.id\}[\s\S]*?support_message/.test(c));
 
 // wiring + migration + pure lib
 ok('wiring: messages + notifications routes dispatched', idx.includes('handleMessages(') && idx.includes('handleNotifications(') && idx.includes('handleNotificationsRead('));

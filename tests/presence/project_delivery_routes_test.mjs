@@ -22,7 +22,7 @@ ok('tenant: media lookups in delivery are site-scoped', (pd.match(/presence_medi
 // ── studio-only writes; client reviews ──
 ok('perms: deliverable create/patch/delete + approval create are studio-only', (pd.match(/if \(!\(await isStudioSide[\s\S]*?\)\)\) return studioDenied/g) || []).length >= 4);
 ok('perms: deliverable download allows the client only for a SHARED, client_visible file', /!studio && !\(d\.client_visible && d\.status === 'shared'\)/.test(pd));
-ok('perms: approval decide requires the approval be client_visible', /!a \|\| !a\.client_visible\) return json\(\{ error: 'not_found'/.test(pd));
+ok('perms: approval decide gate — client_visible OR a studio role (B4: internal approvals are studio-decidable)', /!a \|\| \(!a\.client_visible && !\(await isStudioSide\(jwt, site, principal\)\)\)\) return json\(\{ error: 'not_found'/.test(pd));
 
 // ── version integrity: decision bound to the exact version ──
 ok('integrity: decide guards status=pending AND content_hash in the WHERE', /status=eq\.pending&content_hash=eq\.\$\{a\.content_hash\}/.test(pd));
@@ -42,7 +42,8 @@ ok('protect: deleteMedia refuses while a deliverable references the file', /pres
 ok('protect: bucket now allows application/pdf (0065 doc support + deliverables)', /allowed_mime_types = array_append\(allowed_mime_types, 'application\/pdf'\)/.test(mig));
 
 // ── reviewer boundary ──
-ok('reviewer: client may download a shared deliverable + decide an approval', wsp.includes('download$/.test(route)) return true') && wsp.includes('decide$/.test(route)) return true'));
+ok('bridge: the client downloads/decides via /client/* (bridge-scoped, not the reviewer path)', idx.includes('handleClientDeliverableDownload(') && idx.includes('handleClientApprovalDecide('));
+ok('B2: a deliverable shared after upload (draft→shared) emits deliverable_added', /d\.status !== 'shared' && rows\(up\)\[0\]\.status === 'shared'[\s\S]*?deliverable_added/.test(pd));
 
 // ── wiring + migration ──
 ok('wiring: deliverable + approval routes dispatched', idx.includes('handleDeliverableUploadUrl(') && idx.includes('handleDeliverablesCreate(') && idx.includes('handleDeliverableDownload(') && idx.includes('handleApprovalsCreate(') && idx.includes('handleApprovalDecide('));

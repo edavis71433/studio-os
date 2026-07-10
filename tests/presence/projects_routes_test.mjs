@@ -29,7 +29,7 @@ const lib = read('supabase/functions/presence/lib/service_delivery.ts');
 }
 
 // ── STUDIO-ONLY WRITES + client-visibility filter ──
-ok('perms: role-based studio check (client_reviewer = client side, not agency-only)', /resolveSiteRole\(jwt, site\.id, principal\.kind\)\) !== 'client_reviewer'/.test(proj));
+ok('perms: role-based studio check (client_reviewer = client side, not agency-only)', /resolveSiteRoleCached\(principal, jwt, site\.id\)\) !== 'client_reviewer'/.test(proj));
 ok('perms: every write path guards studioDenied (POST/PATCH/status/tasks/milestones)', (proj.match(/if \(!studio\) return studioDenied\(cors\)/g) || []).length >= 4 || (/if \(!\(await isStudioSide[\s\S]*?\)\)\) return studioDenied/.test(proj) && (proj.match(/studioDenied\(cors\)/g) || []).length >= 5));
 ok('vis: project list filters client side to client_visible', /if \(!studio\) path \+= `&client_visible=is\.true`/.test(proj));
 ok('vis: a non-visible project is 404 for the client side', /!studio && !project\.client_visible\)\) return json\(\{ error: 'not_found'/.test(proj));
@@ -41,10 +41,13 @@ ok('integrity: project status move guards the prior status in WHERE', /presence_
 ok('integrity: task status move guards the prior status in WHERE', /presence_tasks\?id=eq\.\$\{taskId\}&site_id=eq\.\$\{site\.id\}&status=eq\.\$\{task\.status\}/.test(proj) && /canTaskTransition\(task\.status, to\)/.test(proj));
 ok('integrity: task done stamps completed_at, reopen clears it', /completed_at: to === 'done' \? nowIso\(\) : null/.test(proj));
 
-// ── IDEMPOTENT convert→project handoff ──
-ok('idempotent: create-from-deal returns existing when already handed off', /deal\.created_project_id\)[\s\S]*?idempotent: true/.test(proj));
-ok('idempotent: handoff stamp is claimed under created_project_id=is.null (race-safe)', /created_project_id=is\.null&select=id`, \{ method: 'PATCH'/.test(proj));
-ok('idempotent: a losing racer drops its orphan project and returns the winner', /deleted_at: nowIso\(\)[\s\S]*?idempotent: true/.test(proj));
+// ── IDEMPOTENT convert→project handoff (now via the Agency–Client Bridge lib) ──
+const bridge = read('supabase/functions/presence/lib/service_bridge.ts');
+ok('handoff: create-from-deal routes through ensureProjectForDeal (one path, studio-only)', /if \(dealId\) \{[\s\S]*?ensureProjectForDeal\(/.test(proj) && /if \(!studio\) return studioDenied/.test(proj));
+ok('idempotent: ensureProjectForDeal returns existing when already handed off', /deal\.created_project_id\)[\s\S]*?idempotent: true/.test(bridge));
+ok('idempotent: handoff stamp claimed under created_project_id=is.null (race-safe)', /created_project_id=is\.null&select=id`, \{ method: 'PATCH'/.test(bridge));
+ok('idempotent: a losing racer drops its orphan + returns the winner', /deleted_at: nowIso\(\)[\s\S]*?idempotent: true/.test(bridge));
+ok('bridge: the handoff creates the tenant-safe service_link (ensureBridge, UNIQUE project_id upsert)', bridge.includes('presence_service_links?on_conflict=project_id') && bridge.includes('ensureBridge(agencySiteId,'));
 ok('idempotent: DB unique index on created_project_id', /presence_deals_created_project_uq[\s\S]*?created_project_id.*where created_project_id is not null/.test(mig));
 
 // ── EVENT LOG on every meaningful change ──
@@ -57,8 +60,12 @@ ok('validation: client_action_required implies client_visible', /client_action_r
 
 // ── FEATURE GATE + REVIEWER BOUNDARY ──
 ok('gate: authed /projects gated to the relationship edition (like /crm, /sales)', /case 'projects':[\s\S]{0,40}return 'relationship'/.test(feat));
-ok('reviewer: client_reviewer may READ its visible projects (GET /projects + GET /projects/:id)', /route === '\/projects'\) return true/.test(wsp) && /\^\\\/projects\\\/\[0-9a-f-\]\{36\}\$\/\.test\(route\)\) return true/.test(wsp));
-ok('reviewer: cannot create/modify projects, tasks, milestones, or project status (only read + reply + decide + download)', (() => { const fn = wsp.match(/export function reviewerAllowed[\s\S]*?\n\}/)?.[0] || ''; return !fn.includes('/tasks') && !fn.includes('/milestones') && !/projects[\s\S]{0,60}status/.test(fn) && !/method === 'POST' && route === '\/projects'/.test(fn); })());
+// ARCHITECTURE (P2-D hardening): the customer reaches delivery via the Agency–Client
+// Bridge (/client/*) on their OWN site — NOT as a client_reviewer on the agency site.
+// The reviewer allowlist must NOT contain any P2-D delivery route (that was the
+// site-wide client_visible leak vector across clients on a shared site).
+ok('leak-fix: reviewer allowlist contains NO P2-D delivery routes', (() => { const fn = wsp.match(/export function reviewerAllowed[\s\S]*?\n\}/)?.[0] || ''; return !fn.includes('/projects') && !fn.includes('/approvals') && !fn.includes('/surveys') && !fn.includes('/support') && !fn.includes('/notifications') && !fn.includes('/messages'); })());
+ok('bridge: the client uses /client/* (bridge-scoped), dispatched in index.ts', idx.includes("route === '/client/projects'") && idx.includes('handleClientProject(') && idx.includes('handleClientApprovalDecide('));
 
 // ── WIRING ──
 ok('wiring: /projects dispatched after the feature gate + reviewer boundary', idx.includes("route === '/projects') return handleProjects") && idx.indexOf('featureForRoute(route, method)') < idx.indexOf("route === '/projects'"));

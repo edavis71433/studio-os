@@ -42,6 +42,22 @@ export async function resolveSiteRole(jwt: string, siteId: string, principalKind
   return row.role as SiteRole;
 }
 
+// D1 (perf): a request-scoped memo so the site-role is resolved ONCE per request.
+// Keyed by the principal object, which is created fresh per request and GC'd after,
+// so there is no cross-request staleness. The reviewer-boundary gate and the P2-D
+// handlers both resolve the same role otherwise — this collapses that to one lookup
+// (which, on the client-portal path, is a full external /auth/v1/user round-trip).
+const roleCache = new WeakMap<object, Map<string, SiteRole>>();
+export async function resolveSiteRoleCached(principal: { kind: string }, jwt: string, siteId: string): Promise<SiteRole> {
+  let m = roleCache.get(principal as object);
+  if (!m) { m = new Map(); roleCache.set(principal as object, m); }
+  const hit = m.get(siteId);
+  if (hit) return hit;
+  const role = await resolveSiteRole(jwt, siteId, principal.kind);
+  m.set(siteId, role);
+  return role;
+}
+
 export async function listSiteMembers(siteId: string): Promise<Array<{ id: string; email: string; role: string; status: string }>> {
   const r = await svc(`presence_site_members?site_id=eq.${siteId}&select=id,email,role,status,created_at&order=created_at.asc`);
   return (r.ok && Array.isArray(r.json)) ? r.json : [];

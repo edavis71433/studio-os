@@ -150,8 +150,11 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
       resolvedNow = b.status === 'resolved' && reqRow.status !== 'resolved';
     }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
-    const up = await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
-    if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+    // B5: optimistic guard — a status change pins the prior status in the WHERE so two
+    // concurrent triages can't silently clobber each other (matches every other ladder).
+    const guard = (b.status !== undefined && patch.status !== reqRow.status) ? `&status=eq.${reqRow.status}` : '';
+    const up = await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}${guard}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That request just changed — refresh and try again.' }, 409, cors);
     if (resolvedNow && reqRow.project_id) await projectEvent(site.id, reqRow.project_id, 'support_resolved', principal, true, { request_id: id });
     return json({ data: rows(up)[0] }, 200, cors);
   }

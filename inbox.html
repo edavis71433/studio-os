@@ -57,12 +57,15 @@ const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 // stays inside the client they opened.
 function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;const h=href.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c)+(h[1]?'#'+h[1]:'');}
 
-function render(feed,leads){
+// map a derived notification's source to a real Studio page (deep link resolves)
+function notifLink(n){const m=String(n.href||'').match(/^\/projects\/([0-9a-f-]{36})/);if(m)return '/projects.html?project='+m[1];return '/inbox.html';}
+function render(feed,leads,notifs){
   const approvals=(feed.pending_approvals||[]);
   const notices=(feed.notices||[]);
   const moments=(feed.moments||[]);
   const newLeads=(leads||[]).filter(l=>l.status==='new');
-  const total=approvals.length+notices.length+moments.length+newLeads.length;
+  const activity=(notifs||[]).filter(n=>!n.read).slice(0,12);
+  const total=approvals.length+notices.length+moments.length+newLeads.length+activity.length;
   let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;
   if(!total){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div>`;$('main').innerHTML=h;return;}
 
@@ -74,6 +77,9 @@ function render(feed,leads){
     for(const l of newLeads){const who=esc(l.name||l.email||'Someone');
       h+=`<a class="item lead" href="/leads.html"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open in Messages →</div></a>`;}}
 
+  if(activity.length){h+=`<h2>Project activity</h2>`;
+    for(const n of activity){h+=`<a class="item" href="${scoped(notifLink(n))}"><div class="who">${esc(n.label||'Activity')}</div><div class="go">Open →</div></a>`;}}
+
   const worth=[...notices,...moments];
   if(worth.length){h+=`<h2>Worth a look</h2>`;
     for(const n of notices){h+=`<a class="item notice" href="${esc(n.href||'/today.html')}"><div class="who">${esc(n.headline||'Something needs a look')}</div>${n.body?`<div class="body">${esc(n.body)}</div>`:''}<div class="go">Take care of it →</div></a>`;}
@@ -84,11 +90,11 @@ function render(feed,leads){
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your inbox.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your inbox just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 async function load(){
-  const [feed,leads]=await Promise.all([api('/portal/feed'),api('/forms/inbox')]);
+  const [feed,leads,notifs]=await Promise.all([api('/portal/feed'),api('/forms/inbox'),api('/notifications?limit=25').catch(()=>({ok:false}))]);
   if(!feed.ok&&!leads.ok){trouble();return;}
   const f=(feed.ok&&feed.body.data)||{};
   const l=(leads.ok&&leads.body.data&&leads.body.data.submissions)||[];
-  render(f,l);
+  render(f,l,(notifs.ok&&notifs.body.data)||[]);
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

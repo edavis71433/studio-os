@@ -39,7 +39,8 @@ ok('activity: survey + support events written to project_events when project-lin
 ok('attach: support message attachment validated in-site', /presence_media\?id=eq\.\$\{attachment\}&site_id=eq\.\$\{site\.id\}/.test(si));
 
 // reviewer boundary: client submits/replies but cannot triage
-ok('reviewer: client submits/lists/views surveys + support + replies', wsp.includes('respond$/.test(route)) return true') && wsp.includes("route === '/support' && (method === 'GET' || method === 'POST')) return true") && wsp.includes('messages$/.test(route)) return true'));
+ok('bridge: the client submits surveys/support via /client/* (bridge-scoped, not the reviewer path)', idx.includes('handleClientSurveyRespond(') && idx.includes('handleClientSupport(') && idx.includes('handleClientSupportMessage('));
+ok('B5: support triage pins the prior status in the WHERE (optimistic guard)', /guard = \(b\.status !== undefined && patch\.status !== reqRow\.status\)[\s\S]*?status=eq\.\$\{reqRow\.status\}/.test(si));
 ok('reviewer: PATCH /support (triage) is NOT reviewer-allowed', (() => { const fn = wsp.match(/export function reviewerAllowed[\s\S]*?\n\}/)?.[0] || ''; return !/PATCH[\s\S]{0,40}support/.test(fn); })());
 
 // wiring + migration + pure lib

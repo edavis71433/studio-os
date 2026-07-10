@@ -29,20 +29,12 @@ import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, load
  *  Reviewer = read the shared feed, and approve the plans put to them. */
 export function reviewerAllowed(route: string, method: string): boolean {
   if (method === 'GET' && (route === '/portal/context' || route === '/portal/feed')) return true;
-  if (method === 'GET' && route === '/projects') return true;                                   // P2-D: client sees its visible projects
-  if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}$/.test(route)) return true;               // P2-D: a client-visible project's status (handler filters visibility)
-  if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}\/report$/.test(route)) return true;        // P2-D-5: the client's calm project report
-  if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}\/deliverables\/[0-9a-f-]{36}\/download$/.test(route)) return true; // P2-D-2: download a shared deliverable
-  if (method === 'POST' && /^\/approvals\/[0-9a-f-]{36}\/decide$/.test(route)) return true;      // P2-D-2: the client decides an approval put to them
-  if ((method === 'GET' || method === 'POST') && /^\/projects\/[0-9a-f-]{36}\/messages$/.test(route)) return true; // P2-D-3: client reads + replies to the shared thread
-  if (method === 'GET' && route === '/notifications') return true;                               // P2-D-3: client notifications (derived, visibility-filtered)
-  if (method === 'POST' && route === '/notifications/read') return true;                          // P2-D-3: mark notifications seen
-  if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}\/surveys$/.test(route)) return true;        // P2-D-4: client sees active surveys
-  if (method === 'GET' && /^\/surveys\/[0-9a-f-]{36}$/.test(route)) return true;                  // P2-D-4: client views a survey
-  if (method === 'POST' && /^\/surveys\/[0-9a-f-]{36}\/respond$/.test(route)) return true;        // P2-D-4: client submits a survey
-  if (route === '/support' && (method === 'GET' || method === 'POST')) return true;               // P2-D-4: client submits/lists its support requests
-  if (method === 'GET' && /^\/support\/[0-9a-f-]{36}$/.test(route)) return true;                  // P2-D-4: client views its request
-  if (method === 'POST' && /^\/support\/[0-9a-f-]{36}\/messages$/.test(route)) return true;       // P2-D-4: client replies (PATCH triage stays studio-only)
+  // NOTE (P2-D hardening): the customer's service-delivery view is NOT reached as a
+  // client_reviewer on the agency site — it is served through the Agency–Client
+  // Bridge under /client/* on the customer's OWN site (they are its owner, so they
+  // pass this boundary normally). Reviewer P2-D delivery access was removed to
+  // eliminate the site-wide `client_visible` path that could expose one client's
+  // records to another reviewer on a shared site. /client/* is bridge-scoped.
   if (method === 'POST' && /^\/foundations\/plans\/[0-9a-f-]{36}\/decide$/.test(route)) return true;   // approve an infra plan
   if (method === 'POST' && /^\/connections\/[a-z0-9_]+\/write\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // approve a connected write
   if (method === 'POST' && /^\/assets\/[0-9a-f-]{36}\/status$/.test(route)) return true; // DAM-2: approve/reject a file (action-restricted in the handler)
@@ -109,6 +101,25 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     const filesPending = ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length;
     attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0) + filesPending;
   } catch { /* the badge is best-effort — never block the shell on it */ }
+
+  // P2-D: fold service delivery into the ONE attention surface (no second bell).
+  try {
+    if (siteCan(role, 'view_all')) { // studio: open support requests need triage
+      const sup = await svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id&limit=50`);
+      attention_count += ((sup.json as any[])?.length || 0);
+    } else if (site.client_id) { // bridged customer: their UNREAD client-visible delivery activity
+      const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
+      if (links.length) {
+        const s = links[0].agency_site_id; const ids = links.filter((l) => l.agency_site_id === s).map((l) => l.project_id);
+        const [seen, ev] = await Promise.all([
+          svc(`presence_activity_reads?site_id=eq.${s}&reader=eq.${encodeURIComponent('client:' + site.client_id)}&select=last_seen_at&limit=1`),
+          ids.length ? svc(`presence_project_events?site_id=eq.${s}&project_id=in.(${ids.join(',')})&client_visible=is.true&select=created_at&order=created_at.desc&limit=50`) : Promise.resolve({ json: [] as any[] }),
+        ]);
+        const lastSeen = (seen.json as any[])?.[0]?.last_seen_at || null;
+        attention_count += ((ev.json as any[]) || []).filter((e) => !lastSeen || String(e.created_at) > String(lastSeen)).length;
+      }
+    }
+  } catch { /* best-effort */ }
 
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey };
   return json({ data: {

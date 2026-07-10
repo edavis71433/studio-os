@@ -31,6 +31,7 @@ import { handleProjects, handleProject, handleProjectReport, handleProjectStatus
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
+import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage } from './routes/client_delivery.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -46,7 +47,7 @@ import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
-import { resolveSiteRole } from './lib/workspace.ts';
+import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
@@ -256,7 +257,7 @@ serve(async (req) => {
   //     the client gate is refused — the simplified portal is a real boundary, not
   //     a UI facade. Fast-path: sites with no extra members skip this entirely.
   {
-    const siteRole = await resolveSiteRole(jwt, site.id, principal.kind);
+    const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
     if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
       return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
     }
@@ -478,6 +479,33 @@ serve(async (req) => {
   // P2-D-3: notifications (derived from the activity log + a per-reader last-seen)
   if (route === '/notifications' && method === 'GET') return handleNotifications(req, jwt, site, principal, cors);
   if (route === '/notifications/read' && method === 'POST') return handleNotificationsRead(req, jwt, site, principal, cors);
+  // ── P2-D hardening: the CLIENT App's service-delivery view (Agency–Client
+  //    Bridge). The customer is on THEIR OWN site; every action resolves their
+  //    client + verifies a service_link before touching agency-site data. ──
+  if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
+  if (route === '/client/notifications' && method === 'GET') return handleClientNotifications(req, site, principal, cors);
+  if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
+  if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
+  {
+    let m = route.match(/^\/client\/projects\/([0-9a-f-]{36})$/);
+    if (m && method === 'GET') return handleClientProject(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/projects\/([0-9a-f-]{36})\/report$/);
+    if (m && method === 'GET') return handleClientReport(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/projects\/([0-9a-f-]{36})\/messages$/);
+    if (m && (method === 'GET' || method === 'POST')) return handleClientMessages(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/deliverables\/([0-9a-f-]{36})\/download$/);
+    if (m && method === 'GET') return handleClientDeliverableDownload(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/decide$/);
+    if (m && method === 'POST') return handleClientApprovalDecide(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})$/);
+    if (m && method === 'GET') return handleClientSurvey(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})\/respond$/);
+    if (m && method === 'POST') return handleClientSurveyRespond(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/support\/([0-9a-f-]{36})$/);
+    if (m && method === 'GET') return handleClientSupportOne(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/support\/([0-9a-f-]{36})\/messages$/);
+    if (m && method === 'POST') return handleClientSupportMessage(req, site, principal, m[1], cors);
+  }
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);

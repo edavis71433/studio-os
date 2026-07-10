@@ -72,61 +72,101 @@ const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABA
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 
-function render(ctx,feed){
-  const moments=(feed.moments||[]);
-  const pending=(feed.pending_approvals||[]);
-  const pub=feed.last_published;
-  // Section 4: mirror the owner's Today — lead with what (if anything) needs you.
+// ── the reviewer feed (pre-existing owner-shared updates) ──
+function renderFeed(ctx,feed){
+  const moments=(feed.moments||[]); const pending=(feed.pending_approvals||[]); const pub=feed.last_published;
   const need=pending.length;
-  const subtext = need
-    ? (need===1 ? 'One thing needs your OK — no rush.' : `${need} things need your OK — no rush.`)
-    : 'You’re all caught up — nothing needs you right now.';
-  let html=`<div class="rolebadge">● Client view</div>`;
-  html+=`<header><h1>Your updates</h1><p class="sub">${esc(subtext)}</p></header>`;
-  if(pub){const when=new Date(pub.completed_at||pub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    html+=`<div class="status"><span class="d"></span>Your website is live — last updated ${esc(when)}.</div>`;}
-
-  if(pending.length){
-    html+=`<section><h2>Waiting for your OK</h2>`;
-    for(const p of pending){html+=`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span>
-      <h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p>
-      <div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`;}
-    html+=`</section>`;
-  }
-
+  const subtext = need ? (need===1 ? 'One thing needs your OK — no rush.' : `${need} things need your OK — no rush.`) : 'You’re all caught up — nothing needs you right now.';
+  let html=`<div class="rolebadge">● Client view</div><header><h1>Your updates</h1><p class="sub">${esc(subtext)}</p></header>`;
+  if(pub){const when=new Date(pub.completed_at||pub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});html+=`<div class="status"><span class="d"></span>Your website is live — last updated ${esc(when)}.</div>`;}
+  if(pending.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const p of pending){html+=`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span><h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p><div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`;}html+=`</section>`;}
   html+=`<section><h2>Recent updates</h2>`;
   if(!moments.length){html+=`<div class="card"><p class="muted">Nothing new to share right now — your studio will surface anything worth a look here.</p></div>`;}
   else for(const m of moments){html+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;}
   html+=`</section>`;
-  $('main').innerHTML=html;wire();
+  $('main').innerHTML=html;
+  document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
+  document.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
 }
-function wire(){
-  document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decide(b.getAttribute('data-approve'),'approve',b)));
-  document.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decide(b.getAttribute('data-decline'),'abandon',b)));
+async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Set aside.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
+
+// ── the CLIENT App service-delivery view (Agency–Client Bridge) ──
+function renderProjects(projects,unread){
+  let html=`<div class="rolebadge">● Your projects</div><header><h1>Your projects</h1><p class="sub">${projects.length?'What your studio is working on with you.':'Your studio hasn’t started a project with you yet.'}${unread?` · <strong>${unread}</strong> new update${unread===1?'':'s'}`:''}</p></header><section>`;
+  if(!projects.length) html+=`<div class="card"><p class="muted">When your studio starts a project, it’ll appear here with your tasks, files, and approvals.</p></div>`;
+  for(const p of projects){html+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace('_',' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p></div>`;}
+  html+=`</section>`;
+  $('main').innerHTML=html;
+  document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
 }
-async function decide(path,decision,btn){
-  btn.disabled=true;btn.textContent=decision==='approve'?'Approving…':'…';
-  const r=await api(path,'POST',{decision});
-  if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Set aside.');return load();}
-  toast('That didn’t go through — nothing changed. Please try again.');btn.disabled=false;btn.textContent=decision==='approve'?'Approve':'Not yet';
+async function openProject(id){
+  $('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  const [d,rep]=await Promise.all([api('/client/projects/'+id),api('/client/projects/'+id+'/report').catch(()=>null)]);
+  if(!d.ok){toast('That project isn’t available.');return load();}
+  const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
+  let html=`<p><a class="link" href="/client.html">← Your projects</a></p><header><h1>${esc(p.name)}</h1><p class="sub">Status: ${esc((p.status||'').replace('_',' '))}</p></header>`;
+  if(s) html+=`<div class="status"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${s.open_client_actions} action${s.open_client_actions===1?'':'s'} for you</div>`;
+  // approvals that need the client
+  const aps=(data.approvals||[]).filter(a=>a.status==='pending');
+  if(aps.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}" data-d="approved">Approve</button><button data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}" data-d="changes_requested">Request changes</button></div></div>`;}html+=`</section>`;}
+  // your tasks
+  const acts=(data.tasks||[]).filter(t=>t.client_action_required);
+  if(acts.length){html+=`<section><h2>Your to-dos</h2>`;for(const t of acts){html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${t.derived&&t.derived.overdue?'Overdue · ':''}${esc(t.status.replace('_',' '))}</p></div>`;}html+=`</section>`;}
+  // files
+  if((data.deliverables||[]).length){html+=`<section><h2>Files</h2>`;for(const f of data.deliverables){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}html+=`</section>`;}
+  // surveys
+  if((data.surveys||[]).length){html+=`<section><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
+  // milestones
+  if((data.milestones||[]).length){html+=`<section><h2>Milestones</h2>`;for(const m of data.milestones){html+=`<div class="card"><h3>${esc(m.title)}</h3><p>${m.status==='complete'?'✓ Complete':'In progress'}${m.due_date?` · due ${esc(m.due_date)}`:''}</p></div>`;}html+=`</section>`;}
+  // messages
+  html+=`<section><h2>Messages</h2><div id="thread"></div><div class="card"><textarea id="msg" rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
+  // support
+  html+=`<section><h2>Need help?</h2><div class="card"><p class="muted">Have a question for your studio? Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
+  $('main').innerHTML=html;
+  document.querySelectorAll('[data-adec]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/approvals/'+b.getAttribute('data-adec')+'/decide','POST',{decision:b.getAttribute('data-d'),presented_hash:b.getAttribute('data-ah')});if(r.ok){toast('Thank you — recorded.');openProject(id);}else{toast('That didn’t go through.');b.disabled=false;}}));
+  document.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',async()=>{const r=await api('/client/deliverables/'+b.getAttribute('data-dl')+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('That file isn’t available.');}));
+  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
+  $('newSupport').addEventListener('click',()=>openSupport(id));
+  loadThread(id);
+  $('send').addEventListener('click',async()=>{const v=$('msg').value.trim();if(!v)return;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');});
 }
-function ownerNote(ctx){
-  $('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div>
-    <h2 style="margin-top:14px">This is the client view.</h2>
-    <p class="muted">You have the full workspace. This simplified view is what a client you invite as a reviewer sees.</p>
-    <p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;
+async function loadThread(id){const r=await api('/client/projects/'+id+'/messages');const items=((r.body&&r.body.data)||[]).slice().reverse();$('thread').innerHTML=items.length?items.map(m=>`<div class="card"><p><strong>${m.author_kind==='staff'||m.author_kind==='system'?'Your studio':'You'}:</strong> ${esc(m.body)}</p></div>`).join(''):'<p class="muted">No messages yet.</p>';}
+async function openSurvey(sid,pid){
+  const r=await api('/client/surveys/'+sid);
+  if(!r.ok){toast('That survey isn’t available.');return;}
+  const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
+  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>${esc(sv.title||'Survey')}</h1></header><section>`;
+  if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
+  for(const q of (sv.questions||[])){const kind=q.type==='rating'?'number':'text';html+=`<div class="card"><label style="display:block;font-weight:600;margin-bottom:6px">${esc(q.label)}</label>${q.type==='choice'?`<select data-q="${esc(q.key)}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px">${(q.choices||[]).map(c=>`<option>${esc(c)}</option>`).join('')}</select>`:`<input data-q="${esc(q.key)}" type="${kind}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px">`}</div>`;}
+  html+=`<div class="row"><button class="approve" id="subSurvey">Submit</button></div></section>`;
+  $('main').innerHTML=html;
+  $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
+  $('subSurvey').addEventListener('click',async()=>{const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else toast('That didn’t submit.');});
 }
+async function openSupport(pid){
+  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>Open a support request</h1></header><section><div class="card"><label style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
+  $('main').innerHTML=html;
+  $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
+  $('sup-send').addEventListener('click',async()=>{const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid});if(r.ok){toast('Sent — your studio will get back to you.');openProject(pid);}else toast('That didn’t send.');});
+}
+
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+function ownerNote(){$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
 async function load(){
+  const deep=new URLSearchParams(location.search).get('project'); if(deep){await openProject(deep);api('/client/notifications/read','POST',{});return;}
   const ctx=await api('/portal/context');
   if(!ctx.ok){trouble();return;}
   const c=ctx.body.data||{};
-  if(c.sees_full_workspace){ownerNote(c);return;}   // owner/operator → point to the full workspace
+  // Agency–Client Bridge: does this customer have linked delivery? If so, that IS their home.
+  const proj=await api('/client/projects');
+  const projects=(proj.ok&&proj.body.data)||[];
+  if(projects.length){const n=await api('/client/notifications').catch(()=>null);renderProjects(projects,(n&&n.body&&n.body.data&&n.body.unread_count)||(n&&n.body&&n.body.unread_count)||0);api('/client/notifications/read','POST',{});return;}
+  if(c.sees_full_workspace){ownerNote();return;}     // owner with no linked delivery
   const feed=await api('/portal/feed');
   if(!feed.ok){trouble();return;}
-  render(c,feed.body.data||{});
+  renderFeed(c,feed.body.data||{});
 }
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";

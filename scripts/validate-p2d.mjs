@@ -15,10 +15,11 @@ const haveTwoTenant = haveCreds && !!env.SALES_E2E_JWT2;
 
 const GROUPS = [
   ['Pure rules (always): delivery · approvals · notifications · intake', ['service_delivery', 'approvals', 'notifications', 'intake'], 'offline'],
-  ['Structural security (always): projects · deliverables/approvals · comms · surveys/support · UI', ['projects_routes', 'project_delivery_routes', 'project_comms_routes', 'service_intake_routes', 'projects_ui'], 'offline'],
+  ['Structural security (always): projects · delivery · comms · intake · client-bridge · UI', ['projects_routes', 'project_delivery_routes', 'project_comms_routes', 'service_intake_routes', 'client_delivery_routes', 'projects_ui'], 'offline'],
   ['Foundation runtime + isolation (staging)', ['projects_e2e', 'projects_isolation_e2e'], 'live'],
   ['Deliverables/approvals + communication + surveys/support (staging)', ['project_delivery_e2e', 'project_comms_e2e', 'service_intake_e2e'], 'live'],
   ['Client reporting (staging)', ['project_report_e2e'], 'live'],
+  ['Agency–Client Bridge, two-customer isolation (staging)', ['bridge_e2e'], 'live'],
   ['FULL 16-step service lifecycle (staging, two tenants)', ['service_lifecycle_e2e'], 'live'],
 ];
 

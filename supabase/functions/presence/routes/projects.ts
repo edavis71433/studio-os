@@ -6,7 +6,8 @@
 // writes are studio-side. Reuses the P2-C event/idempotency idioms; no legacy data.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { resolveSiteRole } from '../lib/workspace.ts';
+import { resolveSiteRoleCached } from '../lib/workspace.ts';
+import { ensureProjectForDeal } from '../lib/service_bridge.ts';
 import {
   isProjectStatus, canProjectTransition, isTaskStatus, canTaskTransition, isTaskPriority,
   deriveTaskState, compareOrder, nextSortOrder, forViewer, clampLimit, clampOffset, progressOf,
@@ -33,7 +34,7 @@ const dateOrNull = (v: unknown): { ok: true; v: string | null } | { ok: false } 
  *  audience) is the client side. Role-based, so a solo owner is never locked out. */
 export async function isStudioSide(jwt: string, site: SiteRow, principal: Principal): Promise<boolean> {
   if (principal.kind === 'staff' || principal.kind === 'system') return true;
-  try { return (await resolveSiteRole(jwt, site.id, principal.kind)) !== 'client_reviewer'; } catch { return false; }
+  try { return (await resolveSiteRoleCached(principal, jwt, site.id)) !== 'client_reviewer'; } catch { return false; }
 }
 export const studioDenied = (cors: Record<string, string>) =>
   json({ error: 'forbidden', message: 'Only your studio can change service-delivery records.' }, 403, cors);
@@ -69,42 +70,30 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
     if (!studio) return studioDenied(cors);
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
 
-    // idempotent convert handoff: create-from-deal (a deal maps to at most one project)
-    let dealId: string | null = UUID_RE.test(b.deal_id || '') ? b.deal_id : null;
-    let clientId: string | null = null;
+    // create-from-deal → the ONE idempotent handoff (project on THIS agency site +
+    // the tenant-safe Agency–Client Bridge to the customer's own workspace).
+    const dealId: string | null = UUID_RE.test(b.deal_id || '') ? b.deal_id : null;
     if (dealId) {
-      const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,converted_client_id,created_project_id&limit=1`))[0];
+      const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,converted_client_id,converted_site_id,created_project_id&limit=1`))[0];
       if (!deal) return json({ error: 'bad_deal', message: 'That deal isn’t in this workspace.' }, 422, cors);
-      if (deal.created_project_id) {                                 // already handed off → return the existing project
-        const existing = await loadProject(site.id, deal.created_project_id);
-        if (existing) return json({ data: existing, idempotent: true }, 200, cors);
-      }
-      clientId = deal.converted_client_id || null;
-      if (!b.name) b.name = deal.title;
+      const ph = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId: deal.converted_client_id || null, customerSiteId: deal.converted_site_id || null, actor: principal.email || principal.userId || 'system', actorKind: principal.kind });
+      if (!ph.ok || !ph.project) return json({ error: ph.conflict ? 'handoff_conflict' : 'write_failed', message: 'We couldn’t start that project — please try again.' }, ph.conflict ? 409 : 502, cors);
+      return json({ data: ph.project, idempotent: ph.idempotent }, ph.idempotent ? 200 : 201, cors);
     }
+
+    // manual project (no deal)
     const name = clean(b.name, 200);
     if (!name) return json({ error: 'validation', message: 'A project needs a name.' }, 422, cors);
     const sd = dateOrNull(b.start_date), td = dateOrNull(b.target_date);
     if (!sd.ok || !td.ok) return json({ error: 'validation', message: 'Dates must be YYYY-MM-DD.' }, 422, cors);
-
     const ins = await svc('presence_projects', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, client_id: clientId, deal_id: dealId, name,
+      body: JSON.stringify({ site_id: site.id, client_id: null, deal_id: null, name,
         description: clean(b.description, 5000), status: 'active',
         owner_user_id: UUID_RE.test(b.owner_user_id || '') ? b.owner_user_id : null,
         client_visible: b.client_visible === false ? false : true,
         start_date: sd.v, target_date: td.v }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That project didn’t save — please try again.' }, 502, cors);
     const project = rows(ins)[0];
-
-    if (dealId) { // stamp the handoff idempotently (only if still unclaimed); orphan-safe
-      const claim = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&created_project_id=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ created_project_id: project.id }) });
-      if (!rows(claim)[0]) { // someone handed off first — drop our orphan, return theirs
-        await svc(`presence_projects?id=eq.${project.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {});
-        const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=created_project_id&limit=1`))[0];
-        const existing = deal?.created_project_id ? await loadProject(site.id, deal.created_project_id) : null;
-        if (existing) return json({ data: existing, idempotent: true }, 200, cors);
-      }
-    }
     await projectEvent(site.id, project.id, 'project_created', principal, project.client_visible, { name });
     return json({ data: project }, 201, cors);
   }
@@ -209,7 +198,7 @@ export async function handleTasksCreate(req: Request, jwt: string, site: SiteRow
   if (milestoneId) { const m = rows(await svc(`presence_milestones?id=eq.${milestoneId}&project_id=eq.${projectId}&site_id=eq.${site.id}&select=id&limit=1`))[0]; if (!m) milestoneId = null; }
   const dd = dateOrNull(b.due_date);
   if (!dd.ok) return json({ error: 'validation', message: 'Due date must be YYYY-MM-DD.' }, 422, cors);
-  const existing = rows(await svc(`presence_tasks?project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=sort_order`));
+  const existing = rows(await svc(`presence_tasks?project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=sort_order&order=sort_order.desc&limit=1`)); // D2: only the current max, not the whole list
   const clientVisible = b.client_visible === true || b.client_action_required === true;
   const ins = await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: site.id, project_id: projectId, milestone_id: milestoneId, title,
@@ -257,6 +246,10 @@ export async function handleTask(req: Request, jwt: string, site: SiteRow, princ
   if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
   const up = await svc(`presence_tasks?id=eq.${taskId}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+  // B1: a task newly flagged as a client action → tell the client (an activity event)
+  if (task.client_action_required !== true && rows(up)[0].client_action_required === true) {
+    await projectEvent(site.id, projectId, 'client_action', principal, true, { task_id: taskId, title: rows(up)[0].title });
+  }
   return json({ data: rows(up)[0] }, 200, cors);
 }
 
@@ -271,7 +264,7 @@ export async function handleMilestonesCreate(req: Request, jwt: string, site: Si
   if (!title) return json({ error: 'validation', message: 'A milestone needs a title.' }, 422, cors);
   const dd = dateOrNull(b.due_date);
   if (!dd.ok) return json({ error: 'validation', message: 'Due date must be YYYY-MM-DD.' }, 422, cors);
-  const existing = rows(await svc(`presence_milestones?project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=sort_order`));
+  const existing = rows(await svc(`presence_milestones?project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=sort_order&order=sort_order.desc&limit=1`)); // D2: only the current max
   const ins = await svc('presence_milestones', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: site.id, project_id: projectId, title, status: 'open', due_date: dd.v,
       sort_order: nextSortOrder(existing), client_visible: b.client_visible === false ? false : true }) });

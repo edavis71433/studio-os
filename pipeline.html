@@ -171,7 +171,7 @@ async function openDeal(id){
         <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button></div><div id="conForm"></div></div>
         <div class="sec"><h3>Convert to customer</h3>
-          ${d.converted_client_id?`<div class="mut">Converted — workspace <code>${esc(d.converted_site_id||'')}</code>. The customer was invited to set their login and welcomed into onboarding.</div>`:
+          ${d.converted_client_id?`<div class="mut">Converted — workspace <code>${esc(d.converted_site_id||'')}</code>. The customer was invited to set their login and welcomed into onboarding.</div>${d.created_project_id?`<div class="row2" style="margin-top:8px"><a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a></div>`:''}`:
             `<div id="convWrap"><button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert & provision workspace':'Sign the agreement first'}</button></div>`}
         </div>
       </div>`;
@@ -188,7 +188,7 @@ async function openDeal(id){
         <select id="convPlan"><option value="presence">Presence — full website</option><option value="business_os_only">Business OS</option><option value="cms_only">CMS only</option><option value="presence_monitor">Monitor — observe only</option></select>
         <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, convert</button></div>`;
       $('convNo').onclick=()=>openDeal(id);
-      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace provisioned'+(x.idempotent?' (already done)':(x.managed?', added to your studio':(x.invited?', customer invited':''))));openDeal(id);load();}catch(e){toast(e.message,true);$('convYes').disabled=false;}};
+      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(e.message,true);$('convYes').disabled=false;}};
     };
   }catch(e){ $('detailInner').innerHTML='<div class="dbody mut">'+esc(e.message)+'</div>'; }
 }

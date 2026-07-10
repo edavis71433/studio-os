@@ -72,6 +72,10 @@ export async function handleDeliverable(req: Request, jwt: string, site: SiteRow
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     const up = await svc(`presence_deliverables?id=eq.${did}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+    // B2: a file shared after upload (draft→shared, still client-visible) → tell the client
+    if (d.status !== 'shared' && rows(up)[0].status === 'shared' && rows(up)[0].client_visible === true) {
+      await projectEvent(site.id, projectId, 'deliverable_added', principal, true, { deliverable_id: did, title: rows(up)[0].title });
+    }
     return json({ data: rows(up)[0] }, 200, cors);
   }
   if (req.method === 'DELETE') { // soft-delete the OVERLAY only; the underlying media is untouched (delete-protection lives in lib/media.ts)
@@ -87,6 +91,10 @@ export async function handleDeliverableDownload(req: Request, jwt: string, site:
   const studio = await isStudioSide(jwt, site, principal);
   const d = rows(await svc(`presence_deliverables?id=eq.${did}&project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,media_id,title,client_visible,status&limit=1`))[0];
   if (!d || (!studio && !(d.client_visible && d.status === 'shared'))) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  if (!studio) { // B6: a non-studio caller must also be able to see the PARENT project
+    const proj = await loadProject(site.id, projectId);
+    if (!proj || !proj.client_visible) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  }
   const media = rows(await svc(`presence_media?id=eq.${d.media_id}&site_id=eq.${site.id}&deleted_at=is.null&select=storage_path,mime,alt_text&limit=1`))[0];
   if (!media?.storage_path) return json({ error: 'not_found', message: 'That file is no longer available.' }, 404, cors);
   const ext = (media.mime === 'application/pdf') ? '.pdf' : '';
@@ -143,7 +151,8 @@ export async function handleApprovalDecide(req: Request, jwt: string, site: Site
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   if (!isDecision(b.decision)) return json({ error: 'bad_decision', message: 'Choose approve, reject, or request changes.' }, 422, cors);
   const a = rows(await svc(`presence_approvals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
-  if (!a || !a.client_visible) return json({ error: 'not_found', message: 'That request isn’t here.' }, 404, cors);
+  // B4: an internal (client_visible=false) approval is never a dead-end — a studio role may decide it.
+  if (!a || (!a.client_visible && !(await isStudioSide(jwt, site, principal)))) return json({ error: 'not_found', message: 'That request isn’t here.' }, 404, cors);
   if (a.status === b.decision) return json({ data: { status: a.status }, already: true }, 200, cors); // idempotent
   if (!canDecideApproval(a.status)) return json({ error: 'already_decided', message: 'This request has already been decided or replaced.' }, 409, cors);
   const presented = clean(b.presented_hash, 64);

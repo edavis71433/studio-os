@@ -11,6 +11,7 @@ import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, d
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
+import { ensureProjectForDeal } from '../lib/service_bridge.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import {
@@ -331,8 +332,10 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   const outcome = convertOutcome({ stage: deal.stage, converted_client_id: deal.converted_client_id });
-  if (outcome === 'already_converted') { // idempotent: return the existing customer/workspace
-    return json({ data: { converted: true, client_id: deal.converted_client_id, site_id: deal.converted_site_id, idempotent: true } }, 200, cors);
+  if (outcome === 'already_converted') { // idempotent: return the existing customer/workspace (+ ensure the project handoff)
+    const { actor, actor_kind } = actorOf(principal);
+    const ph = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId: deal.converted_client_id, customerSiteId: deal.converted_site_id, actor, actorKind: actor_kind });
+    return json({ data: { converted: true, client_id: deal.converted_client_id, site_id: deal.converted_site_id, project_id: ph.project?.id || deal.created_project_id || null, onboarding: '/get-started.html', idempotent: true } }, 200, cors);
   }
   if (outcome === 'blocked_lost') return json({ error: 'lost', message: 'A lost deal can’t be converted.' }, 409, cors);
   if (outcome === 'blocked_stage') return json({ error: 'not_ready', message: 'Sign the agreement before converting this deal to a customer.' }, 409, cors);
@@ -451,5 +454,10 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     }
   }
 
-  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, hosted: prov.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
+  // 5) SERVICE-DELIVERY HANDOFF (Agency–Client Bridge): create the authoritative
+  //    project on THIS (agency) site for the new customer + link the tenant-safe
+  //    bridge to their own workspace, so post-sale delivery is connected with no
+  //    manual step. Idempotent (deal.created_project_id UNIQUE + bridge UNIQUE).
+  const handoff = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId, customerSiteId: prov.siteId || null, actor: actorOf(principal).actor, actorKind: actorOf(principal).actor_kind });
+  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, project_id: handoff.project?.id || null, hosted: prov.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }
