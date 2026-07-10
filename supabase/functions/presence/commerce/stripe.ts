@@ -15,16 +15,32 @@ const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').
 export function stripeConfigured(): boolean { return !!STRIPE_SECRET; }
 export function siteUrl(): string { return SITE_URL; }
 
-async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' = 'POST'): Promise<any> {
+async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
   const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded' };
   if (idem) h['Idempotency-Key'] = idem;
-  const url = method === 'GET'
-    ? `https://api.stripe.com/v1/${path}${Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''}`
-    : `https://api.stripe.com/v1/${path}`;
+  const qs = (method === 'GET' || method === 'DELETE') && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
+  const url = `https://api.stripe.com/v1/${path}${qs}`;
   const r = await fetch(url, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined });
   const j = await r.json();
   if (!r.ok) throw new Error((j && j.error && j.error.message) || `stripe ${r.status}`);
   return j;
+}
+
+/** Cancel a subscription immediately (stops future billing). Keeps the Stripe
+ *  customer + past invoices for tax/audit. Idempotent-ish: canceling an already-
+ *  canceled sub returns ok. Never throws to the caller. */
+export async function cancelSubscription(subId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!STRIPE_SECRET) return { ok: false, error: 'not_configured' };
+  if (!subId) return { ok: true };
+  try { await stripeReq(`subscriptions/${encodeURIComponent(subId)}`, {}, undefined, 'DELETE'); return { ok: true }; }
+  catch (e) { const m = String((e as Error).message || e); if (/no such subscription|already canceled|resource_missing/i.test(m)) return { ok: true }; return { ok: false, error: m }; }
+}
+
+/** The existing Stripe customer id for an email, or null (W8: reuse, don't dup). */
+export async function findCustomerIdByEmail(email: string): Promise<string | null> {
+  if (!STRIPE_SECRET || !email) return null;
+  try { const r = await stripeReq('customers', { email, limit: '1' }, undefined, 'GET'); return r?.data?.[0]?.id || null; }
+  catch { return null; }
 }
 
 export interface CheckoutParams {

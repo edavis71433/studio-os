@@ -487,6 +487,14 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   // ── AI cost view (operator/governance) — metered token usage → estimated $ ──
   if (route === '/admin/ai-usage' && method === 'GET') return handleAiUsage(req, cors);
 
+  // ── P2-E W2: account-deletion queue (pending/executing/failed/completed) ──
+  if (route === '/admin/deletions' && method === 'GET') {
+    const r = await svc('presence_account_deletions?select=id,client_id,site_id,status,requested_at,scheduled_for,executed_at,error,attempts&order=scheduled_for.asc&limit=500');
+    const rows = Array.isArray(r.json) ? r.json : [];
+    const by = (s: string) => rows.filter((x: any) => x.status === s).length;
+    return json({ data: { deletions: rows, counts: { pending: by('pending'), executing: by('executing'), failed: by('failed'), completed: by('completed'), canceled: by('canceled') } } }, 200, cors);
+  }
+
   // ── M13: agency provisioning (operator creates the agency + its owner seat) ──
   if (route === '/admin/agencies' && method === 'POST') {
     const b = await readBody(req);

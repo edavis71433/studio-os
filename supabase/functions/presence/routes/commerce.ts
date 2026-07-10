@@ -30,6 +30,7 @@ import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../comm
 import { lifecycleCopy } from '../commerce/lifecycle.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
 import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPortal } from '../commerce/stripe.ts';
+import { requestDeletion, cancelDeletion, coolingOffDays } from '../commerce/deletion.ts';
 
 const TRIAL_DAYS = 14;
 
@@ -409,27 +410,34 @@ export async function handleCommerce(req: Request, route: string, method: string
   // public
   if (route === '/commerce/plans' && method === 'GET') return handlePlans(cors);
   if (route === '/commerce/delete-request' && method === 'POST') {
-    // CP-10: self-serve deletion REQUEST — recorded immediately, confirmed to the
-    // customer, alerted to ops; execution follows the written 30-day runbook.
+    // CP-10: self-serve deletion REQUEST → a cancelable cooling-off; the scheduled
+    // executor (commerce/deletion.ts runDeletionSweep) actually completes it.
     const jwt = req.headers.get('x-dds-user-jwt') || '';
     const site = jwt ? await resolveSite(jwt) : null;
     if (!site || !site.client_id) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
-    await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence`, {
-      method: 'PATCH', body: JSON.stringify({ deletion_requested_at: new Date().toISOString() }),
-    });
+    const days = coolingOffDays();
+    const reqd = await requestDeletion(site.client_id, site.id, 'customer');
     const name = await businessNameFor(site.client_id);
     await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
       method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
       body: JSON.stringify({ site_id: site.id, client_id: site.client_id, kind: 'deletion_requested', period: 'once',
         headline: 'Your deletion request is recorded',
-        body: 'We’ll delete your account and data within 30 days. Until then you can still download everything you own — or cancel this request by emailing us.', status: 'active' }),
+        body: `Your account and data will be deleted after ${days} days. Until then you can still download everything you own — or cancel this request.`, status: 'active' }),
     });
     const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`);
     if (cl.json?.[0]?.email) sendEmail(cl.json[0].email, 'Your deletion request is recorded',
-      `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes within 30 days. Until then, everything you own is still downloadable from your workspace — and if you change your mind, just reply to this email.</p>`).catch(() => {});
+      `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes after ${days} days (on or after ${new Date(reqd.scheduled_for).toDateString()}). Until then, everything you own is still downloadable from your workspace — and if you change your mind, you can cancel the request from your account.</p>`).catch(() => {});
     const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-    if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion. Runbook: complete within 30 days.</p>`).catch(() => {});
-    return json({ data: { ok: true, completes_within_days: 30 } }, 200, cors);
+    if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion; scheduled ${reqd.scheduled_for}. The executor completes it after the cooling-off.</p>`).catch(() => {});
+    return json({ data: { ok: true, completes_within_days: days, scheduled_for: reqd.scheduled_for } }, 200, cors);
+  }
+  if (route === '/commerce/delete-cancel' && method === 'POST') {
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    const site = jwt ? await resolveSite(jwt) : null;
+    if (!site || !site.client_id) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    const done = await cancelDeletion(site.client_id);
+    if (done) await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.deletion_requested&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+    return json({ data: { ok: true, canceled: done, message: done ? 'Your deletion request was canceled — your account stays active.' : 'There was no pending deletion request.' } }, 200, cors);
   }
   if (route === '/commerce/signup' && method === 'POST') return handleSignup(req, cors);
   if (route === '/commerce/verify' && method === 'POST') return handleVerify(req, cors);
