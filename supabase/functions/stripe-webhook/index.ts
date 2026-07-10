@@ -130,17 +130,19 @@ async function db(path: string, method: string, payload: unknown): Promise<boole
   return r.ok;
 }
 
-// POST returning the inserted rows (or [] if a unique/PK conflict was ignored).
-async function dbInsertReturning(path: string, payload: unknown, prefer: string): Promise<any[]> {
+// POST returning {code, rows}. rows is the inserted row(s) ([] on an ignored
+// conflict). code lets the caller tell a conflict (2xx, empty) from a real
+// error (4xx/5xx) — e.g. a column that doesn't exist yet (migration not applied).
+async function dbInsertReturning(path: string, payload: unknown, prefer: string): Promise<{ code: number; rows: any[] }> {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
       method: 'POST',
       headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: prefer },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) return [];
-    return await r.json().catch(() => []);
-  } catch { return []; }
+    if (!r.ok) return { code: r.status, rows: [] };
+    return { code: r.status, rows: await r.json().catch(() => []) };
+  } catch { return { code: 0, rows: [] }; }
 }
 
 async function dbGet(path: string): Promise<any[]> {
@@ -170,11 +172,24 @@ async function dbGet(path: string): Promise<any[]> {
 //                 every downstream action is idempotent).
 async function claimEvent(eventId: string, type: string, livemode: boolean | null): Promise<'claimed' | 'done' | 'processing' | 'retry'> {
   if (!eventId) return 'claimed'; // no id to dedupe on — process (best-effort)
-  const inserted = await dbInsertReturning('stripe_webhook_events',
-    { event_id: eventId, type, received_at: new Date().toISOString(), status: 'processing', livemode },
+  const receivedAt = new Date().toISOString();
+  const ins = await dbInsertReturning('stripe_webhook_events',
+    { event_id: eventId, type, received_at: receivedAt, status: 'processing', livemode },
     'return=representation,resolution=ignore-duplicates');
-  if (Array.isArray(inserted) && inserted.length > 0) return 'claimed';
-  // conflict: a row already exists — decide by its status
+  if (ins.rows.length > 0) return 'claimed';
+  // A 4xx here almost always means the 0083 columns (status/livemode) aren't
+  // applied yet on this environment. Fall back to the legacy schema so a deploy
+  // that lands before its migration still dedupes (event_id/type/received_at)
+  // instead of skipping every event. Zero-downtime-safe in either order.
+  if (ins.code >= 400 || ins.code === 0) {
+    const legacy = await dbInsertReturning('stripe_webhook_events',
+      { event_id: eventId, type, received_at: receivedAt },
+      'return=representation,resolution=ignore-duplicates');
+    if (legacy.rows.length > 0) return 'claimed';   // fresh row → we own it
+    // legacy row already exists (no status column to consult) → treat as done
+    return 'done';
+  }
+  // 2xx + empty = a genuine PK conflict; decide by the existing row's status.
   const rows = await dbGet(`stripe_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=status&limit=1`);
   const status = Array.isArray(rows) && rows.length ? String(rows[0].status || 'done') : 'done';
   if (status === 'failed') return 'retry';

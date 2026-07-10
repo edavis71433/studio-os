@@ -17,6 +17,7 @@ ok('claim: a won INSERT → claimed; a conflict is resolved by the row status', 
 ok('claim: done/processing duplicates are acknowledged WITHOUT re-processing', /claim === 'done' \|\| claim === 'processing'\)[\s\S]*?acknowledged without re-processing/.test(wh));
 ok('settle: success marks the event done; failure releases the claim for retry', /if \(res\.status === 200\) await markEventDone/.test(wh) && /else await markEventFailed/.test(wh));
 ok('settle: a failed prior attempt (status=failed) re-processes on Stripe retry', /claimEvent[\s\S]*?'retry'/.test(wh) && /'failed'\) return 'retry'/.test(wh));
+ok('resilient: falls back to legacy schema if 0083 columns not applied yet (deploy-order safe)', /ins\.code >= 400 \|\| ins\.code === 0/.test(wh) && /received_at: receivedAt \}/.test(wh) && /legacy row already exists/.test(wh));
 
 // ── L3: livemode guard ──
 ok('livemode: expected mode derived from the key prefix or STRIPE_EXPECT_LIVEMODE', /function expectedLivemode\(\)[\s\S]*?STRIPE_EXPECT_LIVEMODE[\s\S]*?sk_live_/.test(wh));
