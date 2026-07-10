@@ -52,13 +52,19 @@ export async function applyEntitlementPatch(clientId: string, patch: Entitlement
         svc(`clients?id=eq.${enc(clientId)}&select=email,name&limit=1`),
       ]);
       const copy = lifecycleCopy('welcome_back', String(clQ.json?.[0]?.name || ''));
+      // L5 — send-once: the welcome-back EMAIL rides the notice insert. Ask for
+      // the inserted row back (ignore-duplicates → empty when it already exists
+      // this month) and email ONLY when the notice is newly created. Without this
+      // a pause→reactivate→pause→reactivate in one month re-emails every time.
+      let freshNotice = false;
       if (siteQ.json?.[0]?.id) {
-        await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-          method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+        const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+          method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
           body: JSON.stringify({ site_id: siteQ.json[0].id, client_id: clientId, kind: 'welcome_back', period: new Date().toISOString().slice(0, 7), headline: copy.headline, body: copy.body, status: 'active' }),
         });
+        freshNotice = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
       }
-      if (clQ.json?.[0]?.email) sendEmail(clQ.json[0].email, copy.subject, copy.html).catch(() => {});
+      if (freshNotice && clQ.json?.[0]?.email) sendEmail(clQ.json[0].email, copy.subject, copy.html).catch(() => {});
     } catch { /* welcome-back is best-effort, never blocks billing truth */ }
   }
   return applied;

@@ -51,11 +51,16 @@ export function lifecycleEventsFor(e: EntitlementView, nowIso: string): Lifecycl
   if (shouldExpireTrial(e, nowIso)) out.push('trial_ended');
   if (e.status === 'paused') out.push('payment_trouble');
   if (e.status === 'lapsed') {
-    out.push('account_lapsed');
     const lapsedAt = e.updated_at ? Date.parse(e.updated_at) : NaN;
     const days = Number.isFinite(lapsedAt) ? (now - lapsedAt) / 86400_000 : 0;
-    if (days >= 30) out.push('win_back');            // once ever (period 'once')
-    if (days >= 45) out.push('winddown_reminder');   // day-45 export reminder
+    // L5 — the monthly lapse notice is BOUNDED, not forever. It rides the
+    // wind-down window (month 0 + month 1); after the site comes down at
+    // WIND_DOWN_DAYS the customer has had the full sequence (lapse → win-back →
+    // wind-down reminder → takedown) and the monthly nag stops. Prevents emailing
+    // a long-gone customer every month for years.
+    if (days < WIND_DOWN_DAYS) out.push('account_lapsed');
+    if (days >= 30 && days < WIND_DOWN_DAYS) out.push('win_back');            // once ever (period 'once')
+    if (days >= 45 && days < WIND_DOWN_DAYS) out.push('winddown_reminder');   // day-45 export reminder, bounded to before takedown
   }
   return out;
 }

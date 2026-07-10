@@ -42,6 +42,10 @@ ok('healthy paying customer → zero noise', lifecycleEventsFor(ent({ stripe_sub
   ok('lapsed 45+ days → winddown_reminder joins', lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(46) }), NOW).includes('winddown_reminder'));
   ok('freshly lapsed → neither (only the lapse notice)', (() => { const e = lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(2) }), NOW); return !e.includes('win_back') && !e.includes('winddown_reminder'); })());
   ok('winddown copy: states day-60 + the download door', /day 60/.test(lifecycleCopy('winddown_reminder', 'X').html) && /download/i.test(lifecycleCopy('winddown_reminder', 'X').html));
+  // L5 — the monthly lapse nag is BOUNDED to the wind-down window, not forever
+  ok('L5: lapsed past wind-down → NO more account_lapsed (monthly nag ends)', !lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(WIND_DOWN_DAYS + 5) }), NOW).includes('account_lapsed'));
+  ok('L5: freshly lapsed → account_lapsed still fires (month 0)', lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(1) }), NOW).includes('account_lapsed'));
+  ok('L5: winddown_reminder does NOT re-fire after takedown', !lifecycleEventsFor(ent({ status: 'lapsed', updated_at: old(WIND_DOWN_DAYS + 10) }), NOW).includes('winddown_reminder'));
   ok('win-back copy: nothing deleted, no pressure', /nothing was deleted/i.test(lifecycleCopy('win_back', 'X').html));
   ok('welcome-back copy exists and is warm', /welcome back/i.test(lifecycleCopy('welcome_back', 'X').subject));
 }
