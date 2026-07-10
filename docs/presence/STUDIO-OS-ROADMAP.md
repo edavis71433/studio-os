@@ -25,7 +25,7 @@ Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CM
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
 - ✅ **M3** — Draft-version hash
-- ✅ **M4** — Publish reliability (idempotency + cooldown) *(cooldown live; idempotency pending owner migration 0073)*
+- ✅⏳ **M4** — Publish reliability (idempotency + cooldown) — *implementation complete; cooldown LIVE; idempotency implemented but awaiting owner migration 0073 activation*
 - ⏳ **M5 — Deploy robustness** (timeout · reconcile cron · ceiling · telemetry) *(next active)*
 - ⏳ **M6** — Media hardening (magic-byte · EXIF · quota · cleanup)
 - ⏳ **M7** — Snapshot management (retention · GC)
@@ -66,7 +66,7 @@ Final pricing · founder pricing · support tiers · AI usage limits · entitlem
 - **⟐ Ops alerting** — monitoring you have to go look at ≠ being told. Wire `OPS_ALERT_EMAIL` (already in the env inventory) to real failures: publish failed, webhook failed, function error.
 - **⟐ Dependency notes:** PITR (owner) must precede the DR drill; the Stripe **webhook test-event** must pass before the test-subscription/test-invoice runs.
 
-**Owner:** Stripe webhook test event · publish audit pages · test subscription signup · test invoice payment · PITR enablement · Cookie/DPA review · Google OAuth consent · push local commits after fence lift.
+**Owner:** **apply migration `0073_publish_idempotency.sql`** (activates M4 publish idempotency — cooldown already live) · Stripe webhook test event · publish audit pages · test subscription signup · test invoice payment · PITR enablement · Cookie/DPA review · Google OAuth consent · push local commits after fence lift.
 
 ---
 
