@@ -29,6 +29,8 @@ import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, load
  *  Reviewer = read the shared feed, and approve the plans put to them. */
 export function reviewerAllowed(route: string, method: string): boolean {
   if (method === 'GET' && (route === '/portal/context' || route === '/portal/feed')) return true;
+  if (method === 'GET' && route === '/projects') return true;                                   // P2-D: client sees its visible projects
+  if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}$/.test(route)) return true;               // P2-D: a client-visible project's status (handler filters visibility)
   if (method === 'POST' && /^\/foundations\/plans\/[0-9a-f-]{36}\/decide$/.test(route)) return true;   // approve an infra plan
   if (method === 'POST' && /^\/connections\/[a-z0-9_]+\/write\/[0-9a-f-]{36}\/decide$/.test(route)) return true; // approve a connected write
   if (method === 'POST' && /^\/assets\/[0-9a-f-]{36}\/status$/.test(route)) return true; // DAM-2: approve/reject a file (action-restricted in the handler)

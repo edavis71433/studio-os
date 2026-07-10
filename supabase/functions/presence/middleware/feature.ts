@@ -61,6 +61,10 @@ export function featureForRoute(route: string, method: string): EditionFeature |
     case 'sales':
       return 'relationship';   // authed /sales/* only; public token actions are pre-auth
 
+    // ── Service Delivery (P2-D) — projects/tasks/milestones are Business-OS work ─
+    case 'projects':
+      return 'relationship';
+
     // ── Business Moments — the daily intelligence surface ─────────────────────
     case 'moments':
       return 'business_moments';

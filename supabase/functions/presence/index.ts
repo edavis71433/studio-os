@@ -27,6 +27,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesPublicView } from './routes/sales.ts';
+import { handleProjects, handleProject, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -418,6 +419,25 @@ serve(async (req) => {
     if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesContractSend(req, site, principal, m[1], cors);
+  }
+  // ── P2-D: Service Delivery (authed, site-scoped). One coherent /projects/*
+  //    resource surface — projects · tasks · milestones · activity. Studio side
+  //    manages; the client side reads only client_visible rows (enforced in the
+  //    handlers). All access is site_id-scoped for tenant isolation. ──
+  if (route === '/projects') return handleProjects(req, jwt, site, principal, cors);
+  {
+    let m = route.match(/^\/projects\/([0-9a-f-]{36})$/);
+    if (m) return handleProject(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/status$/);
+    if (m && method === 'POST') return handleProjectStatus(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/tasks$/);
+    if (m && method === 'POST') return handleTasksCreate(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/tasks\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') return handleTask(req, jwt, site, principal, m[1], m[2], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/milestones$/);
+    if (m && method === 'POST') return handleMilestonesCreate(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/milestones\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') return handleMilestone(req, jwt, site, principal, m[1], m[2], cors);
   }
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
