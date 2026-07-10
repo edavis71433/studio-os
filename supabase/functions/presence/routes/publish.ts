@@ -17,6 +17,7 @@ import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
 import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/publish_guard.ts';
 import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
+import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -113,6 +114,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     at(stage);
     logStages('failed:' + stage);
     await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', error_text: `${stage}: ${detail}`.slice(0, 1000), completed_at: new Date().toISOString() }) });
+    // P2-F G3 — surface the failure as a website-attention notice on the ONE
+    // notice model, so an async/scheduled publish the owner wasn't watching still
+    // reaches the card + bell. Idempotent per publish id (no storm on retry).
+    if (site.client_id) await raiseNotice({
+      siteId: site.id, clientId: site.client_id, kind: 'publish_failed', period: `pub:${pubId}`,
+      headline: 'A publish didn’t go through',
+      body: 'Your latest changes couldn’t be published (nothing on your live site changed). Open your website and try publishing again — your work is safe in the draft.',
+    });
     return json({ error: 'publish_failed', message: CALM }, 502, cors);
   };
 
@@ -151,6 +160,8 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     body: JSON.stringify({ status: live ? 'live' : 'deploying', netlify_deploy_id: dep.deployId, ...(live ? { completed_at: new Date().toISOString() } : {}) }),
   });
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: new Date().toISOString() }) });
+  // G3 — a successful publish clears any lingering publish-failed attention notice.
+  if (live && site.client_id) await clearNotice(site.client_id, 'publish_failed');
 
   await writeChangeEvent({ siteId: site.id, entityType: kind, entityId: null, action: kind, summary, principal, provenance: 'human' });
   logStages(live ? 'live' : 'deploying');   // M5: terminal telemetry (deploying = handed to reconcile)

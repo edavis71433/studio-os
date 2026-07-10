@@ -3373,23 +3373,46 @@ function mountAnnouncementCard() {
   });
 }
 // ── L2: the commercial capacity notice — one calm card, never a number ──
+// P2-F G3 — every notice kind gets a home. Website-attention items (publish
+// failed, connection expired, website enquiry) ride the SAME calm card as the
+// lifecycle/billing notices, each with a deep link to where it's resolved — so
+// nothing dead-ends. Priority: website-attention first, then lifecycle, then capacity.
+const NOTICE_ACTION = {
+  publish_failed:   { label: "Open your website",       href: "presence.html" },
+  connection_expired:{ label: "Reconnect",              href: "connections.html" },
+  website_enquiry:  { label: "View enquiries",          href: "leads.html" },
+  lead_followup:    { label: "View enquiries",          href: "leads.html" },
+  domain_expiry:    { label: "Manage domain",           href: "connections.html" },
+  search_setup:     { label: "Finish search setup",     href: "presence.html" },
+  renewal_reminder: { label: "See plans",               href: "pricing.html" },
+  winddown_reminder:{ label: "Download everything",     href: "presence.html" },
+  win_back:         { label: "See plans",               href: "pricing.html" },
+  trial_ending:     { label: "See plans",               href: "pricing.html" },
+  trial_ended:      { label: "See plans",               href: "pricing.html" },
+  payment_trouble:  { label: "Update payment",          href: "presence.html" },
+  account_lapsed:   { label: "Update payment",          href: "presence.html" },
+  capacity:         { label: "See plans",               href: "pricing.html" },
+};
+const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "lead_followup", "capacity"];
 async function renderPlanNotice() {
   let notices = [];
   try { const r = await api("GET", "/commerce/notices"); notices = (r.data && r.data.notices) || []; }
   catch (_) { return; }
-  // Phase RL: lifecycle notices (trial/payment/lapse) ride the same calm card rail
-  const n = notices.find((x) => ["trial_ending", "trial_ended", "payment_trouble", "account_lapsed"].includes(x.kind)) || notices.find((x) => x.kind === "capacity");
+  let n = null;
+  for (const k of NOTICE_PRIORITY) { n = notices.find((x) => x.kind === k); if (n) break; }
+  if (!n) n = notices[0];
   if (!n) return;
   const host = $("welcomeWrap");
   if (!host) return;
+  const act = NOTICE_ACTION[n.kind] || { label: "See plans", href: "pricing.html" };
   const card = el("div", "deskopt");
   card.style.borderColor = "#d9cbf3";
   card.style.background = "#faf7ff";
   card.appendChild(el("div", "dol", n.headline));
   card.appendChild(el("div", "dop", n.body));
   const acts = el("div", "doa");
-  const up = el("a", "textact", "See plans");
-  up.href = "pricing.html"; up.style.textDecoration = "none";
+  const up = el("a", "textact", act.label);
+  up.href = act.href; up.style.textDecoration = "none";
   const dismiss = el("button", "quietact", "Dismiss");
   dismiss.addEventListener("click", async () => {
     try { await api("POST", "/commerce/notices/dismiss", { id: n.id }); } catch (_) {}
