@@ -264,12 +264,23 @@ async function handleNotices(jwt: string, cors: Record<string, string>) {
   return json({ data: { notices } }, 200, cors);
 }
 
-async function handleNoticeDismiss(jwt: string, cors: Record<string, string>) {
+// M2 — dismiss the ONE notice the customer clicked, not every active notice.
+// The card can surface several notices over time (capacity, trial, lapse); the
+// old dismiss-all silently cleared unseen lifecycle notices whose send-once had
+// already fired, so they never reappeared. Scope the PATCH to {id} AND the
+// caller's own client_id (svc bypasses RLS, so the ownership check is explicit).
+async function handleNoticeDismiss(req: Request, jwt: string, cors: Record<string, string>) {
   const site = await resolveSite(jwt);
   if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
-  await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&status=eq.active`, {
-    method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),
-  });
+  let body: any = null;
+  try { body = await req.json(); } catch { body = null; }
+  const id = body && typeof body.id === 'string' ? body.id.trim() : '';
+  const scope = id
+    ? `id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(site.client_id)}&status=eq.active`
+    // no id (legacy caller): fall back to dismissing this client's capacity card
+    // only — never the lifecycle notices, which must run their course.
+    : `client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.capacity&status=eq.active`;
+  await svc(`presence_plan_notices?${scope}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) });
   return json({ data: { dismissed: true } }, 200, cors);
 }
 
@@ -469,7 +480,7 @@ export async function handleCommerce(req: Request, route: string, method: string
   }
   if (route === '/commerce/notices/dismiss' && method === 'POST') {
     if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
-    return handleNoticeDismiss(jwt, cors);
+    return handleNoticeDismiss(req, jwt, cors);
   }
   return json({ error: 'not_found', message: `No commerce route for ${method} ${route}.` }, 404, cors);
 }
