@@ -6215,7 +6215,7 @@ async function msgSummarize(){
         +'<div>'+escHtml(d.summary||'')+'</div>'+un+nx;
     }
   }catch(e){ out.innerHTML='<span style="color:#9a2d2d;">Could not summarize right now.</span>'; }
-  if(btn){ btn.disabled=false; btn.textContent='✨ Summarize thread'; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='✨ Summarize thread'; } }   // finally: re-enable even on the early jwt return
 }
 
 async function loadMsgContext(client, threadData){
@@ -6648,7 +6648,10 @@ async function sendMsg() {
   if (!ctx) { toast("Select a client first."); return; }
   var text = document.getElementById("msgText").value.trim();
   if (!text) { toast("Enter a message."); return; }
-  await api("messages", "POST", {client_id:ctx.id, from_who:"eric", sender_name:"Eric", text:text});
+  // Don't clear the textarea unless the write actually landed (api returns null on
+  // failure) — the old code wiped unsent text even when the save failed.
+  var saved = await api("messages", "POST", {client_id:ctx.id, from_who:"eric", sender_name:"Eric", text:text});
+  if (!saved) { return; }   // api() already toasted the failure
   try { await api("notifications","POST",{client_id:ctx.id,type:"message",title:"New message from Eric",body:text.slice(0,90),link_tab:"messages"}); } catch(e){}
   document.getElementById("msgText").value = "";
   // Surface this message in the client's project feed AND find out whether it actually emailed
@@ -7682,7 +7685,7 @@ async function qaBuild(){
         +(ups?'<div style="margin-top:10px;"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Optional upsells</span><div style="margin-top:6px;">'+ups+'</div></div>':'');
     }
   }catch(e){ out.innerHTML='<span style="color:var(--red);font-size:12.5px;">Build failed: '+escHtml(e.message)+'</span>'; }
-  if(btn){ btn.disabled=false; btn.textContent='Build quote'; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Build quote'; } }   // finally: re-enable even on the early jwt return
 }
 function qaAddUpsell(i){
   var u=(QA.upsells||[])[i]; if(!u) return;
@@ -7712,7 +7715,7 @@ async function saveAndShareQuote(){
       out.style.color='var(--red)'; out.textContent=(j&&(j.detail||j.error))||'Save failed.';
     }
   }catch(e){ out.style.color='var(--red)'; out.textContent='Save failed: '+e.message; }
-  if(btn){ btn.disabled=false; btn.textContent='🔗 Save & get share link'; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🔗 Save & get share link'; } }   // finally: re-enable even on the early jwt return
 }
 async function loadSentQuotes(){
   var host=document.getElementById('q-sent-list'); if(!host) return;
@@ -8543,7 +8546,7 @@ async function discoverProspects(){
       out.textContent=(j&&(j.detail||j.error))||'Search failed.';
     }
   }catch(e){ out.style.color='var(--red)'; out.textContent='Search failed: '+e.message; }
-  if(btn){ btn.disabled=false; btn.textContent='Search & add'; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Search & add'; } }   // finally: re-enable even on the early jwt return
 }
 
 // ── PROSPECT INSIGHTS: likelihood + value band (anchored to real invoice
@@ -9444,12 +9447,14 @@ document.addEventListener("DOMContentLoaded", function() {
     return { client:{ name:client.name, project:client.project_name }, recent: msgs.slice(-6) };
   }
 
-  function genReply(){
+  async function genReply(){
     var steer=(document.getElementById("aiSteer")||{}).value||"";
     document.getElementById("aiThink").style.display="block";
     document.getElementById("aiGenBtn").disabled=true;
     document.getElementById("aiGenBtn").textContent="Working…";
-    fetch(EDGE_FN,{ method:"POST", headers:{"Content-Type":"application/json"},
+    var jwt = await adminJwt();   // the endpoint is authed — without this it 401s (was missing)
+    if(!jwt){ document.getElementById("aiThink").style.display="none"; aiError({message:"Please sign in again."}); return; }
+    fetch(EDGE_FN,{ method:"POST", headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY,"x-dds-user-jwt":jwt},
       body:JSON.stringify({ type:"ai_draft_reply", context:window._aiCtx, steer:steer })
     }).then(function(r){ return r.json(); }).then(function(d){
       document.getElementById("aiThink").style.display="none";
