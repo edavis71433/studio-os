@@ -11,12 +11,12 @@ Each milestone is independently shippable, gated by the full pure regression + g
 
 ## Phase 1 progress
 
-**6 of 10 implemented (60%).** Next active engineering milestone: **M7 — Snapshot retention GC.**
-**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**. (M5 and M6 have no such dependency — fully live, no migration.)
+**7 of 10 implemented (70%).** Next active engineering milestone: **M8 — Preview hardening.**
+**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**. (M5, M6, M7 have no such dependency — fully live, no migration.)
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅⏳ | ✅ | ✅ | ⏳ | ⏳ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ✅⏳ | ✅ | ✅ | ✅ | ⏳ | ⏳ | ⏳ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
@@ -26,7 +26,8 @@ Each milestone is independently shippable, gated by the full pure regression + g
 - ✅⏳ **M4 — Publish idempotency + cooldown** — **Implementation ✅ COMPLETE · Activation ⏳ PENDING** (Jul 9 2026). *Complete:* publish cooldown, publish guard, idempotency implementation, tests (guard 21/21 + tenant-isolation 11/11), regression (88/88), documentation, deployment. **Cooldown is LIVE.** *Pending activation:* idempotency is **implemented but awaiting activation** — the owner must apply migration `0073_publish_idempotency.sql` to staging + prod. Until then: cooldown active, idempotency pending migration activation.
 - ✅ **M5 — Deploy robustness** — DONE (Jul 9 2026). Committed, tested (deploy_reconcile 21/21), deployed — **fully live, no owner dependency**. Deterministic configurable poll timeout (`DEPLOY_POLL_MS`); reconcile of stuck publishes (shared `lib/deploy_reconcile.ts` — reused by GET /publishes AND folded into the default cron cycle, never re-deploys, recovers interrupted-before-deploy rows); global concurrent-deploy ceiling (`MAX_CONCURRENT_DEPLOYS`, default 8, fail-open, additive to the one-in-flight index); per-stage telemetry via structured logging (no migration, no new monitoring). 89/89 pure sweep.
 - ✅ **M6 — Media hardening** — DONE (Jul 9 2026). Committed, tested (media_hardening 40/40), deployed — **fully live, no owner dependency, NO migration**. Pure `lib/media_guard.ts` (magic-byte signature validation, safe segment-level JPEG EXIF/GPS strip, per-site quota math) wired into `createUpload` (quota, pre-URL) + `importImage` (magic-byte + EXIF); `lib/media_gc.ts` `reapMedia` (soft-deleted past 7-day retention + never-uploaded HEAD-404 orphans) folded into the default cron cycle + `task:'media_gc'`. Published/preview output stays EXIF-free + orientation-safe via the existing render transform (one pipeline, unchanged). 90/90 pure sweep.
-- ⏳ **M7–M10** — remaining, in the approved order below (M7 is next active).
+- ✅ **M7 — Snapshot retention GC** — DONE (Jul 9 2026). Committed, tested (snapshot_gc 26/26), deployed — **fully live, no owner dependency, NO migration**. Canonical retention as a **pure selector** `classifySnapshots` (keeps live · last-20 per site · publish/rollback/scheduled/launch/`prev_snapshot_id`/preview references · unclassifiable→keep) + I/O `reapSnapshots` (per-site gather, site-scoped bounded DELETE, oldest-first, converges) folded into the default cron cycle + `task:'snapshot_gc'`. FKs (launch/preview RESTRICT, publishes set-null) back the selector as defense-in-depth. 91/91 pure sweep.
+- ⏳ **M8–M10** — remaining, in the approved order below (M8 is next active).
 
 ## Execution order (dependency-sorted)
 
@@ -37,8 +38,8 @@ M3  ✅ Draft-version hash                (DONE — compute-on-read; unlocks M4/
 M4  ✅⏳ Publish idempotency + cooldown   (IMPLEMENTED — cooldown live; idempotency awaiting mig 0073)
 M5  ✅ Deploy robustness                 (DONE — poll timeout · reconcile cron · ceiling · telemetry; fully live)
 M6  ✅ Media hardening                   (DONE — magic-byte · EXIF-at-upload · quota · GC; fully live, no migration)
-M7  ⏳ Snapshot retention GC             (NEXT — data hygiene)
-M8  Preview hardening                 (cache · signed links · watermark)
+M7  ✅ Snapshot retention GC             (DONE — pure selector + bounded cron reaper; fully live, no migration)
+M8  ⏳ Preview hardening               (NEXT — cache · signed links · watermark)
 M9  Client UX safety                  (optimistic lock · shared state · what-will-change)
 M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 ```
@@ -133,16 +134,12 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M7 — Snapshot retention GC
+## M7 — Snapshot retention GC  ·  ✅ DONE (Jul 9 2026) — fully live, no owner dependency, NO migration
+> **Design:** New `lib/snapshot_gc.ts` with the CANONICAL retention decision as a **pure function** `classifySnapshots(snapshots, {liveIds, referencedIds, keepRecent})` → `{keep, deletable}` (no DB writes inside). A snapshot is KEPT if it is the live snapshot, among the most-recent N **per site** (recency floor, default 20 via `SNAPSHOT_KEEP_RECENT` — covers the working draft's safety snapshots + recent published versions), referenced by publish/rollback history (`presence_publishes.snapshot_id`), a scheduled publish, a launch (`snapshot_id` **and** `prev_snapshot_id` rollback target), or a preview share (`presence_site_preview.snapshot_id`), **or** its `created_at` is unparseable/absent (can't classify → keep). Everything else — an old, wholly-unreferenced safety snapshot — is deletable. The I/O `reapSnapshots` surfaces sites with the oldest snapshots, gathers all four reference classes + the live id **per site**, runs the pure selector over that site's full list, and DELETEs the deletable set **site-scoped** (tenant guard) in bounded chunks; per-site isolated, oldest-first, bounded per tick (≤25 sites), converges across cron ticks. Folded into the default `/system/run` cron cycle (**reuses the existing scheduler/logging — no new scheduler, no new cleanup system**) + a dedicated `task:'snapshot_gc'`. **Defense in depth:** the launch + preview FKs are RESTRICT (the DB refuses a referenced-snapshot delete even if the selector erred); `publishes.snapshot_id` is set-null; `scheduled_publishes.snapshot_id` has no FK and is protected solely by the selector. Tests: `snapshot_gc_test` 26/26 (recency floor, live-always-kept-even-if-oldest, each reference class kept, old-unreferenced collected, uncertainty→keep, **per-site tenant isolation**, determinism, config, wiring); 91/91 pure sweep; 0 type-errors; deployed staging+prod. **No schema change** (reuses the immutable snapshot model + existing FKs).
 
 🎯 Bound `presence_snapshots` jsonb growth without ever losing a restorable or referenced snapshot.
-📦 Snapshot retention garbage collection.
-📁
-- **New pure module:** `lib/snapshot_gc.ts` — `deletableSnapshots(all, {liveId, keepN:20, referencedIds})` returns only snapshots safe to delete (never the live one, never the last 20, never one referenced by a launch/schedule).
-- **`routes/system.ts`** cron: weekly task using the pure selector, deletes via `svc()`.
-- **Reads:** `presence_launches`, `presence_scheduled_publishes` for referenced ids; `presence_publishes` for the live snapshot.
-🧪 `tests/presence/snapshot_gc_test.mjs` — never deletes live/referenced/last-20; deletes the tail; deterministic selection.
-⚠️ Purely additive cron + pure selector. FK (`presence_publishes.snapshot_id`) protects against deleting a referenced snapshot even if the selector erred (belt-and-suspenders). Low risk.
+📦 Snapshot retention garbage collection — the canonical pure selector + bounded cron reaper.
+⚠️ Purely additive cron + pure selector; no fence impact (system/storage only). Realized the retention set is broader than first sketched — it also protects `prev_snapshot_id` (launch rollback targets) and `presence_site_preview` share snapshots, and there is **no persistent draft-snapshot row** (the draft lives in the working tables; `draft_writer` safety snapshots are the tail that actually accumulates, caught by the recency floor).
 
 ---
 

@@ -11,6 +11,7 @@ import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuck
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
+import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runRenewalReminders } from '../commerce/lifecycle.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
 
@@ -198,6 +199,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
       if (task === 'reconcile') return json({ data: await runReconcileStuckPublishes(limit) }, 200, cors); // M5: finalize stuck publishes
       if (task === 'media_gc') return json({ data: await reapMedia(limit ?? 100) }, 200, cors); // M6: reap soft-deleted + orphaned media
+      if (task === 'snapshot_gc') return json({ data: await reapSnapshots(limit ?? 200) }, 200, cors); // M7: prune old unreferenced snapshots
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
       if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
       // default cycle ALSO fires any due scheduled publishes, so a single cron tick covers both
@@ -211,7 +213,8 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const renewals = await runRenewalReminders(50);      // PP-2: annual renewal heads-up (30d + 7d, once per window)
       const retention = await runRetentionSweep();          // keep analytics detail tables bounded (visits 180d, search terms 13mo)
       const media_gc = await reapMedia(100);                 // M6: reap soft-deleted (past retention) + never-uploaded orphan media
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, lifecycle, digest, domains, leads, renewals, retention } }, 200, cors);
+      const snapshot_gc = await reapSnapshots(200);          // M7: prune OLD unreferenced snapshots (keep live/last-20/referenced), bounded per tick
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, digest, domains, leads, renewals, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }
