@@ -16,7 +16,7 @@ import { loadBusinessMemory } from '../concierge/grounding.ts';
 import { anthropicModel } from '../writer/model.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { loadPlan } from '../commerce/enforce.ts';
-import { raiseCapacityNoticeIfNeeded } from '../commerce/metering.ts';
+import { raiseCapacityNoticeIfNeeded, checkAiCeiling, ceilingDenial } from '../commerce/metering.ts';
 
 const OPP_SELECT = 'id,area,opportunity,why_it_matters,supporting_evidence,expected_benefit,estimated_effort,timing_starts,timing_ends,timing_phrase,suggested_next_step,manual_possible,approval_required,ai_can_draft,handoff,status,deferred_until,created_at';
 
@@ -24,6 +24,7 @@ export async function handleCoachRun(site: SiteRow, cors: Record<string, string>
   // Coach is observational — available on every plan (Monitor included). When the
   // AI tier is on, a run is a metered generative op (counts toward capacity).
   const aiOn = anthropicModel() !== null;
+  if (aiOn) { const ceil = await checkAiCeiling(site.client_id); if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); } }
   const summary = await runGrowthCoach(site, true);   // AI-1: explicit user request → model tier allowed + metered in-engine (real tokens)
   if (!summary.ok) return json({ error: 'coach_failed', message: 'The look-ahead didn’t come through — nothing was changed, because the coach never changes anything.' }, 502, cors);
   if (aiOn) {

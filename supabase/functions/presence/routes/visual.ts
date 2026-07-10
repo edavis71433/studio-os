@@ -19,6 +19,7 @@ import { ASSET_SPECS, VISUAL_KINDS, isVisualKind, VISUAL_HONESTY } from '../visu
 import { brandSnapshotFrom, planGeneration, runVariations } from '../visual/generate.ts';
 import { imageModel, visualConfigured } from '../visual/model.ts';
 import { saveVisualPlan, attachVariations, listVisualPlans, getVisualPlan, decideVisualPlan, promoteToLibrary, withPreviews } from '../visual/store.ts';
+import { checkAiCeiling, ceilingDenial, recordImageUsage } from '../commerce/metering.ts';
 
 const NOT_AVAILABLE = 'Making images isn’t switched on for your studio yet. Your own photos still work exactly as always — nothing here changes that.';
 
@@ -51,6 +52,9 @@ export async function handleVisualGenerate(req: Request, site: SiteRow, principa
   // honest gate — never fake an image
   const model = imageModel();
   if (!model) return json({ error: 'not_available', message: NOT_AVAILABLE }, 503, cors);
+  // HARD cost ceiling — enforced BEFORE the (expensive) provider call
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
 
   const brand = await loadBrand(site, cleanPalette(body?.palette));
   const plan = planGeneration({ kind, subject, brand });
@@ -63,6 +67,7 @@ export async function handleVisualGenerate(req: Request, site: SiteRow, principa
     return json({ error: run.reason || 'failed', message: run.reason === 'not_available' ? NOT_AVAILABLE : 'That didn’t come through — nothing was saved. Please try again.' }, run.reason === 'not_available' ? 503 : 502, cors);
   }
   await attachVariations(site.id, row.id, run.images, run.model, plan.width, plan.height);
+  recordImageUsage({ siteId: site.id, clientId: site.client_id, agent: 'visual' }, run.model, (run.images || []).length).catch(() => {}); // meter cost
   return json({ data: await withPreviews(await getVisualPlan(site.id, row.id)) }, 200, cors);
 }
 
@@ -83,11 +88,14 @@ async function regenerate(site: SiteRow, id: string, extraInstruction: string, c
   if (existing.status !== 'proposed') return json({ error: 'not_open', message: 'This one’s already decided — start a new image.' }, 409, cors);
   const model = imageModel();
   if (!model) return json({ error: 'not_available', message: NOT_AVAILABLE }, 503, cors);
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
   const subject = extraInstruction ? `${existing.brief}; ${extraInstruction}` : existing.brief;
   const plan = planGeneration({ kind: existing.kind, subject, brand: existing.brand_snapshot });
   const run = await runVariations(plan, model, count);
   if (!run.ok) return json({ error: run.reason || 'failed', message: run.reason === 'not_available' ? NOT_AVAILABLE : 'That didn’t come through — your earlier options are untouched.' }, run.reason === 'not_available' ? 503 : 502, cors);
   await attachVariations(site.id, id, run.images, run.model, plan.width, plan.height);
+  recordImageUsage({ siteId: site.id, clientId: site.client_id, agent: 'visual' }, run.model, (run.images || []).length).catch(() => {});
   return json({ data: await withPreviews(await getVisualPlan(site.id, id)) }, 200, cors);
 }
 

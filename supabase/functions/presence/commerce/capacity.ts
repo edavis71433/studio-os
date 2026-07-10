@@ -37,11 +37,32 @@ export type OpClass = 'generative' | 'assistive' | 'analysis';
 const AGENT_CLASS: Record<string, OpClass> = {
   writer: 'generative',     // draft-on-request — the archetypal generative op
   coach: 'generative',      // seasonal/opportunity idea generation
+  visual: 'generative',     // AI image generation (the most expensive op) — was misclassified as analysis
   editor: 'assistive',      // rework existing copy in voice
   concierge: 'assistive',   // polish an answer
   reviewer: 'analysis',     // consistency findings
   guardian: 'analysis',     // brand findings
 };
+
+// ── HARD per-tenant monthly cost ceiling (USD) — a real STOP, not a notice ───
+// Enforced BEFORE a provider call (see commerce/metering.ts checkAiCeiling). null
+// = no ceiling (Managed/Agency/Enterprise are pooled by contract). Generous —
+// a normal owner never approaches it; the soft capacity NOTICE fires far below.
+// Tunable here (the one place); env AI_CEILING_MULT scales all, AI_CEILING_DISABLED
+// kills the gate, AI_UNLIMITED_CLIENTS exempts specific clients (all in metering.ts).
+const HARD_CEILING_USD: Record<PlanKey, number | null> = {
+  presence_monitor: 3,
+  cms_only: 12,
+  business_os_only: 8,
+  presence: 12,
+  presence_managed: null,
+  agency: null,
+  enterprise: null,
+};
+/** The plan's hard monthly AI cost ceiling in USD, or null for unlimited. Pure. */
+export function hardCeilingUsd(plan: PlanKey): number | null {
+  return HARD_CEILING_USD[plan] ?? null;
+}
 
 // The "drafting workflows" that belong to Presence-and-up. Monitor cannot reach
 // these — enforced from the entitlement, never by hiding UI.

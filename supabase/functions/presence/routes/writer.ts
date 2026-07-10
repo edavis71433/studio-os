@@ -15,7 +15,7 @@ import type { WriterRequest, WriterKind } from '../writer/contract.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { loadPlan, draftingDenial } from '../commerce/enforce.ts';
-import { meterModel, raiseCapacityNoticeIfNeeded } from '../commerce/metering.ts';
+import { meterModel, raiseCapacityNoticeIfNeeded, checkAiCeiling, ceilingDenial } from '../commerce/metering.ts';
 
 const KINDS: WriterKind[] = ['identity_copy', 'faqs', 'offering_descriptions', 'post', 'testimonial_request', 'policy_doc', 'social_post', 'email_doc', 'page_copy', 'starter_site'];
 
@@ -24,6 +24,9 @@ export async function handleWriterGenerate(req: Request, site: SiteRow, cors: Re
   const plan = await loadPlan(site.client_id);
   const denied = draftingDenial(plan, cors);
   if (denied) return denied;
+  // HARD cost ceiling — enforced before the provider call (a dismissed notice can't bypass it)
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
 
   const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'writer' });
   if (!model) return json({ error: 'writer_unavailable', message: 'Drafting help isn’t switched on right now. Everything can still be written by hand — nothing about your site depends on it.' }, 503, cors);

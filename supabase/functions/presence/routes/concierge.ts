@@ -28,7 +28,7 @@ export async function handleConciergeAsk(req: Request, site: SiteRow, cors: Reco
     ...grounding.moments.map((m) => m.headline + ' ' + m.summary),
     ...grounding.evidence.map((e) => e.human),
   ].join('\n');
-  const polished = await polish(a.text, groundingText);
+  const polished = await polish(a.text, groundingText, { siteId: site.id, clientId: site.client_id, agent: 'concierge' });
 
   return json({
     data: {

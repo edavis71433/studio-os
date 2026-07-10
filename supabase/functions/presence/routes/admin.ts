@@ -445,18 +445,18 @@ async function handleScopedAccessAudit(req: Request, cors: Record<string, string
 async function handleAiUsage(req: Request, cors: Record<string, string>) {
   const url = new URL(req.url);
   const period = /^\d{4}-\d{2}$/.test(url.searchParams.get('period') || '') ? url.searchParams.get('period')! : new Date().toISOString().slice(0, 7);
-  const r = await svc(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops,input_tokens,output_tokens,last_at&order=output_tokens.desc.nullslast&limit=1000`);
+  const r = await svc(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops,input_tokens,output_tokens,images,last_at&order=output_tokens.desc.nullslast&limit=1000`);
   const rows = Array.isArray(r.json) ? r.json : [];
   const clients = rows.map((x: any) => ({
     client_id: x.client_id, generative_ops: x.generative_ops || 0, assistive_ops: x.assistive_ops || 0,
-    input_tokens: x.input_tokens || 0, output_tokens: x.output_tokens || 0, last_at: x.last_at,
-    estimated_usd: estimateUsageCostUsd([{ input_tokens: x.input_tokens, output_tokens: x.output_tokens }]).total_usd,
+    input_tokens: x.input_tokens || 0, output_tokens: x.output_tokens || 0, images: x.images || 0, last_at: x.last_at,
+    estimated_usd: estimateUsageCostUsd([{ input_tokens: x.input_tokens, output_tokens: x.output_tokens, images: x.images }]).total_usd,
   }));
-  const totals = estimateUsageCostUsd(rows.map((x: any) => ({ input_tokens: x.input_tokens, output_tokens: x.output_tokens })));
+  const totals = estimateUsageCostUsd(rows.map((x: any) => ({ input_tokens: x.input_tokens, output_tokens: x.output_tokens, images: x.images })));
   return json({ data: {
     period, client_count: clients.length,
-    totals: { generative_ops: rows.reduce((a: number, x: any) => a + (x.generative_ops || 0), 0), assistive_ops: rows.reduce((a: number, x: any) => a + (x.assistive_ops || 0), 0), input_tokens: rows.reduce((a: number, x: any) => a + (x.input_tokens || 0), 0), output_tokens: rows.reduce((a: number, x: any) => a + (x.output_tokens || 0), 0), ...totals },
-    note: 'Text-token estimate at listed model prices; verify against the provider’s pricing page. Image generation is metered separately (not in this rollup).',
+    totals: { generative_ops: rows.reduce((a: number, x: any) => a + (x.generative_ops || 0), 0), assistive_ops: rows.reduce((a: number, x: any) => a + (x.assistive_ops || 0), 0), input_tokens: rows.reduce((a: number, x: any) => a + (x.input_tokens || 0), 0), output_tokens: rows.reduce((a: number, x: any) => a + (x.output_tokens || 0), 0), images: rows.reduce((a: number, x: any) => a + (x.images || 0), 0), ...totals },
+    note: 'Text-token + image estimate at listed model prices; verify against the provider’s pricing page. Image spend (text_usd/image_usd) is now included.',
     clients,
   } }, 200, cors);
 }

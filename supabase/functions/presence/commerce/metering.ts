@@ -11,10 +11,45 @@ import { svc } from '../lib/db.ts';
 import type { ModelFn } from '../writer/model.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { PlanKey } from './catalog.ts';
-import { PLANS, planByKey } from './catalog.ts';
-import { classifyAgent, generativeAllowance, overCapacity, approachingCapacity, periodOf } from './capacity.ts';
+import { PLANS, planByKey, isPlanKey } from './catalog.ts';
+import { classifyAgent, generativeAllowance, overCapacity, approachingCapacity, periodOf, hardCeilingUsd } from './capacity.ts';
+import { estimateUsageCostUsd } from './pricing.ts';
 
 export interface MeterCtx { siteId: string | null; clientId: string; agent: string; }
+
+// ── HARD cost ceiling — enforced BEFORE a provider call ──────────────────────
+export interface CeilingResult { allowed: boolean; reason?: string; ceiling_usd?: number; spent_usd?: number; plan?: PlanKey; }
+/** Is this tenant allowed to make another (paid) AI call this period? Reads the
+ *  authoritative usage cost + the plan's hard ceiling. Founder / null-ceiling
+ *  plans / operator env overrides bypass. Safe across instances: each op atomically
+ *  increments the ledger, so sustained calls converge on the ceiling (at most a
+ *  small concurrent overshoot). A dismissed NOTICE cannot bypass this. */
+export async function checkAiCeiling(clientId: string, now: Date = new Date()): Promise<CeilingResult> {
+  try {
+    if ((Deno.env.get('AI_CEILING_DISABLED') || '').toLowerCase() === 'true') return { allowed: true };
+    const overrides = (Deno.env.get('AI_UNLIMITED_CLIENTS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (overrides.includes(clientId)) return { allowed: true };
+    const ent = (await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(clientId)}&product=eq.presence&select=plan,founder&limit=1`)).json?.[0] || {};
+    if (ent.founder === true) return { allowed: true };                       // founder override (auditable on the entitlement)
+    const plan: PlanKey = isPlanKey(ent.plan) ? ent.plan : 'presence';
+    let ceiling = hardCeilingUsd(plan);
+    if (ceiling == null) return { allowed: true, plan };                       // pooled-by-contract plans have no ceiling
+    const mult = Number(Deno.env.get('AI_CEILING_MULT')) || 1;
+    ceiling = ceiling * (mult > 0 ? mult : 1);
+    const row = (await svc(`presence_ai_usage?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${periodOf(now)}&select=input_tokens,output_tokens,images&limit=1`)).json?.[0] || {};
+    const spent = estimateUsageCostUsd([{ input_tokens: row.input_tokens, output_tokens: row.output_tokens, images: row.images }]).total_usd;
+    if (spent >= ceiling) { console.warn(`[ai-ceiling] BLOCK client=${clientId} plan=${plan} spent=$${spent} ceiling=$${ceiling}`); return { allowed: false, reason: 'ai_cost_ceiling', ceiling_usd: ceiling, spent_usd: spent, plan }; }
+    return { allowed: true, ceiling_usd: ceiling, spent_usd: spent, plan };
+  } catch (e) {
+    console.error(`[ai-ceiling] check failed for ${clientId}: ${String(e)} — failing OPEN (never wrongly block a paying customer)`);
+    return { allowed: true };                                                 // a lookup hiccup must never block a paying customer
+  }
+}
+
+/** The friendly 429 body when the hard ceiling is reached. */
+export function ceilingDenial(cors: Record<string, string>) {
+  return { body: { error: 'ai_cost_ceiling', upgrade: true, message: 'You’ve used all of this month’s AI generation on your current plan. It resets next month — or upgrade for more room. Everything you’ve already made is safe, and the manual tools always work.' }, status: 429, cors };
+}
 
 // Record one metered AI operation (upsert rollup + append event) via the atomic
 // SECURITY DEFINER function. Never throws.
@@ -26,11 +61,23 @@ export async function recordUsage(ctx: MeterCtx, model: string | null, inTok: nu
       body: JSON.stringify({
         p_client_id: ctx.clientId, p_site_id: ctx.siteId, p_period: periodOf(now),
         p_agent: ctx.agent, p_kind: kind, p_model: model,
-        p_input_tokens: inTok, p_output_tokens: outTok,
+        p_input_tokens: inTok, p_output_tokens: outTok, p_images: 0,
       }),
     });
   } catch (e) {
     console.error(`[metering] failed to record ${ctx.agent} usage for ${ctx.clientId}: ${String(e)} (non-fatal)`);
+  }
+}
+
+/** Record IMAGE generation (the cost-bearing Visual Studio op). One generative op
+ *  that produced `images` images; both are metered so cost reporting is non-zero. */
+export async function recordImageUsage(ctx: MeterCtx, model: string | null, images: number, now: Date = new Date()): Promise<void> {
+  if (!images || images < 1) return;
+  try {
+    await svc('rpc/presence_ai_meter', { method: 'POST',
+      body: JSON.stringify({ p_client_id: ctx.clientId, p_site_id: ctx.siteId, p_period: periodOf(now), p_agent: ctx.agent, p_kind: 'generative', p_model: model, p_input_tokens: 0, p_output_tokens: 0, p_images: Math.trunc(images) }) });
+  } catch (e) {
+    console.error(`[metering] failed to record image usage for ${ctx.clientId}: ${String(e)} (non-fatal)`);
   }
 }
 

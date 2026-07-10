@@ -9,6 +9,7 @@
 // AI toggle exists (Law 24). (2) verifyPolish — any invention → fall back to
 // the deterministic answer. polish() never throws and never blocks.
 import { verifyPolish } from './verify.ts';
+import { recordUsage, type MeterCtx } from '../commerce/metering.ts';
 
 const POLISH_SYSTEM = `You edit a short note from a business concierge to a small-business owner.
 Rules, absolute:
@@ -18,16 +19,17 @@ Rules, absolute:
 - Calm, warm, plain merchant language. No exclamation marks. Never mention AI, assistants, or specialists.
 Return only the reworded note.`;
 
-export async function polish(text: string, groundingText: string): Promise<{ text: string; polished: boolean }> {
+export async function polish(text: string, groundingText: string, meter?: MeterCtx): Promise<{ text: string; polished: boolean }> {
   if ((Deno.env.get('CONCIERGE_POLISH') || '').toLowerCase() !== 'on') return { text, polished: false };
   const key = Deno.env.get('ANTHROPIC_KEY') || '';
   if (!key) return { text, polished: false };
+  const MODEL = 'claude-haiku-4-5-20251001';
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+        model: MODEL, max_tokens: 400,
         system: POLISH_SYSTEM,
         messages: [{ role: 'user', content: `<<<NOTE\n${text.slice(0, 2000)}\nNOTE>>>` }],
       }),
@@ -35,6 +37,8 @@ export async function polish(text: string, groundingText: string): Promise<{ tex
     });
     const j = await res.json();
     if (j?.error) return { text, polished: false };
+    // meter the spend (F3: concierge was invisible). Fire-and-forget, never blocks.
+    if (meter && j?.usage) recordUsage(meter, MODEL, j.usage.input_tokens ?? null, j.usage.output_tokens ?? null).catch(() => {});
     const out = Array.isArray(j?.content) ? j.content.filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('\n').trim() : '';
     const v = verifyPolish(text, out, groundingText);
     if (!v.ok) return { text, polished: false };   // invention detected → deterministic answer stands
