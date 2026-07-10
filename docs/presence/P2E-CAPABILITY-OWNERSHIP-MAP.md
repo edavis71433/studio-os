@@ -62,3 +62,30 @@ The billing **architecture is sound and reuse-first-ready.** ONE signature-verif
 6. Retire the legacy clever-api one-time commerce after parity (P2-G-adjacent).
 
 None of this reopens P2-D. Owner launch items (prod migrations, Stripe test-event/test-mode checks, fenced billing pages, push at fence-lift) stay tracked, not re-listed here.
+
+---
+
+## P2-E RESOLUTION — every verified finding closed (2026-07-10)
+
+All findings above are implemented, tested (structural + pure + live where creds allow), and committed in reviewable increments. Full presence suite: 134 pure/structural suites green; 6 live-integration suites skip cleanly without SB creds. The 31-step `lifecycle_validation_test` (the completion gate) is green.
+
+| Finding | Status | Where | Test |
+|---|---|---|---|
+| **H1** Visual/concierge unmetered | ✅ FIXED (W1) | `metering.recordImageUsage`, `visual.ts`, `polish.ts`, mig `0081` (`images` col + 9-arg RPC) | `ai_metering_routes_test` 16/16 · `ai_ceiling_e2e` 6/6 live |
+| **H2** No hard AI cost ceiling | ✅ FIXED (W1) | `metering.checkAiCeiling` + `ceilingDenial`, gated in `writer`/`coach`/`visual` before the model call | `ai_cost_test` 8/8 |
+| **H3** Deletion has no executor | ✅ FIXED (W2) | `commerce/deletion.ts` (request→cooling-off→`runDeletionSweep`), mig `0082`, cron-wired | `deletion_routes_test` 17/17 · `deletion_e2e` 9/9 live |
+| **H4** Lapsed sites never taken down | ✅ FIXED (W3) | `lifecycle` wind-down branch (≥`WIND_DOWN_DAYS` → hosting down + archived, export preserved) | `entitlement_winddown_test` 12/12 |
+| **M1** Non-atomic webhook idempotency | ✅ FIXED (W4) | claim-first `claimEvent` (ignore-duplicates), status `processing`/`done`/`failed`, mig `0083` | `webhook_idempotency_test` 14/14 |
+| **M2** Dismiss-one dismisses ALL | ✅ FIXED (W5) | `handleNoticeDismiss({id})` scoped to id+client_id; `presence.html` sends `n.id` | `notice_dismiss_test` 6/6 |
+| **M3** Lapsed fully denied vs "read-only" | ✅ FIXED (W3) | `entitlement.ts` lapsed → `readonly` (view+export; billing routes bypass the gate to recover) | `entitlement_winddown_test` |
+| **M4** Terms acceptance never recorded | ✅ FIXED (W6) | `commerce/terms.ts` + mig `0084` (append-only evidence: version+when+ip+ua), in `/export` | `terms_acceptance_test` 11/11 |
+| **M5** billing-sync failures lose the reason | ✅ FIXED (W7) | `[billing-sync]` structured logs (provision fail / no-client / success) | `billing_reconcile_test` 11/11 |
+| **L1** No Stripe customer reuse | ✅ FIXED (W8) | `createSubscriptionCheckout` reuses `findCustomerIdByEmail` (`customer=` vs `customer_email`) | `stripe_customer_reuse_test` 5/5 |
+| **L2** `nosignup` idempotency-key collision | ✅ FIXED (W8) | checkout idempotency key now includes the unique `clientId` | `stripe_customer_reuse_test` |
+| **L3** No `event.livemode` guard | ✅ FIXED (W4) | webhook livemode guard (key-prefix / `STRIPE_EXPECT_LIVEMODE`), cross-mode event ignored 200 | `webhook_idempotency_test` |
+| **L4** Grace never enforced + date truncation | ✅ FIXED (W9) | grace clock ANCHORED to first past-due in `applyEntitlementPatch`; enforced in the sweep (`grace_lapsed`). *Truncation: `grace_until` is `date` by design — day granularity is correct for a 14-day window; benign, not a defect.* | `grace_clock_test` 7/7 |
+| **L5** Welcome-back not send-once; account_lapsed monthly forever | ✅ FIXED (W10) | welcome-back email rides the fresh-notice insert; `account_lapsed`/`win_back`/`winddown_reminder` bounded to the wind-down window | `email_send_once_test` 5/5 · `lifecycle_test` 25/25 |
+| **Billing surfaces** (authoritative, SaaS≠service) | ✅ DONE (W11) | `/commerce/subscription` (billing_type saas + calm AI position), NEW `/client/billing` (service, amounts+pay link), studio project view shows customer SaaS status, `client.html` billing section | `billing_surfaces_test` 14/14 |
+| **W7 reconciliation** (new, from the audit) | ✅ ADDED | `runBillingReconcile` self-heals missed webhooks vs Stripe truth; single entitlement writer `entitlement_sync.ts` | `billing_reconcile_test` |
+
+**Completion gate:** `lifecycle_validation_test` 31/31 — the product now enforces the lifecycle it tells customers it will. Migrations `0081–0084` are additive and remain **owner launch-time apply** (staging applied where testable; prod at launch). No P2-E item is deferred as future cleanup.
