@@ -12,18 +12,18 @@ Each milestone is independently shippable, gated by the full pure regression + g
 ## Phase 1 progress
 
 **7 of 10 implemented (70%).** Next active engineering milestone: **M8 — Preview hardening.**
-**⚠️ M4 has one outstanding OWNER activation dependency** — its idempotency half is *implemented but awaiting activation* (apply migration `0073`); the **cooldown is live**. (M5, M6, M7 have no such dependency — fully live, no migration.)
+**✅ M4 is now FULLY LIVE** — migration `0073` applied to staging + prod (Jul 9 2026; column + index + check verified in both). Idempotency and cooldown both active. **No outstanding owner activation dependency remains in Phase 1.**
 
 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 |
 |:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ | ✅⏳ | ✅ | ✅ | ✅ | ⏳ | ⏳ | ⏳ |
+| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⏳ | ⏳ | ⏳ |
 
 *(✅⏳ = implementation complete, one owner activation step outstanding.)*
 
 - ✅ **M1 — CI + golden safety net** — DONE (Jul 9 2026). Committed, tested, verified; CI runner + hostile-string golden across all 3 templates; one-in-flight index verified.
 - ✅ **M2 — Security audits** — DONE (Jul 9 2026). Committed, tested, verified, deployed. `svc()` tenant/site-scope audit, global-sentinel audit, request-id review, 3 defense-in-depth `site_id` hardenings, tenant-isolation regression tests (9/9), audit record ([PHASE1-SECURITY-AUDIT.md]).
 - ✅ **M3 — Draft-version hash** — DONE (Jul 9 2026). Committed, tested (10/10), deployed. Pure `lib/draft_hash.ts` reuses the ONE serializer; compute-on-read, no migration, no publish change; `draft_hash` on `/site`.
-- ✅⏳ **M4 — Publish idempotency + cooldown** — **Implementation ✅ COMPLETE · Activation ⏳ PENDING** (Jul 9 2026). *Complete:* publish cooldown, publish guard, idempotency implementation, tests (guard 21/21 + tenant-isolation 11/11), regression (88/88), documentation, deployment. **Cooldown is LIVE.** *Pending activation:* idempotency is **implemented but awaiting activation** — the owner must apply migration `0073_publish_idempotency.sql` to staging + prod. Until then: cooldown active, idempotency pending migration activation.
+- ✅ **M4 — Publish idempotency + cooldown** — **FULLY LIVE** (Jul 9 2026). Publish cooldown, publish guard, idempotency, tests (guard 21/21 + tenant-isolation 11/11), regression (88/88), documentation, deployment. Migration `0073_publish_idempotency.sql` **applied to staging + prod** (column + index + check verified in both) — idempotency and cooldown both active. No outstanding owner step.
 - ✅ **M5 — Deploy robustness** — DONE (Jul 9 2026). Committed, tested (deploy_reconcile 21/21), deployed — **fully live, no owner dependency**. Deterministic configurable poll timeout (`DEPLOY_POLL_MS`); reconcile of stuck publishes (shared `lib/deploy_reconcile.ts` — reused by GET /publishes AND folded into the default cron cycle, never re-deploys, recovers interrupted-before-deploy rows); global concurrent-deploy ceiling (`MAX_CONCURRENT_DEPLOYS`, default 8, fail-open, additive to the one-in-flight index); per-stage telemetry via structured logging (no migration, no new monitoring). 89/89 pure sweep.
 - ✅ **M6 — Media hardening** — DONE (Jul 9 2026). Committed, tested (media_hardening 40/40), deployed — **fully live, no owner dependency, NO migration**. Pure `lib/media_guard.ts` (magic-byte signature validation, safe segment-level JPEG EXIF/GPS strip, per-site quota math) wired into `createUpload` (quota, pre-URL) + `importImage` (magic-byte + EXIF); `lib/media_gc.ts` `reapMedia` (soft-deleted past 7-day retention + never-uploaded HEAD-404 orphans) folded into the default cron cycle + `task:'media_gc'`. Published/preview output stays EXIF-free + orientation-safe via the existing render transform (one pipeline, unchanged). 90/90 pure sweep.
 - ✅ **M7 — Snapshot retention GC** — DONE (Jul 9 2026). Committed, tested (snapshot_gc 26/26), deployed — **fully live, no owner dependency, NO migration**. Canonical retention as a **pure selector** `classifySnapshots` (keeps live · last-20 per site · publish/rollback/scheduled/launch/`prev_snapshot_id`/preview references · unclassifiable→keep) + I/O `reapSnapshots` (per-site gather, site-scoped bounded DELETE, oldest-first, converges) folded into the default cron cycle + `task:'snapshot_gc'`. FKs (launch/preview RESTRICT, publishes set-null) back the selector as defense-in-depth. 91/91 pure sweep.
@@ -35,7 +35,7 @@ Each milestone is independently shippable, gated by the full pure regression + g
 M1  ✅ CI + golden safety net          (DONE — no runtime change; SAFEST FIRST)
 M2  ✅ Security audits                  (DONE — tenant-isolation audit + hardening)
 M3  ✅ Draft-version hash                (DONE — compute-on-read; unlocks M4/M8/M9)
-M4  ✅⏳ Publish idempotency + cooldown   (IMPLEMENTED — cooldown live; idempotency awaiting mig 0073)
+M4  ✅ Publish idempotency + cooldown    (FULLY LIVE — mig 0073 applied both envs; idempotency + cooldown active)
 M5  ✅ Deploy robustness                 (DONE — poll timeout · reconcile cron · ceiling · telemetry; fully live)
 M6  ✅ Media hardening                   (DONE — magic-byte · EXIF-at-upload · quota · GC; fully live, no migration)
 M7  ✅ Snapshot retention GC             (DONE — pure selector + bounded cron reaper; fully live, no migration)
@@ -92,9 +92,9 @@ M10 Ops: load test + DR drill         (tunes M5 ceiling; owner-involved)
 
 ---
 
-## M4 — Publish idempotency + cooldown  ·  ✅ Implemented · ⏳ Activation pending (migration 0073)
+## M4 — Publish idempotency + cooldown  ·  ✅ FULLY LIVE (migration 0073 applied both envs, Jul 9 2026)
 > **Design:** the client `/publish` path (only) gained, in precedence order: (a) idempotent **replay** — same `Idempotency-Key` on the same site returns the existing publish (no 2nd snapshot/deploy); (b) **in-flight** fast-path 409 (more accurate than cooldown, keeps one-in-flight semantics — the race-safe partial unique index in `runPipeline` stays the ultimate gate); (c) **60s per-site cooldown** (429 + `Retry-After`) using the authoritative persisted `last_published_at` (multi-instance safe). Pure logic in `lib/publish_guard.ts` (`parseIdempotencyKey`/`cooldownRemainingMs`/`replayData`). `runPipeline` gained an OPTIONAL key param; **all other callers (restore/launch/scheduler/preview-promote) pass none → unchanged**, and internal admin/agency publish pass `req=null` → not cooldown-gated (requirement #11). Backward-compatible: no key = works + cooldown applies; a well-formed key resolves per-site so **cross-tenant reuse is isolated** by the `(site_id, key)` index. `pipeline_test` §4 (planted in-flight → 409) is preserved *because* the in-flight check precedes cooldown. Tests: publish_guard 21/21 + tenant_isolation 11/11 (incl. M4 site-scope of the key lookups); 88/88 pure sweep; 3 functions 0 type-errors; **deployed staging+prod — cooldown live now**.
-> **⚠️ OWNER activation (idempotency half): apply migration `0073_publish_idempotency.sql`** (adds `idempotency_key text` + a length CHECK + the partial unique index `(site_id, idempotency_key) WHERE idempotency_key IS NOT NULL`) to BOTH projects — paste the SQL in the Supabase SQL editor, or `link` + `db push`. I lack DB credentials in this environment, so I could not apply it. The deploy is **safe without it**: no client sends the header, the cooldown needs no column, and a stray header degrades to a calm 502 (fail-safe). Idempotency activates the moment 0073 is applied.
+> **✅ OWNER activation DONE (Jul 9 2026):** migration `0073_publish_idempotency.sql` (adds `idempotency_key text` + a length CHECK + the partial unique index `(site_id, idempotency_key) WHERE idempotency_key IS NOT NULL`) **applied to both staging and prod via the Supabase SQL editor; column + index + check verified present in both.** Idempotency is now active alongside the already-live cooldown. No remaining owner step for M4.
 
 
 🎯 Make publish safe under double-clicks, retries, and rapid re-publishing — without a queue.

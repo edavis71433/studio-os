@@ -3,7 +3,7 @@
 **One authoritative roadmap** combining engineering, product, and launch work in realistic sequence. Detailed phase history lives in `ROADMAP-MASTER.md`; this is the forward plan.
 **Updated:** 2026-07-09. Items tagged **⟐** were folded in from the Jul 9 roadmap-review refinements.
 
-**Current active milestone:** **Phase 1 · M8 — Preview hardening.** (M7 snapshot retention GC ✅ done Jul 9 — fully live, no migration. M6 ✅ · M5 ✅ — fully live. M4 ✅ — cooldown live; idempotency pending owner migration 0073.) Everything above it is complete; everything below is queued in execution order.
+**Current active milestone:** **Phase 1 · M8 — Preview hardening.** (M7 snapshot retention GC ✅ done Jul 9 — fully live, no migration. M6 ✅ · M5 ✅ — fully live. M4 ✅ — **FULLY LIVE**; migration 0073 applied to both envs Jul 9.) Everything above it is complete; everything below is queued in execution order.
 
 ---
 
@@ -25,7 +25,7 @@ Scale-safety on the existing deterministic engine. Order fixed; see `PRESENCE-CM
 - ✅ **M1** — CI & golden safety net
 - ✅ **M2** — Security hardening (tenant isolation)
 - ✅ **M3** — Draft-version hash
-- ✅⏳ **M4** — Publish reliability (idempotency + cooldown) — *implementation complete; cooldown LIVE; idempotency implemented but awaiting owner migration 0073 activation*
+- ✅ **M4** — Publish reliability (idempotency + cooldown) — *FULLY LIVE; migration 0073 applied to both envs Jul 9; idempotency + cooldown both active*
 - ✅ **M5** — Deploy robustness (timeout · reconcile cron · ceiling · telemetry) *(fully live)*
 - ✅ **M6** — Media hardening (magic-byte · EXIF · quota · GC) *(fully live, no migration)*
 - ✅ **M7** — Snapshot management (retention · GC) *(fully live, no migration)*
@@ -66,7 +66,7 @@ Final pricing · founder pricing · support tiers · AI usage limits · entitlem
 - **⟐ Ops alerting** — monitoring you have to go look at ≠ being told. Wire `OPS_ALERT_EMAIL` (already in the env inventory) to real failures: publish failed, webhook failed, function error.
 - **⟐ Dependency notes:** PITR (owner) must precede the DR drill; the Stripe **webhook test-event** must pass before the test-subscription/test-invoice runs.
 
-**Owner:** **apply migration `0073_publish_idempotency.sql`** (activates M4 publish idempotency — cooldown already live) · Stripe webhook test event · publish audit pages · test subscription signup · test invoice payment · PITR enablement · Cookie/DPA review · Google OAuth consent · push local commits after fence lift.
+**Owner:** ~~apply migration `0073_publish_idempotency.sql`~~ ✅ **DONE (Jul 9 2026 — applied to both envs; M4 fully live)** · Stripe webhook test event · publish audit pages · test subscription signup · test invoice payment · PITR enablement · Cookie/DPA review · Google OAuth consent · push local commits after fence lift.
 
 ---
 
