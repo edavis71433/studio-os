@@ -28,10 +28,13 @@ Set the staging creds, then run **one command**:
 ```bash
 export SALES_E2E_TARGET="https://wjlpursnwbmlcdwbeowv.functions.supabase.co/presence"
 export SALES_E2E_ANON="<staging anon key>"
-export SALES_E2E_JWT="<operator-A session JWT>"          # a workspace with the relationship edition
-export SALES_E2E_SITE="<operator-A site uuid (x-dds-scope-site), or blank for own site>"
+export SALES_E2E_JWT="<operator-A session JWT>"          # a workspace with the relationship edition (e.g. Business OS)
+export SALES_E2E_SITE=""                                  # ⚠️ LEAVE BLANK for a solo owner — resolveSite(jwt) finds their own site.
 export SALES_E2E_JWT2="<operator-B session JWT>"          # a DIFFERENT workspace (for step 3)
-export SALES_E2E_SITE2="<operator-B site uuid>"
+export SALES_E2E_SITE2=""                                 # ⚠️ blank (see below)
+# ⚠️ x-dds-scope-site (SALES_E2E_SITE) is the AGENCY-operator drill-in header. Set it ONLY when
+#    the JWT belongs to an agency member scoping INTO a managed client's site. For a plain solo
+#    owner, sending their OWN site id here triggers resolveScopedSite → agency check → DENIED.
 
 deno run --allow-read --allow-env --allow-run --allow-net scripts/validate-p2c1.mjs
 ```
