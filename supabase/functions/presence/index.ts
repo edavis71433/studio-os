@@ -27,7 +27,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesPublicView } from './routes/sales.ts';
-import { handleProjects, handleProject, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
+import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
@@ -431,6 +431,8 @@ serve(async (req) => {
   {
     let m = route.match(/^\/projects\/([0-9a-f-]{36})$/);
     if (m) return handleProject(req, jwt, site, principal, m[1], cors);
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/report$/);
+    if (m && method === 'GET') return handleProjectReport(req, jwt, site, principal, m[1], cors);
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/status$/);
     if (m && method === 'POST') return handleProjectStatus(req, jwt, site, principal, m[1], cors);
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/tasks$/);

@@ -10,7 +10,7 @@ import { resolveSiteRole } from '../lib/workspace.ts';
 import {
   isProjectStatus, canProjectTransition, isTaskStatus, canTaskTransition, isTaskPriority,
   deriveTaskState, compareOrder, nextSortOrder, forViewer, clampLimit, clampOffset, progressOf,
-  type ProjectStatus, type TaskStatus,
+  reportSummary, type ProjectStatus, type TaskStatus,
 } from '../lib/service_delivery.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -153,6 +153,30 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
     return json({ data: rows(up)[0] }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+/** A calm client report composed from authoritative rows (no report store). The
+ *  client sees counts of only what's client-visible; the studio sees everything. */
+export async function handleProjectReport(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  const project = await loadProject(site.id, id);
+  if (!project || (!studio && !project.client_visible)) return json({ error: 'not_found' }, 404, cors);
+  const [ts, ms, dl, ap, ev] = await Promise.all([
+    svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=status,client_visible,client_action_required,due_date&limit=1000`),
+    svc(`presence_milestones?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=status,client_visible`),
+    svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=status,client_visible`),
+    svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=status,client_visible`),
+    svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${site.id}&select=created_at,client_visible&order=created_at.desc&limit=1`),
+  ]);
+  // the client's report reflects only what they can see
+  const tasks = forViewer(rows(ts), studio);
+  const milestones = forViewer(rows(ms), studio);
+  const deliverables = (studio ? rows(dl) : rows(dl).filter((d) => d.client_visible === true));
+  const approvals = forViewer(rows(ap), studio);
+  const lastEv = (studio ? rows(ev) : rows(ev).filter((e) => e.client_visible === true))[0];
+  const summary = reportSummary({ tasks, milestones, deliverables, approvals, lastActivityAt: lastEv?.created_at || null }, nowIso());
+  return json({ data: { project: { id: project.id, name: project.name, status: project.status, start_date: project.start_date, target_date: project.target_date }, summary, generated_at: nowIso(), is_studio_view: studio } }, 200, cors);
 }
 
 export async function handleProjectStatus(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {

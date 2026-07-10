@@ -76,6 +76,10 @@ export function buildNav(c: NavContext): NavSection[] {
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }
 
+  // Projects — the service-delivery area (P2-D): the work you do FOR customers.
+  // A first-class outcome; its tasks/files/messages/approvals live on the project.
+  if (f.hasRelationship) single('projects', 'Projects', '/projects.html');
+
   // Files — the business library (internally: the DAM). Photos, brand, documents,
   //  downloads — plus AI-generated assets via Visual Studio.
   if (f.hasWebsite) {

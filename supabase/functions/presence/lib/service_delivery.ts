@@ -109,3 +109,31 @@ export function progressOf(tasks: TaskCount[]): { total: number; done: number; p
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return { total, done, pct };
 }
+
+// ── client report (pure composition over AUTHORITATIVE rows — no report store) ──
+export interface ReportInputs {
+  tasks: Array<{ status: TaskStatus; client_action_required?: boolean | null; due_date?: string | null }>;
+  milestones: Array<{ status: 'open' | 'complete' }>;
+  deliverables: Array<{ status?: string | null }>;
+  approvals: Array<{ status?: string | null }>;
+  lastActivityAt?: string | null;
+}
+/** A calm, explainable client summary composed from authoritative rows. Every
+ *  number is a direct count of real data — no vanity metrics, no separate store. */
+export function reportSummary(inp: ReportInputs, nowIso: string): {
+  progress: { total: number; done: number; pct: number };
+  milestones: { total: number; complete: number };
+  open_client_actions: number;
+  overdue_tasks: number;
+  pending_approvals: number;
+  shared_files: number;
+  last_activity_at: string | null;
+} {
+  const progress = progressOf(inp.tasks);
+  const milestones = { total: inp.milestones.length, complete: inp.milestones.filter((m) => m.status === 'complete').length };
+  const open_client_actions = inp.tasks.filter((t) => t.client_action_required === true && t.status !== 'done').length;
+  const overdue_tasks = inp.tasks.filter((t) => deriveTaskState(t, nowIso).overdue).length;
+  const pending_approvals = inp.approvals.filter((a) => a.status === 'pending').length;
+  const shared_files = inp.deliverables.filter((d) => d.status === 'shared').length;
+  return { progress, milestones, open_client_actions, overdue_tasks, pending_approvals, shared_files, last_activity_at: inp.lastActivityAt ?? null };
+}

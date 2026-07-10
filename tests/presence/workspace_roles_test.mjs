@@ -90,7 +90,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // Architecture v1.0 (frozen refinements): Analytics is first-class; utilities overflow.
   ok('nav: Analytics is a first-class outcome (not a utility)', owner.some(s=>s.key==='analytics' && !s.utility && s.items[0].href==='/analytics.html'));
   ok('nav: utilities (Connections/Settings/Help) live in the overflow (utility:true)', ['connections','settings','help'].every(k=>{const s=owner.find(x=>x.key===k);return !!s && s.utility===true;}));
-  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','files','analytics','inbox','studio'].includes(s.key)));
+  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','projects','files','analytics','inbox','studio'].includes(s.key)));
 
   const reviewer = buildNav(ctx({ role:'client_reviewer', capabilities: caps('client_reviewer') }));
   ok('nav: reviewer gets ONE calm surface', reviewer.length===1 && reviewer[0].items[0].href==='/client.html');

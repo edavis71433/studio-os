@@ -31,6 +31,7 @@ export function reviewerAllowed(route: string, method: string): boolean {
   if (method === 'GET' && (route === '/portal/context' || route === '/portal/feed')) return true;
   if (method === 'GET' && route === '/projects') return true;                                   // P2-D: client sees its visible projects
   if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}$/.test(route)) return true;               // P2-D: a client-visible project's status (handler filters visibility)
+  if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}\/report$/.test(route)) return true;        // P2-D-5: the client's calm project report
   if (method === 'GET' && /^\/projects\/[0-9a-f-]{36}\/deliverables\/[0-9a-f-]{36}\/download$/.test(route)) return true; // P2-D-2: download a shared deliverable
   if (method === 'POST' && /^\/approvals\/[0-9a-f-]{36}\/decide$/.test(route)) return true;      // P2-D-2: the client decides an approval put to them
   if ((method === 'GET' || method === 'POST') && /^\/projects\/[0-9a-f-]{36}\/messages$/.test(route)) return true; // P2-D-3: client reads + replies to the shared thread

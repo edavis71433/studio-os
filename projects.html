@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Projects — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Your customer projects — tasks, milestones, files, messages, and approvals in one place.">
+<!-- P2-D: Service Delivery on the ONE shared shell. Studio manages; a client sees only what's shared. -->
+<link rel="stylesheet" href="/shell.css">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f4ecdd;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d8b878;--warn-soft:#2a2338}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
+  .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
+  h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:4px}
+  .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.sm{font-size:12.5px;padding:6px 10px}
+  .btn:disabled{opacity:.5;pointer-events:none}
+  .spacer{flex:1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .card:hover{border-color:var(--p)}
+  .card .t{font-weight:600}
+  .card .m{color:var(--soft);font-size:13px;margin-top:2px}
+  .pill{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .pill.complete{background:var(--good-soft);color:var(--good)}
+  .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
+  .prog{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px}
+  .prog>i{display:block;height:100%;background:var(--p)}
+  dialog{border:none;border-radius:16px;padding:0;max-width:640px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
+  .dbody{padding:18px 20px;max-height:70vh;overflow:auto}
+  .sec{margin-top:18px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:none}
+  .item .t{font-size:14px}
+  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px}
+  .tag.client{background:var(--p-soft);color:var(--p)}
+  .tag.action{background:var(--warn-soft);color:var(--warn)}
+  .tag.overdue{background:#f6dede;color:#9a3b3b}
+  .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  .steps{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}
+  .stat{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+  .stat b{font-variant-numeric:tabular-nums;font-size:20px;font-family:var(--serif);font-weight:500}
+  .stat span{display:block;font-size:12px;color:var(--soft)}
+  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+  input,textarea,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+  textarea{min-height:70px;resize:vertical}
+  label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
+  .chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.chk input{width:auto}
+  .mut{color:var(--soft);font-size:13px}
+  a{color:var(--p)}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Projects</h1>
+  <div class="sub" id="sub">The work you do for your customers — tasks, files, and approvals in one place.</div>
+  <div class="bar" id="filters" role="tablist" aria-label="Filter by status"></div>
+  <div class="bar"><button class="btn" id="newProject" hidden>+ New project</button><span class="spacer"></span></div>
+  <div id="list" aria-live="polite"></div>
+</div>
+
+<dialog id="newDlg" aria-label="New project">
+  <form id="newForm" class="dbody" style="max-height:none">
+    <div style="font-family:var(--serif);font-size:20px;margin-bottom:12px">New project</div>
+    <label for="np-name">Project name</label>
+    <input id="np-name" required maxlength="200" placeholder="e.g. Acme website build" autocomplete="off">
+    <label for="np-desc" style="margin-top:10px">Description <span class="mut">(optional)</span></label>
+    <textarea id="np-desc" maxlength="5000" placeholder="What's the scope?"></textarea>
+    <label for="np-target" style="margin-top:10px">Target date <span class="mut">(optional)</span></label>
+    <input id="np-target" type="date">
+    <div class="row2" style="justify-content:flex-end;margin-top:14px">
+      <button type="button" class="btn ghost" id="np-cancel">Cancel</button>
+      <button type="submit" class="btn">Create project</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="detail" aria-label="Project detail"><div id="detailInner"></div></dialog>
+
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+// valid next stages mirror lib/service_delivery.ts (project + task ladders)
+const P_NEXT={active:['on_hold','complete','archived'],on_hold:['active','complete','archived'],complete:['active','archived'],archived:['active']};
+const T_NEXT={todo:['in_progress','blocked','done'],in_progress:['todo','blocked','done'],blocked:['todo','in_progress'],done:['todo','in_progress']};
+const STATUSES=['active','on_hold','complete','archived'];
+let TOKEN="",FILTER="",STUDIO=true;
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+
+async function api(path,method,body){
+  const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
+  let b={}; try{b=await r.json();}catch(_){}
+  if(!r.ok){const e=new Error((b&&b.message)||'That didn’t go through.');e.status=r.status;e.body=b;throw e;}
+  return b;
+}
+
+function renderFilters(){
+  const opts=[['','All'],...STATUSES.map(s=>[s,s[0].toUpperCase()+s.slice(1).replace('_',' ')])];
+  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
+  $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.status;renderFilters();load();});
+}
+
+async function load(){
+  if(window.ddsSkeleton) window.ddsSkeleton($('list'),4);
+  try{
+    const res=await api('/projects'+(FILTER?('?status='+FILTER):''));
+    STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO;
+    const items=res.data||[];
+    if(!items.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:'No projects yet',body:STUDIO?'Create a project to start managing a customer’s work — tasks, files, and approvals live here.':'Your projects will appear here.',actionLabel:STUDIO?'New project':'',onAction:STUDIO?openNew:null}); else $('list').innerHTML='<p class="mut">No projects yet.</p>'; return; }
+    $('list').innerHTML=items.map(p=>`<div class="card" data-id="${p.id}" tabindex="0" role="button"><div><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${p.target_date?('Target '+esc(p.target_date)):'No target date'}${p.client_visible===false?' · internal':''}</div></div><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span></div>`).join('');
+    $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openProject(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
+  }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
+}
+
+function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value=''; $('newDlg').showModal(); setTimeout(()=>$('np-name').focus(),20); }
+$('newProject').onclick=openNew;
+$('np-cancel').onclick=()=>$('newDlg').close();
+$('newForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const name=$('np-name').value.trim(); if(!name){toast('A project needs a name.',true);return;}
+  const btn=e.submitter; if(btn)btn.disabled=true;
+  try{ const r=await api('/projects','POST',{name,description:$('np-desc').value.trim(),target_date:$('np-target').value||undefined}); $('newDlg').close(); toast('Project created'); await load(); openProject(r.data.id); }
+  catch(err){ toast(err.message,true); } finally{ if(btn)btn.disabled=false; }
+};
+
+function miniForm(host, fields, onSubmit){
+  host.innerHTML='';
+  const f=document.createElement('form'); f.className='mini'; const inputs={};
+  fields.forEach(fl=>{
+    if(fl.type==='checkbox'){ const w=document.createElement('label'); w.className='chk'; const el=document.createElement('input'); el.type='checkbox'; el.id='mf-'+fl.name; w.appendChild(el); w.appendChild(document.createTextNode(' '+fl.label)); f.appendChild(w); inputs[fl.name]=el; return; }
+    const lab=document.createElement('label'); lab.textContent=fl.label; lab.htmlFor='mf-'+fl.name; f.appendChild(lab);
+    const el=document.createElement(fl.type==='textarea'?'textarea':(fl.type==='select'?'select':'input')); el.id='mf-'+fl.name;
+    if(fl.type==='select'){ (fl.options||[]).forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;el.appendChild(op);}); }
+    else { if(fl.type&&fl.type!=='textarea') el.type=fl.type; if(fl.placeholder)el.placeholder=fl.placeholder; }
+    f.appendChild(el); inputs[fl.name]=el;
+  });
+  const row=document.createElement('div'); row.className='row2'; row.style.justifyContent='flex-end';
+  const cancel=document.createElement('button'); cancel.type='button'; cancel.className='btn ghost sm'; cancel.textContent='Cancel';
+  const save=document.createElement('button'); save.type='submit'; save.className='btn sm'; save.textContent='Save';
+  row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
+  cancel.onclick=()=>host.innerHTML='';
+  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{const v={};for(const[k,el]of Object.entries(inputs))v[k]=el.type==='checkbox'?el.checked:el.value.trim();await onSubmit(v);}catch(err){toast(err.message,true);save.disabled=false;}};
+  setTimeout(()=>{const first=f.querySelector('input,textarea,select'); if(first)first.focus();},20);
+}
+
+async function openProject(id){
+  history.replaceState(null,'','?project='+id+(scope()?'&client='+scope():''));
+  const dlg=$('detail'); $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; dlg.showModal();
+  try{
+    const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
+    const p=data.project; STUDIO=data.is_studio_view!==false;
+    const rp=rep&&rep.data&&rep.data.summary;
+    const nextP=(P_NEXT[p.status]||[]);
+    const statusBtns=STUDIO?nextP.map(s=>`<button class="btn ghost sm" data-pstatus="${s}">${esc(s.replace('_',' '))}</button>`).join(''):'';
+    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}</div><div class="row2">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="mut">No milestones yet.</div>';
+    const ts=(data.tasks||[]).map(t=>{const d=t.derived||{};return `<div class="item"><div class="t">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(t.status.replace('_',' '))}</span>${STUDIO?(T_NEXT[t.status]||[]).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(s.replace('_',' '))}</button>`).join(''):''}</div></div>`;}).join('')||'<div class="mut">No tasks yet.</div>';
+    const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="mut">No files yet.</div>';
+    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="mut">No approvals yet.</div>';
+    $('detailInner').innerHTML=`
+      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(p.name)}</div>
+        <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div>
+        <button class="btn ghost sm" id="closeDetail">Close</button></div>
+      <div class="dbody">
+        ${rp?`<div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div></div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div>`:''}
+        ${STUDIO&&statusBtns?`<div class="sec"><h3>Status</h3><div class="steps">${statusBtns}</div></div>`:''}
+        <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
+        <div class="sec"><h3>Tasks ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
+        <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share a file</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
+        <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
+        <div class="sec"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
+      </div>`;
+    $('closeDetail').onclick=()=>{dlg.close();history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():''));};
+    // status
+    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(e.message,true);}});
+    // milestones
+    if($('addMs'))$('addMs').onclick=()=>miniForm($('msForm'),[{name:'title',label:'Milestone title'},{name:'due_date',label:'Due date (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/milestones','POST',{title:v.title,due_date:v.due_date||undefined});openProject(id);});
+    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/milestones/'+b.dataset.mdone,'PATCH',{status:'complete'});openProject(id);}catch(e){toast(e.message,true);}});
+    // tasks
+    if($('addTask'))$('addTask').onclick=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});openProject(id);});
+    $('detailInner').querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/tasks/'+b.dataset.task,'PATCH',{status:b.dataset.to});openProject(id);}catch(e){toast(e.message,true);}});
+    // deliverables
+    if($('addFile'))$('addFile').onclick=()=>shareFile(id);
+    $('detailInner').querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{try{const r=await api('/projects/'+id+'/deliverables/'+b.dataset.dl+'/download');window.open(r.data.url,'_blank','noopener');}catch(e){toast(e.message,true);}});
+    // approvals
+    if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary});openProject(id);});
+    $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{try{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');openProject(id);}catch(e){toast(e.message,true);}});
+    loadMessages(id);
+  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(e.message)+'</p><button class="btn ghost sm" onclick="document.getElementById(\'detail\').close()">Close</button></div>'; }
+}
+
+async function shareFile(id){
+  const host=$('dlForm');
+  miniForm(host,[{name:'title',label:'File name'},{name:'file',label:'Choose a file',type:'file'}],async()=>{});
+  const fileInput=host.querySelector('#mf-file'); const titleInput=host.querySelector('#mf-title');
+  host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const file=fileInput.files&&fileInput.files[0];if(!file){toast('Pick a file first.',true);return;}
+    try{ const up=await api('/projects/'+id+'/deliverables/upload-url','POST',{mime:file.type,bytes:file.size,title:titleInput.value.trim()||file.name});
+      const put=await fetch(up.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type,'x-upsert':'true'},body:file}); if(!put.ok)throw new Error('Upload failed.');
+      await api('/projects/'+id+'/deliverables','POST',{media_id:up.data.media_id,title:titleInput.value.trim()||file.name,status:'shared'}); toast('File shared'); openProject(id);
+    }catch(err){ toast(err.message,true); } };
+}
+
+async function loadMessages(id){
+  try{
+    const {data}=await api('/projects/'+id+'/messages?limit=30');
+    const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
+    $('msgList').innerHTML=items;
+    const host=$('msgForm');
+    host.innerHTML=`<form class="mini"><label>Message</label><textarea id="mm-body" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send</button></div></form>`;
+    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=host.querySelector('#mm-body').value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});loadMessages(id);}catch(err){toast(err.message,true);}};
+  }catch(e){ $('msgList').innerHTML='<div class="mut">Couldn’t load messages.</div>'; }
+}
+
+(async function(){
+  try{
+    const {data}=await sb.auth.getSession();
+    TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/portal.html">sign in</a> to see your projects.</p>'; return; }
+    renderFilters(); await load();
+    const deep=new URLSearchParams(location.search).get('project'); if(deep) openProject(deep);
+  }catch(_){ $('list').innerHTML='<p class="mut">We couldn’t load your projects just now.</p>'; }
+})();
+</script>
+</body>
+</html>
