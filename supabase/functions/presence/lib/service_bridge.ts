@@ -14,9 +14,16 @@ async function projectEventRow(siteId: string, projectId: string, kind: string, 
     body: JSON.stringify({ project_id: projectId, site_id: siteId, kind, actor, actor_kind: actorKind, client_visible: clientVisible, detail }) }).catch(() => {});
 }
 
-/** Upsert the bridge for a project (idempotent — UNIQUE(project_id)). */
+/** Upsert the bridge for a project (idempotent — UNIQUE(project_id)). Enforces the
+ *  frozen launch constraint: ONE primary agency per customer. A customer already
+ *  owned by a DIFFERENT agency is refused (returns false) — the link is not made. */
 export async function ensureBridge(agencySiteId: string, projectId: string, customerClientId: string | null, customerSiteId: string | null, dealId: string | null): Promise<boolean> {
   if (!customerClientId) return false; // a project with no customer (manual studio project) needs no bridge
+  // claim the customer's primary agency (first writer wins; PK enforces one-agency)
+  await svc('presence_customer_agency?on_conflict=customer_client_id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify({ customer_client_id: customerClientId, agency_site_id: agencySiteId }) }).catch(() => {});
+  const owner = rows(await svc(`presence_customer_agency?customer_client_id=eq.${customerClientId}&select=agency_site_id&limit=1`))[0];
+  if (owner && owner.agency_site_id !== agencySiteId) return false; // belongs to another agency — refuse (multi-agency is deferred)
   const r = await svc('presence_service_links?on_conflict=project_id', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ agency_site_id: agencySiteId, project_id: projectId, customer_client_id: customerClientId, customer_site_id: customerSiteId, deal_id: dealId, status: 'active' }),
