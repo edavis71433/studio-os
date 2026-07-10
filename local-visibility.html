@@ -14,10 +14,13 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:site" content="@davisdigitalstudio">
 <meta property="og:url" content="https://davisdigitalstudio.com/local-visibility">
-<meta property="og:title" content="Free Local Visibility Score · Davis Digital Studio">
+<meta property="og:title" content="Free Local Visibility Score — Davis Digital Studio">
 <meta property="og:description" content="How visible is your business in local search? Answer 6 questions, get a real score and your biggest opportunity to rank higher on Google.">
 <meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Free Local Visibility Score — Davis Digital Studio">
+<meta name="twitter:description" content="How visible is your business in local search? Answer 6 questions, get a real score and your biggest opportunity to rank higher on Google.">
+<meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#5b3fa0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -169,6 +172,15 @@ body{}
 @media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
 </style>
 <link rel="stylesheet" href="/enhance.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Local Visibility Checker","url":"https://davisdigitalstudio.com/local-visibility","applicationCategory":"BusinessApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Answer six quick questions for an honest local-visibility score based on your Google Business Profile, reviews, website, and directory signals, plus your single biggest opportunity. A guide, not a guarantee.","provider":{"@type":"ProfessionalService","name":"Davis Digital Studio","legalName":"Davis Digital Studio LLC","url":"https://davisdigitalstudio.com/","founder":{"@type":"Person","name":"Eric Davis"}}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+{"@type":"ListItem","position":1,"name":"Home","item":"https://davisdigitalstudio.com/"},
+{"@type":"ListItem","position":2,"name":"Free tools","item":"https://davisdigitalstudio.com/tools"},
+{"@type":"ListItem","position":3,"name":"Local Visibility Checker","item":"https://davisdigitalstudio.com/local-visibility"}]}
+</script>
 </head>
 <body data-page="local-visibility">
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -205,7 +217,7 @@ body{}
     <div>
       <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; Local Visibility</div>
       <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">How visible is your business in <em style="color:var(--p);font-style:italic;">local search?</em></h1>
-      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Answer 6 questions and get a real local visibility score with your single biggest opportunity to rank higher on Google.</p>
+      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">When someone nearby searches for what you do, does your business show up — or does a competitor? Answer six quick questions for an honest local visibility score and the single biggest thing holding you back.</p>
     </div>
     <div style="background:#fff;border-radius:22px;padding:34px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);display:flex;flex-direction:column;align-items:center;" aria-hidden="true">
       <svg viewBox="0 0 120 120" width="100" height="100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -393,13 +405,20 @@ body{}
   </div>
 
   <!-- Results -->
-  <div class="results" id="lvResults" role="region" aria-live="polite">
+  <div class="results" id="lvResults" role="region" aria-label="Your local visibility results" aria-live="polite">
+    <h2 id="lvResultsHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:22px;color:var(--ink);margin-bottom:16px;outline:none;">Your local visibility results</h2>
     <div id="lvSummary" style="display:none;font-size:15px;color:var(--ink);line-height:1.8;padding:18px 22px;background:var(--pxxxl,#f7f4fd);border-radius:12px;margin-bottom:20px;border-left:3px solid var(--p);"></div>
     <div class="score-hero">
       <div class="score-big" id="lvScoreNum">0</div>
       <div class="score-label">Local Visibility Score out of 100</div>
       <div class="score-grade" id="lvGrade"></div>
       <div class="biz-name-display" id="lvBizName"></div>
+    </div>
+
+    <!-- Methodology / honesty note: separates self-reported answers from certainty,
+         labels heuristics, and avoids implying a live scan or guaranteed rankings. -->
+    <div style="background:var(--pxxxl,#f7f4fd);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:12.5px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--ink);">How to read this.</strong> This score is based on the answers you gave &mdash; it's a quick, honest guide, not a live scan of your Google listing and not a guarantee of rankings. Local visibility also shifts over time as competitors change and Google updates how it ranks. Any figures mentioned are widely-cited industry averages, not a promise about your specific results. A proper review looks at more than six questions can.
     </div>
 
     <div class="signals-grid" id="signalsGrid"></div>
@@ -413,6 +432,29 @@ body{}
     <div class="actions-list">
       <h3>Priority actions</h3>
       <div id="actionsList"></div>
+    </div>
+
+    <!-- Lead capture (value delivered in full above; nothing gated). Optional
+         follow-up that routes the full result + context into clever-api
+         lead_intake with the site-wide Formspree fallback. Same architecture as
+         the ROI Calculator and Pricing Estimator — no second workflow. -->
+    <div id="leadCard" style="background:#fff;border:1px solid rgba(91,63,160,0.18);border-radius:16px;padding:24px;margin-bottom:20px;">
+      <form id="leadForm" onsubmit="return submitLead(event,'local_visibility','Local Visibility Checker')" novalidate>
+        <h3 style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;">Want your score and action plan emailed to you?</h3>
+        <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 16px;">I'll send your visibility score, the signals I looked at, and your prioritized next steps &mdash; plus a couple of things specific to your business and area that a six-question check can't see. No spam, no obligation.</p>
+        <label for="leadName" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Your name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input id="leadName" type="text" autocomplete="name" placeholder="Your name" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+        <label for="leadEmail" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Email address</label>
+        <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+        <div id="leadError" role="alert" style="display:none;color:#c0392b;font-size:13px;margin-bottom:12px;"></div>
+        <button type="submit" class="btn btn-primary" id="leadSubmit">Email me my results &rarr;</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:12px;">I reply personally, usually within one business day. Your details are only used to send this and follow up &mdash; never sold, never spammed.</p>
+      </form>
+      <div id="leadThanks" style="display:none;" role="status">
+        <h3 id="leadThanksHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;outline:none;">On its way &mdash; thank you.</h3>
+        <p id="leadThanksBody" style="font-size:14px;color:var(--muted);line-height:1.7;">I've got your results. I'll follow up personally, usually within one business day, with your score, the plan, and anything about your local presence worth knowing.</p>
+        <p style="font-size:14px;margin-top:12px;"><a href="contact.html" style="color:var(--p);">Prefer to talk it through now? Book a free call &rarr;</a></p>
+      </div>
     </div>
 
     <div class="upgrade-card">
@@ -752,6 +794,16 @@ function showResults() {
   document.getElementById('lvResults').style.display = 'block';
   document.getElementById('stepIndicator').style.display = 'none';
 
+  // Preserve the full result + context for the CRM lead (used by getLeadSummary).
+  window.__lvContext = {
+    bizName: bizName, city: city, type: answers.q1 || '', score: score, grade: gradeText,
+    answers: answers, opp: opp.title,
+    actions: actions.slice(0, 4).map(function(a){ return a.h; })
+  };
+
+  // Move focus to the results heading for SR/keyboard users.
+  var rh = document.getElementById('lvResultsHeading'); if (rh) { try { rh.focus(); } catch(e) {} }
+
   if (typeof gtag === 'function') gtag('event', 'local_visibility_complete', { event_category: 'tools', event_label: bizName, value: score });
 }
 
@@ -773,6 +825,14 @@ function restart() {
   document.getElementById('q6_city').value = '';
   document.getElementById('q1').classList.add('active');
   document.getElementById('sd1').classList.add('active');
+  // Reset the lead-capture card so a different business can submit again.
+  __leadSent = false;
+  var lf = document.getElementById('leadForm'); if (lf) lf.style.display = '';
+  var lt = document.getElementById('leadThanks'); if (lt) lt.style.display = 'none';
+  var le = document.getElementById('leadError'); if (le) le.style.display = 'none';
+  var lb = document.getElementById('leadSubmit'); if (lb) { lb.disabled = false; lb.innerHTML = 'Email me my results &rarr;'; }
+  var lem = document.getElementById('leadEmail'); if (lem) lem.value = '';
+  var lnm = document.getElementById('leadName'); if (lnm) lnm.value = '';
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
@@ -788,6 +848,64 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
   }
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', enable); else enable();
 })();
+
+// ── Lead capture → CRM (existing architecture: clever-api lead_intake + Formspree
+//    fallback, identical to the ROI Calculator + Pricing Estimator). anon key public. ──
+var SB_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+var LEAD_FORMSPREE="https://formspree.io/f/mvznevlo";
+var __leadSent=false;
+function getLeadSummary(){
+  var c = window.__lvContext || {};
+  var typeLabels = {restaurant:'Restaurant/Bar',service:'Home Services',salon:'Salon/Spa',retail:'Retail/Boutique',health:'Health/Wellness',other:'Other local business'};
+  var a = c.answers || {};
+  var gbp = {yes_claimed:'GBP actively managed', yes_unclaimed:'GBP exists but unmanaged', no:'No GBP'}[a.q2] || 'GBP not stated';
+  var rev = {great:'50+ reviews / 4.5 stars+', decent:'10-50 reviews / 4.0+', few:'under 10 reviews', bad:'mixed or under 4.0'}[a.q3] || 'reviews not stated';
+  var web = {optimized:'site mentions city + service', partial:'basic site', none:'no or outdated site'}[a.q4] || 'website not stated';
+  var cit = {many:'many consistent directories', some:'a few directories', none:'few or no directories'}[a.q5] || 'directories not stated';
+  return 'Local Visibility Checker — Business: ' + (c.bizName||'?') + ' (' + (typeLabels[c.type]||c.type||'?') + ') in ' + (c.city||'?') + '. '
+    + 'Score: ' + c.score + '/100 (' + c.grade + '). '
+    + 'Self-reported — ' + gbp + '; ' + rev + '; ' + web + '; ' + cit + '. '
+    + 'Top opportunity: ' + c.opp + '. Priority actions: ' + (c.actions||[]).join('; ') + '. '
+    + '[Page: ' + location.href + '; Ref: ' + (document.referrer||'direct') + ']';
+}
+function submitLead(ev, source, toolName){
+  ev.preventDefault();
+  if (__leadSent) return false;
+  var email=(document.getElementById('leadEmail').value||'').trim();
+  var nm=(document.getElementById('leadName').value||'').trim();
+  var c=window.__lvContext||{};
+  var biz=c.bizName||'';
+  var err=document.getElementById('leadError');
+  var btn=document.getElementById('leadSubmit');
+  err.style.display='none';
+  if(!email||email.indexOf('@')===-1){ err.textContent='Please enter a valid email so I can send this to you.'; err.style.display='block'; return false; }
+  var summary=getLeadSummary();
+  var original=btn.innerHTML; btn.disabled=true; btn.textContent='Sending…';
+  function done(){
+    __leadSent=true;
+    document.getElementById('leadForm').style.display='none';
+    document.getElementById('leadThanks').style.display='block';
+    var body=document.getElementById('leadThanksBody');
+    if(body && biz){ body.textContent="I've got your results for "+biz+". I'll follow up personally, usually within one business day, with your score, the plan, and anything about "+(c.city||'your area')+" worth knowing."; }
+    var h=document.getElementById('leadThanksHeading'); if(h){ try{ h.focus(); }catch(e){} }
+    if(typeof gtag==='function'){ gtag('event','generate_lead',{event_category:'lead',event_label:source}); }
+  }
+  fetch(SB_URL+"/functions/v1/clever-api",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY},
+    body:JSON.stringify({type:"lead_intake",source:source,name:(nm||biz||email),email:email,subject:"New Website Enquiry — "+toolName+(biz?(" ("+biz+")"):""),message:summary})
+  })
+  .then(function(r){ return r.json().catch(function(){return{};}).then(function(j){return{ok:r.ok,j:j};}); })
+  .then(function(res){ if(res.ok&&res.j&&res.j.ok){ done(); } else { throw new Error('crm'); } })
+  .catch(function(){
+    fetch(LEAD_FORMSPREE,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({_subject:'New Website Enquiry — '+toolName+(biz?' ('+biz+')':''),_replyto:email,email:email,name:(nm||'Not provided'),business:biz||'Not provided',message:summary,source:source})})
+    .then(function(r){ if(r.ok){done();} else {throw new Error('fs');} })
+    .catch(function(){ btn.disabled=false; btn.innerHTML=original; err.innerHTML='Something went wrong sending that &mdash; please try again, or email me at <a href="mailto:eric@davisdigitalstudio.com" style="color:#c0392b;text-decoration:underline">eric@davisdigitalstudio.com</a>.'; err.style.display='block'; });
+  });
+  return false;
+}
 </script>
 
 
