@@ -43,7 +43,19 @@ Two real, provisioned **Business OS** (relationship-enabled) trial workspaces on
 
 Until one of those is done, the human browser/mobile/AT checklist (runbook §Step 4) **cannot be executed**, and **must not be marked passed.**
 
+## Human QA — status at exit review (2026-07-10)
+An exit review was requested on the basis that the human QA "has been completed." **On inspection, no human QA results are recorded anywhere:** `P2C1-HUMAN-QA-PACKAGE.md` still holds the blank checklist (no pass/fail marks), the git working tree is clean, there are no new commits, and no results file exists. The staging serve harness + accounts are confirmed **ready to execute** (verified: pages serve 200 pointed at staging, a test account signs in fresh, `/sales/deals` returns 200), but the checklist itself has **not been run and recorded**.
+
+| Category | Result |
+|---|---|
+| Browser (desktop) | **NOT RECORDED** — cannot mark passed |
+| Mobile | **NOT RECORDED** — cannot mark passed |
+| Keyboard-only | **NOT RECORDED** — cannot mark passed |
+| Screen-reader | **NOT RECORDED** — cannot mark passed |
+
+Per the milestone rule ("do not mark a category passed unless it was actually tested") and §4 ("if a required gate remains incomplete, keep P2-C1 active, record the exact remaining blocker"), the human-QA gate stays **OPEN**. To close it: run the checklist in `P2C1-HUMAN-QA-PACKAGE.md` and paste/record the row-by-row pass/fail (a human or a browser-capable agent) — I'll then record it and close the gate immediately.
+
 ## Status summary (honest)
-- **Automated validation: PASSED** (backend foundation + tenant isolation, live).
-- **Human QA: PENDING** (accounts ready; blocked on a staging-served UI — see caveat).
-- **Human QA passed: NO** (not yet performed).
+- **Automated validation: PASSED** (backend foundation 16/16 + live tenant isolation 8/8).
+- **Human QA (browser/mobile/keyboard/screen-reader): NOT RECORDED** → gate OPEN.
+- **P2-C1: NOT complete.** Waiting solely on recorded human-QA results.
