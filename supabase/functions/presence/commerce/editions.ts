@@ -36,12 +36,14 @@ export type EditionFeature =
 const CMS: EditionFeature[] = ['website', 'developer', 'forms', 'client_portal', 'reports'];
 const BOS: EditionFeature[] = ['business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];
 const STUDIO: EditionFeature[] = Array.from(new Set([...CMS, ...BOS]));
-// Monitor OBSERVES an existing website (read-only) plus full intelligence. It
-// shows the workspace (the observed site + migration readiness) and Business OS,
-// but never drafts/publishes — that's enforced by the site edition ('monitor'),
-// not by hiding the surface. No CMS authoring (developer/forms) since it hosts
-// nothing. This is why Monitor is its OWN edition, not business_os_only.
-const MONITOR: EditionFeature[] = ['website', 'business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];
+// Monitor WATCHES an existing website (read-only) plus the intelligence layer —
+// Business Moments, connected data, guidance, and reports — so you "know the moment
+// it needs you". It shows the observed workspace but never drafts/publishes
+// (enforced by the site edition 'monitor') and has no CMS authoring (developer/
+// forms), since it hosts nothing. It deliberately does NOT include the relationship
+// suite (CRM / sales / projects) — that is Business OS — so a $19 watch plan never
+// out-features the $29 Business OS plan (relationship is the thing you upgrade for).
+const MONITOR: EditionFeature[] = ['website', 'business_moments', 'connected', 'ai', 'reports', 'client_portal'];
 
 const MATRIX: Record<EditionKey, EditionFeature[]> = {
   monitor: MONITOR,
