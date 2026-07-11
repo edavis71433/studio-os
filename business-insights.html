@@ -77,7 +77,7 @@ function obsHtml(o){
 }
 function groupHtml(g){
   return `<section class="group">
-    <p class="glabel"><span class="gi" aria-hidden="true">${esc((g.observations[0]||{}).icon||'')}</span>${esc(g.label)}</p>
+    <p class="glabel"><span class="gi" aria-hidden="true">${esc(((g.observations||[])[0]||{}).icon||'')}</span>${esc(g.label)}</p>
     ${(g.observations||[]).map(obsHtml).join('')}
   </section>`;
 }

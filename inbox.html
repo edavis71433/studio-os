@@ -59,7 +59,7 @@ const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;const h=href.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c)+(h[1]?'#'+h[1]:'');}
 
 // map a derived notification's source to a real Studio page (deep link resolves)
-function notifLink(n){const m=String(n.href||'').match(/^\/projects\/([0-9a-f-]{36})/);if(m)return '/projects.html?project='+m[1];return '/inbox.html';}
+function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/([0-9a-f-]{36})/);if(m){const anc=h.split('#')[1];return '/projects.html?project='+m[1]+(anc?'#'+anc:'');}if(h&&h.charAt(0)==='/')return h;return '/today.html';}
 function render(feed,leads,notifs){
   const approvals=(feed.pending_approvals||[]);
   const notices=(feed.notices||[]);
@@ -96,6 +96,7 @@ async function load(){
   const f=(feed.ok&&feed.body.data)||{};
   const l=(leads.ok&&leads.body.data&&leads.body.data.submissions)||[];
   render(f,l,(notifs.ok&&notifs.body.data)||[]);
+  api('/notifications/read','POST',{}).catch(()=>{});   // opening the Inbox marks activity seen (clears the bell)
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

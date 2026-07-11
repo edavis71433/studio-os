@@ -151,7 +151,7 @@ function render(profile,summary,notes,items,studio){
   // Carry the agency ?client= scope so drilling in never loses the client context.
   const _q=(()=>{const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';})();
   const _ctx=profile._ctx||{};
-  const _dealLink=(studio&&_ctx.deal_id)?`<a class="link" href="/pipeline.html?deal=${esc(_ctx.deal_id)}">Pipeline deal →</a>`:'';
+  const _dealLink=(studio&&_ctx.deal_id)?`<a class="link" href="/pipeline.html?deal=${esc(_ctx.deal_id)}${_q?'&'+_q.slice(1):''}">Pipeline deal →</a>`:'';
   const _projLink=(studio&&_ctx.project_id)?`<a class="link" href="/projects.html?project=${esc(_ctx.project_id)}${_q?'&'+_q.slice(1):''}">Their project →</a>`:'';
   html+=`<section><h2>Open in context</h2><div class="links">
     <a class="link" href="/today.html${_q}">Today →</a>

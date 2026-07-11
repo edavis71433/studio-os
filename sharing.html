@@ -82,7 +82,7 @@ function render(members){
   // members
   html+=`<h2>People with access</h2><div class="card">
     <div class="invite"><input id="email" type="email" placeholder="client@theirbusiness.com" aria-label="Client email"><button class="pri" id="add">Invite as reviewer</button></div>`;
-  if(members.length){for(const m of members){html+=`<div class="rowitem"><span class="grow"><span class="t">${esc(m.email)}</span><br><span class="d">${esc(m.role.replace('_',' '))} · ${esc(m.status)}</span></span>${m.role!=='business_owner'?`<button data-revoke="${esc(m.id)}">Remove</button>`:''}</div>`;}}
+  if(members.length){for(const m of members){html+=`<div class="rowitem"><span class="grow"><span class="t">${esc(m.email)}</span><br><span class="d">${esc(m.role.replace('_',' '))} · ${esc(m.status)}</span></span>${m.role!=='business_owner'?`<button data-resend="${esc(m.email)}" data-role="${esc(m.role)}">Resend invite</button> <button data-revoke="${esc(m.id)}">Remove</button>`:''}</div>`;}}
   else html+=`<div class="rowitem"><span class="d">No one else yet — invite a client above to give them a review-only portal.</span></div>`;
   html+=`</div>`;
   // shares
@@ -98,6 +98,7 @@ function render(members){
 function wire(){
   const add=$('add');if(add)add.addEventListener('click',invite);
   document.querySelectorAll('[data-revoke]').forEach(b=>b.addEventListener('click',()=>revoke(b.getAttribute('data-revoke'))));
+  document.querySelectorAll('[data-resend]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/portal/members','POST',{email:b.getAttribute('data-resend'),role:b.getAttribute('data-role')||'client_reviewer'});toast((r.ok&&r.body.data&&r.body.data.message)||'Invite re-sent.');b.disabled=false;}));
   document.querySelectorAll('[data-surface]').forEach(b=>b.addEventListener('click',()=>toggle(b)));
 }
 async function invite(){const e=($('email').value||'').trim();if(!e){toast('Enter their email.');return;}
