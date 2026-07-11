@@ -257,12 +257,29 @@ async function loadSurveys(id){
     $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(e.message,true);}});
   }catch(e){ $('svList').innerHTML='<div class="mut">Couldn’t load surveys.</div>'; }
 }
+const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);return d<7?d+'d ago':new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 async function loadSupport(id){
   try{
     const {data}=await api('/support'); const items=(data||[]).filter(r=>r.project_id===id);
-    $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div>`).join(''):'<div class="mut">No support requests for this project.</div>';
+    $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="mut">No support requests for this project.</div>';
     $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id);}catch(e){toast(e.message,true);}});
+    $('supList').querySelectorAll('[data-sopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.sopen,id));
   }catch(e){ $('supList').innerHTML='<div class="mut">Couldn’t load support.</div>'; }
+}
+// The owner can now READ the request + the client's messages and REPLY — the
+// backend was always there; only the UI (mark-resolved only) was missing.
+async function openStudioSupport(rid,pid){
+  try{
+    const r=await api('/support/'+rid); const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
+    const resolved=rq.status==='resolved'||rq.status==='closed';
+    const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
+    const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
+    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
+    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label>Reply to the client</label><textarea id="sr-body" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
+    $('sup-back').onclick=()=>loadSupport(pid);
+    const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=$('sr-body').value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});openStudioSupport(rid,pid);}catch(err){toast(err.message,true);}};
+    const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid);}catch(e){toast(e.message,true);}};
+  }catch(e){ toast('Couldn’t open that request.',true); }
 }
 
 (async function(){

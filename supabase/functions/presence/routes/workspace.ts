@@ -104,9 +104,17 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 
   // P2-D: fold service delivery into the ONE attention surface (no second bell).
   try {
-    if (siteCan(role, 'view_all')) { // studio: open support requests need triage
-      const sup = await svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id&limit=50`);
+    if (siteCan(role, 'view_all')) { // studio: open support requests + unread client messages need triage
+      const reader = String(principal.userId || principal.email || 'anon'); // same key /notifications(/read) uses
+      const [sup, seenQ, msgQ] = await Promise.all([
+        svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id&limit=50`),
+        svc(`presence_activity_reads?site_id=eq.${site.id}&reader=eq.${encodeURIComponent(reader)}&select=last_seen_at&limit=1`),
+        // FD-N: a client's project message must reach the bell/Today, not only the Inbox
+        svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=created_at,detail&order=created_at.desc&limit=50`),
+      ]);
       attention_count += ((sup.json as any[])?.length || 0);
+      const lastSeen = (seenQ.json as any[])?.[0]?.last_seen_at || null;
+      attention_count += ((msgQ.json as any[]) || []).filter((e) => (e.detail || {}).from === 'client' && (!lastSeen || String(e.created_at) > String(lastSeen))).length;
     } else if (site.client_id) { // bridged customer: their UNREAD client-visible delivery activity
       const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
       if (links.length) {
