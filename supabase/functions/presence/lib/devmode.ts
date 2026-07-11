@@ -49,7 +49,10 @@ export function validateThemeTokens(input: unknown): { tokens: Record<string, st
 /** Strip anything that could execute or exfiltrate. Denylist + defensive: no
  *  <script>/<iframe>/<object>/<embed>/<link>/<meta>/<style>, no on*= handlers,
  *  no javascript:/data:/vbscript: URLs, no <base>. What remains is inert markup.
- *  (A published-site CSP is the second layer; this is the first.) */
+ *  NOTE: this sanitizer is currently the ONLY defense layer on published sites.
+ *  A published-site CSP + an allow-list parser are QUEUED (see FEATURE-DISCOVERY-
+ *  QUEUE.md) and must land BEFORE Developer Mode is granted to anyone beyond
+ *  trusted developers/operators. Until then, keep the `developer` role narrow. */
 export function sanitizeDevHtml(html: string): string {
   let s = String(html || '');
   // remove dangerous elements entirely (with their content)
