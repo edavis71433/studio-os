@@ -47,6 +47,13 @@
         "url": "https://davisdigitalstudio.com/",
         "email": "eric@davisdigitalstudio.com",
         "founder": { "@type": "Person", "name": "Eric Davis" },
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Burbank",
+          "addressRegion": "CA",
+          "addressCountry": "US"
+        },
+        "areaServed": { "@type": "Country", "name": "United States" },
         "contactPoint": {
           "@type": "ContactPoint",
           "contactType": "Website enquiries",
@@ -115,6 +122,7 @@
       <div id="contactError" role="alert" style="display:none;margin:0 0 16px;padding:12px 16px;border-radius:10px;background:rgba(224,85,85,0.08);border:1px solid rgba(224,85,85,0.25);color:#c0392b;font-size:14px;line-height:1.5"></div>
       <button id="contactSubmit" type="submit" class="btn btn-primary">Send it over <span class="arr">&rarr;</span></button>
       <p class="hint">I reply personally, usually within one business day.</p>
+      <p class="hint" style="margin-top:8px">Sending this doesn't commit you to anything &mdash; and your details are only ever used to reply, never shared or sold.</p>
       <p class="hint" style="margin-top:14px">Prefer to skip the form? Email me at <a href="mailto:eric@davisdigitalstudio.com" style="color:var(--p)">eric@davisdigitalstudio.com</a> or <a href="https://calendly.com/eric-davisdigitalstudio/30min" target="_blank" rel="noopener" style="color:var(--p)">grab a time directly &rarr;</a></p>
     </form>
   </div>
@@ -140,9 +148,14 @@
         <img src="eric-davis-small.jpg" alt="Eric Davis, founder of Davis Digital Studio" width="46" height="46" loading="lazy">
         <div class="hero-sig-txt"><strong>You'll hear back from me, personally</strong> Not a sales team, not an auto-responder &mdash; Eric.</div>
       </div>
-      <h3 class="serif" style="font-size:20px;margin-bottom:14px">What to expect</h3>
-      <p class="lead-muted" style="font-size:15px">A relaxed 20&ndash;30 minute conversation. I'll ask about your business and your customers, and give you an honest read on what would actually move the needle. If that's not me, I'll say so.</p>
-      <ul role="list" style="list-style:none;margin:18px 0 0;padding:16px 0 0;border-top:1px solid var(--hair);display:flex;flex-wrap:wrap;gap:8px 20px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">
+      <h3 class="serif" style="font-size:20px;margin-bottom:14px">After you hit send</h3>
+      <ol role="list" style="list-style:none;margin:0;padding:0;display:grid;gap:11px">
+        <li style="display:flex;gap:12px;align-items:flex-start"><span aria-hidden="true" style="font-family:var(--mono);font-size:12px;color:var(--p);margin-top:1px">01</span><span class="lead-muted" style="font-size:14.5px">Your note comes straight to me &mdash; I read it myself, not a queue or a sales team.</span></li>
+        <li style="display:flex;gap:12px;align-items:flex-start"><span aria-hidden="true" style="font-family:var(--mono);font-size:12px;color:var(--p);margin-top:1px">02</span><span class="lead-muted" style="font-size:14.5px">I reply personally, usually within one business day.</span></li>
+        <li style="display:flex;gap:12px;align-items:flex-start"><span aria-hidden="true" style="font-family:var(--mono);font-size:12px;color:var(--p);margin-top:1px">03</span><span class="lead-muted" style="font-size:14.5px">If it makes sense, we have a short, relaxed conversation &mdash; 20&ndash;30 minutes, no pitch.</span></li>
+        <li style="display:flex;gap:12px;align-items:flex-start"><span aria-hidden="true" style="font-family:var(--mono);font-size:12px;color:var(--p);margin-top:1px">04</span><span class="lead-muted" style="font-size:14.5px">You leave with an honest read on what would actually help &mdash; whether or not you hire me.</span></li>
+      </ol>
+      <ul role="list" style="list-style:none;margin:22px 0 0;padding:16px 0 0;border-top:1px solid var(--hair);display:flex;flex-wrap:wrap;gap:8px 20px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">
         <li>Nearly a decade in enterprise systems</li>
         <li aria-hidden="true" style="opacity:.4">&middot;</li>
         <li>M.S. Business Analytics, CSUN</li>
@@ -207,9 +220,15 @@ function submitContact(ev){
   var goal = document.getElementById('g').value.trim();
 
   errBox.style.display = 'none';
+  document.getElementById('n').removeAttribute('aria-invalid');
+  document.getElementById('e').removeAttribute('aria-invalid');
   if (!name || !email || email.indexOf('@') === -1) {
     errBox.textContent = 'Please add your name and a valid email so I can get back to you.';
     errBox.style.display = 'block';
+    // Move focus to the first invalid field so keyboard + screen-reader users
+    // are taken straight to what needs fixing.
+    var badField = !name ? document.getElementById('n') : document.getElementById('e');
+    if (badField) { badField.setAttribute('aria-invalid', 'true'); try { badField.focus(); } catch (e) {} }
     return false;
   }
 
@@ -232,12 +251,14 @@ function submitContact(ev){
   }
 
   // Compose the message body once, used by both the CRM and the fallback.
+  // Includes page + referrer so the studio has the enquiry's context.
   var msgBody = (goal || 'Not provided')
     + (business ? '\n\nBusiness: ' + business : '')
-    + (website ? '\nWebsite: ' + website : '');
+    + (website ? '\nWebsite: ' + website : '')
+    + '\n\n[Page: ' + location.href + '; Ref: ' + (document.referrer || 'direct') + ']';
 
-  // PRIMARY: drop the lead straight into the CRM (leads table) via lead_intake.
-  // Puts the lead into the pipeline, gives it tracking + reminders, emails Eric.
+  // PRIMARY: record the Website Enquiry in the CRM via lead_intake — puts it in
+  // the pipeline with tracking + reminders and emails Eric.
   fetch(SB_URL + "/functions/v1/clever-api", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
@@ -256,7 +277,7 @@ function submitContact(ev){
     else { throw new Error('crm_failed'); }
   })
   .catch(function(){
-    // FALLBACK: Formspree, so a lead is never silently dropped if the CRM is down.
+    // FALLBACK: Formspree, so a Website Enquiry is never silently dropped if the CRM is down.
     fetch('https://formspree.io/f/mvznevlo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
