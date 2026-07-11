@@ -1,46 +1,112 @@
-# Pre-launch deep sweep — findings & recommendations
+# Pre-launch deep sweep — findings & status
 
-Final sweep across all authenticated HTML + backend routes, through four lenses: **automation-for-Eric** (touch less), **ease-for-client** (think less), **workflow gaps** (fewer steps, nothing falls through), and **no-code** (every workflow completable without code, as easy as the best benchmark). Ranked by impact; tagged by what's safe to do headlessly vs. needs a browser / your dashboards.
+Final sweep across all authenticated HTML + backend routes, through four lenses:
+**automation-for-Eric** (touch less), **ease-for-client** (think less), **workflow
+gaps** (fewer steps, nothing falls through), and **no-code** (every workflow
+completable without code). Ranked by impact. This doc now records final status —
+everything safe to do headlessly has been implemented, tested, and deployed to
+staging (behind the push fence; prod backend deploy is a separate owner step).
 
-**Headline:** the platform is in genuinely good shape — the *reading* surfaces (8 CMS pages, `approve.html`), the delivery event-sourcing, the one publish pipeline, and the convert-to-customer handoff are excellent and already highly automated. Gaps cluster in three spots: (a) a couple of manual steps in *your* sales loop, (b) friction in client *doing* surfaces (support, request-changes, onboarding, mobile forms), and (c) work that completes in the backend but never surfaces to you.
+**Headline:** the platform was already in good shape. This pass closed the sales-loop
+blind spot, made the client's *doing* surfaces two-way, fixed dead links, and
+removed the last mobile friction. What remains is genuinely owner- or
+browser-gated (auth-flow change, a policy call, your Google link).
 
 ---
 
-## ✅ Implemented this pass (safe, tested, deployed to staging)
-1. **Auto-email proposals & contracts on Send** *(automation — the #1 leverage item both sweeps flagged)*. Was: Send copies a link, then you switch to email and paste it. Now it auto-emails the deal's contact on the **studio's** brand (never "Studio OS"), best-effort, link still returned as fallback. `sales.ts` + `pipeline.html` toast ("emailed to the client").
-2. **Fixed the broken "view deal" link** *(workflow)*. `leads.html` pointed converted enquiries at `crm.html#deal-…` (no handler → dead end); now `/pipeline.html?deal=…` with the client scope carried. Test corrected.
-3. **Clearer decline copy** *(client)*. Declining an approval said "Set aside." → now "Noted — your studio has been told. Nothing changed."
+## ✅ Implemented, tested (148/0/4), deployed to staging
 
-## 🟢 Safe to implement next (headless, high value)
-4. **Surface a signed contract / accepted proposal to you** *(workflow, HIGH)*. When a client signs via the token link, the deal advances but **no operator surface shows it** — you only find out by opening Pipeline and clicking each deal. Emit a notice so "Contract signed — ready to convert {name}" lands on Today/Attention/bell with a deep-link. Pairs with #1 to fully close the sales loop. (`sales.ts` sign/decide → `raiseNotice`; `attention.ts` read.)
-5. **Default the Convert plan from the accepted proposal** *(automation, small)*. Convert re-asks the plan every time; default it from the deal, keep the dropdown as override. (`pipeline.html` + `sales.ts:convert`.)
-6. **Fix support deep-links** *(workflow)*. `notifications.ts` returns `/support#request-…` but there is no `support.html` — a "your studio replied" notification dead-ends. Rewrite to the surface that renders support (`projects.html?project=…#support` / the client project view).
-7. **iOS form auto-zoom** *(client, mobile, CSS)*. Login, verification-code, survey, and brief inputs are `font-size:14px`, so iPhones jump-zoom on focus. Bump form inputs to `16px`.
-8. **Move the Google review URL out of code** *(automation + client)*. `project-survey.html` hardcodes `YOUR_PLACE_ID`, so **every happy client is currently never asked for a review** (silent revenue leak). Make it a per-site setting (or derive from the connected Google Business Profile).
+**Batch 1 — sales automation**
+1. **Auto-email proposals & contracts on Send.** Send used to just copy a link; now
+   it auto-emails the deal's contact on the **studio's** brand (never "Studio OS"),
+   best-effort, link still returned as fallback. `sales.ts` + `pipeline.html`.
+2. **Fixed the broken "view deal" link.** `leads.html` pointed converted enquiries at
+   `crm.html#deal-…` (dead end) → now `/pipeline.html?deal=…` with client scope.
+3. **Clearer decline copy** in `client.html` ("Noted — your studio has been told…").
 
-## 🟡 Frontend adds — valuable, fenced, best confirmed in a browser
-9. **Client support is a one-way dead-end** *(client, HIGH)*. A client can open a request but can't see its status or your replies — even though `GET /client/support` + `/client/support/:id` fully support it. Render the request list + threads in `client.html`.
-10. **"Request changes" sends you no context** *(client)*. `client.html` fires `changes_requested` with no note; `portal.html` already does it right (a "what would you like changed?" modal). Mirror that one textarea.
-11. **Messages have no timestamps / reply expectation** *(client)*. Add relative time + "your studio usually replies within a day."
-12. **"I'll set it up myself" drops a client into the raw editor** *(client)*. Route it to the existing calm 3-step guide instead of `/presence.html`.
-13. **Customers hub → deal/project doorways** *(workflow)*. `crm.html` "Open in context" lists everything except the customer's Pipeline deal and Project. Add both (ids resolvable from the bridge + `converted_client_id`).
-14. **Unify the three "needs you" surfaces** *(workflow)*. The bell (`/portal/feed`) shows notices+approvals+moments; Inbox additionally shows client messages, surveys, and new leads. Point the bell at Inbox (the intended one place) or widen the feed so all three tell one story.
-15. **Suggest AI-image alt text** *(automation)*. `visual-studio.html` asks you to type alt text via `prompt()`; pre-fill a caption to accept/edit.
+**Batch 2 — surface work + mobile**
+4. **W1 — Surface a signed contract / accepted proposal to you.** A client signing via
+   the token link advanced the deal but *no operator surface showed it*. Now raises one
+   notice ("ready to convert {name}") on the deal's agency site → Today/Attention/bell
+   with a deep-link to Pipeline. Reuses the single notice model; idempotent; operator-only
+   by construction. (`sales.ts` sign/accept → `raiseNotice`; `attention_center.ts` +
+   `workspace.ts` wire the kind.)
+6. **W5 — Fixed support deep-links.** `notifications.ts` + `client_delivery.ts` pointed at
+   `/support#request-…` (no such page). Now project-anchored `#support-…` and
+   `/client.html?support=…`, which both surfaces actually render.
+7. **C6 — iOS form auto-zoom.** Login, verification-code, survey, brief, and portal inputs
+   were <16px, so iPhones jump-zoom on focus. Bumped to 16px (`set-password`,
+   `project-survey`, `get-started`, `portal` ×4). Desktop density effectively unchanged.
 
-## 🔴 Needs a browser to verify (auth/routing/native inputs)
-16. **Password-setup transcription** *(client, first impression)*. `set-password.html` makes clients hand-copy a numeric code (3 separate autofill warnings on the page = a flow fighting the browser). Move to a magic-link.
-17. **Two competing client homes + a choice** *(client)*. `welcome.html` offers "Enter workspace" vs "Go to portal"; pick one canonical landing server-side and route silently.
-18. **Scheduling uses `prompt()` with hand-typed ISO timestamps** *(workflow)*. `presence.html` publish-later asks for `2026-08-01T09:00` as text; replace with a `datetime-local` input.
-19. **The 10-field brief as first action** *(client)*. Stage it — ask the 1–2 required things first, reveal the rest as optional.
+**Batch 3 — client "doing" surfaces**
+9. **C1 — Client support is now two-way.** A client could open a request but never see its
+   status or your replies. `client.html` now lists their requests + opens a full thread
+   (original + studio replies with timestamps + reply box) over the existing
+   `/client/support` endpoints. `?support=<id>` deep-link opens a thread directly.
+10. **C2 — "Request changes" now carries a note.** Reveals a "what would you like changed?"
+    field, passed through as `decision_note` (backend already supported it).
+11. **C8 — Message timestamps + reply expectation.** Relative time on each message/reply +
+    "your studio usually replies within a day."
+12. **C10 — "I'll set it up myself" no longer cold-drops into the raw editor.** Routes
+    through the existing calm 3-step guide (`get-started.html manualFallback`).
 
-## 🔑 Needs your dashboards / a policy call
-20. **Auto-nudge stale approvals** *(automation, policy)*. Today you click "Email the client to approve"; a pending approval could sit forever. Auto-nudge after N days — needs an email-cadence cap so it never feels spammy.
-21. **Auto-send the post-project survey on completion** *(automation)* + surface a consented 5★ quote as a CRM note. Currently fully manual/disconnected.
-22. **New-project templates** *(automation)*. Every build starts from an empty project; a default task/milestone template (like agency starter kits, "fills only what's empty") would save re-building each time.
-23. **"New project" can't attach an existing customer** *(workflow)*. Only Convert builds the client-visible bridge; add a customer/deal picker so a project for an existing client is client-visible.
+**Batch 4 — workflow + automation polish**
+5. **A5 — Convert plan default.** The Convert dialog already defaults to the flagship
+    **Presence** plan (no per-deal plan is captured, so there's nothing better to default
+    from without a schema change — noted, not built). No change needed.
+13. **W3 — CRM deal/project doorways.** "Open in context" listed every surface *except* the
+    customer's Pipeline deal and their Project. `/crm/profile` now returns a studio-only
+    context (deal via `converted_client_id`, project via the bridge); `crm.html` shows
+    "Pipeline deal →" and "Their project →". Client side never sees them.
+14. **W4 — Unified the "needs you" surfaces.** The bell (quick glance) and the Inbox
+    (everything, incl. client messages/surveys/leads) competed. The bell popover now ends
+    with "See everything in your Inbox →" so they tell one story.
+15. **A7 — Suggest AI-image alt text.** Visual Studio asked you to type alt text into an
+    empty `prompt()`; it now pre-fills what you described the image as.
 
-## No-code comparison (vs the benchmarks)
-Every core workflow — add a lead, move a deal, send a proposal, sign a contract, edit the site, publish, approve, get paid, onboard — is completable with **buttons/forms only, no code**. Against the benchmarks: **competitive** with HubSpot/Zoho on CRM ease (and #1 above closes the one spot where they auto-sent and we didn't); **deliberately simpler/safer** than Wix/Webflow/WordPress on editing (form-based "can't-break-it"); and we **lead** the git-based hosts on publishing (one button vs. a deploy pipeline). The single remaining "harder for a non-coder than a competitor" item was the manual proposal/contract email — now fixed. The last no-code-for-*Eric* gap is the review-URL code edit (#8).
+---
 
-## Already excellent — do NOT rebuild
-Convert one-tap handoff (provision + project + bridge + welcome email, idempotent) · enquiry→deal with no re-typing · fully event-sourced delivery with derived notifications · one publish/preview/schedule/restore pipeline · `approve.html` (model email-approval flow) · the 8 CMS pages (calm, colour-independent, jargon-free) · portal messaging/upload internals (optimistic send + rollback + double-fire guards) · proactive nudges auto-derived · invoice→Stripe link auto-created · agency starter kits · Today/Inbox aggregation.
+## 🔑 Owner action remaining (only you can do this)
+8. **A2/C5 — Google review link.** `project-survey.html`'s review link is still
+   `…?placeid=YOUR_PLACE_ID`. The survey already *hides* the review button while the
+   placeholder is present (so no happy client hits a dead link), which means **zero
+   reviews are captured until you paste your real link**. Verify your Google Business
+   Profile → copy the review link → set `GOOGLE_REVIEW_URL` (one line near the top of the
+   survey's `<script>`). This is the single remaining "edit a value" step; everything
+   else is button/form driven. (Also added to `GO-LIVE-ACTIVATION-CHECKLIST.md §5b`.)
+
+## 🔴 Deferred — needs a browser to verify (I won't change auth/routing blind)
+16. **C4 — Password-setup via magic-link** instead of hand-copying a numeric code. This is
+    an auth-flow change; doing it blind risks breaking login. Do it with a browser open.
+17. **C3 — Two competing client homes.** `welcome.html` offers "Enter workspace" vs "Go to
+    portal"; pick one canonical landing server-side. Needs the edition/routing rules
+    confirmed against the live app.
+18. **W7 — Scheduling `prompt()` for ISO timestamps** → a `datetime-local` input in
+    `presence.html`. Native-input behavior wants a browser check.
+19. **C7 — Stage the 10-field brief** (ask 1–2 required first, reveal the rest). Frontend,
+    but best confirmed visually.
+
+## 🔑 Deferred — needs a policy call from you
+20. **A6 — Auto-nudge stale approvals.** Needs an email-cadence cap (how many days, how
+    often) so it never feels spammy — that's your call, and it wants the cron wired.
+21. **A3 — Auto-send the post-project survey on completion** + surface a consented 5★ quote
+    as a CRM note. Currently manual; the trigger point + cadence are a decision.
+22. **A4 — New-project templates** (a default task/milestone starter that "fills only
+    what's empty"). Needs your preferred default checklist.
+23. **W6 — "New project" can't attach an existing customer.** Only Convert builds the
+    client-visible bridge; a customer/deal picker on manual project creation would extend
+    that. Medium build; deferred with the other bridge work.
+
+## No-code comparison (unchanged conclusion)
+Every core workflow — add a lead, move a deal, send a proposal, sign a contract, edit the
+site, publish, approve, get paid, onboard, **now also see/answer support and request
+changes with context** — is completable with buttons/forms only. Competitive with
+HubSpot/Zoho on CRM ease (auto-send now matched), deliberately simpler/safer than
+Wix/Webflow on editing, and ahead of git-based hosts on publishing. The last
+"edit-a-value" gap for a non-coder is the review link (#8, owner).
+
+## Already excellent — did NOT rebuild
+Convert one-tap handoff · enquiry→deal with no re-typing · fully event-sourced delivery
+with derived notifications · one publish/preview/schedule/restore pipeline · `approve.html`
+· the 8 CMS pages · portal messaging/upload internals · proactive nudges · invoice→Stripe
+link · agency starter kits · Today/Inbox aggregation.
