@@ -34,7 +34,7 @@ import type { SiteRow } from '../lib/site.ts';
 /** Read the Google Search Console metrics that already live in the shared `signals`
  *  table (source='gsc', keyed by client_id). No new store, no ingestion — reuse.
  *  Returns hasData:false honestly when there's none (the state everywhere today). */
-async function readGsc(clientId: string | null | undefined): Promise<GscMetrics> {
+export async function readGsc(clientId: string | null | undefined): Promise<GscMetrics> {
   const empty: GscMetrics = { impressions: 0, clicks: 0, priorImpressions: null, priorClicks: null, ctr: null, position: null, period: '', hasData: false, totalImpressions: 0, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null };
   if (!clientId) return empty;
   const r = await svc(`signals?client_id=eq.${encodeURIComponent(clientId)}&source=eq.gsc&select=metric,value,period&order=period.desc&limit=48`);
@@ -60,7 +60,7 @@ async function readGsc(clientId: string | null | undefined): Promise<GscMetrics>
 
 const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
 /** Load recent visit rows for a site over the current + prior window (for trend). */
-async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRow[]> {
+export async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRow[]> {
   const startIso = new Date(nowMs - 2 * periodDays(period) * 86_400_000).toISOString();
   const r = await svc(`presence_visits?site_id=eq.${siteId}&ts=gte.${startIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`);
   return (Array.isArray((r as any).json) ? (r as any).json : []) as VisitRow[];
