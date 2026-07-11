@@ -510,8 +510,8 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   // sitemap (lastmod = snapshot time — the only clock the renderer may read)
   const lastmod = snapshot.created_at.slice(0, 10);
   const KEY_PATHS: Array<[string, string]> = [['offerings', '/menu/'], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
-  const urls = ['/', ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => p), '/privacy/', '/accessibility/', ...c.posts.filter((p) => !p.noindex).map((p) => `/updates/${p.slug}/`)];
-  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
+  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) }))];
+  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO
   {
