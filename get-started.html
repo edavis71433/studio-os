@@ -126,7 +126,7 @@ function wireIntake(){
   document.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{readIntake();INTAKE.services.splice(+b.getAttribute('data-rm'),1);if(!INTAKE.services.length)INTAKE.services=[''];renderIntake();}));
   $('addsvc').addEventListener('click',()=>{readIntake();INTAKE.services.push('');renderIntake();setTimeout(()=>{const el=document.querySelector('[data-svc="'+(INTAKE.services.length-1)+'"]');if(el)el.focus();},0);});
   $('build').addEventListener('click',build);
-  $('manual').addEventListener('click',async()=>{readIntake();await saveIndustry();location.href='/presence.html';});
+  $('manual').addEventListener('click',async()=>{readIntake();await saveIndustry();manualFallback('manual');});
 }
 
 // Phase T3: persist the industry — the site's template reads vocabFor(industry)
@@ -172,7 +172,7 @@ function manualFallback(reason){
   $('main').innerHTML=`
     <div class="eyebrow">Let’s set it up together</div>
     <h1>We’ll build it with you.</h1>
-    <p class="sub">${reason==='switched_off'?'Automatic drafting isn’t switched on yet — no problem. Your workspace has everything you need to build your site, one calm step at a time.':'The draft didn’t come through just now — nothing was lost. Let’s set it up in your workspace, one step at a time.'}</p>
+    <p class="sub">${reason==='manual'?'No problem — you’re in the driver’s seat. Your workspace has everything you need to build your site, one calm step at a time.':reason==='switched_off'?'Automatic drafting isn’t switched on yet — no problem. Your workspace has everything you need to build your site, one calm step at a time.':'The draft didn’t come through just now — nothing was lost. Let’s set it up in your workspace, one step at a time.'}</p>
     <div class="card">
       <div class="steps">
         <div class="step now"><span class="dot">1</span><span><span class="t">Add your business details</span><br><span class="w">Your name, what you do, how to reach you.</span></span></div>

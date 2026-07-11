@@ -233,7 +233,7 @@ export async function handleClientNotifications(req: Request, site: SiteRow, pri
   const lastSeen = rows(seenR)[0]?.last_seen_at || null;
   const items = [
     ...rows(evR).map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: notifHref(e.kind, e.project_id, e.detail || {}), created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
-    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${clean(r.subject, 60)}`, href: `/support#request-${r.id}`, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
+    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${clean(r.subject, 60)}`, href: `/client.html?support=${r.id}`, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
   ].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit);
   return json({ data: items, unread_count: items.filter((i) => !i.read).length }, 200, cors);
 }
