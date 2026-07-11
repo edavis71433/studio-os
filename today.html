@@ -147,7 +147,7 @@ function render(moments, features, feed, ctx){
     const _lnk = (href, label) => { let h = href; if(_sc && href.charAt(0)==='/'){ const p = href.split('#'); h = p[0] + (p[0].indexOf('?')>=0?'&':'?') + 'client=' + encodeURIComponent(_sc) + (p[1]?'#'+p[1]:''); } return `<a class="link" href="${h}">${label}</a>`; };
     const _sep = ' <span style="color:var(--soft)">·</span> ';
     const clearLinks = (hasWebsite
-      ? [['/attention.html','What needs you'],['/approval-center.html','Approvals'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/timeline.html','Website story'],['/upcoming.html','What’s next'],['/business-insights.html','Insights'],['/snapshot-history.html','Versions'],['/leads.html','Your messages']]
+      ? [['/attention.html','What needs you'],['/approval-center.html','Approvals'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/timeline.html','Website story'],['/upcoming.html','What’s next'],['/business-insights.html','Insights'],['/snapshot-history.html','Versions'],['/leads.html','Website enquiries']]
       : [['/crm.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
     html += `<div class="moment calm"><span class="tag">All clear</span>
