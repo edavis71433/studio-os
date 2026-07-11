@@ -109,15 +109,31 @@ export async function importImage(siteId: string, bytes: Uint8Array, mime: strin
 
 /** Delete: refuse while referenced (names the blockers); soft-delete row + remove object. */
 export async function deleteMedia(siteId: string, mediaId: string) {
-  const [off, posts, deliverables] = await Promise.all([
+  const [off, posts, deliverables, settingsQ] = await Promise.all([
     svc(`presence_offerings?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=name`),
     svc(`presence_posts?site_id=eq.${siteId}&hero_media_id=eq.${mediaId}&deleted_at=is.null&select=title`),
     svc(`presence_deliverables?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=title`), // P2-D: a shared deliverable protects its file
+    // FD-AUD1: the site's own presentation media — logo/OG/cover and any image
+    // embedded in a content block (gallery/team/before-after/video). Without this,
+    // deleting your logo or a gallery photo succeeds silently and the serializer
+    // drops it from every page — gone for good after the media_gc window.
+    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks&limit=1`),
   ]);
+  const s = Array.isArray(settingsQ.json) ? settingsQ.json[0] : null;
+  const siteRefs: string[] = [];
+  if (s) {
+    if (s.logo_media_id === mediaId) siteRefs.push('your logo');
+    if (s.og_media_id === mediaId) siteRefs.push('your social-share image');
+    if (s.cover_media_id === mediaId) siteRefs.push('your cover photo');
+    // blocks is a JSON column; media ids live inside it as UUID strings (exact,
+    // 36-char — no false substring match between distinct UUIDs).
+    if (s.blocks && JSON.stringify(s.blocks).includes(mediaId)) siteRefs.push('a section on your website');
+  }
   const refs = [
     ...(Array.isArray(off.json) ? off.json.map((o: any) => `menu item “${o.name}”`) : []),
     ...(Array.isArray(posts.json) ? posts.json.map((p: any) => `post “${p.title}”`) : []),
     ...(Array.isArray(deliverables.json) ? deliverables.json.map((d: any) => `deliverable “${d.title || 'file'}”`) : []),
+    ...siteRefs,
   ];
   if (refs.length) return { error: 'in_use', message: `That image is used by ${refs.join(' and ')} — remove it there first.` };
 

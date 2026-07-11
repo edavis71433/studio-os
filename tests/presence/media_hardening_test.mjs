@@ -103,6 +103,9 @@ ok('short: truncated JPEG (2 bytes) declared image/jpeg → REJECTED', magicMatc
   ok('tenant: quota usage query is SITE-scoped (no cross-tenant count)', /presence_media\?site_id=eq\.\$\{siteId\}&deleted_at=is\.null&select=bytes/.test(media));
   ok('wiring: importImage validates magic bytes (rejects polyglots)', /magicMatchesMime\(bytes, mime\)/.test(media) && /invalid_image/.test(media));
   ok('wiring: importImage strips EXIF from the stored JPEG original', /stripJpegExif\(bytes\)/.test(media));
+  // FD-AUD1: delete must refuse while the image is the site's logo/OG/cover or embedded in a block
+  ok('delete-guard: deleteMedia checks presence_settings (logo/og/cover/blocks) before deleting', /presence_settings\?site_id=eq\.\$\{siteId\}&select=logo_media_id,og_media_id,cover_media_id,blocks/.test(media));
+  ok('delete-guard: logo/og/cover/block references block the delete with a named reason', /logo_media_id === mediaId/.test(media) && /your logo/.test(media) && /a section on your website/.test(media));
 
   const sys = read('supabase/functions/presence/routes/system.ts');
   ok('wiring: media GC runs on the default cron cycle (no owner cron change)', /const media_gc = await reapMedia\(/.test(sys));
