@@ -10252,33 +10252,33 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       const url = String(body.url || '').trim();
       if (!email) return json({ error: 'email required' }, 400);
 
+      const businessType = String(body.businessType || '').trim();
+      const page = String(body.page || '').trim();
+      const referrer = String(body.referrer || '').trim();
       try {
-        const key = SB_SERVICE || Deno.env.get('SUPABASE_ANON_KEY') || '';
-        if (key) {
-          await fetch(`${SB_URL}/rest/v1/audit_leads`, {
-            method: 'POST',
-            headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-            body: JSON.stringify({
-              tool: 'report_card',
-              business_name: name || null,
-              client_email: email,
-              url: url || null,
-              city: city || null,
-            }),
-          });
-        }
+        // De-duplicated capture into the shared audit_leads workflow (no parallel
+        // system); preserves business type + page/referrer context for the studio.
+        await recordAuditLead({
+          tool: 'report_card',
+          business_name: name || null,
+          client_email: email,
+          url: url || null,
+          city: city || null,
+          business_type: businessType || null,
+          findings: (page || referrer) ? { page: page || null, referrer: referrer || null } : undefined,
+        });
       } catch (_e) { /* lead capture is best-effort */ }
 
       let visitorEmailed = false;
       try {
         visitorEmailed = await emailOk(
           email,
-          'Your Digital Report Card is on the way',
+          'Got your Digital Report Card request',
           notifyShell(
-            'Your Digital Report Card is on the way',
+            'Got your request — thank you',
             [
-              `Thanks${name ? ', ' + name : ''}! I've received your request and I'm putting together your free Digital Report Card now.`,
-              'Expect it within a few minutes. If you don\'t see it, check your spam folder, or just reply to this email and I\'ll resend it.',
+              `Thanks${name ? ', ' + name : ''}! I've received your request for a free Digital Report Card.`,
+              'I put these together personally, so it isn\'t instant — expect it in your inbox usually within one business day. If you don\'t see it, check your spam folder, or just reply to this email.',
             ],
           ),
         );
@@ -10288,11 +10288,12 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       try {
         ericEmailed = await emailOk(
           ERIC,
-          `Report Card request: ${name || email}`,
+          `New Website Enquiry — Digital Report Card — ${name || email}`,
           notifyShell(
             'New Digital Report Card request',
             [
               `Business: ${name || '(not provided)'}`,
+              `Business type: ${businessType || '(not provided)'}`,
               `Email: ${email}`,
               `City: ${city || '(not provided)'}`,
               `Website: ${url || '(not provided)'}`,
