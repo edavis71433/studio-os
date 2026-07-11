@@ -1,0 +1,25 @@
+/* Studio OS — shared design system for the customer CMS experience (CMS-UX 1–8).
+   Single source of truth for the palette + the shared page primitives. Loaded by
+   every /cms customer page BEFORE its bespoke component styles and before
+   shell.css, preserving the original cascade. Token superset covers every
+   variable any page references (incl. --faint and --bad). */
+:root{
+  --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;
+  --accent:#5b3fa0;--accent-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;
+  --warn:#8a6d3b;--warn-soft:#f3ead9;--bad:#a2453f;--bad-soft:#f6e6e4;
+  --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--bad:#e2938c;--bad-soft:#2c1a19;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+:root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--bad:#a2453f;--bad-soft:#f6e6e4}
+:root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--bad:#e2938c;--bad-soft:#2c1a19}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:680px;margin:0 auto;padding:44px 22px 96px}
+a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
+header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
+a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+.spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
