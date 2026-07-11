@@ -1430,12 +1430,12 @@ input:focus, textarea:focus, select:focus{ border-color:var(--p); box-shadow:0 0
         <h2 style="font-family:var(--serif);font-size:28px;font-weight:400;margin-bottom:6px;">Project Brief</h2>
         <p style="font-size:13px;color:var(--muted);margin-bottom:24px;">Help me understand your business so I can build exactly what you need.</p>
         <div class="card" id="briefFormCard">
-          <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card-body brief-grid" style="gap:16px 22px;">
             <div>
               <label for="b-tagline" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">One-line tagline for your business</label>
               <input id="b-tagline" style="width:100%;padding:10px 14px;border:1.5px solid rgba(91,63,160,0.15);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;" placeholder="e.g. A wine bar where jazz and food meet in Pasadena">
             </div>
-            <div>
+            <div class="brief-full">
               <label for="b-goal" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Primary goal for this project *</label>
               <textarea id="b-goal" rows="3" style="width:100%;padding:10px 14px;border:1.5px solid rgba(91,63,160,0.15);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;resize:vertical;" placeholder="e.g. Get more reservations and private event bookings from Google"></textarea>
             </div>
@@ -1463,15 +1463,15 @@ input:focus, textarea:focus, select:focus{ border-color:var(--p); box-shadow:0 0
               <label for="b-donts" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Things you don't want on the site</label>
               <input id="b-donts" style="width:100%;padding:10px 14px;border:1.5px solid rgba(91,63,160,0.15);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;" placeholder="e.g. No stock photos, no overly corporate feel">
             </div>
-            <div>
+            <div class="brief-full">
               <label for="b-logins" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Existing platform logins to share (optional)</label>
               <textarea id="b-logins" rows="2" style="width:100%;padding:10px 14px;border:1.5px solid rgba(91,63,160,0.15);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;resize:vertical;" placeholder="e.g. WordPress login, Google Business, Yelp — these stay private in the portal"></textarea>
             </div>
-            <div>
+            <div class="brief-full">
               <label for="b-other" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Anything else I should know?</label>
               <textarea id="b-other" rows="3" style="width:100%;padding:10px 14px;border:1.5px solid rgba(91,63,160,0.15);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;resize:vertical;" placeholder="Open field — deadlines, special requests, context about your business"></textarea>
             </div>
-            <button onclick="submitBrief()" style="background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;align-self:flex-start;">Submit brief →</button>
+            <button onclick="submitBrief()" class="brief-full" style="background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;justify-self:start;">Submit brief →</button>
           </div>
         </div>
         <div class="card" id="briefSubmitted" style="display:none;">
@@ -5041,7 +5041,7 @@ function renderHQFallback(){
 }
 
 /* ── READING MEASURE ── a calm page is a narrow page. */
-.main-content{ max-width:820px; margin-left:auto; margin-right:auto; padding:34px 28px 80px; }
+.main-content{ max-width:1040px; margin-left:auto; margin-right:auto; padding:34px 28px 80px; }
 @media(max-width:768px){ .main-content{ padding:20px 16px 96px; } }
 
 /* ── TYPOGRAPHY HIERARCHY ── */
