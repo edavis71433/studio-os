@@ -68,5 +68,24 @@ Never emitted: table names, database ids, internal event `kind` strings, provide
 - Human **browser/mobile/AT pass** on the rendered timeline.
 - Prod deploy of the function (additive read-only route; the customer page stays behind the push fence).
 
+## CMS-UX-2.1 — Milestones (polish pass)
+A polish pass only — the normal timeline is unchanged; milestones appear **inline** (no separate page) with a second, celebratory visual treatment. Every milestone is backed by a **real row** — nothing is fabricated.
+
+**Milestones surfaced (evidence → treatment):**
+| Milestone | Real evidence | How |
+|---|---|---|
+| Your website went live | earliest `presence_publishes` (`status=live, kind=publish`, `order=asc limit 1`) | upgrade the first-publish row in place, or synthesise if it predates the fetch window |
+| Your domain is connected | `presence_infra_plans` (`connect_domain`, `applied`) | flag existing event |
+| Your first website enquiry | earliest non-spam `presence_form_submissions` | upgrade/synthesise |
+| Your first testimonial is up | earliest `presence_change_events` (`testimonial`,`create`) | upgrade/synthesise |
+| Online for N years | anniversary of going-live (`onlineSince` = first publish) | synthesised, one per whole year passed |
+| A project milestone | `presence_project_events` (`project_created`/`milestone_created`/`milestone_completed`, client-visible) | flag existing event |
+
+**Deliberately NOT shown (no reliable evidence):** first review, "major redesign completed", Growth-Partnership-started — omitted rather than guessed (same honesty rule as SSL / review-response).
+
+**How it works:** three extra `asc limit 1` probes in the route find the earliest live-publish / enquiry / testimonial (the real "first" evidence). The pure adapter upgrades the matching in-window event in place (`milestone: true` + celebratory title + emoji), and for evidence older than the fetch window it synthesises the celebration from the probed timestamp — so no duplicate ever appears (`matched` guard). Anniversaries are computed deterministically against the passed-in `now`. Output adds one field: `milestone?: boolean`; the frontend renders those with a warm accent card + filled node + "Milestone" ribbon. No new route, table, or event system.
+
+**Validation:** `website_timeline_test.mjs` now **80/80** (adds: no-signal-no-fabrication, first-publish upgrade-in-place with no dup, synthesise-when-older-than-window, first enquiry/testimonial, anniversaries incl. the pre-one-year guard, project-milestone flagging, milestone client-safety). Regression 142/142; typecheck clean; redeployed to staging (401 auth-gated).
+
 ## Boundaries respected
-Stopped at CMS-UX-2. Did **not** begin CMS-UX-3, the Website Navigator, design-system work, or portal retirement.
+Stopped at CMS-UX-2 / 2.1. Did **not** begin the Website Navigator, design-system work, or portal retirement. (CMS-UX-3 — the Website Attention Center — is the next authorised step.)

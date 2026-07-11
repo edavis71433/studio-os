@@ -132,8 +132,10 @@ const group = (t, key) => t.groups.find((g) => g.key === key);
 {
   const t = build({ domainActions: [{ id: 'd1', title: 'yourshop.com', applied_at: '2026-07-08T09:00:00Z', created_at: '2026-07-08T08:00:00Z' }] });
   const e = allEvents(t)[0];
-  eq('11 domain milestone title', e.title, 'Your domain was connected');
+  eq('11 domain milestone title', e.title, 'Your domain is connected');
   eq('11 category Milestones', e.category, 'Milestones');
+  ok('11 flagged as a milestone', e.milestone === true);
+  eq('11 celebratory icon', e.icon, '🌐');
 }
 
 // 12. Project events: categorise + reuse notifLabel; internal churn omitted
@@ -202,6 +204,94 @@ const group = (t, key) => t.groups.find((g) => g.key === key);
   eq('16 all four sources merged into one day', today.length, 4);
   eq('16 newest first within the day', today[0].category, 'Content');       // 11:00 offering edit
   ok('16 spans categories', new Set(today.map((e) => e.category)).size >= 3);
+}
+
+// ── CMS-UX-2.1 — evidence-backed milestones, celebrated inline ───────────────
+
+// 17. No milestone signals → no fabricated milestones (normal events unchanged)
+{
+  const t = build({ publishes: [{ id: 'p1', status: 'live', created_at: '2026-07-08T09:00:00Z' }] });
+  const e = allEvents(t)[0];
+  ok('17 ordinary publish is not a milestone', !e.milestone);
+  eq('17 stays Published the site', e.title, 'Published the site');
+}
+
+// 18. First live publish (in window) → upgraded in place to a milestone
+{
+  const t = build({
+    publishes: [
+      { id: 'p2', status: 'live', created_at: '2026-07-08T10:00:00Z' },
+      { id: 'p1', status: 'live', created_at: '2026-07-01T09:00:00Z' },
+    ],
+    milestones: { firstPublishId: 'p1', firstPublishAt: '2026-07-01T09:00:00Z', onlineSince: '2026-07-01T09:00:00Z' },
+  });
+  const live = allEvents(t).find((e) => e.milestone);
+  eq('18 exactly one milestone (no dup)', allEvents(t).filter((e) => e.milestone).length, 1);
+  eq('18 first publish → went live', live?.title, 'Your website went live');
+  eq('18 celebratory icon', live?.icon, '🎉');
+  eq('18 category Milestones', live?.category, 'Milestones');
+  const other = allEvents(t).find((e) => !e.milestone);
+  eq('18 later publish stays ordinary', other?.title, 'Published the site');
+}
+
+// 19. First publish OLDER than the window → synthesised from the probe (no dup)
+{
+  const t = build({
+    publishes: [{ id: 'recent', status: 'live', created_at: '2026-07-08T10:00:00Z' }],
+    milestones: { firstPublishId: 'old', firstPublishAt: '2025-01-01T09:00:00Z', onlineSince: '2025-01-01T09:00:00Z' },
+  });
+  const live = allEvents(t).find((e) => e.title === 'Your website went live');
+  ok('19 synthesised milestone present', !!live && live.milestone === true);
+  eq('19 dated to first publish', live?.at, '2025-01-01T09:00:00Z');
+  eq('19 lands in Earlier', group(t, 'earlier')?.events.some((e) => e.milestone), true);
+}
+
+// 20. First enquiry + first testimonial celebrated
+{
+  const t = build({
+    enquiries: [{ id: 'e1', form_kind: 'contact', name: 'Jo', created_at: '2026-07-08T09:00:00Z' }],
+    changes: [{ id: 't1', entity_type: 'testimonial', action: 'create', created_at: '2026-07-07T09:00:00Z' }],
+    milestones: { firstEnquiryId: 'e1', firstEnquiryAt: '2026-07-08T09:00:00Z', firstTestimonialId: 't1', firstTestimonialAt: '2026-07-07T09:00:00Z' },
+  });
+  const enq = allEvents(t).find((e) => e.title === 'Your first website enquiry');
+  const tst = allEvents(t).find((e) => e.title === 'Your first testimonial is up');
+  ok('20 first enquiry milestone', enq?.milestone === true && enq.icon === '⭐');
+  ok('20 first testimonial milestone', tst?.milestone === true && tst.icon === '⭐');
+}
+
+// 21. Anniversary — one per whole year online, dated to the anniversary
+{
+  const t = build({ milestones: { onlineSince: '2024-07-01T00:00:00Z' } });  // NOW = 2026-07-08 → 2 years
+  const anns = allEvents(t).filter((e) => /online for/.test(e.title));
+  eq('21 two anniversaries passed', anns.length, 2);
+  ok('21 one-year wording', anns.some((e) => e.title === 'Your website has been online for one year'));
+  ok('21 all flagged milestone + 📈', anns.every((e) => e.milestone === true && e.icon === '📈'));
+}
+
+// 22. No anniversary before the first year elapses
+{
+  const t = build({ milestones: { onlineSince: '2026-06-01T00:00:00Z' } });  // < 1 year
+  ok('22 no premature anniversary', !allEvents(t).some((e) => /online for/.test(e.title)));
+}
+
+// 23. Project milestone events are celebrated; messages/support are not
+{
+  const t = build({ projectEvents: [
+    { id: 'm', kind: 'milestone_completed', actor_kind: 'staff', created_at: '2026-07-08T09:00:00Z' },
+    { id: 'g', kind: 'message', actor_kind: 'staff', created_at: '2026-07-08T08:00:00Z' },
+  ] });
+  const ms = allEvents(t).find((e) => e.category === 'Milestones');
+  const msg = allEvents(t).find((e) => e.category === 'Communication');
+  ok('23 project milestone flagged', ms?.milestone === true);
+  ok('23 message not a milestone', !msg?.milestone);
+}
+
+// 24. Milestone flag never leaks internals (still client-safe)
+{
+  const t = build({ milestones: { firstPublishAt: '2026-07-01T09:00:00Z', firstPublishId: 'secret-uuid', onlineSince: '2026-07-01T09:00:00Z' } });
+  const s = JSON.stringify(t);
+  ok('24 no probe id leaks via milestones', !s.includes('secret-uuid'));
+  ok('24 milestone is a plain boolean', allEvents(t).every((e) => e.milestone === undefined || e.milestone === true));
 }
 
 console.log(fail === 0

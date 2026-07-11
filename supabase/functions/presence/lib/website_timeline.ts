@@ -32,6 +32,17 @@ export interface RawLaunch { id: string; name?: string; status?: string; created
 export interface RawDomainAction { id: string; title?: string; applied_at?: string; created_at: string }
 export interface RawProjectEvent { id: string; kind: string; actor_kind?: string; detail?: Record<string, unknown>; created_at: string }
 
+// CMS-UX-2.1 — first-of-a-kind signals, each backed by a REAL row the route
+// probed (earliest live publish / enquiry / testimonial). `onlineSince` anchors
+// anniversaries to when the site actually went live. Every one is optional; a
+// milestone is only ever surfaced when its evidence is present.
+export interface MilestoneSignals {
+  firstPublishId?: string; firstPublishAt?: string;
+  firstEnquiryId?: string; firstEnquiryAt?: string;
+  firstTestimonialId?: string; firstTestimonialAt?: string;
+  onlineSince?: string;
+}
+
 export interface WebsiteTimelineInput {
   now: string;
   publishes: RawPublish[];
@@ -43,6 +54,7 @@ export interface WebsiteTimelineInput {
   launches: RawLaunch[];
   domainActions: RawDomainAction[];
   projectEvents: RawProjectEvent[];
+  milestones?: MilestoneSignals;
 }
 
 // ── client-safe output ───────────────────────────────────────────────────────
@@ -58,6 +70,7 @@ export interface TimelineEvent {
   actor: string;              // "You" | "Your studio" | "Automatic" | "A visitor"
   href?: string;              // an existing customer page, optionally deep-linked
   related_page?: string;      // a friendly page name
+  milestone?: boolean;        // CMS-UX-2.1 — a celebratory, evidence-backed moment
 }
 export interface TimelineGroup { key: 'upcoming' | 'today' | 'yesterday' | 'this_week' | 'earlier'; label: string; events: TimelineEvent[] }
 export interface WebsiteTimeline {
@@ -89,7 +102,10 @@ const SECTION_TAB: Record<string, string> = {
   media: 'media', redirect: 'business',
 };
 
-interface Internal { at: string; category: TimelineCategory; actor: string; title: string; description?: string; href?: string; related_page?: string }
+interface Internal { at: string; category: TimelineCategory; actor: string; title: string; description?: string; href?: string; related_page?: string; milestone?: boolean; iconOverride?: string }
+
+// celebratory emoji per milestone — encouraging, not childish
+const M_LIVE = '🎉', M_STAR = '⭐', M_DOMAIN = '🌐', M_ANNIV = '📈', M_PROJECT = '🎉';
 
 const trim = (s?: string, n = 140): string | undefined => {
   if (!s) return undefined;
@@ -117,16 +133,40 @@ const GROUP_LABEL: Record<TimelineGroup['key'], string> = {
 };
 const GROUP_ORDER: TimelineGroup['key'][] = ['upcoming', 'today', 'yesterday', 'this_week', 'earlier'];
 
+// Whole-year anniversaries of going live that have already passed, each dated to
+// the anniversary itself. Pure + deterministic (compares against passed-in now).
+function anniversaries(onlineSince: string, now: string): Array<{ years: number; at: string }> {
+  const start = new Date(onlineSince), tn = Date.parse(now);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(tn)) return [];
+  const out: Array<{ years: number; at: string }> = [];
+  for (let y = 1; y <= 25; y++) {
+    const d = new Date(start); d.setUTCFullYear(d.getUTCFullYear() + y);
+    if (d.getTime() > tn) break;
+    out.push({ years: y, at: d.toISOString() });
+  }
+  return out;
+}
+
 /** Build the calm, grouped Website Timeline from existing events. Pure. */
 export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeline {
   const now = input.now;
+  const ms = input.milestones || {};
   const events: Internal[] = [];
   const item = (m: TimelineItem) => ({ title: m.title, description: trim(m.detail), at: m.at });
+  // which first-of-a-kind signals were upgraded in place (so we don't also
+  // synthesise a duplicate for an event still inside the fetch window)
+  const matched = { publish: false, enquiry: false, testimonial: false };
 
   // Published / restored — REUSE mapPublish
   for (const r of input.publishes || []) {
     const m = item(mapPublish(r));
-    events.push({ ...m, category: 'Publishing', actor: actorOf(r.actor_kind) || 'You', href: '/presence.html#history', related_page: 'Your website' });
+    const isFirst = !!ms.firstPublishId && r.id === ms.firstPublishId && r.status !== 'failed' && r.kind !== 'restore';
+    if (isFirst) matched.publish = true;
+    events.push({
+      ...m, category: isFirst ? 'Milestones' : 'Publishing', actor: actorOf(r.actor_kind) || 'You',
+      href: '/presence.html#history', related_page: 'Your website',
+      ...(isFirst ? { title: 'Your website went live', description: m.description || 'Your site was published for the very first time.', milestone: true, iconOverride: M_LIVE } : {}),
+    });
   }
 
   // Content edits — REUSE mapChange; drop publish/restore (covered above) and internal notes
@@ -135,12 +175,15 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
     const m = item(mapChange(r));
     const isSite = r.entity_type === 'domain' || r.entity_type === 'site';
     const tab = SECTION_TAB[r.entity_type];
+    const isFirstTestimonial = !!ms.firstTestimonialId && r.id === ms.firstTestimonialId;
+    if (isFirstTestimonial) matched.testimonial = true;
     events.push({
       ...m,
-      category: isSite ? 'Website' : 'Content',
+      category: isFirstTestimonial ? 'Milestones' : (isSite ? 'Website' : 'Content'),
       actor: actorOf(r.actor_kind) || 'You',
       href: isSite ? '/presence.html#foundations' : (tab ? `/presence.html#${tab}` : '/presence.html'),
       related_page: 'Your website',
+      ...(isFirstTestimonial ? { title: 'Your first testimonial is up', milestone: true, iconOverride: M_STAR } : {}),
     });
   }
 
@@ -159,7 +202,13 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
   // Enquiries from the site — REUSE mapLead
   for (const r of input.enquiries || []) {
     const m = item(mapLead(r));
-    events.push({ ...m, category: 'Communication', actor: 'A visitor', href: '/leads.html', related_page: 'Your messages' });
+    const isFirst = !!ms.firstEnquiryId && r.id === ms.firstEnquiryId;
+    if (isFirst) matched.enquiry = true;
+    events.push({
+      ...m, category: isFirst ? 'Milestones' : 'Communication', actor: 'A visitor',
+      href: '/leads.html', related_page: 'Your messages',
+      ...(isFirst ? { title: 'Your first website enquiry', description: m.description || 'Someone reached out through your website for the first time.', milestone: true, iconOverride: M_STAR } : {}),
+    });
   }
 
   // Scheduled publishes — future-dated → "Coming up"
@@ -194,23 +243,48 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
     events.push({
       at: r.applied_at || r.created_at,
       category: 'Milestones', actor: 'You',
-      title: 'Your domain was connected',
+      title: 'Your domain is connected',
       description: trim(r.title),
       href: '/presence.html#foundations', related_page: 'Your website',
+      milestone: true, iconOverride: M_DOMAIN,
     });
   }
 
   // Project delivery events (bridged) — REUSE notifLabel; customer pages only
+  const PROJECT_MILESTONE = new Set(['project_created', 'milestone_created', 'milestone_completed']);
   for (const r of input.projectEvents || []) {
     const cat = projectCategory(r.kind);
     if (!cat) continue; // internal-only kinds (e.g. bare task churn) are skipped
+    const isMilestone = PROJECT_MILESTONE.has(r.kind);
     events.push({
       at: r.created_at,
       category: cat, actor: actorOf(r.actor_kind) || 'Your studio',
       title: notifLabel(r.kind),
       description: trim(typeof r.detail?.title === 'string' ? r.detail.title as string : undefined),
       href: '/client.html', related_page: 'Your project',
+      ...(isMilestone ? { milestone: true, iconOverride: M_PROJECT } : {}),
     });
+  }
+
+  // ── CMS-UX-2.1 milestones with evidence outside the fetch window ───────────
+  // If a first-of-a-kind event is older than what we fetched, its normal row
+  // isn't present to upgrade — so synthesise the celebration from the probed
+  // timestamp. (Only ever when the signal — i.e. a real row — exists.)
+  if (ms.firstPublishAt && !matched.publish) {
+    events.push({ at: ms.firstPublishAt, category: 'Milestones', actor: 'You', title: 'Your website went live', description: 'Your site was published for the very first time.', href: '/presence.html#history', related_page: 'Your website', milestone: true, iconOverride: M_LIVE });
+  }
+  if (ms.firstEnquiryAt && !matched.enquiry) {
+    events.push({ at: ms.firstEnquiryAt, category: 'Milestones', actor: 'A visitor', title: 'Your first website enquiry', description: 'Someone reached out through your website for the first time.', href: '/leads.html', related_page: 'Your messages', milestone: true, iconOverride: M_STAR });
+  }
+  if (ms.firstTestimonialAt && !matched.testimonial) {
+    events.push({ at: ms.firstTestimonialAt, category: 'Milestones', actor: 'You', title: 'Your first testimonial is up', href: '/presence.html#testimonials', related_page: 'Your website', milestone: true, iconOverride: M_STAR });
+  }
+  // Anniversaries — anchored to when the site actually went live. One calm
+  // celebration per whole year that has already passed.
+  if (ms.onlineSince) {
+    for (const a of anniversaries(ms.onlineSince, now)) {
+      events.push({ at: a.at, category: 'Milestones', actor: 'Automatic', title: a.years === 1 ? 'Your website has been online for one year' : `Your website has been online for ${a.years} years`, description: 'A year of being found online — here’s to the next.', related_page: 'Your website', milestone: true, iconOverride: M_ANNIV });
+    }
   }
 
   // sort newest-first, cap, then bucket by day
@@ -226,11 +300,12 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
       description: e.description,
       at: e.at,
       when: humanWhen(e.at, now),
-      icon: ICON[e.category],
+      icon: e.iconOverride || ICON[e.category],
       category: e.category,
       actor: e.actor,
       href: e.href,
       related_page: e.related_page,
+      ...(e.milestone ? { milestone: true } : {}),
     });
     byKey.set(key, list);
   }

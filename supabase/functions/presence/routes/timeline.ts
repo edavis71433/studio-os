@@ -23,7 +23,9 @@ export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, 
   const now = new Date().toISOString();
 
   // ── the customer's OWN site: one bounded parallel gather ───────────────────
-  const [pubs, changes, conns, moments, enquiries, scheduled, launches, domain] = await Promise.all([
+  // The last three probes (asc, limit 1) find the EARLIEST live publish / enquiry
+  // / testimonial — the real evidence behind the "first …" milestones (CMS-UX-2.1).
+  const [pubs, changes, conns, moments, enquiries, scheduled, launches, domain, firstPub, firstEnq, firstTest] = await Promise.all([
     svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,actor_kind,created_at,completed_at&order=created_at.desc&limit=25`),
     svc(`presence_change_events?site_id=eq.${site.id}&select=id,entity_type,action,summary,actor_kind,created_at&order=created_at.desc&limit=40`),
     svc(`presence_connection_events?site_id=eq.${site.id}&select=id,provider_key,action,actor_kind,created_at&order=created_at.desc&limit=15`),
@@ -32,10 +34,22 @@ export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, 
     svc(`presence_scheduled_publishes?site_id=eq.${site.id}&status=eq.pending&select=id,scheduled_for,summary,kind,created_at&order=scheduled_for.asc&limit=5`),
     svc(`presence_launches?site_id=eq.${site.id}&select=id,name,status,created_at,updated_at,approved_at&order=created_at.desc&limit=15`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&kind=eq.connect_domain&status=eq.applied&select=id,title,applied_at,created_at&order=created_at.desc&limit=5`),
+    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&kind=eq.publish&select=id,created_at,completed_at&order=created_at.asc&limit=1`),
+    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,created_at&order=created_at.asc&limit=1`),
+    svc(`presence_change_events?site_id=eq.${site.id}&entity_type=eq.testimonial&action=eq.create&select=id,created_at&order=created_at.asc&limit=1`),
   ]);
 
   // provider display names, resolved server-side (never the raw key on screen)
   const connections = arr(conns).map((r) => ({ ...r, provider_label: PROVIDER_LABEL[r.provider_key] }));
+
+  // first-of-a-kind signals — only present when a real row backs them
+  const fp = arr(firstPub)[0], fe = arr(firstEnq)[0], ft = arr(firstTest)[0];
+  const milestones = {
+    firstPublishId: fp?.id, firstPublishAt: fp ? (fp.completed_at || fp.created_at) : undefined,
+    firstEnquiryId: fe?.id, firstEnquiryAt: fe?.created_at,
+    firstTestimonialId: ft?.id, firstTestimonialAt: ft?.created_at,
+    onlineSince: fp ? (fp.completed_at || fp.created_at) : undefined,
+  };
 
   // ── their linked project(s), if bridged: client-visible events only ────────
   let projectEvents: any[] = [];
@@ -65,6 +79,7 @@ export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, 
     launches: arr(launches),
     domainActions: arr(domain),
     projectEvents,
+    milestones,
   });
 
   return json({ data: timeline }, 200, cors);

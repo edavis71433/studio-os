@@ -38,6 +38,16 @@
   .node{flex:none;width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--line);
     display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:var(--shadow);z-index:1}
   .body{flex:1;min-width:0;padding-top:2px}
+
+  /* CMS-UX-2.1 — the milestone treatment: a warm, celebratory card. Calm, not loud. */
+  li.event.is-milestone{padding-bottom:22px}
+  li.event.is-milestone .node{background:var(--accent);border-color:var(--accent);color:#fff;
+    box-shadow:0 0 0 5px var(--accent-soft),var(--shadow)}
+  li.event.is-milestone .body{background:linear-gradient(180deg,var(--accent-soft),transparent);
+    border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-top:-4px}
+  li.event.is-milestone .etitle{font-family:var(--serif);font-weight:500;font-size:18px}
+  li.event.is-milestone .mtag{display:inline-block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--accent);font-weight:700;margin-bottom:3px}
   .etitle{font-size:15.5px;font-weight:600;margin:0;line-height:1.35;color:var(--ink);text-wrap:pretty}
   .edesc{margin:3px 0 0;font-size:14px;color:var(--soft);line-height:1.45}
   .meta{margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--faint)}
@@ -101,13 +111,16 @@ function eventRow(e){
   const link = href(e.href);
   const go = link ? `<a class="go" href="${esc(link)}">${esc(e.related_page ? 'Open '+e.related_page : 'View')}</a>` : '';
   const bits = [];
-  if(e.category) bits.push(`<span class="cat">${esc(e.category)}</span>`);
+  if(!e.milestone && e.category) bits.push(`<span class="cat">${esc(e.category)}</span>`);
   if(e.actor) bits.push(`<span>${esc(e.actor)}</span>`);
   if(e.when) bits.push(`<span>${esc(e.when)}</span>`);
   const meta = bits.join('<span class="dot"></span>');
-  return `<li class="event">
+  // milestones get a second, celebratory treatment — same rail, warmer card
+  const tag = e.milestone ? `<span class="mtag">Milestone</span>` : '';
+  return `<li class="event${e.milestone ? ' is-milestone' : ''}">
     <span class="node" aria-hidden="true">${esc(e.icon || '•')}</span>
     <div class="body">
+      ${tag}
       <p class="etitle">${esc(e.title)}</p>
       ${e.description ? `<p class="edesc">${esc(e.description)}</p>` : ''}
       <div class="meta">${meta}${go}</div>
