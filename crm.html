@@ -147,13 +147,15 @@ function render(profile,summary,notes,items,studio){
   if(studio && profile.pending_approvals>0){
     html+=`<section><h2>Waiting on the client</h2><div class="card"><p class="muted" style="margin-bottom:12px">${profile.pending_approvals} ${profile.pending_approvals===1?'change is':'changes are'} waiting for approval. Send a plain email with a one-tap approve link.</p><button class="primary" id="notifyapprove">Email the client to approve</button></div></section>`;
   }
-  // integrated doorways (no duplication — these open the existing surfaces)
+  // integrated doorways (no duplication — these open the existing surfaces).
+  // Carry the agency ?client= scope so drilling in never loses the client context.
+  const _q=(()=>{const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';})();
   html+=`<section><h2>Open in context</h2><div class="links">
-    <a class="link" href="/today.html">Today →</a>
-    <a class="link" href="/leads.html">Website enquiries →</a>
-    <a class="link" href="/connections.html">Connected services →</a>
-    <a class="link" href="/presence.html">Website & publishing →</a>
-    <a class="link" href="/sharing.html">Sharing & access →</a>
+    <a class="link" href="/today.html${_q}">Today →</a>
+    <a class="link" href="/leads.html${_q}">Website enquiries →</a>
+    <a class="link" href="/connections.html${_q}">Connected services →</a>
+    <a class="link" href="/presence.html${_q}">Website & publishing →</a>
+    <a class="link" href="/sharing.html${_q}">Sharing & access →</a>
     <a class="link" href="#" id="exportlink">Export everything →</a></div></section>`;
 
   $('main').innerHTML=html;wire();

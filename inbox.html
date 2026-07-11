@@ -76,7 +76,7 @@ function render(feed,leads,notifs){
 
   if(newLeads.length){h+=`<h2>New messages</h2>`;
     for(const l of newLeads){const who=esc(l.name||l.email||'Someone');
-      h+=`<a class="item lead" href="/leads.html"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open enquiry →</div></a>`;}}
+      h+=`<a class="item lead" href="${scoped('/leads.html')}"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open enquiry →</div></a>`;}}
 
   if(activity.length){h+=`<h2>Project activity</h2>`;
     for(const n of activity){h+=`<a class="item" href="${scoped(notifLink(n))}"><div class="who">${esc(n.label||'Activity')}</div><div class="go">Open →</div></a>`;}}
