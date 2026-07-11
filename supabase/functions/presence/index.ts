@@ -41,6 +41,7 @@ import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleWebsiteTimeline } from './routes/timeline.ts';
+import { handleAttentionCenter } from './routes/attention.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
@@ -401,6 +402,7 @@ serve(async (req) => {
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
   if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
+  if (route === '/attention' && method === 'GET') return handleAttentionCenter(site, cors);
   if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
   {
     const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);

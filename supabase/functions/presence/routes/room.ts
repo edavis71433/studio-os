@@ -144,9 +144,13 @@ export async function handleChanges(site: SiteRow, cors: Record<string, string>)
 // ONE bounded projection: the same draft/live/validate/diff/publish reads the
 // room already makes, plus a single scheduled-publish probe, fed to the pure
 // buildContentTree adapter. Nothing new is stored; the client-safe shape only.
-export async function handleContentTree(site: SiteRow, cors: Record<string, string>) {
+/** Assemble the Content Tree for a site (the one gather, shared). Returns null
+ *  only when the template is unavailable. Reused by /content-tree and the
+ *  CMS-UX-3 Attention Center so the validation → customer-safe status mapping
+ *  lives in exactly one place. */
+export async function siteContentTree(site: SiteRow): Promise<ReturnType<typeof buildContentTree> | null> {
   const t = getTemplate(site.template_slug, site.template_version);
-  if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
+  if (!t) return null;
   const now = new Date().toISOString();
 
   const [{ snapshot }, lastLiveQ, lastAnyQ, schedQ] = await Promise.all([
@@ -168,7 +172,7 @@ export async function handleContentTree(site: SiteRow, cors: Record<string, stri
   const validation = validateSnapshot(snapshot, t.manifest);
   const changes = describeChanges(snapshot.content, liveContent);
 
-  const tree = buildContentTree({
+  return buildContentTree({
     manifest: t.manifest,
     draft: snapshot.content,
     live: liveContent,
@@ -181,7 +185,11 @@ export async function handleContentTree(site: SiteRow, cors: Record<string, stri
       everPublished: !!lastLive,
     },
   });
+}
 
+export async function handleContentTree(site: SiteRow, cors: Record<string, string>) {
+  const tree = await siteContentTree(site);
+  if (!tree) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
   return json({ data: tree }, 200, cors);
 }
 

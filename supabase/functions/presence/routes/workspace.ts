@@ -154,7 +154,7 @@ const NOTICE_HREF: Record<string, string> = {
   payment_trouble: '/portal.html', account_lapsed: '/portal.html',
   winddown_reminder: '/portal.html', win_back: '/portal.html', deletion_requested: '/portal.html',
 };
-const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
+export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 
 /** The client portal's read: only what's shared with the reviewer — shared
  *  Business Moments, the site's publish status, and the plans awaiting their OK.
