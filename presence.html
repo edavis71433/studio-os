@@ -679,6 +679,28 @@ const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-p
 /* ── helpers ── */
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+// A small masked/text dialog — replaces native prompt() (no cleartext passwords, and
+// it matches the app's styled surfaces). Resolves the entered value, or null on cancel.
+function askText(title, opts) {
+  opts = opts || {};
+  return new Promise((resolve) => {
+    const dlg = el("dialog"); dlg.style.cssText = "border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)";
+    const form = el("form"); form.style.cssText = "padding:20px";
+    const h = el("div", null, title); h.style.cssText = "font-weight:600;margin-bottom:6px"; form.appendChild(h);
+    if (opts.hint) { const hh = el("div", null, opts.hint); hh.style.cssText = "font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px"; form.appendChild(hh); }
+    const inp = el("input"); inp.type = opts.password ? "password" : "text"; if (opts.value) inp.value = opts.value; if (opts.placeholder) inp.placeholder = opts.placeholder;
+    inp.style.cssText = "width:100%;font:inherit;font-size:16px;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:9px;outline:none;box-sizing:border-box"; form.appendChild(inp);
+    const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:14px";
+    const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer";
+    const ok = el("button", null, opts.ok || "Save"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer";
+    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
+    let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
+    cancel.addEventListener("click", () => finish(null));
+    form.addEventListener("submit", (e) => { e.preventDefault(); finish(inp.value); });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });
+    dlg.showModal(); setTimeout(() => inp.focus(), 20);
+  });
+}
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
@@ -2500,7 +2522,7 @@ async function renderLaunches() {
   const stage = el("button", null, "Stage a launch from your current draft"); stage.type = "button";
   stage.style.cssText = "font:inherit;font-size:12.5px;margin:8px 0;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   stage.addEventListener("click", async () => {
-    const name = prompt("Name this launch (e.g. Spring refresh):", "");
+    const name = await askText("Name this launch", { placeholder: "e.g. Spring refresh", ok: "Stage" });
     if (name === null) return;
     try { await api("POST", "/launches", { name }); toast("Launch staged — preview and approve it below"); renderLaunches(); }
     catch (err) { toast(err.message, true); }
@@ -2568,7 +2590,7 @@ async function renderPreviewPanel() {
     mk("Open preview", () => { if (st.preview.url) window.open(st.preview.url, "_blank", "noopener"); });
     mk("Copy link", () => { if (st.preview.url && navigator.clipboard) { navigator.clipboard.writeText(st.preview.url); toast("Preview link copied"); } });
     mk("Preview in editor", () => openPreview("preview"));
-    mk(st.preview.has_password ? "Change / remove password" : "Password-protect", () => { const pw = prompt(st.preview.has_password ? "New password (leave blank to remove):" : "Set a preview password:", ""); if (pw !== null) act("/preview/settings", "Preview access updated", { password: pw }); });
+    mk(st.preview.has_password ? "Change / remove password" : "Password-protect", async () => { const pw = await askText(st.preview.has_password ? "Change preview password" : "Set a preview password", { password: true, ok: "Update", hint: st.preview.has_password ? "Leave blank to remove the password." : "Anyone with the link will need this to view the preview." }); if (pw !== null) act("/preview/settings", "Preview access updated", { password: pw }); });
     mk("Reset link", () => { if (confirm("Reset the preview link? The old link stops working.")) act("/preview/settings", "Preview link reset", { regenerate_token: true }); });
     if (st.live.published) mk("Compare with Live", () => openPreview("live"));
     mk("Promote to Live", () => { if (confirm("Promote the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Promoting to Live — this usually takes under a minute"); }, true);
@@ -3095,9 +3117,9 @@ let BLOCKS_WORK = null;
 let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
 let CL_ITEMS = null;        // CL-1: saved content-library items (null = not loaded)
 let CL_SHOW = false;
-function clSave(idx) {   // CL-1: save a crafted section to the reusable library
+async function clSave(idx) {   // CL-1: save a crafted section to the reusable library
   const blk = BLOCKS_WORK[idx]; const def = BLOCK_DEFS.find((d) => d.type === blk.type);
-  const name = prompt("Name this saved section:", blk.title || (def && def.name) || "Saved section");
+  const name = await askText("Name this saved section", { value: blk.title || (def && def.name) || "Saved section", ok: "Save" });
   if (name === null) return;
   api("POST", "/content-library", { name, block: blk }).then(() => { CL_ITEMS = null; toast("Saved to your content library"); }).catch((err) => toast(err.message, true));
 }
