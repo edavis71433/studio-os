@@ -39,7 +39,7 @@ import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAsse
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, SPECS } from './routes/content.ts';
-import { handleHealth, handleChanges, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
+import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
@@ -398,6 +398,7 @@ serve(async (req) => {
   // ── M7: the Client Room (all additive to frozen v1) ──
   if (route === '/health' && method === 'GET') return handleHealth(site, cors);
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
+  if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
   if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
   {
     const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);

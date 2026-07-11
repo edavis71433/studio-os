@@ -17,6 +17,7 @@ import { ensureAndListNotes, resolveNote } from '../lib/notes.ts';
 import { applySnapshotToDraft } from '../lib/draft_writer.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from '../lib/render_types.ts';
+import { buildContentTree } from '../lib/content_tree.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -136,6 +137,52 @@ export async function handleChanges(site: SiteRow, cors: Record<string, string>)
       draft_hash: st.draftHash,   // M9: review these changes, then publish with If-Match this hash
     },
   }, 200, cors);
+}
+
+// ── GET /content-tree (CMS-UX-1) — the read-only Client Content Tree ─────────
+// A calm, non-technical map of the site: pages × sections × status × edit links.
+// ONE bounded projection: the same draft/live/validate/diff/publish reads the
+// room already makes, plus a single scheduled-publish probe, fed to the pure
+// buildContentTree adapter. Nothing new is stored; the client-safe shape only.
+export async function handleContentTree(site: SiteRow, cors: Record<string, string>) {
+  const t = getTemplate(site.template_slug, site.template_version);
+  if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
+  const now = new Date().toISOString();
+
+  const [{ snapshot }, lastLiveQ, lastAnyQ, schedQ] = await Promise.all([
+    serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now }),
+    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id,created_at,completed_at&order=created_at.desc&limit=1`),
+    svc(`presence_publishes?site_id=eq.${site.id}&select=status&order=created_at.desc&limit=1`),
+    svc(`presence_scheduled_publishes?site_id=eq.${site.id}&status=eq.pending&select=id&limit=1`),
+  ]);
+  const lastLive = lastLiveQ.json?.[0] ?? null;
+  const lastAny = lastAnyQ.json?.[0] ?? null;
+  const scheduledPending = Array.isArray(schedQ.json) && schedQ.json.length > 0;
+
+  let liveContent: SnapshotContent | null = null;
+  if (lastLive?.snapshot_id) {
+    const s = await svc(`presence_snapshots?id=eq.${lastLive.snapshot_id}&select=content&limit=1`);
+    liveContent = s.json?.[0]?.content ? normalizeSnapshotContent(s.json[0].content) : null;
+  }
+
+  const validation = validateSnapshot(snapshot, t.manifest);
+  const changes = describeChanges(snapshot.content, liveContent);
+
+  const tree = buildContentTree({
+    manifest: t.manifest,
+    draft: snapshot.content,
+    live: liveContent,
+    validation,
+    changes,
+    publish: {
+      lastPublishedAt: lastLive?.completed_at || lastLive?.created_at || null,
+      lastPublishFailed: lastAny?.status === 'failed',
+      scheduledPending,
+      everPublished: !!lastLive,
+    },
+  });
+
+  return json({ data: tree }, 200, cors);
 }
 
 export async function handleNotesList(site: SiteRow, cors: Record<string, string>) {
