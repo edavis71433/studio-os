@@ -25,7 +25,7 @@ import { encryptionConfigured } from '../connected/crypto.ts';
 import { buildWritePlan, writeSpec, writeWorkflowsForProvider } from '../connected/writes.ts';
 import type { WriteWorkflow } from '../connected/writes.ts';
 import { saveWritePlan, listWritePlans, getWritePlan, decideWritePlan, markWriteOutcome, claimWriteForExecution, releaseWriteClaim, auditWrite } from '../connected/writestore.ts';
-import { executeWrite, writeConfigured } from '../connected/execute.ts';
+import { executeWrite } from '../connected/execute.ts';
 
 const CATEGORY_LABEL: Record<string, string> = {
   search: 'Being found', local_listing: 'Your listings', analytics: 'Your numbers',
