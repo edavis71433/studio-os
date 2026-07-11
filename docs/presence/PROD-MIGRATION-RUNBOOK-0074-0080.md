@@ -1,5 +1,27 @@
 # Prod migration runbook — apply 0074–0080
 
+> **UPDATE (2026-07-11): the CLI hold-back method below does NOT work with supabase CLI v2.109.**
+> Attempting it fails at the pre-flight check ("Remote migration versions not found in local
+> migrations directory") — the CLI now enforces that local files match the remote history, and
+> prod's history records `0000–0002, 0006–0019, 0036–0072`. Holding those back makes it refuse.
+> **Nothing is applied** when this happens (it errors before touching the DB). Letting `db push`
+> run WITH all files present is worse — it would try to apply the fenced `0003–0005` and re-apply
+> already-live `0020–0035`/`0073`.
+>
+> **✅ USE THIS INSTEAD — apply the SQL directly (safe, idempotent, matches how 0020–0072 got there):**
+> 1. Supabase dashboard → **prod** project (`qksstlqzbhesadrrofgn`) → **SQL Editor** → New query.
+> 2. Open `docs/presence/APPLY-0074-0080-prod.sql`, copy **all** of it, paste, **Run**.
+>    (It's the seven migrations concatenated in order; every statement is `create … if not exists`.)
+> 3. Verify the tables (list below). Done.
+>
+> `psql` alternative if you prefer CLI:
+> `psql "postgresql://postgres:[DB-PASSWORD]@db.qksstlqzbhesadrrofgn.supabase.co:5432/postgres" -f docs/presence/APPLY-0074-0080-prod.sql`
+>
+> The original hold-back steps are kept below for history only — **do not use them**.
+
+---
+
+
 **What this does:** applies the seven pending P2-C/P2-D migrations to **production** (`qksstlqzbhesadrrofgn`), waking the sales-pipeline, project-delivery, and agency-client-bridge routes that are currently dormant on prod.
 
 **Why it's safe:**
