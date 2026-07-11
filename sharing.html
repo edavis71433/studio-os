@@ -59,6 +59,7 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
+sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; });
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(p,m,b){const r=await fetch(FN+p,{method:m||'GET',headers:H(),body:b?JSON.stringify(b):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
@@ -67,11 +68,11 @@ function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');set
 const SURFACES=[
   {k:'business_moments',t:'Today',d:'Your calm daily updates',def:true},
   {k:'reports',t:'Analytics',d:'Reviews & findings',def:true},
-  {k:'media',t:'Files',d:'Your photos & documents',def:true},
+  {k:'media',t:'Photos',d:'Your photos & media',def:true},
   {k:'connected',t:'Connected data',d:'Your review/visitor numbers',def:true},
   {k:'drafts',t:'Drafts',d:'Work in progress',def:false},
   {k:'visual_assets',t:'Visual Studio assets',d:'AI-made images',def:false},
-  {k:'files',t:'Files',d:'Documents & deliverables',def:false},
+  {k:'files',t:'Documents',d:'Documents & deliverables',def:false},
   {k:'internal_notes',t:'Internal notes',d:'Private to your studio',def:false,internal:true},
 ];
 let SHARES={};

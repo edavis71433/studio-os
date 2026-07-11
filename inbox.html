@@ -88,8 +88,8 @@ function render(feed,leads,notifs){
 
   $('main').innerHTML=h;
 }
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your inbox.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your inbox just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h1>Sign in to see your inbox.</h1><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h1>We couldn’t load your inbox just now.</h1><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 async function load(){
   const [feed,leads,notifs]=await Promise.all([api('/portal/feed'),api('/forms/inbox'),api('/notifications?limit=25').catch(()=>({ok:false}))]);
   if(!feed.ok&&!leads.ok){trouble();return;}

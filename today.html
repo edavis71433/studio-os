@@ -276,7 +276,7 @@ function orientationCard(c){
   try{ localStorage.setItem(KEY, JSON.stringify(now)); }catch(_){}
   if(!gained.length) return;  // lateral move / downgrade → nothing to welcome
   const list=gained.map(f=>FEATURE_LABEL[f]||String(f).replace(/_/g,' ')).filter(Boolean);
-  const host=document.querySelector('main')||document.body;
+  const host=document.getElementById('main')||document.body;
   const card=document.createElement('div');
   card.style.cssText='max-width:860px;margin:0 auto 20px;padding:20px 22px;border:1px solid var(--accent);border-radius:16px;background:var(--accent-soft)';
   card.innerHTML=`<div style="font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:6px">Welcome to ${esc(c.edition_name)}</div>
@@ -298,14 +298,14 @@ async function healthLine(){
   try { r = (await apiGet('/coach/health')).data; } catch(_) { return; }
   if (!r) return;
   const attn = r.status === 'attention' || r.status === 'quiet';
-  const host = document.querySelector('main') || document.body;
+  const host = document.getElementById('main') || document.body;
   const line = document.createElement('div');
   line.style.cssText = 'max-width:860px;margin:10px auto 0;padding:12px 20px;border-radius:12px;font-size:14px;border:1px solid var(--line);background:' + (attn ? 'var(--warn-soft)' : 'var(--good-soft)') + ';color:var(--ink)';
   const sugg = (r.suggestions || [])[0];
   if (!sugg) {
     line.textContent = '✓ ' + (r.headline || 'Everything looks healthy.');
   } else {
-    line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(sugg.href) + '" style="color:#5b3fa0;font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:#8a8172">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
+    line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(sugg.href) + '" style="color:var(--accent);font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:var(--muted)">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
   }
   host.insertBefore(line, host.firstChild ? host.firstChild.nextSibling : null);
 }
@@ -315,7 +315,7 @@ async function journeyStrip(){
   let j = null;
   try { j = (await apiGet('/coach/journey')).data; } catch(_) { return; }
   if (!j || !Array.isArray(j.milestones)) return;
-  const host = document.querySelector('main') || document.body;
+  const host = document.getElementById('main') || document.body;
   const wrap = document.createElement('div');
   wrap.style.cssText = 'max-width:860px;margin:28px auto 0;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--card)';
   let html = '<div style="font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:14px">Your journey</div>';
@@ -334,7 +334,7 @@ async function journeyStrip(){
 
 function planCard(c){
   if(!c || !c.edition_name) return;
-  const host = document.querySelector('main') || document.body;
+  const host = document.getElementById('main') || document.body;
   const card = document.createElement('div');
   card.style.cssText = 'max-width:860px;margin:26px auto 40px;padding:16px 20px;border:1px solid var(--accent-soft);border-radius:14px;background:var(--card);font-size:14px;color:var(--soft)';
   const own = document.createElement('div');
@@ -346,7 +346,7 @@ function planCard(c){
     const gains = (c.upsell.gains||[]).map(g => esc(String(g).replace(/_/g,' '))).join(', ');
     up.innerHTML = esc(c.upsell.name) + (c.upsell.monthly ? ' (from $' + c.upsell.monthly + '/mo)' : '') +
       (gains ? ' adds: ' + gains + '.' : '.') +
-      ' <a href="mailto:hello@davisdigitalstudio.com?subject=' + encodeURIComponent('Upgrading to ' + c.upsell.name) + '" style="color:#5b3fa0">Ask about upgrading →</a>';
+      ' <a href="mailto:eric@davisdigitalstudio.com?subject=' + encodeURIComponent('Upgrading to ' + c.upsell.name) + '" style="color:var(--accent)">Ask about upgrading →</a>';
     card.appendChild(up);
   }
   host.appendChild(card);

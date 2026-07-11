@@ -344,7 +344,7 @@ function renderDetail(){
       <button class="btn" onclick="$('replacer').click()">Replace…</button>
       <button class="btn" onclick="duplicate('${a.id}')">Duplicate</button>
       <button class="btn" onclick="download('${a.id}')">Download</button>
-      ${a.asset_status==='archived'?`<button class="btn" onclick="status('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="status('${a.id}','archive')">Archive</button>`}
+      ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
       <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
 }
@@ -360,7 +360,7 @@ async function toggleFav(id){
   const r=await api('PATCH','/assets/'+id,{favorite:next});
   if(r.ok){if(a)a.favorite=next;render();}
 }
-async function status(id,action){
+async function setAssetStatus(id,action){
   const r=await api('POST','/assets/'+id+'/status',{action});
   if(r.ok){toast(action==='archive'?'Archived':'Restored');closeDetail();load();}else toast((r.body&&r.body.message)||'Not allowed');
 }

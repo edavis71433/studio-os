@@ -1647,7 +1647,7 @@ async function login() {
   var btn = document.getElementById("loginBtn");
   var err = document.getElementById("loginError");
 
-  if (!user || !pass) { showErr("Please enter your username and password."); return; }
+  if (!user || !pass) { showErr("Please enter your email and password."); return; }
 
   btn.innerHTML = "<div class=\"spinner\"></div> Signing in...";
   btn.style.opacity = "0.8";
