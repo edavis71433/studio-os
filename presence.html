@@ -1603,6 +1603,8 @@ function renderFoundations(f, plans, launch, dom) {
 
   if (dstat && dstat.health === "ok") {
     const p = el("p", "aihint", "✓ " + dstat.custom_domain + " is live and secure."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+    const apexD = String(dstat.custom_domain).replace(/^www\./, "");
+    const w = stepLine("Visitors reach you at both " + apexD + " and www." + apexD + " — either way works, and it’s always on https."); w.style.color = "var(--soft,#6b6478)"; domCard.appendChild(w);
     const rm = removeBtn("Remove this domain"); rm.style.marginTop = "8px"; domCard.appendChild(rm);
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
@@ -1660,25 +1662,26 @@ function renderFoundations(f, plans, launch, dom) {
   }
   wrap.appendChild(domCard);
 
-  const dnsCard = section("the records", f.dns.sentence);
+  const dnsCard = section("your domain’s records", f.dns.sentence);
   if (f.dns.records.length) {
     const list = el("p", "aihint", f.dns.records.slice(0, 6).map((r) => `${r.type} — ${r.plain}`).join(" · "));
     list.style.marginTop = "4px";
     dnsCard.appendChild(list);
   }
-  section("the lock in the browser", f.ssl.sentence);
-  const emailCard = section("email protection", f.email.sentence);
+  section("security — the padlock in the browser", f.ssl.sentence);
+  const emailCard = section("email", f.email.sentence);
   if (f.email.has_mail && !(f.email.spf && f.email.dmarc)) {
-    const acts = el("div", "doa");
-    const b = el("button", "textact", "Prepare the protection plan");
+    const why = el("p", "aihint", "Emails you send from your domain can land in people’s spam. Setting this up adds a few small records that tell inboxes your mail is really from you."); why.style.marginTop = "5px"; emailCard.appendChild(why);
+    const acts = el("div", "doa"); acts.style.marginTop = "6px";
+    const b = el("button", "textact", "Set up email protection");
     b.addEventListener("click", async () => {
-      try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Prepared — review it below."); openFoundationsDesk(); }
+      try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Set up — the records to add are below."); openFoundationsDesk(); }
       catch (err) { toast(err.message, true); }
     });
     acts.appendChild(b);
     emailCard.appendChild(acts);
   }
-  section("hosting", f.hosting.sentence);
+  section("where your site lives (hosting)", f.hosting.sentence);
 
   // ── M14: the right to leave, one button — everything they own, portable ──
   {
