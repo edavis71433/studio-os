@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contacts — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Everyone you do business with — in one place.">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
+  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
+  header .sub{color:var(--soft);font-size:15px;margin:0}
+  .bar{display:flex;gap:8px;margin:22px 0 6px;align-items:center}
+  .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
+  .search:focus{border-color:var(--p)}
+  .btn{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--p);background:var(--p);color:#fff;border-radius:999px;padding:9px 15px;cursor:pointer;white-space:nowrap}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{border-color:var(--p);color:var(--p)}
+  .c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 18px;box-shadow:var(--shadow);margin-bottom:11px}
+  .c .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .c .who{font-weight:600;font-size:15.5px}
+  .c .co{font-size:13px;color:var(--faint)}
+  .c .contact{font-size:13.5px;color:var(--soft);margin-top:3px}
+  .c .contact a{color:var(--p);text-decoration:none}
+  .c .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:6px 13px;cursor:pointer;text-decoration:none}
+  .c .acts a.reply{background:var(--p);color:#fff;border-color:var(--p)}
+  .c .acts button:hover{border-color:var(--p);color:var(--p)}
+  .muted{color:var(--soft);font-size:14.5px}
+  .center{text-align:center;padding:56px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  dialog{border:none;border-radius:16px;padding:0;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  .dbody{padding:22px}
+  .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 12px}
+  .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 5px}
+  .dbody input{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none}
+  .dbody input:focus{border-color:var(--p)}
+  .row2{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Studio OS · Contacts — everyone you do business with, in one place.</footer>
+</div>
+<dialog id="newDlg" aria-label="New contact">
+  <form id="newForm" class="dbody">
+    <h3>New contact</h3>
+    <label for="c-name">Name</label>
+    <input id="c-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+    <label for="c-email">Email</label>
+    <input id="c-email" type="email" maxlength="160" placeholder="jane@business.com" autocomplete="off">
+    <label for="c-phone">Phone</label>
+    <input id="c-phone" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">
+    <label for="c-company">Company</label>
+    <input id="c-company" maxlength="120" placeholder="Acme Co." autocomplete="off">
+    <div class="row2"><button type="button" class="btn ghost" id="c-cancel">Cancel</button><button type="submit" class="btn">Add contact</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="",ALL=[],Q="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+function render(){
+  const q=Q.trim().toLowerCase();
+  const rows=q?ALL.filter(c=>((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)):ALL;
+  let h=`<div class="rolebadge">● Contacts</div>
+    <header><h1>Contacts</h1><p class="sub">${ALL.length?ALL.length+' '+(ALL.length===1?'contact':'contacts')+' · everyone you do business with.':'Everyone you do business with, in one place.'}</p></header>
+    <div class="bar"><input class="search" id="q" type="search" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ New</button></div>`;
+  if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
+  else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">No contacts match “${esc(Q)}”.</p>`;}
+  else for(const c of rows){
+    const who=esc(c.name||c.email||c.phone||'Contact');
+    const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
+    h+=`<div class="c">
+      <div class="top"><span class="who">${who}</span>${c.company?`<span class="co">${esc(c.company)}</span>`:''}</div>
+      <div class="contact">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}${c.email&&c.phone?' · ':''}${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:''}</div>
+      <div class="acts">
+        ${c.email?`<a class="reply" href="mailto:${esc(c.email)}">Email</a>`:(c.phone?`<a class="reply" href="tel:${esc(tel)}">Call</a>`:'')}
+        <button data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
+      </div></div>`;
+  }
+  $('main').innerHTML=h;wire();
+}
+function wire(){
+  const q=$('q');if(q)q.addEventListener('input',()=>{Q=q.value;const p=q.selectionStart;render();const nq=$('q');if(nq){nq.focus();try{nq.setSelectionRange(p,p);}catch(_){}}});
+  const nb=$('new');if(nb)nb.addEventListener('click',openNew);
+  document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>newDeal(b.getAttribute('data-deal'))));
+  const rt=$('retry');if(rt)rt.addEventListener('click',load);
+}
+function openNew(){$('c-name').value='';$('c-email').value='';$('c-phone').value='';$('c-company').value='';$('newDlg').showModal();setTimeout(()=>$('c-name').focus(),20);}
+$('c-cancel').onclick=()=>$('newDlg').close();
+$('newForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const name=$('c-name').value.trim(),email=$('c-email').value.trim();
+  if(!name&&!email){toast('A contact needs a name or an email.');return;}
+  const btn=e.submitter;if(btn)btn.disabled=true;
+  try{
+    const r=await api('/sales/contacts','POST',{name,email:email||undefined,phone:$('c-phone').value.trim()||undefined,company:$('c-company').value.trim()||undefined});
+    if(!r.ok){toast(r.status===403?'Contacts are part of Business OS.':((r.body&&r.body.message)||'That didn’t save.'));if(btn)btn.disabled=false;return;}
+    $('newDlg').close();toast(r.body&&r.body.deduped?'That contact already existed.':'Contact added.');await load();
+  }catch(_){toast('That didn’t save.');}finally{if(btn)btn.disabled=false;}
+};
+// Start a pipeline deal straight from a contact — no re-typing.
+async function newDeal(cid){
+  const c=ALL.find(x=>x.id===cid);if(!c)return;
+  const title=(c.name||c.company||c.email||'New')+' — project';
+  try{
+    const d=await api('/sales/deals','POST',{title,contact_id:cid});
+    if(!d.ok){toast(d.status===403?'Pipeline is part of Business OS.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
+    const dealId=d.body&&d.body.data&&d.body.data.id;const sc=scope();
+    toast('Deal started.');
+    if(dealId)setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},700);
+  }catch(_){toast('Couldn’t start that deal.');}
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your contacts.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your contacts just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
+async function load(){
+  const r=await api('/sales/contacts?limit=500');
+  if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of Business OS.</h2><p class="muted">Your current plan doesn’t include the Customers area yet.</p></div>`;return;}
+  if(!r.ok){trouble();return;}
+  ALL=(r.body&&r.body.data)||[];render();
+}
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>
