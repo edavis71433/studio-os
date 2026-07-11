@@ -68,6 +68,10 @@
     <input id="f-title" required maxlength="200" placeholder="e.g. Acme website" autocomplete="off">
     <label for="f-email" style="margin-top:10px">Client email <span class="mut">(optional — enables their login on convert)</span></label>
     <input id="f-email" type="email" maxlength="160" placeholder="name@business.com" autocomplete="off">
+    <label for="f-name" style="margin-top:10px">Client name <span class="mut">(optional)</span></label>
+    <input id="f-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+    <label for="f-phone" style="margin-top:10px">Phone <span class="mut">(optional)</span></label>
+    <input id="f-phone" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">
     <div class="row2" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn ghost" id="f-cancel">Cancel</button><button type="submit" class="btn">Create deal</button></div>
   </form>
 </dialog>
@@ -85,6 +89,9 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
 const STAGES=['lead','qualified','proposal','contract','won','lost'];
+// calm, human stage labels (the raw enum never reaches the owner's eyes)
+const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
+const stageLabel=(s)=>STAGE_LABEL[s]||s;
 let TOKEN="",FILTER="",DEALS=[];
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
@@ -108,23 +115,25 @@ async function load(){
     const res=await api('/sales/deals'+(FILTER?('?stage='+FILTER):''));
     DEALS=res.data||[];
     if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New inquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
-    $('list').innerHTML=DEALS.map(d=>`<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div></div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(d.stage)}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`).join('');
+    $('list').innerHTML=DEALS.map(d=>`<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div></div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
 }
 
 // ── new deal: an accessible in-dialog form (no prompt) ──
-function openNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
+function openNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
 $('newDeal').onclick=openNewDeal;
 $('f-cancel').onclick=()=>$('formDlg').close();
 $('dealForm').onsubmit=async(e)=>{
   e.preventDefault();
   const title=$('f-title').value.trim(); if(!title){toast('A deal needs a title.',true);return;}
   const email=$('f-email').value.trim();
+  const cname=$('f-name').value.trim(); const cphone=$('f-phone').value.trim();
   const btn=e.submitter; if(btn)btn.disabled=true;
   try{
     let contactId=null;
-    if(email){ const c=await api('/sales/contacts','POST',{email,name:email.split('@')[0]}); contactId=c.data&&c.data.id; }
+    // capture a real name/phone if given (no more "jane.doe" contacts from the email)
+    if(email||cname){ const c=await api('/sales/contacts','POST',{email:email||undefined,name:cname||(email?email.split('@')[0]:'New contact'),phone:cphone||undefined}); contactId=c.data&&c.data.id; }
     await api('/sales/deals','POST',{title,contact_id:contactId});
     $('formDlg').close(); toast('Deal added'); load();
   }catch(err){ toast(err.message,true); } finally{ if(btn)btn.disabled=false; }
@@ -159,16 +168,25 @@ async function openDeal(id){
     // only VALID next stages (mirrors lib/sales_lifecycle.ts); 'won' is convert-only
     const NEXT={lead:['qualified','lost'],qualified:['proposal','lead','lost'],proposal:['contract','qualified','lost'],contract:['won','proposal','lost'],won:[],lost:['lead']};
     const nextStages=(NEXT[d.stage]||[]).filter(s=>s!=='won');
-    const stepBtns=nextStages.map(s=>`<button class="btn ghost" data-stage="${s}">${esc(s)}</button>`).join('');
+    const stepBtns=nextStages.map(s=>`<button class="btn ghost" data-stage="${s}">${esc(stageLabel(s))}</button>`).join('');
     const props=(data.proposals||[]).map(p=>`<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} · ${esc(p.status)}</span>${p.status==='draft'?`<button class="btn ghost" data-send-proposal="${p.id}">Send</button>`:''}</div>`).join('')||'<div class="mut">No proposals yet.</div>';
-    const cons=(data.contracts||[]).map(k=>`<div class="row2"><span class="mut">${esc(k.title||'Agreement')} · ${esc(k.status)}${k.signer_name?(' — signed by '+esc(k.signer_name)):''}</span>${k.status==='draft'?`<button class="btn ghost" data-send-contract="${k.id}">Send</button>`:''}</div>`).join('')||'<div class="mut">No agreement yet.</div>';
+    const cons=(data.contracts||[]).map(k=>`<div class="row2"><span class="mut">${esc(k.title||'Agreement')} · ${esc(k.status)}${k.signer_name?(' — signed by '+esc(k.signer_name)+(k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):'')):''}</span>${k.status==='draft'?`<button class="btn ghost" data-send-contract="${k.id}">Send</button>`:''}</div>`).join('')||'<div class="mut">No agreement yet.</div>';
     const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
     $('detailInner').innerHTML=`
       <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(d.title||'Deal')}</div>
-        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · <span class="stage${d.stage==='won'?' won':''}">${esc(d.stage)}</span></div></div>
+        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · <span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span></div></div>
         <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
       <div class="dbody">
         <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Converted ✓</span>':stepBtns||'<span class="mut">—</span>'}</div></div>
+        <div class="sec"><h3>Details</h3>
+          <label class="mut" for="ed-value">Deal value (USD)</label><br>
+          <input id="ed-value" type="number" step="0.01" min="0" value="${d.expected_value_cents?(d.expected_value_cents/100):''}" placeholder="2500" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+          <label class="mut" for="ed-close" style="display:block;margin-top:8px">Expected close</label>
+          <input id="ed-close" type="date" value="${esc(d.expected_close||'')}" style="padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+          <label class="mut" for="ed-notes" style="display:block;margin-top:8px">Notes</label>
+          <textarea id="ed-notes" rows="3" placeholder="Anything worth remembering about this deal…" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">${esc(d.notes||'')}</textarea>
+          <div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ed-save">Save details</button></div>
+        </div>
         <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button></div><div id="conForm"></div></div>
         <div class="sec"><h3>Convert to customer</h3>
@@ -177,7 +195,8 @@ async function openDeal(id){
         </div>
       </div>`;
     $('closeD').onclick=()=>{dlg.close();history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():''));};
-    $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+b.dataset.stage);openDeal(id);load();}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(e.message,true);}});
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:$('ed-notes').value.trim()});toast('Saved');openDeal(id);load();}catch(e){toast(e.message,true);eds.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});toast('Agreement sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>miniForm($('propForm'),[{name:'label',label:'Line item',placeholder:'Website design'},{name:'price',label:'Price (USD)',type:'number',step:'0.01',placeholder:'2500'}],async(v)=>{if(!v.label){toast('Add a label.',true);return;}await api('/sales/deals/'+id+'/proposals','POST',{line_items:[{label:v.label,qty:1,unit_cents:Math.round(parseFloat(v.price||'0')*100)}]});toast('Proposal drafted');openDeal(id);});
