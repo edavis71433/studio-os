@@ -23,7 +23,7 @@ ok('inbox: links each enquiry to its CRM deal (converted + deal_id)', /deal_id: 
 ok('inbox: the deal lookup is site-scoped + bounded to the shown ids', /presence_deals\?site_id=eq\.\$\{site\.id\}&deleted_at=is\.null&source_submission_id=in\.\(\$\{ids\.join\(','\)\}\)/.test(commercial));
 
 // frontend: converted state + deep link + no re-convert
-ok('leads UI: converted enquiry shows "in pipeline — view deal" deep link', /l\.converted\?`<a class="reply" href="crm\.html#deal-\$\{esc\(l\.deal_id\|\|''\)\}"/.test(leads));
+ok('leads UI: converted enquiry shows "in pipeline — view deal" deep link', /l\.converted\?`<a class="reply" href="\/pipeline\.html\?deal=\$\{esc\(l\.deal_id\|\|''\)\}/.test(leads));
 ok('leads UI: the "→ Deal" button is hidden once converted (no re-convert)', /l\.converted\?[\s\S]*?:`<button data-deal=/.test(leads));
 ok('leads UI: reflects idempotent server response ("already in your pipeline")', /already_converted\?'This enquiry is already in your pipeline\.'/.test(leads));
 ok('wording: "Website enquiry" terminology used consistently', /website enquiry/i.test(leads) && /website enquiry/i.test(commercial));

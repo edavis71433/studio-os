@@ -89,7 +89,7 @@ function renderFeed(ctx,feed){
   document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   document.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
 }
-async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Set aside.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
+async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Noted — your studio has been told. Nothing changed.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
 
 // ── the CLIENT App service-delivery view (Agency–Client Bridge) ──
 function renderProjects(projects,unread){

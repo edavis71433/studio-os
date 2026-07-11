@@ -12,6 +12,7 @@ import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal } from '../lib/service_bridge.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import {
@@ -215,6 +216,28 @@ export async function handleSalesProposalCreate(req: Request, site: SiteRow, pri
   return json({ data: rows(ins)[0] }, 201, cors);
 }
 
+/** Auto-email a signed proposal/contract link to the deal's contact, so "Send"
+ *  is one click — not send → copy link → switch to email → paste → send. Uses
+ *  the STUDIO's brand (never the platform name — secrecy rule). Best-effort: it
+ *  never blocks the send; the link is still returned for manual sharing, and it
+ *  no-ops cleanly when the contact has no email or email isn't configured. */
+async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'proposal' | 'contract', url: string | null): Promise<boolean> {
+  if (!url || !dealId) return false;
+  try {
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
+    const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
+    if (!email) return false;
+    const brand = await loadEmailBrand(siteId);
+    const subject = kind === 'contract' ? 'Your agreement is ready to sign' : 'Your proposal is ready to review';
+    const line = kind === 'contract'
+      ? 'Your studio has prepared an agreement for you. Review and sign it here — nothing is final until you do.'
+      : 'Your studio has prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.';
+    const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
+    const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
+    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand);
+  } catch { return false; }
+}
+
 export async function handleSalesProposalSend(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const r = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`);
@@ -234,7 +257,8 @@ export async function handleSalesProposalSend(req: Request, site: SiteRow, princ
   await dealEvent(site.id, p.deal_id, 'proposal_sent', principal, { detail: { proposal_id: id } });
   // move the deal to 'proposal' if it's earlier (guarded; records the stage change)
   await advanceStage(site.id, p.deal_id, 'proposal', ['lead', 'qualified'], principal);
-  return json({ data: rows(up)[0], url }, 200, cors);
+  const emailed = await emailSalesDoc(site.id, p.deal_id, 'proposal', url);   // auto-send to the contact
+  return json({ data: rows(up)[0], url, emailed }, 200, cors);
 }
 
 /** Public (token) OR authed proposal decision. */
@@ -291,8 +315,10 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
   if (c.status === 'sent') return json({ data: c, url: await mkLink(), content_hash: c.content_hash, already_sent: true }, 200, cors);
   const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
+  const link = await mkLink();
   await dealEvent(site.id, c.deal_id, 'contract_sent', principal, { detail: { contract_id: id } });
-  return json({ data: rows(up)[0], url: await mkLink(), content_hash: c.content_hash }, 200, cors);
+  const emailed = await emailSalesDoc(site.id, c.deal_id, 'contract', link);   // auto-send to the contact
+  return json({ data: rows(up)[0], url: link, content_hash: c.content_hash, emailed }, 200, cors);
 }
 
 /** Public (token) contract signing — version-integrity enforced. */
