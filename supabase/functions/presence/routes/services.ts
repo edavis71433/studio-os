@@ -33,7 +33,10 @@ export async function handleExport(site: SiteRow, principal: Principal, cors: Re
   return json({ data }, 200, cors);
 }
 
-export async function handleLaunch(site: SiteRow, cors: Record<string, string>) {
+/** The Launch Assistant checklist for a site, from ACTUAL state (live probes +
+ *  evidence + zone). Extracted so the CMS-UX-4 Website Health page can project
+ *  the very same honest done/todo/n-a signals — one gather, one source. */
+export async function siteLaunchChecklist(site: SiteRow) {
   const now = new Date().toISOString();
   const domain = await siteDomain(site);
   const [zone, conn, runQ, reviewQ] = await Promise.all([
@@ -57,7 +60,7 @@ export async function handleLaunch(site: SiteRow, cors: Record<string, string>) 
     liveUrl ? fence((async () => (await fetch(liveUrl + '/sitemap.xml', { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
   ]);
   const rec = zone?.records ?? [];
-  const checklist = buildLaunchChecklist({
+  return buildLaunchChecklist({
     edition: site.edition, domain,
     apex_resolves: zone ? rec.some((r) => (r.type === 'A' || r.type === 'AAAA' || r.type === 'CNAME') && r.name === domain) : null,
     https_ok: httpsOk,
@@ -71,7 +74,10 @@ export async function handleLaunch(site: SiteRow, cors: Record<string, string>) 
     accessibility_criticals: a11yCrit,
     review_done: (reviewQ.json ?? []).length > 0,
   });
-  return json({ data: checklist }, 200, cors);
+}
+
+export async function handleLaunch(site: SiteRow, cors: Record<string, string>) {
+  return json({ data: await siteLaunchChecklist(site) }, 200, cors);
 }
 
 export async function handleDnsGet(jwt: string, site: SiteRow, cors: Record<string, string>) {
