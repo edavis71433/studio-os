@@ -82,6 +82,10 @@
     <textarea id="np-desc" maxlength="5000" placeholder="What's the scope?"></textarea>
     <label for="np-target" style="margin-top:10px">Target date <span class="mut">(optional)</span></label>
     <input id="np-target" type="date">
+    <label for="np-customer" style="margin-top:10px">For an existing customer <span class="mut">(optional — they'll see this project in their workspace)</span></label>
+    <select id="np-customer"><option value="">Just my studio (internal)</option></select>
+    <label for="np-template" style="margin-top:10px">Start from</label>
+    <select id="np-template"><option value="">Empty project</option><option value="website">Website build — a ready-made checklist</option></select>
     <div class="row2" style="justify-content:flex-end;margin-top:14px">
       <button type="button" class="btn ghost" id="np-cancel">Cancel</button>
       <button type="submit" class="btn">Create project</button>
@@ -133,14 +137,26 @@ async function load(){
   }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
 }
 
-function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value=''; $('newDlg').showModal(); setTimeout(()=>$('np-name').focus(),20); }
+async function loadCustomerOptions(){
+  const sel=$('np-customer'); if(!sel||sel.dataset.loaded)return;
+  try{ const r=await api('/sales/deals'); const deals=(r.data||[]).filter(d=>d.converted_client_id);
+    // de-dupe by customer (a customer may have several deals); newest title wins
+    const seen={}; deals.forEach(d=>{ if(!seen[d.converted_client_id]) seen[d.converted_client_id]=d.title||'Customer'; });
+    const opts=Object.keys(seen).map(cid=>`<option value="${esc(cid)}">${esc(seen[cid])}</option>`).join('');
+    sel.innerHTML='<option value="">Just my studio (internal)</option>'+opts; sel.dataset.loaded='1';
+  }catch(_){/* picker is optional — a manual internal project still works */}
+}
+function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value='';if($('np-customer'))$('np-customer').value='';if($('np-template'))$('np-template').value=''; $('newDlg').showModal(); loadCustomerOptions(); setTimeout(()=>$('np-name').focus(),20); }
 $('newProject').onclick=openNew;
 $('np-cancel').onclick=()=>$('newDlg').close();
 $('newForm').onsubmit=async(e)=>{
   e.preventDefault();
   const name=$('np-name').value.trim(); if(!name){toast('A project needs a name.',true);return;}
   const btn=e.submitter; if(btn)btn.disabled=true;
-  try{ const r=await api('/projects','POST',{name,description:$('np-desc').value.trim(),target_date:$('np-target').value||undefined}); $('newDlg').close(); toast('Project created'); await load(); openProject(r.data.id); }
+  const body={name,description:$('np-desc').value.trim(),target_date:$('np-target').value||undefined};
+  const cust=$('np-customer')&&$('np-customer').value; if(cust)body.customer_client_id=cust;
+  const tmpl=$('np-template')&&$('np-template').value; if(tmpl)body.template=tmpl;
+  try{ const r=await api('/projects','POST',body); $('newDlg').close(); toast(r.templated?'Project created with a starter checklist':'Project created'); await load(); openProject(r.data.id); }
   catch(err){ toast(err.message,true); } finally{ if(btn)btn.disabled=false; }
 };
 

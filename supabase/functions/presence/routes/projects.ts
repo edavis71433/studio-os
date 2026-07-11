@@ -7,7 +7,8 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
-import { ensureProjectForDeal } from '../lib/service_bridge.ts';
+import { ensureProjectForDeal, ensureBridge } from '../lib/service_bridge.ts';
+import { templateByKey, type ProjectTemplate } from '../lib/project_templates.ts';
 import {
   isProjectStatus, canProjectTransition, isTaskStatus, canTaskTransition, isTaskPriority,
   deriveTaskState, compareOrder, nextSortOrder, forViewer, clampLimit, clampOffset, progressOf,
@@ -49,6 +50,29 @@ export async function loadProject(siteId: string, id: string) {
   return rows(r)[0] || null;
 }
 
+/** A4: seed a fresh project's milestones + tasks from a starter template. Inserts
+ *  directly (no per-item activity events — this is the initial scaffold, not a
+ *  stream of "a task was added" notifications to the customer). Best-effort per
+ *  row; a hiccup on one task never blocks the project being usable. */
+async function applyTemplate(siteId: string, projectId: string, tmpl: ProjectTemplate): Promise<void> {
+  let mOrder = 0, tOrder = 0;
+  for (const m of tmpl.milestones) {
+    let milestoneId: string | null = null;
+    try {
+      const mi = rows(await svc('presence_milestones', { method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ site_id: siteId, project_id: projectId, title: m.title, status: 'open', due_date: null, sort_order: mOrder, client_visible: true }) }))[0];
+      milestoneId = mi?.id || null;
+    } catch { /* skip a milestone that won't insert */ }
+    mOrder += 10;
+    for (const t of (m.tasks || [])) {
+      const clientAction = t.client_action_required === true;
+      await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ site_id: siteId, project_id: projectId, milestone_id: milestoneId, title: t.title, detail: '', status: 'todo', priority: 'normal', client_visible: clientAction, client_action_required: clientAction, due_date: null, sort_order: tOrder, source: 'template' }) }).catch(() => {});
+      tOrder += 10;
+    }
+  }
+}
+
 // ═══ PROJECTS ═══
 export async function handleProjects(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const studio = await isStudioSide(jwt, site, principal);
@@ -81,21 +105,50 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
       return json({ data: ph.project, idempotent: ph.idempotent }, ph.idempotent ? 200 : 201, cors);
     }
 
-    // manual project (no deal)
+    // manual project (no deal) — optionally attached to an existing customer (W6)
+    // and/or seeded from a starter template (A4).
     const name = clean(b.name, 200);
     if (!name) return json({ error: 'validation', message: 'A project needs a name.' }, 422, cors);
     const sd = dateOrNull(b.start_date), td = dateOrNull(b.target_date);
     if (!sd.ok || !td.ok) return json({ error: 'validation', message: 'Dates must be YYYY-MM-DD.' }, 422, cors);
+
+    // W6: attach to an existing customer THIS agency converted → the project becomes
+    // client-visible in their own workspace via the Agency–Client Bridge. A customer
+    // can have more than one project (the bridge is keyed per project). We verify the
+    // customer is ours (a converted deal on this site) before trusting the id.
+    let customerClientId: string | null = UUID_RE.test(b.customer_client_id || '') ? b.customer_client_id : null;
+    let customerSiteId: string | null = null;
+    if (customerClientId) {
+      const owned = rows(await svc(`presence_deals?site_id=eq.${site.id}&converted_client_id=eq.${customerClientId}&deleted_at=is.null&select=converted_site_id&limit=1`))[0];
+      if (!owned) return json({ error: 'bad_customer', message: 'That customer isn’t one of yours yet — convert their deal first.' }, 422, cors);
+      customerSiteId = owned.converted_site_id || null;
+    }
+    const clientVisible = b.client_visible === false ? false : true;
+
     const ins = await svc('presence_projects', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, client_id: null, deal_id: null, name,
+      body: JSON.stringify({ site_id: site.id, client_id: customerClientId, deal_id: null, name,
         description: clean(b.description, 5000), status: 'active',
         owner_user_id: UUID_RE.test(b.owner_user_id || '') ? b.owner_user_id : null,
-        client_visible: b.client_visible === false ? false : true,
+        client_visible: clientVisible,
         start_date: sd.v, target_date: td.v }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That project didn’t save — please try again.' }, 502, cors);
     const project = rows(ins)[0];
     await projectEvent(site.id, project.id, 'project_created', principal, project.client_visible, { name });
-    return json({ data: project }, 201, cors);
+
+    // W6: build the bridge so the customer sees this project in their workspace.
+    if (customerClientId) {
+      const bridged = await ensureBridge(site.id, project.id, customerClientId, customerSiteId, null);
+      if (!bridged) { // belongs to another studio — don't leave an orphan client-visible project
+        await svc(`presence_projects?id=eq.${project.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ client_id: null, client_visible: false }) }).catch(() => {});
+        return json({ error: 'bridge_denied', message: 'That customer is managed by another studio.' }, 409, cors);
+      }
+    }
+
+    // A4: seed a starter scaffold into the (empty) new project — fills only, never merges.
+    const tmpl = templateByKey(clean(b.template, 40));
+    if (tmpl) await applyTemplate(site.id, project.id, tmpl);
+
+    return json({ data: project, templated: !!tmpl, bridged: !!customerClientId }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
