@@ -69,13 +69,16 @@ export async function handleNotifications(req: Request, jwt: string, site: SiteR
     svc(`presence_project_events?site_id=eq.${site.id}${projectFilter}&select=kind,detail,project_id,client_visible,created_at&order=created_at.desc&limit=${limit}`),
     // B3: support requests also notify (esp. project-less ones, which emit no project event).
     // Studio sees all open/active tickets; a client caller sees only its own.
-    svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null${studio ? '' : `&requester=eq.${encodeURIComponent(readerKey(principal))}`}&select=id,subject,status,updated_at&order=updated_at.desc&limit=25`),
+    svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null${studio ? '' : `&requester=eq.${encodeURIComponent(readerKey(principal))}`}&select=id,subject,status,project_id,updated_at&order=updated_at.desc&limit=25`),
     svc(`presence_activity_reads?site_id=eq.${site.id}&reader=eq.${encodeURIComponent(readerKey(principal))}&select=last_seen_at&limit=1`),
   ]);
   const lastSeen = rows(seenR)[0]?.last_seen_at || null;
   const items = [
     ...rows(evR).map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: notifHref(e.kind, e.project_id, e.detail || {}), project_id: e.project_id, created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
-    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${String(r.subject || '').slice(0, 60)}`, href: `/support#request-${r.id}`, project_id: null, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
+    // W5 (3rd copy): the /support#… page doesn't exist. A project-scoped request
+    // deep-links to its project (inbox rewrites /projects/:id → projects.html?project=…,
+    // where the studio now has a full support thread); project-less ones open the list.
+    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${String(r.subject || '').slice(0, 60)}`, href: r.project_id ? `/projects/${r.project_id}#support-${r.id}` : '/projects.html', project_id: r.project_id || null, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
   ].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit);
   const unread_count = items.filter((i) => !i.read).length;
   return json({ data: items, unread_count, is_studio_view: studio }, 200, cors);

@@ -210,7 +210,10 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
     const msg = res.error === 'bad_email' ? 'That doesn’t look like an email address.' : res.error === 'bad_role' ? 'Pick a valid role.' : 'That didn’t save — please try again.';
     return json({ error: res.error, message: msg }, res.error === 'write_failed' ? 502 : 400, cors);
   }
-  return json({ data: { ok: true, message: 'Added. They’ll see only what you choose to share.' } }, 200, cors);
+  const message = res.emailed
+    ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.'
+    : 'Added — but the invite email didn’t send. Send them their sign-in link yourself, or try again.';
+  return json({ data: { ok: true, emailed: !!res.emailed, message } }, 200, cors);
 }
 
 export async function handleMemberRevoke(jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {

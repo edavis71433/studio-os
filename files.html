@@ -390,8 +390,9 @@ async function uploadFiles(files){
   for(const file of files){
     const isDoc=file.type==='application/pdf';
     let name=(file.name||'file').replace(/\.[a-z0-9]+$/i,'');
-    let alt=name;
-    if(!isDoc){alt=prompt('Describe this photo (for search & accessibility):',name)||'';if(alt.trim().length<3){toast('Skipped — a short description is required.');continue;}}
+    // Never gate the upload on a modal or drop the file — default the alt text to the
+    // filename (as documents already do); you can refine it in the detail panel after.
+    let alt=name.trim().length>=3?name:'Photo';
     const dims=await dimsOf(file);
     const up=await api('POST','/media/upload-url',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});
     if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');continue;}

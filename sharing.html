@@ -102,7 +102,7 @@ function wire(){
 }
 async function invite(){const e=($('email').value||'').trim();if(!e){toast('Enter their email.');return;}
   const r=await api('/portal/members','POST',{email:e,role:'client_reviewer'});
-  if(r.ok){toast('Invited.');return load();}toast((r.body&&r.body.message)||'That didn’t save.');}
+  if(r.ok){toast((r.body&&r.body.data&&r.body.data.message)||'Invited.');return load();}toast((r.body&&r.body.message)||'That didn’t save.');}
 async function revoke(id){if(!confirm('Remove their access?'))return;const r=await api('/portal/members/'+id+'/revoke','POST',{});if(r.ok){toast('Removed.');return load();}toast('That didn’t work.');}
 async function toggle(btn){const surface=btn.getAttribute('data-surface');const next=btn.getAttribute('aria-checked')!=='true';
   btn.setAttribute('aria-checked',String(next));

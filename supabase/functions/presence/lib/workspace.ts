@@ -65,10 +65,13 @@ export async function listSiteMembers(siteId: string): Promise<Array<{ id: strin
 
 // CP-9: the invite email — a one-tap magic link instead of a hand-typed code.
 // Best-effort: the membership row is the truth; the email never blocks it.
-async function sendInviteLink(email: string, siteId: string): Promise<void> {
+/** Sends the invite/sign-in email. Returns true only if an email was actually
+ *  sent — so the caller can honestly tell the owner whether the client was
+ *  notified (rather than silently swallowing a failed send). */
+async function sendInviteLink(email: string, siteId: string): Promise<boolean> {
   const base = Deno.env.get('SUPABASE_URL') || '';
   const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-  if (!base || !key) return;
+  if (!base || !key) return false;
   const site = Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com';
   const gen = async (type: string) => {
     const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
@@ -80,17 +83,18 @@ async function sendInviteLink(email: string, siteId: string): Promise<void> {
   };
   let link = await gen('invite');            // new user → invite (creates the account)
   if (!link) link = await gen('magiclink');  // existing user → magic link
-  if (!link) return;
+  if (!link) return false;
   const { sendEmail } = await import('../commerce/account.ts');
   const { loadEmailBrand } = await import('./email_brand.ts');
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
-  const name = String(bn.json?.[0]?.business_name || 'a business on Studio OS');
-  const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand
-  await sendEmail(email, `You’ve been invited to help run ${name}`,
-    `<p>You’ve been invited to help run <strong>${name}</strong> on Studio OS.</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type. You can set a password afterwards from your portal.</p>`, brand).catch(() => {});
+  const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
+  const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand (never the platform name)
+  const sent = await sendEmail(email, `You’ve been invited to help run ${name}`,
+    `<p>You’ve been invited to help run <strong>${name}</strong>.</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type. You can set a password afterwards from your account.</p>`, brand).catch(() => false);
+  return sent !== false;
 }
 
-export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string }> {
+export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string; emailed?: boolean }> {
   const clean = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return { ok: false, error: 'bad_email' };
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
@@ -98,8 +102,9 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }),
   });
-  if (r.ok) sendInviteLink(clean, siteId).catch(() => {});   // CP-9: one-tap invite email, best-effort
-  return r.ok ? { ok: true } : { ok: false, error: 'write_failed' };
+  if (!r.ok) return { ok: false, error: 'write_failed' };
+  const emailed = await sendInviteLink(clean, siteId).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
+  return { ok: true, emailed };
 }
 
 export async function revokeSiteMember(siteId: string, memberId: string): Promise<boolean> {
