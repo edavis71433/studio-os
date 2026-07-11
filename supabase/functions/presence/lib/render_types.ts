@@ -52,6 +52,7 @@ export interface SnapshotContent {
     verification?: { google?: string; bing?: string };
     logo?: MediaRef | null;
     og_image?: MediaRef | null;
+    cover?: MediaRef | null;   // owner-chosen hero image (preferred over the auto-pick)
     announcement?: { text: string; url?: string; expires_at?: string | null };
     /** Phase CP-2 Design Studio: structured layout choices (all optional/additive). */
     hero_layout?: string;

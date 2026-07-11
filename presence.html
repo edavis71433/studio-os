@@ -1905,6 +1905,7 @@ function renderMediaGrid(grid, manage, onPick) {
         return b;
       };
       row.appendChild(mkAssign("logo_media_id", "Logo", "Set as logo"));
+      row.appendChild(mkAssign("cover_media_id", "Hero photo", "Set as hero image"));
       row.appendChild(mkAssign("og_media_id", "Share image", "Use when shared"));
       // Phase O: edit the photo description (alt text) after upload — a11y/SEO
       const ed = el("button", null, "Edit description");

@@ -121,6 +121,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       // Phase V no-code essentials — through ref() so variants land in the media manifest
       logo: ref(settings.logo_media_id),
       og_image: ref(settings.og_media_id),
+      cover: ref(settings.cover_media_id),   // the owner's chosen hero image (preferred over an auto-pick)
       ...(String(settings.announcement_text || '').trim()
         ? { announcement: { text: String(settings.announcement_text).trim(), url: String(settings.announcement_url || '').trim() || undefined, expires_at: settings.announcement_expires_at || null } }
         : {}),

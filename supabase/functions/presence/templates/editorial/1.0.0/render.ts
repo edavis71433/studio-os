@@ -311,7 +311,7 @@ function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[
 
 function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>, blocks: RenderedBlock[] = []): string {
   const i = c.identity;
-  const hero = bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || c.settings?.logo || null;
+  const hero = c.settings?.cover || bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || c.settings?.logo || null;
   const featured = bySort(c.offerings).slice(0, 6);
   const tst = bySort(c.testimonials).slice(0, 3);
   const faqs = bySort(c.faqs).slice(0, 4);
