@@ -61,7 +61,7 @@ function ready(){
   document.getElementById('mark').innerHTML = '✓';
   document.getElementById('title').textContent = 'Welcome. Your workspace is ready.';
   document.getElementById('body').innerHTML = 'Everything is set up. A receipt is on its way to your email. Next, we’ll help you add your business details and go live — one calm step at a time.';
-  document.getElementById('actions').innerHTML = `<a class="btn" href="${roomHref}">Enter your workspace →</a><div><a class="plain" href="/portal.html">Go to your portal instead</a></div>`;
+  document.getElementById('actions').innerHTML = `<a class="btn" href="${roomHref}">Enter your workspace →</a>`;   // C3: one canonical landing — the guided first-run. No fork to the retired portal.
 }
 function stillWorking(){
   document.getElementById('title').textContent = 'Almost there…';

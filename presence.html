@@ -2449,7 +2449,21 @@ async function renderLaunches() {
     if (l.status === "draft" || l.status === "approved") mk("Update from draft", () => act(`/launches/${l.id}/recapture`, "Refreshed from your current draft"));
     if (l.status === "approved") {
       mk("Launch now", () => { if (confirm("Launch “" + l.name + "”? This replaces your live site with the staged version.")) act(`/launches/${l.id}/promote`, "Launching — this usually takes under a minute"); }, true);
-      mk("Schedule", () => { const when = prompt("Launch at (ISO time, e.g. 2026-08-01T09:00):", ""); if (when) { const iso = new Date(when).toString() === "Invalid Date" ? null : new Date(when).toISOString(); if (iso) act(`/launches/${l.id}/schedule`, "Scheduled", { scheduled_for: iso }); else toast("Couldn’t read that time.", true); } });
+      mk("Schedule", () => {
+        // W7: a friendly native date+time picker instead of hand-typed ISO text.
+        if (row.querySelector(".sched-inline")) { const ex = row.querySelector(".sched-inline input"); if (ex) ex.focus(); return; }
+        const wrap = el("div"); wrap.className = "sched-inline"; wrap.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px";
+        const inp = el("input"); inp.type = "datetime-local";
+        const pad = (n) => String(n).padStart(2, "0");
+        const d = new Date(Date.now() + 86400000); d.setHours(9, 0, 0, 0);   // default: tomorrow 9:00 local
+        inp.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        inp.style.cssText = "font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--line,#ddd)";
+        const ok = el("button", null, "Confirm"); ok.type = "button"; ok.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470";
+        const no = el("button", null, "Cancel"); no.type = "button"; no.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
+        ok.addEventListener("click", () => { const v = inp.value; if (!v) { toast("Pick a date and time.", true); return; } const dt = new Date(v); if (isNaN(dt.getTime())) { toast("Couldn’t read that time.", true); return; } if (dt.getTime() <= Date.now()) { toast("Pick a time in the future.", true); return; } act(`/launches/${l.id}/schedule`, "Scheduled", { scheduled_for: dt.toISOString() }); });
+        no.addEventListener("click", () => wrap.remove());
+        wrap.appendChild(inp); wrap.appendChild(ok); wrap.appendChild(no); row.appendChild(wrap); inp.focus();
+      });
     }
     if (l.status === "published") mk("Roll back", () => { if (confirm("Roll back “" + l.name + "” to the previous version?")) act(`/launches/${l.id}/rollback`, "Rolling back…"); });
     if (l.status === "draft" || l.status === "approved" || l.status === "scheduled") mk("Cancel", () => act(`/launches/${l.id}/cancel`, "Canceled"));
