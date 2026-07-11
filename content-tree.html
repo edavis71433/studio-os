@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your website map — Studio OS</title>
+<meta name="description" content="A calm map of your website — every page and section, what's ready, what needs a look, and where to edit it.">
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;
+    --accent:#5b3fa0;--accent-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;
+    --warn:#8a6d3b;--warn-soft:#f3ead9;--bad:#a2453f;--bad-soft:#f6e6e4;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--bad:#e2938c;--bad-soft:#2c1a19;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9;--bad:#a2453f;--bad-soft:#f6e6e4}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--bad:#e2938c;--bad-soft:#2c1a19}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:44px 22px 96px}
+  a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
+  header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
+  header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:52ch}
+  /* the one-line state of the whole site */
+  .summary{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px 20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .summary .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .summary .state{font-family:var(--serif);font-size:18px;font-weight:500}
+  .summary .meta{color:var(--soft);font-size:13.5px;margin-left:auto;text-align:right}
+  .dot.ok{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)} .dot.wait{background:var(--accent)} .dot.off{background:var(--soft)}
+  /* a page */
+  .page{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden}
+  .page-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 20px}
+  .page-top h2{font-family:var(--serif);font-weight:500;font-size:19px;margin:0}
+  .page-top .path{color:var(--soft);font-size:12.5px;font-weight:400;margin-left:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .badge{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+  .badge.ok{color:var(--good);background:var(--good-soft)} .badge.warn{color:var(--warn);background:var(--warn-soft)}
+  .badge.bad{color:var(--bad);background:var(--bad-soft)} .badge.wait{color:var(--accent);background:var(--accent-soft)}
+  .badge.off{color:var(--soft);background:transparent;border-color:var(--line)}
+  /* sections list inside a page */
+  ul.sections{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+  ul.sections li{display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line)}
+  ul.sections li:first-child{border-top:none}
+  .sec-name{font-size:15px;font-weight:500;flex:none;min-width:0}
+  .sec-name .req{color:var(--soft);font-size:11.5px;font-weight:400;margin-left:6px;letter-spacing:.02em}
+  .sec-status{font-size:13px;color:var(--soft);margin-left:2px}
+  .sec-status.attn{color:var(--warn)} .sec-status.bad{color:var(--bad)}
+  .grow{flex:1 1 auto}
+  a.edit{font-size:13.5px;color:var(--accent);text-decoration:none;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:6px 14px;white-space:nowrap;transition:background .15s,border-color .15s}
+  a.edit:hover{background:var(--accent-soft);border-color:var(--accent)} a.edit:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .auto-note{padding:14px 20px;color:var(--soft);font-size:13.5px;border-top:1px solid var(--line)}
+  .page.auto .page-top h2{color:var(--soft)}
+  .center{text-align:center;padding:56px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
+  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  .foot{margin-top:30px;color:var(--soft);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="/today.html">← Back to Today</a>
+    <h1>Your website map</h1>
+    <p class="sub" id="sub">Every page on your site, and what’s on each one — what’s ready, what needs a look, and a way straight to editing it. Nothing here changes your site; it’s just a map.</p>
+  </header>
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// CMS-UX-1 — the Client Content Tree, rendered.
+// Consumes ONLY the existing read-only projection: GET /content-tree.
+// Every "Edit" opens the ONE existing editor (/presence.html) at the right
+// section via its hash contract. No new content model, editor, or write path.
+// Calm language: never "manifest", "entity", "validation", "field" on screen.
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CLIENT = new URLSearchParams(location.search).get('client') || '';   // agency drill-in, preserved into edit links
+let TOKEN = "";
+sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
+
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':CLIENT });
+async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
+
+// status → a badge tone (kept purely presentational; the words come from the API)
+const TONE = {
+  publish_failed:'bad', missing_required:'bad', needs_review:'warn',
+  draft_changes:'wait', scheduled:'wait', published:'ok', complete:'ok', empty_optional:'off',
+};
+const SITE_STATE = {
+  never_published: { dot:'off',  text:'Not published yet' },
+  live:           { dot:'ok',   text:'Your site is live' },
+  draft_changes:  { dot:'wait', text:'You have unpublished changes' },
+  scheduled:      { dot:'wait', text:'Changes scheduled to publish' },
+  publish_failed: { dot:'bad',  text:'A publish didn’t go through' },
+};
+
+// keep the agency scope on every hop into the editor
+function editHref(link){
+  if(!CLIENT) return link;
+  const [base, hash] = String(link).split('#');
+  return base + (base.includes('?') ? '&' : '?') + 'client=' + encodeURIComponent(CLIENT) + (hash ? '#'+hash : '');
+}
+function when(iso){
+  if(!iso) return '';
+  const d = String(iso).slice(0,10);
+  return 'Last published ' + d;
+}
+
+function sectionRow(s){
+  const tone = TONE[s.status] || 'off';
+  const attnCls = (tone==='bad') ? ' bad' : (tone==='warn' ? ' attn' : '');
+  const count = s.issue_count > 0 ? ` · ${s.issue_count} to resolve` : '';
+  const req = s.required ? '<span class="req">needed to publish</span>' : '';
+  return `<li>
+    <span class="sec-name">${esc(s.label)}${req}</span>
+    <span class="sec-status${attnCls}">${esc(s.status_label)}${count}</span>
+    <span class="grow"></span>
+    <a class="edit" href="${esc(editHref(s.editor_link))}">Edit</a>
+  </li>`;
+}
+
+function pageCard(p){
+  const tone = TONE[p.status] || 'off';
+  if(p.auto){
+    return `<section class="page auto">
+      <div class="page-top">
+        <h2>${esc(p.label)}<span class="path">${esc(p.path)}</span></h2>
+        <span class="badge off">Automatic</span>
+      </div>
+      <p class="auto-note">This page is created and kept up to date for you — there’s nothing to edit here.</p>
+    </section>`;
+  }
+  const sections = (p.sections||[]).map(sectionRow).join('');
+  const list = sections ? `<ul class="sections">${sections}</ul>` : '';
+  return `<section class="page">
+    <div class="page-top">
+      <h2>${esc(p.label)}<span class="path">${esc(p.path)}</span></h2>
+      <span class="badge ${tone}">${esc(p.status_label)}</span>
+    </div>
+    ${list}
+  </section>`;
+}
+
+function render(tree){
+  if(!tree || !Array.isArray(tree.pages) || !tree.pages.length){
+    $('main').innerHTML = `<div class="center"><h2>Your site is being set up.</h2>
+      <p class="sub" style="margin:8px auto 0">As soon as your pages are ready, they’ll appear here as a simple map. Nothing to do in the meantime.</p></div>`;
+    return;
+  }
+  const st = SITE_STATE[tree.site_status] || SITE_STATE.never_published;
+  const attn = tree.attention_count || 0;
+  const attnLine = attn > 0
+    ? `<span class="meta">${attn} thing${attn===1?'':'s'} to look at</span>`
+    : (tree.last_published_at ? `<span class="meta">${esc(when(tree.last_published_at))}</span>` : '');
+  let html = `<div class="summary">
+    <span class="dot ${st.dot}"></span>
+    <span class="state">${esc(st.text)}</span>
+    ${attnLine}
+  </div>`;
+  html += tree.pages.map(pageCard).join('');
+  html += `<p class="foot">This map reads your site — it never changes it. Editing happens in your editor, and nothing goes live until you publish.</p>`;
+  $('main').innerHTML = html;
+}
+
+function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to see your website map.</h2><p class="sub" style="margin:8px auto 0">Your site lives with your account — sign in to see every page at a glance.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your map just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your site — this is only this page. Please refresh in a moment.</p></div>`; }
+
+(async function init(){
+  try{
+    const { data } = await sb.auth.getSession();
+    TOKEN = (data && data.session && data.session.access_token) || "";
+    if(!TOKEN){ signedOut(); return; }
+    const res = await apiGet('/content-tree');
+    render(res && res.data);
+  }catch(e){
+    if(e === 401){ signedOut(); return; }
+    trouble();
+  }
+})();
+</script>
+</body>
+</html>
