@@ -147,6 +147,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 // straight to the page that resolves it, not a generic landing (one fewer hop).
 const NOTICE_HREF: Record<string, string> = {
   lead_followup: '/leads.html',
+  deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
   domain_expiry: '/presence.html#business',
   search_setup: '/presence.html#search',
   welcome_back: '/today.html',

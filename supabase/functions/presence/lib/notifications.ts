@@ -28,7 +28,10 @@ export function notifHref(kind: string, projectId: string | null, detail: Record
     case 'support_opened':
     case 'support_message':
     case 'support_resolved':
-      return detail && detail.request_id ? `/support#request-${detail.request_id}` : '/support';
+      // Support lives inside the project view (client.html / projects.html render
+      // it there) — there is no standalone /support page. Keep the same
+      // project-anchored convention as messages/approvals so the link resolves.
+      return base + (detail && detail.request_id ? `#support-${detail.request_id}` : '#support');
     default: return base;
   }
 }

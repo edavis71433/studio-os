@@ -14,7 +14,8 @@ ok('href: approval → the exact approval anchor', notifHref('approval_requested
 ok('href: deliverable → files anchor', notifHref('deliverable_added', P, {}) === `/projects/${P}#files`);
 ok('href: task → the exact task anchor', notifHref('task_status_change', P, { task_id: 't' }) === `/projects/${P}#task-t`);
 ok('href: milestone → milestones anchor', notifHref('milestone_completed', P, {}) === `/projects/${P}#milestones`);
-ok('href: support → support request anchor (not project-scoped)', notifHref('support_message', null, { request_id: 'r' }) === '/support#request-r');
+ok('href: support → project-anchored support request (the surface that renders it)', notifHref('support_message', P, { request_id: 'r' }) === `/projects/${P}#support-r`);
+ok('href: support without a project falls back to the support anchor', notifHref('support_message', null, {}) === '#support');
 ok('href: unknown kind → project base', notifHref('mystery', P, {}) === `/projects/${P}`);
 
 ok('label: every known kind has a human label', ['message', 'approval_requested', 'deliverable_added', 'milestone_completed', 'survey_requested', 'support_opened'].every((k) => notifLabel(k) && notifLabel(k) !== 'Activity'));

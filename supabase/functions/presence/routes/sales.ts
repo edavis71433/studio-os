@@ -13,6 +13,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { raiseNotice } from '../lib/notice.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import {
@@ -238,6 +239,26 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
   } catch { return false; }
 }
 
+/** W1: a client just accepted a proposal / signed a contract via the token link.
+ *  The deal advanced, but the studio has no live surface telling them so — they'd
+ *  only find out by opening Pipeline and clicking each deal. Raise ONE notice on
+ *  the deal's (agency) site so "ready to convert {name}" lands on the operator's
+ *  Today / Attention / bell with a deep-link to Pipeline. Deals only ever live on
+ *  agency sites, so this is operator-only by construction. Best-effort; the
+ *  stable `period` makes it idempotent (once per deal per event). */
+async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' | 'signed'): Promise<void> {
+  try {
+    const site = rows(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
+    if (!site?.client_id) return; // no owning client → nowhere calm to surface it
+    const title = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=title&limit=1`))[0]?.title || 'a deal';
+    const headline = event === 'signed' ? `Agreement signed — ready to convert ${title}` : `Proposal accepted — ${title}`;
+    const body = event === 'signed'
+      ? 'The client signed. Convert them to a customer to provision their workspace whenever you’re ready.'
+      : 'The client accepted your proposal. Prepare the agreement to sign when you’re ready.';
+    await raiseNotice({ siteId, clientId: site.client_id, kind: 'deal_signed', period: `${event}:${dealId}`, headline, body });
+  } catch { /* non-fatal — the deal event + Pipeline still record it */ }
+}
+
 export async function handleSalesProposalSend(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const r = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`);
@@ -282,7 +303,10 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'proposal-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'proposal-decide' } as Principal;
   await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision } });
-  if (decision === 'accepted') await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
+  if (decision === 'accepted') {
+    await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
+    await raiseDealReady(tok.site_id, dealId, 'accepted');   // W1: tell the studio
+  }
   return json({ data: { status: decision } }, 200, cors);
 }
 
@@ -348,6 +372,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
+  await raiseDealReady(tok.site_id, dealId, 'signed');   // W1: "ready to convert {name}" → operator Today/Attention/bell
   return json({ data: { status: 'signed' } }, 200, cors);
 }
 
