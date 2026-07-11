@@ -219,7 +219,7 @@ async function domainStatus(site: { custom_domain: string | null; netlify_site_i
   };
 }
 
-async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (method === 'GET') return json({ data: await domainStatus(site) }, 200, cors);
   if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
 

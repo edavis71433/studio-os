@@ -1561,14 +1561,14 @@ async function openFoundationsDesk() {
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
-    const [f, plans, launch] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans"), api("GET", "/launch")]);
-    renderFoundations(f.data, plans.data || [], launch.data);
+    const [f, plans, launch, dom] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans"), api("GET", "/launch"), api("GET", "/foundations/domain").catch(() => ({ data: null }))]);
+    renderFoundations(f.data, plans.data || [], launch.data, dom && dom.data);
   } catch (err) {
     $("deskResults").innerHTML = "";
     toast(err.message, true);
   }
 }
-function renderFoundations(f, plans, launch) {
+function renderFoundations(f, plans, launch, dom) {
   const wrap = $("deskResults"); wrap.innerHTML = "";
 
   // ── M14: the Launch Assistant — the whole launch, one calm list ──
@@ -1592,7 +1592,49 @@ function renderFoundations(f, plans, launch) {
     wrap.appendChild(card);
     return card;
   };
-  section("your address", f.domain.sentence);
+  // ── Connect your own domain — self-serve, over the complete attach→SSL→verify core.
+  //    (An operator scoped into a client gets the very same card, so it serves both.)
+  const domCard = el("div", "deskopt");
+  domCard.appendChild(el("div", "dol", "your domain"));
+  const dstat = (dom && dom.custom_domain) ? dom : null;
+  if (!dstat) {
+    const p = el("p", "aihint", (f.domain.sentence || "") + " Already own a domain? Connect it here:"); p.style.marginTop = "6px";
+    domCard.appendChild(p);
+    const row = el("div", "doa"); row.style.gap = "8px"; row.style.flexWrap = "wrap"; row.style.marginTop = "6px";
+    const inp = el("input"); inp.type = "text"; inp.placeholder = "www.yourbusiness.com"; inp.setAttribute("autocomplete", "off");
+    inp.style.cssText = "flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:16px";
+    const btn = el("button", "textact", "Connect this domain");
+    btn.addEventListener("click", async () => {
+      const domain = (inp.value || "").trim().toLowerCase();
+      if (!domain) { toast("Type your domain first (e.g. www.yourbusiness.com).", true); return; }
+      btn.disabled = true;
+      try { await api("POST", "/foundations/domain", { domain }); toast("Domain added — now add the two records below at your registrar."); openFoundationsDesk(); }
+      catch (err) { toast(err.message, true); btn.disabled = false; }
+    });
+    row.appendChild(inp); row.appendChild(btn); domCard.appendChild(row);
+  } else {
+    const health = dstat.health;
+    const badge = health === "ok" ? "✓ Live and secure" : health === "ssl_pending" ? "DNS is set — issuing your security certificate (usually minutes)…" : "Waiting for DNS — add the records below at your registrar";
+    const p = el("p", "aihint", dstat.custom_domain + " — " + badge); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+    if (health !== "ok" && dstat.dns) {
+      const apex = (dstat.dns.expected_apex_ip && dstat.dns.expected_apex_ip[0]) || "75.2.60.5";
+      const cname = dstat.dns.expected_cname || "your site’s .netlify.app address";
+      const help = el("p", "aihint", "In your registrar’s DNS settings (GoDaddy, Namecheap, etc.), add these two records:"); help.style.marginTop = "6px"; domCard.appendChild(help);
+      [["A", "@", apex], ["CNAME", "www", cname]].forEach(([type, name, val]) => {
+        const r = el("div"); r.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:5px;flex-wrap:wrap";
+        const code = el("span", null, type + "   " + name + "   →   " + val); code.style.cssText = "font:13px/1.4 ui-monospace,monospace;background:var(--soft-bg,#f4f2ef);color:var(--ink,#1b1525);padding:5px 9px;border-radius:6px";
+        const cp = el("button", "textact", "Copy"); cp.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(String(val)).then(() => toast("Copied " + val)).catch(() => {}); });
+        r.appendChild(code); r.appendChild(cp); domCard.appendChild(r);
+      });
+    }
+    const acts = el("div", "doa"); acts.style.marginTop = "8px"; acts.style.gap = "8px";
+    const chk = el("button", "textact", "Check status"); chk.addEventListener("click", () => openFoundationsDesk()); acts.appendChild(chk);
+    const rm = el("button", "textact", "Remove"); rm.style.opacity = "0.7";
+    rm.addEventListener("click", async () => { if (!confirm("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.")) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(err.message, true); } });
+    acts.appendChild(rm); domCard.appendChild(acts);
+  }
+  wrap.appendChild(domCard);
+
   const dnsCard = section("the records", f.dns.sentence);
   if (f.dns.records.length) {
     const list = el("p", "aihint", f.dns.records.slice(0, 6).map((r) => `${r.type} — ${r.plain}`).join(" · "));

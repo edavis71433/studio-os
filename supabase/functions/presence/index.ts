@@ -37,7 +37,7 @@ import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchReca
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
-import { handleAdmin } from './routes/admin.ts';
+import { handleAdmin, handleDomain } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleWebsiteTimeline } from './routes/timeline.ts';
@@ -609,6 +609,13 @@ serve(async (req) => {
   if (route === '/foundations/email' && method === 'GET') return handleEmailHealth(site, cors);
   if (route === '/monitor/import-inventory' && method === 'GET') return handleImportInventory(site, cors);
   // ── M12: Platform Services — the technical foundation, in plain words; changes only as approved plans ──
+  // Self-serve custom domain (the caller's OWN site) — reuses the complete domain
+  // core (attach → SSL → live DNS status). Reviewer boundary above already blocks
+  // client_reviewers; a site owner or an operator scoped into the client reaches it.
+  if (route === '/foundations/domain' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {
+    const r = await handleDomain(req, method, site, principal, cors);
+    return r || json({ error: 'method_not_allowed' }, 405, cors);
+  }
   if (route === '/foundations' && method === 'GET') return handleFoundationsGet(site, cors);
   if (route === '/foundations/prepare' && method === 'POST') return handleFoundationsPrepare(req, site, principal, cors);
   if (route === '/foundations/plans' && method === 'GET') return handleFoundationsPlans(jwt, site, cors);
