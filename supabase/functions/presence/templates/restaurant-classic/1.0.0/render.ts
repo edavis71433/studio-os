@@ -513,6 +513,16 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   const urls = ['/', ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => p), '/privacy/', '/accessibility/', ...c.posts.filter((p) => !p.noindex).map((p) => `/updates/${p.slug}/`)];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
+  // RSS feed for /updates/ — subscribers + SEO
+  {
+    const feedItems = c.posts.filter((p) => !p.noindex).slice(0, 20).map((p) => {
+      const link = esc(site.baseUrl + `/updates/${p.slug}/`);
+      const pub = p.published_at ? `<pubDate>${new Date(p.published_at).toUTCString()}</pubDate>` : '';
+      const desc = p.excerpt ? `<description>${esc(p.excerpt)}</description>` : '';
+      return `<item><title>${esc(p.title || 'Update')}</title><link>${link}</link><guid>${link}</guid>${pub}${desc}</item>`;
+    }).join('');
+    files['feed.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>${esc(i.business_name)} — Updates</title><link>${esc(site.baseUrl + '/updates/')}</link><description>${esc('Latest updates from ' + i.business_name)}</description>${feedItems}</channel></rss>\n`;
+  }
 
   // redirects (301 map) + immutable cache headers for hashed assets
   const redirects = (c.redirects || []).map((r) => `${r.from_path}  ${r.to_path}  301`).join('\n');

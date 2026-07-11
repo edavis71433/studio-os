@@ -352,7 +352,7 @@ function planCard(c){
     const gains = (c.upsell.gains||[]).map(g => esc(String(g).replace(/_/g,' '))).join(', ');
     up.innerHTML = esc(c.upsell.name) + (c.upsell.monthly ? ' (from $' + c.upsell.monthly + '/mo)' : '') +
       (gains ? ' adds: ' + gains + '.' : '.') +
-      ' <a href="mailto:eric@davisdigitalstudio.com?subject=' + encodeURIComponent('Upgrading to ' + c.upsell.name) + '" style="color:var(--accent)">Ask about upgrading →</a>';
+      ' <a href="mailto:support@davisdigitalstudio.com?subject=' + encodeURIComponent('Upgrading to ' + c.upsell.name) + '" style="color:var(--accent)">Ask about upgrading →</a>';
     card.appendChild(up);
   }
   host.appendChild(card);
