@@ -18,6 +18,27 @@ import type { Principal } from '../../_shared/auth.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { loadProfile, loadTimeline, listNotes, addNote, setNotePinned, deleteNote } from '../crm/store.ts';
 import { filterTimeline, relationshipSummary, isAudience, cleanNoteBody } from '../crm/contract.ts';
+import { svc } from '../lib/db.ts';
+import { linksForCustomer } from '../lib/service_bridge.ts';
+
+/** W3: resolve this customer's Pipeline deal + linked project so the studio can
+ *  open them in context from the CRM (studio-side only; additive, best-effort).
+ *  The deal lives on the agency site (converted_client_id = this client); the
+ *  project comes through the Agency–Client Bridge. */
+async function crmContext(site: SiteRow): Promise<{ deal_id?: string; project_id?: string }> {
+  const ctx: { deal_id?: string; project_id?: string } = {};
+  if (!site.client_id) return ctx;
+  try {
+    const [dealR, links] = await Promise.all([
+      svc(`presence_deals?converted_client_id=eq.${site.client_id}&deleted_at=is.null&select=id,updated_at&order=updated_at.desc&limit=1`),
+      linksForCustomer(site.client_id),
+    ]);
+    const dealId = (Array.isArray(dealR.json) ? dealR.json[0]?.id : null) || null;
+    if (dealId) ctx.deal_id = dealId;
+    if (links[0]?.project_id) ctx.project_id = links[0].project_id;
+  } catch { /* doorways are additive — never block the profile */ }
+  return ctx;
+}
 
 /** The studio side sees internal items; the client side sees only shared. */
 async function isStudioSide(jwt: string, principal: Principal): Promise<boolean> {
@@ -34,7 +55,8 @@ export async function handleCrmProfile(jwt: string, site: SiteRow, principal: Pr
   ]);
   const visible = filterTimeline(timeline, studio);
   const summary = relationshipSummary(profile, visible[0]?.at ?? null, now);
-  return json({ data: { profile, summary, is_studio_view: studio, last_activity_at: visible[0]?.at ?? null } }, 200, cors);
+  const context = studio ? await crmContext(site) : {};   // W3: Pipeline/Project doorways, studio-side only
+  return json({ data: { profile, summary, context, is_studio_view: studio, last_activity_at: visible[0]?.at ?? null } }, 200, cors);
 }
 
 export async function handleCrmTimeline(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

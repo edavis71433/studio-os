@@ -79,7 +79,7 @@ const FN = SUPABASE_URL + "/functions/v1/presence";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null;
+let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null, LAST_SUBJECT = "";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') });
@@ -161,6 +161,7 @@ async function generate(){
   const subject = ($('subject').value||'').trim();
   if(!CHOSEN){ toast('Pick what you need first — a banner, a post, or a link preview.'); return; }
   if(subject.length < 3){ toast('Tell us in a few words what the image should show.'); return; }
+  LAST_SUBJECT = subject;   // A7: seeds the alt-text so you accept/edit rather than retype
   const go = $('go'); go.disabled = true; go.textContent = 'Making a few options…';
   $('planhost').innerHTML = '<div class="spin" role="status" aria-label="Working"></div>';
   const r = await apiPost('/visual/generate', { kind: CHOSEN, subject, count: 3 });
@@ -182,7 +183,7 @@ function wirePlan(){
 }
 
 async function use(varId){
-  const alt = prompt('Describe this image in a few words (it helps customers and search engines):', '');
+  const alt = prompt('Describe this image in a few words (it helps customers and search engines):', LAST_SUBJECT || '');
   if(alt === null) return;
   if((alt||'').trim().length < 3){ toast('A few words, please — it makes the image accessible.'); return; }
   const r = await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'approve', variation_id:varId, alt_text:alt.trim() });

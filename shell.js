@@ -213,7 +213,11 @@
       (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
       (d.pending_approvals || []).forEach(function (p) { out += '<a class="row" href="' + esc(withScope((CTX && CTX.landing) || '/today.html')) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>'; });
       (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
-      body.innerHTML = out || '<div class="muted">You’re all caught up.</div>';
+      // W4: the bell is the quick glance; the Inbox is the complete "everything that
+      // needs you" (also client messages, surveys, new leads). Send them to the one
+      // place rather than have two surfaces compete.
+      var footer = '<a class="row" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
+      body.innerHTML = (out || '<div class="muted">You’re all caught up.</div>') + footer;
     });
   }
   function closeNotifications() { if (notif) notif.classList.remove('open'); }

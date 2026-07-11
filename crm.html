@@ -150,8 +150,13 @@ function render(profile,summary,notes,items,studio){
   // integrated doorways (no duplication — these open the existing surfaces).
   // Carry the agency ?client= scope so drilling in never loses the client context.
   const _q=(()=>{const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';})();
+  const _ctx=profile._ctx||{};
+  const _dealLink=(studio&&_ctx.deal_id)?`<a class="link" href="/pipeline.html?deal=${esc(_ctx.deal_id)}">Pipeline deal →</a>`:'';
+  const _projLink=(studio&&_ctx.project_id)?`<a class="link" href="/projects.html?project=${esc(_ctx.project_id)}${_q?'&'+_q.slice(1):''}">Their project →</a>`:'';
   html+=`<section><h2>Open in context</h2><div class="links">
     <a class="link" href="/today.html${_q}">Today →</a>
+    ${_dealLink}
+    ${_projLink}
     <a class="link" href="/leads.html${_q}">Website enquiries →</a>
     <a class="link" href="/connections.html${_q}">Connected services →</a>
     <a class="link" href="/presence.html${_q}">Website & publishing →</a>
@@ -187,7 +192,7 @@ async function load(){
   if(p.status===403||tl.status===403){$('main').innerHTML=`<div class="center"><h2>This view lives in your studio workspace.</h2><p class="muted">Your client view shows what your studio shares with you.</p></div>`;return;}
   if(!p.ok){trouble();return;}
   const d=p.body.data||{};
-  render(d.profile||{},d.summary||'',(nt.ok&&nt.body.data.notes)||[],(tl.ok&&tl.body.data.items)||[],!!d.is_studio_view);
+  render(Object.assign(d.profile||{},{_ctx:d.context||{}}),d.summary||'',(nt.ok&&nt.body.data.notes)||[],(tl.ok&&tl.body.data.items)||[],!!d.is_studio_view);
 }
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
