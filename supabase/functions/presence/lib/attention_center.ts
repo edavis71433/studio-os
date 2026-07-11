@@ -60,7 +60,7 @@ export interface AttentionInput {
 const NOTICE_NEEDS = new Set(['payment_trouble', 'account_lapsed', 'lead_followup', 'search_setup', 'deletion_requested', 'publish_failed', 'connection_expired', 'website_enquiry']);
 const NOTICE_SOON = new Set(['domain_expiry', 'trial_ending', 'trial_ended', 'renewal_reminder', 'winddown_reminder', 'win_back']);
 
-function whenWord(iso: string, now: string): string {
+export function whenWord(iso: string, now: string): string {
   const then = Date.parse(iso), n = Date.parse(now);
   if (!isFinite(then) || !isFinite(n)) return 'soon';
   const days = Math.round((then - n) / 86400000);
