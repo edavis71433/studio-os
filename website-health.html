@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website health — Studio OS</title>
+<meta name="description" content="A calm, plain-English health check for your website — what's working, what's worth a look, and why.">
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;
+    --accent:#5b3fa0;--accent-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;
+    --warn:#8a6d3b;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--warn-soft:#f3ead9}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:44px 22px 96px}
+  a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
+  header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
+  header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:54ch}
+
+  /* the overall verdict — a reassuring hero, calm not clinical */
+  .verdict{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:17px;padding:22px 22px;box-shadow:var(--shadow);display:flex;gap:16px;align-items:center}
+  .vmark{flex:none;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px}
+  .verdict.healthy .vmark{background:var(--good-soft)} .verdict.attention .vmark{background:var(--warn-soft)} .verdict.new .vmark{background:var(--accent-soft)}
+  .vtext h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0;line-height:1.2}
+  .vtext p{margin:3px 0 0;color:var(--soft);font-size:14px;font-variant-numeric:tabular-nums}
+
+  .cat{margin-top:30px}
+  .clabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px}
+  .chk{display:flex;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow);margin-bottom:10px}
+  .ci{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
+  .ci.ok{background:var(--good-soft);color:var(--good)} .ci.attention{background:var(--warn-soft);color:var(--warn)}
+  .ci.coming{background:var(--accent-soft);color:var(--accent)} .ci.off{background:var(--line);color:var(--soft)}
+  .cb{flex:1;min-width:0}
+  .ct{font-size:15px;font-weight:600;margin:0;line-height:1.35;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+  .cw{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .cw.ok{color:var(--good);background:var(--good-soft)} .cw.attention{color:var(--warn);background:var(--warn-soft)}
+  .cw.coming{color:var(--accent);background:var(--accent-soft)} .cw.off{color:var(--soft);background:var(--line)}
+  .cwhy{margin:5px 0 0;font-size:14px;color:var(--soft);line-height:1.45}
+  .cact{margin-top:11px}
+  a.act{display:inline-block;font-size:13.5px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;transition:background .15s,border-color .15s}
+  a.act:hover{background:var(--accent-soft);border-color:var(--accent)} a.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .center{text-align:center;padding:56px 20px}
+  .center .mark{font-size:40px;display:block;margin-bottom:12px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
+  .center .sub{color:var(--soft);font-size:15px;max-width:42ch;margin:0 auto}
+  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  .foot{margin-top:32px;color:var(--faint);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="/today.html">← Back to Today</a>
+    <h1>Website health</h1>
+    <p class="sub" id="sub">A calm, plain-English check-up of your website — what’s working, what’s worth a look, and why it matters. Nothing here changes your site.</p>
+  </header>
+  <div id="main"><div class="spin" role="status" aria-label="Checking your website"></div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// CMS-UX-4 — the Website Health page, rendered.
+// Consumes ONLY the existing read-only projection: GET /website-health.
+// Colour is never the only signal — each check shows an icon glyph AND a word.
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CLIENT = new URLSearchParams(location.search).get('client') || '';
+let TOKEN = "";
+sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
+
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':CLIENT });
+async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); if(r.status===401) return Promise.reject(401); return r.ok ? r.json() : Promise.reject(r.status); }
+function href(link){ if(!link) return null; if(!CLIENT) return link; const [b,h]=String(link).split('#'); return b + (b.includes('?')?'&':'?') + 'client=' + encodeURIComponent(CLIENT) + (h?'#'+h:''); }
+
+// state → glyph (icon is a second, non-colour signal alongside the word)
+const GLYPH = { ok:'✓', attention:'!', coming:'⏳', off:'–' };
+const VERDICT = {
+  healthy: { mark:'🌿', h:'Your website is healthy.' },
+  attention:{ mark:'🔎', h:'A few things could use a look.' },
+  new:     { mark:'🌱', h:'Your website is almost ready.' },
+};
+
+function checkHtml(c){
+  const link = href(c.action_href);
+  const act = (c.action_label && link) ? `<div class="cact"><a class="act" href="${esc(link)}">${esc(c.action_label)}</a></div>` : '';
+  return `<div class="chk">
+    <span class="ci ${esc(c.state)}" aria-hidden="true">${GLYPH[c.state]||'•'}</span>
+    <div class="cb">
+      <p class="ct">${esc(c.title)} <span class="cw ${esc(c.state)}">${esc(c.status_label)}</span></p>
+      ${c.why ? `<p class="cwhy">${esc(c.why)}</p>` : ''}
+      ${act}
+    </div>
+  </div>`;
+}
+function catHtml(cat){
+  return `<section class="cat">
+    <p class="clabel">${esc(cat.label)}</p>
+    ${(cat.checks||[]).map(checkHtml).join('')}
+  </section>`;
+}
+
+function render(h){
+  if(!h || !h.categories || !h.categories.length){
+    $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🌱</span>
+      <h2>Your website is being set up.</h2>
+      <p class="sub">As soon as there’s something to check, your health report will appear here — calmly, in plain words.</p></div>`;
+    return;
+  }
+  const v = VERDICT[h.overall] || VERDICT.healthy;
+  $('sub').textContent = 'A calm check-up of your website — what’s working, what’s worth a look, and why. Nothing here changes your site.';
+  let html = `<div class="verdict ${esc(h.overall)}">
+    <span class="vmark" aria-hidden="true">${v.mark}</span>
+    <div class="vtext"><h2>${esc(h.headline || v.h)}</h2><p>${esc(h.summary||'')}</p></div>
+  </div>`;
+  html += h.categories.map(catHtml).join('');
+  html += `<p class="foot">This is a read-only check-up — it never changes your website. Anything worth doing links to where you can do it.</p>`;
+  $('main').innerHTML = html;
+}
+
+function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>Sign in to check your website’s health.</h2><p class="sub">Your website lives with your account — sign in to see how it’s doing.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t run the check just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page. Please refresh in a moment.</p></div>`; }
+
+(async function init(){
+  try{
+    const { data } = await sb.auth.getSession();
+    TOKEN = (data && data.session && data.session.access_token) || "";
+    if(!TOKEN){ signedOut(); return; }
+    const res = await apiGet('/website-health');
+    render(res && res.data);
+  }catch(e){ if(e === 401){ signedOut(); return; } trouble(); }
+})();
+</script>
+</body>
+</html>
