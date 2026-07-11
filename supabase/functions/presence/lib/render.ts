@@ -10,6 +10,7 @@ import manifest_bc_1_0_0 from '../templates/business-classic/1.0.0/manifest.json
 import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.ts';
 import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
+import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 
 // ── FD-T2: indexed, lazy-ready template registry ─────────────────────────────
 // slug → version → LOADER. Render resolution goes through this ONE boundary and is
@@ -105,11 +106,16 @@ export function devLayerFragments(dev: Snapshot['dev_customization']): { style: 
       return out;
     })
     .join(';');
-  const css = dev.custom_css || '';
+  // Defense-in-depth: re-sanitize at render, never trust stored values. This is
+  // a no-op for content already sanitized on save, but guarantees that even a
+  // future write path that bypassed buildCustomization cannot become stored XSS
+  // on the live site.
+  const css = sanitizeDevCss(dev.custom_css || '');
   const style = (vars || css)
     ? `<style id="presence-dev">${vars ? `:root{${vars}}` : ''}${css ? `\n${css}` : ''}</style>`
     : '';
-  const block = dev.custom_html ? `<div class="presence-dev-block">${dev.custom_html}</div>` : '';
+  const safeHtml = dev.custom_html ? sanitizeDevHtml(dev.custom_html) : '';
+  const block = safeHtml ? `<div class="presence-dev-block">${safeHtml}</div>` : '';
   return { style, block };
 }
 
@@ -143,7 +149,31 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
   if (t.manifest.content_contract_version !== snapshot.content_contract_version) {
     throw new Error(`contract mismatch: template consumes v${t.manifest.content_contract_version}, snapshot is v${snapshot.content_contract_version}`);
   }
-  return injectAnalytics(injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization), site.siteId);
+  return injectCsp(injectAnalytics(injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization), site.siteId));
+}
+
+// ── Published-site Content-Security-Policy (defense-in-depth) ────────────────
+// A second layer beneath the developer-HTML sanitizer. It ships ONLY directives
+// that add real protection with zero breakage risk on our output:
+//   • object-src 'none'  — blocks <object>/<embed>/plugin injection
+//   • base-uri 'self'    — blocks a <base> tag hijacking every relative URL
+// Scripts/styles/images stay permissive ('unsafe-inline', https:, data:) because
+// the templates legitimately use an inline analytics script, inline JSON-LD +
+// styles, and storage-hosted images. Tightening script-src (to actually block
+// injected inline JS) requires hashing/externalising the per-site analytics
+// script AND a browser smoke on a real published page — QUEUED, not shipped here.
+const PUBLISHED_CSP = "default-src 'self' https: data: 'unsafe-inline'; object-src 'none'; base-uri 'self'";
+export function injectCsp(fileMap: FileMap): FileMap {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${PUBLISHED_CSP}">`;
+  const out: FileMap = {};
+  for (const [path, contents] of Object.entries(fileMap)) {
+    if (typeof contents === 'string' && path.endsWith('.html') && !contents.includes('Content-Security-Policy')) {
+      out[path] = contents.includes('<head>')
+        ? contents.replace('<head>', `<head>${meta}`)
+        : (contents.includes('</head>') ? contents.replace('</head>', `${meta}</head>`) : `${meta}${contents}`);
+    } else out[path] = contents;
+  }
+  return out;
 }
 
 /** AN-2: inject the ONE first-party analytics tracker into every rendered page.

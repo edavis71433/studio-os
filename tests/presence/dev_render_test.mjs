@@ -6,7 +6,7 @@
 // same bytes → same rollback/restore/preview".
 //
 //   deno run --allow-read --allow-env tests/presence/dev_render_test.mjs
-import { injectDevLayer, devLayerFragments } from '../../supabase/functions/presence/lib/render.ts';
+import { injectDevLayer, devLayerFragments, injectCsp } from '../../supabase/functions/presence/lib/render.ts';
 import { buildDevLayer } from '../../supabase/functions/presence/lib/serializer.ts';
 
 const results = [];
@@ -79,6 +79,21 @@ const DEV = { theme_tokens: { accent: '#123456', radius: '8px' }, custom_css: '.
   const layer = buildDevLayer({ theme_tokens: {}, custom_css: '', custom_html: '<p>hi</p><script>alert(1)</script>' });
   const out = injectDevLayer(sampleMap(), layer);
   ok('no <script> reaches rendered HTML', !out['index.html'].toLowerCase().includes('<script'));
+}
+
+// ═══ CSP + render-time re-sanitize (defense-in-depth) ═══
+{
+  const csp = injectCsp(sampleMap());
+  ok('CSP meta injected into every HTML page', /Content-Security-Policy/.test(csp['index.html']) && /Content-Security-Policy/.test(csp['menu/index.html']));
+  ok('CSP blocks object + base-uri', /object-src 'none'/.test(csp['index.html']) && /base-uri 'self'/.test(csp['index.html']));
+  ok('CSP does not break inline (keeps unsafe-inline for analytics/styles)', /'unsafe-inline'/.test(csp['index.html']));
+  ok('CSP idempotent (not double-injected)', injectCsp(csp)['index.html'].match(/Content-Security-Policy/g).length === 1);
+  ok('CSP leaves non-HTML assets untouched', csp['assets/app.css'] === 'body{color:#000}');
+  // render-time re-sanitize: a stored <script> in custom_html never reaches the block
+  const evil = devLayerFragments({ theme_tokens: {}, custom_css: 'a{x:expression(alert(1))}', custom_html: '<p>ok</p><script>alert(1)</script><marquee>x</marquee>' });
+  ok('render re-sanitizes stored HTML (<script> gone)', !/<script/i.test(evil.block) && evil.block.includes('<p>ok</p>'));
+  ok('render re-sanitizes stored HTML (<marquee> gone)', !/<marquee/i.test(evil.block));
+  ok('render re-sanitizes stored CSS (expression() gone)', !/expression\(/i.test(evil.style));
 }
 
 const passed = results.filter((r) => r.p).length;

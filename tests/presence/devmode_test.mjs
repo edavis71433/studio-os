@@ -7,7 +7,7 @@
 // unchanged).
 //
 //   deno run --allow-read --allow-env tests/presence/devmode_test.mjs
-import { sanitizeDevHtml, sanitizeDevCss, validateThemeTokens, buildCustomization, projectFiles, ALLOWED_TOKENS } from '../../supabase/functions/presence/lib/devmode.ts';
+import { sanitizeDevHtml, sanitizeDevCss, validateThemeTokens, buildCustomization, projectFiles, ALLOWED_TOKENS, DEV_HTML_ALLOW } from '../../supabase/functions/presence/lib/devmode.ts';
 import { devModeAllowed } from '../../supabase/functions/presence/routes/dev.ts';
 
 const results = [];
@@ -94,6 +94,27 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('access: plain business_owner denied (not entitled)', devModeAllowed('business_owner', 'user') === false);
   ok('access: business_staff denied', devModeAllowed('business_staff', 'user') === false);
   ok('access: client_reviewer denied', devModeAllowed('client_reviewer', 'user') === false);
+}
+
+// ═══ N. allow-list pass — only safe content tags survive (defense-in-depth) ═══
+{
+  // allow-listed content tags are kept
+  for (const t of ['div', 'p', 'a', 'img', 'h2', 'ul', 'li', 'strong', 'figure', 'table', 'section']) {
+    ok(`allow-list keeps <${t}>`, sanitizeDevHtml(`<${t}>x</${t}>`).includes(`<${t}`));
+  }
+  // non-allow-listed tags are stripped (their inner text is preserved)
+  const marquee = sanitizeDevHtml('<marquee>scroll</marquee>');
+  ok('allow-list strips <marquee> wrapper', !/<\/?marquee/i.test(marquee) && marquee.includes('scroll'));
+  ok('allow-list strips <button>', !/<\/?button/i.test(sanitizeDevHtml('<button>go</button>')));
+  ok('allow-list strips <input>', !/<input/i.test(sanitizeDevHtml('<input value="x">')));
+  ok('allow-list strips <details>/<dialog>', !/<\/?(details|dialog)/i.test(sanitizeDevHtml('<details><dialog>hi</dialog></details>')));
+  // denylist still wins on the truly dangerous ones
+  ok('denylist still strips <script>', !/<script/i.test(sanitizeDevHtml('<script>alert(1)</script><p>ok</p>')));
+  ok('denylist still strips <iframe>', !/<iframe/i.test(sanitizeDevHtml('<iframe src="x"></iframe>')));
+  // a realistic developer block survives intact
+  const real = sanitizeDevHtml('<section><h2>Family-owned</h2><p>Since <strong>2019</strong>.</p><a href="/menu">See our menu</a></section>');
+  ok('real content block survives', real.includes('<section') && real.includes('<h2') && real.includes('<strong') && real.includes('href="/menu"'));
+  ok('DEV_HTML_ALLOW is a non-empty set', DEV_HTML_ALLOW.size > 20 && DEV_HTML_ALLOW.has('div') && !DEV_HTML_ALLOW.has('script'));
 }
 
 // ── summary ──
