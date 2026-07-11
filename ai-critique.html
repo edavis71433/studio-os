@@ -297,7 +297,7 @@ a{color:inherit;}
     <a href="industries.html">Industries</a>
     <a href="work.html">Results</a>
     <a href="about.html">About</a>
-    <a href="audit.html">Free tools</a>
+    <a href="audit.html">Free site review</a>
   </nav>
   <div class="nav-actions">
     <a href="portal.html" class="nav-login">Client login</a>
@@ -639,7 +639,7 @@ a{color:inherit;}
     </div>
     <div class="fcol">
       <p class="fcol-h">Start</p>
-      <a href="audit.html">Free tools</a>
+      <a href="audit.html">Free site review</a>
       <a href="tools.html">Free tools</a>
       <a href="contact.html">Book a free call</a>
       <a href="portal.html">Client login</a>
@@ -855,6 +855,7 @@ a{color:inherit;}
     }).then(function(r){ if(!r.ok) throw new Error('send_failed'); return r.json(); }).then(function(){
       $('emailRow').hidden = true;
       $('emailDone').hidden = false;   // only on a genuine success
+      if(typeof gtag === 'function'){ gtag('event','generate_lead',{ event_category:'lead', event_label:'ai_critique_email' }); }
     }).catch(function(){
       // don't claim "sent" when it failed — let them retry
       btn.disabled = false; btn.textContent = label;
