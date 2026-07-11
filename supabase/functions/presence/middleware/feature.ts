@@ -49,7 +49,7 @@ export function featureForRoute(route: string, method: string): EditionFeature |
     case 'schedule':
       return isWrite ? 'website' : null;                 // scheduling a publish = website; listing lives in Inbox (baseline)
     case 'foundations':
-      return seg[1] === 'dns' ? 'website' : null;        // custom domain = website hosting; other foundations are platform baseline
+      return (seg[1] === 'dns' || seg[1] === 'domain') ? 'website' : null;  // custom domain + DNS = website hosting; other foundations are platform baseline
     case 'dev':
       return 'developer';                                // Developer Mode — its own atom (CMS has it; Monitor/Business OS do not)
 
