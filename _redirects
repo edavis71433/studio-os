@@ -19,3 +19,26 @@
 # Resources hub — permanent as of V2 (previously retired to /audit; that
 # redirect is removed, this clean-URL rewrite added in its place)
 /tools             /tools.html         200
+
+# Clean URLs for the marketing pages (extensionless links resolve to the .html file)
+/                       /index.html                 200
+/about                  /about.html                 200
+/services               /services.html              200
+/web-design             /web-design.html            200
+/seo-strategy           /seo-strategy.html          200
+/monthly-retainer       /monthly-retainer.html      200
+/how-we-work            /how-we-work.html           200
+/the-experience         /the-experience.html        200
+/industries             /industries.html            200
+/work                   /work.html                  200
+/contact                /contact.html               200
+/privacy                /privacy.html               200
+/terms                  /terms.html                 200
+/accessibility          /accessibility.html         200
+/ai-disclaimer          /ai-disclaimer.html         200
+/portal-terms           /portal-terms.html          200
+/restaurant-web-design      /restaurant-web-design.html      200
+/salon-web-design           /salon-web-design.html           200
+/retail-web-design          /retail-web-design.html          200
+/home-services-web-design   /home-services-web-design.html   200
+/health-wellness-web-design /health-wellness-web-design.html 200

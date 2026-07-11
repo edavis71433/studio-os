@@ -23,7 +23,7 @@
 <meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
@@ -131,7 +131,7 @@
       <a href="work.html" style="display:inline-block;border:1px solid var(--hair);border-radius:100px;padding:8px 16px;font-size:14px;color:var(--ink);text-decoration:none;background:var(--paper)">Results</a>
       <a href="industries.html" style="display:inline-block;border:1px solid var(--hair);border-radius:100px;padding:8px 16px;font-size:14px;color:var(--ink);text-decoration:none;background:var(--paper)">All industries</a>
     </div>
-    <p class="lead-muted mt-m" style="font-size:15px">Want to know if it's the right fit? <a href="about.html" class="textlink">See how I work</a> or <a href="audit.html" class="textlink">get a free site review &rarr;</a></p>
+    <p class="lead-muted mt-m" style="font-size:15px">Want to know if it's the right fit? <a href="how-we-work.html" class="textlink">See how I work</a> or <a href="audit.html" class="textlink">get a free site review &rarr;</a></p>
   </div>
 </div>
 </section>
@@ -189,5 +189,6 @@ els.forEach(el=>io.observe(el));
 window.addEventListener('load',()=>setTimeout(()=>els.forEach(el=>el.classList.add('in')),1200));
 </script>
 <script src="nav.js" defer></script>
+<script src="analytics.js" defer></script>
 </body>
 </html>
