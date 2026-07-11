@@ -275,23 +275,31 @@ export async function handleRestore(req: Request, site: SiteRow, principal: Prin
 }
 
 /** GET /publishes — plain-language history; lazily reconciles pending deploys. */
-export async function handlePublishHistory(site: SiteRow, cors: Record<string, string>) {
+/** The site's kept-version history, with the customer-facing summary fallback +
+ *  restorable flag. Shared by GET /publishes and the CMS-UX-8 Snapshot History
+ *  so the version wording lives in exactly one place. */
+export async function publishHistoryRows(site: SiteRow) {
   // M5: reconcile anything left in-flight — the SAME reconcileOnePublish the cron
   // uses (one implementation, never re-deploys). Was inlined here; now shared.
   await reconcileSitePublishes(site.id);
 
   const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,version_label,created_at,completed_at,snapshot_id&order=created_at.desc&limit=30`);
   const rows = Array.isArray(r.json) ? r.json : [];
-  return json({
-    data: rows.map((p: any) => ({
-      id: p.id, kind: p.kind,
-      status: p.status === 'live' ? 'live' : p.status === 'failed' ? 'failed' : 'publishing',
-      summary: p.change_summary || (p.kind === 'restore' ? 'Restored an earlier version' : 'Published your site'),
-      label: p.version_label || '',
-      at: p.created_at, completed_at: p.completed_at,
-      restorable: !!p.snapshot_id && p.status === 'live',
-    })),
-  }, 200, cors);
+  return rows.map((p: any) => ({
+    id: p.id, kind: p.kind,
+    status: p.status === 'live' ? 'live' : p.status === 'failed' ? 'failed' : 'publishing',
+    summary: p.change_summary || (p.kind === 'restore' ? 'Restored an earlier version' : 'Published your site'),
+    label: p.version_label || '',
+    at: p.created_at, completed_at: p.completed_at,
+    restorable: !!p.snapshot_id && p.status === 'live',
+    snapshot_id: p.snapshot_id || null,
+  }));
+}
+
+export async function handlePublishHistory(site: SiteRow, cors: Record<string, string>) {
+  const rows = await publishHistoryRows(site);
+  // keep the existing /publishes shape exactly (no snapshot_id in the response)
+  return json({ data: rows.map(({ snapshot_id: _s, ...pub }) => pub) }, 200, cors);
 }
 
 // ── Phase AA (FD-7): name a kept version ─────────────────────────────────────

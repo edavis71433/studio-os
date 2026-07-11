@@ -46,6 +46,7 @@ import { handleWebsiteHealth } from './routes/health_page.ts';
 import { handleUpcoming } from './routes/upcoming.ts';
 import { handleApprovalCenter } from './routes/approvals_page.ts';
 import { handleBusinessInsights } from './routes/insights_page.ts';
+import { handleSnapshotHistory } from './routes/history_page.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
@@ -411,6 +412,7 @@ serve(async (req) => {
   if (route === '/upcoming' && method === 'GET') return handleUpcoming(site, cors);
   if (route === '/approval-center' && method === 'GET') return handleApprovalCenter(site, cors);
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
+  if (route === '/snapshot-history' && method === 'GET') return handleSnapshotHistory(site, cors);
   if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
   {
     const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);
