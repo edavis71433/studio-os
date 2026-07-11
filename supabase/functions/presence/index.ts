@@ -274,8 +274,13 @@ serve(async (req) => {
   //    Publishing concepts don't exist for them — the platform never writes
   //    to a website it doesn't host. Everything else (profile, studio,
   //    coach, concierge) prepares guidance and stays available.
-  if (site.edition === 'monitor' && (route === '/publish' || route === '/restore' || route.startsWith('/launches')) && method === 'POST') {
-    return json({ error: 'edition_monitor', message: 'Your website stays exactly where it is — this plan observes and guides, it never publishes. Upgrading adds hosting and publishing whenever you’re ready.' }, 403, cors);
+  //    "Monitor never drafts" is now true at the boundary, not merely hidden in the
+  //    nav: reads of the website area are fine, but ANY write to a website-authoring
+  //    route (publish/restore/launches AND content edits — offerings, media, identity,
+  //    etc.) is refused for an observe-only monitor site. Non-website writes it
+  //    legitimately makes (connections, notes, settings) are unaffected.
+  if (site.edition === 'monitor' && (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') && featureForRoute(route, method) === 'website') {
+    return json({ error: 'edition_monitor', message: 'Your website stays exactly where it is — this plan watches and guides, it never edits or publishes. Upgrading adds editing and publishing whenever you’re ready.' }, 403, cors);
   }
 
   // ── Phase FE-1: FEATURE-boundary enforcement (outside RLS; mirrors buildNav).
