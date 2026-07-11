@@ -32,7 +32,7 @@ export async function changeSummary(siteId: string): Promise<string> {
   if (!rows.length) return 'Publishing your site';
   const counts: Record<string, number> = {};
   for (const r of rows) counts[r.entity_type] = (counts[r.entity_type] || 0) + 1;
-  const label: Record<string, string> = { identity: 'business details', location: 'hours & location', offering: 'menu items', testimonial: 'testimonials', faq: 'FAQs', post: 'updates', media: 'photos', redirect: 'links', voice: 'voice profile', settings: 'settings' };
+  const label: Record<string, string> = { identity: 'business details', location: 'hours & location', offering: 'offerings', testimonial: 'testimonials', faq: 'FAQs', post: 'updates', media: 'photos', redirect: 'links', voice: 'voice profile', settings: 'settings' };
   const parts = Object.entries(counts).map(([k, n]) => `${n} ${label[k] || k} change${n > 1 ? 's' : ''}`);
   const deletions = rows.filter((r) => r.action === 'delete').length;
   return parts.join(', ') + (deletions ? ` (including ${deletions} deletion${deletions > 1 ? 's' : ''})` : '');

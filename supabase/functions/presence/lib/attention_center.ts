@@ -57,7 +57,7 @@ export interface AttentionInput {
 }
 
 // notice kinds that call for action now vs. that are simply approaching
-const NOTICE_NEEDS = new Set(['payment_trouble', 'account_lapsed', 'lead_followup', 'search_setup', 'deletion_requested', 'publish_failed', 'connection_expired', 'website_enquiry', 'deal_signed']);
+const NOTICE_NEEDS = new Set(['payment_trouble', 'account_lapsed', 'lead_followup', 'search_setup', 'deletion_requested', 'publish_failed', 'connection_expired', 'website_enquiry', 'deal_signed', 'deal_followup']);
 const NOTICE_SOON = new Set(['domain_expiry', 'trial_ending', 'trial_ended', 'renewal_reminder', 'winddown_reminder', 'win_back']);
 
 export function whenWord(iso: string, now: string): string {

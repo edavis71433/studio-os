@@ -55,7 +55,7 @@ interface EntitySpec {
 
 export const SPECS: Record<string, EntitySpec> = {
   offerings: {
-    table: 'presence_offerings', entityType: 'offering', noun: 'menu item',
+    table: 'presence_offerings', entityType: 'offering', noun: 'offering',
     fields: {
       name: { max: 120, required: true }, category: { max: 60, required: true },
       description: { max: 500 }, price_text: { max: 40 },

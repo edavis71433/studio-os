@@ -319,6 +319,32 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
   return { nudged };
 }
 
+// ── CRM: nudge stale DEALS (leads had this; deals didn't) ────────────────────
+// A deal parked in qualified/proposal/contract with no movement for a few days
+// would otherwise sit forever — Pipedrive/Dubsado's whole promise is "no deal
+// falls through." Same 15-min sweep, same notices rail, send-once per deal.
+export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> {
+  const from = new Date(Date.now() - 30 * 86400_000).toISOString();   // not ancient (<30d)
+  const to = new Date(Date.now() - 3 * 86400_000).toISOString();      // quiet at least 3 days
+  const q = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(qualified,proposal,contract)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,title,stage&order=updated_at.asc&limit=${limit}`);
+  let nudged = 0;
+  for (const deal of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; title?: string; stage: string }>) {
+    const siteQ = await svc(`presence_sites?id=eq.${deal.site_id}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+    const title = deal.title || 'a deal';
+    const body = deal.stage === 'proposal' ? 'A proposal has been out for a few days with no reply — a quick nudge often closes it.'
+      : deal.stage === 'contract' ? 'The agreement is sent but not signed yet — a gentle reminder helps it over the line.'
+      : 'This deal has gone quiet for a few days — a quick follow-up keeps it moving.';
+    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ site_id: deal.site_id, client_id: clientId, kind: 'deal_followup', period: `deal:${deal.id}`, headline: `Follow up on ${title}`, body, status: 'active' }),
+    });
+    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) nudged++;
+  }
+  return { nudged };
+}
+
 // ── PP-2 / CP-3.1: the annual renewal heads-up ───────────────────────────────
 // Never surprise a customer with a yearly charge. For annual terms not set to
 // cancel, a calm note goes out ~30 days and again ~7 days before the renewal

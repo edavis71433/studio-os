@@ -156,6 +156,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 const NOTICE_HREF: Record<string, string> = {
   lead_followup: '/leads.html',
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
+  deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
   domain_expiry: '/presence.html#business',
   search_setup: '/presence.html#search',
   welcome_back: '/today.html',
