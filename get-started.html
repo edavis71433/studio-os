@@ -83,7 +83,7 @@ const INDUSTRIES=[
 const LESSONS=[
   ['✓','Approvals','Studio OS proposes; you approve. Nothing publishes without you.'],
   ['◆','Ownership','It’s yours — export anytime, connect or disconnect freely, leave without penalty.'],
-  ['↺','Rollback','Every publish is kept. If a change looks wrong, restore an earlier version in one step.'],
+  ['↺','Undo anything','Every publish is kept. If a change looks wrong, restore an earlier version in one step.'],
 ];
 let INTAKE={industry:'restaurant',services:['Dinner','Lunch','Catering'],description:''};
 let BIZ='your business';
@@ -112,7 +112,7 @@ function renderIntake(){
         <button class="primary" id="build">Build my website →</button>
         <button class="plain" id="manual">I’ll set it up myself</button>
       </div>
-      <p class="hint">We’ll draft your homepage, pages, copy, and SEO from this — then you review and publish when it’s right.</p>
+      <p class="hint">We’ll draft your homepage, pages, and the words that help customers find you on Google — then you review and publish when it’s right.</p>
     </div>`;
   wireIntake();
 }
@@ -141,7 +141,7 @@ async function build(){
   // so the PUT must land before /writer/generate runs (else wrong-vocab drafts).
   await saveIndustry();
   if(!INTAKE.services.some(s=>s.trim())&&INTAKE.description.trim().length<8){renderIntake();$('desc').focus();return;}
-  $('main').innerHTML=`<div class="center"><div class="spin" role="status"></div><p class="big">Drafting your website…</p><p class="sub" style="margin:0 auto">Turning what you told us into real pages, homepage copy, and SEO. This takes a few seconds.</p></div>`;
+  $('main').innerHTML=`<div class="center"><div class="spin" role="status"></div><p class="big">Drafting your website…</p><p class="sub" style="margin:0 auto">Turning what you told us into real pages and homepage copy, written so customers can find you on Google. This takes a few seconds.</p></div>`;
   const req=buildStarterRequest(INTAKE);
   const gen=await api('/writer/generate','POST',req);
   if(!gen.ok){ return manualFallback(gen.status===503?'switched_off':'failed'); }
@@ -159,14 +159,14 @@ function drafted(applied){
   $('main').innerHTML=`
     <div class="eyebrow" style="color:var(--good)">✓ Drafted</div>
     <h1>Your website is ready to review.</h1>
-    <p class="sub">We drafted your pages, homepage copy, and SEO from what you told us. ${applied?'It’s in your workspace as a draft':'It’s waiting as a proposal'} — nothing is live yet.</p>
+    <p class="sub">We drafted your pages and homepage copy from what you told us — including the behind-the-scenes bits that help Google find you. ${applied?'It’s in your workspace as a draft':'It’s waiting as a proposal'} — nothing is live yet.</p>
     <div class="card">
       <div class="steps">${steps.map(s=>`<div class="step ${s[2]?'done':''} ${s[3]?'':(s===steps[1]?'now':'')}"><span class="dot">${s[2]?'✓':''}</span><span><span class="t">${esc(s[1])}</span></span></div>`).join('')}</div>
       <div class="bar"><button class="primary" id="review">Review &amp; preview your website →</button></div>
       <p class="hint">You’ll see it exactly as visitors will. Change anything, then publish with one calm step — and every version is kept, so you can always go back.</p>
     </div>
     <div class="card" style="padding-top:6px">${LESSONS.map(l=>`<div class="lesson"><span class="ic">${l[0]}</span><span><b>${esc(l[1])}.</b> ${esc(l[2])}</span></div>`).join('')}</div>`;
-  $('review').addEventListener('click',()=>location.href='/presence.html');
+  $('review').addEventListener('click',()=>location.href='/presence.html?view=preview');
 }
 function manualFallback(reason){
   $('main').innerHTML=`

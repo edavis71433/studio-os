@@ -108,10 +108,13 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     const q = clean(u.searchParams.get('q'), 80).replace(/[(),*"\\]/g, ' ').trim();   // L2: neutralize PostgREST filter grammar
     const limit = clampLimit(u.searchParams.get('limit'));
     const offset = Math.max(0, Math.trunc(Number(u.searchParams.get('offset'))) || 0);
-    let path = `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
-    if (stage && isStage(stage)) path += `&stage=eq.${stage}`;
-    if (q) path += `&title.ilike.*${encodeURIComponent(q)}*`;
-    const r = await svc(path);
+    // next_step/next_step_at land with migration 0089 — try the full select, fall
+    // back to the pre-0089 shape so a deploy ahead of the migration never breaks
+    // the pipeline list.
+    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at';
+    const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}`;
+    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pipeline just now.' }, 502, cors);
     return json({ data: rows(r), limit, offset }, 200, cors);
   }
@@ -183,7 +186,13 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (b.next_step !== undefined) patch.next_step = clean(b.next_step, 200);
     if (b.next_step_at !== undefined) { const nd = b.next_step_at ? clean(b.next_step_at, 10) : ''; if (nd && !DATE_RE.test(nd)) return json({ error: 'validation', message: 'The next-step date must be a date (YYYY-MM-DD).' }, 422, cors); patch.next_step_at = nd || null; }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
-    const up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    let up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    // Deploy-order tolerance: before migration 0089 the next-step columns don't
+    // exist — a whole Details save (value/close/notes) must not 502 over them.
+    if (!up.ok && ('next_step' in patch || 'next_step_at' in patch)) {
+      delete patch.next_step; delete patch.next_step_at;
+      if (Object.keys(patch).length) up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    }
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
     return json({ data: rows(up)[0] }, 200, cors);
   }
@@ -306,7 +315,10 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     const brand = await loadEmailBrand(siteId);
     const amount = '$' + (amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you a ${title.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand);
+    // Operator-typed title → escape it (it lands inside HTML) and mind the article.
+    const safeTitle = title.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+    const article = /^[aeiou]/i.test(title) ? 'an' : 'a';
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand);
   } catch { return false; }
 }
 
@@ -373,7 +385,9 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   const doubleTap = reused && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents));
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
-  if (!reused) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
+  // `repaired` = the FIRST attempt's link failed before its event could be
+  // recorded — the retry that completes it must write the history line.
+  if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, amount_cents: Number(inv.amount_cents) }, reused ? 200 : 201, cors);
 }
 
@@ -528,6 +542,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   // EXECUTED COPY: the email is the durable record ("you'll always be able to ask
   // for a copy" — now they don't have to ask). Full agreement text + signature
   // facts, on the studio's brand, to the signer (falls back to the deal contact).
+  let copyEmailed = false;
   try {
     let to = signerEmail;
     if (!to) {
@@ -537,11 +552,11 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     if (to) {
       const brand = await loadEmailBrand(tok.site_id);
       const escHtml = (s: string) => s.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
-      await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
+      copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
         `<p>Here's your copy of the agreement, exactly as signed. Keep this email — it's your record.</p>` +
         `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;white-space:pre-wrap;font-size:14px">${escHtml(String(c.body || ''))}</div>` +
         `<p style="font-size:13px;color:#6b6478">Signed by <strong>${escHtml(signerName)}</strong> on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} · document fingerprint ${String(c.content_hash || '').slice(0, 12)}</p>`,
-        brand).catch(() => {});
+        brand).catch(() => false);
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -552,7 +567,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     const dep = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`))[0];
     if (dep?.stripe_url) pay = { url: String(dep.stripe_url), amount_cents: Number(dep.amount_cents) || 0 };
   } catch { /* optional */ }
-  return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null } }, 200, cors);
+  return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null, copy_emailed: copyEmailed } }, 200, cors);
 }
 
 // ═══ PUBLIC VIEW (token) — a prospect reviews the proposal/contract before acting ═══

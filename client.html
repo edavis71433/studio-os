@@ -106,7 +106,8 @@ function renderProjects(projects,unread){
   projects.slice(0,6).forEach(async(p)=>{
     try{
       const r=await api('/client/projects/'+p.id+'/report');
-      const d=(r&&r.body&&r.body.data)||{};
+      // the numbers live under data.summary (the same shape the detail view reads)
+      const d=(r&&r.body&&r.body.data&&(r.body.data.summary||r.body.data))||{};
       const el=document.getElementById('glance-'+p.id);if(!el)return;
       const pct=d.progress&&d.progress.pct;
       const waiting=(Number(d.pending_approvals)||0)+(Number(d.open_client_actions)||0);
@@ -126,7 +127,7 @@ async function appendBilling(){
     if(!inv.length) return;
     const row=(i)=>`<div class="card"><h3>${esc(i.name||'Invoice')}<\/h3><p>${i.amount?('Amount: $'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?(' · due '+esc(i.due_date)):''}</p>${i.pay_url?`<p><a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener">Pay this invoice →<\/a><\/p>`:(i.paid_at?'<p class="muted">Paid — thank you.<\/p>':'<p class="muted">Your studio will send payment details.<\/p>')}<\/div>`;
     const sec=document.createElement('section');
-    sec.innerHTML=`<h2>Billing<\/h2><p class="muted" style="margin:-4px 0 10px">Invoices from your studio for project work. Your Studio OS subscription is billed separately.<\/p>${inv.map(row).join('')}`;
+    sec.innerHTML=`<h2>Billing<\/h2><p class="muted" style="margin:-4px 0 10px">Invoices from your studio for project work. Your website subscription is billed separately.<\/p>${inv.map(row).join('')}`;
     $('main').appendChild(sec);
   }catch(_){/* billing is additive; never block the projects view */}
 }

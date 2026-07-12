@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/shell.css">
 <style>
   :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24}}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e}}
   :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
   *{box-sizing:border-box;margin:0}
@@ -115,7 +115,14 @@ async function load(){
     const res=await api('/sales/deals'+(FILTER?('?stage='+FILTER):''));
     DEALS=res.data||[];
     if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New inquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
-    $('list').innerHTML=DEALS.map(d=>`<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div></div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`).join('');
+    // Deals with a DUE next step float to the top (overdue first) — the pipeline
+    // answers "what do I do today", not just "what exists".
+    const today=new Date().toISOString().slice(0,10);
+    DEALS.sort((a,b)=>{const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
+    $('list').innerHTML=DEALS.map(d=>{
+      const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
+      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}</div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+    }).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
 }
@@ -219,7 +226,12 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(e.message,true);}});
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:$('ed-notes').value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});toast('Saved');openDeal(id);load();}catch(e){toast(e.message,true);eds.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
-    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});toast('Agreement sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});
+      // The sign→pay moment only works if a deposit is WAITING when they sign —
+      // nudge the operator the moment the agreement goes out without one.
+      const hasOpenDeposit=(data.invoices||[]).some(v=>v.purpose==='deposit'&&v.status==='open');
+      toast('Agreement sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':''))+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.'));
+      if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
     // Multi-line proposal form — real projects have design + build + care, not one line.
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{
       const host=$('propForm');
@@ -252,11 +264,15 @@ async function openDeal(id){
       }catch(e){
         if(e.status===409&&e.body&&e.body.error==='amount_mismatch'){
           const open=e.body.open_invoice||{};
-          $('invForm').innerHTML=`<div class="mut" style="margin:8px 0">${esc(e.body.message||'An open one already exists.')}</div>
+          $('invForm').innerHTML=`<div class="mut" style="margin:8px 0" role="alert">${esc(e.body.message||'An open one already exists.')} <span class="mut">If you send another, both links stay payable until one is paid.</span></div>
             <div class="row2"><button class="btn ghost" id="resendOpen">Resend the ${money(open.amount_cents)} link</button>
             <button class="btn ghost" id="forceNew">Send another for the new amount</button></div>`;
-          $('resendOpen').onclick=()=>sendMoney({purpose:body.purpose});
-          $('forceNew').onclick=()=>sendMoney({...body,force:true});
+          $('resendOpen').focus();
+          // Resend passes the OPEN amount explicitly (an ad-hoc deposit may have no
+          // accepted proposal to default from); both buttons guard the double-click.
+          const arm=(id,fn)=>{const b=$(id);b.onclick=()=>{$('resendOpen').disabled=true;$('forceNew').disabled=true;fn();};};
+          arm('resendOpen',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined}));
+          arm('forceNew',()=>sendMoney({...body,force:true}));
           return;
         }
         toast(e.message,true);
@@ -265,7 +281,7 @@ async function openDeal(id){
     const sendInv=$('sendInvoice'); if(sendInv) sendInv.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Amount (USD) — leave blank to use the accepted proposal',type:'number',step:'0.01',placeholder:'2500'}],async(v)=>{const body={purpose:'service'};if(v.amount)body.amount_cents=Math.round(parseFloat(v.amount)*100);await sendMoney(body);});
     $('detailInner').querySelectorAll('[data-copy-pay]').forEach(b=>b.onclick=()=>{
       const url=b.dataset.copyPay;
-      const fallback=()=>{const i=document.createElement('input');i.value=url;document.body.appendChild(i);i.select();try{document.execCommand('copy');toast('Payment link copied');}catch(_){toast('Couldn’t copy — the link is: '+url,true);}i.remove();};
+      const fallback=()=>{const i=document.createElement('input');i.value=url;document.body.appendChild(i);i.select();try{document.execCommand('copy');toast('Payment link copied');}catch(_){toast('Couldn’t copy on this device — use the Copy link button in the invoice list, or the email has the same link.',true);}i.remove();};
       if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Payment link copied')).catch(fallback);else fallback();
     });
     const sendDep=$('sendDeposit'); if(sendDep) sendDep.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Deposit amount (USD)',type:'number',step:'0.01',placeholder:'500'}],async(v)=>{if(!v.amount){toast('Enter a deposit amount.',true);return;}await sendMoney({purpose:'deposit',amount_cents:Math.round(parseFloat(v.amount)*100),title:'Deposit'});});

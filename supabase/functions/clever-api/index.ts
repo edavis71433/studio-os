@@ -570,7 +570,7 @@ function _isOverdue(inv: any, nowMs?: number): boolean {
 // now as part of step 2.) NOTE: this limiter is in-memory per instance — a
 // durable, table-backed, per-tenant limiter is the step-2 pipeline's job; this
 // is the interim floor.
-const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft', 'lead_intake', 'discovery_intake', 'audit_lead', 'report_card']);
+const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft', 'lead_intake', 'discovery_intake', 'audit_lead', 'report_card', 'survey_response']);
 const RATE_MAX = 12;
 const RATE_WINDOW_MS = 60_000;
 const rateHits = new Map<string, { count: number; resetAt: number }>();
@@ -699,12 +699,15 @@ function emailWrap(body: string) {
 }
 
 function notifyShell(heading: string, lines: string[], cta?: { label: string; href: string }) {
+  // Lines can carry PUBLIC input (lead_intake, survey_response) — escape them so
+  // a submitted message can never inject HTML into the owner's trusted email.
+  const escLine = (s: string) => String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
   return emailWrap(`
     <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
       <a href="https://davisdigitalstudio.com" style="font-family:Georgia,serif;font-size:18px;color:#fff;text-decoration:none;display:block;margin-bottom:20px;">Davis<span style="color:#c4aee8;">Digital</span> Studio</a>
       <div style="background:#1e1338;border-radius:16px;padding:28px;">
-        <h1 style="font-family:Georgia,serif;font-size:21px;font-weight:400;color:#fff;margin:0 0 14px;">${heading}</h1>
-        ${lines.map(l => `<p style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 10px;">${l}</p>`).join('')}
+        <h1 style="font-family:Georgia,serif;font-size:21px;font-weight:400;color:#fff;margin:0 0 14px;">${escLine(heading)}</h1>
+        ${lines.map(l => `<p style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 10px;">${escLine(l)}</p>`).join('')}
         ${cta ? `<div style="text-align:center;margin-top:20px;"><a href="${cta.href}" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:11px 24px;border-radius:100px;text-decoration:none;">${cta.label}</a></div>` : ''}
       </div>
     </div>
@@ -4639,7 +4642,7 @@ serve(async (req) => {
       kickoff: 'Kickoff', content: 'Gathering your content', design: 'Design',
       build: 'Building your site', review: 'Your review', launch: 'Launch', complete: 'Complete',
     };
-    const PORTAL_URL = 'https://davisdigitalstudio.com/portal';
+    const PORTAL_URL = 'https://davisdigitalstudio.com/portal.html';
     const contactEmail = async (contactId: string) => {
       try {
         const r = await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${encodeURIComponent(contactId)}&select=email,name&limit=1`,
@@ -4668,7 +4671,7 @@ serve(async (req) => {
                 `The action itself is saved. The client simply wasn't emailed.`,
                 `Fix: open the client record and make sure their contact (and email) is linked, then re-send if needed.`,
               ],
-              { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
+              { label: 'Open Studio OS', href: 'https://davisdigitalstudio.com/studio.html' },
             ));
           } catch (_) { /* best-effort */ }
           return { emailed: false, reason: 'no_contact_linked' };
@@ -4683,7 +4686,7 @@ serve(async (req) => {
                 `You just performed a <strong>${eventType}</strong> action, but the linked contact has no email on file, so no notification went out.`,
                 `The action itself is saved. Add an email to the contact to enable notifications.`,
               ],
-              { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
+              { label: 'Open Studio OS', href: 'https://davisdigitalstudio.com/studio.html' },
             ));
           } catch (_) { /* best-effort */ }
           return { emailed: false, reason: 'contact_has_no_email' };
@@ -7453,7 +7456,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
           `<strong>Your login</strong><br>Email: ${email}<br>Password: ${pass || '(set in your welcome details)'}`,
           `Sign in any time at the link below. I'd recommend changing your password after your first login.`,
         ],
-        { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }
+        { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal.html' }
       );
       const clientEmailed = await emailOk(email, `Your Davis Digital Studio portal is ready`, html, CLIENT_OPTS);
       const ericEmailed = await emailOk(ERIC, `Portal created: ${name}`, notifyShell(`New client portal created`, [`${name} (${email}) now has a portal.`]));
@@ -7537,10 +7540,10 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         // workspace isn't connected yet (the email above still goes out).
         try {
           const H2 = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' };
-          const cl = await fetch(`${SB_URL}/rest/v1/clients?email=eq.${encodeURIComponent('eric@davisdigitalstudio.com')}&select=id&limit=1`, { headers: H2 });
+          const cl = await fetch(`${SB_URL}/rest/v1/clients?email=ilike.${encodeURIComponent('eric@davisdigitalstudio.com')}&select=id&limit=1`, { headers: H2 });
           const clientId = ((await cl.json().catch(() => []))[0] || {}).id;
           if (clientId) {
-            const st = await fetch(`${SB_URL}/rest/v1/presence_sites?client_id=eq.${clientId}&select=id&limit=1`, { headers: H2 });
+            const st = await fetch(`${SB_URL}/rest/v1/presence_sites?client_id=eq.${clientId}&select=id&order=created_at.asc&limit=1`, { headers: H2 });
             const studioSiteId = ((await st.json().catch(() => []))[0] || {}).id;
             if (studioSiteId) {
               await fetch(`${SB_URL}/rest/v1/presence_form_submissions`, {
@@ -10197,8 +10200,8 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
         message ? message.replace(/\n/g, '<br>') : '',
       ].filter(Boolean);
       const cta = toClient
-        ? { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }
-        : { label: 'Open admin →', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' };
+        ? { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal.html' }
+        : { label: 'Open Studio OS →', href: 'https://davisdigitalstudio.com/studio.html' };
       await sendEmail(recipient, toClient ? `Update on your project` : `${pretty} — ${name}`, notifyShell(heading, lines.length ? lines : ['(no details)'], cta), toClient ? CLIENT_OPTS : undefined);
       return json({ ok: true });
     }
@@ -10252,7 +10255,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
             `They asked for a copy at: ${email}`,
             `Headline: ${result.headline || '(none)'}`,
           ],
-          { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' }
+          { label: 'Open Studio OS', href: 'https://davisdigitalstudio.com/studio.html' }
         ));
         return json({ ok: true, emailed: visitorEmailed, admin_emailed: ericEmailed });
       } catch (e) {
@@ -10326,7 +10329,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
               `City: ${city || '(not provided)'}`,
               `Website: ${url || '(not provided)'}`,
             ],
-            { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
+            { label: 'Open Studio OS', href: 'https://davisdigitalstudio.com/studio.html' },
           ),
         );
       } catch (_e) { /* don't fail the request on notify email */ }
@@ -10357,7 +10360,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
               `From: ${name || '(no name)'}${email ? ' · ' + email : ''}`,
               ...(lines.length ? lines : ['(no details provided)']),
             ],
-            { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
+            { label: 'Open Studio OS', href: 'https://davisdigitalstudio.com/studio.html' },
           ),
         );
       } catch (_e) { /* never fail the form on the notify email */ }
@@ -10421,10 +10424,12 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
     // ── PROJECT SURVEY (project-survey.html) ──
     // Sends the survey responses to Eric. Returns a truthful { emailed } flag.
     if (type === 'survey_response') {
-      const name = String(body.clientName || '').trim();
-      const email = String(body.clientEmail || '').trim();
-      const subject = String(body.subject || '').trim();
-      const message = String(body.message || '').trim();
+      // Public + now rate-limited; hard caps so an anonymous caller can't stuff
+      // megabytes into the sentiment table or the owner's inbox.
+      const name = String(body.clientName || '').trim().slice(0, 200);
+      const email = String(body.clientEmail || '').trim().slice(0, 200);
+      const subject = String(body.subject || '').trim().slice(0, 200);
+      const message = String(body.message || '').trim().slice(0, 4000);
 
       const lines = message ? message.split('\n').filter((l: string) => l.trim().length) : [];
 
@@ -10633,7 +10638,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
               await sendEmail(
                 to,
                 overdue ? `Still here whenever you're ready, ${name}` : `Quick reminder on your project content`,
-                notifyShell(overdue ? `Picking up where we left off` : `Your content checklist`, lines, { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS,
+                notifyShell(overdue ? `Picking up where we left off` : `Your content checklist`, lines, { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal.html' }), CLIENT_OPTS,
               );
               await stampClient(c.id, { last_content_nudge_at: new Date().toISOString() });
               result.nudges_sent++;
@@ -10671,7 +10676,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
                     `Just a friendly check-in. Your project is waiting on something from you to keep moving.`,
                     `No rush at all if life got busy. Whenever you can get to it, we pick right back up. Anything I can do to make it easier, just reply here.`,
                   ],
-                  { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal' },
+                  { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal.html' },
                 ),
               );
               await fetch(`${SB_URL}/rest/v1/projects?id=eq.${encodeURIComponent(p.id)}`, {
@@ -11278,7 +11283,7 @@ if (type === 'rec_decide') {
         await sendEmail(to, `A recommendation from Eric`,
           notifyShell(`I spotted something worth doing`,
             [rec.title, rec.detail || '', rec.why ? `Why it matters: ${rec.why}` : ''].filter(Boolean),
-            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
+            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal.html' }), CLIENT_OPTS);
       }
     } catch (_) { /* never block on email */ }
   }
@@ -11574,7 +11579,7 @@ if (type === 'review_publish') {
       `;
       await sendEmail(to, review.headline || `Your monthly review from Davis Digital Studio`,
         notifyShell(review.headline || `Your month with Davis Digital Studio`, [body],
-          { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
+          { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal.html' }), CLIENT_OPTS);
     }
   } catch (_) { /* never block on email */ }
   return json({ ok: true }, 200, reqCors);
@@ -11773,7 +11778,7 @@ if (type === 'gp_submit_request') {
   try {
     await sendEmail(ERIC, `New request: ${title}`,
       notifyShell('A client submitted a request', [title, detail].filter(Boolean),
-        { label: 'Open admin →', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' }));
+        { label: 'Open Studio OS →', href: 'https://davisdigitalstudio.com/studio.html' }));
   } catch (_) {}
   return json({ ok: true, data: Array.isArray(ins.data) ? ins.data[0] : ins.data }, 200, reqCors);
 }
@@ -11808,7 +11813,7 @@ if (type === 'gp_rec_respond') {
     await sendEmail(ERIC, `Client ${decision} a recommendation`,
       notifyShell(`A client responded to a recommendation`,
         [`"${rec.title}" was ${decision}.`],
-        { label: 'Open admin →', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' }));
+        { label: 'Open Studio OS →', href: 'https://davisdigitalstudio.com/studio.html' }));
   } catch (_) {}
   return json({ ok: true }, 200, reqCors);
 }
@@ -11932,7 +11937,7 @@ if (type === 'gp_rec_action') {
   try {
     await sendEmail(ERIC, `Growth: ${action.replace('_', ' ')} — ${caller.partnership.client_name || 'client'}`,
       notifyShell('A client took action on a recommendation', emailLines.length ? emailLines : [action],
-        { label: 'Open admin →', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' }));
+        { label: 'Open Studio OS →', href: 'https://davisdigitalstudio.com/studio.html' }));
   } catch (_) {}
 
   return json({ ok: true, data: { recommendation_id: recId, new_status: newStatus } }, 200, reqCors);
@@ -12018,7 +12023,7 @@ if (type === 'gp_quote_respond') {
         await sendEmail(to, `Your quote from Davis Digital Studio`,
           notifyShell('Here is your quote',
             [patch.amount ? `Price: ${patch.amount}` : '', patch.eric_note || ''].filter(Boolean) as string[],
-            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal' }), CLIENT_OPTS);
+            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal.html' }), CLIENT_OPTS);
       }
     }
   } catch (_) {}

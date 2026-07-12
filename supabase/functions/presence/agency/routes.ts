@@ -130,6 +130,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
 
   // ── the portfolio: directory + everything observable from one place ──
   if (route === '/agency/portfolio' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
     const url = new URL(req.url);
     const input = await gather(member.agency_id, now);
     const rows = filterPortfolio(buildPortfolio(input), {
@@ -142,6 +143,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
 
   // ── work queues + cross-client patterns — from the existing pipeline only ──
   if (route === '/agency/queues' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
     const input = await gather(member.agency_id, now);
     return json({ data: { queues: buildQueues(input), patterns: buildPatterns(input) } }, 200, cors);
   }

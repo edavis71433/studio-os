@@ -32,3 +32,15 @@
   Cache-Control: public, max-age=86400
 
 # Updated Sun Jun 21 14:58:53 UTC 2026
+
+/studio.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex
+
+/sign.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex
+
+/set-password.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex

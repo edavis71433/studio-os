@@ -9,14 +9,14 @@
 <style>
   :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--good:#33664b;--good-soft:#e7f1ea;
     --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--good:#8bbf9f;--good-soft:#1f2a24}}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--good:#8bbf9f;--good-soft:#1f2a24;--err:#e08b83}}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
   .wrap{max-width:640px;margin:0 auto;padding:44px 20px 90px}
   h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 4px}
   .sub{color:var(--soft);font-size:15px;margin:0 0 22px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);margin-bottom:14px}
-  .body{white-space:pre-wrap;font-size:15px}
+  .body{white-space:pre-wrap;font-size:15px;overflow-wrap:anywhere}
   table{width:100%;border-collapse:collapse;font-size:14.5px}
   td{padding:8px 4px;border-bottom:1px solid var(--line)} td:last-child{text-align:right;white-space:nowrap}
   .total td{font-weight:700;border-bottom:none}
@@ -54,7 +54,7 @@ function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’
 function softFail(msg){
   const m=msg||'That didn’t go through — give it another try in a moment.';
   let n=$('softErr');
-  if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='#a3423a';$('main').appendChild(n);}
+  if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='var(--err,#a3423a)';$('main').appendChild(n);}
   n.textContent=m;
   // A version change can NEVER succeed on retry — swap the actions for a reload.
   if(/reload|updated/i.test(m)){
@@ -95,7 +95,7 @@ function renderProposal(p){
   // Declining is final (a fresh proposal needs a fresh link) — so it takes two
   // deliberate taps, and the label says exactly what it does.
   const dd=$('decline');if(dd)dd.onclick=async()=>{
-    if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';return;}
+    if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';announce('Tap again to confirm declining — this is final');return;}
     dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});
     if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else softFail(r.body&&r.body.message);};
 }
@@ -115,18 +115,24 @@ function renderContract(c){
     if(r.ok){
       const pay=r.body&&r.body.data&&r.body.data.pay_url;
       const amt=r.body&&r.body.data&&r.body.data.pay_amount_cents;
-      if(pay){
-        // Sign → pay, one session: the deposit is already waiting — offer it now.
-        $('main').innerHTML=`<div class="center"><h1>Signed — welcome aboard! 🎉</h1>
-          <p class="sub">A copy of your signed agreement is on its way to your email.</p>
+      const copySent=!!(r.body&&r.body.data&&r.body.data.copy_emailed);
+      const copyLine=copySent?'A copy of your signed agreement is on its way to your email.':'Your signed agreement stays below — use “Print / save a copy” to keep your record, or ask your studio any time.';
+      // Keep the AGREEMENT in the DOM: "Print / save a copy" must print the
+      // document that was signed, not a confirmation screen. Replace only the
+      // sign-form card with the success block.
+      const success=pay
+        ?`<div class="center" style="padding:24px 0 8px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${copyLine}</p></div>
           <div class="card" style="text-align:left"><p style="font-weight:600;margin-bottom:6px">One more step to lock in your start</p>
-          <p class="muted" style="margin-top:0">Your ${money(amt)} deposit is ready — paying it now secures your place in the schedule.</p>
+          <p class="muted" style="margin-top:0">Your ${money(amt)} deposit is ready — paying it now locks in your start.</p>
           <div class="row"><a href="${esc(pay)}" style="display:inline-block;background:var(--p);color:#fff;font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none">Pay the ${money(amt)} deposit →</a></div>
-          <p class="muted">Prefer later? The same secure link is in your email — nothing expires today.</p></div></div>`;
-        announce('Signed. Your deposit link is ready.');
-      } else {
-        thanks('Signed — welcome aboard! 🎉','A copy of your signed agreement is on its way to your email. Your studio has been told and will kick things off.');
-      }
+          <p class="muted">Prefer later? The same secure link is in your email — nothing expires today.</p>
+          <div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div></div>`
+        :`<div class="center" style="padding:24px 0 8px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${copyLine} Your studio has been told and will kick things off.</p>
+          <div class="row" style="justify-content:center"><button class="ghost" onclick="window.print()">Print / save a copy</button></div></div>`;
+      const formCard=s.closest('.card'); if(formCard)formCard.remove();
+      $('main').insertAdjacentHTML('afterbegin',success);
+      window.scrollTo({top:0,behavior:'smooth'});
+      announce(pay?'Signed. Your deposit link is ready.':'Signed — welcome aboard');
     }
     else{softFail(r.body&&r.body.message);}};
 }

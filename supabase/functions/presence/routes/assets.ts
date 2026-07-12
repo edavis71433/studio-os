@@ -243,12 +243,14 @@ export async function handleAssetStatus(req: Request, site: SiteRow, principal: 
       const { pending_replace: _pr, ...rest } = meta;
       await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ asset_status: 'approved', metadata: { ...rest, approved_by: who, approved_at: now } }) });
       await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: `Approved and applied a replacement`, principal, provenance: 'human', fields: ['asset_status', 'storage_path'] });
+      await notifyOwnerOfReviewerDecision(site, principal, 'File replacement approved', `file:${id}:approve`);   // staged replacements are the ONE file shape reviewers see
       return json({ data: { ok: true, status: 'approved', applied: true, affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
     }
     // reject: discard the proposed replacement; the old version stays live untouched
     const { pending_replace: _pr, ...rest } = meta;
     await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ asset_status: 'archived', metadata: { ...rest, rejected_by: who, rejected_at: now } }) });
     await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: `Declined a proposed replacement`, principal, provenance: 'human', fields: ['asset_status'] });
+    await notifyOwnerOfReviewerDecision(site, principal, 'File replacement declined', `file:${id}:reject`);
     return json({ data: { ok: true, status: 'archived', applied: false } }, 200, cors);
   }
 

@@ -68,7 +68,9 @@ self.addEventListener('fetch', function(e) {
       url.pathname.startsWith('/content-tree') || url.pathname.startsWith('/snapshot-history') ||
       url.pathname.startsWith('/timeline') || url.pathname.startsWith('/upcoming') ||
       url.pathname.startsWith('/website-health') || url.pathname.startsWith('/help') ||
-      url.pathname.startsWith('/admin-health') || url.pathname.startsWith('/pricing')) return; // every signed-in/app surface — always fresh
+      url.pathname.startsWith('/admin-health') || url.pathname.startsWith('/admin-growth') ||
+      url.pathname === '/pricing' || url.pathname === '/pricing.html' ||   // exact — /pricing-estimator keeps its NETWORK_FIRST rule
+      url.pathname.startsWith('/payment-')) return; // every signed-in/app/money surface — always fresh
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });

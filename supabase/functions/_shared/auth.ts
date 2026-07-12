@@ -194,6 +194,16 @@ export async function resolvePrincipal(req: Request, body: any): Promise<Princip
       if (tenantId !== null) {
         return { kind: 'client', userId: uid, tenantId, role: 'client', email: email || null, jwt, requestId };
       }
+      // MEMBERSHIP fallback: an invited workspace member (e.g. a client_reviewer
+      // added via sharing) has no contacts/clients row of their own — their only
+      // linkage is presence_site_members. Without this they 401 at the door and
+      // the whole share-with-a-reviewer feature is unreachable. Their in-site
+      // powers stay fail-closed (resolveSiteRole + the reviewer boundary).
+      const mm = await fetch(`${SB_URL}/rest/v1/presence_site_members?status=eq.active&or=(user_id.eq.${encodeURIComponent(uid)},email.eq.${encodeURIComponent(email)})&select=id&limit=1`, { headers: svc });
+      const members = mm.ok ? await mm.json() : [];
+      if (Array.isArray(members) && members.length) {
+        return { kind: 'client', userId: uid, tenantId: TENANT_ID, role: 'client', email: email || null, jwt, requestId };
+      }
     } catch (_) { /* fall through */ }
 
     // valid token but neither staff nor a known client — authenticated but unscoped

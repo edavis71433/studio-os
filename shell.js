@@ -132,13 +132,19 @@
     bar.id = 'dds-mbar'; bar.setAttribute('aria-label', 'Quick navigation');
     var home = isReviewer ? { href: '/client.html', label: 'Updates' } : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
     var inbox = isReviewer ? null : { href: '/inbox.html', label: 'Inbox' };
+    var herePath = normalizePath(location.pathname);
+    var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     bar.innerHTML =
-      '<a href="' + esc(withScope(home.href)) + '">' + esc(home.label) + '</a>' +
-      (inbox ? '<a href="' + esc(withScope(inbox.href)) + '">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</a>' : '') +
-      '<button type="button" id="dds-mbar-menu">Menu</button>';
+      '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + esc(home.label) + '</a>' +
+      (inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</a>' : '') +
+      '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">Menu</button>';
     document.body.appendChild(bar);
     var mb = document.getElementById('dds-mbar-menu');
-    if (mb) mb.addEventListener('click', function (e) { e.stopPropagation(); toggleDrawer(nav); });
+    if (mb) mb.addEventListener('click', function (e) {
+      e.stopPropagation(); toggleDrawer(nav);
+      var open = drawer && drawer.classList.contains('open');
+      mb.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
   }
 
   function wire(nav) {
@@ -228,16 +234,19 @@
       var body = notif.querySelector('.body');
       if (!r.ok) { body.innerHTML = '<div class="muted">You’re all caught up.</div>'; return; }
       var d = r.body.data || {}; var out = '';
+      // A reviewer's whole world is client.html — every bell row lands THERE
+      // (the owner pages these rows normally target are 403 walls for them).
+      var revr = CTX && CTX.site_role === 'client_reviewer';
       // Phase FLOW: notices first (a lead waiting, a domain expiring) — each taps
       // straight through to the page that resolves it, from any screen.
-      (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
+      (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(revr ? '/client.html' : withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
       // An approval tap lands on the thing that RESOLVES it (file → Files,
       // connected → Connections, infra → the Foundations desk) — never a generic landing.
       (d.pending_approvals || []).forEach(function (p) {
-        var target = p.href ? p.href : p.kind === 'connected' ? '/connections.html' : p.kind === 'file' ? '/files.html' : '/presence.html#foundations';
-        out += '<a class="row" href="' + esc(withScope(target)) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>';
+        var target = revr ? '/client.html' : (p.href ? p.href : p.kind === 'connected' ? '/connections.html' : p.kind === 'file' ? '/files.html' : '/presence.html#foundations');
+        out += '<a class="row" href="' + esc(revr ? target : withScope(target)) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>';
       });
-      (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
+      (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(revr ? '/client.html' : withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
       // W4: the bell is the quick glance; the Inbox is the complete "everything that
       // needs you" (also client messages, surveys, new leads). Send them to the one
       // place rather than have two surfaces compete. A client's "one place" is their
@@ -289,7 +298,7 @@
     var html = (nav || []).map(function (s) {
       return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
-    if (!drawer) { drawer = el('<div class="dds-drawer"></div>'); document.body.appendChild(drawer); }
+    if (!drawer) { drawer = el('<div class="dds-drawer" id="dds-drawer"></div>'); document.body.appendChild(drawer); }
     drawer.innerHTML = html; drawer.classList.add('open');
   }
 

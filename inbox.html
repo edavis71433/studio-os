@@ -71,7 +71,7 @@ function render(feed,leads,notifs){
   const unreadCount=activity.filter(n=>!n.read).length;
   const total=approvals.length+notices.length+moments.length+newLeads.length+unreadCount;
   let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;
-  if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div>`;$('main').innerHTML=h;return;}
+  if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div><p style="text-align:center;margin-top:14px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p>`;$('main').innerHTML=h;return;}
   if(!total&&activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing new — recent activity is below.</div>`;}
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
@@ -83,12 +83,12 @@ function render(feed,leads,notifs){
       h+=`<a class="item lead" href="${scoped('/leads.html')}"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open enquiry →</div></a>`;}}
 
   if(activity.length){h+=`<h2>Project activity</h2>`;
-    for(const n of activity){h+=`<a class="item" href="${scoped(notifLink(n))}"${n.read?' style="opacity:.55"':''}><div class="top"><span class="who">${esc(n.label||'Activity')}</span>${n.created_at?`<span class="when">${esc(when(n.created_at))}</span>`:''}</div><div class="go">Open →</div></a>`;}}
+    for(const n of activity){h+=`<a class="item" href="${scoped(notifLink(n))}"><div class="top"><span class="who"${n.read?' style="font-weight:400;color:var(--soft)"':''}>${n.read?'✓ ':''}${esc(n.label||'Activity')}</span>${n.created_at?`<span class="when">${esc(when(n.created_at))}</span>`:''}</div><div class="go">Open →</div></a>`;}}
 
   const worth=[...notices,...moments];
   if(worth.length){h+=`<h2>Worth a look</h2>`;
     for(const n of notices){h+=`<a class="item notice" href="${esc(scoped(n.href||'/today.html'))}"><div class="who">${esc(n.headline||'Something needs a look')}</div>${n.body?`<div class="body">${esc(n.body)}</div>`:''}<div class="go">Take care of it →</div></a>`;}
-    for(const m of moments){h+=`<a class="item" href="/today.html"><div class="who">${esc(m.headline||'A moment')}</div>${m.summary?`<div class="body">${esc(m.summary)}</div>`:''}<div class="go">Open Today →</div></a>`;}}
+    for(const m of moments){h+=`<a class="item" href="${esc(scoped('/today.html'))}"><div class="who">${esc(m.headline||'A moment')}</div>${m.summary?`<div class="body">${esc(m.summary)}</div>`:''}<div class="go">Open Today →</div></a>`;}}
 
   $('main').innerHTML=h;
 }

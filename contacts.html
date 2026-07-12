@@ -17,7 +17,7 @@
   .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
   header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
   header .sub{color:var(--soft);font-size:15px;margin:0}
-  .bar{display:flex;gap:8px;margin:22px 0 6px;align-items:center}
+  .bar{display:flex;gap:8px;margin:22px 0 6px;align-items:center;flex-wrap:wrap}
   .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
   .search:focus{border-color:var(--p)}
   .btn{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--p);background:var(--p);color:#fff;border-radius:999px;padding:9px 15px;cursor:pointer;white-space:nowrap}
@@ -152,7 +152,7 @@ function mapHeader(h){h=h.toLowerCase().trim();
 function openImport(){
   const z=$('csvZone');
   z.innerHTML=`<div class="card" style="margin:10px 0;padding:14px 16px"><p style="font-weight:600;margin-bottom:4px">Import contacts from a CSV</p>
-    <p class="muted" style="margin-top:0">Export from anywhere (Google Contacts, a spreadsheet, another tool) — we look for name, email, phone, and company columns. Duplicates are skipped automatically.</p>
+    <p class="muted" style="margin-top:0">Export from anywhere (Google Contacts, a spreadsheet, another tool) — we look for name, email, phone, and company columns. Anyone already in your contacts (matched by email) is skipped automatically.</p>
     <input type="file" id="csvFile" accept=".csv,text/csv" aria-label="Choose a CSV file"><div id="csvPrev"></div></div>`;
   $('csvFile').addEventListener('change',async(e)=>{
     const f=e.target.files&&e.target.files[0];if(!f)return;
@@ -168,14 +168,23 @@ function openImport(){
       <button class="btn" id="csvGo">Import ${items.length}</button> <button class="btn" id="csvCancel" style="border-color:transparent">Cancel</button>`;
     $('csvCancel').onclick=()=>{z.innerHTML='';};
     $('csvGo').onclick=async()=>{
-      const btn=$('csvGo');btn.disabled=true;let added=0,existed=0,failed=0;
-      for(let i=0;i<items.length;i++){
-        btn.textContent=`Importing ${i+1}/${items.length}…`;
-        try{const r=await api('/sales/contacts','POST',items[i]);
-          if(r.ok){if(r.body&&r.body.deduped)existed++;else added++;}else failed++;
-        }catch(_){failed++;}
+      const btn=$('csvGo');btn.disabled=true;let added=0,existed=0,failed=0,done=0;
+      // status region so screen readers hear progress (the button text alone isn't announced)
+      let live=document.getElementById('csvLive');
+      if(!live){live=document.createElement('p');live.id='csvLive';live.className='muted';live.setAttribute('role','status');live.setAttribute('aria-live','polite');$('csvPrev').appendChild(live);}
+      // 5-wide chunks: 500 serial POSTs took minutes; parallel-5 keeps it polite AND fast
+      for(let i=0;i<items.length;i+=5){
+        const chunk=items.slice(i,i+5);
+        await Promise.all(chunk.map(async(it)=>{
+          try{const r=await api('/sales/contacts','POST',it);
+            if(r.ok){if(r.body&&r.body.deduped)existed++;else added++;}else failed++;
+          }catch(_){failed++;}
+          done++;
+        }));
+        btn.textContent=`Importing ${Math.min(done,items.length)}/${items.length}…`;
+        live.textContent=`Imported ${done} of ${items.length}`;
       }
-      z.innerHTML='';toast(`${added} added${existed?`, ${existed} already existed`:''}${failed?`, ${failed} couldn’t be read`:''}.`);
+      z.innerHTML='';toast(`${added} added${existed?`, ${existed} already existed`:''}${failed?`, ${failed} couldn’t be imported`:''}.`);
       await load();
     };
   });

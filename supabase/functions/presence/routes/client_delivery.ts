@@ -26,8 +26,11 @@ const customerOf = (site: SiteRow): string | null => (site.client_id ? String(si
 const noCustomer = (cors: Record<string, string>) => json({ data: [], message: 'No service delivery is linked to your account yet.' }, 200, cors);
 
 async function clientEvent(agencySiteId: string, projectId: string, kind: string, principal: Principal, detail: Record<string, unknown> = {}) {
+  // detail.from='client' marks events from the CLIENT DOOR (this file is the only
+  // one) — principal.kind can't tell a customer from the studio owner (both are
+  // 'client'), and the studio's bell must never ring for its own actions.
   await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ project_id: projectId, site_id: agencySiteId, kind, actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail }) }).catch(() => {});
+    body: JSON.stringify({ project_id: projectId, site_id: agencySiteId, kind, actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', ...detail } }) }).catch(() => {});
 }
 
 // ═══ SERVICE BILLING (the customer's invoices FROM the agency) ═══

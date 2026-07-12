@@ -564,7 +564,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 <nav class="dock" id="dock">
   <button data-tab="today" class="on">Today</button>
   <button data-tab="sections">Sections</button>
-  <button data-tab="preview">Proof</button>
+  <button data-tab="preview">Preview</button>
   <button data-tab="publish" id="dockPublish">Publish</button>
 </nav>
 
@@ -774,12 +774,14 @@ const changedIds = () => new Set((S.changes?.changes || []).map((c) => c.entity_
 function showGate(title, msg, showBtn) {
   $("app").hidden = true; $("dock").style.display = "none";
   $("gate").hidden = false;
-  $("gateTitle").textContent = title; $("gateMsg").textContent = msg;
+  // A client reviewer who wandered in has their OWN page — honest title, and
+  // send them there, never to the owner door.
+  const forReviewer = /client view|shares with you/i.test(String(msg || ""));
+  $("gateTitle").textContent = forReviewer ? "This is the studio's workspace" : title;
+  $("gateMsg").textContent = msg;
   const b = $("gateBtn");
   b.hidden = !showBtn;
-  // A client reviewer who wandered in has their OWN page — send them there,
-  // never to the owner door.
-  if (/client view|shares with you/i.test(String(msg || ""))) { b.href = "/client.html"; b.textContent = "Go to your view"; }
+  if (forReviewer) { b.href = "/client.html"; b.textContent = "Go to your view"; }
 }
 
 /* ── navigation ── */
@@ -813,7 +815,7 @@ function contextHint(view) {
   if (h && window.ddsHint) setTimeout(() => window.ddsHint(h[0], h[1]), 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", business: "business", settings: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
 function routeHash() {
   const h = (location.hash || "").replace("#", "").toLowerCase();
   if (!h) return;
@@ -2049,6 +2051,19 @@ $("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if
    preserves today's behavior). A standalone CMS lacks the Business-OS brains
    (business_moments/connected/ai) even while it keeps full website drafting. ── */
 function hasFeature(f) { return !S.features || S.features.indexOf(f) >= 0; }
+// SC-1: static links out of the editor must keep the agency drill-in scope —
+// dropping ?client= silently switches a scoped operator back to their own tenant.
+function carryScopeOnLinks() {
+  const c = new URLSearchParams(location.search).get("client");
+  if (!c) return;
+  document.querySelectorAll('a[href^="/today.html"], a[href^="/files.html"], a[href^="/inbox.html"], a[href^="/crm.html"]').forEach((a) => {
+    const h = a.getAttribute("href");
+    if (h.indexOf("client=") >= 0) return;
+    const [pathq, hash] = h.split("#");
+    a.setAttribute("href", pathq + (pathq.indexOf("?") >= 0 ? "&" : "?") + "client=" + encodeURIComponent(c) + (hash ? "#" + hash : ""));
+  });
+}
+
 function applyEditionGating() {
   const isMonitor = !!(S.site && S.site.edition === "monitor");
   const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
@@ -2061,6 +2076,7 @@ function applyEditionGating() {
   if (isMonitor) {
     const p = $("btnPublish"); if (p) p.style.display = "none";
     const dp = $("dockPublish"); if (dp) dp.style.display = "none";
+    const up = $("btnUpload"); if (up) up.style.display = "none";   // uploads are writes too
     if (!document.getElementById("monitorNote")) {
       const n = document.createElement("div");
       n.id = "monitorNote";
@@ -2542,6 +2558,20 @@ function showReceipt(firstPublish) {
         : "Every word on your site came from you.<br>This version is kept safe, always."}</div>
     </div>`;
   $("ritActions").innerHTML = "";
+  // The peak moment needs a DOOR: see the live site, share the link. Without
+  // this the receipt says "you're on the internet" and offers no way to visit.
+  const liveUrl = S.site && (S.site.custom_domain ? `https://${S.site.custom_domain}` : (S.site.netlify_site_id ? `https://presence-${String(S.site.id).replace(/-/g, "").slice(0, 12)}.netlify.app` : null));
+  if (liveUrl) {
+    const see = document.createElement("a");
+    see.href = liveUrl; see.target = "_blank"; see.rel = "noopener";
+    see.textContent = "See your live site →";
+    see.style.cssText = "display:inline-block;margin-top:26px;margin-right:10px;background:var(--plum,#5b3fa0);color:#fff;font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none";
+    $("ritActions").appendChild(see);
+    const cp = el("button", "notyet", "Copy the link");
+    cp.style.marginTop = "26px"; cp.style.marginRight = "10px";
+    cp.addEventListener("click", () => { try { navigator.clipboard.writeText(liveUrl).then(() => toast("Link copied — share it anywhere.")); } catch (_) { toast(liveUrl); } });
+    $("ritActions").appendChild(cp);
+  }
   const done = el("button", "notyet", "Back to your room");
   done.style.marginTop = "26px";
   done.addEventListener("click", closeRitual);
@@ -2756,14 +2786,21 @@ async function refreshAll() {
   S.features = (ctxR && ctxR.data && ctxR.data.edition_features) || null;
   S.upsell = (ctxR && ctxR.data && ctxR.data.upsell) || null;   // the honest next rung (Settings shows it — this tier's one organic offer surface)
   applyEditionGating();
+  carryScopeOnLinks();
   applyVocab();
   fillSingles(); await loadToday();
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
   mountDesignCard();
   mountSearchCard();
-  mountBillingCard();
-  mountDeletionCard();
+  // Account cards belong to the WORKSPACE OWNER only. A drilled-in operator
+  // (?client=) is editing the CLIENT's site — but /commerce/* resolves the
+  // caller's OWN account, so these cards would show (and could act on!) the
+  // STUDIO's own billing and deletion inside the client's workspace.
+  if (!new URLSearchParams(location.search).get("client")) {
+    mountBillingCard();
+    mountDeletionCard();
+  }
 }
 // ── P2-E: billing & subscription — status + the door to Stripe's portal ──
 // This is the payment-recovery path the entitlement gate + lifecycle emails
@@ -2794,8 +2831,11 @@ async function mountBillingCard() {
   // The honest next rung — for CMS-only this Settings card is the ONE surface
   // that organically shows what upgrading adds (gains AND what switches off).
   if (S.upsell && S.upsell.name) {
-    const gains = (S.upsell.gains || []).map((g) => String(g).replace(/_/g, " ")).join(", ");
-    const losses = (S.upsell.gives_up || []).map((g) => String(g).replace(/_/g, " ")).join(", ");
+    // Human names for the feature atoms — raw keys never reach the owner's eyes.
+    const NICE = { website: "the website tools", business_moments: "Business Moments", connected: "connected services", ai: "AI help", relationship: "Customers & Pipeline", reports: "Analytics", client_portal: "client sharing", developer: "Developer Mode", forms: "website forms", managed_service: "our managed service", agency: "agency tools", enterprise: "enterprise controls" };
+    const nice = (g) => NICE[String(g)] || String(g).replace(/_/g, " ");
+    const gains = (S.upsell.gains || []).map(nice).join(", ");
+    const losses = (S.upsell.gives_up || []).map(nice).join(", ");
     const u = el("div", "hint");
     u.style.marginTop = "10px";
     u.textContent = `${S.upsell.name}${S.upsell.monthly ? ` (from $${S.upsell.monthly}/mo)` : ""}${gains ? ` adds ${gains}.` : "."}` +
@@ -3537,6 +3577,8 @@ $("f-industry").addEventListener("change", async () => {
 });
 // ── Phase V (FD-N4): the announcement bar — a simple site-wide notice, no code ──
 function mountAnnouncementCard() {
+  // Only for plans that HAVE a website to announce on (and that can publish).
+  if (!hasFeature("website") || (S.site && S.site.edition === "monitor")) return;
   const host = $("view-business"); if (!host || $("annCard")) return;
   const card = el("div", "field"); card.id = "annCard"; card.style.marginTop = "18px";
   card.innerHTML = `<label for="ann-text">Announcement bar</label>
@@ -3570,19 +3612,19 @@ function mountAnnouncementCard() {
 // lifecycle/billing notices, each with a deep link to where it's resolved — so
 // nothing dead-ends. Priority: website-attention first, then lifecycle, then capacity.
 const NOTICE_ACTION = {
-  publish_failed:   { label: "Open your website",       href: "presence.html" },
+  publish_failed:   { label: "Open your website",       href: "presence.html#publish" },
   connection_expired:{ label: "Reconnect",              href: "connections.html" },
   website_enquiry:  { label: "View enquiries",          href: "leads.html" },
   lead_followup:    { label: "View enquiries",          href: "leads.html" },
-  domain_expiry:    { label: "Manage domain",           href: "connections.html" },
-  search_setup:     { label: "Finish search setup",     href: "presence.html" },
+  domain_expiry:    { label: "Manage domain",           href: "presence.html#business" },
+  search_setup:     { label: "Finish search setup",     href: "presence.html#search" },
   renewal_reminder: { label: "See plans",               href: "pricing.html" },
-  winddown_reminder:{ label: "Download everything",     href: "presence.html" },
+  winddown_reminder:{ label: "Download everything",     href: "presence.html#settings" },
   win_back:         { label: "See plans",               href: "pricing.html" },
   trial_ending:     { label: "See plans",               href: "pricing.html" },
   trial_ended:      { label: "See plans",               href: "pricing.html" },
-  payment_trouble:  { label: "Update payment",          href: "presence.html" },
-  account_lapsed:   { label: "Update payment",          href: "presence.html" },
+  payment_trouble:  { label: "Update payment",          href: "presence.html#settings" },
+  account_lapsed:   { label: "Update payment",          href: "presence.html#settings" },
   capacity:         { label: "See plans",               href: "pricing.html" },
 };
 const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "lead_followup", "capacity"];
@@ -3632,7 +3674,7 @@ async function renderFirstRun() {
   card.appendChild(head);
   card.appendChild(el("div", "dop", `A few calm steps. ${fr.done} of ${fr.total} done — do them in any order, or come back later.`));
 
-  const viewFor = { details: "business", brand: "business", domain: "history", publish: "today", connect: "today", observe: "today" };
+  const viewFor = { details: "business", brand: "business", domain: "business", publish: "today", connect: "today", observe: "today" };
   for (const s of (fr.steps || [])) {
     const row = el("div", "deskopt");
     row.style.margin = "8px 0 0"; row.style.background = s.done ? "#f4fbf6" : "#fff";

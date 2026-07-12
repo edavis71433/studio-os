@@ -247,6 +247,22 @@ serve(async (req) => {
     site = sc.site; scopedName = sc.scoped.name;
   } else {
     site = await resolveSite(jwt);
+    // MEMBERSHIP fallback: an invited member (client_reviewer / staff seat) owns
+    // no site of their own — RLS returns nothing. Resolve via their active
+    // membership instead; every in-site power still flows through resolveSiteRole
+    // + the reviewer boundary below (fail-closed).
+    if (!site && (principal.userId || principal.email)) {
+      try {
+        const { svc } = await import('./lib/db.ts');
+        const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+        const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
+        const siteId = Array.isArray(m.json) && (m.json as any[])[0]?.site_id;
+        if (siteId) {
+          const s = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
+          if (Array.isArray(s.json) && (s.json as any[])[0]) site = (s.json as any[])[0] as SiteRow;
+        }
+      } catch { /* fail closed to no_site */ }
+    }
   }
   if (!site) {
     return json({ error: 'no_site', message: 'No Presence site is set up for this account yet.' }, 404, cors);

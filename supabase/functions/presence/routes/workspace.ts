@@ -124,8 +124,10 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
       const lastSeen = (seenQ.json as any[])?.[0]?.last_seen_at || null;
       attention_count += ((msgQ.json as any[]) || []).filter((e) => {
         if (lastSeen && String(e.created_at) <= String(lastSeen)) return false;
-        if (e.kind === 'message') return (e.detail || {}).from === 'client';
-        return e.actor_kind === 'client';   // an approval decided / survey answered by the client
+        // detail.from='client' is stamped ONLY by the client door (client_delivery.ts)
+        // — actor_kind can't distinguish the customer from the studio owner (both
+        // 'client'), and the studio's own decisions must never ring its own bell.
+        return (e.detail || {}).from === 'client';
       }).length;
     } else if (site.client_id) { // bridged customer: their UNREAD client-visible delivery activity
       const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
@@ -205,7 +207,9 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     ...(((infraQ.ok && infraQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'infrastructure', title: p.title, summary: p.summary, decide_path: `/foundations/plans/${p.id}/decide` })),
     ...(((writeQ.ok && writeQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'connected', provider: p.provider_key, title: p.title, summary: p.summary, decide_path: `/connections/${p.provider_key}/write/${p.id}/decide` })),
     // DAM-2: a file replacement waiting for approval — same feed, links into Files
-    ...(((fileQ.ok && fileQ.json) || []) as any[]).filter((m) => (m.metadata || {}).pending_replace).map((m) => ({ id: m.id, kind: 'file', title: `Replace ${displayName(m)}`, summary: 'A file replacement is waiting for your OK before it goes live.', decide_path: `/assets/${m.id}/status`, href: `/files.html?focus=${m.id}` })),
+    // href is audience-aware: files.html is an OWNER page — a reviewer decides
+    // from their own view, never a 403 wall.
+    ...(((fileQ.ok && fileQ.json) || []) as any[]).filter((m) => (m.metadata || {}).pending_replace).map((m) => ({ id: m.id, kind: 'file', title: `Replace ${displayName(m)}`, summary: 'A file replacement is waiting for your OK before it goes live.', decide_path: `/assets/${m.id}/status`, href: seesFull ? `/files.html?focus=${m.id}` : '/client.html' })),
   ] : [];
   const last = (pubQ.ok && pubQ.json?.[0]) || null;
   // Phase FLOW: the notices rail joins the ONE global feed the shell bell reads,

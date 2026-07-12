@@ -142,17 +142,22 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
 .dds-toast .ico{flex:0 0 auto;font-weight:700}
 @media (prefers-reduced-motion:reduce){.dds-toast{transition:none}}
 
+/* Legacy alias tokens — a few components referenced --dds-accent; keep them
+   pointing at the real palette so dark mode never falls back to light values. */
+:root{--dds-accent:var(--dds-p);--dds-accent-soft:var(--dds-p-soft)}
+
 /* ── mobile bottom bar (shell.js mountMobileBar) — phones only ── */
 #dds-mbar{display:none}
 @media (max-width:760px){
-  #dds-mbar{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;background:var(--dds-card,#fff);border-top:1px solid var(--dds-line,#eee9e0);padding:calc(6px) 8px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 16px rgba(27,21,37,.06)}
-  #dds-mbar a,#dds-mbar button{flex:1;text-align:center;font:inherit;font-size:13px;font-weight:600;color:var(--dds-ink,#1b1525);background:none;border:none;padding:10px 4px;border-radius:10px;text-decoration:none;cursor:pointer}
-  #dds-mbar a:active,#dds-mbar button:active{background:var(--dds-accent-soft,#efeafa)}
-  #dds-mbar .mdot{display:inline-block;min-width:16px;padding:0 4px;border-radius:999px;background:var(--dds-accent,#5b3fa0);color:#fff;font-size:10.5px;line-height:16px;vertical-align:2px}
-  body{padding-bottom:64px}
-}
-@media (prefers-color-scheme:dark){
-  @media (max-width:760px){
-    #dds-mbar{background:var(--dds-card,#1f1a2b);border-top-color:var(--dds-line,#2a2338);box-shadow:0 -4px 16px rgba(0,0,0,.3)}
-  }
+  /* Above the drawer (2147482999) so Menu can CLOSE what it opened; the drawer
+     leaves the bottom strip usable. */
+  #dds-mbar{position:fixed;bottom:0;left:0;right:0;z-index:2147483000;display:flex;background:var(--dds-card,#fff);border-top:1px solid var(--dds-line,#eee9e0);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 16px rgba(27,21,37,.12)}
+  #dds-mbar a,#dds-mbar button{flex:1;text-align:center;font:inherit;font-size:13px;font-weight:600;color:var(--dds-ink,#1b1525);background:none;border:none;padding:12px 4px;border-radius:10px;text-decoration:none;cursor:pointer}
+  #dds-mbar a:active,#dds-mbar button:active{background:var(--dds-p-soft,#efeafa)}
+  #dds-mbar a[aria-current="page"]{color:var(--dds-p,#5b3fa0)}
+  #dds-mbar .mdot{display:inline-block;min-width:16px;padding:0 4px;border-radius:999px;background:var(--dds-p,#5b3fa0);color:#fff;font-size:10.5px;line-height:16px;vertical-align:2px}
+  body{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  /* keep toasts + one-time hints clear of the bar */
+  .dds-toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));pointer-events:none}
+  .dds-hint{bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important;z-index:2147483001}
 }

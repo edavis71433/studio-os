@@ -367,32 +367,52 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
 export async function runInvoiceReminders(limit = 20): Promise<{ reminded: number }> {
   const cutoff = new Date(Date.now() - 7 * 86400_000).toISOString();   // open for 7+ days
   const today = new Date().toISOString().slice(0, 10);
-  const q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&or=(due_date.lt.${today},and(due_date.is.null,created_at.lt.${encodeURIComponent(cutoff)}))&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url&order=created_at.asc&limit=${limit}`);
+  // Fetch a WIDE candidate window, then drop already-reminded ones up front —
+  // otherwise the oldest `limit` open invoices occupy the window forever and
+  // invoice #limit+1 never gets its reminder (starvation).
+  const q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&or=(due_date.lt.${today},and(due_date.is.null,created_at.lt.${encodeURIComponent(cutoff)}))&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url&order=created_at.asc&limit=${limit * 5}`);
+  const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string }>;
+  let fresh = candidates;
+  if (candidates.length) {
+    const periods = candidates.map((i) => `"invremind:${i.id}"`).join(',');
+    const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${candidates.length}`);
+    const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
+    fresh = candidates.filter((i) => !done.has(`invremind:${i.id}`)).slice(0, limit);
+  }
   let reminded = 0;
-  for (const inv of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string }>) {
+  for (const inv of fresh) {
     const siteQ = await svc(`presence_sites?id=eq.${inv.site_id}&select=client_id&limit=1`);
     const clientId = siteQ.json?.[0]?.client_id;
     if (!clientId) continue;
     const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
     const what = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
-    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ site_id: inv.site_id, client_id: clientId, kind: 'deal_followup', period: `invremind:${inv.id}`, headline: `Still unpaid — ${inv.title || what} (${amount})`, body: 'We nudged the client once with the same secure link. If it stays quiet, a personal note usually lands best.', status: 'active' }),
-    });
-    if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;   // already reminded once — never nag
-    reminded++;
+    // Discover the client email FIRST — the notice must tell the truth about
+    // whether a nudge actually went out (and never burn the once-ever dedupe
+    // on a claim that didn't happen).
+    let email = '';
     try {
       if (inv.deal_id) {
         const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=contact_id&limit=1`)).json?.[0];
-        const email = deal?.contact_id ? (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=email&limit=1`)).json?.[0]?.email : '';
-        if (email) {
-          const brand = await loadEmailBrand(inv.site_id);
-          const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-          sendEmail(String(email), `A gentle reminder — ${inv.title || what} (${amount})`,
-            `<p>Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
-        }
+        email = deal?.contact_id ? String((await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=email&limit=1`)).json?.[0]?.email || '') : '';
       }
-    } catch { /* the owner notice already carries it */ }
+    } catch { /* treated as no email on file */ }
+    const noticeBody = email
+      ? 'We nudged the client once with the same secure link. If it stays quiet, a personal note usually lands best.'
+      : 'There’s no client email on this deal, so no automatic nudge went out — a personal note (or adding their email to the contact) is the way forward.';
+    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ site_id: inv.site_id, client_id: clientId, kind: 'deal_followup', period: `invremind:${inv.id}`, headline: `Still unpaid — ${inv.title || what} (${amount})`, body: noticeBody, status: 'active' }),
+    });
+    if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;   // already reminded once — never nag
+    reminded++;
+    if (email) {
+      try {
+        const brand = await loadEmailBrand(inv.site_id);
+        const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
+        sendEmail(email, `A gentle reminder — ${inv.title || what} (${amount})`,
+          `<p>Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
+      } catch { /* the owner notice already carries it */ }
+    }
   }
   return { reminded };
 }
@@ -453,20 +473,27 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
       const clientId = siteQ.json?.[0]?.client_id;
       if (!clientId) continue;
       const what = kind === 'contract' ? 'agreement' : 'proposal';
-      // send-once gate FIRST (the notice doubles as the owner's heads-up)
-      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ site_id: doc.site_id, client_id: clientId, kind: 'deal_followup', period: `remind:${doc.id}`, headline: `Reminder sent — ${doc.title || `the ${what}`}`, body: `The ${what} has been out a few days, so we sent the client one gentle reminder with a fresh link. If it stays quiet, a personal note lands best.`, status: 'active' }),
-      });
-      if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;
+      // Discover the email FIRST — the notice must tell the truth, and a doc with
+      // no reachable client shouldn't burn its once-ever reminder on a no-op.
+      let email = '';
       try {
         const deal = (await svc(`presence_deals?id=eq.${doc.deal_id}&site_id=eq.${doc.site_id}&select=contact_id&limit=1`)).json?.[0];
-        const email = deal?.contact_id ? (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${doc.site_id}&select=email&limit=1`)).json?.[0]?.email : '';
-        if (!email) continue;
+        email = deal?.contact_id ? String((await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${doc.site_id}&select=email&limit=1`)).json?.[0]?.email || '') : '';
+      } catch { /* treated as no email */ }
+      const noticeBody = email
+        ? `The ${what} has been out a few days, so we sent the client one gentle reminder with a fresh link. If it stays quiet, a personal note lands best.`
+        : `The ${what} has been out a few days, but there's no client email on the deal — add one to the contact, or reach out personally.`;
+      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+        body: JSON.stringify({ site_id: doc.site_id, client_id: clientId, kind: 'deal_followup', period: `remind:${doc.id}`, headline: `${email ? 'Reminder sent' : 'Still waiting'} — ${doc.title || `the ${what}`}`, body: noticeBody, status: 'active' }),
+      });
+      if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;
+      if (!email) continue;
+      try {
         const token = await signSalesToken({ t: kind, id: doc.id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
         const brand = await loadEmailBrand(doc.site_id);
         const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'contract' ? 'Review & sign' : 'Review the proposal'} →</a>`;
-        sendEmail(String(email), `Still there for you — ${doc.title || `your ${what}`}`,
+        sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`,
           `<p>Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
         reminded++;
       } catch { /* the owner notice already recorded the attempt */ }

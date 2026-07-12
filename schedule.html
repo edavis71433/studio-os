@@ -83,7 +83,7 @@ function render(){
       </div>
     </section>
     <section><h2>Upcoming</h2>`;
-  if(!LIST.length)h+=`<p class="muted">Nothing scheduled. When you schedule a publish, it appears here until it goes live.</p>`;
+  if(!LIST.length)h+=`<p class="muted">Nothing scheduled. When you schedule a publish, it appears here until it goes live.</p><p style="margin-top:10px"><a class="link" href="/presence.html?view=preview">Preview your draft →</a></p>`;
   else for(const s of LIST){
     h+=`<div class="sch"><div><div class="w">${esc(fmt(s.scheduled_for))}</div><div class="m"><span class="k">${s.kind==='revert'?'Revert':'Publish'}</span> ${esc(s.summary||'')}</div></div><button data-cancel="${esc(s.id)}">Cancel</button></div>`;
   }
