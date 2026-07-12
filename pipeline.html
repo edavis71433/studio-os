@@ -9,8 +9,8 @@
 <!-- P2-C: Studio App sales pipeline on the ONE shared shell + shared state helpers. -->
 <link rel="stylesheet" href="/shell.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#938ba3;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#3f7a5a;--good-soft:#e7f1ea;--warn:#8a6d3b;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#7a7192;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24}}
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24}}
   :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
   *{box-sizing:border-box;margin:0}
@@ -104,7 +104,7 @@ async function api(path,method,body){
 }
 
 function renderFilters(){
-  const opts=[['','All'],...STAGES.map(s=>[s,s[0].toUpperCase()+s.slice(1)])];
+  const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
   $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;renderFilters();load();});
 }
@@ -194,8 +194,8 @@ async function openDeal(id){
         <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3><div class="mut">Send the client a secure payment link — an invoice (defaults to the accepted proposal's total) or a deposit to start the work.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button></div><div id="invForm"></div></div>
         <div class="sec"><h3>Convert to customer</h3>
-          ${d.converted_client_id?`<div class="mut">Converted — workspace <code>${esc(d.converted_site_id||'')}</code>. The customer was invited to set their login and welcomed into onboarding.</div>${d.created_project_id?`<div class="row2" style="margin-top:8px"><a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a></div>`:''}`:
-            `<div id="convWrap"><button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert & provision workspace':'Sign the agreement first'}</button></div>`}
+          ${d.converted_client_id?`<div class="mut">Converted — their workspace is ready. The customer was invited to set their login and welcomed into onboarding.</div>${d.created_project_id?`<div class="row2" style="margin-top:8px"><a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a></div>`:''}`:
+            `<div id="convWrap"><button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert — set up their workspace':'Sign the agreement first'}</button></div>`}
         </div>
       </div>`;
     $('closeD').onclick=()=>{dlg.close();history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():''));};

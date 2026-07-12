@@ -9,6 +9,7 @@ import { json } from '../../_shared/http.ts';
 import { buildGrounding } from '../concierge/grounding.ts';
 import { answer } from '../concierge/answer.ts';
 import { polish } from '../concierge/polish.ts';
+import { checkAiCeiling } from '../commerce/metering.ts';
 import type { SiteRow } from '../lib/site.ts';
 
 export async function handleConciergeAsk(req: Request, site: SiteRow, cors: Record<string, string>) {
@@ -22,6 +23,14 @@ export async function handleConciergeAsk(req: Request, site: SiteRow, cors: Reco
 
   const grounding = await buildGrounding(site);
   const a = answer({ question, topicId, history }, grounding);
+
+  // HARD cost ceiling (margin protection): the ANSWER is deterministic and free,
+  // only the optional language polish spends model tokens — so over the ceiling we
+  // skip the polish and still answer, rather than deny. Same guard writer/coach/visual use.
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) {
+    return json({ data: { verb: a.verb, answer: a.text, topic: a.topic, actions: a.actions, grounded: a.grounded, low_confidence: a.low_confidence, sources: a.sources } }, 200, cors);
+  }
 
   // optional language polish — facts already fixed; verifier guards; fallback always
   const groundingText = [

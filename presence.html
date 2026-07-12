@@ -3215,7 +3215,7 @@ function renderBlocksCard() {
     sub.appendChild(ti);
     if (def.ctaSimple) {
       const t = el("input"), bt = el("input"), u = el("input");
-      t.placeholder = "Banner text"; t.value = blk.text || ""; bt.placeholder = "Button label (optional)"; bt.value = blk.button || ""; u.placeholder = "Button link URL (optional)"; u.value = blk.url || "";
+      t.placeholder = "Banner text"; t.value = blk.text || ""; bt.placeholder = "Button label (optional)"; bt.value = blk.button || ""; u.placeholder = "Where the button goes (optional link)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
       const commit = () => { BLOCKS_WORK[idx] = { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
