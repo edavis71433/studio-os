@@ -202,12 +202,64 @@ export async function handleSalesDealStage(req: Request, site: SiteRow, principa
   return json({ data: rows(up)[0] }, 200, cors);
 }
 
+// ═══ SAVED TEMPLATES (proposals + contracts) ═══
+// Save once, reuse on every deal — the repeat-operator time-saver. Contract bodies
+// may carry {{client_name}} / {{deal_title}}, filled from the deal at create time.
+async function loadTemplate(siteId: string, id: string, kind: 'proposal' | 'contract') {
+  if (!UUID_RE.test(id)) return null;
+  return rows(await svc(`presence_sales_templates?id=eq.${id}&site_id=eq.${siteId}&kind=eq.${kind}&deleted_at=is.null&select=*&limit=1`))[0] || null;
+}
+export async function handleSalesTemplates(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method === 'GET') {
+    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
+    return r.ok ? json({ data: rows(r) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
+  }
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const kind = b.kind === 'contract' ? 'contract' : b.kind === 'proposal' ? 'proposal' : null;
+  if (!kind) return json({ error: 'bad_kind', message: 'A template is a proposal or a contract.' }, 422, cors);
+  const name = clean(b.name, 120);
+  if (!name) return json({ error: 'validation', message: 'Give the template a name.' }, 422, cors);
+  let title = clean(b.title, 200), body = '', line_items: unknown[] = [];
+  if (UUID_RE.test(b.from_proposal_id || '')) {   // save an existing proposal as the template
+    const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items&limit=1`))[0];
+    if (!p) return json({ error: 'not_found', message: 'That proposal isn’t here.' }, 404, cors);
+    title = title || p.title; line_items = Array.isArray(p.line_items) ? p.line_items : [];
+  } else if (UUID_RE.test(b.from_contract_id || '')) {   // save an existing contract as the template
+    const c = rows(await svc(`presence_contracts?id=eq.${b.from_contract_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,body&limit=1`))[0];
+    if (!c) return json({ error: 'not_found', message: 'That agreement isn’t here.' }, 404, cors);
+    title = title || c.title; body = String(c.body || '');
+  } else {
+    body = clean(b.body, 50000);
+    if (kind === 'proposal') { const norm = normalizeLineItems(b.line_items); if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors); line_items = norm.items; }
+    if (kind === 'contract' && !body) return json({ error: 'validation', message: 'A contract template needs the agreement text.' }, 422, cors);
+  }
+  const ins = await svc('presence_sales_templates', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, kind, name, title, body, line_items, created_by: principal.email || principal.userId || 'system' }) });
+  return (ins.ok && rows(ins)[0]) ? json({ data: rows(ins)[0] }, 201, cors) : json({ error: 'write_failed' }, 502, cors);
+}
+export async function handleSalesTemplateDelete(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const up = await svc(`presence_sales_templates?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
+  return rows(up)[0] ? json({ data: { ok: true } }, 200, cors) : json({ error: 'not_found' }, 404, cors);
+}
+/** Fill {{client_name}} / {{deal_title}} from the deal. */
+async function fillPlaceholders(siteId: string, deal: any, text: string): Promise<string> {
+  let clientName = '';
+  try { if (deal.contact_id) clientName = rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name&limit=1`))[0]?.name || ''; } catch { /* best-effort */ }
+  return text.replace(/\{\{\s*client_name\s*\}\}/g, clientName || 'the client').replace(/\{\{\s*deal_title\s*\}\}/g, String(deal.title || 'the project'));
+}
+
 // ═══ PROPOSALS ═══
 export async function handleSalesProposalCreate(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  if (b.template_id) {   // one-tap: draft from a saved template
+    const t = await loadTemplate(site.id, String(b.template_id), 'proposal');
+    if (!t) return json({ error: 'not_found', message: 'That template isn’t here.' }, 404, cors);
+    b = { ...b, line_items: t.line_items, title: b.title || t.title || t.name };
+  }
   const norm = normalizeLineItems(b.line_items);
   if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
   const ins = await svc('presence_proposals', { method: 'POST', headers: { Prefer: 'return=representation' },
@@ -368,6 +420,11 @@ export async function handleSalesContractCreate(req: Request, site: SiteRow, pri
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  if (b.template_id) {   // one-tap: draft from a saved template, placeholders filled from the deal
+    const t = await loadTemplate(site.id, String(b.template_id), 'contract');
+    if (!t) return json({ error: 'not_found', message: 'That template isn’t here.' }, 404, cors);
+    b = { ...b, body: await fillPlaceholders(site.id, deal, String(t.body || '')), title: b.title || t.title || t.name };
+  }
   const body = clean(b.body, 50000);
   if (!body) return json({ error: 'validation', message: 'A contract needs a body.' }, 422, cors);
   const terms = (b.terms_snapshot && typeof b.terms_snapshot === 'object') ? b.terms_snapshot : {};
