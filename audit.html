@@ -131,6 +131,7 @@ a{color:inherit;}
 .gate-btn{background:var(--p);color:#fff;border:none;border-radius:100px;padding:13px 24px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:opacity 0.15s;}
 .gate-btn:hover{opacity:0.88;}
 .gate-msg{font-size:12px;color:var(--muted);margin-top:4px;}
+.gate-msg.is-err{color:#c23b3b;}.gate-msg.is-ok{color:#2e7d4f;}
 
 /* UPSELL */
 .upsell-box{background:rgba(91,63,160,0.2);border:1px solid rgba(196,174,232,0.2);border-radius:16px;padding:24px;display:flex;gap:24px;align-items:flex-start;}
@@ -309,6 +310,17 @@ a{color:inherit;}
   /* light-ink ring track + AA-in-light upsell price get their dark lifts here */
   .score-ring svg circle:first-child{stroke:rgba(239,234,247,.14);}
   .upsell-price{color:#c4aee8;}
+  /* the "#1 Opportunity" inline box — same rescue rule the 4 sibling tool pages carry */
+  .page-hero-v2 [style*="background:#f7f4fd"]{background:#171320 !important;}
+  /* specimen metric chips keep their light fills — pin their tiny labels to dark ink */
+  .page-hero-v2 [style*="background:#fff3f3"],.page-hero-v2 [style*="background:#f3fff5"],
+  .page-hero-v2 [style*="background:#fff3f3"] *,.page-hero-v2 [style*="background:#f3fff5"] *{color:#1b1525 !important;}
+  /* the credibility strip (Founder / Background / Education) above the paid
+     tiers: hard-coded light section + white card carried var(--ink) text →
+     invisible white-on-white in dark. Flip the surfaces to the dark family. */
+  section[style*="background:#F4F0E9"]{background:#1f1a2e !important;border-top-color:#332B49 !important;}
+  section[style*="background:#F4F0E9"] .footer-trust-inner{background:#241d38 !important;border-color:#332B49 !important;}
+  .gate-msg.is-err{color:#e08b83;}.gate-msg.is-ok{color:#8fd3a0;}
   ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
 }
 </style>
@@ -1397,8 +1409,8 @@ function unlockReport() {
   var emailEl = document.getElementById('gateEmail');
   var msg = document.getElementById('gateMsg');
   var email = (emailEl ? emailEl.value : '').trim();
-  if (!email || !email.includes('@')) { if(msg){msg.style.color='#e05555';msg.textContent='Please enter a valid email.';} return; }
-  if (msg) { msg.style.color='var(--muted)'; msg.textContent='Sending your full report...'; }
+  if (!email || !email.includes('@')) { if(msg){msg.className='gate-msg is-err';msg.textContent='Please enter a valid email.';} return; }
+  if (msg) { msg.className='gate-msg'; msg.textContent='Sending your full report...'; }
   var gateBtn = document.getElementById('gateBtn');
   if (gateBtn) { gateBtn.disabled = true; gateBtn.style.opacity = '0.6'; gateBtn.style.cursor = 'default'; }
 
@@ -1460,11 +1472,11 @@ function unlockReport() {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({type:'audit_lead', clientName:d.name||'', clientEmail:email, meta:{url:d.url||'', bizType:bizLabel, city:d.city||'', score:d.overall||0, perf:d.perf||null, seo:d.seo||null, a11y:d.a11y||null, lcp:d.lcp||null, fcp:d.fcp||null, cls:d.cls||null, tbt:d.tbt||null, fallback:false, topIssues:issues.slice(0,3).map(function(i){return{title:i.title,sev:i.sev};}), userConfirmHtml:reportHtml}})
   }).then(function() {
-    if (msg) { msg.style.color='#6abf69'; msg.textContent='Full report sent! Check your inbox.'; }
+    if (msg) { msg.className='gate-msg is-ok'; msg.textContent='Full report sent! Check your inbox.'; }
     if (gateBtn) { gateBtn.disabled = false; gateBtn.style.opacity = ''; gateBtn.style.cursor = ''; }
     if (typeof gtag==='function') gtag('event','unlock_audit_report',{event_category:'lead'});
   }).catch(function() {
-    if (msg) { msg.style.color='#e05555'; msg.textContent='Something went wrong. Please try again.'; }
+    if (msg) { msg.className='gate-msg is-err'; msg.textContent='Something went wrong. Please try again.'; }
     if (gateBtn) { gateBtn.disabled = false; gateBtn.style.opacity = ''; gateBtn.style.cursor = ''; }
   });
 }
