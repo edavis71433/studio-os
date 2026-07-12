@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Review &amp; sign</title>
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--good:#33664b;--good-soft:#e7f1ea;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--good:#8bbf9f;--good-soft:#1f2a24}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:44px 20px 90px}
+  h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 4px}
+  .sub{color:var(--soft);font-size:15px;margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);margin-bottom:14px}
+  .body{white-space:pre-wrap;font-size:15px}
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  td{padding:8px 4px;border-bottom:1px solid var(--line)} td:last-child{text-align:right;white-space:nowrap}
+  .total td{font-weight:700;border-bottom:none}
+  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 5px}
+  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 12px;outline:none}
+  input:focus{border-color:var(--p)}
+  .row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:11px 22px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  button:disabled{opacity:.5;cursor:default}
+  .ok{background:var(--good-soft);color:var(--good);border-radius:12px;padding:14px 16px;font-weight:600;margin-top:14px}
+  .muted{color:var(--soft);font-size:13.5px;margin-top:14px}
+  .center{text-align:center;padding:56px 20px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<script>
+// The public review & sign page. The email's "Review & sign" link lands here with
+// ?t=<signed token>. Reads the proposal/contract via the token-gated public view,
+// then accepts or signs — nothing final until the client acts.
+const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
+const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money=(c)=>'$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:2});
+const TOKEN=new URLSearchParams(location.search).get('t')||'';
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'apikey':KEY},body:body?JSON.stringify(body):undefined});return{ok:r.ok,body:await r.json().catch(()=>({}))};}
+function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p></div>`;}
+function thanks(t,s){$('main').innerHTML=`<div class="center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`;}
+async function load(){
+  if(!TOKEN){fail();return;}
+  const r=await api('/sales/p/'+encodeURIComponent(TOKEN));
+  if(!r.ok||!r.body.data){fail(r.body&&r.body.message);return;}
+  const d=r.body.data;
+  if(d.kind==='proposal')renderProposal(d);else renderContract(d);
+}
+function renderProposal(p){
+  const items=(p.line_items||[]).map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+  let h=`<h1>${esc(p.title||'Your proposal')}</h1><p class="sub">Take your time — nothing is final until you accept.</p>
+  <div class="card"><table>${items}<tr class="total"><td>Total</td><td>${money(p.subtotal_cents)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}</div>`;
+  if(p.status==='accepted'){h+=`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`;}
+  else if(p.status==='declined'){h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;}
+  else h+=`<div class="row"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Not right now</button></div>`;
+  $('main').innerHTML=h;
+  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{fail(r.body&&r.body.message);}};
+  const dd=$('decline');if(dd)dd.onclick=async()=>{dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else fail(r.body&&r.body.message);};
+}
+function renderContract(c){
+  let h=`<h1>${esc(c.title||'Your agreement')}</h1><p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
+  <div class="card"><div class="body">${esc(c.body)}</div></div>`;
+  if(c.status==='signed'){h+=`<div class="ok">✓ Signed${c.signed_at?' on '+esc(new Date(c.signed_at).toLocaleDateString()):''} — you’re all set.</div>`;}
+  else h+=`<div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
+    <label for="em">Your email (optional)</label><input id="em" type="email" autocomplete="email" placeholder="you@business.com">
+    <div class="row"><button id="sign">Sign the agreement</button></div>
+    <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div>`;
+  $('main').innerHTML=h;
+  const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();if(!nm){$('nm').focus();return;}s.disabled=true;
+    const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
+    if(r.ok)thanks('Signed — welcome aboard! 🎉','Your studio has been told and will kick things off. Anything sent to you next lands in your email.');
+    else{fail(r.body&&r.body.message);}};
+}
+load();
+</script>
+</body>
+</html>

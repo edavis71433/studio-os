@@ -370,7 +370,7 @@ export async function handleSalesProposalSend(req: Request, site: SiteRow, princ
   if (!p) return json({ error: 'not_found' }, 404, cors);
   if (p.status === 'sent') { // idempotent: already sent → return the existing link
     const secret = linkSecret();
-    const link = secret ? `${fnBase()}/functions/v1/presence/sales/p/${await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
+    const link = secret ? `${siteUrl()}/sign.html?t=${await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
     return json({ data: p, url: link, already_sent: true }, 200, cors);
   }
   if (p.status !== 'draft') return json({ error: 'bad_state', message: 'Only a draft proposal can be sent.' }, 409, cors);
@@ -378,7 +378,7 @@ export async function handleSalesProposalSend(req: Request, site: SiteRow, princ
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   const secret = linkSecret();
   const token = secret ? await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret) : null;
-  const url = token ? `${fnBase()}/functions/v1/presence/sales/p/${token}` : null;
+  const url = token ? `${siteUrl()}/sign.html?t=${token}` : null;   // the human signing PAGE, not the raw API
   await dealEvent(site.id, p.deal_id, 'proposal_sent', principal, { detail: { proposal_id: id } });
   // move the deal to 'proposal' if it's earlier (guarded; records the stage change)
   await advanceStage(site.id, p.deal_id, 'proposal', ['lead', 'qualified'], principal);
@@ -443,7 +443,7 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
   const c = rows(r)[0];
   if (!c) return json({ error: 'not_found' }, 404, cors);
   const secret = linkSecret();
-  const mkLink = async () => secret ? `${fnBase()}/functions/v1/presence/sales/c/${await signSalesToken({ t: 'contract', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
+  const mkLink = async () => secret ? `${siteUrl()}/sign.html?t=${await signSalesToken({ t: 'contract', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
   if (c.status === 'signed') return json({ error: 'already_signed' }, 409, cors);
   if (c.status === 'sent') return json({ data: c, url: await mkLink(), content_hash: c.content_hash, already_sent: true }, 200, cors);
   const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
