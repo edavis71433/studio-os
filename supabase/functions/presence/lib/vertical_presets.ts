@@ -14,15 +14,18 @@ import { REALIZED_BLOCK_TYPES } from './site_blocks.ts';
 import type { SiteBlockType } from './render_types.ts';
 
 // Block palettes per vertical family (ordered by how prominently they belong).
-const HOME_TRADES: SiteBlockType[] = ['before_after', 'service_areas', 'process', 'certifications', 'stats', 'features'];
-const BEAUTY: SiteBlockType[] = ['team', 'gallery', 'pricing', 'features'];
-const FITNESS: SiteBlockType[] = ['pricing', 'features', 'team', 'stats'];
-const PROFESSIONAL: SiteBlockType[] = ['team', 'process', 'stats', 'certifications', 'features'];
-const MEDICAL: SiteBlockType[] = ['team', 'certifications', 'features', 'process'];
-const RETAIL: SiteBlockType[] = ['gallery', 'features', 'stats'];
-const FOOD: SiteBlockType[] = ['gallery', 'features'];            // the menu is already the core page
-const COMMUNITY: SiteBlockType[] = ['stats', 'features', 'cta'];
-const GENERIC: SiteBlockType[] = ['features', 'stats', 'cta'];
+// Later realized types (reviews, appointment, partners, video, gallery,
+// before_after) are woven in where they earn their place — same engine, richer
+// out-of-the-box recommendations, zero render changes.
+const HOME_TRADES: SiteBlockType[] = ['before_after', 'reviews', 'service_areas', 'gallery', 'process', 'certifications', 'stats', 'features'];
+const BEAUTY: SiteBlockType[] = ['appointment', 'before_after', 'team', 'gallery', 'pricing', 'reviews', 'features'];
+const FITNESS: SiteBlockType[] = ['appointment', 'pricing', 'gallery', 'team', 'reviews', 'stats', 'features'];
+const PROFESSIONAL: SiteBlockType[] = ['team', 'process', 'reviews', 'appointment', 'stats', 'certifications', 'features'];
+const MEDICAL: SiteBlockType[] = ['appointment', 'team', 'certifications', 'reviews', 'features', 'process'];
+const RETAIL: SiteBlockType[] = ['gallery', 'reviews', 'partners', 'features', 'stats'];
+const FOOD: SiteBlockType[] = ['gallery', 'reviews', 'features'];  // the menu is already the core page
+const COMMUNITY: SiteBlockType[] = ['gallery', 'stats', 'partners', 'video', 'features', 'cta'];
+const GENERIC: SiteBlockType[] = ['features', 'reviews', 'stats', 'cta'];
 
 const FAMILY: Record<string, SiteBlockType[]> = {
   // home & trades

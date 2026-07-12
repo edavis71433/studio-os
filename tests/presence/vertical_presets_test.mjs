@@ -19,6 +19,10 @@ ok('retail → gallery', has('retail', 'gallery') && has('florist', 'gallery'));
 ok('food → gallery (menu is already the core page)', has('restaurant', 'gallery') && has('coffee_shop', 'gallery'));
 ok('fitness → pricing + team', has('fitness', 'pricing') && has('yoga', 'team'));
 ok('community → stats + cta', has('nonprofit', 'stats') && has('church', 'cta'));
+ok('booking-led verticals recommend the appointment block', has('salon', 'appointment') && has('dental', 'appointment') && has('gym', 'appointment') && has('law', 'appointment'));
+ok('review-led verticals recommend the reviews badge', has('plumber', 'reviews') && has('restaurant', 'reviews') && has('retail', 'reviews') && has('generic', 'reviews'));
+ok('beauty shows transformations (before_after)', has('salon', 'before_after') && has('spa', 'before_after'));
+ok('retail + community recommend the partners strip', has('boutique', 'partners') && has('nonprofit', 'partners'));
 ok('generic / unknown → a safe baseline (features)', has('generic', 'features') && has('zzz-unknown', 'features') && has(null, 'features'));
 
 ok('every suggested block is a REALIZED block type', allIndustryKeys().concat(['zzz']).every((k) => suggestedBlocksFor(k).every((b) => REALIZED_BLOCK_TYPES.includes(b))));
