@@ -16,6 +16,7 @@ import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, r
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
+import { timingSafeEqual } from '../../_shared/hmac.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -120,7 +121,8 @@ function authorized(req: Request, body: any): boolean {
   // it in the body, so nothing legitimate used the query path.
   const fromBody = body && typeof body.secret === 'string' ? body.secret : '';
   const fromHeader = req.headers.get('x-system-secret') || '';
-  return fromBody === SCHEDULER_SECRET || fromHeader === SCHEDULER_SECRET;
+  // constant-time compare — a high-value shared secret must not leak via timing
+  return timingSafeEqual(fromBody, SCHEDULER_SECRET) || timingSafeEqual(fromHeader, SCHEDULER_SECRET);
 }
 
 const CRON_STALE_MS = 45 * 60_000;   // 3 missed 15-min ticks = the scheduler is dead

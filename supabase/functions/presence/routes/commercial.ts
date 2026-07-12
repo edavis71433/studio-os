@@ -161,7 +161,9 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
 async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return '';
-  const data = new TextEncoder().encode(ip + '|' + (APPROVAL_SECRET || 'salt'));
+  // salt fallback chain: never a guessable literal (an unset APPROVAL_SECRET
+  // would have made IPv4 pre-images enumerable)
+  const data = new TextEncoder().encode(ip + '|' + (APPROVAL_SECRET || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'salt'));
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
 }

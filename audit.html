@@ -1072,7 +1072,7 @@ function computeComposite(perf, seoRaw, a11y, deep, psiSkipped, mobileUsability,
   var onPagePts = 20;
   if (!deep || !deep.fetchedHtml) {
     onPagePts = 10;
-    findings.push({sev:'medium', pillar:'visibility', title:'Could not fetch homepage for deep analysis', body:'Some sites block automated requests. Scoring is based on PSI only.'});
+    findings.push({sev:'medium', pillar:'visibility', title:'Could not fetch homepage for deep analysis', body:'Some sites block automated requests. Scoring is based on the speed test only.'});
   } else {
     var op = deep.onPage;
     if (!op.title || op.titleLength < 25 || op.titleLength > 65) {
