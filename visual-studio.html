@@ -90,6 +90,57 @@ async function apiGet(p){ try { const r = await fetch(FN+p, { headers:H() }); re
 async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
 function toast(m){ if(window.ddsToast)return void ddsToast(m);const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 3000); }
 
+// Small styled dialogs — replace native prompt()/confirm(), matching the app's
+// surfaces (same pattern as presence.html's askText). askText resolves the
+// entered value or null on cancel; askConfirm resolves true/false.
+function dlgShell(){
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+  return dlg;
+}
+function dlgBtn(label,primary){
+  const b=document.createElement('button'); b.type='button'; b.textContent=label;
+  b.style.cssText=primary
+    ?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
+    :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+  return b;
+}
+function askText(title, opts){
+  opts=opts||{};
+  return new Promise((resolve)=>{
+    const dlg=dlgShell();
+    const form=document.createElement('form'); form.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; form.appendChild(h);
+    if(opts.hint){ const hh=document.createElement('div'); hh.textContent=opts.hint; hh.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; form.appendChild(hh); }
+    const inp=document.createElement('input'); inp.type='text'; if(opts.value)inp.value=opts.value; if(opts.placeholder)inp.placeholder=opts.placeholder;
+    inp.style.cssText='width:100%;font:inherit;font-size:16px;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:9px;outline:none;box-sizing:border-box'; form.appendChild(inp);
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const cancel=dlgBtn('Cancel',false); const ok=dlgBtn(opts.ok||'Save',true); ok.type='submit';
+    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    cancel.addEventListener('click',()=>finish(null));
+    form.addEventListener('submit',(e)=>{ e.preventDefault(); finish(inp.value); });
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
+    dlg.showModal(); setTimeout(()=>inp.focus(),20);
+  });
+}
+function askConfirm(title, body, okLabel){
+  return new Promise((resolve)=>{
+    const dlg=dlgShell();
+    const box=document.createElement('div'); box.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const cancel=dlgBtn('Cancel',false); const ok=dlgBtn(okLabel||'OK',true);
+    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    cancel.addEventListener('click',()=>finish(false));
+    ok.addEventListener('click',()=>finish(true));
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
+    dlg.showModal(); setTimeout(()=>ok.focus(),20);
+  });
+}
+
 function composer(available){
   if(!available){
     return `<div class="panel"><p class="label">Not switched on yet</p>
@@ -186,7 +237,7 @@ function wirePlan(){
 }
 
 async function use(varId){
-  const alt = prompt('Describe this image in a few words (it helps customers and search engines):', LAST_SUBJECT || '');
+  const alt = await askText('Describe this image in a few words', { hint:'It helps customers and search engines.', value: LAST_SUBJECT || '', ok:'Save' });
   if(alt === null) return;
   if((alt||'').trim().length < 3){ toast('A few words, please — it makes the image accessible.'); return; }
   const r = await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'approve', variation_id:varId, alt_text:alt.trim() });
@@ -206,7 +257,7 @@ async function doEdit(){
   if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t apply that just now.'); }
 }
 async function discard(){
-  if(!confirm('Discard these options? Nothing was saved, so there’s nothing to lose.')) return;
+  if(!(await askConfirm('Discard these options?', 'Nothing was saved, so there’s nothing to lose.', 'Discard'))) return;
   await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'abandon' });
   $('planhost').innerHTML=''; CURRENT=null; toast('Discarded.');
 }

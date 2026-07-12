@@ -40,8 +40,12 @@ export interface CycleResult {
 // wrong here: nothing in the cycle bumps it, so the same window repeated
 // forever. Falls back to the old ordering until 0091 is applied.
 async function activeSites(limit: number): Promise<SiteRow[]> {
-  const er = await svc('presence_entitlements?product=eq.presence&status=eq.active&select=client_id');
-  const activeClients = new Set((er.ok && Array.isArray(er.json) ? er.json : []).map((r: any) => String(r.client_id)));
+  // svcAll, not a bare select: PostgREST's max-rows cap would silently truncate
+  // a NONDETERMINISTIC subset of active clients (~1000), dropping their sites
+  // out of observation with zero signal. Paged + ordered + logged at the bound.
+  const { svcAll } = await import('../lib/db.ts');
+  const er = await svcAll('presence_entitlements?product=eq.presence&status=eq.active&select=client_id', 'client_id');
+  const activeClients = new Set(er.map((r: any) => String(r.client_id)));
   if (!activeClients.size) return [];
   let sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
   if (!sr.ok) sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);

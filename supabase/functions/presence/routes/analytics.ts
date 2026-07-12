@@ -59,11 +59,18 @@ export async function readGsc(clientId: string | null | undefined): Promise<GscM
 }
 
 const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
-/** Load recent visit rows for a site over the current + prior window (for trend). */
-export async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRow[]> {
+/** Load recent visit rows for a site over the current + prior window (for trend).
+ *  TRUTHFULNESS (AN-4): the 5000-row cap, ordered ts.desc, truncates the PRIOR
+ *  window first — a busy site would silently show an inflated "up from N" trend
+ *  built on an undercounted prior period. At the cap we mark the result
+ *  truncated; consumers suppress the trend clause rather than fabricate one. */
+export type VisitRows = VisitRow[] & { truncated?: boolean };
+export async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRows> {
   const startIso = new Date(nowMs - 2 * periodDays(period) * 86_400_000).toISOString();
   const r = await svc(`presence_visits?site_id=eq.${siteId}&ts=gte.${startIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`);
-  return (Array.isArray((r as any).json) ? (r as any).json : []) as VisitRow[];
+  const rows = (Array.isArray((r as any).json) ? (r as any).json : []) as VisitRows;
+  if (rows.length >= 5000) rows.truncated = true;
+  return rows;
 }
 
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);

@@ -88,6 +88,9 @@ export interface VisitAgg {
   countries: Array<{ country: string; visits: number }>;
   events: { phone: number; email: number; cta: number; download: number };
   hasData: boolean;
+  /** True when the source rows hit the fetch cap — the PRIOR window is then
+   *  undercounted, so consumers must not state a trend (AN-4: never fake). */
+  truncated: boolean;
 }
 
 const topN = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
@@ -130,6 +133,7 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
     countries: topN(countries, 5).map(([country, visits]) => ({ country, visits })),
     events,
     hasData: pageviews > 0 || curVisitors.size > 0,
+    truncated: (rows as VisitRow[] & { truncated?: boolean }).truncated === true,
   };
 }
 

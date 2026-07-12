@@ -1,3 +1,7 @@
+// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
+// imports; exercised only by its test). It documents a frozen-architecture contract
+// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
+// delete it (with an ADR note) when its phase arrives.
 // ── Curated color palettes (Phase COMP — FD-T6-lite) ─────────────────────────
 // The no-code half of styling: an OWNER picks a designed palette; it becomes the
 // SAME theme tokens Developer Mode uses (one machinery, no duplication), rides

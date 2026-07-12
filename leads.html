@@ -123,12 +123,12 @@ async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,
 // Reuses the existing form submission as the deal's source (source_submission_id).
 async function createDeal(id){
   const l=ALL.find(x=>x.id===id); if(!l)return;
-  const title=(l.name||l.email||'New inquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
+  const title=(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
   try{
     let contactId=null;
     if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
     const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id});
-    if(!d.ok){toast(d.status===403?'Pipeline is part of Business OS.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
+    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;
     // reflect converted state locally (idempotent: server returns the existing deal on a repeat)
     l.converted=true; l.deal_id=dealId; if(l.status==='new')l.status='read';

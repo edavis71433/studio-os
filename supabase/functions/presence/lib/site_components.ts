@@ -1,3 +1,7 @@
+// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
+// imports; exercised only by its test). It documents a frozen-architecture contract
+// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
+// delete it (with an ADR note) when its phase arrives.
 // ── Structured component library (Phase T) — blocks, not a page builder ──────
 // The "structured site builder" is a catalog of REUSABLE BLOCKS defined as DATA:
 // each declares its fields, validation, the schema.org it emits, its a11y

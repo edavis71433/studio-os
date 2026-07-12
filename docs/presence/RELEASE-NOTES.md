@@ -2,7 +2,7 @@
 
 ## Version 1.0 — Release Notes
 
-**Status:** feature-frozen, QA-passed ([QA-RELEASE-VERIFICATION](QA-RELEASE-VERIFICATION.md)), deployed to staging + prod. Frontend committed, **not pushed** (go-live gate).
+**Status:** **LIVE since Jul 11 2026** (launched; QA record: [QA-RELEASE-VERIFICATION](QA-RELEASE-VERIFICATION.md)). Deployed to staging + prod.
 
 **What V1 is:** a calm SaaS that keeps a small business's presence correct, found, and growing. Customer-complete workflows: buy/sign-in, CMS/structured content, Creative Studio (Writer/Editor/Reviewer/Brand Guardian), the daily Business-Moments surface, Growth Coach, Concierge, media upload, **AI Visual Studio**, **Connected Platform (connect a service)**, and Publishing (versioned, restorable). Plus Presence Monitor (watch an existing site) and the operator/advanced tiers (Industry Packs, Marketplace, Enterprise, Agency, Platform Services).
 
@@ -36,7 +36,7 @@ Honest inventory. **None is a V1 correctness blocker.**
 
 | Item | Impact | Disposition |
 |---|---|---|
-| ~~Baseline `deno check` type errors (`rollback` on `OrgPlan`/`MarketplacePlan`; a marketplace_ops comparison)~~ ✅ **STALE — closed (verified Jul 12 2026):** all three functions typecheck clean, and the Jul 11–12 audit-campaign rounds gate on it — e.g. commit `9df037c` "Gates: … typecheck ×3 clean" (also `1cd7ff1`); TD-1 recorded the clever-api 46→0 pass | ~~Pre-existing, in enterprise/marketplace types~~ resolved | ~~V1.1 cleanup~~ done |
+| ~~Baseline `deno check` type errors (`rollback` on `OrgPlan`/`MarketplacePlan`; a marketplace_ops comparison)~~ ✅ **STALE — closed (verified Jul 12 2026):** all three functions typecheck clean, and the Jul 11–12 audit-campaign rounds gate on it — e.g. commit `caacf12` "Gates: … typecheck ×3 clean" (also `1cd7ff1`); TD-1 recorded the clever-api 46→0 pass | ~~Pre-existing, in enterprise/marketplace types~~ resolved | ~~V1.1 cleanup~~ done |
 | `ENGINEERING-ATLAS.md` / `API-INVENTORY-v1-FROZEN.md` deep depth stops at M8.5/M5 | Superseded by the current [V1 System Reference](V1-SYSTEM-REFERENCE.md) / [API Reference](API-REFERENCE.md) | Historical; keep for provenance |
 | `connected_data` cache is one-deep (`+prev`) | No trend/time-series features | V1.1 (unlocks trends) |
 | Pack intelligence intentionally shallow (restaurant/coffee_shop) | Fewer industry-specific moments | V1.1 depth |
@@ -69,7 +69,7 @@ Honest inventory. **None is a V1 correctness blocker.**
 - [ ] **Set `ANTHROPIC_KEY`** → AI drafting in the Creative Studio (manual parity means the app works without it).
 - [ ] **Set `VISUAL_MODEL_KEY`** (+ optional `VISUAL_MODEL_URL/_NAME`) → live AI Visual Studio generation.
 - [ ] **Configure Stripe** (`STRIPE_SECRET` LIVE, `SITE_URL`, webhook + `BILLING_SYNC_SECRET`) and **confirm prices + subscription events** → live billing.
-- [ ] **Set `NETLIFY_AUTH_TOKEN`** and **push the held commits** (the go-live gate) → the customer pages go live.
+- [x] **Set `NETLIFY_AUTH_TOKEN`** and **push the held commits** — DONE Jul 11 2026 (launched).
 
 ## Production Activation Checklist
 
@@ -83,7 +83,7 @@ Honest inventory. **None is a V1 correctness blocker.**
    - Visual → generate → approve → appears in the media library.
    - AI → a Writer draft returns options (fact-guarded).
 4. **Live-browser QA** the signed-in customer pages (today / connections / visual-studio / portal) — the one step no automated suite covers.
-5. Clear the go-live gate (prices, Stripe events, nav) and **push** the frontend.
+5. ~~Clear the go-live gate and push the frontend~~ — DONE Jul 11 2026 (launched).
 6. Confirm the unattended cycle runs (cron installed with `SCHEDULER_SECRET`).
 
 ---

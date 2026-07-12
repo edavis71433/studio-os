@@ -7,10 +7,13 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 const sync = read('supabase/functions/presence/commerce/entitlement_sync.ts');
 const life = read('supabase/functions/presence/commerce/lifecycle.ts');
+const notice = read('supabase/functions/presence/lib/notice.ts');
 
-// welcome-back email rides the notice insert (send-once), not fired blindly
-ok('welcome-back: asks for the inserted row (return=representation) to detect freshness', /kind: 'welcome_back'[\s\S]*?resolution=ignore-duplicates,return=representation/.test(sync) || /resolution=ignore-duplicates,return=representation[\s\S]*?welcome_back/.test(sync));
-ok('welcome-back: emails ONLY when the notice is newly created', /freshNotice = ins\.ok && Array\.isArray\(ins\.json\) && ins\.json\.length > 0/.test(sync) && /if \(freshNotice && clQ\.json\?\.\[0\]\?\.email\) sendEmail/.test(sync));
+// welcome-back email rides the notice insert (send-once), not fired blindly.
+// The insert now flows through the ONE writer (raiseNotice), whose created
+// boolean comes from the idempotent representation-returning insert.
+ok('welcome-back: freshness detected via raiseNotice (idempotent insert, return=representation)', /freshNotice = await raiseNotice\(\{[\s\S]*?kind: 'welcome_back'/.test(sync) && /resolution=ignore-duplicates,return=representation/.test(notice) && /const created = ins\.ok && Array\.isArray\(ins\.json\) && ins\.json\.length > 0/.test(notice));
+ok('welcome-back: emails ONLY when the notice is newly created', /freshNotice = await raiseNotice\(/.test(sync) && /if \(freshNotice && clQ\.json\?\.\[0\]\?\.email\) sendEmail/.test(sync));
 ok('welcome-back: the old unconditional email send is gone', !/\n      if \(clQ\.json\?\.\[0\]\?\.email\) sendEmail\(clQ\.json\[0\]\.email, copy\.subject/.test(sync));
 
 // account_lapsed is bounded to the wind-down window (not monthly forever)

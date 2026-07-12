@@ -195,13 +195,17 @@ async function openSurvey(sid,pid){
   const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
   let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>${esc(sv.title||'Survey')}</h1></header><section>`;
   if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
+  let qi=0;
   for(const q of (sv.questions||[])){
-    const box=`style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"`;
+    // Each generated field gets a real id so its label's `for` associates it
+    // (q.key is server data — an index-based id is guaranteed attribute-safe).
+    const fid=`svq-${++qi}`;
+    const box=`id="${fid}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"`;
     let field;
     if(q.type==='rating') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select>`;
     else if(q.type==='choice') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose…</option>${(q.choices||[]).map(c=>`<option>${esc(c)}</option>`).join('')}</select>`;
     else field=`<input data-q="${esc(q.key)}" type="text" ${box}>`;
-    html+=`<div class="card"><label style="display:block;font-weight:600;margin-bottom:6px">${esc(q.label)}</label>${field}</div>`;
+    html+=`<div class="card"><label for="${fid}" style="display:block;font-weight:600;margin-bottom:6px">${esc(q.label)}</label>${field}</div>`;
   }
   html+=`<div class="row"><button class="approve" id="subSurvey">Send your answers</button></div></section>`;
   $('main').innerHTML=html;
@@ -209,7 +213,7 @@ async function openSurvey(sid,pid){
   $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
 }
 async function openSupport(pid){
-  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>Open a support request</h1></header><section><div class="card"><label style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
+  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>Open a support request</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
   $('main').innerHTML=html;
   $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
   $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid});if(r.ok){toast('Sent — your studio will get back to you.');openProject(pid);}else{toast('That didn’t send.');b.disabled=false;}});

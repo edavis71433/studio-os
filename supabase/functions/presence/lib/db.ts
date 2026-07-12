@@ -38,6 +38,24 @@ export async function svcCount(path: string): Promise<number | null> {
   } catch { return null; }
 }
 
+/** Fetch ALL rows of a query, paged — PostgREST's max-rows cap silently
+ *  truncates large unbounded selects (a NONDETERMINISTIC subset without an
+ *  order), which is a correctness cliff, not a perf issue. Deterministic order
+ *  required. Hard-bounded by maxPages; logs if the bound is hit so saturation
+ *  is never silent. */
+export async function svcAll(path: string, orderCol: string, pageSize = 1000, maxPages = 10): Promise<any[]> {
+  const out: any[] = [];
+  for (let p = 0; p < maxPages; p++) {
+    const sep = path.includes('?') ? '&' : '?';
+    const r = await svc(`${path}${sep}order=${orderCol}.asc&limit=${pageSize}&offset=${p * pageSize}`);
+    const rows = r.ok && Array.isArray(r.json) ? r.json : [];
+    out.push(...rows);
+    if (rows.length < pageSize) return out;
+  }
+  console.error(`[db] svcAll hit its ${maxPages * pageSize}-row bound for ${path.split('?')[0]} — results are TRUNCATED`);
+  return out;
+}
+
 export async function asUser(jwt: string, path: string, init: RequestInit = {}) {
   const r = await fetch(`${REST}/${path}`, {
     ...init,

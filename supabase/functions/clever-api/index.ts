@@ -658,7 +658,7 @@ const CLIENT_OPTS: { from: string; replyTo: string } = { from: CLIENT_FROM, repl
 // with the exact Resend status + body so they're visible in dev/prod logs.
 // Recipients are MASKED in logs (edge logs are operator-visible + provider-retained).
 function maskAddr(e: string): string { return String(e || '').replace(/^(.).*@/, '$1***@'); }
-async function sendEmail(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string }) {
+async function sendEmail(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string; critical?: boolean }) {
   if (!RESEND_KEY) {
     console.error('[email] skipped send to', maskAddr(to), '— RESEND_KEY not configured. Subject:', subject);
     return new Response(JSON.stringify({ error: 'resend_not_configured' }), { status: 500 });
@@ -667,9 +667,13 @@ async function sendEmail(to: string, subject: string, html: string, opts?: { fro
     // Domain-wide deliverability: honor the SAME suppression store + one-click
     // unsubscribe as the presence sender (_shared/email_infra — ONE module for
     // both functions). One sender ignoring bounces junks the whole domain.
-    const { isSuppressed, unsubscribeUrl, maskEmail } = await import('../_shared/email_infra.ts');
-    if (await isSuppressed(to)) {
-      console.warn('[email] suppressed — not sending to', maskEmail(to), '| subject:', subject);
+    // critical:true = transactional (login links, signed copies, payment links):
+    // survives an OPT-OUT — matching the unsubscribe page's promise — but never
+    // a bounce/complaint.
+    const { maySend, unsubscribeUrl, maskEmail } = await import('../_shared/email_infra.ts');
+    const gate = await maySend(to, { critical: !!(opts && opts.critical) });
+    if (!gate.ok) {
+      console.warn(`[email] suppressed (${gate.reason}) — not sending to`, maskEmail(to), '| subject:', subject);
       return new Response(JSON.stringify({ error: 'recipient_suppressed' }), { status: 200 });
     }
     // Plain-text alternative (spam-scoring + text-only clients), same strip as
@@ -4888,7 +4892,7 @@ serve(async (req) => {
       // Look the contact up with the service role so a linkage gap doesn't show
       // the client a blank portal. Logged so the missing auth_user_id link can
       // be fixed. Still scoped to THIS user's own contact only.
-      console.warn('client_project: RLS read returned no contact; using service fallback for', email || uid);
+      console.warn('client_project: RLS read returned no contact; using service fallback for', email ? maskAddr(email) : uid);
       const svc = { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` };
       try {
         if (uid) {

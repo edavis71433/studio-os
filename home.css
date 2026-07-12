@@ -302,7 +302,7 @@ body[data-page="home"] .final-cta .secondary-link:hover{ color:var(--paper); bor
 @media(max-width:600px){
   body[data-page="home"] .hero-card.reply-card{ padding:20px 18px 16px; }
   body[data-page="home"] .credibility{ padding:16px 0; }
-  body[data-page="home"] .credibility p{ font-size:11px; padding:0 12px; }
+  body[data-page="home"] .credibility p{ font-size:12.5px; padding:0 12px; }
   body[data-page="home"] .selective{ padding:clamp(64px,10vh,88px) 0; }
   body[data-page="home"] .quiet-line{ padding:clamp(80px,14vh,120px) 0; }
   body[data-page="home"] .quiet-line h2{ font-size:clamp(26px,7.5vw,32px); }

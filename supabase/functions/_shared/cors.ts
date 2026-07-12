@@ -19,7 +19,7 @@ export function corsFor(req: Request) {
   const allow = CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret',
     // PUT/PATCH/DELETE are not CORS-safelisted; the presence REST routes (M7)
     // need them listed or every browser preflight fails. Additive for the
     // POST-only monolith (extra names in this header grant nothing by themselves).
@@ -32,7 +32,7 @@ export function corsFor(req: Request) {
 // Uses the canonical origin; per-request CORS is applied at the response layer.
 export const cors = {
   'Access-Control-Allow-Origin': CORS_ORIGINS[0],
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Vary': 'Origin',
 };

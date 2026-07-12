@@ -5,6 +5,13 @@
 // logging failure must not cost a customer their account. Bump these when the
 // terms/privacy text materially changes.
 import { svc } from '../lib/db.ts';
+import { hmacHex } from '../../_shared/hmac.ts';
+
+// Same keyed hash as the signing path (R3) — one minimization posture everywhere.
+async function hmacHexIp(ip: string): Promise<string> {
+  const secret = Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || 'terms';
+  return await hmacHex(secret, ip);
+}
 
 export const TERMS_VERSION = Deno.env.get('TERMS_VERSION') || '2026-07-01';
 export const PRIVACY_VERSION = Deno.env.get('PRIVACY_VERSION') || '2026-07-01';
@@ -32,11 +39,13 @@ export async function recordAcceptance(ev: AcceptanceEvidence): Promise<boolean>
         client_id: ev.clientId, email: ev.email || '',
         terms_version: termsVersion, privacy_version: PRIVACY_VERSION,
         accepted_at: new Date().toISOString(),
-        ip: (ev.ip || '').slice(0, 100), user_agent: (ev.userAgent || '').slice(0, 400),
+        // MINIMIZATION: hashed IP, matching the signing path — a raw address
+        // has no extra evidentiary value over a keyed hash for consent records.
+        ip: ev.ip ? await hmacHexIp(String(ev.ip)) : '', user_agent: (ev.userAgent || '').slice(0, 400),
         method: ev.method || 'clickwrap_signup', context: ev.context || 'signup',
       }),
     });
-    if (!r.ok) console.error(`[terms] could not record acceptance for ${ev.email || ev.clientId} (non-fatal): ${r.status}`);
+    if (!r.ok) { const { maskEmail } = await import('../../_shared/email_infra.ts'); console.error(`[terms] could not record acceptance for ${ev.email ? maskEmail(ev.email) : ev.clientId} (non-fatal): ${r.status}`); }
     return r.ok;
   } catch (e) {
     console.error(`[terms] acceptance write threw (non-fatal): ${String((e as Error)?.message || e)}`);

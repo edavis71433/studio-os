@@ -1,3 +1,7 @@
+// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
+// imports; exercised only by its test). It documents a frozen-architecture contract
+// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
+// delete it (with an ADR note) when its phase arrives.
 // ── Guided onboarding — pure core (Phase I) ──────────────────────────────────
 // The first-run experience is an ORCHESTRATION over existing systems, not a new
 // one: a short intake → the existing `starter_site` writer (a draft PROPOSAL,

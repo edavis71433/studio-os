@@ -44,3 +44,60 @@
 /set-password.html
   Cache-Control: no-store, no-cache, must-revalidate
   X-Robots-Tag: noindex
+
+# Canonical extensionless page URLs (generated from sitemap.xml) — the /*.html
+# no-cache rule does not match these, so each gets the same policy explicitly.
+/
+  Cache-Control: no-cache, must-revalidate
+/services
+  Cache-Control: no-cache, must-revalidate
+/web-design
+  Cache-Control: no-cache, must-revalidate
+/seo-strategy
+  Cache-Control: no-cache, must-revalidate
+/monthly-retainer
+  Cache-Control: no-cache, must-revalidate
+/tools
+  Cache-Control: no-cache, must-revalidate
+/industries
+  Cache-Control: no-cache, must-revalidate
+/restaurant-web-design
+  Cache-Control: no-cache, must-revalidate
+/salon-web-design
+  Cache-Control: no-cache, must-revalidate
+/retail-web-design
+  Cache-Control: no-cache, must-revalidate
+/health-wellness-web-design
+  Cache-Control: no-cache, must-revalidate
+/home-services-web-design
+  Cache-Control: no-cache, must-revalidate
+/how-we-work
+  Cache-Control: no-cache, must-revalidate
+/the-experience
+  Cache-Control: no-cache, must-revalidate
+/work
+  Cache-Control: no-cache, must-revalidate
+/about
+  Cache-Control: no-cache, must-revalidate
+/contact
+  Cache-Control: no-cache, must-revalidate
+/audit
+  Cache-Control: no-cache, must-revalidate
+/ai-critique
+  Cache-Control: no-cache, must-revalidate
+/report-card
+  Cache-Control: no-cache, must-revalidate
+/roi-calculator
+  Cache-Control: no-cache, must-revalidate
+/pricing-estimator
+  Cache-Control: no-cache, must-revalidate
+/local-visibility
+  Cache-Control: no-cache, must-revalidate
+/privacy
+  Cache-Control: no-cache, must-revalidate
+/terms
+  Cache-Control: no-cache, must-revalidate
+/accessibility
+  Cache-Control: no-cache, must-revalidate
+/ai-disclaimer
+  Cache-Control: no-cache, must-revalidate

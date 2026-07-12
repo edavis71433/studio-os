@@ -42,6 +42,7 @@
   .thanks{text-align:center;padding:24px 0;}
   .thanks .big{font-size:52px;margin-bottom:12px;}
   .hint{font-size:12px;color:var(--muted);margin-top:6px;}
+  .form-err{display:none;background:#fbeeee;border:1.5px solid #dfb3b3;color:#8a3030;border-radius:11px;padding:10px 14px;font-size:13.5px;margin-bottom:16px;}
 
   /* ── Dark-mode variant (token-level) ─────────────────────────── */
   @media (prefers-color-scheme: dark){
@@ -52,6 +53,7 @@
     select option{background:#241d38;color:#EFEAF7;}
     .eyebrow,.req{color:#c4aee8;}
     a{color:#c4aee8;}
+    .form-err{background:#2f1d22;border-color:#6e3a44;color:#eeb8b8;}
   }
 </style>
 </head>
@@ -114,6 +116,7 @@
         <textarea id="anything" rows="3" placeholder="Competitors you admire, must-haves, deadlines, anything on your mind"></textarea>
       </div>
 
+      <div class="form-err" id="formErr" role="alert"></div>
       <button class="btn" onclick="submitIntake()">Send it over →</button>
     </div>
 
@@ -133,7 +136,18 @@
   async function submitIntake(){
     var name = document.getElementById("name").value.trim();
     var email = document.getElementById("email").value.trim();
-    if(!name || !email){ alert("Please add your name and email so I know who you are."); return; }
+    var errBox = document.getElementById("formErr");
+    errBox.style.display = "none";
+    document.getElementById("name").removeAttribute("aria-invalid");
+    document.getElementById("email").removeAttribute("aria-invalid");
+    if(!name || !email){
+      errBox.textContent = "Please add your name and email so I know who you are.";
+      errBox.style.display = "block";
+      var missing = !name ? document.getElementById("name") : document.getElementById("email");
+      missing.setAttribute("aria-invalid", "true");
+      missing.focus();
+      return;
+    }
 
     var payload = {
       name: name,

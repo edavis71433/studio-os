@@ -135,7 +135,7 @@ CI + a one-command test task · reconcile migration history · monitoring/alerti
 
 - [x] **Stripe production config — DONE (Jul 9 2026):** live `STRIPE_SECRET` (`rk_live_` restricted key) set in prod; production checkout verified (`cs_live_` URL); a routing bug (`public_audit_checkout` unregistered) found + fixed + deployed. See LAUNCH-BOARD B1.
 - [ ] Remaining Stripe (OWNER pre-launch, not engineering): webhook **test event** → 200 · **publish** buy-audit/audit/payment-success · one **test-mode subscription signup** · one **test-mode invoice payment**
-- [ ] **Apply migration `0073_publish_idempotency.sql`** to staging + prod (OWNER) — activates Presence CMS Phase 1 M4 **publish idempotency** (idempotency_key column + partial unique index). Cooldown is already live; idempotency implemented but awaiting this migration. Paste the SQL in the Supabase SQL editor, or `link` + `db push`.
+- [x] **Apply migration `0073_publish_idempotency.sql`** — applied Jul 9 2026.  ~~ to staging + prod (OWNER) — activates Presence CMS Phase 1 M4 **publish idempotency** (idempotency_key column + partial unique index). Cooldown is already live; idempotency implemented but awaiting this migration. Paste the SQL in the Supabase SQL editor, or `link` + `db push`.
 - [ ] Prices confirmed by owner; Stripe subscription events registered; nav links added; **commits pushed**
 - [ ] Portal surfaces Moments + Concierge; connect flow + callback page (if connected launches)
 - [ ] Cookie Policy, DPA + sub-processor list, in-product AI disclosure, connected-consent copy

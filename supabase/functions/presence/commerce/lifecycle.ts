@@ -17,6 +17,7 @@ import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNotice
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { raiseNotice } from '../lib/notice.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -91,7 +92,7 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
       headline: 'One small step gets you into Google’s reports',
       body: 'Your site is live and Google can find it. Add your free Search Console code (Business → Search & discovery) and you’ll see exactly how people find you. Two minutes, once.',
       subject: 'Your website is live — one small step gets you Google’s reports',
-      html: `<p>Your website for <strong>${name}</strong> is live and search engines can find it.</p><p>One optional step unlocks Google’s own reports about how people find you: add your free Search Console code in your workspace (Business → Search &amp; discovery). Two minutes, once — we handle everything else automatically.</p>`,
+      html: `<p>Your website for <strong>${name}</strong> is live and search engines can find it.</p><p>One optional step unlocks Google’s own reports about how people find you: add your free Search Console code in your workspace (Business → Search &amp; discovery). Two minutes, once — we take care of the rest.</p>`,
     };
     case 'winddown_reminder': return {
       headline: 'Two weeks left before your site comes down',
@@ -179,7 +180,14 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
       if (lapsedDays >= WIND_DOWN_DAYS) {
         const hosted = await svc(`presence_sites?client_id=eq.${encodeURIComponent(e.client_id)}&status=in.(live,paused,ready)&select=id,netlify_site_id&limit=5`);
         for (const site of (Array.isArray(hosted.json) ? hosted.json : [])) {
-          if (site.netlify_site_id) await deleteSite(site.netlify_site_id).catch(() => {});
+          // deleteSite returns {ok:false} rather than throwing — CHECK it. Erasing
+          // netlify_site_id after a failed takedown would leave a lapsed customer's
+          // site live on Netlify forever, unfindable and unreported. On failure the
+          // row keeps its pointer and retries next sweep (and pages via sweepIssues).
+          if (site.netlify_site_id) {
+            const del = await deleteSite(site.netlify_site_id).catch(() => ({ ok: false }));
+            if (!(del as { ok?: boolean }).ok) { console.error(`[lifecycle] wind-down takedown FAILED for site ${site.id} — keeping netlify_site_id for retry`); continue; }
+          }
           const up = await svc(`presence_sites?id=eq.${encodeURIComponent(site.id)}`, {
             method: 'PATCH', body: JSON.stringify({ status: 'archived', netlify_site_id: null, custom_domain: null }),
           });
@@ -194,25 +202,21 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
       const vQ = sQ.json?.[0]?.id ? await svc(`presence_settings?site_id=eq.${sQ.json[0].id}&select=google_site_verification&limit=1`) : { json: [] as any[] };
       if (sQ.json?.[0]?.last_published_at && !String(vQ.json?.[0]?.google_site_verification || '').trim()) {
         const copy = lifecycleCopy('search_setup', bizName);
-        const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-          method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-          body: JSON.stringify({ site_id: sQ.json[0].id, client_id: e.client_id, kind: 'search_setup', period: 'once', headline: copy.headline, body: copy.body, status: 'active' }),
-        });
-        if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) { notices++; if (email && (await sendEmail(email, copy.subject, copy.html))) emails++; }
+        const fresh = await raiseNotice({ siteId: sQ.json[0].id, clientId: e.client_id, kind: 'search_setup', period: 'once', headline: copy.headline, body: copy.body });
+        if (fresh) { notices++; if (email && (await sendEmail(email, copy.subject, copy.html))) emails++; }
       }
     }
     for (const kind of events) {
       const copy = lifecycleCopy(kind, bizName);
-      // send-once: the unique(client,kind,period) key decides — a returned row = newly inserted
+      // send-once: raiseNotice's unique(client,kind,period) key decides — created=true = newly inserted
       const dedupe = kind === 'win_back' ? 'once' : periodOf(nowIso);
-      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ site_id: siteId, client_id: e.client_id, kind, period: dedupe, headline: copy.headline, body: copy.body, status: 'active' }),
-      });
-      const fresh = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
+      const fresh = await raiseNotice({ siteId, clientId: e.client_id, kind, period: dedupe, headline: copy.headline, body: copy.body });
       if (fresh) {
         notices++;
-        if (email && (await sendEmail(email, copy.subject, copy.html))) emails++;
+        // payment_trouble + winddown_reminder are TRANSACTIONAL (payment failure /
+        // "your site comes down") — they must survive a marketing opt-out.
+        const critical = kind === 'payment_trouble' || kind === 'winddown_reminder' ? { critical: true } : undefined;
+        if (email && (await sendEmail(email, copy.subject, copy.html, undefined, critical))) emails++;
       }
     }
   }
@@ -305,14 +309,10 @@ export async function runDomainWatch(limit = 10): Promise<{ checked: number; war
     if (days !== null && days <= 30) {
       const soon = days <= 7;
       const when = days <= 0 ? 'has expired' : `expires in ${days} day${days === 1 ? '' : 's'}`;
-      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ site_id: site.id, client_id: site.client_id, kind: 'domain_expiry', period: periodOf(nowIso),
-          headline: `Your domain ${when}`,
-          body: `${site.custom_domain} ${when}${info?.registrar ? ` at ${info.registrar}` : ''}. Renew it at your registrar (auto-renew is the calm option) — if it lapses, your website and email stop answering. Nothing else is needed on our side.`,
-          status: 'active' }),
-      });
-      if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+      const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'domain_expiry', period: periodOf(nowIso),
+        headline: `Your domain ${when}`,
+        body: `${site.custom_domain} ${when}${info?.registrar ? ` at ${info.registrar}` : ''}. Renew it at your registrar (auto-renew is the calm option) — if it lapses, your website and email stop answering. Nothing else is needed on our side.` });
+      if (fresh) {
         warned++;
         const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`);
         if (cl.json?.[0]?.email) {
@@ -351,11 +351,8 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
     if (!clientId) continue;
     const who = lead.name || lead.email || 'Someone';
     const copy = leadFollowupCopy(lead.form_kind, who);
-    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ site_id: lead.site_id, client_id: clientId, kind: 'lead_followup', period: `lead:${lead.id}`, headline: copy.headline, body: copy.body, status: 'active' }),
-    });
-    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+    const fresh = await raiseNotice({ siteId: lead.site_id, clientId, kind: 'lead_followup', period: `lead:${lead.id}`, headline: copy.headline, body: copy.body });
+    if (fresh) {
       nudged++;
       const ident = await svc(`presence_identity?site_id=eq.${lead.site_id}&select=email&limit=1`);
       const owner = ident.json?.[0]?.email;
@@ -385,11 +382,8 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
     const body = deal.stage === 'proposal' ? 'A proposal has been out for a few days with no reply — a quick nudge often closes it.'
       : deal.stage === 'contract' ? 'The agreement is sent but not signed yet — a gentle reminder helps it over the line.'
       : 'This deal has gone quiet for a few days — a quick follow-up keeps it moving.';
-    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ site_id: deal.site_id, client_id: clientId, kind: 'deal_followup', period: `deal:${deal.id}`, headline: `Follow up on ${title}`, body, status: 'active' }),
-    });
-    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+    const fresh = await raiseNotice({ siteId: deal.site_id, clientId, kind: 'deal_followup', period: `deal:${deal.id}`, headline: `Follow up on ${title}`, body });
+    if (fresh) {
       nudged++;
       // Parity with lead follow-ups: a quiet $5k proposal deserves at least the
       // email a fresh $0 lead gets. Send-once (gated on the notice insert above).
@@ -448,11 +442,8 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
     const noticeBody = email
       ? 'We nudged the client once with the same secure link. If it stays quiet, a personal note usually lands best.'
       : 'There’s no client email on this deal, so no automatic nudge went out — a personal note (or adding their email to the contact) is the way forward.';
-    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ site_id: inv.site_id, client_id: clientId, kind: 'deal_followup', period: `invremind:${inv.id}`, headline: `Still unpaid — ${inv.title || what} (${amount})`, body: noticeBody, status: 'active' }),
-    });
-    if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;   // already reminded once — never nag
+    const fresh = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: `invremind:${inv.id}`, headline: `Still unpaid — ${inv.title || what} (${amount})`, body: noticeBody });
+    if (!fresh) continue;   // already reminded once — never nag
     reminded++;
     if (email) {
       try {
@@ -487,11 +478,8 @@ export async function runRenewalReminders(limit = 50): Promise<{ reminded: numbe
     const published = Array.isArray(pubQ.json) ? pubQ.json.length : 0;
     const planName = EDITION_DEFS[editionFromPlan(e.plan)]?.name || 'your';
     const copy = renewalReminderCopy(planName, e.current_period_end, win, published);
-    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ site_id: siteId, client_id: e.client_id, kind: 'renewal_reminder', period: renewalNoticePeriod(e.current_period_end, win), headline: copy.headline, body: copy.body, status: 'active' }),
-    });
-    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+    const fresh = await raiseNotice({ siteId, clientId: e.client_id, kind: 'renewal_reminder', period: renewalNoticePeriod(e.current_period_end, win), headline: copy.headline, body: copy.body });
+    if (fresh) {
       reminded++;
       const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=email&limit=1`);
       const owner = ident.json?.[0]?.email;
@@ -532,11 +520,8 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
       const noticeBody = email
         ? `The ${what} has been out a few days, so we sent the client one gentle reminder with a fresh link. If it stays quiet, a personal note lands best.`
         : `The ${what} has been out a few days, but there's no client email on the deal — add one to the contact, or reach out personally.`;
-      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ site_id: doc.site_id, client_id: clientId, kind: 'deal_followup', period: `remind:${doc.id}`, headline: `${email ? 'Reminder sent' : 'Still waiting'} — ${doc.title || `the ${what}`}`, body: noticeBody, status: 'active' }),
-      });
-      if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;
+      const fresh = await raiseNotice({ siteId: doc.site_id, clientId, kind: 'deal_followup', period: `remind:${doc.id}`, headline: `${email ? 'Reminder sent' : 'Still waiting'} — ${doc.title || `the ${what}`}`, body: noticeBody });
+      if (!fresh) continue;
       if (!email) continue;
       try {
         const token = await signSalesToken({ t: kind, id: doc.id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);

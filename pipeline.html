@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pipeline — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Your sales pipeline — from first inquiry through onboarding.">
+<meta name="description" content="Your sales pipeline — from first enquiry through onboarding.">
 <!-- P2-C: Studio App sales pipeline on the ONE shared shell + shared state helpers. -->
 <link rel="stylesheet" href="/shell.css">
 <style>
@@ -61,7 +61,7 @@
 <body>
 <div class="wrap">
   <h1>Pipeline</h1>
-  <div class="sub">From first inquiry through onboarding — one deal at a time.</div>
+  <div class="sub">From first enquiry through onboarding — one deal at a time.</div>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by stage"></div>
   <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span></div>
   <div id="list" aria-live="polite"></div>
@@ -113,6 +113,8 @@ const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:
 let TOKEN="",FILTER="",DEALS=[];
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+// Server errors that read like a sentence still show; raw technical junk doesn't.
+const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -132,7 +134,7 @@ async function load(){
   try{
     const res=await api('/sales/deals'+(FILTER?('?stage='+FILTER):''));
     DEALS=res.data||[];
-    if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New inquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
+    if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New enquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
     // Deals with a DUE next step float to the top (overdue first) — the pipeline
     // answers "what do I do today", not just "what exists".
     const today=new Date().toISOString().slice(0,10);
@@ -142,7 +144,7 @@ async function load(){
       return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}</div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`;
     }).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
-  }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
+  }catch(e){ if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
 }
 
 // ── new deal: an accessible in-dialog form (no prompt) ──
@@ -162,7 +164,7 @@ $('dealForm').onsubmit=async(e)=>{
     const created=await api('/sales/deals','POST',{title,contact_id:contactId});
     $('formDlg').close(); toast('Deal added'); load();
     if(created&&created.data&&created.data.id) openDeal(created.data.id);   // straight into the deal — no hunting the list
-  }catch(err){ toast(err.message,true); } finally{ if(btn)btn.disabled=false; }
+  }catch(err){ toast(nice(err),true); } finally{ if(btn)btn.disabled=false; }
 };
 
 // ── an inline mini-form helper (replaces prompt) ──
@@ -186,7 +188,7 @@ function miniForm(host, fields, onSubmit){
   row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
   cancel.onclick=()=>host.innerHTML='';
   if(window.ddsDraftRestore)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));
-  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{await onSubmit(Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()])));if(window.ddsDraftClear)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));}catch(err){toast(err.message,true);save.disabled=false;}};
+  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{await onSubmit(Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()])));if(window.ddsDraftClear)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));}catch(err){toast(nice(err),true);save.disabled=false;}};
   setTimeout(()=>{const first=f.querySelector('input,textarea'); if(first)first.focus();},20);
 }
 
@@ -247,16 +249,16 @@ async function openDeal(id){
     // ONE cleanup for every way the dialog closes (✕, Esc, form-close) — else a
     // refresh after Esc unexpectedly reopens the deal from the stale ?deal= URL.
     if(!dlg.dataset.wiredClose){dlg.dataset.wiredClose='1';dlg.addEventListener('close',()=>history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():'')));}
-    $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(nice(e),true);}});
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(e.message,true);eds.disabled=false;}};
-    $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);}});
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});
       // The sign→pay moment only works if a deposit is WAITING when they sign —
       // nudge the operator the moment the agreement goes out without one.
       const hasOpenDeposit=(data.invoices||[]).some(v=>v.purpose==='deposit'&&v.status==='open');
       toast('Agreement sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':''))+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.'));
-      if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
+      if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);}});
     // Multi-line proposal form — real projects have design + build + care, not one line.
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{
       const host=$('propForm');
@@ -269,14 +271,14 @@ async function openDeal(id){
       $('plSave').onclick=async()=>{
         const items=[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
         if(!items.length){toast('Add at least one line item.',true);return;}
-        try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));toast('Proposal drafted');openDeal(id);}catch(e){toast(e.message,true);}
+        try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));toast('Proposal drafted');openDeal(id);}catch(e){toast(nice(e),true);}
       };
       host.querySelector('.pl-label').focus();
     };
     const addCon=$('addCon'); if(addCon) addCon.onclick=()=>miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…',draft:'con-'+id}],async(v)=>{if(!v.body){toast('Add the agreement text.',true);return;}await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});toast('Agreement drafted');openDeal(id);});
     // saved templates: one-tap draft-from-template + save-as-template
-    $('detailInner').querySelectorAll('[data-use-ptpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/proposals','POST',{template_id:b.dataset.usePtpl});toast('Proposal drafted from your template');openDeal(id);}catch(e){toast(e.message,true);b.disabled=false;}});
-    $('detailInner').querySelectorAll('[data-use-ctpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/contracts','POST',{template_id:b.dataset.useCtpl});toast('Agreement drafted from your template');openDeal(id);}catch(e){toast(e.message,true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-use-ptpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/proposals','POST',{template_id:b.dataset.usePtpl});toast('Proposal drafted from your template');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-use-ctpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/contracts','POST',{template_id:b.dataset.useCtpl});toast('Agreement drafted from your template');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-tpl-prop]').forEach(b=>b.onclick=()=>miniForm($('propForm'),[{name:'name',label:'Template name',placeholder:'e.g. Standard website package'}],async(v)=>{if(!v.name){toast('Give the template a name.',true);return;}await api('/sales/templates','POST',{kind:'proposal',name:v.name,from_proposal_id:b.dataset.tplProp});toast('Saved — it’ll appear on every deal.');openDeal(id);}));
     $('detailInner').querySelectorAll('[data-tpl-con]').forEach(b=>b.onclick=()=>miniForm($('conForm'),[{name:'name',label:'Template name',placeholder:'e.g. Standard service agreement'}],async(v)=>{if(!v.name){toast('Give the template a name.',true);return;}await api('/sales/templates','POST',{kind:'contract',name:v.name,from_contract_id:b.dataset.tplCon});toast('Saved — it’ll appear on every deal.');openDeal(id);}));
     // ONE sender for both kinds; understands the server's honesty guard: if an
@@ -303,7 +305,7 @@ async function openDeal(id){
           arm('forceNew',()=>sendMoney({...body,force:true}));
           return;
         }
-        toast(e.message,true);
+        toast(nice(e),true);
       }
     }
     const sendInv=$('sendInvoice'); if(sendInv) sendInv.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Amount (USD) — leave blank to use the accepted proposal',type:'number',step:'0.01',placeholder:'2500'}],async(v)=>{const body={purpose:'service'};if(v.amount)body.amount_cents=Math.round(parseFloat(v.amount)*100);await sendMoney(body);});
@@ -317,12 +319,12 @@ async function openDeal(id){
       // two-step confirm (no confirm() dialog) + choose their edition
       const wrap=$('convWrap'); wrap.innerHTML=`<div class="mut" style="margin-bottom:8px">This creates the customer’s account + workspace and invites them to sign in.</div>
         <label for="convPlan">Their plan</label>
-        <select id="convPlan"><option value="presence">Presence — full website</option><option value="business_os_only">Business OS</option><option value="cms_only">CMS only</option><option value="presence_monitor">Monitor — observe only</option></select>
+        <select id="convPlan"><option value="presence">Presence — full website</option><option value="business_os_only">Business OS</option><option value="cms_only">Website only</option><option value="presence_monitor">Monitor — observe only</option></select>
         <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, convert</button></div>`;
       $('convNo').onclick=()=>openDeal(id);
-      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(e.message,true);$('convYes').disabled=false;}};
+      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
     };
-  }catch(e){ $('detailInner').innerHTML='<div class="dbody mut">'+esc(e.message)+'</div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="dbody mut">'+esc(nice(e))+'</div>'; }
 }
 
 (async function(){

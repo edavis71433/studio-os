@@ -302,7 +302,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : 'Your studio has prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.';
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand);
+    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
   } catch { return false; }
 }
 
@@ -318,7 +318,7 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     // Operator-typed title → escape it (it lands inside HTML) and mind the article.
     const safeTitle = title.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
     const article = /^[aeiou]/i.test(title) ? 'an' : 'a';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand);
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a payment link = transactional
   } catch { return false; }
 }
 
@@ -563,7 +563,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed by: <strong>${escHtml(signerName)}</strong><br>` +
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>`,
-        brand).catch(() => false);
+        brand, { critical: true }).catch(() => false);   // their signed legal record = transactional
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -719,11 +719,11 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
       invited = !!link;
       sendEmail(email, 'Welcome to Studio OS — set up your login',
         `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
-      ).catch(() => {});
+      undefined, { critical: true }).catch(() => {});   // login access = transactional
     } else {
       sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
         `<p>Welcome! Your workspace is set up and ready.</p><p>Sign in at <a href="${siteUrl()}/portal.html">your portal</a>, then open <a href="${siteUrl()}/get-started.html">your guided setup</a>.</p>`,
-      ).catch(() => {});
+      undefined, { critical: true }).catch(() => {});   // login access = transactional
     }
   }
 

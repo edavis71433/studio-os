@@ -2,7 +2,7 @@
 
 **Start here.** This is the single entry point to every Studio OS Presence document. If you are inheriting this system, read this page, then the [V1 System Reference](V1-SYSTEM-REFERENCE.md), then the [Constitution](constitution/). That is enough to understand, run, and extend the platform.
 
-> **Status:** Version 1 is **feature-frozen** and **QA-passed** (see [QA-RELEASE-VERIFICATION](QA-RELEASE-VERIFICATION.md)). The codebase is deployed to staging + prod; the customer-facing static pages are committed but **not pushed** (an intentional go-live gate — see [Owner Activation](RELEASE-NOTES.md#owner-activation-checklist)).
+> **Status:** Version 1 is **LIVE** — launched Jul 11 2026 (fence lifted, 344 commits pushed; see [QA-RELEASE-VERIFICATION](QA-RELEASE-VERIFICATION.md) for the pre-launch QA record). Post-launch audit-campaign commits await the next push — see STUDIO-OS-ROADMAP "Do Now".
 
 ---
 

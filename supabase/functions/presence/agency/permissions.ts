@@ -1,3 +1,7 @@
+// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
+// imports; exercised only by its test). It documents a frozen-architecture contract
+// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
+// delete it (with an ADR note) when its phase arrives.
 // ── Agency permissions (L5.7) — COMPOSITION over the existing capability table ─
 // The agency doesn't get a second permission system. This composes the existing
 // role→capability table (auth.ts `can`) with a SCOPE (which orgs/locations a

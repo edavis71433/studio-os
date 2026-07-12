@@ -722,6 +722,11 @@ function toast(msg, bad) {
   $("toasts").appendChild(t);
   setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
 }
+// Server errors that read like a sentence still show; raw technical junk doesn't.
+function nice(e) {
+  const m = e && e.message ? String(e.message) : "";
+  return /^[A-Z]/.test(m) && m.length < 160 && !/[{}<>]|_|\bsql\b|\bpostgres/i.test(m) ? m : "Something went wrong on our side — please try again.";
+}
 
 /* ── API: identical calls to M7 ── */
 async function api(method, route, body) {
@@ -890,7 +895,7 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
         await api("PUT", sing === "identity" ? "/identity" : "/location", { [field]: inp.value });
         whisper(wid, "saved"); whisper("topWhisper", "saved");
         scheduleChangesRefresh();
-      } catch (err) { whisper(wid, ""); toast(err.message, true); }
+      } catch (err) { whisper(wid, ""); toast(nice(err), true); }
     }, 700);
   });
 });
@@ -920,7 +925,7 @@ function renderHours() {
       whisper("save-hours", "saving"); whisper("topWhisper", "saving");
       debounce("hours", async () => {
         try { await api("PUT", "/location", { hours: S.location.hours }); whisper("save-hours", "saved"); whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
-        catch (err) { whisper("save-hours", ""); toast(err.message, true); }
+        catch (err) { whisper("save-hours", ""); toast(nice(err), true); }
       }, 600);
     };
     cb.addEventListener("change", () => { open.disabled = close.disabled = cb.checked; save(); });
@@ -938,7 +943,7 @@ function renderHours() {
         : { day: d.day, closed: false, intervals: [{ open: "09:00", close: "17:00" }] });
       S.location = { ...(S.location || {}), hours };
       try { await api("PUT", "/location", { hours }); renderHours(); toast("Typical hours set — adjust any day"); scheduleChangesRefresh(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     grid.appendChild(quick);
   }
@@ -951,12 +956,12 @@ $("closedSwitch").addEventListener("change", async () => {
   S.location = { ...(S.location || {}), temporarily_closed: now };
   $("f-closednote").hidden = !now;
   try { await api("PUT", "/location", { temporarily_closed: now }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
-  catch (err) { toast(err.message, true); }
+  catch (err) { toast(nice(err), true); }
 });
 $("f-closednote").addEventListener("input", () => {
   debounce("closednote", async () => {
     try { await api("PUT", "/location", { temporarily_closed_note: $("f-closednote").value }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   }, 700);
 });
 
@@ -1043,21 +1048,21 @@ function dishEditor(o) {
     </div>`;
   ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
     try { const r = await api("PATCH", `/offerings/${o.id}`, { media_id: mediaId }); Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   }));
   ed.querySelector('[data-act="vis"]').addEventListener("click", async () => {
     try { const r = await api("PATCH", `/offerings/${o.id}`, { is_visible: o.is_visible === false });
       Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
     const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
     try { const r = await api("PATCH", `/offerings/${o.id}`, body); Object.assign(o, r.data); renderOfferings(); toast("Saved"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   armDelete(ed.querySelector('[data-act="del"]'), async () => {
     try { await api("DELETE", `/offerings/${o.id}`); S.offerings = S.offerings.filter((x) => x.id !== o.id); renderOfferings(); toast("Removed"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   return ed;
 }
@@ -1079,7 +1084,7 @@ function addDishLine(afterNode, cat) {
     if (!name || !category) { toast("A dish needs a name and a section.", true); return; }
     try { const r = await api("POST", "/offerings", { name, category, price_text: price });
       S.offerings.push(r.data); renderOfferings(); toast("On the draft menu"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   afterNode.parentNode ? afterNode.parentNode.insertBefore(ed, afterNode.nextSibling) : afterNode.appendChild(ed);
   ed.querySelector("input").focus();
@@ -1092,7 +1097,7 @@ async function moveCategory(cat, dir) {
   S.settings = { ...(S.settings || {}), category_order: cats };
   renderOfferings();
   try { await api("PUT", "/settings", { category_order: cats }); scheduleChangesRefresh(); }
-  catch (err) { toast(err.message, true); }
+  catch (err) { toast(nice(err), true); }
 }
 
 /* two-tap destructive confirm, in words */
@@ -1121,7 +1126,7 @@ function stateWord(entity, collection, rerender, onWord, offWord) {
   b.addEventListener("click", async (e) => {
     e.stopPropagation();
     try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: true }); Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   return b;
 }
@@ -1146,17 +1151,17 @@ function simpleEditor(entity, collection, fields, rerender, words) {
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
     const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
     try { const r = await api("PATCH", `/${collection}/${entity.id}`, body); Object.assign(entity, r.data); rerender(); toast("Saved"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   ed.querySelector('[data-act="vis"]').addEventListener("click", async () => {
     try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: entity.is_visible === false });
       Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   armDelete(ed.querySelector('[data-act="del"]'), async () => {
     try { await api("DELETE", `/${collection}/${entity.id}`);
       S[collection] = S[collection].filter((x) => x.id !== entity.id); rerender(); toast("Removed"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   return ed;
 }
@@ -1239,7 +1244,7 @@ function renderPosts() {
       e.stopPropagation();
       try { const r = await api("PATCH", `/posts/${p.id}`, { status: shown ? "draft" : "published" });
         Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(tog);
     const edit = el("button", "quietact", "edit");
@@ -1264,7 +1269,7 @@ function postEditor(p) {
     </div>`;
   ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
     try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   }));
   if (p.status === "published") {
     const improve = el("button", "quietact", "✦ improve with help");
@@ -1275,11 +1280,11 @@ function postEditor(p) {
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
     const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
     try { const r = await api("PATCH", `/posts/${p.id}`, body); Object.assign(p, r.data); renderPosts(); toast("Saved"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   armDelete(ed.querySelector('[data-act="del"]'), async () => {
     try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); renderPosts(); toast("Removed"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   return ed;
 }
@@ -1344,7 +1349,7 @@ $("deskGo").addEventListener("click", async () => {
   } catch (err) {
     $("deskResults").innerHTML = "";
     btn.disabled = false; btn.textContent = "Try again";
-    toast(err.message, true);
+    toast(nice(err), true);
   }
 });
 function payloadPreview(p) {
@@ -1390,7 +1395,7 @@ function renderDeskOptions(draft) {
         toast(r.data.note);
         await refreshAll();                     // everything the acceptance touched, reloaded
         if (DESK.view) go(DESK.view);
-      } catch (err) { keep.disabled = false; keep.textContent = "Keep this one"; toast(err.message, true); }
+      } catch (err) { keep.disabled = false; keep.textContent = "Keep this one"; toast(nice(err), true); }
     });
     acts.appendChild(keep);
     wrap.appendChild(card);
@@ -1462,7 +1467,7 @@ async function openCombinedReviewDesk() {
     }
   } catch (err) {
     $("deskResults").innerHTML = "";
-    toast(err.message, true);
+    toast(nice(err), true);
   }
 }
 function renderFindingsInto(wrap, report, reportBase, heading) {
@@ -1496,7 +1501,7 @@ function renderFindingsInto(wrap, report, reportBase, heading) {
     const dis = el("button", "quietact", "Dismiss");
     dis.addEventListener("click", async () => {
       try { await api("POST", `${reportBase}/${report.id}/dismiss`, { finding_id: f.review_id }); card.remove(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(dis);
     card.appendChild(acts);
@@ -1520,7 +1525,7 @@ async function openCoachDesk() {
     renderCoachOpps(r.data || []);
   } catch (err) {
     $("deskResults").innerHTML = "";
-    toast(err.message, true);
+    toast(nice(err), true);
   }
 }
 function renderCoachOpps(opps) {
@@ -1560,19 +1565,19 @@ function renderCoachOpps(opps) {
         } else {
           card.remove(); toast("Yours to run with — the first step is written above.");
         }
-      } catch (err) { toast(err.message, true); }
+      } catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(start);
     const later = el("button", "quietact", "Later");
     later.addEventListener("click", async () => {
       try { await api("POST", `/coach/opportunities/${o.id}/decide`, { decision: "defer" }); card.remove(); toast("Set aside — it’ll come back around."); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(later);
     const dis = el("button", "quietact", "Not for us");
     dis.addEventListener("click", async () => {
       try { await api("POST", `/coach/opportunities/${o.id}/decide`, { decision: "dismiss" }); card.remove(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(dis);
     card.appendChild(acts);
@@ -1585,7 +1590,7 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
   async (b, done) => {
     if (!b.question || !b.answer) { toast("Both the question and your answer are needed.", true); return; }
     try { const r = await api("POST", "/faqs", b); S.faqs.push(r.data); done(); renderFaqs(); toast("Answered"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   }, "Keep this answer"));
 // ── M12: Platform Services — the technical side, in plain words ──
 async function openFoundationsDesk() {
@@ -1602,7 +1607,7 @@ async function openFoundationsDesk() {
     renderFoundations(f.data, plans.data || [], launch.data, dom && dom.data);
   } catch (err) {
     $("deskResults").innerHTML = "";
-    toast(err.message, true);
+    toast(nice(err), true);
   }
 }
 function renderFoundations(f, plans, launch, dom) {
@@ -1636,7 +1641,7 @@ function renderFoundations(f, plans, launch, dom) {
   domCard.appendChild(el("div", "dol", "your domain"));
   const dstat = (dom && dom.custom_domain) ? dom : null;
   const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
-  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!confirm("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.")) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(err.message, true); } }); return rm; };
+  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!confirm("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.")) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
 
   if (dstat && dstat.health === "ok") {
     const p = el("p", "aihint", "✓ " + dstat.custom_domain + " is live and secure."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
@@ -1683,7 +1688,7 @@ function renderFoundations(f, plans, launch, dom) {
       if (!domain) { toast("Type your domain first (e.g. yourbusiness.com).", true); return; }
       connectBtn.disabled = true;
       try { await api("POST", "/foundations/domain", { domain }); toast("Connected — here are your two records."); openFoundationsDesk(); }
-      catch (err) { toast(err.message, true); connectBtn.disabled = false; }
+      catch (err) { toast(nice(err), true); connectBtn.disabled = false; }
     });
     row.appendChild(inp); row.appendChild(connectBtn); havePanel.appendChild(row); domCard.appendChild(havePanel);
 
@@ -1721,7 +1726,7 @@ function renderFoundations(f, plans, launch, dom) {
     const b = el("button", "textact", "Set up email protection");
     b.addEventListener("click", async () => {
       try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Set up — the records to add are below."); openFoundationsDesk(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(b);
     emailCard.appendChild(acts);
@@ -1748,7 +1753,7 @@ function renderFoundations(f, plans, launch, dom) {
         a.click();
         URL.revokeObjectURL(a.href);
         toast("Exported. It's all in there — and it's all yours.");
-      } catch (err) { toast(err.message, true); }
+      } catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(b);
     card.appendChild(acts);
@@ -1784,13 +1789,13 @@ function renderFoundations(f, plans, launch, dom) {
         const ap = el("button", "textact", "Approve it");
         ap.addEventListener("click", async () => {
           try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "approve" }); toast("Approved — your studio takes it from here."); openFoundationsDesk(); }
-          catch (err) { toast(err.message, true); }
+          catch (err) { toast(nice(err), true); }
         });
         acts.appendChild(ap);
         const ab = el("button", "quietact", "Not now");
         ab.addEventListener("click", async () => {
           try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "abandon" }); card.remove(); }
-          catch (err) { toast(err.message, true); }
+          catch (err) { toast(nice(err), true); }
         });
         acts.appendChild(ab);
         card.appendChild(acts);
@@ -1829,14 +1834,14 @@ async function renderMonitorCard() {
           const res = await api("POST", "/monitor/verify");
           toast(res.data.verified ? "Verified — observation begins." : res.data.note, !res.data.verified);
           renderMonitorCard();
-        } catch (err) { toast(err.message, true); }
+        } catch (err) { toast(nice(err), true); }
       });
       acts.appendChild(v);
     }
     const d = el("button", "quietact", "Disconnect");
     d.addEventListener("click", async () => {
       try { await api("DELETE", "/monitor/connection"); toast("Disconnected."); renderMonitorCard(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     });
     acts.appendChild(d);
     card.appendChild(acts);
@@ -1851,7 +1856,7 @@ $("btnMonitorConnect").addEventListener("click", () => inlineAdd("monitorAddWrap
       await api("POST", "/monitor/connect", { url: b.url, method: "meta" });
       done(); renderMonitorCard();
       toast("Connected — one small step proves it’s yours.");
-    } catch (err) { toast(err.message, true); }
+    } catch (err) { toast(nice(err), true); }
   }, "Connect it"));
 
 // ── M10: Business Knowledge Import — papers in, quiet awareness out ──
@@ -1867,7 +1872,7 @@ async function renderKnowledgeDocs() {
       const del = el("button", "quietact", "Remove");
       del.addEventListener("click", async () => {
         try { await api("DELETE", `/knowledge/docs/${d.id}`); row.remove(); toast("Removed"); }
-        catch (err) { toast(err.message, true); }
+        catch (err) { toast(nice(err), true); }
       });
       acts.appendChild(del);
       row.appendChild(acts);
@@ -1883,7 +1888,7 @@ $("btnAddKnowledge").addEventListener("click", () => inlineAdd("knowledgeAddWrap
       const r = await api("POST", "/knowledge/import", b);
       done(); renderKnowledgeDocs();
       toast(r.data.items ? `Kept — ${r.data.items} item${r.data.items > 1 ? "s" : ""} noticed.` : "Kept.");
-    } catch (err) { toast(err.message, true); }
+    } catch (err) { toast(nice(err), true); }
   }, "Keep this document"));
 
 $("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
@@ -1891,20 +1896,20 @@ $("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
   async (b, done) => {
     if (!b.quote || !b.author) { toast("The words and who said them are needed.", true); return; }
     try { const r = await api("POST", "/testimonials", b); S.testimonials.push(r.data); done(); renderTes(); toast("Kept"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   }, "Keep this kind word"));
 $("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
   [["title","Title","text",160,"Summer patio is open"],["body_md","The update","textarea",20000,""]],
   async (b, done) => {
     if (!b.title) { toast("An update needs a title.", true); return; }
     try { const r = await api("POST", "/posts", { ...b, status: "draft" }); S.posts.unshift(r.data); done(); renderPosts(); toast("Saved as a draft — show it when it’s ready"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   }, "Save as a draft"));
 
 /* ── photographs (identical media API) ── */
 async function loadMedia() {
   try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); loadAssetHealth(); }
-  catch (err) { toast(err.message, true); }
+  catch (err) { toast(nice(err), true); }
 }
 // Phase DAM: the library's plain-English health — reuses /assets/health (DAM-13).
 async function loadAssetHealth() {
@@ -1954,7 +1959,7 @@ function renderMediaGrid(grid, manage, onPick) {
             renderMediaGrid(grid, true);
             toast(on ? offLabel + " cleared" : onLabel + " set — publish to apply");
             scheduleChangesRefresh();
-          } catch (err) { toast(err.message, true); }
+          } catch (err) { toast(nice(err), true); }
         });
         return b;
       };
@@ -1979,7 +1984,7 @@ function renderMediaGrid(grid, manage, onPick) {
             await api("PUT", `/media/${m.id}`, { alt_text: val });
             m.alt_text = val; renderMediaGrid(grid, true);
             toast("Description updated — publish to apply");
-          } catch (err) { toast(err.message, true); inp.remove(); }
+          } catch (err) { toast(nice(err), true); inp.remove(); }
         };
         inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
         inp.addEventListener("blur", commit);
@@ -2002,7 +2007,7 @@ function renderMediaGrid(grid, manage, onPick) {
           dot.style.cssText = "width:28px;height:22px;border-radius:5px;cursor:pointer;border:1px solid var(--line,#ccc);background:" + (cur ? "#5b3fa0" : "rgba(0,0,0,.06)");
           dot.addEventListener("click", async () => {
             try { await api("PUT", `/media/${m.id}`, { focal_x: x, focal_y: y }); m.focal_x = x; m.focal_y = y; g.remove(); toast("Focus set — publish to apply"); scheduleChangesRefresh(); }
-            catch (err) { toast(err.message, true); }
+            catch (err) { toast(nice(err), true); }
           });
           g.appendChild(dot);
         });
@@ -2014,7 +2019,7 @@ function renderMediaGrid(grid, manage, onPick) {
       del.addEventListener("click", async () => {
         if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
         try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
-        catch (err) { toast(err.message, true); }
+        catch (err) { toast(nice(err), true); }
       });
       cell.appendChild(del);
     }
@@ -2041,7 +2046,7 @@ $("btnUploadGo").addEventListener("click", async () => {
     whisper("save-media", "saved");
     $("uploadPrep").hidden = true; $("fileInput").value = ""; S.pendingFile = null;
     await loadMedia(); toast("In the collection");
-  } catch (err) { whisper("save-media", ""); toast(err.message, true); }
+  } catch (err) { whisper("save-media", ""); toast(nice(err), true); }
 });
 let pickerCb = null;
 function openPicker(onPick) {
@@ -2105,7 +2110,7 @@ async function loadToday() {
     renderStatement(); renderFactsProse();
     if (showMoments && S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
     renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { toast(nice(err), true); }
 }
 
 /* ── the concierge's letters: moments + in-letter conversation (M9.4) ──
@@ -2142,7 +2147,7 @@ function renderMoments(moments) {
           await api("POST", `/moments/${m.id}/dismiss`);
           card.classList.add("away");
           setTimeout(() => { card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }, 260);
-        } catch (err) { toast(err.message, true); }
+        } catch (err) { toast(nice(err), true); }
       });
       la.appendChild(dis);
     }
@@ -2256,7 +2261,7 @@ function renderNotes(notes) {
         await api("POST", `/notes/${n.id}/dismiss`);
         card.classList.add("away");
         setTimeout(() => { card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }, 260);
-      } catch (err) { toast(err.message, true); }
+      } catch (err) { toast(nice(err), true); }
     });
     la.appendChild(dis);
     card.appendChild(la);
@@ -2376,7 +2381,7 @@ async function mountLookSeg() {
         LOOKS = null; PV.template = "";
         const s = await api("GET", "/site"); S.site = s.data.site;
         mountLookSeg(); loadPreview(); scheduleChangesRefresh(); applyVocab();
-      } catch (err) { toast(err.message, true); }
+      } catch (err) { toast(nice(err), true); }
     });
     seg.appendChild(use);
   }
@@ -2429,7 +2434,7 @@ async function loadPreview() {
     html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
     frame.srcdoc = html;
   } catch (err) {
-    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err.message)}</div>`;
+    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(nice(err))}</div>`;
   }
 }
 
@@ -2490,7 +2495,7 @@ async function loadRitual() {
       acts.appendChild(promise);
     }
   } catch (err) {
-    $("ritSub").textContent = err.message;
+    $("ritSub").textContent = nice(err);
   }
 }
 function pipeHtml(stage) { // stage: 0 sealing, 1 deploying, 2 live, -1 failed at deploy
@@ -2600,10 +2605,10 @@ async function renderLaunches() {
     const name = await askText("Name this launch", { placeholder: "e.g. Spring refresh", ok: "Stage" });
     if (name === null) return;
     try { await api("POST", "/launches", { name }); toast("Launch staged — preview and approve it below"); renderLaunches(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   card.appendChild(stage);
-  const act = async (path, okmsg, body) => { try { await api("POST", path, body || {}); toast(okmsg); renderLaunches(); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } };
+  const act = async (path, okmsg, body) => { try { await api("POST", path, body || {}); toast(okmsg); renderLaunches(); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } };
   launches.filter((l) => l.status !== "canceled" && l.status !== "rolled_back").forEach((l) => {
     const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
     const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
@@ -2659,7 +2664,7 @@ async function renderPreviewPanel() {
   card.appendChild(grid);
   const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:12px";
   const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
-  const act = async (path, okMsg, body) => { try { await api("POST", path, body || {}); toast(okMsg); renderPreviewPanel(); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } };
+  const act = async (path, okMsg, body) => { try { await api("POST", path, body || {}); toast(okMsg); renderPreviewPanel(); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } };
   mk("Update preview from draft", () => act("/preview/publish", "Preview updated — share it or promote when ready"), true);
   if (st.preview.exists) {
     mk("Open preview", () => { if (st.preview.url) window.open(st.preview.url, "_blank", "noopener"); });
@@ -2713,7 +2718,7 @@ async function loadHistory() {
             const val = inp.value.trim();
             if (val === (p.label || "")) { inp.remove(); return; }
             try { await api("POST", `/publishes/${p.id}/label`, { label: val }); p.label = val; loadHistory(); toast(val ? "Version named" : "Name removed"); }
-            catch (err) { toast(err.message, true); inp.remove(); }
+            catch (err) { toast(nice(err), true); inp.remove(); }
           };
           inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
           inp.addEventListener("blur", commit);
@@ -2738,7 +2743,7 @@ async function loadHistory() {
       row.appendChild(acts);
       list.appendChild(row);
     });
-  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">The journal wouldn’t open just now.</div><div class="eh">${esc(err.message)}</div></div>`; }
+  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">The journal wouldn’t open just now.</div><div class="eh">${esc(nice(err))}</div></div>`; }
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
@@ -2753,7 +2758,7 @@ $("btnRestoreGo").addEventListener("click", async () => {
     go("today");
   } catch (err) {
     btn.disabled = false; btn.textContent = "Bring it into my draft";
-    toast(err.message, true);
+    toast(nice(err), true);
   }
 });
 
@@ -2826,7 +2831,7 @@ async function mountBillingCard() {
     b.addEventListener("click", async () => {
       b.disabled = true; const t = b.textContent; b.textContent = "Opening…";
       try { const r = await api("POST", "/commerce/portal", {}); if (r.data && r.data.url) location.href = r.data.url; else { toast("Billing management isn’t available right now.", true); b.disabled = false; b.textContent = t; } }
-      catch (err) { toast(err.message || "Couldn’t open billing.", true); b.disabled = false; b.textContent = t; }
+      catch (err) { toast(err.message ? nice(err) : "Couldn’t open billing.", true); b.disabled = false; b.textContent = t; }
     });
     card.appendChild(b);
   } else if (s.has_service_billing) {
@@ -2869,11 +2874,11 @@ function mountDeletionCard() {
   b.addEventListener("click", async () => {
     if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Are you sure? Click again to confirm"; setTimeout(() => { delete b.dataset.armed; b.textContent = "Request deletion"; }, 6000); return; }
     try { const r = await api("POST", "/commerce/delete-request", {}); showRequested(r.data && r.data.completes_within_days); toast(r.data && r.data.already_pending ? "You already have a deletion request pending" : (r.data && r.data.emailed ? "Deletion requested — we emailed you the details" : "Deletion requested — the details are on this page")); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   cancelBtn.addEventListener("click", async () => {
     try { const r = await api("POST", "/commerce/delete-cancel", {}); cancelBtn.hidden = true; b.disabled = false; b.textContent = "Request deletion"; delete b.dataset.armed; toast((r.data && r.data.message) || "Deletion request canceled."); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   d.append(p, b, cancelBtn);
   host.appendChild(d);
@@ -2913,7 +2918,7 @@ async function mountSearchCard() {
       const nh = new Set((S.settings && S.settings.pages_noindex) || []);
       cb.checked ? nh.delete(key) : nh.add(key);
       try { const r = await api("PUT", "/settings", { pages_noindex: [...nh] }); S.settings = r.data || { ...S.settings, pages_noindex: [...nh] }; toast(cb.checked ? label + " will show on Google — publish to apply" : label + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
-      catch (err) { toast(err.message, true); cb.checked = !cb.checked; }
+      catch (err) { toast(nice(err), true); cb.checked = !cb.checked; }
     });
     const lb = el("label", null, label); lb.setAttribute("for", "nx-" + key); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
     rowEl.append(cb, lb); sec.appendChild(rowEl);
@@ -2935,7 +2940,7 @@ async function mountSearchCard() {
       const entry = { title: ti.value.trim(), description: di.value.trim() };
       if (!entry.title && !entry.description) delete map[key]; else map[key] = entry;
       try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Search wording saved — publish to apply"); scheduleChangesRefresh(); }
-      catch (err) { toast(err.message, true); }
+      catch (err) { toast(nice(err), true); }
     };
     [ti, di].forEach((inp) => inp.addEventListener("change", save));
     box.append(ti, di); ov.appendChild(box);
@@ -2962,14 +2967,14 @@ async function mountSearchCard() {
         line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
         const x = el("button", null, "✕"); x.type = "button"; x.title = "Remove this forward";
         x.style.cssText = "border:none;background:none;cursor:pointer;color:var(--ink-2,#888)";
-        x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(err.message, true); } });
+        x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } });
         line2.appendChild(x); list.appendChild(line2);
       });
     } catch (_) { list.textContent = "Forwards couldn’t load just now."; }
   }
   add.addEventListener("click", async () => {
     try { await api("POST", "/redirects", { from_path: fi.value, to_path: tiR.value }); fi.value = ""; tiR.value = ""; loadRedirects(); toast("Forward added — publish to apply"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
   loadRedirects();
 }
@@ -3059,7 +3064,7 @@ async function saveTokens(change, msg) {
     const card = $("designCard"); if (card) card.remove();
     mountDesignCard();
     toast(msg + " — publish to see it live"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { toast(nice(err), true); }
 }
 function pillRow(host, label, opts, isOn, onPick) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
@@ -3127,7 +3132,7 @@ async function mountBrandKitCard() {
       if (st.logo_media_id) S.settings = { ...(S.settings || {}), logo_media_id: st.logo_media_id };
       const c = $("designCard"); if (c) c.remove(); mountDesignCard();
       toast("Brand kit applied — publish to take it live"); scheduleChangesRefresh(); refreshDesignPreview();
-    } catch (err) { toast(err.message, true); }
+    } catch (err) { toast(nice(err), true); }
   });
   card.appendChild(apply);
   host.appendChild(card);
@@ -3157,10 +3162,10 @@ async function mountDesignCard() {
   if (((S.site && S.site.template) || "").indexOf("business-classic") === 0) {
     const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
     pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-      async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(err.message, true); } });
+      async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
     const navRow = [["Standard", ""], ["Centered", "centered"]];
     pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-      async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(err.message, true); } });
+      async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
   }
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
@@ -3229,7 +3234,7 @@ async function clSave(idx) {   // CL-1: save a crafted section to the reusable l
   const blk = BLOCKS_WORK[idx]; const def = BLOCK_DEFS.find((d) => d.type === blk.type);
   const name = await askText("Name this saved section", { value: blk.title || (def && def.name) || "Saved section", ok: "Save" });
   if (name === null) return;
-  api("POST", "/content-library", { name, block: blk }).then(() => { CL_ITEMS = null; toast("Saved to your content library"); }).catch((err) => toast(err.message, true));
+  api("POST", "/content-library", { name, block: blk }).then(() => { CL_ITEMS = null; toast("Saved to your content library"); }).catch((err) => toast(nice(err), true));
 }
 function clInsert(block) {   // CL-1: insert a saved block into the SAME editor (no second editor)
   if (!block || !block.type) return;
@@ -3269,7 +3274,7 @@ async function saveBlocks() {
     BLOCKS_WORK = currentBlocks();
     renderBlocksCard();
     toast("Content blocks saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { toast(nice(err), true); }
 }
 function mountBlocksCard() {
   const host = $("designHost"); if (!host || $("blocksCard")) return;
@@ -3392,7 +3397,7 @@ function renderBlocksCard() {
         const ins = el("button", null, "Insert"); ins.type = "button"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
         ins.addEventListener("click", () => clInsert(it.block));
         const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-        del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(err.message, true); } });
+        del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); } });
         row.append(ins, del); list.appendChild(row);
       });
       libRow.appendChild(list);
@@ -3500,7 +3505,7 @@ async function saveSections(order, hidden) {
     S.settings = r.data || { ...S.settings, sections_order: order, sections_hidden: hidden };
     const c = $("sectionsCard"); if (c) c.remove(); mountSectionsCard();
     toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { toast(nice(err), true); }
 }
 function mountSectionsCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("sectionsCard")) return;
@@ -3566,7 +3571,7 @@ function refreshDesignPreview() {
       S.settings = r.data || { ...(S.settings || {}), ...body };
       toast(v ? "Saved — publish, then verify at the search engine" : "Cleared");
       scheduleChangesRefresh();
-    } catch (err) { toast(err.message, true); }
+    } catch (err) { toast(nice(err), true); }
   });
 });
 // ── Phase O: industry selector — drives the template's vocabulary + schema ──
@@ -3577,7 +3582,7 @@ $("f-industry").addEventListener("change", async () => {
     S.settings = r.data || { ...(S.settings || {}), industry_key: sel.value };
     toast("Saved — your site uses the right words when you next publish");
     scheduleChangesRefresh();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { toast(nice(err), true); }
 });
 // ── Phase V (FD-N4): the announcement bar — a simple site-wide notice, no code ──
 function mountAnnouncementCard() {
@@ -3607,7 +3612,7 @@ function mountAnnouncementCard() {
       announcement_expires_at: until ? until + "T23:59:59Z" : null,
     };
     try { const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, ...body }; toast(body.announcement_text ? "Notice saved — publish to show it" : "Notice cleared"); scheduleChangesRefresh(); }
-    catch (err) { toast(err.message, true); }
+    catch (err) { toast(nice(err), true); }
   });
 }
 // ── L2: the commercial capacity notice — one calm card, never a number ──

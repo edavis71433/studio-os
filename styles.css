@@ -181,7 +181,7 @@ footer.site .fwrap{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:40px;pad
 footer.site .brand{color:var(--paper);font-size:22px;margin-bottom:14px}
 footer.site p{font-size:14px;max-width:34ch;line-height:1.7}
 footer.site .fcol-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-  color:rgba(255,255,255,.4);margin-bottom:16px}
+  color:rgba(255,255,255,.62);margin-bottom:16px}
 footer.site .fcol a{display:block;font-size:14px;color:rgba(255,255,255,.62);padding:6px 0;transition:.15s}
 footer.site .fcol a:hover{color:var(--paper)}
 footer.site .fbase{display:flex;justify-content:space-between;align-items:center;padding-top:28px;
@@ -208,7 +208,10 @@ footer.site .fbase a{color:rgba(255,255,255,.5)}
   .svc-grid{grid-template-columns:1fr}
   footer.site .fwrap{grid-template-columns:1fr;gap:28px}
   .pad{padding:72px 0}.hero{padding:60px 0 56px}
-  .mobile-open .nav-links{display:flex;position:absolute;top:70px;left:0;right:0;flex-direction:column;
+  /* top matches the 62px mobile header; cap + scroll so a tall menu stays
+     reachable on landscape phones instead of truncating off-screen */
+  .mobile-open .nav-links{display:flex;position:absolute;top:62px;left:0;right:0;flex-direction:column;
+    max-height:calc(100vh - 62px);overflow-y:auto;
     background:var(--paper);padding:20px 32px;gap:18px;border-bottom:1px solid var(--hair)}
   /* mobile submenu: stack links cleanly instead of collapsing into one line */
   .mobile-open .nav-has-sub{display:flex;flex-direction:column;gap:14px}
@@ -219,7 +222,7 @@ footer.site .fbase a{color:rgba(255,255,255,.5)}
   .mobile-open .nav-sub a small{display:block;font-size:12px;color:var(--muted);margin-top:1px}
   .mobile-open .nav-sub-toggle .caret{display:none}
 }
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.js-anim .reveal{opacity:1;transform:none}}
 
 /* ---------------------------------------------------------------
    GLOBAL CHROME — skip link, focus visibility, current-page state.

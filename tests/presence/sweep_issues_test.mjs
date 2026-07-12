@@ -24,7 +24,7 @@ const healthy = {
   lifecycle: { expired_trials: 0, notices: 0, emails: 0, wound_down: 0, grace_lapsed: 0 },
   deletion: { due: 0, completed: 0, failed: 0 },
   digest: { sent: 0, skipped_dedupe: true },            // THE bug shape: ~671/672 ticks — must be clean
-  domains: { checked: 0, notices: 0 },
+  domains: { checked: 0, warned: 0 },
   leads: { nudged: 0 },
   deal_nudges: { nudged: 0 },
   renewals: { reminded: 0 },

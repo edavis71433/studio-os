@@ -13,6 +13,30 @@
   var burgers = document.querySelectorAll('.burger');
   var subs = document.querySelectorAll('.nav-has-sub');
 
+  // At mobile widths the CSS force-shows the submenu (styles.css keeps
+  // .nav-sub visible ≤880px, both inline and inside the drawer), so the
+  // toggle link is not a disclosure control there — leaving it claiming
+  // aria-expanded="false" over a visible menu would be a lie. Strip the
+  // popup ARIA on mobile; restore the collapsed-popup semantics on desktop,
+  // where hover/focus genuinely opens and closes it.
+  var mobileMq = window.matchMedia('(max-width:880px)');
+  function syncSubAria(){
+    subs.forEach(function(sub){
+      var toggle = sub.querySelector('.nav-sub-toggle');
+      if(!toggle) return;
+      if(mobileMq.matches){
+        toggle.removeAttribute('aria-haspopup');
+        toggle.removeAttribute('aria-expanded');
+      } else if(!toggle.hasAttribute('aria-expanded')){
+        toggle.setAttribute('aria-haspopup', 'true');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+  syncSubAria();
+  if(mobileMq.addEventListener) mobileMq.addEventListener('change', syncSubAria);
+  else if(mobileMq.addListener) mobileMq.addListener(syncSubAria);
+
   // ---- Mobile drawer ----------------------------------------------------
   burgers.forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -35,10 +59,10 @@
     function open(){
       if(suppressNextOpen){ suppressNextOpen = false; return; }
       sub.classList.remove('closed');
-      toggle.setAttribute('aria-expanded', 'true');
+      if(!mobileMq.matches) toggle.setAttribute('aria-expanded', 'true');
     }
     function close(){
-      toggle.setAttribute('aria-expanded', 'false');
+      if(!mobileMq.matches) toggle.setAttribute('aria-expanded', 'false');
     }
     sub.addEventListener('mouseenter', open);
     sub.addEventListener('mouseleave', function(){
@@ -54,7 +78,7 @@
 
     sub.escapeClose = function(){
       sub.classList.add('closed');
-      toggle.setAttribute('aria-expanded', 'false');
+      if(!mobileMq.matches) toggle.setAttribute('aria-expanded', 'false');
       suppressNextOpen = true;
       toggle.focus();
     };

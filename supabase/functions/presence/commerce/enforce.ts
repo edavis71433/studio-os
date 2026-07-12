@@ -26,7 +26,7 @@ export function draftingDenial(plan: PlanKey, cors: Record<string, string>): Res
   if (planAllowsDrafting(plan)) return null;
   return json({
     error: 'plan_upgrade_required',
-    message: 'Drafting is part of Presence. Your Monitor plan watches your existing website and guides you — upgrade to Presence and Studio OS will draft and publish for you.',
+    message: 'Your current plan doesn’t include this — upgrading adds it.',
     upgrade: true,
   }, 403, cors);
 }

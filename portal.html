@@ -31,6 +31,9 @@
   button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);
     background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;width:100%;margin-top:20px}
   button:disabled{opacity:.55;cursor:default}
+  /* dark mode: --p lifts to #b79ceb, so the filled button needs dark ink (#fff on #b79ceb fails contrast).
+     .linky buttons keep their own higher-specificity accent color. */
+  @media (prefers-color-scheme:dark){button{color:#171320}}
   .err{background:#fbeaea;color:#8a2f2f;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
   @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
   .muted{color:var(--muted);font-size:13px;margin-top:16px;text-align:center}

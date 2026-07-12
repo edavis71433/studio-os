@@ -18,6 +18,12 @@
   p { font-size:14.5px; line-height:1.65; color:var(--muted); margin-bottom:10px; }
   a.btn { display:inline-block; margin-top:18px; background:var(--p); color:#fff; text-decoration:none; padding:12px 26px; border-radius:100px; font-size:14px; font-weight:600; }
   a.plain { display:inline-block; margin-top:12px; color:var(--muted); font-size:13px; text-decoration:none; }
+  /* ── Dark-mode variant (token-level; mirrors signup.html's recipe).
+     The button keeps #5b3fa0 + white — that pairing passes in both themes. ── */
+  @media (prefers-color-scheme:dark){
+    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; }
+    .card { background:#241d38; border-color:rgba(183,156,235,.18); }
+  }
 </style>
 </head>
 <body>

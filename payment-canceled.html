@@ -18,6 +18,14 @@
   p { font-size:14.5px; line-height:1.65; color:var(--muted); margin-bottom:10px; }
   a.btn { display:inline-block; margin-top:18px; background:var(--p); color:#fff; text-decoration:none; padding:12px 26px; border-radius:100px; font-size:14px; font-weight:600; }
   a.plain { display:inline-block; margin-top:12px; color:var(--muted); font-size:13px; text-decoration:none; }
+  p a { color:var(--p); }
+  /* ── Dark-mode variant (token-level; mirrors signup.html's recipe).
+     The button keeps #5b3fa0 + white — that pairing passes in both themes. ── */
+  @media (prefers-color-scheme:dark){
+    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; }
+    .card { background:#241d38; border-color:rgba(183,156,235,.18); }
+    p a { color:#c4aee8; }
+  }
 </style>
 </head>
 <body>
@@ -25,9 +33,21 @@
     <div class="mark">↩</div>
     <h1>No worries — nothing was charged.</h1>
     <p>The checkout was closed before completing, and no payment was made.</p>
-    <p>The payment link in your email still works whenever you're ready — nothing expires today. If something about the amount or the payment options didn't look right, just message Eric — it'll get sorted quickly.</p>
-    <a class="btn" href="https://davisdigitalstudio.com/portal.html">Sign in →</a>
+    <p id="detail">The payment link in your email still works whenever you're ready — nothing expires today. If something about the amount or the payment options didn't look right, just message Eric — it'll get sorted quickly.</p>
+    <a class="btn" id="cta" href="https://davisdigitalstudio.com/portal.html">Sign in →</a>
     <a class="plain" href="https://davisdigitalstudio.com">davisdigitalstudio.com</a>
   </div>
+  <script>
+    // Audit buyers arrive with ?kind=audit — they never received an emailed
+    // payment link and don't have a portal account. Swap the copy for what
+    // actually happens next with an audit order (mirrors payment-success.html).
+    (function () {
+      if (new URLSearchParams(location.search).get('kind') !== 'audit') return;
+      document.getElementById('detail').innerHTML = 'Your audit order wasn’t placed, so there’s nothing to undo. Whenever you’re ready, you can pick up right where you left off. Questions first? Email <a href="mailto:support@davisdigitalstudio.com">support@davisdigitalstudio.com</a> — it’ll get sorted quickly.';
+      var cta = document.getElementById('cta');
+      cta.textContent = 'Return to your audit order →';
+      cta.href = 'https://davisdigitalstudio.com/audit.html#pricing';
+    })();
+  </script>
 </body>
 </html>

@@ -23,3 +23,22 @@ a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{te
 .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* ── Dark mode: filled action buttons need dark ink ─────────────────────────
+   --accent lifts to #b79ceb in dark, and the pages' own `a.act{color:#fff}`
+   (attention.html, approval-center.html) fails contrast on it. A plain
+   `a.act` rule here CANNOT win — this sheet loads before the page styles.
+   `.group .cact a.act` out-specifies the pages' base rule while their
+   transparent variants (.group.coming_soon/.completed/.scheduled a.act, equal
+   specificity but later in the cascade) still win and keep accent text —
+   the :where() theme gate adds zero specificity so those ties hold.
+   Structure verified: upcoming.html wraps acts in .iact, website-health.html
+   has .cact but no .group, business-insights.html has neither — untouched.
+   snapshot-history.html's filled variant (a.act.primary inside .group .row)
+   gets the same dark ink. */
+@media (prefers-color-scheme:dark){
+  :where(:root:not([data-theme="light"])) .group .cact a.act,
+  :where(:root:not([data-theme="light"])) .group .row a.act.primary{color:#171320}
+}
+:where(:root[data-theme="dark"]) .group .cact a.act,
+:where(:root[data-theme="dark"]) .group .row a.act.primary{color:#171320}

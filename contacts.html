@@ -135,7 +135,7 @@ $('newForm').onsubmit=async(e)=>{
   const btn=e.submitter;if(btn)btn.disabled=true;
   try{
     const r=await api('/sales/contacts','POST',{name,email:email||undefined,phone:$('c-phone').value.trim()||undefined,company:$('c-company').value.trim()||undefined});
-    if(!r.ok){toast(r.status===403?'Contacts are part of Business OS.':((r.body&&r.body.message)||'That didn’t save.'));if(btn)btn.disabled=false;return;}
+    if(!r.ok){toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'That didn’t save.'));if(btn)btn.disabled=false;return;}
     $('newDlg').close();toast(r.body&&r.body.deduped?'That contact already existed.':'Contact added.');await load();
   }catch(_){toast('That didn’t save.');}finally{if(btn)btn.disabled=false;}
 };
@@ -205,7 +205,7 @@ async function newDeal(cid){
   const title=(c.name||c.company||c.email||'New')+' — project';
   try{
     const d=await api('/sales/deals','POST',{title,contact_id:cid});
-    if(!d.ok){toast(d.status===403?'Pipeline is part of Business OS.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
+    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;const sc=scope();
     toast('Deal started.');
     if(dealId)setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},700);
@@ -215,7 +215,7 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your contacts just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){
   const r=await api('/sales/contacts?limit=500');
-  if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of Business OS.</h2><p class="muted">Your current plan doesn’t include the Customers area yet.</p></div>`;return;}
+  if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
   if(!r.ok){trouble();return;}
   ALL=(r.body&&r.body.data)||[];render();
 }

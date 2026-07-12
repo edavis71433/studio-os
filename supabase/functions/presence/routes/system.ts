@@ -6,7 +6,7 @@
 //   POST /system/run     {secret, task?: 'cycle'|'retry'|'coach', limit?}
 //   GET  /system/health  ?secret=…   (or x-system-secret header)
 import { json } from '../../_shared/http.ts';
-import { svc, svcCount } from '../lib/db.ts';
+import { svc, svcAll, svcCount } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns } from '../ops/scheduler.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
@@ -129,28 +129,37 @@ const FAILURE_ALARM_24H = 10;        // sustained failures = something systemic
 async function health(): Promise<any> {
   const secrets = validateSecrets();
   // db reachability + cheap operational reads (exact counts — never fetch-to-count)
-  let dbOk = false, activeSites = 0, lastCycle: any = null, failures24h = 0;
+  let dbOk = false, activeSites = 0, lastCycle: any = null, failures24h = 0, stuckRuns = 0;
   try {
     const ping = await svc('presence_sites?select=id&limit=1');
     dbOk = ping.ok;
     activeSites = (await svcCount('presence_entitlements?product=eq.presence&status=eq.active')) ?? 0;
-    // Liveness reads the TICK row (written unconditionally every tick), not just
-    // 'cycle' (written only per active-entitled site — with zero active sites a
-    // healthy scheduler would look dead, or a dead one undetectable).
-    const last = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1');
+    // Liveness reads the last FINISHED tick — not the last STARTED one. A chain
+    // that dies mid-run keeps inserting fresh 'running' rows every 15 minutes,
+    // so measuring start time would report a healthy scheduler while trial
+    // expiry, billing enforcement, and all hygiene silently never complete.
+    // Finish time is the only honest liveness signal.
+    const last = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=finished_at.desc&select=status,started_at,finished_at,site_id&limit=1');
     lastCycle = last.json?.[0] || null;
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     failures24h = (await svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}`)) ?? 0;
+    // Runs stuck 'running' past any plausible invocation lifetime = the chain is
+    // dying before its own reaper (which is the LAST step of that same chain).
+    // Counted here so a persistently-dying tick pages even though nothing ever
+    // reaches 'failed' status on its own.
+    const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString();
+    stuckRuns = (await svcCount(`presence_scheduled_runs?status=eq.running&started_at=lt.${encodeURIComponent(twoHoursAgo)}`)) ?? 0;
   } catch { /* dbOk stays false */ }
   // Top-level ok is what the external watchdog pages on, so it must reflect the
   // failures a human needs to hear about — not just "the box is on". A dead cron
-  // (no cycle in 45 min, once one has EVER run) or sustained failures degrade it.
+  // (no COMPLETED tick in 45 min, once one has EVER completed), sustained
+  // failures, or stuck runs degrade it.
   const lastCycleAt = lastCycle ? Date.parse(lastCycle.finished_at || lastCycle.started_at || '') : NaN;
   const cronStale = Number.isFinite(lastCycleAt) && (Date.now() - lastCycleAt) > CRON_STALE_MS;
-  const failureAlarm = failures24h >= FAILURE_ALARM_24H;
+  const failureAlarm = failures24h >= FAILURE_ALARM_24H || stuckRuns > 0;
   const ok = secrets.ok && dbOk && !cronStale && !failureAlarm;
   const health_center = await computeHealthCenter().catch(() => null);
-  return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
+  return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, stuck_runs: stuckRuns, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
 }
 
 // ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).
@@ -177,7 +186,7 @@ export async function computeHealthCenter(): Promise<any> {
     svcCount('presence_entitlements?product=eq.presence&status=eq.lapsed'),
     svcCount('presence_plan_notices?status=eq.active'),
     svcCount(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since)}`),
-    svc(`presence_ai_usage?period=eq.${period}&select=generative_ops,assistive_ops&limit=1000`),
+    svcAll(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops`, 'client_id').then((rows) => ({ ok: true, json: rows })),
   ]);
   const aiOps = (arr(aiUseQ) as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0);
   const missing = Object.values(SECRET_GROUPS).flat().filter((d) => d.required && !envPresent(d.name)).map((d) => d.name);
@@ -251,7 +260,19 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
       if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
-      if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
+      if (task === 'gsc_sync') {
+        // Ledgered like the tick groups: the daily pg_cron job's response is
+        // discarded by pg_net, so without a ledger row a persistently failing
+        // sync (expired refresh token, Google 5xx) is structurally invisible.
+        const row = await svc('presence_scheduled_runs', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ run_type: 'gsc_sync', site_id: null, status: 'running', started_at: new Date().toISOString(), attempts: 1 }),
+        }).then((r) => r.json?.[0]?.id || null).catch(() => null);
+        const res = await runGscSync(limit);
+        const issues = sweepIssues({ gsc_sync: res });
+        if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: res }) }).catch(() => {});
+        return json({ data: res }, 200, cors);
+      }
 
       // ── SPLIT MODE (the scaling knob): run one GROUP of the default chain as
       // its own ledgered tick. As the fleet grows, the single 15-min tick's
@@ -279,12 +300,12 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['nurture', () => runProspectNurture(10)],
           ],
           hygiene: [
+            ['stale_runs', () => reapStaleRuns()],   // FIRST: converts the previous run's stuck rows into countable failures
             ['digest', () => runWeeklyDigest()],
             ['domains', () => runDomainWatch(10)],
             ['retention', () => runRetentionSweep()],
             ['media_gc', () => reapMedia(100)],
             ['snapshot_gc', () => reapSnapshots(200)],
-            ['stale_runs', () => reapStaleRuns()],
           ],
         };
         const progress: Record<string, unknown> = { group: task };
@@ -318,6 +339,10 @@ export async function handleSystem(req: Request, route: string, method: string, 
         return res;
       };
 
+      // The reaper runs FIRST: it converts the PREVIOUS tick's stuck 'running'
+      // rows into countable failures. At the end of the chain it would itself
+      // be skipped by exactly the mid-chain death it exists to surface.
+      await step('stale_runs', () => reapStaleRuns());
       const cycle = await step('cycle', () => runOperationsCycle({ limit }));
       const scheduled = await step('scheduled_publishes', () => runDuePublishes(limit));
       const reconcile = await step('reconcile', () => runReconcileStuckPublishes(50));   // M5: finalize stuck publishes every tick
@@ -338,7 +363,6 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots
-      await step('stale_runs', () => reapStaleRuns());                             // resolve runs stuck 'running' >2h → failed (alarms)
 
       // Terminal status reflects EVERY sweep, not just the cycle: a persistently
       // failing prune/reminder marks the tick failed → counts toward

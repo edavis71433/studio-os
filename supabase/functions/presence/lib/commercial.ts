@@ -147,8 +147,8 @@ export function renewalReminderCopy(planName: string, renewalDateIso: string, wi
   const when = new Date(renewalDateIso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   const lead = window === 7 ? `Your ${planName} plan renews on ${when}` : `A heads-up: your ${planName} plan renews ${when}`;
   const built = publishedUpdates > 0
-    ? ` Over the past year your website published ${publishedUpdates} update${publishedUpdates === 1 ? '' : 's'} and stayed correct and online the whole way.`
-    : ' Your website has stayed correct and online all year.';
+    ? ` Over the past year your website published ${publishedUpdates} update${publishedUpdates === 1 ? '' : 's'} and stayed correct and cared-for the whole way.`
+    : ' Your website has stayed correct and cared-for all year.';
   return {
     headline: lead,
     body: `${lead}, continuing your annual plan.${built} Nothing is needed from you — it renews automatically. If you'd like to review or change your plan, you can do that any time.`,

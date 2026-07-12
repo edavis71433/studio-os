@@ -55,7 +55,13 @@ async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
       ? rows(await svc(`presence_sites?client_id=eq.${enc(clientId)}&select=id,netlify_site_id,status`))
       : [];
     for (const s of sites) {
-      if (s.netlify_site_id) await deleteSite(s.netlify_site_id).catch(() => {});
+      // Takedown must SUCCEED before we erase the pointer — a failed delete with
+      // the id nulled leaves the "deleted" customer's site live on Netlify
+      // forever. Failure here fails the whole run → back to pending → retried.
+      if (s.netlify_site_id) {
+        const del = await deleteSite(s.netlify_site_id).catch(() => ({ ok: false }));
+        if (!(del as { ok?: boolean }).ok) return { ok: false, error: `netlify_takedown: site ${s.id}` };
+      }
       await svc(`presence_sites?id=eq.${s.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'deleting', netlify_site_id: null, custom_domain: null }) }).catch(() => {});
     }
     // 4) DELETE THE AUTH USER — without this the login (and its email/last-IP
@@ -85,6 +91,11 @@ async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
       if (em.endsWith('@deleted.invalid')) continue;
       await svc(`contacts?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, phone: null, owner_notes: '' }) }).catch(() => {});
       await svc(`presence_signups?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }).catch(() => {});
+      // push subscriptions carry email/endpoint/user-agent — hard-delete (they're
+      // device tokens, not business records); free-tool submissions by the same
+      // person are anonymized too ("your personal details are anonymized").
+      await svc(`presence_push_subscriptions?email=eq.${enc(em)}`, { method: 'DELETE' }).catch(() => {});
+      await svc(`audit_leads?client_email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ client_email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }).catch(() => {});
     }
     return { ok: true };
   } catch (e) {

@@ -15,6 +15,7 @@
 //   POST /commerce/first-run/dismiss(authed)  dismiss the welcome
 import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
+import { raiseNotice } from '../lib/notice.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -425,12 +426,9 @@ export async function handleCommerce(req: Request, route: string, method: string
     const days = coolingOffDays();
     const reqd = await requestDeletion(site.client_id, site.id, 'customer');
     const name = await businessNameFor(site.client_id);
-    await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
-      body: JSON.stringify({ site_id: site.id, client_id: site.client_id, kind: 'deletion_requested', period: 'once',
-        headline: 'Your deletion request is recorded',
-        body: `Your account and data will be deleted after ${days} days. Until then you can still download everything you own — or cancel this request.`, status: 'active' }),
-    });
+    await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'deletion_requested', period: 'once',
+      headline: 'Your deletion request is recorded',
+      body: `Your account and data will be deleted after ${days} days. Until then you can still download everything you own — or cancel this request.` });
     // Email the confirmation ONCE — only when this POST actually created a new
     // request, not on an idempotent re-click of an already-pending one.
     let emailed = false;

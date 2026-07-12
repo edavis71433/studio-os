@@ -654,11 +654,15 @@
   // Tab focus-trap for a visible dialog; pulls focus in on the first Tab.
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Tab') return;
+    // getClientRects, NOT offsetParent: offsetParent is always null for
+    // position:fixed elements in Chromium, which silently exempted every
+    // fixed-position modal (files slide-over, presence ritual) from the trap.
+    var vis = function (el) { return el.getClientRects().length > 0; };
     var mm = document.querySelectorAll('[aria-modal="true"],[role="dialog"]'), modal = null;
-    for (var i = 0; i < mm.length; i++) { if (mm[i].offsetParent !== null) modal = mm[i]; }
+    for (var i = 0; i < mm.length; i++) { if (vis(mm[i])) modal = mm[i]; }
     if (!modal) return;
     var f = modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
-    f = Array.prototype.filter.call(f, function (el) { return el.offsetParent !== null; });
+    f = Array.prototype.filter.call(f, vis);
     if (!f.length) return;
     var first = f[0], last = f[f.length - 1];
     if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }

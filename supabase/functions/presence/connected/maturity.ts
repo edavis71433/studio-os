@@ -1,3 +1,7 @@
+// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
+// imports; exercised only by its test). It documents a frozen-architecture contract
+// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
+// delete it (with an ADR note) when its phase arrives.
 // ── Provider Maturity Matrix (L4.5) — generated, never hand-kept ────────────
 // Every connected provider's maturity, DERIVED from what is actually built:
 // its normalizer (read), whether its reads feed Connected Intelligence, and

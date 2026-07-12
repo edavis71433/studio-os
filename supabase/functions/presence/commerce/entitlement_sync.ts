@@ -7,6 +7,7 @@
 // access after cancelling — or lose it after paying. It re-derives truth from
 // Stripe on a schedule and corrects only real drift.
 import { svc } from '../lib/db.ts';
+import { raiseNotice } from '../lib/notice.ts';
 import { lifecycleCopy } from './lifecycle.ts';
 import { sendEmail } from './account.ts';
 import { stripeConfigured, retrieveSubscription } from './stripe.ts';
@@ -58,11 +59,7 @@ export async function applyEntitlementPatch(clientId: string, patch: Entitlement
       // a pause→reactivate→pause→reactivate in one month re-emails every time.
       let freshNotice = false;
       if (siteQ.json?.[0]?.id) {
-        const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
-          method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
-          body: JSON.stringify({ site_id: siteQ.json[0].id, client_id: clientId, kind: 'welcome_back', period: new Date().toISOString().slice(0, 7), headline: copy.headline, body: copy.body, status: 'active' }),
-        });
-        freshNotice = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
+        freshNotice = await raiseNotice({ siteId: siteQ.json[0].id, clientId, kind: 'welcome_back', period: new Date().toISOString().slice(0, 7), headline: copy.headline, body: copy.body });
       }
       if (freshNotice && clQ.json?.[0]?.email) sendEmail(clQ.json[0].email, copy.subject, copy.html).catch(() => {});
     } catch { /* welcome-back is best-effort, never blocks billing truth */ }

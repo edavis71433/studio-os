@@ -126,6 +126,10 @@ export async function raiseCapacityNoticeIfNeeded(site: SiteRow, plan: PlanKey, 
     : `You've been using the writing and guidance features heavily — your current plan has handled it well. If you'd like more capacity, we're happy to talk it through.`;
 
   try {
+    // NOT raiseNotice(): this is deliberately resolution=merge-duplicates — a
+    // PATCH-on-conflict that refreshes the copy (the upgrade suggestion can
+    // change mid-month) and re-activates the notice while the customer is still
+    // over capacity. raiseNotice's ignore-duplicates insert can't express that.
     await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ site_id: site.id, client_id: site.client_id, kind: 'capacity', period: periodOf(now), headline, body, status: 'active' }),

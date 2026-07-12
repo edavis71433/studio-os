@@ -111,6 +111,7 @@ export interface TrafficAgg {
   devices: Array<{ device: string; share: number }>;
   events: { phone: number; email: number; cta: number; download: number };
   hasData: boolean;
+  truncated?: boolean;   // fetch cap hit → prior window undercounted → NO trend claims (AN-4)
 }
 const prettyPath = (p: string) => {
   if (p === '/' || p === '') return 'your home page';
@@ -124,7 +125,9 @@ export function trafficInsights(agg: TrafficAgg, period: Period): Insight[] {
   const w = periodWord(period);
   if (!agg.hasData) return [{ key: 'traffic', title: 'Website visitors', sentence: `No visits recorded yet this ${w} — once your site is published and shared, visitor numbers show up here.`, number: 0, href: '/presence.html#publish', tone: 'neutral' }];
   const out: Insight[] = [];
-  out.push({ key: 'traffic', title: 'Website visitors', sentence: `${agg.visitors} ${agg.visitors === 1 ? 'person' : 'people'} visited your website this ${w}${trendPhrase(agg.visitors, agg.priorVisitors, w)}.`, number: agg.visitors, detail: `${agg.pageviews} page views in all.`, href: '/analytics.html', tone: 'good' });
+  // truncated = the prior window is undercounted; stating a trend would
+  // fabricate a direction (AN-4: say less, never wrong).
+  out.push({ key: 'traffic', title: 'Website visitors', sentence: `${agg.visitors} ${agg.visitors === 1 ? 'person' : 'people'} visited your website this ${w}${agg.truncated ? '' : trendPhrase(agg.visitors, agg.priorVisitors, w)}.`, number: agg.visitors, detail: `${agg.pageviews} page views in all.`, href: '/analytics.html', tone: 'good' });
   if (agg.topSources.length) { const s = agg.topSources[0]; out.push({ key: 'source', title: 'Where they come from', sentence: `Most visitors arrive from ${s.source}.`, detail: agg.topSources.slice(1, 3).map((x) => x.source).join(' and ') ? `Then ${agg.topSources.slice(1, 3).map((x) => x.source).join(' and ')}.` : '', tone: 'neutral' });
   }
   if (agg.topPages.length) { const p = agg.topPages[0]; out.push({ key: 'top_page', title: 'What they look at', sentence: `${prettyPath(p.path).replace(/^your/, 'Your')} is getting the most attention.`, number: p.views, tone: 'neutral' }); }
@@ -136,6 +139,7 @@ export function trafficInsights(agg: TrafficAgg, period: Period): Insight[] {
 /** A traffic "moment" — only on a MEANINGFUL change, never daily noise (AN-2.7). */
 export function trafficNotice(agg: TrafficAgg): { headline: string; summary: string } | null {
   if (!agg.hasData || agg.visitors < 12) return null;         // too small to be meaningful
+  if (agg.truncated) return null;                             // undercounted prior window → no growth claims (AN-4)
   if (agg.priorVisitors >= 4 && agg.visitors >= agg.priorVisitors * 2) {
     return { headline: 'More people are finding you.', summary: `Visitors roughly doubled — ${agg.priorVisitors} to ${agg.visitors}.` };
   }

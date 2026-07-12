@@ -1,3 +1,7 @@
+// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
+// imports; exercised only by its test). It documents a frozen-architecture contract
+// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
+// delete it (with an ADR note) when its phase arrives.
 // ── Unified Workspace Shell — pure nav helpers (Phase C1) ────────────────────
 // The shell is ONE application frame injected on every signed-in page. It does
 // NOT define a navigation model — it consumes buildNav() (the one source of

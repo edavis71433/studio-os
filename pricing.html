@@ -81,11 +81,12 @@
 
   <div class="toggle">
     <div class="seg">
-      <button id="segMonthly" class="on" onclick="setTerm('monthly')">Monthly</button>
-      <button id="segAnnual" onclick="setTerm('annual')">Annual</button>
+      <button id="segMonthly" class="on" aria-pressed="true" onclick="setTerm('monthly')">Monthly</button>
+      <button id="segAnnual" aria-pressed="false" onclick="setTerm('annual')">Annual</button>
     </div>
   </div>
   <div class="savehint" id="savehint"></div>
+  <p id="termStatus" role="status" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></p>
 
   <div id="cards" class="grid"><div class="loading">Loading plans…</div></div>
 
@@ -133,6 +134,10 @@ function setTerm(t){
   TERM = t;
   document.getElementById('segMonthly').classList.toggle('on', t==='monthly');
   document.getElementById('segAnnual').classList.toggle('on', t==='annual');
+  document.getElementById('segMonthly').setAttribute('aria-pressed', t==='monthly' ? 'true' : 'false');
+  document.getElementById('segAnnual').setAttribute('aria-pressed', t==='annual' ? 'true' : 'false');
+  // setTerm only runs on a click, so this announces the change — not page load.
+  document.getElementById('termStatus').textContent = t==='annual' ? 'Prices show annual billing.' : 'Prices show monthly billing.';
   render();
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

@@ -114,6 +114,8 @@ const STATUSES=['active','on_hold','complete','archived'];
 let TOKEN="",FILTER="",STUDIO=true;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+// Server errors that read like a sentence still show; raw technical junk doesn't.
+const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -137,7 +139,7 @@ async function load(){
     if(!items.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:'No projects yet',body:STUDIO?'Create a project to start managing a customer’s work — tasks, files, and approvals live here.':'Your projects will appear here.',actionLabel:STUDIO?'New project':'',onAction:STUDIO?openNew:null}); else $('list').innerHTML='<p class="mut">No projects yet.</p>'; return; }
     $('list').innerHTML=items.map(p=>`<div class="card" data-id="${p.id}" tabindex="0" role="button"><div><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${p.target_date?('Target '+esc(p.target_date)):'No target date'}${p.client_visible===false?' · internal':''}</div></div><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span></div>`).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openProject(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
-  }catch(e){ if(window.ddsError) window.ddsError($('list'),e.message,load); else $('list').innerHTML='<p class="mut">'+esc(e.message)+'</p>'; }
+  }catch(e){ if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
 }
 
 async function loadCustomerOptions(){
@@ -160,7 +162,7 @@ $('newForm').onsubmit=async(e)=>{
   const cust=$('np-customer')&&$('np-customer').value; if(cust)body.customer_client_id=cust;
   const tmpl=$('np-template')&&$('np-template').value; if(tmpl)body.template=tmpl;
   try{ const r=await api('/projects','POST',body); $('newDlg').close(); toast(r.templated?'Project created with a starter checklist':'Project created'); await load(); openProject(r.data.id); }
-  catch(err){ toast(err.message,true); } finally{ if(btn)btn.disabled=false; }
+  catch(err){ toast(nice(err),true); } finally{ if(btn)btn.disabled=false; }
 };
 
 function miniForm(host, fields, onSubmit){
@@ -179,7 +181,7 @@ function miniForm(host, fields, onSubmit){
   const save=document.createElement('button'); save.type='submit'; save.className='btn sm'; save.textContent='Save';
   row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
   cancel.onclick=()=>host.innerHTML='';
-  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{const v={};for(const[k,el]of Object.entries(inputs))v[k]=el.type==='checkbox'?el.checked:el.value.trim();await onSubmit(v);}catch(err){toast(err.message,true);save.disabled=false;}};
+  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{const v={};for(const[k,el]of Object.entries(inputs))v[k]=el.type==='checkbox'?el.checked:el.value.trim();await onSubmit(v);}catch(err){toast(nice(err),true);save.disabled=false;}};
   setTimeout(()=>{const first=f.querySelector('input,textarea,select'); if(first)first.focus();},20);
 }
 
@@ -213,23 +215,23 @@ async function openProject(id){
       </div>`;
     $('closeDetail').onclick=()=>{dlg.close();history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():''));};
     // status
-    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
     // milestones
     if($('addMs'))$('addMs').onclick=()=>miniForm($('msForm'),[{name:'title',label:'Milestone title'},{name:'due_date',label:'Due date (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/milestones','POST',{title:v.title,due_date:v.due_date||undefined});openProject(id);});
-    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/milestones/'+b.dataset.mdone,'PATCH',{status:'complete'});openProject(id);}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/milestones/'+b.dataset.mdone,'PATCH',{status:'complete'});openProject(id);}catch(e){toast(nice(e),true);}});
     // tasks
     if($('addTask'))$('addTask').onclick=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});openProject(id);});
-    $('detailInner').querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/tasks/'+b.dataset.task,'PATCH',{status:b.dataset.to});openProject(id);}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/tasks/'+b.dataset.task,'PATCH',{status:b.dataset.to});openProject(id);}catch(e){toast(nice(e),true);}});
     // deliverables
     if($('addFile'))$('addFile').onclick=()=>shareFile(id);
-    $('detailInner').querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{try{const r=await api('/projects/'+id+'/deliverables/'+b.dataset.dl+'/download');window.open(r.data.url,'_blank','noopener');}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{try{const r=await api('/projects/'+id+'/deliverables/'+b.dataset.dl+'/download');window.open(r.data.url,'_blank','noopener');}catch(e){toast(nice(e),true);}});
     // approvals
     if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary});openProject(id);});
-    $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{try{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');openProject(id);}catch(e){toast(e.message,true);}});
+    $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{try{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');openProject(id);}catch(e){toast(nice(e),true);}});
     // surveys + support (studio triage/review)
     if($('addSurvey'))$('addSurvey').onclick=()=>miniForm($('svForm'),[{name:'title',label:'Survey title'},{name:'q',label:'A question to ask'}],async v=>{await api('/projects/'+id+'/surveys','POST',{title:v.title,questions:[{label:v.q||'Your feedback',type:'text'}]});loadSurveys(id);});
     loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);}
-  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(e.message)+'</p><button class="btn ghost sm" onclick="document.getElementById(\'detail\').close()">Close</button></div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="document.getElementById(\'detail\').close()">Close</button></div>'; }
 }
 
 async function shareFile(id){
@@ -240,7 +242,7 @@ async function shareFile(id){
     try{ const up=await api('/projects/'+id+'/deliverables/upload-url','POST',{mime:file.type,bytes:file.size,title:titleInput.value.trim()||file.name});
       const put=await fetch(up.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type,'x-upsert':'true'},body:file}); if(!put.ok)throw new Error('Upload failed.');
       await api('/projects/'+id+'/deliverables','POST',{media_id:up.data.media_id,title:titleInput.value.trim()||file.name,status:'shared'}); toast('File shared'); openProject(id);
-    }catch(err){ toast(err.message,true); } };
+    }catch(err){ toast(nice(err),true); } };
 }
 
 async function loadMessages(id){
@@ -253,14 +255,14 @@ async function loadMessages(id){
     host.innerHTML=`<form class="mini"><label for="mm-body-${id}">Message</label><textarea id="mm-body-${id}" data-dds-draft="1" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send</button></div></form>`;
     const ta=host.querySelector('textarea');
     if(window.ddsDraftRestore)window.ddsDraftRestore(ta);
-    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=ta.value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});if(window.ddsDraftClear)window.ddsDraftClear(ta);loadMessages(id);}catch(err){toast(err.message,true);}};
+    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=ta.value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});if(window.ddsDraftClear)window.ddsDraftClear(ta);loadMessages(id);}catch(err){toast(nice(err),true);}};
   }catch(e){ $('msgList').innerHTML='<div class="mut">Couldn’t load messages.</div>'; }
 }
 async function loadSurveys(id){
   try{
     const {data}=await api('/projects/'+id+'/surveys'); const items=data||[];
     $('svList').innerHTML=items.length?items.map(s=>`<div class="item"><div class="t">${esc(s.title)} <span class="tag">${esc(s.status)}</span></div><button class="btn ghost sm" data-sv="${s.id}">Responses</button></div>`).join(''):'<div class="mut">No surveys yet.</div>';
-    $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(e.message,true);}});
+    $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(nice(e),true);}});
   }catch(e){ $('svList').innerHTML='<div class="mut">Couldn’t load surveys.</div>'; }
 }
 const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);return d<7?d+'d ago':new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
@@ -268,7 +270,7 @@ async function loadSupport(id){
   try{
     const {data}=await api('/support'); const items=(data||[]).filter(r=>r.project_id===id);
     $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="mut">No support requests for this project.</div>';
-    $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id);}catch(e){toast(e.message,true);}});
+    $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id);}catch(e){toast(nice(e),true);}});
     $('supList').querySelectorAll('[data-sopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.sopen,id));
   }catch(e){ $('supList').innerHTML='<div class="mut">Couldn’t load support.</div>'; }
 }
@@ -284,8 +286,8 @@ async function openStudioSupport(rid,pid){
     $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body-${rid}">Reply to the client</label><textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
     $('sup-back').onclick=()=>loadSupport(pid);
     const sta=$('sr-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta); // a half-written reply survives an accidental close/refresh
-    const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid);}catch(err){toast(err.message,true);}};
-    const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid);}catch(e){toast(e.message,true);}};
+    const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid);}catch(err){toast(nice(err),true);}};
+    const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid);}catch(e){toast(nice(e),true);}};
   }catch(e){ toast('Couldn’t open that request.',true); }
 }
 

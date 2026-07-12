@@ -80,5 +80,5 @@ export async function runGscSync(limit = 100, now: Date = new Date()): Promise<{
     try { const r = await syncGscForSite(site, now); r.ok ? synced++ : (r.note === 'not_connected' ? skipped++ : failed++); }
     catch { failed++; }
   }
-  return { ok: true, synced, failed, skipped };
+  return { ok: failed === 0, synced, failed, skipped };
 }

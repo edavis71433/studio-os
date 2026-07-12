@@ -1,0 +1,9 @@
+# ── Publish an ALLOWLISTED dist/, never the repo root ─────────────────────────
+# A security audit live-verified that publishing the repo root behind _redirects
+# 404! denylist rules leaked backend source, migrations, and internal docs
+# (Netlify does not reliably shadow physically-existing files). scripts/
+# build-public.sh copies only the public site into dist/; anything not
+# explicitly allowlisted simply doesn't exist on the CDN.
+[build]
+  command = "bash scripts/build-public.sh"
+  publish = "dist"

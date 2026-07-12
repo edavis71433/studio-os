@@ -60,6 +60,22 @@
     .buy { position:static; padding:28px 24px; }
     h1 { font-size:26px; }
   }
+
+  /* ── Dark-mode variant (token-level; mirrors signup.html's recipe).
+     Buttons keep #5b3fa0 + white — that pairing passes in both themes. ── */
+  @media (prefers-color-scheme:dark){
+    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; --line:#372e50; --good:#8fd3ae; }
+    .detail, .buy { background:#241d38; }
+    input, textarea { background:#171320; color:var(--ink); }
+    input::placeholder, textarea::placeholder { color:rgba(239,234,247,.35); }
+    input:focus, textarea:focus { background:#1f1a2e; }
+    .eyebrow { color:#c4aee8; }
+    .back:hover { color:#c4aee8; }
+    .inc .tick { background:rgba(183,156,235,.14); color:#c4aee8; }
+    .credit { background:rgba(46,125,82,.16); border-color:rgba(143,211,174,.35); color:#a9d8bc; }
+    .credit strong { color:var(--good); }
+    .err { color:#f2a6a0; }
+  }
 </style>
 </head>
 <body>
@@ -84,16 +100,16 @@
       <div class="bt">Start your audit</div>
       <p class="bp"><strong id="a-price2">$99</strong> · <span id="a-delivery2">in 24 hours</span></p>
       <label for="a-name">Your name or business name</label>
-      <input id="a-name" placeholder="e.g. Rosa's Bakery" maxlength="120">
+      <input id="a-name" autocomplete="name" placeholder="e.g. Rosa's Bakery" maxlength="120">
       <label for="a-email">Email</label>
-      <input id="a-email" type="email" placeholder="you@business.com" maxlength="200">
+      <input id="a-email" type="email" autocomplete="email" placeholder="you@business.com" maxlength="200">
       <label for="a-website">Your website <span style="font-weight:400;color:var(--muted);">(leave blank if you don't have one)</span></label>
-      <input id="a-website" placeholder="yourbusiness.com" maxlength="300">
+      <input id="a-website" autocomplete="url" placeholder="yourbusiness.com" maxlength="300">
       <label for="a-notes">Anything specific you want looked at? <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
       <textarea id="a-notes" maxlength="1000" placeholder="e.g. we're not showing up on Google Maps"></textarea>
       <input class="hp" id="a-company" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button id="a-go" onclick="startCheckout()">Continue to secure checkout &rarr;</button>
-      <div class="err" id="a-err"></div>
+      <div class="err" id="a-err" role="alert"></div>
       <p class="fine">Secure payment via Stripe. Card, bank, Apple Pay &amp; Google Pay accepted.<br>Davis Digital Studio LLC · 3727 W. Magnolia Blvd #1061, Burbank, CA 91505</p>
       <p class="disc">Some audit inputs are AI-assisted and some use third-party tools like Google Lighthouse and SEMrush. Every paid audit includes strategic review and prioritization by Eric personally. No audit guarantees rankings, traffic, or revenue.</p>
     </div>

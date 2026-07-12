@@ -9,7 +9,7 @@ const PRECACHE = [
 ];
 
 // Pages that must always load fresh (have live API calls or dynamic content)
-const NETWORK_FIRST = ['/audit', '/tools', '/report-card', '/speed-test', '/local-visibility', '/pricing-estimator', '/roi-calculator', '/'];
+const NETWORK_FIRST = ['/audit', '/tools', '/report-card', '/local-visibility', '/pricing-estimator', '/roi-calculator', '/'];
 
 self.addEventListener('install', function(e) {
   e.waitUntil(

@@ -7,9 +7,10 @@
 <meta name="referrer" content="no-referrer">
 <title>Review &amp; sign</title>
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--good:#33664b;--good-soft:#e7f1ea;
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--btn-ink:#fff;--good:#33664b;--good-soft:#e7f1ea;
     --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--good:#8bbf9f;--good-soft:#1f2a24;--err:#e08b83}}
+  /* dark mode: the accent lifts to #b79ceb, so filled controls need dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--btn-ink:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--err:#e08b83}}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
   .wrap{max-width:640px;margin:0 auto;padding:44px 20px 90px}
@@ -24,8 +25,9 @@
   input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 12px;outline:none}
   input:focus{border-color:var(--p)}
   .row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
-  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:11px 22px;cursor:pointer}
+  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:var(--btn-ink);padding:11px 22px;cursor:pointer}
   button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .paybtn{display:inline-block;background:var(--p);color:var(--btn-ink);font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none}
   button:disabled{opacity:.5;cursor:default}
   .ok{background:var(--good-soft);color:var(--good);border-radius:12px;padding:14px 16px;font-weight:600;margin-top:14px}
   .muted{color:var(--soft);font-size:13.5px;margin-top:14px}
@@ -89,7 +91,10 @@ async function load(){
   const d=r.body.data;
   // The studio's own identity, not a generic page.
   if(d.brand){
-    if(d.brand.accent)document.documentElement.style.setProperty('--p',d.brand.accent);
+    // A custom brand accent replaces --p in BOTH themes, so the dark-mode
+    // dark-ink swap (tuned to the default lilac lift) no longer applies —
+    // keep the original white ink on the studio's own accent.
+    if(d.brand.accent){document.documentElement.style.setProperty('--p',d.brand.accent);document.documentElement.style.setProperty('--btn-ink','#fff');}
     if(d.brand.name)document.title=`Review & sign — ${d.brand.name}`;
     window.__brandName=d.brand.name||'';
   }
@@ -145,7 +150,7 @@ function renderContract(c){
         ?`<div class="center no-print" style="padding:24px 0 8px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${copyLine}</p></div>
           <div class="card no-print" style="text-align:left"><p style="font-weight:600;margin-bottom:6px">One more step to lock in your start</p>
           <p class="muted" style="margin-top:0">Your ${money(amt)} deposit is ready — paying it now locks in your start.</p>
-          <div class="row"><a href="${esc(pay)}" style="display:inline-block;background:var(--p);color:#fff;font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none">Pay the ${money(amt)} deposit →</a></div>
+          <div class="row"><a class="paybtn" href="${esc(pay)}">Pay the ${money(amt)} deposit →</a></div>
           <p class="muted">Prefer later? The same secure link is in your email — nothing expires today.</p></div>
           ${cert}`
         :`<div class="center no-print" style="padding:24px 0 8px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${copyLine} Your studio has been told and will kick things off.</p></div>

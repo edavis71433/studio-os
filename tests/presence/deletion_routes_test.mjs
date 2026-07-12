@@ -19,9 +19,11 @@ ok('executor: revokes access (entitlement status → deleted)', /product=eq\.pre
 ok('executor: cancels Stripe billing (keeps customer + invoices)', /cancelSubscription\(ent\.stripe_subscription_id\)/.test(del) && /export async function cancelSubscription/.test(stripe));
 ok('executor: takes the hosted site down + soft-deletes the workspace (staged, recoverable)', /deleteSite\(s\.netlify_site_id\)/.test(del) && /status: 'deleting'/.test(del));
 ok('executor: anonymizes customer PII', /name: 'Deleted account', email: `deleted-\$\{clientId\}@deleted\.invalid`/.test(del));
-// The ONE allowed DELETE is the GoTrue admin auth-user delete (privacy requires
-// the LOGIN to actually die); no REST-table row is ever hard-deleted.
-ok('executor: RETAINS financial evidence (no hard DELETE of any table row; auth-user delete only)', (del.match(/method: 'DELETE'/g) || []).length === 1 && /auth\/v1\/admin\/users\/\$\{u\.id\}`, \{ method: 'DELETE'/.test(del) && /status: 'deleted'/.test(del) && /status: 'deleting'/.test(del));
+// The TWO allowed DELETEs: the GoTrue admin auth-user delete (privacy requires
+// the LOGIN to actually die) and the push-subscription purge (device tokens
+// carrying email/endpoint/UA — not business records). No OTHER table row is
+// ever hard-deleted (financial evidence retained).
+ok('executor: RETAINS financial evidence (only auth-user + push-subscription DELETEs; no other table)', (del.match(/method: 'DELETE'/g) || []).length === 2 && /auth\/v1\/admin\/users\/\$\{u\.id\}`, \{ method: 'DELETE'/.test(del) && /presence_push_subscriptions\?email=eq\.\$\{enc\(em\)\}`, \{ method: 'DELETE'/.test(del) && /status: 'deleted'/.test(del) && /status: 'deleting'/.test(del));
 ok('executor: a failed run is retryable (status back to pending + error recorded)', /status: 'pending', error: res\.error/.test(del));
 ok('executor: cross-tenant safe (every op scoped to the row’s client_id)', (del.match(/client_id=eq\.\$\{enc\(clientId\)\}/g) || []).length >= 3);
 

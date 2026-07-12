@@ -96,6 +96,31 @@ async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST',
 
 function toast(msg){ if(window.ddsToast)return void ddsToast(msg);const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
 
+// Small styled confirm — replaces native confirm(), matching the app's surfaces
+// (same pattern as presence.html's askText). Resolves true/false.
+function askConfirm(title, body, okLabel){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div'); box.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
+      b.style.cssText=primary
+        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
+        :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b; };
+    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
+    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    cancel.addEventListener('click',()=>finish(false));
+    ok.addEventListener('click',()=>finish(true));
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
+    dlg.showModal(); setTimeout(()=>ok.focus(),20);
+  });
+}
+
 // connection state → a simple, human status (never technical)
 function statusOf(e){
   const c = e.connection || {}; const st = c.status, hl = c.health;
@@ -228,7 +253,7 @@ async function connectKey(key, label){
   toast('That key didn’t connect — nothing changed. Please check it and try again.');
 }
 async function disconnect(key, label, btn){
-  if(!confirm('Disconnect ' + label + '? Your account and everything in it stay exactly as they are — this only stops Presence reading it.')) return;
+  if(!(await askConfirm('Disconnect ' + label + '?', 'Studio OS stops reading it from here on. Your ' + label + ' account and everything in it stay exactly as they are — you can reconnect any time.', 'Disconnect'))) return;
   btn.disabled = true; btn.textContent = 'Disconnecting…';
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/disconnect', {});
   if(r.ok){ toast('Disconnected ' + label + '. Your account is untouched.'); return reload(); }
