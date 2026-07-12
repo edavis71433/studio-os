@@ -46,6 +46,8 @@
       if (window.supabase) return resolve();
       var s = document.createElement('script');
       s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4";
+      s.integrity = "sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug";
+      s.crossOrigin = "anonymous";
       s.onload = function () { resolve(); }; s.onerror = function () { resolve(); };
       document.head.appendChild(s);
     });
@@ -302,6 +304,31 @@
     drawer.innerHTML = html; drawer.classList.add('open');
   }
 
+  // ── SC-1 (global): carry the agency drill-in scope on EVERY static app link ──
+  // Nav/bell/palette links already scope via withScope(); this covers the page-
+  // authored anchors ("← Back to Today", empty-state CTAs, rail exits) that were
+  // the one systematic leak — a scoped operator must never silently switch
+  // tenants by tapping a hardcoded exit.
+  var APP_PAGES = /^\/(today|presence|crm|contacts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
+  function carryScopeGlobally() {
+    var s = scopeId(); if (!s) return;
+    document.querySelectorAll('a[href^="/"]').forEach(function (a) {
+      var h = a.getAttribute('href') || '';
+      if (!APP_PAGES.test(h) || h.indexOf('client=') >= 0) return;
+      a.setAttribute('href', withScope(h));
+    });
+  }
+  document.addEventListener('DOMContentLoaded', carryScopeGlobally);
+  // re-apply after page re-renders (delegated, cheap, debounced by rAF)
+  (function () {
+    var pend = false;
+    var mo2 = (typeof MutationObserver !== 'undefined') ? new MutationObserver(function () {
+      if (pend || !scopeId()) return; pend = true;
+      (window.requestAnimationFrame || setTimeout)(function () { pend = false; carryScopeGlobally(); });
+    }) : null;
+    if (mo2) document.addEventListener('DOMContentLoaded', function () { if (document.body) mo2.observe(document.body, { childList: true, subtree: true }); });
+  })();
+
   // ── boot ──
   function mountFrame() {
     root = document.getElementById('dds-shell');
@@ -398,6 +425,10 @@
         api('/portal/context').then(function (r) {
           if (!r.ok || !r.body || !r.body.data) { minimalShell(); return; }
           CTX = r.body.data; render();
+          // PERF: /portal/context is the single most expensive boot read (~17
+          // queries incl. 3× auth). The shell already fetched it — publish it so
+          // a page can reuse it instead of firing an identical second request.
+          try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
         });
       }).catch(minimalShell);
     });

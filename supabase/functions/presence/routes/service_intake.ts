@@ -91,7 +91,7 @@ export async function handleSupport(req: Request, jwt: string, site: SiteRow, pr
   if (req.method === 'GET') {
     const u = new URL(req.url);
     const status = u.searchParams.get('status');
-    const q = clean(u.searchParams.get('q'), 80);
+    const q = clean(u.searchParams.get('q'), 80).replace(/[(),*"\\]/g, ' ').trim();   // neutralize PostgREST filter grammar (matches sales.ts/projects.ts)
     const limit = clampLimit(u.searchParams.get('limit'));
     const offset = clampOffset(u.searchParams.get('offset'));
     let path = `presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&select=id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;

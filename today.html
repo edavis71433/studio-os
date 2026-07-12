@@ -85,7 +85,7 @@
 <!-- PT-5: one-time contextual tip, taught where it's relevant, then gone forever -->
 <div class="dds-hint" data-hint="today-bell" hidden>The 🔔 at the top shows everything that needs you — from any page in Studio&nbsp;OS.</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 // ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features.
 //    No engine, no new system. Calm, plain language; nothing technical.
@@ -245,15 +245,18 @@ function trouble(){
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
+    let feedFailed = false;
     const [moments, features, ctx, feed, bridged] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       apiGet('/portal/context').catch(()=>null),
-      apiGet('/portal/feed').catch(()=>null),
+      apiGet('/portal/feed').catch(()=>{feedFailed=true;return null;}),
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     render(list, features?.data || {}, feed && feed.data, ctx && ctx.data);
+    // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
+    if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);
     orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);

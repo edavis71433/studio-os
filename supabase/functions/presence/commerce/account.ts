@@ -111,7 +111,16 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: EMAIL_FROM, to, subject, html: wrapped, reply_to: 'eric@davisdigitalstudio.com' }),
+      // List-Unsubscribe: one-click opt-out header (Gmail/Yahoo bulk-sender rules +
+      // CAN-SPAM). A mailto is the honest minimum for a solo studio — no list server
+      // needed; the reply lands with Eric who honors it.
+      body: JSON.stringify({
+        from: EMAIL_FROM, to, subject, html: wrapped, reply_to: 'eric@davisdigitalstudio.com',
+        headers: {
+          'List-Unsubscribe': '<mailto:support@davisdigitalstudio.com?subject=unsubscribe>',
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      }),
     });
     return r.ok;
   } catch { return false; }

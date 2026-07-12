@@ -432,14 +432,15 @@ export async function handleCommerce(req: Request, route: string, method: string
     });
     // Email the confirmation ONCE — only when this POST actually created a new
     // request, not on an idempotent re-click of an already-pending one.
+    let emailed = false;
     if (reqd.created) {
       const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`);
-      if (cl.json?.[0]?.email) sendEmail(cl.json[0].email, 'Your deletion request is recorded',
-        `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes after ${days} days (on or after ${new Date(reqd.scheduled_for).toDateString()}). Until then, everything you own is still downloadable from your workspace — and if you change your mind, you can cancel the request from your account.</p>`).catch(() => {});
+      if (cl.json?.[0]?.email) emailed = await sendEmail(cl.json[0].email, 'Your deletion request is recorded',
+        `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes after ${days} days (on or after ${new Date(reqd.scheduled_for).toDateString()}). Until then, everything you own is still downloadable from your workspace — and if you change your mind, you can cancel the request from your account.</p>`).catch(() => false);
       const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
       if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion; scheduled ${reqd.scheduled_for}. The executor completes it after the cooling-off.</p>`).catch(() => {});
     }
-    return json({ data: { ok: true, completes_within_days: days, scheduled_for: reqd.scheduled_for, already_pending: !reqd.created } }, 200, cors);
+    return json({ data: { ok: true, completes_within_days: days, scheduled_for: reqd.scheduled_for, already_pending: !reqd.created, emailed } }, 200, cors);
   }
   if (route === '/commerce/delete-cancel' && method === 'POST') {
     const jwt = req.headers.get('x-dds-user-jwt') || '';

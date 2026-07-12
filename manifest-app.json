@@ -1,0 +1,31 @@
+{
+  "name": "Studio OS",
+  "short_name": "Studio OS",
+  "description": "Your business in one calm place — website, customers, projects, and everything that needs you.",
+  "start_url": "/studio.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#5b3fa0",
+  "background_color": "#faf8f5",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Today", "url": "/today.html", "description": "What needs you today" },
+    { "name": "Inbox", "url": "/inbox.html", "description": "Everything that needs you" },
+    { "name": "Pipeline", "url": "/pipeline.html", "description": "Your deals, one at a time" }
+  ]
+}

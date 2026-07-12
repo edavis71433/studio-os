@@ -663,7 +663,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 /* ════ The Client Room · Direction A dress over the frozen M7 movement ════
    Every API call, route, and contract is byte-identical to M7. Only the
@@ -2864,7 +2864,7 @@ function mountDeletionCard() {
   const showRequested = (days) => { b.disabled = true; b.textContent = days ? `Scheduled — completes in ${days} day${days === 1 ? "" : "s"}` : "Request recorded — check your email"; cancelBtn.hidden = false; };
   b.addEventListener("click", async () => {
     if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Are you sure? Click again to confirm"; setTimeout(() => { delete b.dataset.armed; b.textContent = "Request deletion"; }, 6000); return; }
-    try { const r = await api("POST", "/commerce/delete-request", {}); showRequested(r.data && r.data.completes_within_days); toast(r.data && r.data.already_pending ? "You already have a deletion request pending" : "Deletion requested — we emailed you the details"); }
+    try { const r = await api("POST", "/commerce/delete-request", {}); showRequested(r.data && r.data.completes_within_days); toast(r.data && r.data.already_pending ? "You already have a deletion request pending" : (r.data && r.data.emailed ? "Deletion requested — we emailed you the details" : "Deletion requested — the details are on this page")); }
     catch (err) { toast(err.message, true); }
   });
   cancelBtn.addEventListener("click", async () => {

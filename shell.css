@@ -161,3 +161,34 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
   .dds-toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));pointer-events:none}
   .dds-hint{bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important;z-index:2147483001}
 }
+
+/* ── A11y global fixes (WCAG 2.1 AA), applied from the ONE shared stylesheet ──
+   1) Dark-mode primary buttons: pages fill them with the light accent (#b79ceb)
+      and white text = 2.34:1 (fail). The light accent + DARK ink = 7.6:1 (pass).
+      Explicit-toggle blocks win in both directions so a forced theme is correct. */
+@media (prefers-color-scheme:dark){
+  .btn.primary,button.primary,.primary,.approve,button.approve,.form-submit-btn,.btn-review{
+    color:#171320 !important;
+  }
+}
+:root[data-theme="dark"] .btn.primary,
+:root[data-theme="dark"] button.primary,
+:root[data-theme="dark"] .primary,
+:root[data-theme="dark"] .approve,
+:root[data-theme="dark"] button.approve,
+:root[data-theme="dark"] .form-submit-btn,
+:root[data-theme="dark"] .btn-review{ color:#171320 !important; }
+/* a forced LIGHT theme under an OS-dark preference must keep white text on the
+   deep-plum light-mode button */
+:root[data-theme="light"] .btn.primary,
+:root[data-theme="light"] button.primary,
+:root[data-theme="light"] .primary,
+:root[data-theme="light"] .approve,
+:root[data-theme="light"] button.approve,
+:root[data-theme="light"] .form-submit-btn{ color:#fff !important; }
+
+/* 2) iOS focus-zoom: any sub-16px form control zooms the page on focus. Floor
+      every control to 16px on phones — cross-cutting, zero-risk. */
+@media (max-width:760px){
+  input:not([type=checkbox]):not([type=radio]),textarea,select{ font-size:16px !important; }
+}
