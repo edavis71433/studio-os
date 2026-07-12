@@ -356,7 +356,7 @@ h5.rune .whisper.ok{color:var(--sage)}
   <div class="card">
     <h1 id="gateTitle">One moment…</h1>
     <p id="gateMsg">Finding your room.</p>
-    <a class="pillbtn inked" id="gateBtn" href="portal.html" hidden style="display:inline-block;text-decoration:none">Go to your portal</a>
+    <a class="pillbtn inked" id="gateBtn" href="/studio.html" hidden style="display:inline-block;text-decoration:none">Go to your account</a>
   </div>
 </div>
 
@@ -376,7 +376,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
     </nav>
-    <div class="foot"><a href="portal.html">← Back to your portal</a></div>
+    <div class="foot"><a href="/today.html">← Back to Today</a></div>
   </aside>
 
   <div class="main">
@@ -719,7 +719,7 @@ async function api(method, route, body) {
   if (!navigator.onLine) { const e = new Error("You look offline. Everything you saved is safe — it’ll be here when you’re back."); e.offline = true; throw e; }
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  if (!jwt) { showGate("Please sign in", "Your room uses the same sign-in as your portal. Sign in there and come straight back.", true); throw new Error("no-session"); }
+  if (!jwt) { showGate("Please sign in", "Your room uses your usual sign-in. Sign in and come straight back.", true); throw new Error("no-session"); }
   // M9 optimistic locking: echo the draft version (M3 hash) on writes so a stale
   // edit is refused, never silently overwriting a newer one. One place → every
   // save is protected consistently, no duplicated logic.
@@ -2042,7 +2042,12 @@ $("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if
 function hasFeature(f) { return !S.features || S.features.indexOf(f) >= 0; }
 function applyEditionGating() {
   const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
-  const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("ai");               // Visual Studio = AI brains
+  const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("website");          // Visual Studio makes site imagery — website feature (matches the server route gate)
+  // A watch-plan (monitor) site OBSERVES — it never publishes. Hide the button
+  // instead of letting every tap end in a server refusal.
+  if (S.site && S.site.edition === "monitor") {
+    const p = $("btnPublish"); if (p) p.style.display = "none";
+  }
 }
 
 /* ── today: statement, prose facts, letters, journal ── */
@@ -2710,10 +2715,14 @@ function fillSingles() {
   renderHours();
 }
 async function refreshAll() {
+  // The website-content reads are TOLERANT: a plan without the website feature
+  // (e.g. a Customers-only plan opening #settings) must still get this page —
+  // a locked area renders empty, it never takes Settings down with it.
+  const soft = (p) => p.catch((e) => (e && e.status === 403 ? { data: [] } : Promise.reject(e)));
   const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
     api("GET", "/site"),
-    api("GET", "/offerings"), api("GET", "/faqs"), api("GET", "/testimonials"), api("GET", "/posts"),
-    api("GET", "/media"), api("GET", "/settings"),
+    soft(api("GET", "/offerings")), soft(api("GET", "/faqs")), soft(api("GET", "/testimonials")), soft(api("GET", "/posts")),
+    soft(api("GET", "/media")), api("GET", "/settings"),
     api("GET", "/portal/context").catch(() => null),
   ]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
@@ -3616,7 +3625,7 @@ async function renderFirstRun() {
   try {
     const { data } = await sb.auth.getSession();
     if (!data || !data.session) {
-      showGate("Your room is just past the front desk", "Presence uses the same sign-in as your portal. Sign in there, and you’ll land right back here.", true);
+      showGate("Your room is just past the front desk", "It uses your usual sign-in. Sign in, and you’ll land right back here.", true);
       return;
     }
     $("gate").hidden = true; $("app").hidden = false;
@@ -3632,9 +3641,9 @@ async function renderFirstRun() {
     else if (v && $("view-" + v)) go(v);
     routeHash();   // CP-2.6: #hash deep-links (palette/nav) — hash wins when present
   } catch (err) {
-    if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or send a note from your portal.", true);
+    if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or write to support@davisdigitalstudio.com.", true);
     else if (err.status === 403) showGate("Paused for now", err.message, true);
-    else if (err.message !== "no-session") showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Refresh to try again, or reach us from your portal.", true);
+    else if (err.message !== "no-session") showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Refresh to try again, or write to support@davisdigitalstudio.com.", true);
   }
 })();
 </script>

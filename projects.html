@@ -286,7 +286,7 @@ async function openStudioSupport(rid,pid){
   try{
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
-    if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/portal.html">sign in</a> to see your projects.</p>'; return; }
+    if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/studio.html">sign in</a> to see your projects.</p>'; return; }
     renderFilters(); await load();
     const deep=new URLSearchParams(location.search).get('project'); if(deep) openProject(deep);
   }catch(_){ $('list').innerHTML='<p class="mut">We couldn’t load your projects just now.</p>'; }

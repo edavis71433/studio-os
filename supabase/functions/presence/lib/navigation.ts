@@ -64,6 +64,7 @@ export function buildNav(c: NavContext): NavSection[] {
     website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
     if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
     if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
+    if (canPublish(c)) website.push({ key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' });
     if (canPublish(c)) website.push({ key: 'history', label: 'History', href: '/presence.html#history' });
     sections.push({ key: 'website', label: 'Website', items: website });
   }
@@ -72,6 +73,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // sales Pipeline fold in here as sub-items (the primary bar stays outcomes-only).
   if (f.hasRelationship) {
     const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/crm.html' }];
+    customers.push({ key: 'leads', label: 'Leads', href: '/leads.html' });
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html' });
     customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });
     sections.push({ key: 'customers', label: 'Customers', items: customers });
@@ -100,6 +102,26 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasAgency && c.isAgency) single('studio', 'Studio', '/agency.html');
 
   // ── Utilities — rendered in the profile/overflow menu, not the primary bar ──
+  // More views — the deeper read-only lenses (Attention, Approvals, Timeline…).
+  // They were reachable only from Today's "all clear" card — i.e. they vanished
+  // exactly when something needed attention. Here they're always one ⌘K away.
+  if (has(c, 'view_all')) {
+    const views: NavItem[] = [];
+    if (f.hasBusinessOS || f.hasWebsite) {
+      views.push({ key: 'attention', label: 'Attention Center', href: '/attention.html' });
+      views.push({ key: 'approval_center', label: 'Approval Center', href: '/approval-center.html' });
+      views.push({ key: 'view_timeline', label: 'Timeline', href: '/timeline.html' });
+      views.push({ key: 'view_upcoming', label: 'Upcoming', href: '/upcoming.html' });
+    }
+    if (f.hasBusinessOS) views.push({ key: 'view_insights', label: 'Business insights', href: '/business-insights.html' });
+    if (f.hasWebsite) {
+      views.push({ key: 'view_content_tree', label: 'Content tree', href: '/content-tree.html' });
+      views.push({ key: 'view_site_health', label: 'Website health', href: '/website-health.html' });
+      views.push({ key: 'view_snapshots', label: 'Snapshot history', href: '/snapshot-history.html' });
+    }
+    if (views.length) sections.push({ key: 'views', label: 'More views', items: views, utility: true });
+  }
+
   // Connections — integrations (the connected services)
   if (f.hasConnected) utility('connections', 'Connections', '/connections.html');
 

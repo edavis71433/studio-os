@@ -9,6 +9,7 @@ import { svc } from '../lib/db.ts';
 import { signDownload, createUpload } from '../lib/media.ts';
 import { isStudioSide, studioDenied, loadProject, projectEvent } from './projects.ts';
 import { isDecision, isSubjectType, canDecideApproval, approvalHash } from '../lib/approvals.ts';
+import { emailBridgedCustomer } from '../lib/service_bridge.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -141,6 +142,12 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That request didn’t save — please try again.' }, 502, cors);
   const a = rows(ins)[0];
   await projectEvent(site.id, projectId, 'approval_requested', principal, a.client_visible, { approval_id: a.id, title });
+  // An approval that waits on the CLIENT must reach their email — otherwise it
+  // can sit unseen until they happen to open the portal. Best-effort.
+  if (a.client_visible) {
+    emailBridgedCustomer(site.id, projectId, `Needs your OK — ${title}`,
+      `<p>Your studio has something ready for your review: <strong>${title.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))}</strong>.</p><p>Nothing goes ahead without you — take a look when you have a minute.</p>`).catch(() => {});
+  }
   return json({ data: a }, 201, cors);
 }
 

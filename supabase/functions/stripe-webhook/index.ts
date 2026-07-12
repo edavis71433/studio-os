@@ -293,11 +293,45 @@ Deno.serve(async (req: Request) => {
   // Multi-tenant service invoices/deposits (presence_invoices) — same one authority,
   // flipped via metadata.presence_invoice_id (threaded onto the Payment Link's intent).
   const markPresenceInvoicePaid = async (invoiceId: string, via: string): Promise<Response> => {
-    const wrote = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}`, 'PATCH', { status: 'paid', paid_at: eventTime, updated_at: eventTime });
+    // Fetch first: (a) an unknown id must NOT log a false success, (b) only an
+    // OPEN invoice may flip (a voided one stays void even if its old link is paid),
+    // (c) the row's site/deal ids feed the owner-facing echo below.
+    const inv = (await dbGet(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&select=id,site_id,deal_id,title,amount_cents,purpose,status&limit=1`))[0];
+    if (!inv) {
+      console.error(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} not found (via ${via}) — acking so Stripe stops retrying`);
+      return new Response('ok (unknown invoice)', { status: 200 });
+    }
+    if (inv.status === 'paid') return new Response('ok (already paid)', { status: 200 });
+    if (inv.status !== 'open') {
+      console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} is '${inv.status}', not flipping (via ${via})`);
+      return new Response('ok (not open)', { status: 200 });
+    }
+    const wrote = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, 'PATCH', { status: 'paid', paid_at: eventTime, updated_at: eventTime });
     if (!wrote) {
       console.error(`[stripe-webhook] ${type} FAILED to mark presence_invoice ${invoiceId} paid (via ${via}) — returning 500 so Stripe retries`);
       return new Response('db write failed', { status: 500 });
     }
+    // The owner-facing echo: a deal event (Pipeline history) + a notice (bell /
+    // Today / Inbox) — without these, payment was invisible inside the app.
+    try {
+      const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+      if (inv.deal_id) {
+        await db('presence_deal_events', 'POST', {
+          site_id: inv.site_id, deal_id: inv.deal_id, kind: 'invoice_paid',
+          actor: 'stripe', actor_kind: 'system',
+          detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents) || 0, purpose: inv.purpose },
+        });
+      }
+      const siteRow = (await dbGet(`presence_sites?id=eq.${encodeURIComponent(inv.site_id)}&select=client_id&limit=1`))[0];
+      if (siteRow?.client_id) {
+        await db('presence_plan_notices', 'POST', {
+          site_id: inv.site_id, client_id: siteRow.client_id, kind: 'invoice_paid',
+          period: `paid:${inv.id}`, status: 'active',
+          headline: `Paid — ${inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice')} (${amount})`,
+          body: inv.purpose === 'deposit' ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
+        });
+      }
+    } catch (e) { console.error(`[stripe-webhook] paid-echo best-effort failed for ${invoiceId}:`, e); }
     console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} paid (via ${via})`);
     return new Response('ok', { status: 200 });
   };

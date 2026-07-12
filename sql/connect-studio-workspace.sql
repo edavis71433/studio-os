@@ -39,12 +39,15 @@ begin
     returning id into v_site;
   end if;
 
-  -- 4. the agency + owner seat (Studio portfolio, cross-client queues)
+  -- 4. the agency + owner seat (Studio portfolio, cross-client queues).
+  --    Lookup ignores status (a paused row is reactivated, never duplicated).
   select id into v_agency from public.presence_agencies
-   where lower(name) = 'davis digital studio' and status = 'active' limit 1;
+   where lower(name) = 'davis digital studio' limit 1;
   if v_agency is null then
     insert into public.presence_agencies (name) values ('Davis Digital Studio')
     returning id into v_agency;
+  else
+    update public.presence_agencies set status = 'active' where id = v_agency;
   end if;
 
   insert into public.presence_agency_members (agency_id, email, role, status)

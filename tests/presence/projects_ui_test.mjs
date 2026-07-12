@@ -13,7 +13,7 @@ const nav = read('supabase/functions/presence/lib/navigation.ts');
 
 ok('shell: loads the ONE shared shell (shell.js + shell.css)', /src="\/shell\.js"/.test(h) && /href="\/shell\.css"/.test(h));
 ok('auth: uses the portal auth realm (dds-portal-auth) + supabase-js', /storageKey:'dds-portal-auth'/.test(h) && /supabase-js@2\.45\.4/.test(h));
-ok('auth: redirects to portal sign-in when there is no session', /sign in<\/a>/.test(h) && /portal\.html/.test(h));
+ok('auth: sends a signed-out visitor to the STUDIO door (owner surface)', /studio\.html/i.test(h) && !/portal\.html/.test(h));
 ok('config: single supabase config (prod ref), scope header for agency drill-in', /qksstlqzbhesadrrofgn/.test(h) && /x-dds-scope-site':scope\(\)/.test(h));
 ok('wires: list + detail + report endpoints', /api\('\/projects'/.test(h) && /\/projects\/'\+id\)/.test(h) && /\/report'/.test(h));
 ok('wires: task + milestone + status mutations', /\/tasks\/'\+/.test(h) && /\/milestones\/'\+/.test(h) && /\/status','POST'/.test(h));

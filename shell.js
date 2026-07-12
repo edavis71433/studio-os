@@ -215,8 +215,12 @@
       (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
       // W4: the bell is the quick glance; the Inbox is the complete "everything that
       // needs you" (also client messages, surveys, new leads). Send them to the one
-      // place rather than have two surfaces compete.
-      var footer = '<a class="row" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
+      // place rather than have two surfaces compete. A client's "one place" is their
+      // updates page — never the owner Inbox.
+      var isReviewer = CTX && CTX.site_role === 'client_reviewer';
+      var footer = isReviewer
+        ? '<a class="row" href="/client.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See all your updates →</a>'
+        : '<a class="row" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
       body.innerHTML = (out || '<div class="muted">You’re all caught up.</div>') + footer;
     });
   }
@@ -233,7 +237,6 @@
     var edition = (CTX && CTX.edition) || '';
     var rows = '';
     if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>';
-    if (CTX && CTX.is_operator) rows += '<a class="row" href="/dds-studio-manage-9k2p.html">Admin & operator tools</a>';
     // Architecture v1.0: utility destinations (Connections, Settings, Help) live here.
     UTILS.forEach(function (sec) { sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + '</a>'; }); });
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
@@ -241,7 +244,10 @@
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;
     prof.classList.add('open');
     var so = document.getElementById('dds-signout');
-    if (so) so.addEventListener('click', function (e) { e.preventDefault(); if (sb) sb.auth.signOut().then(function () { location.href = '/portal.html'; }); else location.href = '/portal.html'; });
+    // Sign out to the RIGHT door: clients back to the client door, everyone else
+    // (owners, team, agency) to the Studio OS door.
+    var door = (CTX && CTX.site_role === 'client_reviewer') ? '/portal.html' : '/studio.html';
+    if (so) so.addEventListener('click', function (e) { e.preventDefault(); if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door; });
   }
   function closeProfile() { if (prof) prof.classList.remove('open'); }
   document.addEventListener('click', function () { closeNotifications(); closeProfile(); });
@@ -265,7 +271,7 @@
     document.documentElement.classList.add('dds-has-shell');
   }
   function minimalShell() {
-    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/portal.html" aria-label="Sign in">◐</a>';
+    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────

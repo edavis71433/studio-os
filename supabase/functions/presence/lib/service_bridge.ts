@@ -97,3 +97,22 @@ export async function linkForCustomerVia(customerClientId: string, table: string
   const link = await linkForCustomerProject(customerClientId, row.project_id);
   return link ? { link, row } : null;
 }
+
+/** Email the bridged customer about project activity that needs them (a studio
+ *  message, an approval request). Without this, the delivery loop stalls unless
+ *  the client habitually opens the portal — an approval could sit unseen forever.
+ *  Best-effort: resolves project → bridge → customer email; never throws. */
+export async function emailBridgedCustomer(agencySiteId: string, projectId: string, subject: string, bodyHtml: string): Promise<boolean> {
+  try {
+    const link = rows(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${agencySiteId}&status=eq.active&select=customer_client_id&limit=1`))[0];
+    if (!link?.customer_client_id) return false;
+    const client = rows(await svc(`clients?id=eq.${link.customer_client_id}&select=email&limit=1`))[0];
+    const email = client?.email ? String(client.email) : '';
+    if (!email) return false;
+    const { sendEmail } = await import('../commerce/account.ts');
+    const { loadEmailBrand } = await import('./email_brand.ts');
+    const brand = await loadEmailBrand(agencySiteId);
+    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
+    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand);
+  } catch { return false; }
+}

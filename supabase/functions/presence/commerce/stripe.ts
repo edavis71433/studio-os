@@ -117,6 +117,9 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
     'metadata[kind]': 'service_invoice',
     'payment_intent_data[metadata][presence_invoice_id]': p.invoiceId,
     'payment_intent_data[metadata][kind]': 'service_invoice',
+    // ONE payment per invoice — after it completes, Stripe deactivates the link,
+    // so a client double-clicking the email can never pay the same invoice twice.
+    'restrictions[completed_sessions][limit]': '1',
   }, `plink-${p.invoiceId}`);
   return { url: String(link.url), id: String(link.id) };
 }

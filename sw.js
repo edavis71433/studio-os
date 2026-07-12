@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v12'; // bumped: unified workspace shell (shell.js/css) + signed-in surfaces excluded from cache-first — always fresh chrome
+const CACHE_NAME = 'dds-v13'; // bumped: studio door + every app/token page excluded from cache-first — a stale signing page is a correctness bug
 const PRECACHE = [
   '/about',
   '/services',
@@ -56,7 +56,19 @@ self.addEventListener('fetch', function(e) {
       url.pathname.startsWith('/developer') || url.pathname.startsWith('/crm') ||
       url.pathname.startsWith('/shell') || url.pathname.startsWith('/approve') ||
       url.pathname.startsWith('/leads') || url.pathname.startsWith('/schedule') ||
-      url.pathname.startsWith('/get-started')) return;   // shell + token-approve + leads/schedule + first-run — always fresh
+      url.pathname.startsWith('/get-started') ||
+      url.pathname.startsWith('/studio') ||            // the owner front door — never stale
+      url.pathname.startsWith('/sign') ||              // contract/proposal signing + signup — stale = correctness bug
+      url.pathname.startsWith('/project-survey') || url.pathname.startsWith('/welcome') ||
+      url.pathname.startsWith('/provision') || url.pathname.startsWith('/pipeline') ||
+      url.pathname.startsWith('/contacts') || url.pathname.startsWith('/projects') ||
+      url.pathname.startsWith('/inbox') || url.pathname.startsWith('/files') ||
+      url.pathname.startsWith('/analytics') || url.pathname.startsWith('/attention') ||
+      url.pathname.startsWith('/approval-center') || url.pathname.startsWith('/business-insights') ||
+      url.pathname.startsWith('/content-tree') || url.pathname.startsWith('/snapshot-history') ||
+      url.pathname.startsWith('/timeline') || url.pathname.startsWith('/upcoming') ||
+      url.pathname.startsWith('/website-health') || url.pathname.startsWith('/help') ||
+      url.pathname.startsWith('/admin-health') || url.pathname.startsWith('/pricing')) return; // every signed-in/app surface — always fresh
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });

@@ -184,7 +184,7 @@ function manualFallback(reason){
     <div class="card" style="padding-top:6px">${LESSONS.map(l=>`<div class="lesson"><span class="ic">${l[0]}</span><span><b>${esc(l[1])}.</b> ${esc(l[2])}</span></div>`).join('')}</div>`;
   $('go').addEventListener('click',()=>location.href='/presence.html');
 }
-function signedOut(){$('main').innerHTML=`<div class="center"><p class="big">Sign in to get started.</p><p style="margin-top:16px"><a class="plain" href="/portal.html">Sign in →</a></p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><p class="big">Sign in to get started.</p><p style="margin-top:16px"><a class="plain" href="/studio.html">Sign in →</a></p></div>`;}
 
 (async function(){
   try{

@@ -30,7 +30,7 @@
   .c .contact{font-size:13.5px;color:var(--soft);margin-top:3px}
   .c .contact a{color:var(--p);text-decoration:none}
   .c .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:6px 13px;cursor:pointer;text-decoration:none}
+  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:10px 15px;cursor:pointer;text-decoration:none}
   .c .acts a.reply{background:var(--p);color:#fff;border-color:var(--p)}
   .c .acts button:hover{border-color:var(--p);color:var(--p)}
   .muted{color:var(--soft);font-size:14.5px}
@@ -74,7 +74,7 @@
   </form>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -94,7 +94,7 @@ function render(){
   const rows=q?ALL.filter(c=>((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)):ALL;
   let h=`<div class="rolebadge">● Contacts</div>
     <header><h1>Contacts</h1><p class="sub">${ALL.length?ALL.length+' '+(ALL.length===1?'contact':'contacts')+' · everyone you do business with.':'Everyone you do business with, in one place.'}</p></header>
-    <div class="bar"><input class="search" id="q" type="search" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ New</button></div>`;
+    <div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ New</button></div>`;
   if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
   else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">No contacts match “${esc(Q)}”.</p>`;}
   else for(const c of rows){
@@ -141,7 +141,7 @@ async function newDeal(cid){
     if(dealId)setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},700);
   }catch(_){toast('Couldn’t start that deal.');}
 }
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your contacts.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your contacts.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your contacts just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){
   const r=await api('/sales/contacts?limit=500');

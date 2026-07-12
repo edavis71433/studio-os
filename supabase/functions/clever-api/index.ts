@@ -10399,6 +10399,22 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       const message = String(body.message || '').trim();
 
       const lines = message ? message.split('\n').filter((l: string) => l.trim().length) : [];
+
+      // PERSIST first (email is a channel, not a store): survey_responses is the
+      // table the sentiment/referral features read — responses that only landed
+      // in an inbox were starving them. Best-effort; the email still goes out.
+      try {
+        if (SB_SERVICE) {
+          const meta = (body.meta && typeof body.meta === 'object') ? body.meta : {};
+          const clientId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(meta.client_id || '')) ? String(meta.client_id) : null;
+          await fetch(`${SB_URL}/rest/v1/survey_responses`, {
+            method: 'POST',
+            headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ client_id: clientId, client_name: name || String((meta as any).client_name || '') || null, client_email: email || null, message: message || null }),
+          });
+        }
+      } catch (_e) { /* best-effort */ }
+
       let ericEmailed = false;
       try {
         ericEmailed = await emailOk(
@@ -10410,7 +10426,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
               `From: ${name || '(no name)'}${email ? ' · ' + email : ''}`,
               ...(lines.length ? lines : ['(no details provided)']),
             ],
-            { label: 'Open admin', href: 'https://davisdigitalstudio.com/dds-studio-manage-9k2p' },
+            { label: 'Open Studio OS', href: 'https://davisdigitalstudio.com/studio.html' },
           ),
         );
       } catch (_e) { /* ignore */ }

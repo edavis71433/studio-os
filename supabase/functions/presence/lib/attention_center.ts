@@ -102,7 +102,9 @@ export function buildAttentionCenter(input: AttentionInput): AttentionCenter {
   // 3) changes waiting for the customer's approval (own site + bridged delivery)
   const appr = input.approvals_waiting + input.project_approvals_waiting;
   if (appr > 0) {
-    needs.push({ tone: 'needs_attention', icon: '✅', title: appr === 1 ? 'A change is waiting for your approval' : `${appr} changes are waiting for your approval`, why: 'Nothing goes ahead until you say yes — take a quick look when you can.', action_label: 'Review', action_href: '/today.html' });
+    // Bridged delivery approvals are decided in the client view; own-site plans on Today.
+    const apprHref = input.project_approvals_waiting > 0 && input.approvals_waiting === 0 ? '/client.html' : '/today.html';
+    needs.push({ tone: 'needs_attention', icon: '✅', title: appr === 1 ? 'A change is waiting for your approval' : `${appr} changes are waiting for your approval`, why: 'Nothing goes ahead until you say yes — take a quick look when you can.', action_label: 'Review', action_href: apprHref });
   }
 
   // 4) something the studio needs from you (client-visible actions)

@@ -161,13 +161,14 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   const deal = await loadDeal(site.id, id);
   if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   if (req.method === 'GET') {
-    const [contact, proposals, contracts, events] = await Promise.all([
+    const [contact, proposals, contracts, events, invoices] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
       svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version&order=created_at.desc`),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=50`),
+      svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,paid_at,created_at&order=created_at.desc`),
     ]);
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: rows(events) } }, 200, cors);
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: rows(events), invoices: rows(invoices) } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -301,7 +302,7 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     const brand = await loadEmailBrand(siteId);
     const amount = '$' + (amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${title.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand);
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you a ${title.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand);
   } catch { return false; }
 }
 
@@ -321,26 +322,37 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     amountCents = prop ? Number(prop.subtotal_cents) : null;
   }
   if (!amountCents || amountCents < 50) return json({ error: 'validation', message: 'Enter an amount to invoice (or accept a proposal first).' }, 422, cors);
-  amountCents = Math.min(100000000, amountCents);
+  if (amountCents > 100000000) return json({ error: 'validation', message: 'That amount is over $1,000,000 — double-check it and try again.' }, 422, cors);
   const purpose = b.purpose === 'deposit' ? 'deposit' : 'service';
   const title = clean(b.title, 200) || (purpose === 'deposit' ? 'Deposit' : 'Invoice');
   const description = clean(b.description, 1000) || `${title} — ${deal.title || 'project'}`;
   const dueDate = (typeof b.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.due_date)) ? b.due_date : null;
-  const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' }) });
-  const inv = rows(ins)[0];
-  if (!inv) return json({ error: 'write_failed', message: 'That invoice didn’t save — please try again.' }, 502, cors);
-  let payUrl: string | null = null;
-  try {
-    const link = await createServicePaymentLink({ amountCents, currency: 'usd', description, invoiceId: inv.id });
-    payUrl = link.url;
-    await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
-  } catch {
-    return json({ data: { ...inv, stripe_url: null }, warning: 'link_failed', message: 'Invoice saved, but the payment link didn’t generate — tap Send again.' }, 200, cors);
+
+  // IDEMPOTENT: a double-tap (or a retry after a link failure) must never mint a
+  // second open invoice. Reuse the existing open row for this deal+purpose —
+  // repair its missing link if that's why the operator is retrying.
+  let inv = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.${purpose}&status=eq.open&deleted_at=is.null&select=*&order=created_at.desc&limit=1`))[0];
+  let reused = !!inv;
+  if (inv && b.force === true) { reused = false; inv = null; }   // explicit "yes, another one"
+  if (!inv) {
+    const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' }) });
+    inv = rows(ins)[0];
+    if (!inv) return json({ error: 'write_failed', message: 'That invoice didn’t save — please try again.' }, 502, cors);
   }
-  const emailed = await emailInvoice(site.id, dealId, title, payUrl, amountCents);
-  await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: amountCents, purpose } });
-  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed }, 201, cors);
+  let payUrl: string | null = inv.stripe_url || null;
+  if (!payUrl) {
+    try {
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description, invoiceId: inv.id });
+      payUrl = link.url;
+      await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+    } catch {
+      return json({ data: { ...inv, stripe_url: null }, warning: 'link_failed', message: 'Invoice saved, but the payment link didn’t generate — tap Send again (it will finish this same invoice, not make another).' }, 200, cors);
+    }
+  }
+  const emailed = await emailInvoice(site.id, dealId, title, payUrl, Number(inv.amount_cents));
+  if (!reused) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused }, reused ? 200 : 201, cors);
 }
 
 /** W1: a client just accepted a proposal / signed a contract via the token link.
@@ -410,6 +422,14 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   if (decision === 'accepted') {
     await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
     await raiseDealReady(tok.site_id, dealId, 'accepted');   // W1: tell the studio
+  } else {
+    // A decline deserves a heads-up too — silence here means the studio keeps
+    // waiting on a deal that already said no. Best-effort, idempotent per deal.
+    try {
+      const st = rows(await svc(`presence_sites?id=eq.${tok.site_id}&select=client_id&limit=1`))[0];
+      const title = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=title&limit=1`))[0]?.title || 'a deal';
+      if (st?.client_id) await raiseNotice({ siteId: tok.site_id, clientId: st.client_id, kind: 'deal_followup', period: `declined:${dealId}`, headline: `They passed on the proposal — ${title}`, body: 'The client declined. A quick follow-up note often keeps the door open — or send an updated proposal.' });
+    } catch { /* non-fatal */ }
   }
   return json({ data: { status: decision } }, 200, cors);
 }
@@ -636,5 +656,14 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   //    bridge to their own workspace, so post-sale delivery is connected with no
   //    manual step. Idempotent (deal.created_project_id UNIQUE + bridge UNIQUE).
   const handoff = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId, customerSiteId: prov.siteId || null, actor: actorOf(principal).actor, actorKind: actorOf(principal).actor_kind });
+
+  // 5b) BILLING BACKFILL: deposits/invoices sent BEFORE convert were written with
+  //     customer_client_id NULL (the customer didn't exist yet). Stamp them now so
+  //     the client's own Billing view shows the full money story. Idempotent.
+  try {
+    await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&customer_client_id=is.null`, {
+      method: 'PATCH', body: JSON.stringify({ customer_client_id: clientId, customer_site_id: prov.siteId || null }),
+    });
+  } catch { /* best-effort — the studio-side record is already correct */ }
   return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, project_id: handoff.project?.id || null, hosted: prov.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }

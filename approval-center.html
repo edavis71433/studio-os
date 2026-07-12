@@ -114,7 +114,7 @@ function render(a){
     + `<p class="foot">Nothing here goes live until you approve it. Each “Review” opens the page where you can take a closer look and give the go-ahead.</p>`;
 }
 
-function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2 style="color:var(--ink)">Sign in to see what needs approval.</h2><p class="sub">Your approvals live with your account — sign in to review them.</p><p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`; }
+function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2 style="color:var(--ink)">Sign in to see what needs approval.</h2><p class="sub">Your approvals live with your account — sign in to review them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
 function trouble(){ $('main').innerHTML = `<div class="center"><h2 style="color:var(--ink)">We couldn’t load your approvals just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page. Please refresh in a moment.</p></div>`; }
 
 (async function init(){

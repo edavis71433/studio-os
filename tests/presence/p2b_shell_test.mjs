@@ -52,7 +52,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 // ── the shell is the ONE frame + owns the internal-tools gate + shared states ──
 {
   const shell = read('shell.js');
-  ok('shell: internal DDS tools shown ONLY when is_operator', /is_operator[\s\S]{0,80}dds-studio-manage-9k2p\.html/.test(shell));
+  // Two-door consolidation: the legacy admin console is retired — the shell must
+  // NOT link it, and sign-out goes to the role-aware door (client vs studio).
+  ok('shell: retired admin console is not linked', !/dds-studio-manage-9k2p\.html/.test(shell));
+  ok('shell: sign-out is role-aware (client → portal door, owners → studio door)', /client_reviewer[\s\S]{0,120}\/portal\.html[\s\S]{0,40}\/studio\.html/.test(shell));
   ok('shell: consumes buildNav via /portal/context (does not define nav)', /\/portal\/context/.test(shell) && /CTX\.nav/.test(shell));
   ok('shell: provides the shared state helpers (empty/skeleton/error/toast)', /window\.ddsEmpty/.test(shell) && /window\.ddsSkeleton/.test(shell) && /window\.ddsError/.test(shell) && /window\.ddsToast/.test(shell));
   ok('shell: reuses the ONE auth realm (dds-portal-auth)', /storageKey: 'dds-portal-auth'/.test(shell));

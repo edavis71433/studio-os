@@ -172,7 +172,12 @@ function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1
 
 async function loadContext(){
   const c=await api('GET','/portal/context');
-  if(c.ok&&c.body.data){S.caps=c.body.data.capabilities||[];S.canEdit=S.caps.includes('edit');}
+  if(c.ok&&c.body.data){
+    S.caps=c.body.data.capabilities||[];
+    // A watch-plan (monitor) site observes — uploads are off, so never show an
+    // Add button whose every use the server would refuse.
+    S.canEdit=S.caps.includes('edit')&&c.body.data.edition!=='monitor';
+  }
 }
 function qstr(){
   const c=COLS.find(x=>x.key===S.col)||COLS[0];
@@ -185,7 +190,7 @@ function qstr(){
 async function load(){
   if(S.col==='stock'){ if(S.stockState==null) return loadStock(); return renderStock(); }   // FD-T10: stock has its own surface
   const [a,col,h]=await Promise.all([api('GET','/assets?'+qstr()),api('GET','/assets/collections'),api('GET','/assets/health')]);
-  if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>Files live in your full workspace.</h2><p>Your client view shows what you’ve chosen to share.</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
+  if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${(a.body&&a.body.message)||"Your client view shows what you’ve chosen to share."}</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
   let rows=(a.ok&&a.body.data&&a.body.data.assets)||[];
   const c=COLS.find(x=>x.key===S.col);
   if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
@@ -425,7 +430,7 @@ document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeDetail();});
 // deep link: /files.html?focus=<id> (from ⌘K)
 function focusParam(){return new URLSearchParams(location.search).get('focus')||'';}
 
-function signedOut(){$('root').innerHTML=`<div class="empty"><h2>Sign in to see your files.</h2><p style="margin-top:14px"><a class="btn primary" href="/portal.html" style="text-decoration:none">Sign in →</a></p></div>`;}
+function signedOut(){$('root').innerHTML=`<div class="empty"><h2>Sign in to see your files.</h2><p style="margin-top:14px"><a class="btn primary" href="/studio.html" style="text-decoration:none">Sign in →</a></p></div>`;}
 (async function(){
   try{
     const {data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";

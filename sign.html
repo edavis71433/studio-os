@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <title>Review &amp; sign</title>
 <style>
   :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--good:#33664b;--good-soft:#e7f1ea;
@@ -35,7 +36,7 @@
 </style>
 </head>
 <body>
-<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<div class="wrap"><div id="main" aria-live="polite"><div class="spin" role="status" aria-label="Loading"></div></div></div>
 <script>
 // The public review & sign page. The email's "Review & sign" link lands here with
 // ?t=<signed token>. Reads the proposal/contract via the token-gated public view,
@@ -47,7 +48,15 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const money=(c)=>'$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:2});
 const TOKEN=new URLSearchParams(location.search).get('t')||'';
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'apikey':KEY},body:body?JSON.stringify(body):undefined});return{ok:r.ok,body:await r.json().catch(()=>({}))};}
-function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p></div>`;}
+function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p><p class="muted">Stuck? Just reply to the email this link came from.</p></div>`;}
+// A RECOVERABLE problem (version changed, too many tries) keeps the page — the
+// person shouldn't lose the document they just read over a retryable hiccup.
+function softFail(msg){
+  let n=$('softErr');
+  if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='#a3423a';$('main').appendChild(n);}
+  n.textContent=msg||'That didn’t go through — give it another try in a moment.';
+  document.querySelectorAll('button:disabled').forEach(b=>b.disabled=false);
+}
 function thanks(t,s){$('main').innerHTML=`<div class="center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`;}
 async function load(){
   if(!TOKEN){fail();return;}
@@ -62,10 +71,15 @@ function renderProposal(p){
   <div class="card"><table>${items}<tr class="total"><td>Total</td><td>${money(p.subtotal_cents)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}</div>`;
   if(p.status==='accepted'){h+=`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`;}
   else if(p.status==='declined'){h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;}
-  else h+=`<div class="row"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Not right now</button></div>`;
+  else h+=`<div class="row"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Decline this proposal</button></div>`;
   $('main').innerHTML=h;
-  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{fail(r.body&&r.body.message);}};
-  const dd=$('decline');if(dd)dd.onclick=async()=>{dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else fail(r.body&&r.body.message);};
+  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{softFail(r.body&&r.body.message);}};
+  // Declining is final (a fresh proposal needs a fresh link) — so it takes two
+  // deliberate taps, and the label says exactly what it does.
+  const dd=$('decline');if(dd)dd.onclick=async()=>{
+    if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';return;}
+    dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});
+    if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else softFail(r.body&&r.body.message);};
 }
 function renderContract(c){
   let h=`<h1>${esc(c.title||'Your agreement')}</h1><p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
@@ -76,10 +90,12 @@ function renderContract(c){
     <div class="row"><button id="sign">Sign the agreement</button></div>
     <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div>`;
   $('main').innerHTML=h;
-  const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();if(!nm){$('nm').focus();return;}s.disabled=true;
+  const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();
+    if(!nm){softFail('Type your full name in the box above — that’s your signature.');$('nm').focus();return;}
+    s.disabled=true;
     const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
     if(r.ok)thanks('Signed — welcome aboard! 🎉','Your studio has been told and will kick things off. Anything sent to you next lands in your email.');
-    else{fail(r.body&&r.body.message);}};
+    else{softFail(r.body&&r.body.message);}};
 }
 load();
 </script>

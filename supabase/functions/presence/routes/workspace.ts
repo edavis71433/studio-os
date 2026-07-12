@@ -44,7 +44,11 @@ export function reviewerAllowed(route: string, method: string): boolean {
 
 async function requireManager(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ role: SiteRole } | Response> {
   const role = await resolveSiteRole(jwt, site.id, principal.kind);
-  if (!siteCan(role, 'invite') && !siteCan(role, 'configure')) {
+  // Managing PEOPLE (members + what clients see) is the 'invite' capability
+  // alone. 'configure' is settings power, deliberately NOT people power — a
+  // developer can configure the site but must never add members or reshape
+  // client visibility (matches the capability table's own comment).
+  if (!siteCan(role, 'invite')) {
     return json({ error: 'forbidden', message: 'Only the account owner can manage who sees what.' }, 403, cors);
   }
   return { role };
@@ -74,12 +78,15 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // Phase P: the honest upsell — the next self-serve rung + what it GAINS (from
   // featureDelta, so it can never overpromise). Shown only to owners (never to
   // client reviewers or operators); null at the top of the ladder = no card.
-  let upsell: { plan_key: string; name: string; tagline: string; monthly: number | null; gains: string[] } | null = null;
+  let upsell: { plan_key: string; name: string; tagline: string; monthly: number | null; gains: string[]; gives_up: string[] } | null = null;
   if (planKey && role === 'business_owner' && !isOperator) {
     const next = nextPlanUp(planKey);
     if (next) {
-      const gains = featureDelta(editionKey, editionFromPlan(next.key)).gained;
-      upsell = { plan_key: next.key, name: next.name, tagline: next.tagline || '', monthly: next.monthly, gains: gains.slice(0, 4) };
+      const delta = featureDelta(editionKey, editionFromPlan(next.key));
+      // HONEST both ways: if the "next rung" would switch anything OFF (e.g.
+      // Monitor → CMS loses Moments/Connections/AI), the card must say so —
+      // an upsell that silently removes what they use is a trust-killer.
+      upsell = { plan_key: next.key, name: next.name, tagline: next.tagline || '', monthly: next.monthly, gains: delta.gained.slice(0, 4), gives_up: delta.lost.slice(0, 4) };
     }
   }
 
@@ -157,12 +164,16 @@ const NOTICE_HREF: Record<string, string> = {
   lead_followup: '/leads.html',
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
+  invoice_paid: '/pipeline.html',  // money landed → the deal it landed on
+  publish_failed: '/presence.html#publish',
   domain_expiry: '/presence.html#business',
   search_setup: '/presence.html#search',
   welcome_back: '/today.html',
-  capacity: '/portal.html', trial_ending: '/portal.html', trial_ended: '/portal.html',
-  payment_trouble: '/portal.html', account_lapsed: '/portal.html',
-  winddown_reminder: '/portal.html', win_back: '/portal.html', deletion_requested: '/portal.html',
+  // account/billing notices land on Today (the plan card + billing live there;
+  // the legacy portal app is retired — portal.html is now just the sign-in door)
+  capacity: '/today.html', trial_ending: '/today.html', trial_ended: '/today.html',
+  payment_trouble: '/today.html', account_lapsed: '/today.html',
+  winddown_reminder: '/today.html', win_back: '/today.html', deletion_requested: '/today.html',
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 
@@ -195,6 +206,25 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // so "a lead is waiting" / "your domain expires soon" surface on every page —
   // not only in the portal card. Each carries the href that resolves it.
   const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, headline: n.headline, body: n.body, href: noticeHref(n.kind) }));
+
+  // Bridged customer: their unread delivery activity lives on the AGENCY site
+  // (counted into the bell by /portal/context) — without a findable row here the
+  // badge points at nothing. One calm row that links where the items actually are.
+  if (site.client_id) {
+    try {
+      const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
+      if (links.length) {
+        const s = links[0].agency_site_id; const ids = links.filter((l) => l.agency_site_id === s).map((l) => l.project_id);
+        const [seen, ev] = await Promise.all([
+          svc(`presence_activity_reads?site_id=eq.${s}&reader=eq.${encodeURIComponent('client:' + site.client_id)}&select=last_seen_at&limit=1`),
+          ids.length ? svc(`presence_project_events?site_id=eq.${s}&project_id=in.(${ids.join(',')})&client_visible=is.true&select=created_at&order=created_at.desc&limit=50`) : Promise.resolve({ json: [] as any[] }),
+        ]);
+        const lastSeen = ((seen.json as any[]) || [])[0]?.last_seen_at || null;
+        const unread = (((ev.json as any[]) || [])).filter((e) => !lastSeen || String(e.created_at) > String(lastSeen)).length;
+        if (unread > 0) notices.unshift({ id: 'bridge-updates', kind: 'client_updates', headline: unread === 1 ? 'An update from your studio' : `${unread} updates from your studio`, body: 'New activity on your project — messages, files, or something to approve.', href: '/client.html' });
+      }
+    } catch { /* best-effort — the bell still works without this row */ }
+  }
   return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last } }, 200, cors);
 }
 

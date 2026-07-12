@@ -31,6 +31,9 @@
   @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
   .muted{color:var(--soft);font-size:13px;margin-top:16px;text-align:center}
   .muted a{color:var(--p);text-decoration:none;cursor:pointer}
+  button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13px}
+  button.linky:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
+  input:focus-visible,button:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .panel{display:none}
   .panel h2{font-family:var(--serif);font-weight:500;font-size:21px;margin-bottom:6px}
   .panel p{color:var(--soft);font-size:14px;margin-bottom:6px}
@@ -55,8 +58,8 @@
       <button id="go" type="submit">Sign in</button>
     </form>
     <div class="err" id="err" role="alert"></div>
-    <p class="muted"><a id="forgot">Forgot your password?</a></p>
-    <p class="muted">A client of the studio? <a href="/portal.html">Your sign-in is here</a>.</p>
+    <p class="muted"><button class="linky" id="forgot" type="button">Forgot your password?</button></p>
+    <p class="muted">A client of the studio? <a href="/portal.html" style="color:var(--p)">Your sign-in is here</a>.</p>
   </div>
 
   <!-- ROUTING -->
@@ -68,42 +71,47 @@
   <!-- SIGNED IN, NO WORKSPACE CONNECTED (honest state — never a dead spinner) -->
   <div id="noWorkspace" class="panel">
     <h2>You're signed in ✓</h2>
-    <p>This account is on the team, but its Studio OS workspace isn't connected on this environment yet.</p>
-    <p>Everything still runs — use the admin console while we finish connecting the workspace.</p>
-    <button id="toAdmin" type="button">Open the admin console</button>
-    <button class="ghost" id="retry" type="button">Try the workspace again</button>
-    <p class="muted"><a id="signout1">Sign out</a></p>
+    <p id="nwMsg">This account doesn't have its Studio OS workspace connected yet. If you just set it up, give it a minute and try again — otherwise write to
+      <a href="mailto:support@davisdigitalstudio.com" style="color:var(--p)">support@davisdigitalstudio.com</a> and we'll connect you.</p>
+    <button id="retry" type="button">Try again</button>
+    <p class="muted"><button class="linky" id="signout1" type="button">Sign out</button></p>
   </div>
 
   <!-- RESET SENT -->
   <div id="resetSent" class="panel">
     <h2>Check your email</h2>
     <p>If that address has an account, a reset link is on its way. It lands you on a page to choose a new password.</p>
-    <p class="muted"><a id="backToLogin">Back to sign in</a></p>
+    <p class="muted"><button class="linky" id="backToLogin" type="button">Back to sign in</button></p>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 // ── Studio OS — the ONE owner front door ─────────────────────────────────────
 // Signs in, asks the platform who you are, and lands you in the right place:
 //   • workspace member  → your landing page (Today / Website / Studio), where
 //     the shared shell nav carries Website·Customers·Projects·Files·Inbox — one app.
-//   • team w/o workspace → honest panel + admin console (never a dead spinner).
+//   • team w/o workspace → honest panel (never a dead spinner).
 //   • a client           → their door (/portal.html).
 // Session is shared with every app page (storageKey 'dds-portal-auth').
 var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 var FN = SUPABASE_URL + "/functions/v1";
-var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+var sb = null;
+if (typeof supabase !== "undefined") {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+}
 var $ = function(id){ return document.getElementById(id); };
 function show(id){ ['loginPanel','routing','noWorkspace','resetSent'].forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); }
 function err(m){ var e=$('err'); e.textContent=m; e.style.display='block'; }
+if (!sb) err("Connection problem — check your internet and refresh this page.");
 
 function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
+function panel(msg){ if (msg) $('nwMsg').textContent = msg; show('noWorkspace'); }
 
 async function route(token){
   show('routing');
+  var networkTrouble = false;
   // 1) the unified workspace — /portal/context knows role, tier, and landing
   try {
     var r = await withTimeout(fetch(FN + "/presence/portal/context", {
@@ -111,7 +119,11 @@ async function route(token){
     }), 9000);
     var j = await r.json().catch(function(){ return {}; });
     if (r.ok && j && j.data && j.data.landing) { location.href = j.data.landing; return; }
-  } catch (e) { /* fall through — never strand the user on a spinner */ }
+    // Honest states — a paused/lapsed account gets the server's own words, not a wrong door.
+    if (r.status === 403 && j && j.message) { panel(j.message); return; }
+    if (r.status !== 404) networkTrouble = true;  // 404 no_site → check team; anything else was a hiccup
+  } catch (e) { networkTrouble = true; }
+  if (networkTrouble) { panel("We couldn't reach your workspace just now — it's probably the connection, not you. Try again in a moment."); return; }
   // 2) team member without a connected workspace → honest panel
   try {
     var w = await withTimeout(fetch(FN + "/clever-api", {
@@ -120,14 +132,15 @@ async function route(token){
       body: JSON.stringify({ type: "whoami" })
     }), 9000);
     var wj = await w.json().catch(function(){ return {}; });
-    if (wj && wj.isTeam) { show('noWorkspace'); return; }
-  } catch (e) { /* fall through */ }
+    if (wj && wj.isTeam) { panel(null); return; }
+  } catch (e) { panel("We couldn't reach the studio just now — try again in a moment."); return; }
   // 3) a client — their door is the portal
   location.href = "/portal.html";
 }
 
 $('f').addEventListener('submit', async function(ev){
   ev.preventDefault();
+  if (!sb) { err("Connection problem — check your internet and refresh this page."); return; }
   var em = $('em').value.trim(), pw = $('pw').value;
   if (!em || !pw) { err('Enter your email and password.'); return; }
   var b = $('go'); b.disabled = true; b.textContent = 'Signing in…'; $('err').style.display='none';
@@ -139,21 +152,23 @@ $('f').addEventListener('submit', async function(ev){
 });
 
 $('forgot').addEventListener('click', async function(){
+  if (!sb) return;
   var em = $('em').value.trim();
   if (!em) { err('Type your email above first, then tap “Forgot your password?” again.'); $('em').focus(); return; }
   try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html' }); } catch(e){}
   show('resetSent');
 });
 $('backToLogin').addEventListener('click', function(){ show('loginPanel'); });
-$('toAdmin').addEventListener('click', function(){ location.href = '/dds-studio-manage-9k2p.html'; });
 $('retry').addEventListener('click', async function(){
+  if (!sb) return;
   var s = await sb.auth.getSession(); var t = s && s.data && s.data.session && s.data.session.access_token;
   if (t) route(t); else show('loginPanel');
 });
-$('signout1').addEventListener('click', async function(){ try{ await sb.auth.signOut(); }catch(e){} show('loginPanel'); });
+$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } show('loginPanel'); });
 
 // Already signed in? Route straight through — this page is a door, not a stop.
 (async function(){
+  if (!sb) return;
   try {
     var s = await sb.auth.getSession();
     var t = s && s.data && s.data.session && s.data.session.access_token;

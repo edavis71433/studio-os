@@ -112,7 +112,7 @@ async function toggle(btn){const surface=btn.getAttribute('data-surface');const 
   else{btn.setAttribute('aria-checked',String(!next));toast('That didn’t save.');}
 }
 function notOwner(){$('main').innerHTML=`<div class="center"><h2>Only the account owner can manage sharing.</h2><p class="muted">Ask your studio if you need access changed.</p></div>`;}
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to manage sharing.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to manage sharing.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>Couldn’t load this just now.</h2><p class="muted">Please refresh.</p></div>`;}
 
 async function load(){

@@ -8,6 +8,7 @@ import { svc } from '../lib/db.ts';
 import { isStudioSide, loadProject, projectEvent } from './projects.ts';
 import { clampLimit, clampOffset } from '../lib/service_delivery.ts';
 import { isAudience, notifHref, notifLabel, isRead } from '../lib/notifications.ts';
+import { emailBridgedCustomer } from '../lib/service_bridge.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -47,6 +48,13 @@ export async function handleMessages(req: Request, jwt: string, site: SiteRow, p
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That message didn’t send — please try again.' }, 502, cors);
     // a client-audience message participates in the ONE activity log (feeds notifications)
     await projectEvent(site.id, projectId, 'message', principal, audience === 'client', { message_id: rows(ins)[0].id, from: studio ? 'studio' : 'client' });
+    // A studio→client message must reach the client's EMAIL, not only a portal
+    // they may not be watching. Best-effort; the message itself is already saved.
+    if (studio && audience === 'client') {
+      const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+      emailBridgedCustomer(site.id, projectId, 'A message from your studio',
+        `<p>Your studio wrote to you about your project:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote>`).catch(() => {});
+    }
     return json({ data: rows(ins)[0] }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);

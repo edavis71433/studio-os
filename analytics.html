@@ -109,7 +109,7 @@ async function load(){
   renderHome(r.body.data||{});
 }
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const c=await api('/portal/context');CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
 </script>
 </body>

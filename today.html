@@ -230,7 +230,7 @@ function signedOut(){
   $('sub').textContent = '';
   $('main').innerHTML = `<div class="center"><h2>Welcome back.</h2>
     <p class="muted">Sign in to see what — if anything — needs you today.</p>
-    <p style="margin-top:22px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;
+    <p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;
 }
 function trouble(){
   $('main').innerHTML = `<div class="center"><h2>We couldn’t load your day just now.</h2>
@@ -244,20 +244,39 @@ function trouble(){
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
-    const [moments, features, ctx, feed] = await Promise.all([
+    const [moments, features, ctx, feed, bridged] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       apiGet('/portal/context').catch(()=>null),
       apiGet('/portal/feed').catch(()=>null),
+      apiGet('/client/projects').catch(()=>null),   // bridge: work a studio is doing FOR you
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     render(list, features?.data || {}, feed && feed.data, ctx && ctx.data);
+    studioProjectCard(bridged && bridged.data);
     orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);
     healthLine();
     journeyStrip();
   }catch(_){ trouble(); }
 })();
+
+// ── Bridge discovery: a converted customer has a studio building FOR them, but
+// nothing used to point at that delivery view — they could sign in and never
+// find their own project. One calm card, only when a linked project exists. ──
+function studioProjectCard(d){
+  try{
+    const projects = (d && (d.projects || d)) || [];
+    if(!Array.isArray(projects) || !projects.length) return;
+    const host = document.querySelector('main') || document.body;
+    const card = document.createElement('a');
+    card.href = '/client.html';
+    card.style.cssText = 'display:block;max-width:860px;margin:18px auto 0;padding:16px 20px;border:1px solid var(--accent-soft,#e5ddf5);border-radius:14px;background:var(--card,#fff);font-size:14px;color:inherit;text-decoration:none';
+    const name = projects[0] && (projects[0].title || projects[0].name) || 'Your project';
+    card.innerHTML = '<strong>' + esc(name) + '</strong> — your studio is on it. <span style="color:var(--accent,#5b3fa0);font-weight:600">See progress, files, and anything waiting on you →</span>';
+    host.insertBefore(card, host.firstChild ? host.firstChild.nextSibling : null);
+  }catch(_){/* never break Today over a nicety */}
+}
 
 // ── PP-6: the one-time "welcome to your new plan" orientation. When the edition
 // grows (an upgrade added feature areas), name exactly what became available —
@@ -350,8 +369,10 @@ function planCard(c){
     const up = document.createElement('div');
     up.style.marginTop = '8px';
     const gains = (c.upsell.gains||[]).map(g => esc(String(g).replace(/_/g,' '))).join(', ');
+    const losses = (c.upsell.gives_up||[]).map(g => esc(String(g).replace(/_/g,' '))).join(', ');
     up.innerHTML = esc(c.upsell.name) + (c.upsell.monthly ? ' (from $' + c.upsell.monthly + '/mo)' : '') +
       (gains ? ' adds: ' + gains + '.' : '.') +
+      (losses ? ' <span style="color:var(--warn,#775d31)">Heads up: it switches off ' + losses + ' — ask us about a plan that keeps both.</span>' : '') +
       ' <a href="mailto:support@davisdigitalstudio.com?subject=' + encodeURIComponent('Upgrading to ' + c.upsell.name) + '" style="color:var(--accent)">Ask about upgrading →</a>';
     card.appendChild(up);
   }
