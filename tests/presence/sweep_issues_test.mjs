@@ -21,7 +21,7 @@ const healthy = {
   scheduled_publishes: { ok: true, run_type: 'scheduled-publish', considered: 0, ran: 0, failures: 0, results: [] },
   reconcile: { ok: true, run_type: 'reconcile', scanned: 0, live: 0, failed: 0, abandoned: 0, pending: 0 },
   reconcile_billing: { checked: 0, corrected: 0, errors: 0, skipped_no_stripe: true },   // no-Stripe env
-  lifecycle: { expired_trials: 0, notices: 0, emails: 0, wound_down: 0, grace_lapsed: 0 },
+  lifecycle: { expired_trials: 0, notices: 0, emails: 0, wound_down: 0, grace_lapsed: 0, failures: 0 },
   deletion: { due: 0, completed: 0, failed: 0 },
   digest: { sent: 0, skipped_dedupe: true },            // THE bug shape: ~671/672 ticks — must be clean
   domains: { checked: 0, warned: 0 },
@@ -47,6 +47,7 @@ ok('a failed retention prune pages', sweepIssues({ ...healthy, retention: { ...h
 ok('a FAILED weekly digest send pages', sweepIssues({ ...healthy, digest: { sent: 0, failures: 1 } }).length > 0);
 ok('deletion executor failure pages', sweepIssues({ ...healthy, deletion: { due: 1, completed: 0, failed: 1 } }).length > 0);
 ok('stale-run reaper failure pages', sweepIssues({ ...healthy, stale_runs: { ok: false } }).length > 0);
+ok('wind-down takedown failure pages (OB-1)', sweepIssues({ ...healthy, lifecycle: { ...healthy.lifecycle, failures: 1 } }).length > 0);
 ok('interrupted scheduled publish pages', sweepIssues({ ...healthy, scheduled_publishes: { ...healthy.scheduled_publishes, ok: false, failures: 1 } }).length > 0);
 
 // ── the digest regression, pinned forever ─────────────────────────────────────

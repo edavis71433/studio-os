@@ -122,9 +122,9 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
 }
 
 // ── the impure runner (called from /system/run) ──────────────────────────────
-export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: number; notices: number; emails: number; wound_down: number; grace_lapsed: number }> {
+export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: number; notices: number; emails: number; wound_down: number; grace_lapsed: number; failures: number }> {
   const nowIso = new Date().toISOString();
-  let expired = 0, notices = 0, emails = 0, wound_down = 0, grace_lapsed = 0;
+  let expired = 0, notices = 0, emails = 0, wound_down = 0, grace_lapsed = 0, failures = 0;
 
   // FAIRNESS (0091): ordered by the last_swept_at rotation cursor + stamped on
   // consideration, so trial-expiry/grace/wind-down reach EVERY entitlement at
@@ -183,10 +183,10 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
           // deleteSite returns {ok:false} rather than throwing — CHECK it. Erasing
           // netlify_site_id after a failed takedown would leave a lapsed customer's
           // site live on Netlify forever, unfindable and unreported. On failure the
-          // row keeps its pointer and retries next sweep (and pages via sweepIssues).
+          // row keeps its pointer and retries next sweep (counted in failures → sweepIssues pages).
           if (site.netlify_site_id) {
             const del = await deleteSite(site.netlify_site_id).catch(() => ({ ok: false }));
-            if (!(del as { ok?: boolean }).ok) { console.error(`[lifecycle] wind-down takedown FAILED for site ${site.id} — keeping netlify_site_id for retry`); continue; }
+            if (!(del as { ok?: boolean }).ok) { failures++; console.error(`[lifecycle] wind-down takedown FAILED for site ${site.id} — keeping netlify_site_id for retry`); continue; }
           }
           const up = await svc(`presence_sites?id=eq.${encodeURIComponent(site.id)}`, {
             method: 'PATCH', body: JSON.stringify({ status: 'archived', netlify_site_id: null, custom_domain: null }),
@@ -220,7 +220,7 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
       }
     }
   }
-  return { expired_trials: expired, notices, emails, wound_down, grace_lapsed };
+  return { expired_trials: expired, notices, emails, wound_down, grace_lapsed, failures };
 }
 
 // ── Phase CP-3 (CP-5): the weekly owner digest — the Monday routine, automated ──

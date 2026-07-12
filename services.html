@@ -26,6 +26,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="services.css">
+<link rel="stylesheet" href="portal-mock.css">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -166,12 +167,34 @@
   <div class="reveal mt-l" style="display:grid;grid-template-columns:1fr;gap:22px;align-items:center;border:1px solid var(--hair);border-radius:20px;padding:24px;background:var(--paper-2);">
     <p class="hint" style="max-width:60ch;margin:0">Three problems, three fixes &mdash; but one place to watch it happen. Every step above shows up in the same project workspace, in plain English. <a href="/the-experience" class="textlink">See the full experience &rarr;</a></p>
     <figure style="margin:0;border:1px solid var(--hair);border-radius:14px;overflow:hidden;background:var(--paper);">
-      <picture>
-        <source media="(max-width:600px)" type="image/webp" srcset="portal-home-mobile.webp">
-        <source media="(max-width:600px)" srcset="portal-home-mobile.png">
-        <source type="image/webp" srcset="portal-home.webp">
-        <img src="portal-home.png" alt="A client's project workspace on login — progress, approvals, files, and invoices in one organized place" loading="lazy" width="1440" height="1097" style="display:block;width:100%;height:auto" onerror="if(this.src.indexOf('portal-preview')===-1){this.onerror=null;this.src='portal-preview.png';}">
-      </picture>
+      <!-- Hand-built preview of the real client workspace (see portal-mock.css).
+           Decorative: role="img" + aria-label carries the meaning; the sample
+           business is fictional and the numbers are modest on purpose. -->
+      <div class="pmock" role="img" aria-label="Preview of your project workspace: a calm home screen for Rosa's Bakery with one change waiting for approval, word that new photos are live, and a note that 12 people found the business on Google this week.">
+        <div class="pmock-chrome"><span class="pmock-dots"><i></i><i></i><i></i></span><span class="pmock-url">rosasbakery.com</span></div>
+        <div class="pmock-shell"><span class="pmock-mark">R</span><span>Rosa's Bakery</span><span class="pmock-ctx">&middot; Your workspace</span><span class="pmock-bell">1</span></div>
+        <div class="pmock-body">
+          <div class="pmock-hi">Good morning, Rosa.</div>
+          <div class="pmock-sub">One thing needs your OK &mdash; no rush.</div>
+          <div class="pmock-lab">Waiting for your OK</div>
+          <div class="pmock-card approve">
+            <span class="pmock-tag">Change</span>
+            <div class="t">Updated hours for spring</div>
+            <div class="d">Your new weekend hours, ready to go live.</div>
+            <div class="pmock-row"><span class="pmock-btn pri">Approve</span><span class="pmock-btn">Not yet</span></div>
+          </div>
+          <div class="pmock-lab">Recent updates</div>
+          <div class="pmock-card good">
+            <span class="pmock-tag g">Good news</span>
+            <div class="t">Your new photos are live</div>
+            <div class="d">Six fresh photos on your gallery page.</div>
+          </div>
+          <div class="pmock-card pm-extra">
+            <div class="t">12 people found you on Google this week</div>
+            <div class="d">A little ahead of last week.</div>
+          </div>
+        </div>
+      </div>
       <figcaption style="padding:12px 16px;font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--muted);border-top:1px solid var(--hair);">What you see when you log in &mdash; progress, approvals, files, and invoices, all in one place.</figcaption>
     </figure>
   </div>

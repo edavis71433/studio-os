@@ -48,7 +48,8 @@ export async function svcAll(path: string, orderCol: string, pageSize = 1000, ma
   for (let p = 0; p < maxPages; p++) {
     const sep = path.includes('?') ? '&' : '?';
     const r = await svc(`${path}${sep}order=${orderCol}.asc&limit=${pageSize}&offset=${p * pageSize}`);
-    const rows = r.ok && Array.isArray(r.json) ? r.json : [];
+    if (!r.ok) { console.error(`[db] svcAll page ${p} failed for ${path.split('?')[0]} — returning PARTIAL result (${out.length} rows)`); return out; }
+    const rows = Array.isArray(r.json) ? r.json : [];
     out.push(...rows);
     if (rows.length < pageSize) return out;
   }

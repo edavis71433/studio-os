@@ -141,7 +141,7 @@ async function health(): Promise<any> {
     // so measuring start time would report a healthy scheduler while trial
     // expiry, billing enforcement, and all hygiene silently never complete.
     // Finish time is the only honest liveness signal.
-    const last = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=finished_at.desc&select=status,started_at,finished_at,site_id&limit=1');
+    const last = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1');
     lastCycle = last.json?.[0] || null;
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     failures24h = (await svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}`)) ?? 0;
@@ -174,7 +174,7 @@ export async function computeHealthCenter(): Promise<any> {
   const since = new Date(Date.now() - 7 * 86400_000).toISOString();
   const since24 = new Date(Date.now() - 24 * 3600_000).toISOString();
   const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []);
-  const cronQ = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&order=created_at.desc&select=status,started_at,finished_at&limit=1');
+  const cronQ = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=created_at.desc&select=status,started_at,finished_at&limit=1');
   const lastCycle = arr(cronQ)[0] || null;
   // Exact counts (HEAD + count=exact) — fetch-to-count went WRONG past the
   // PostgREST max-rows cap, silently under-reporting at scale.

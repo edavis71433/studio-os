@@ -1,0 +1,152 @@
+/* ============================================================
+   portal-mock.css — hand-built previews of the client workspace
+   for the marketing site (replaces the stale portal-*.png shots).
+
+   FAITHFULNESS: a miniature of the REAL product — the same bones
+   and palette as client.html / today.html / shell.css: plum
+   #5b3fa0, ink #1b1525, warm bg #faf8f5, white cards, hairline
+   #eee9e0, Iowan Old Style/Palatino for display, system sans
+   body, a slim top bar with the square serif brand mark. No
+   invented charts or features.
+
+   A11Y: each mock is decorative — the page gives it
+   role="img" + aria-label ("Preview of your project
+   workspace: …"); everything inside is presentational.
+
+   MOTION: none. Nothing here animates, so prefers-reduced-motion
+   is satisfied by construction.
+
+   THEME: the marketing pages flip tokens via prefers-color-scheme
+   (no manual toggle on the public site); the mock flips with them
+   to the app's dark family — page #171320 · panel #1f1a2e ·
+   card-tone #241d38 — with plum lifted to #c4aee8 where it is
+   used as text/accent (the light #5b3fa0 vanishes on dark).
+   ============================================================ */
+
+.pmock{
+  --pm-bg:#faf8f5; --pm-card:#fff; --pm-ink:#1b1525; --pm-soft:#6b6478; --pm-faint:#6f677d;
+  --pm-line:#eee9e0; --pm-p:#5b3fa0; --pm-p-soft:#efeafa;
+  --pm-btn:#5b3fa0; --pm-btn-ink:#fff;
+  --pm-good:#33664b; --pm-good-soft:#e7f1ea; --pm-chrome:#f1ece4;
+  --pm-serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --pm-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  width:100%;
+  /* the old screenshots were 1440×1097 — keeping their aspect means the
+     wrappers reserve the same space and nothing on the page shifts. The
+     ratio is a preferred size: if the content ever needs more height on a
+     very narrow screen, the box grows instead of clipping. */
+  aspect-ratio:1440/1097;
+  display:flex; flex-direction:column;
+  background:var(--pm-bg); color:var(--pm-ink);
+  font-family:var(--pm-sans); line-height:1.45;
+  container-type:inline-size;
+  overflow:hidden;
+  user-select:none; -webkit-user-select:none;
+}
+@media (prefers-color-scheme:dark){
+  .pmock{
+    --pm-bg:#171320; --pm-card:#1f1a2e; --pm-ink:#efeaf7; --pm-soft:#a79ebc; --pm-faint:#948bad;
+    --pm-line:#2a2338; --pm-p:#c4aee8; --pm-p-soft:#241d38;
+    --pm-btn:#b79ceb; --pm-btn-ink:#171320;   /* the app's dark primary: light plum + dark ink (AA) */
+    --pm-good:#8bbf9f; --pm-good-soft:#1f2a24; --pm-chrome:#241d38;
+  }
+}
+.pmock *{box-sizing:border-box;margin:0}
+
+/* ── browser chrome: dots + the client's own domain ── */
+.pmock-chrome{flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:clamp(6px,1.4cqw,9px) clamp(10px,2.2cqw,14px);
+  background:var(--pm-chrome);border-bottom:1px solid var(--pm-line)}
+.pmock-dots{display:flex;gap:5px;flex:0 0 auto}
+.pmock-dots i{width:clamp(7px,1.4cqw,9px);height:clamp(7px,1.4cqw,9px);border-radius:50%}
+.pmock-dots i:nth-child(1){background:#d98b7f}
+.pmock-dots i:nth-child(2){background:#d9bc7f}
+.pmock-dots i:nth-child(3){background:#8fbf9c}
+.pmock-url{flex:1 1 auto;min-width:0;max-width:52%;margin:0 auto;
+  background:var(--pm-bg);border:1px solid var(--pm-line);border-radius:999px;
+  padding:clamp(2px,.6cqw,4px) clamp(8px,2cqw,13px);
+  font-size:clamp(8.5px,1.8cqw,11.5px);color:var(--pm-soft);text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* balance the dots so the address bar sits truly centered */
+.pmock-chrome::after{content:"";flex:0 0 auto;width:clamp(25px,5.2cqw,33px)}
+
+/* ── the app's slim top bar: square serif mark + business name ── */
+.pmock-shell{flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  padding:clamp(5px,1.4cqw,8px) clamp(10px,2.4cqw,15px);
+  background:var(--pm-card);border-bottom:1px solid var(--pm-line);
+  font-size:clamp(10px,2.1cqw,13px);font-weight:600;white-space:nowrap}
+.pmock-mark{flex:0 0 auto;width:clamp(15px,3.2cqw,20px);height:clamp(15px,3.2cqw,20px);
+  border-radius:clamp(4px,1cqw,6px);background:var(--pm-btn);color:var(--pm-btn-ink);
+  display:grid;place-items:center;font-family:var(--pm-serif);
+  font-size:clamp(9px,2cqw,12px);font-weight:500}
+.pmock-ctx{color:var(--pm-faint);font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.pmock-bell{margin-left:auto;flex:0 0 auto;min-width:clamp(13px,2.8cqw,17px);height:clamp(13px,2.8cqw,17px);
+  border-radius:999px;background:var(--pm-p-soft);color:var(--pm-p);
+  font-size:clamp(8px,1.7cqw,10.5px);font-weight:700;display:grid;place-items:center;padding:0 4px}
+
+/* ── body: the calm centered column the real app uses ── */
+.pmock-body{flex:1 1 auto;width:min(100%,540px);margin:0 auto;
+  padding:clamp(12px,3cqw,22px) clamp(14px,3.6cqw,24px) clamp(10px,2.4cqw,16px);
+  display:flex;flex-direction:column;gap:clamp(7px,1.7cqw,11px);min-height:0}
+.pmock-hi{font-family:var(--pm-serif);font-weight:500;letter-spacing:-.01em;
+  font-size:clamp(15px,3.6cqw,23px);line-height:1.15}
+.pmock-sub{color:var(--pm-soft);font-size:clamp(9.5px,2cqw,12.5px);margin-top:-3px}
+.pmock-back{color:var(--pm-p);font-weight:600;font-size:clamp(9px,1.9cqw,11.5px)}
+.pmock-lab{font-size:clamp(8px,1.7cqw,10.5px);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--pm-faint);font-weight:600;margin-top:clamp(2px,.8cqw,6px)}
+
+/* cards — white, hairline, soft radius, serif titles (client.html) */
+.pmock-card{background:var(--pm-card);border:1px solid var(--pm-line);
+  border-radius:clamp(9px,2.2cqw,14px);
+  padding:clamp(9px,2.2cqw,15px) clamp(11px,2.6cqw,17px);
+  box-shadow:0 1px 2px rgba(27,21,37,.04)}
+.pmock-card.approve{border-left:3px solid var(--pm-p)}
+.pmock-card.good{border-left:3px solid var(--pm-good)}
+.pmock-card .t{font-family:var(--pm-serif);font-weight:500;
+  font-size:clamp(11.5px,2.6cqw,16px);line-height:1.25}
+.pmock-card .d{color:var(--pm-soft);font-size:clamp(9.5px,2cqw,12.5px);margin-top:2px}
+.pmock-tag{display:inline-block;font-size:clamp(7.5px,1.6cqw,9.5px);letter-spacing:.05em;
+  text-transform:uppercase;color:var(--pm-p);background:var(--pm-p-soft);
+  border-radius:999px;padding:2px 8px;font-weight:600;margin-bottom:clamp(4px,1cqw,7px)}
+.pmock-tag.g{color:var(--pm-good);background:var(--pm-good-soft)}
+
+/* pill buttons — plum primary, quiet outline secondary */
+.pmock-row{display:flex;gap:7px;margin-top:clamp(7px,1.8cqw,12px);flex-wrap:wrap}
+.pmock-btn{display:inline-block;font-size:clamp(9px,1.9cqw,12px);font-weight:600;
+  border-radius:999px;border:1px solid var(--pm-line);color:var(--pm-ink);
+  padding:clamp(3px,.9cqw,6px) clamp(9px,2.3cqw,14px)}
+.pmock-btn.pri{background:var(--pm-btn);border-color:var(--pm-btn);color:var(--pm-btn-ink)}
+
+/* status strip + milestone meter (project view) */
+.pmock-status{display:flex;align-items:center;gap:9px;
+  background:var(--pm-good-soft);border-radius:clamp(8px,1.8cqw,11px);
+  padding:clamp(6px,1.6cqw,9px) clamp(9px,2.2cqw,13px);
+  font-size:clamp(9.5px,2cqw,12.5px)}
+.pmock-status > i{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--pm-good)}
+.pmock-status span{white-space:nowrap}
+.pmock-meter{flex:1 1 auto;min-width:40px;height:clamp(4px,1cqw,6px);border-radius:999px;
+  background:var(--pm-line);overflow:hidden}
+.pmock-meter i{display:block;height:100%;width:60%;background:var(--pm-p);border-radius:999px}
+
+/* task rows with check states */
+.pmock-task{display:flex;gap:9px;align-items:baseline;
+  font-size:clamp(10px,2.1cqw,13px);
+  padding:clamp(5px,1.4cqw,9px) 0;border-top:1px solid var(--pm-line)}
+.pmock-task:first-child{border-top:0;padding-top:0}
+.pmock-task:last-child{padding-bottom:0}
+.pmock-task .ck{flex:0 0 auto;font-weight:700;color:var(--pm-good)}
+.pmock-task.todo .ck{color:var(--pm-faint)}
+.pmock-task .when{color:var(--pm-soft)}
+
+/* deliverable row with its Approve chip */
+.pmock-file{display:flex;align-items:center;gap:10px}
+.pmock-file .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pmock-file .pmock-btn{margin-left:auto;flex:0 0 auto}
+
+/* very narrow columns: drop the garnish so the essentials stay readable
+   (this replaces the old separate -mobile screenshot variants) */
+@container (max-width:430px){
+  .pmock .pm-extra{display:none}
+  .pmock-ctx{display:none}
+  .pmock-url{max-width:64%}
+}

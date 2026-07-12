@@ -26,6 +26,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="the-experience.css">
+<link rel="stylesheet" href="portal-mock.css">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
 {"@type":"ListItem","position":1,"name":"Home","item":"https://davisdigitalstudio.com/"},
@@ -148,12 +149,34 @@
   <h2 class="kicker mt-s reveal">One calm, organized place &mdash; from our first call onward.</h2>
   <p class="lead-muted mt-m reveal" style="max-width:60ch">This project workspace is part of every project &mdash; not something you have to learn or pay extra for. It's simply how working with me works: everything in order, nothing lost, always clear where things stand.</p>
   <figure class="xp-proof reveal mt-l">
-    <picture>
-      <source media="(max-width:600px)" type="image/webp" srcset="portal-home-mobile.webp">
-      <source media="(max-width:600px)" srcset="portal-home-mobile.png">
-      <source type="image/webp" srcset="portal-home.webp">
-      <img src="portal-home.png" alt="A client's home view in their Davis Digital Studio project workspace" loading="lazy" width="1440" height="1097">
-    </picture>
+    <!-- Hand-built preview of the real client workspace (see portal-mock.css).
+         Decorative: role="img" + aria-label carries the meaning; the sample
+         business is fictional and the numbers are modest on purpose. -->
+    <div class="pmock" role="img" aria-label="Preview of your project workspace: a calm home screen for Rosa's Bakery with one change waiting for approval, word that new photos are live, and a note that 12 people found the business on Google this week.">
+      <div class="pmock-chrome"><span class="pmock-dots"><i></i><i></i><i></i></span><span class="pmock-url">rosasbakery.com</span></div>
+      <div class="pmock-shell"><span class="pmock-mark">R</span><span>Rosa's Bakery</span><span class="pmock-ctx">&middot; Your workspace</span><span class="pmock-bell">1</span></div>
+      <div class="pmock-body">
+        <div class="pmock-hi">Good morning, Rosa.</div>
+        <div class="pmock-sub">One thing needs your OK &mdash; no rush.</div>
+        <div class="pmock-lab">Waiting for your OK</div>
+        <div class="pmock-card approve">
+          <span class="pmock-tag">Change</span>
+          <div class="t">Updated hours for spring</div>
+          <div class="d">Your new weekend hours, ready to go live.</div>
+          <div class="pmock-row"><span class="pmock-btn pri">Approve</span><span class="pmock-btn">Not yet</span></div>
+        </div>
+        <div class="pmock-lab">Recent updates</div>
+        <div class="pmock-card good">
+          <span class="pmock-tag g">Good news</span>
+          <div class="t">Your new photos are live</div>
+          <div class="d">Six fresh photos on your gallery page.</div>
+        </div>
+        <div class="pmock-card pm-extra">
+          <div class="t">12 people found you on Google this week</div>
+          <div class="d">A little ahead of last week.</div>
+        </div>
+      </div>
+    </div>
   </figure>
   <p class="xp-proof-cap reveal">This is what you see when you log in &mdash; included with every project.</p>
   <p class="lead-muted mt-m reveal" style="max-width:60ch">And it doesn't close down at launch. <a href="/monthly-retainer" class="textlink">See what happens after &rarr;</a></p>

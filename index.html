@@ -26,6 +26,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="home.css">
+<link rel="stylesheet" href="portal-mock.css">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -244,12 +245,29 @@
         <svg class="conv-icon" style="--tx:2px;--ty:-72px;--tdelay:.1s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
       </div>
       <figure class="portal-proof">
-        <picture>
-          <source media="(max-width:600px)" type="image/webp" srcset="portal-progress-mobile.webp">
-          <source media="(max-width:600px)" srcset="portal-progress-mobile.png">
-          <source type="image/webp" srcset="portal-progress.webp">
-          <img src="portal-progress.png" alt="A client's view of their project progress in the Davis Digital Studio portal" loading="lazy" width="1440" height="1097" onerror="if(this.src.indexOf('portal-preview')===-1){this.onerror=null;this.src='portal-preview.png';}">
-        </picture>
+        <!-- Hand-built preview of the real client workspace (see portal-mock.css).
+             Decorative: role="img" + aria-label carries the meaning; the sample
+             business is fictional and the numbers are modest on purpose. -->
+        <div class="pmock" role="img" aria-label="Preview of your project workspace: the Rosa's Bakery website project with 3 of 5 milestones done, a progress bar, your to-dos with one item waiting on you, and a homepage design ready to approve.">
+          <div class="pmock-chrome"><span class="pmock-dots"><i></i><i></i><i></i></span><span class="pmock-url">rosasbakery.com</span></div>
+          <div class="pmock-shell"><span class="pmock-mark">R</span><span>Rosa's Bakery</span><span class="pmock-ctx">&middot; Your workspace</span><span class="pmock-bell">1</span></div>
+          <div class="pmock-body">
+            <div class="pmock-back">&larr; Your projects</div>
+            <div class="pmock-hi">Website refresh</div>
+            <div class="pmock-sub">In progress &middot; on schedule</div>
+            <div class="pmock-status"><i></i><span><strong>3 of 5</strong> milestones done</span><span class="pmock-meter"><i></i></span></div>
+            <div class="pmock-lab">Your to-dos</div>
+            <div class="pmock-card">
+              <div class="pmock-task"><span class="ck">&#10003;</span><span>Share your menu photos <span class="when">&mdash; done</span></span></div>
+              <div class="pmock-task todo"><span class="ck">&#9675;</span><span>Review the homepage copy <span class="when">&mdash; waiting on you</span></span></div>
+            </div>
+            <div class="pmock-lab">Files</div>
+            <div class="pmock-card">
+              <div class="pmock-file"><span class="t">Homepage design &mdash; v2</span><span class="pmock-btn pri">Approve</span></div>
+              <div class="d pm-extra">Ready for your look whenever you have a minute.</div>
+            </div>
+          </div>
+        </div>
         <figcaption>Your project, the moment you log in &mdash; what's done, what's next, and what (if anything) needs you.</figcaption>
       </figure>
     </div>

@@ -145,7 +145,7 @@ export function trafficNotice(agg: TrafficAgg): { headline: string; summary: str
   }
   const s = agg.topSources[0];
   if (s && /google/i.test(s.source) && agg.topSources.length > 1 && s.visits >= agg.visitors * 0.6) {
-    return { headline: 'Google is becoming your biggest source.', summary: `Most of this ${'period'} run of visitors came from Google search.` };
+    return { headline: 'Google is becoming your biggest source.', summary: 'Most of your recent visitors came from Google search.' };
   }
   return null;
 }

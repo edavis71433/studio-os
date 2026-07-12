@@ -42,7 +42,7 @@ export async function handleBusinessInsights(site: SiteRow, cors: Record<string,
     // a device observation the compose layer doesn't emit — honest, from real
     // shares, only when there's a clear majority device
     const top = (traffic.devices || [])[0];
-    if (top && top.share >= 0.5) {
+    if (top && top.share >= 50) {   // share is an integer PERCENT (lib/visits.ts) — 0.5 fired on any top device
       insights.push({ key: 'device', title: 'How they browse', sentence: `Most of your visitors are on ${top.device} devices.`, tone: 'neutral' });
     }
   }

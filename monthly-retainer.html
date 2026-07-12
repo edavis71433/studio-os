@@ -28,6 +28,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="monthly-retainer.css">
+<link rel="stylesheet" href="portal-mock.css">
 <script src="/analytics.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"Growth Partnership","serviceType":"Website growth and ongoing support","provider":{"@type":"ProfessionalService","name":"Davis Digital Studio","legalName":"Davis Digital Studio LLC","url":"https://davisdigitalstudio.com/","founder":{"@type":"Person","name":"Eric Davis"}},"description":"An ongoing, hands-on partnership for small-business websites — the same person who built your site keeps it current, working, and improving every month. Starts around $400/month.","areaServed":{"@type":"Country","name":"United States"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://davisdigitalstudio.com/"},{"@type":"ListItem","position":2,"name":"Services","item":"https://davisdigitalstudio.com/services"},{"@type":"ListItem","position":3,"name":"Growth Partnership"}]}</script>
@@ -189,12 +190,34 @@
   <h2 class="kicker mt-s reveal">I don't hand you the keys and disappear.</h2>
   <p class="lead-muted mt-m reveal">Launch day isn't goodbye. Your project workspace stays open, your whole history stays intact, and I'm still your point of contact &mdash; not a new name in a support queue. When you need a change, an answer, or help growing months from now, you're not starting over with a stranger.</p>
   <figure class="portal-proof reveal mt-l">
-    <picture>
-      <source media="(max-width:600px)" type="image/webp" srcset="portal-home-mobile.webp">
-      <source media="(max-width:600px)" srcset="portal-home-mobile.png">
-      <source type="image/webp" srcset="portal-home.webp">
-      <img src="portal-home.png" alt="A client's home view in their Davis Digital Studio project workspace, still open and active after launch" loading="lazy" width="1440" height="1097">
-    </picture>
+    <!-- Hand-built preview of the real client workspace (see portal-mock.css).
+         Decorative: role="img" + aria-label carries the meaning; the sample
+         business is fictional and the numbers are modest on purpose. -->
+    <div class="pmock" role="img" aria-label="Preview of your project workspace after launch: the same calm home screen for Rosa's Bakery with one change waiting for approval, word that new photos are live, and a note that 12 people found the business on Google this week.">
+      <div class="pmock-chrome"><span class="pmock-dots"><i></i><i></i><i></i></span><span class="pmock-url">rosasbakery.com</span></div>
+      <div class="pmock-shell"><span class="pmock-mark">R</span><span>Rosa's Bakery</span><span class="pmock-ctx">&middot; Your workspace</span><span class="pmock-bell">1</span></div>
+      <div class="pmock-body">
+        <div class="pmock-hi">Good morning, Rosa.</div>
+        <div class="pmock-sub">One thing needs your OK &mdash; no rush.</div>
+        <div class="pmock-lab">Waiting for your OK</div>
+        <div class="pmock-card approve">
+          <span class="pmock-tag">Change</span>
+          <div class="t">Updated hours for spring</div>
+          <div class="d">Your new weekend hours, ready to go live.</div>
+          <div class="pmock-row"><span class="pmock-btn pri">Approve</span><span class="pmock-btn">Not yet</span></div>
+        </div>
+        <div class="pmock-lab">Recent updates</div>
+        <div class="pmock-card good">
+          <span class="pmock-tag g">Good news</span>
+          <div class="t">Your new photos are live</div>
+          <div class="d">Six fresh photos on your gallery page.</div>
+        </div>
+        <div class="pmock-card pm-extra">
+          <div class="t">12 people found you on Google this week</div>
+          <div class="d">A little ahead of last week.</div>
+        </div>
+      </div>
+    </div>
     <figcaption>Your workspace stays right here &mdash; same login, same history, same voice &mdash; long after launch.</figcaption>
   </figure>
 </div>
