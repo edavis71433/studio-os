@@ -1,6 +1,6 @@
 # Go-live activation checklist (owner)
 
-Everything below is done in external dashboards with your accounts — I can't do these, but here are the exact steps/values so there's no guessing. Backend is already current on prod (both functions + all migrations). Do these, then `git push`.
+Everything below is done in external dashboards with your accounts. **Status Jul 12 2026: push DONE (allowlist build live — source paths 404) · dead ADMIN_SHARED_SECRET deleted · migrations 0086–0093 + workspace-connect applied (prod; 0086–0093 staging) · VAPID set + push live · Resend bounce webhook armed · Stripe consolidated to ONE destination (Studio OS - platform webhook).** Remaining: NURTURE_DRIP decision, PITR check, external uptime monitor, human browser/mobile QA.
 
 Prod project ref: **`qksstlqzbhesadrrofgn`**
 
