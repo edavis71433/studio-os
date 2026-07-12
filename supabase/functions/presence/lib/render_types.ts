@@ -121,11 +121,17 @@ export interface SiteBlockVideo { type: 'video'; title?: string; url: string; ca
 export interface SiteBlockPartners { type: 'partners'; title?: string; logos: MediaRef[] }
 export interface SiteBlockReviews { type: 'reviews'; title?: string; rating: number; count: number; source?: string }
 export interface SiteBlockAppointment { type: 'appointment'; title?: string; text?: string; button?: string; url: string }
+// Growth blocks (T-BLOCKS r2) — link-out only, zero external origins on the page.
+export interface SiteBlockNewsletter { type: 'newsletter'; title?: string; text?: string; button?: string; url: string }
+export interface SiteBlockSocial { type: 'social'; title?: string; links: Array<{ network: string; url: string }> }
+export interface SiteBlockEvents { type: 'events'; title?: string; items: Array<{ name: string; date: string; time?: string; detail?: string; url?: string }> }
+export interface SiteBlockMap { type: 'map'; title?: string; image?: MediaRef | null; address?: string; directions_url?: string }
 export type SiteBlock =
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
-  | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment;
+  | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment
+  | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap;
 export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */

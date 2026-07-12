@@ -45,8 +45,12 @@
   .dbody{padding:22px}
   .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 12px}
   .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 5px}
-  .dbody input{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none}
-  .dbody input:focus{border-color:var(--p)}
+  .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none}
+  .dbody input:focus,.dbody select:focus{border-color:var(--p)}
+  .dbody .note{font-size:12.5px;color:var(--faint);margin:12px 0 0;line-height:1.5}
+  .dbody .done{text-align:center;padding:8px 0 4px}
+  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px}
+  .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
   .row2{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
@@ -76,6 +80,29 @@
     <div class="row2"><button type="button" class="btn ghost" id="c-cancel">Cancel</button><button type="submit" class="btn">Add contact</button></div>
   </form>
 </dialog>
+<dialog id="custDlg" aria-label="Add a customer">
+  <form id="custForm" class="dbody">
+    <div id="cust-fields">
+      <h3>Add a customer</h3>
+      <label for="cu-name">Their name</label>
+      <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+      <label for="cu-biz">Business name</label>
+      <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
+      <label for="cu-email">Email</label>
+      <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
+      <label for="cu-edition">What they get</label>
+      <select id="cu-edition">
+        <option value="presence" selected>Full website + business tools</option>
+        <option value="cms_only">Website only</option>
+        <option value="business_os_only">Business tools only</option>
+        <option value="presence_monitor">Monitoring only</option>
+      </select>
+      <p class="note">This creates their account + workspace and emails them a sign-in invitation. You bill them as usual — they never pay for software.</p>
+      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
+    </div>
+    <div id="cust-done" style="display:none"></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
@@ -97,7 +124,7 @@ function render(){
   const rows=q?ALL.filter(c=>((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)):ALL;
   let h=`<div class="rolebadge">● Contacts</div>
     <header><h1>Contacts</h1><p class="sub">${ALL.length?ALL.length+' '+(ALL.length===1?'contact':'contacts')+' · everyone you do business with.':'Everyone you do business with, in one place.'}</p></header>
-    <div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ New</button><button class="btn" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button></div><div id="csvZone"></div>`;
+    <div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="new">+ Contact</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button></div><div id="csvZone"></div>`;
   if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
   else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">No contacts match “${esc(Q)}”.</p>`;}
   else for(const c of rows){
@@ -122,6 +149,7 @@ function render(){
 function wire(){
   const q=$('q');if(q)q.addEventListener('input',()=>{Q=q.value;const p=q.selectionStart;render();const nq=$('q');if(nq){nq.focus();try{nq.setSelectionRange(p,p);}catch(_){}}});
   const nb=$('new');if(nb)nb.addEventListener('click',openNew);
+  const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>newDeal(b.getAttribute('data-deal'))));
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
   const ic=$('importCsv');if(ic)ic.addEventListener('click',openImport);
@@ -138,6 +166,42 @@ $('newForm').onsubmit=async(e)=>{
     if(!r.ok){toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'That didn’t save.'));if(btn)btn.disabled=false;return;}
     $('newDlg').close();toast(r.body&&r.body.deduped?'That contact already existed.':'Contact added.');await load();
   }catch(_){toast('That didn’t save.');}finally{if(btn)btn.disabled=false;}
+};
+// ── ADD A CUSTOMER: set up an existing customer with their own workspace +
+// a sign-in invitation — no deal/sign/convert ceremony. Reuses the shared
+// provisioning path server-side; here we just collect + show the outcome. ──
+function openAddCustomer(){
+  $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
+  $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
+  const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
+  $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
+}
+$('cu-cancel').onclick=()=>$('custDlg').close();
+$('custForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
+  if(!email){toast('Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
+  const btn=$('cu-submit');btn.disabled=true;btn.textContent='Setting up…';
+  try{
+    const r=await api('/sales/customers','POST',{name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value});
+    if(!r.ok){
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'We couldn’t set them up just now.');
+      toast(m);btn.disabled=false;btn.textContent='Set up + invite';return;
+    }
+    const d=(r.body&&r.body.data)||{};
+    const already=!!d.already_exists;
+    const heading=already?'They already have a workspace':'Invitation sent';
+    const line=already
+      ?'Nothing was duplicated — they’re already set up. Send them their sign-in link if they need it.'
+      :('Invitation sent to '+esc(email)+'. They’ll set a password and land in their guided setup.');
+    const link=d.portal_url?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
+    $('cust-fields').style.display='none';
+    const done=$('cust-done');
+    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">'+(already?'✓':'✓')+'</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
+    done.style.display='';
+    const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
+    await load();
+  }catch(_){toast('We couldn’t set them up just now.');btn.disabled=false;btn.textContent='Set up + invite';}
 };
 // ── CSV IMPORT: bring an existing contact list in one go. Pure frontend — the
 // server already dedupes per email and validates every row, so this simply

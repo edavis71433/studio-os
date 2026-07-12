@@ -70,8 +70,8 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('text', 'text', { required: true, aiAssist: true }), t('button', 'text'), t('url', 'url')], schema: null, a11y: 'real link/button, visible focus', seo: 'internal linking', industries: ['*'] },
   { key: 'lead_form', label: 'Lead / Contact Form', category: 'contact', purpose: 'Capture enquiries (feeds Leads + CRM).',
     fields: [t('fields', 'enum', { repeatable: true }), t('intro', 'text', { aiAssist: true })], schema: 'ContactPoint', a11y: 'labels + error text tied to inputs; keyboard complete', seo: 'ContactPoint', industries: ['*'] },
-  { key: 'newsletter', label: 'Newsletter', category: 'contact', purpose: 'Email sign-up.',
-    fields: [t('intro', 'text', { aiAssist: true }), t('provider', 'url')], schema: null, a11y: 'labelled input, success state announced', seo: 'engagement', industries: ['*'] },
+  { key: 'newsletter', label: 'Newsletter', category: 'contact', purpose: 'Email sign-up — a link out to your newsletter provider\'s page (no third-party form embedded).',
+    fields: [t('text', 'text', { aiAssist: true, max: 200 }), t('url', 'url', { required: true }), t('button', 'text', { max: 40 })], schema: null, a11y: 'a real labelled link out, visible focus', seo: 'engagement', industries: ['*'] },
   { key: 'appointment', label: 'Appointment Booking', category: 'commerce', purpose: 'Book a time (links a scheduler).',
     fields: [t('provider_url', 'url', { required: true }), t('intro', 'text')], schema: 'ReserveAction', a11y: 'clear link out, no trapped focus', seo: 'ReserveAction', industries: ['salon', 'medical', 'dental', 'fitness', 'professional'] },
   { key: 'hours', label: 'Business Hours', category: 'contact', purpose: 'When you\'re open, incl. holidays.',
@@ -87,7 +87,7 @@ export const COMPONENTS: ComponentDef[] = [
   { key: 'products', label: 'Products', category: 'commerce', purpose: 'Featured products (display; e-commerce is V1.1).',
     fields: [t('name', 'text', { required: true, repeatable: true }), t('price_text', 'text'), t('image', 'image'), t('description', 'richtext', { aiAssist: true })], schema: 'Product', a11y: 'image alt = product name', seo: 'Product', industries: ['retail'] },
   { key: 'events', label: 'Events', category: 'community', purpose: 'Upcoming events.',
-    fields: [t('name', 'text', { required: true, repeatable: true }), t('date', 'text', { required: true }), t('location', 'text'), t('description', 'richtext', { aiAssist: true })], schema: 'Event', a11y: 'date as text, not only visual', seo: 'Event (rich result)', industries: ['restaurant', 'fitness', 'church', 'nonprofit', 'retail'] },
+    fields: [t('name', 'text', { required: true, repeatable: true }), t('date', 'text', { required: true }), t('time', 'text'), t('detail', 'richtext', { aiAssist: true }), t('url', 'url')], schema: 'Event', a11y: 'date as text, not only visual', seo: 'Event (rich result)', industries: ['restaurant', 'fitness', 'church', 'nonprofit', 'retail'] },
   { key: 'announcement', label: 'Announcement Bar', category: 'header', purpose: 'A timely notice (holiday hours, a sale).',
     fields: [t('text', 'text', { required: true, aiAssist: true }), t('url', 'url'), t('expires_at', 'text')], schema: null, a11y: 'dismissible, announced to AT, not color-only', seo: 'freshness', industries: ['*'] },
   { key: 'blog', label: 'Updates / Blog', category: 'content', purpose: 'News and posts.',
@@ -102,8 +102,10 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('name', 'text', { repeatable: true, required: true }), t('issuer', 'text'), t('number', 'text')], schema: 'EducationalOccupationalCredential', a11y: 'plain text list', seo: 'trust signals', industries: ['home_services', 'medical', 'law', 'contractor'] },
   { key: 'partners', label: 'Partners / Brands', category: 'proof', purpose: 'Brands you work with.',
     fields: [t('logo', 'image', { repeatable: true, required: true }), t('name', 'text')], schema: null, a11y: 'logo alt = partner name', seo: 'trust signals', industries: ['professional', 'retail', 'marketing'] },
-  { key: 'social_feed', label: 'Social Feed', category: 'community', purpose: 'A link/embed to social profiles.',
-    fields: [t('handle', 'text', { repeatable: true }), t('network', 'enum')], schema: null, a11y: 'links labelled by network', seo: 'sameAs links', industries: ['*'] },
+  { key: 'social', label: 'Social Links', category: 'community', purpose: 'Icon links to your social profiles — link-out only, never an embedded feed (no trackers).',
+    fields: [t('network', 'enum', { repeatable: true }), t('url', 'url', { required: true })], schema: null, a11y: 'each icon link labelled by network name', seo: 'sameAs links', industries: ['*'] },
+  { key: 'map', label: 'Map & Directions', category: 'contact', purpose: 'A privacy-safe map: your own map image + address text + a directions link — never a third-party embed.',
+    fields: [t('image', 'image'), t('address', 'text'), t('directions_url', 'url')], schema: null, a11y: 'address as readable text; the map image is supplementary, never the only source', seo: 'local relevance (address on the page)', industries: ['*'] },
 ];
 
 export function componentByKey(key: string): ComponentDef | null { return COMPONENTS.find((c) => c.key === key) || null; }

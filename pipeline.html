@@ -35,6 +35,7 @@
   .card .m{color:var(--soft);font-size:13px;margin-top:2px}
   .stage{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .stage.won{background:var(--good-soft);color:var(--good)}
+  .stage.lost{background:transparent;border:1px solid var(--line);color:var(--soft)}
   .val{font-variant-numeric:tabular-nums;color:var(--soft);font-size:13px}
   dialog{border:none;border-radius:16px;padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
@@ -98,6 +99,9 @@ const STAGES=['lead','qualified','proposal','contract','won','lost'];
 // calm, human stage labels (the raw enum never reaches the owner's eyes)
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
 const stageLabel=(s)=>STAGE_LABEL[s]||s;
+// The badge reads as an OUTCOME where one exists: a converted deal is "Won ✓"
+// (calm green), a lost one is a muted "Lost" — active stages keep their labels.
+const stageBadge=(s)=>`<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Lost':esc(stageLabel(s))}</span>`;
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
 const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project'};
 function evtLabel(e){
@@ -111,6 +115,10 @@ function evtLabel(e){
 }
 const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:'short',day:'numeric'};if(t.getFullYear()!==new Date().getFullYear())o.year='numeric';return t.toLocaleDateString('en-US',o);};
 let TOKEN="",FILTER="",DEALS=[];
+// Signing links returned by /send (emailed OR not), kept for this session so a
+// "not-emailed" doc always shows a persistent "copy the signing link" — never a
+// silently-unsent agreement again. Keyed by proposal/contract id.
+const LINKS={};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
@@ -121,6 +129,47 @@ async function api(path,method,body){
   let b={}; try{b=await r.json();}catch(_){}
   if(!r.ok){const e=new Error((b&&b.message)||'That didn’t go through.');e.status=r.status;e.body=b;throw e;}
   return b;
+}
+
+// The studio's own name (for the starter agreement's sign-off) — fetched once,
+// best-effort; scope-aware because H() carries x-dds-scope-site, so a scoped
+// agency drill-in signs with the scoped business's name (the actual seller).
+let BIZQ=null;
+const bizName=()=>(BIZQ=BIZQ||api('/identity').then(r=>(r.data&&r.data.business_name)||'').catch(()=>{BIZQ=null;return '';}));
+
+// The DEFAULT starter agreement — a calm, plain-language first draft for an
+// owner with no saved templates yet. Saved templates stay the power path; this
+// only ever fills an EMPTY form, and every word is editable before sending.
+function starterAgreement(d,c,accepted,biz){
+  const work=accepted
+    ? `${d.title||'The project'} — the work set out in the proposal you accepted${accepted.title&&accepted.title!=='Proposal'?' (“'+accepted.title+'”)':''}, for a total of ${money(accepted.subtotal_cents)}.`
+    : '[describe the work — what you’ll build or do, and what’s included]';
+  const invest=(accepted?`The total investment is ${money(accepted.subtotal_cents)}, matching the accepted proposal.`:'The total investment is [price].')
+    +' A deposit gets the work started; the remainder is invoiced as we go or on completion.';
+  return `This is a working agreement in plain language — it says what we’ve agreed in words we can both read. Edit anything below before sending.
+
+What we’ll do
+${work}
+
+Investment
+${invest}
+
+Timeline
+We’ll start around [start date] and aim to wrap up by [target date]. Work begins once this agreement is signed and the deposit is paid. If either date needs to move, we’ll tell each other early.
+
+What I need from you
+Content when I ask for it (words, photos, logins), honest feedback within a few days of each review, and one person who can give the final OK. If those run late, the timeline gently moves with them.
+
+Ownership
+The finished work is yours once the final payment clears. Your content — your words, images, and customer information — is always yours, and you can take it with you at any time.
+
+Changes
+Small tweaks along the way are included. Bigger changes — new pages, new features, a change of direction — are welcome too; we’ll agree what they cost in writing before I start on them.
+
+If we part ways
+Either of us can end this with written notice. You pay for the work completed up to that point, and you keep everything you’ve paid for.
+
+— ${biz||'[your name]'}`;
 }
 
 function renderFilters(){
@@ -141,7 +190,7 @@ async function load(){
     DEALS.sort((a,b)=>{const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
     $('list').innerHTML=DEALS.map(d=>{
       const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
-      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}</div><div style="text-align:right"><span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span><div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}</div><div style="text-align:right">${stageBadge(d.stage)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
     }).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   }catch(e){ if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
@@ -168,7 +217,11 @@ $('dealForm').onsubmit=async(e)=>{
 };
 
 // ── an inline mini-form helper (replaces prompt) ──
-function miniForm(host, fields, onSubmit){
+// opts.alt = {label, run} adds a PRIMARY button beside a now-secondary Save —
+// used so an agreement/proposal can be "Save & send" in one click while "Save
+// draft" stays available. Both paths clear the draft on success.
+function miniForm(host, fields, onSubmit, opts){
+  opts=opts||{};
   host.innerHTML='';
   const f=document.createElement('form'); f.className='mini';
   const inputs={};
@@ -184,17 +237,25 @@ function miniForm(host, fields, onSubmit){
   });
   const row=document.createElement('div'); row.className='row2'; row.style.justifyContent='flex-end';
   const cancel=document.createElement('button'); cancel.type='button'; cancel.className='btn ghost'; cancel.textContent='Cancel';
-  const save=document.createElement('button'); save.type='submit'; save.className='btn'; save.textContent='Save';
-  row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
+  const save=document.createElement('button'); save.type='submit'; save.className=opts.alt?'btn ghost':'btn'; save.textContent=opts.saveLabel||'Save';
+  const altBtn=opts.alt?document.createElement('button'):null;
+  if(altBtn){altBtn.type='button';altBtn.className='btn';altBtn.textContent=opts.alt.label;}
+  row.appendChild(cancel); row.appendChild(save); if(altBtn)row.appendChild(altBtn); f.appendChild(row); host.appendChild(f);
   cancel.onclick=()=>host.innerHTML='';
   if(window.ddsDraftRestore)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));
-  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{await onSubmit(Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()])));if(window.ddsDraftClear)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));}catch(err){toast(nice(err),true);save.disabled=false;}};
+  const values=()=>Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()]));
+  const clearDrafts=()=>{if(window.ddsDraftClear)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
+  const setBusy=(x)=>{save.disabled=x;if(altBtn)altBtn.disabled=x;};
+  const runWith=async(fn)=>{setBusy(true);try{await fn(values());clearDrafts();}catch(err){toast(nice(err),true);setBusy(false);}};
+  f.onsubmit=(e)=>{e.preventDefault();runWith(onSubmit);};
+  if(altBtn)altBtn.onclick=()=>runWith(opts.alt.run);
   setTimeout(()=>{const first=f.querySelector('input,textarea'); if(first)first.focus();},20);
 }
 
 async function openDeal(id){
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
   const dlg=$('detail'); $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; dlg.showModal();
+  bizName(); // warm the studio-name cache so the agreement starter fills instantly
   try{
     const [{data},tplRes]=await Promise.all([api('/sales/deals/'+id),api('/sales/templates').catch(()=>({data:[]}))]);
     const d=data.deal, c=data.contact;
@@ -210,19 +271,43 @@ async function openDeal(id){
     const stepBtns=[
       fwd?`<button class="btn" data-stage="${fwd}">Move to ${esc(stageLabel(fwd))} →</button>`:'',
       ...back.map(s=>`<button class="btn ghost" data-stage="${s}">Back to ${esc(stageLabel(s))}</button>`),
-      nextStages.includes('lost')?`<button class="btn ghost" data-stage="lost" style="margin-left:auto;border-color:transparent;color:var(--soft)">Not a fit</button>`:'',
+      nextStages.includes('lost')?`<button class="btn ghost" id="markLost" style="margin-left:auto;border-color:transparent;color:var(--soft)">Mark as lost (not a fit)</button>`:'',
     ].join('');
-    const props=(data.proposals||[]).map(p=>`<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} · ${esc(p.status)}</span><span>${p.status==='draft'?`<button class="btn ghost" data-send-proposal="${p.id}">Send</button> `:''}<button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span></div>`).join('')||'<div class="mut">No proposals yet.</div>';
+    // A saved-but-unsent doc must NEVER read as finished: a plain status chip +
+    // a PRIMARY Send. A sent-but-not-emailed doc keeps a persistent "copy link"
+    // (LINKS) so it's never silently stuck. `forWhom` personalises the CTA.
+    const forWhom=(c&&c.name)?(' to '+esc(c.name)):'';
+    const linkNote=(kind,docId,label)=>LINKS[docId]?`<div class="mut" style="flex-basis:100%;margin-top:4px">Prepared — <a href="${esc(LINKS[docId])}" target="_blank" rel="noopener">open the ${label}</a>, or use “Copy ${label}”. It wasn’t emailed, so share it yourself.</div>`:'';
+    const props=(data.proposals||[]).map(p=>{
+      const chip=p.status==='accepted'?`<span class="stage won">Accepted ✓</span>`:p.status==='declined'?`<span class="stage lost">Declined</span>`:p.status==='sent'?`<span class="stage">Sent — awaiting decision</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      const act=p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
+      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} ${chip}</span><span>${act}<button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${p.status==='sent'?linkNote('proposal',p.id,'link'):''}</div>`;
+    }).join('')||'<div class="mut">No proposals yet.</div>';
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
-    const cons=(data.contracts||[]).map(k=>`<div class="row2"><span class="mut">${esc(k.title||'Agreement')} · ${esc(k.status)}${k.signer_name?(' — signed by '+esc(k.signer_name)+(k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):'')):''}</span><span>${k.status==='draft'?`<button class="btn ghost" data-send-contract="${k.id}">Send</button> `:''}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button></span></div>`).join('')||'<div class="mut">No agreement yet.</div>';
+    const cons=(data.contracts||[]).map(k=>{
+      const signed=k.status==='signed';
+      const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
+      const act=k.status==='draft'?`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `:k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
+      return `<div class="row2"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button></span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>`;
+    }).join('')||'<div class="mut">No agreement yet.</div>';
     const conTplBtns=conTpls.map(t=>`<button class="btn ghost" data-use-ctpl="${t.id}" title="Draft an agreement from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
+    const draftContract=(data.contracts||[]).find(k=>k.status==='draft'); // saved but not sent
+    // Convert = adding YOUR customer (service voice, frozen billing boundary):
+    // the studio bills them for the work — they never subscribe to software.
+    // Self-serve platform signups pick a plan at signup.html; never here.
+    const whoName=esc(((c&&c.name)||d.title||'this client'));
+    const convExplain=(c&&c.email
+      ? `This adds ${whoName} as your customer — it creates their account + workspace and emails ${esc(c.email)} a sign-in invitation. Nothing else needed.`
+      : `This adds ${whoName} as your customer — it creates their account + workspace. There’s no client email on this deal, so no sign-in invitation goes out; you can share access with them later.`)
+      +' It’s part of your service: you bill them as usual — they never subscribe to anything or pay for software.';
     $('detailInner').innerHTML=`
       <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(d.title||'Deal')}</div>
-        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · <span class="stage${d.stage==='won'?' won':''}">${esc(stageLabel(d.stage))}</span>${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}</div></div>
+        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}</div></div>
         <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
       <div class="dbody">
-        <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Converted ✓</span>':stepBtns||'<span class="mut">—</span>'}</div></div>
+        <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Won ✓ — converted to a customer</span>':d.stage==='lost'?`<span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button>`:stepBtns||'<span class="mut">—</span>'}</div><div id="lostForm"></div></div>
         <div class="sec"><h3>Details</h3>
           <label class="mut" for="ed-value">Deal value (USD)</label><br>
           <input id="ed-value" type="number" step="0.01" min="0" value="${d.expected_value_cents?(d.expected_value_cents/100):''}" placeholder="2500" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
@@ -240,42 +325,87 @@ async function openDeal(id){
           ${(data.invoices||[]).map(v=>`<div class="row2"><span class="mut">${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))} — ${money(v.amount_cents)}</span><span>${v.status==='paid'?`<span style="color:var(--good,#33664b);font-weight:700">✓ Paid${v.paid_at?' '+new Date(v.paid_at).toLocaleDateString():''}</span>`:v.status==='void'?`<span class="mut">Voided</span>`:`<span style="color:var(--warn,#775d31);font-weight:600">Awaiting payment</span>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''}`}</span></div>`).join('')}
           <div class="mut">Send the client a secure payment link — an invoice (defaults to the accepted proposal's total) or a deposit to start the work.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button></div><div id="invForm"></div></div>
         <div class="sec"><h3>Convert to customer</h3>
-          ${d.converted_client_id?`<div class="mut">Converted — their workspace is ready. The customer was invited to set their login and welcomed into onboarding.</div>${d.created_project_id?`<div class="row2" style="margin-top:8px"><a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a></div>`:''}`:
-            `<div id="convWrap"><button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert — set up their workspace':'Sign the agreement first'}</button></div>`}
+          ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html">Manage their access →</a></div>`:
+            canConvert?`<div id="convWrap"><button class="btn" id="convert">Convert — set up their workspace</button><div class="mut" style="margin-top:8px">${convExplain}</div></div>`:
+            draftContract?`<div class="mut">Your agreement is drafted but hasn’t been sent yet — ${whoName} can’t sign until it goes out. Send it for signature first; once it’s signed you can add them as your customer.</div><div class="row2" style="margin-top:8px"><button class="btn" data-send-contract="${draftContract.id}">Send the agreement for signature →</button></div>`:
+            `<div id="convWrap"><button class="btn" disabled>Sign the agreement first</button></div>`}
         </div>
         ${(data.events||[]).length?`<div class="sec"><h3>History</h3>${(data.events||[]).map(e=>`<div class="hrow"><span>${esc(evtLabel(e))}</span><span class="hd">${esc(evtDate(e.created_at))}</span></div>`).join('')}</div>`:''}
+        ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
     $('closeD').onclick=()=>dlg.close();
     // ONE cleanup for every way the dialog closes (✕, Esc, form-close) — else a
     // refresh after Esc unexpectedly reopens the deal from the stale ?deal= URL.
     if(!dlg.dataset.wiredClose){dlg.dataset.wiredClose='1';dlg.addEventListener('close',()=>history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():'')));}
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(nice(e),true);}});
+    // Lost is gentle but deliberate: an optional one-line reason (stored on the
+    // deal via the stage route's `reason` → lost_reason) so "why" survives.
+    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — a note for your own records',placeholder:'e.g. Went with someone cheaper'}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});toast('Marked as lost');openDeal(id);load();}catch(e){toast(nice(e),true);}});
+    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');dlg.close();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
-    $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);}});
-    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});
-      // The sign→pay moment only works if a deposit is WAITING when they sign —
-      // nudge the operator the moment the agreement goes out without one.
+    // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
+    // the convert gate's "send first"). It records the link in LINKS, copies it,
+    // and — critically — tells the operator honestly whether it was EMAILED or
+    // only prepared (so a not-emailed doc is never mistaken for delivered).
+    const copyToClip=(url)=>{if(!url)return;if(navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});};
+    const sendProposalById=async(pid)=>{const r=await api('/sales/proposals/'+pid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[pid]=r.url;toast(r.emailed?('Proposal sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')):'Proposal prepared — it wasn’t emailed, so copy the link and send it yourself.');copyToClip(r.url);openDeal(id);};
+    const sendContractById=async(cid)=>{const r=await api('/sales/contracts/'+cid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[cid]=r.url;
+      // The sign→pay moment only works if a deposit is WAITING when they sign.
       const hasOpenDeposit=(data.invoices||[]).some(v=>v.purpose==='deposit'&&v.status==='open');
-      toast('Agreement sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':''))+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.'));
-      if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);}});
+      toast(r.emailed?('Agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.')):'Agreement prepared — it wasn’t emailed, so copy the signing link and send it yourself.');
+      copyToClip(r.url);openDeal(id);};
+    // Copy an already-sent doc's link (send is idempotent → re-fetches the link).
+    const copyDocLink=async(kind,docId)=>{try{let url=LINKS[docId];if(!url){const r=await api('/sales/'+(kind==='contract'?'contracts':'proposals')+'/'+docId+'/send','POST',{});url=r.url;if(url)LINKS[docId]=url;}if(!url){toast('No signing link is available — check your email settings.',true);return;}copyToClip(url);toast(kind==='contract'?'Signing link copied':'Link copied');}catch(e){toast(nice(e),true);}};
+    $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendProposalById(b.dataset.sendProposal);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
+    $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
     // Multi-line proposal form — real projects have design + build + care, not one line.
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{
       const host=$('propForm');
       let ln=0; // per-deal, per-line draft keys — typed line items survive an accidental Esc
       const rowHtml=()=>{ln++;return `<div class="row2 prop-line" style="margin-top:6px"><input type="text" class="pl-label" data-dds-draft="prop-${id}-label-${ln}" placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price" data-dds-draft="prop-${id}-price-${ln}" placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div>`;};
-      host.innerHTML=`<div style="margin-top:8px">${rowHtml()}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button><span style="flex:1"></span><button type="button" class="btn" id="plSave">Draft proposal</button></div></div>`;
+      host.innerHTML=`<div style="margin-top:8px">${rowHtml()}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">Save draft</button><button type="button" class="btn" id="plSaveSend">Save & send →</button></div></div>`;
       const restoreDrafts=()=>{if(window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
       restoreDrafts();
+      // Same idea as the agreement starter: a first proposal shouldn't open
+      // blank. Only when the restored draft left the first line EMPTY — seed it
+      // from the deal itself (title + expected value if set); fully editable,
+      // and the price field's own placeholder stands in for [price].
+      const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price');
+      if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100); }
       $('plMore').onclick=()=>{$('plSave').closest('div').insertAdjacentHTML('beforebegin',rowHtml());restoreDrafts();};
-      $('plSave').onclick=async()=>{
-        const items=[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
-        if(!items.length){toast('Add at least one line item.',true);return;}
-        try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));toast('Proposal drafted');openDeal(id);}catch(e){toast(nice(e),true);}
-      };
+      const clearPropDrafts=()=>{if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
+      const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
+      // Save draft ONLY writes the record; Save & send writes then immediately
+      // emails the review link — so the common path is one click and a proposal
+      // is never left silently unsent.
+      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const r=await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});clearPropDrafts();return r.data&&r.data.id;};
+      const busyProp=(x)=>{$('plSave').disabled=x;$('plSaveSend').disabled=x;};
+      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast('Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
+      $('plSaveSend').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}await sendProposalById(pid);}catch(e){toast(nice(e),true);busyProp(false);}};
       host.querySelector('.pl-label').focus();
     };
-    const addCon=$('addCon'); if(addCon) addCon.onclick=()=>miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…',draft:'con-'+id}],async(v)=>{if(!v.body){toast('Add the agreement text.',true);return;}await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});toast('Agreement drafted');openDeal(id);});
+    const addCon=$('addCon'); if(addCon) addCon.onclick=()=>{
+      // Write the draft record; return its id so "Save & send" can email it next.
+      const saveCon=async(v)=>{if(!v.body)throw new Error('Add the agreement text.');const r=await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});return r.data&&r.data.id;};
+      miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…',draft:'con-'+id}],
+        async(v)=>{await saveCon(v);toast('Agreement saved as a draft — send it when you’re ready.');openDeal(id);},
+        {saveLabel:'Save draft',alt:{label:'Save & send for signature →',run:async(v)=>{const cid=await saveCon(v);await sendContractById(cid);}}});
+      // A first agreement shouldn't open as a blank page. Precedence: a restored
+      // draft wins (ddsDraftRestore already ran inside miniForm); the template
+      // “Use …” buttons never open this form at all (they draft server-side); the
+      // starter below fills ONLY a still-empty body — and stays fully editable.
+      const f=$('conForm'); const titleEl=f.querySelector('input'); const bodyEl=f.querySelector('textarea');
+      if(bodyEl&&!bodyEl.value){
+        const who=((c&&c.name)||d.title||'').trim();
+        if(titleEl&&!titleEl.value)titleEl.value=who?('Service agreement — '+who):'Service agreement';
+        const accepted=(data.proposals||[]).find(p=>p.status==='accepted');
+        bodyEl.style.minHeight='260px'; // the starter is a full page — let it breathe
+        bizName().then(biz=>{ if(!bodyEl.value) bodyEl.value=starterAgreement(d,c,accepted,biz); });
+      }
+    };
     // saved templates: one-tap draft-from-template + save-as-template
     $('detailInner').querySelectorAll('[data-use-ptpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/proposals','POST',{template_id:b.dataset.usePtpl});toast('Proposal drafted from your template');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-use-ctpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/contracts','POST',{template_id:b.dataset.useCtpl});toast('Agreement drafted from your template');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
@@ -318,11 +448,14 @@ async function openDeal(id){
     });
     const sendDep=$('sendDeposit'); if(sendDep) sendDep.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Deposit amount (USD)',type:'number',step:'0.01',placeholder:'500'}],async(v)=>{if(!v.amount){toast('Enter a deposit amount.',true);return;}await sendMoney({purpose:'deposit',amount_cents:Math.round(parseFloat(v.amount)*100),title:'Deposit'});});
     const conv=$('convert'); if(conv) conv.onclick=()=>{
-      // two-step confirm (no confirm() dialog) + choose their edition
-      const wrap=$('convWrap'); wrap.innerHTML=`<div class="mut" style="margin-bottom:8px">This creates the customer’s account + workspace and invites them to sign in.</div>
-        <label for="convPlan">Their plan</label>
-        <select id="convPlan"><option value="presence">Presence — full website</option><option value="business_os_only">Business OS</option><option value="cms_only">Website only</option><option value="presence_monitor">Monitor — observe only</option></select>
-        <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, convert</button></div>`;
+      // two-step confirm (no confirm() dialog). Service language, not SaaS: the
+      // labels say WHAT THEY GET; the values stay the same edition keys the
+      // convert route expects (CONVERT_PLANS in routes/sales.ts).
+      const wrap=$('convWrap'); wrap.innerHTML=`
+        <label for="convPlan">What they get</label>
+        <select id="convPlan"><option value="presence" selected>Full website + business tools (most projects)</option><option value="cms_only">Website only</option><option value="business_os_only">Business tools only (no website with you)</option><option value="presence_monitor">Monitoring only (a site you didn’t build)</option></select>
+        <div class="mut" style="margin-top:6px">You can change this later.</div>
+        <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, add them as my customer</button></div>`;
       $('convNo').onclick=()=>openDeal(id);
       $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
     };

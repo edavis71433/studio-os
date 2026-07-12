@@ -3260,6 +3260,14 @@ const BLOCK_DEFS = [
   { type: "partners", name: "Trusted by (logo strip)", mediaKind: "gallery", hint: "Logos of brands you work with — instant credibility. Pick them from your files." },
   { type: "reviews", name: "Review rating badge", reviewsSimple: true, hint: "" },
   { type: "appointment", name: "Booking button", apptSimple: true, hint: "" },
+  // Growth blocks (r2) — every one links OUT; nothing external ever loads on the site.
+  { type: "newsletter", name: "Newsletter sign-up", newsletterSimple: true, hint: "" },
+  { type: "social", name: "Social links", field: "links", hint: "One per line:  network | link   (e.g.  instagram | https://instagram.com/yourbusiness — icons appear automatically)",
+    parse: (p) => ({ network: p[0] || "", url: p[1] || "" }), fmt: (o) => [o.network, o.url].filter(Boolean).join(" | ") },
+  { type: "events", name: "Upcoming events", field: "items", hint: "One per line:  Name | date | time | detail | link   (a date like 2026-07-26 shows as “Jul 26”; time, detail and link are optional)",
+    parse: (p) => ({ name: p[0] || "", date: p[1] || "", time: p[2] || "", detail: p[3] || "", url: p[4] || "" }),
+    fmt: (o) => { const a = [o.name || "", o.date || "", o.time || "", o.detail || "", o.url || ""]; while (a.length > 2 && !a[a.length - 1]) a.pop(); return a.join(" | "); } },
+  { type: "map", name: "Map & directions", mapSimple: true, hint: "" },
 ];
 function mediaThumb(id) {
   const m = (S.media || []).find((x) => x.id === id);
@@ -3302,6 +3310,8 @@ function emptyBlock(def) {
   if (def.ctaSimple) { b.text = ""; return b; }
   if (def.reviewsSimple) { b.rating = 5; b.count = 0; return b; }
   if (def.apptSimple) { b.url = ""; return b; }
+  if (def.newsletterSimple) { b.url = ""; return b; }
+  if (def.mapSimple) { b.address = ""; return b; }
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
   if (def.mediaKind === "video") { b.url = ""; return b; }
   if (def.mediaKind === "ba") { b.items = []; return b; }
@@ -3377,6 +3387,30 @@ function renderBlocksCard() {
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, bt, u);
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your booking page — nothing external loads on your site."));
+    } else if (def.newsletterSimple) {
+      const t = el("input"), bt = el("input"), u = el("input");
+      t.placeholder = "A short line (optional) — e.g. Get updates from us."; t.value = blk.text || "";
+      bt.placeholder = "Button label (e.g. Sign up)"; bt.value = blk.button || "";
+      u.placeholder = "Your sign-up link (e.g. your Mailchimp or newsletter page)"; u.value = blk.url || "";
+      [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
+      [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
+      sub.append(t, bt, u);
+      sub.appendChild(el("div", "hint", "Visitors tap the button and land on your sign-up page — nothing external loads on your site."));
+    } else if (def.mapSimple) {
+      const ad = el("input"), du = el("input");
+      ad.placeholder = "Your address (shown as text)"; ad.value = blk.address || "";
+      du.placeholder = "Directions link (optional — if empty, we link to a map search of your address)"; du.value = blk.directions_url || "";
+      [ad, du].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "map", title: ti.value.trim(), address: ad.value.trim(), directions_url: du.value.trim(), image_media_id: BLOCKS_WORK[idx].image_media_id || undefined }; };
+      [ad, du].forEach((inp) => inp.addEventListener("change", commit));
+      sub.append(ad, du);
+      const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:4px";
+      if (blk.image_media_id) picRow.appendChild(mediaThumb(blk.image_media_id));
+      const pick = el("button", null, blk.image_media_id ? "Change map image" : "Add a map image (optional)"); pick.type = "button"; pick.style.cssText = miniBtn;
+      pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_media_id = id || undefined; renderBlocksCard(); }); });
+      picRow.appendChild(pick); sub.appendChild(picRow);
+      sub.appendChild(el("div", "hint", "Privacy-safe by design: your own image plus a “Get directions” link — no third-party map embed, so no trackers on your site."));
     } else if (def.mediaKind) {
       renderMediaBlockBody(def, blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));

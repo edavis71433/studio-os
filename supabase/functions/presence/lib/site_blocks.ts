@@ -16,6 +16,7 @@ import type {
   SiteBlockProcess, SiteBlockPricing, SiteBlockCertifications, SiteBlockServiceAreas, SiteBlockCtaBanner,
   SiteBlockGallery, SiteBlockBeforeAfter, SiteBlockVideo, MediaRef,
   SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment,
+  SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
 } from './render_types.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
@@ -23,11 +24,13 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'features', 'stats', 'team', 'process', 'pricing', 'certifications', 'service_areas', 'cta',
   'gallery', 'before_after', 'video',
   'partners', 'reviews', 'appointment',
+  'newsletter', 'social', 'events', 'map',
 ];
 
-// Per-block item caps — bounded content, never unbounded. Total blocks capped too.
-const MAX_BLOCKS = 14;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12 };
+// Per-block item caps — bounded content, never unbounded. Total blocks capped too
+// (one instance per type, so the cap = the realized-type count: every block can coexist).
+const MAX_BLOCKS = 18;
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12 };
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const arr = (x: unknown): any[] => (Array.isArray(x) ? x : []);
@@ -41,11 +44,13 @@ interface StoredGallery { type: 'gallery'; title?: string; image_ids: string[] }
 interface StoredBeforeAfter { type: 'before_after'; title?: string; items: Array<{ before_id: string; after_id: string; caption?: string }> }
 interface StoredVideo { type: 'video'; title?: string; url: string; caption?: string; poster_id?: string }
 interface StoredPartners { type: 'partners'; title?: string; image_ids: string[] }
+interface StoredMap { type: 'map'; title?: string; image_media_id?: string; address?: string; directions_url?: string }
 export type StoredBlock =
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | StoredGallery | StoredBeforeAfter | StoredVideo
-  | StoredPartners | SiteBlockReviews | SiteBlockAppointment;
+  | StoredPartners | SiteBlockReviews | SiteBlockAppointment
+  | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
@@ -145,6 +150,39 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         if (/^https?:\/\//i.test(url)) block = { type: 'appointment', title, url, text: s((b as any).text, 200) || undefined, button: s((b as any).button, 40) || undefined } as SiteBlockAppointment;
         break;
       }
+      case 'newsletter': {   // ESP sign-up button — same link-out posture as appointment
+        const url = s((b as any).url, 300);
+        if (/^https?:\/\//i.test(url)) block = { type: 'newsletter', title, url, text: s((b as any).text, 200) || undefined, button: s((b as any).button, 40) || undefined } as SiteBlockNewsletter;
+        break;
+      }
+      case 'social': {   // profile icon strip — links out only, never an embedded feed
+        const links = arr((b as any).links)
+          .map((l) => ({ network: s(l?.network, 24).toLowerCase(), url: s(l?.url, 300) }))
+          .filter((l) => /^https?:\/\//i.test(l.url)).slice(0, CAP.social);
+        if (links.length) block = { type: 'social', title, links } as SiteBlockSocial;
+        break;
+      }
+      case 'events': {   // upcoming events list — name + date required per item
+        const items = arr((b as any).items).map((it) => {
+          const ev: SiteBlockEvents['items'][number] = { name: s(it?.name, 100), date: s(it?.date, 40) };
+          const time = s(it?.time, 40); if (time) ev.time = time;
+          const detail = s(it?.detail, 240); if (detail) ev.detail = detail;
+          const url = s(it?.url, 300); if (/^https?:\/\//i.test(url)) ev.url = url;
+          return ev;
+        }).filter((it) => it.name && it.date).slice(0, CAP.events);
+        if (items.length) block = { type: 'events', title, items } as SiteBlockEvents;
+        break;
+      }
+      case 'map': {   // PRIVACY-SAFE static map: the site's OWN image + address text +
+        // a directions LINK-OUT — never a third-party tile/iframe embed (constitution
+        // Part 4: zero external origins; embeds would put trackers on customer sites).
+        const address = s((b as any).address, 200) || undefined;
+        const image_media_id = uid((b as any).image_media_id) || undefined;
+        const du = s((b as any).directions_url, 400);
+        const directions_url = /^https?:\/\//i.test(du) ? du : undefined;
+        if (address || image_media_id) block = { type: 'map', title, address, image_media_id, directions_url } as StoredMap;
+        break;
+      }
     }
     if (block) { out.push(block); seen.add(type); }
     if (out.length >= MAX_BLOCKS) break;
@@ -185,6 +223,11 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
         if (logos.length) out.push({ type: 'partners', title: b.title, logos });
         break;
       }
+      case 'map': {   // an address keeps the block valuable even if the image can't resolve
+        const image = b.image_media_id ? ref(b.image_media_id) : null;
+        if (image || b.address) out.push({ type: 'map', title: b.title, image, address: b.address, directions_url: b.directions_url });
+        break;
+      }
       default:
         out.push(b);
     }
@@ -217,6 +260,42 @@ const numericPrice = (p?: string): string | undefined => {
   if (!p) return undefined;
   const m = p.replace(/,/g, '').match(/\d+(\.\d+)?/);
   return m ? m[0] : undefined;
+};
+
+// ── Events: dates stay honest — ISO in storage renders human, pure string math
+//    (no clock, no timezone). Anything else renders exactly as the owner wrote it. ──
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIME_24_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+/** "2026-07-26" → "Jul 26" (null when not a plausible ISO date). */
+const humanDate = (d: string): string | null => {
+  const m = ISO_DATE_RE.exec(d); if (!m) return null;
+  const mo = Number(m[2]), day = Number(m[3]);
+  if (mo < 1 || mo > 12 || day < 1 || day > 31) return null;
+  return `${MONTHS[mo - 1]} ${day}`;
+};
+
+// ── Social: inline SVG icons — self-hosted markup, zero external origins, one
+//    consistent stroke weight. Evocative line icons (not trademark-exact glyphs);
+//    unknown networks fall back to a generic link icon. ──
+const SOCIAL_ICONS: Record<string, string> = {
+  instagram: '<rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>',
+  facebook: '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
+  x: '<path d="M4 4l16 16"/><path d="M20 4L4 20"/>',
+  tiktok: '<path d="M14 4v9.5a3.75 3.75 0 1 1-3.75-3.75"/><path d="M14 4c.4 2.8 2.3 4.7 5 5"/>',
+  youtube: '<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><polygon points="10 9.2 15 12 10 14.8 10 9.2" fill="currentColor" stroke="none"/>',
+  linkedin: '<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4V8h4v2"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>',
+  yelp: '<polygon points="12 2 14.6 8.6 21.5 9.3 16.5 13.9 17.9 20.8 12 17.3 6.1 20.8 7.5 13.9 2.5 9.3 9.4 8.6 12 2"/>',
+  google: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+};
+const SOCIAL_LABELS: Record<string, string> = {
+  instagram: 'Instagram', facebook: 'Facebook', x: 'X', twitter: 'X', tiktok: 'TikTok',
+  youtube: 'YouTube', linkedin: 'LinkedIn', yelp: 'Yelp', google: 'Google',
+};
+const socialIcon = (network: string): string => {
+  const key = network === 'twitter' ? 'x' : network;
+  return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SOCIAL_ICONS[key] || SOCIAL_ICONS.link}</svg>`;
 };
 
 /** Render validated blocks to deterministic HTML sections + optional JSON-LD.
@@ -290,6 +369,54 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         }
         break;
       }
+      case 'newsletter': {   // calm ESP link-out — mirrors the appointment button
+        const href = safeHref(b.url);
+        html = href ? `<section class="block wrap block-newsletter">${h2(b.title, 'Get updates from us')}${b.text ? `<p class="nl-text">${esc(b.text)}</p>` : ''}<p class="nl-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Sign up')}</a></p></section>` : '';
+        break;
+      }
+      case 'social': {   // icon strip, link-out only — no live feeds, no external assets
+        const links = b.links.map((l) => {
+          const href = safeHref(l.url); if (!href) return '';
+          const label = SOCIAL_LABELS[l.network] || (l.network ? l.network.charAt(0).toUpperCase() + l.network.slice(1) : 'Website');
+          return `<li><a href="${attr(href)}" rel="noopener" target="_blank" aria-label="${attr(label)}" title="${attr(label)}">${socialIcon(l.network)}</a></li>`;
+        }).filter(Boolean);
+        if (links.length) html = `<section class="block wrap block-social">${h2(b.title, 'Find us online')}<ul class="social">${links.join('')}</ul></section>`;
+        break;
+      }
+      case 'events': {   // clean list; ISO dates show human ("Jul 26") inside <time>
+        const rows = b.items.map((it) => {
+          const nice = humanDate(it.date);
+          const when = nice ? `<time datetime="${attr(it.date)}">${esc(nice)}</time>` : esc(it.date);
+          const href = it.url ? safeHref(it.url) : null;
+          const name = href ? `<a href="${attr(href)}" rel="noopener">${esc(it.name)}</a>` : esc(it.name);
+          return `<li class="ev"><span class="ev-when">${when}${it.time ? `<span class="ev-time">${esc(it.time)}</span>` : ''}</span><span class="ev-body"><span class="ev-name">${name}</span>${it.detail ? `<span class="ev-detail">${esc(it.detail)}</span>` : ''}</span></li>`;
+        });
+        html = `<section class="block alt block-events"><div class="wrap">${h2(b.title, 'Upcoming events')}<ul class="events">${rows.join('')}</ul></div></section>`;
+        // Honest Event schema: only items with a machine-readable ISO date, and only
+        // the fields actually present (startDate gains a time only when it's HH:MM).
+        const ldEvents = b.items.filter((it) => humanDate(it.date) !== null).map((it) => {
+          const t24 = it.time ? TIME_24_RE.exec(it.time) : null;
+          return {
+            '@type': 'Event', name: it.name,
+            startDate: t24 ? `${it.date}T${t24[1].padStart(2, '0')}:${t24[2]}` : it.date,
+            ...(it.detail ? { description: it.detail } : {}),
+            ...(it.url && safeHref(it.url) ? { url: it.url } : {}),
+          };
+        });
+        if (ldEvents.length) ld = { '@context': 'https://schema.org', '@type': 'ItemList', name: b.title || 'Upcoming events', itemListElement: ldEvents.map((ev, i) => ({ '@type': 'ListItem', position: i + 1, item: ev })) };
+        break;
+      }
+      case 'map': {   // PRIVACY-SAFE: self-hosted image + address text + a directions
+        // LINK-OUT (built from the address when none given) — never a third-party
+        // tile/iframe embed, so no trackers ever load on the customer's site.
+        const dirHref = b.directions_url ? safeHref(b.directions_url)
+          : (b.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}` : null);
+        const img = b.image ? `<div class="map-img">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px')}</div>` : '';
+        const addr = b.address ? `<p class="map-addr">${esc(b.address)}</p>` : '';
+        const dir = dirHref ? `<p class="map-dir"><a href="${attr(dirHref)}" rel="noopener" target="_blank">Get directions →</a></p>` : '';
+        if (img || addr) html = `<section class="block wrap block-map">${h2(b.title, 'Find us')}${img}${addr}${dir}</section>`;
+        break;
+      }
     }
     if (b.type === 'partners') {
       html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
@@ -348,4 +475,20 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .v-poster img{width:100%;border-radius:12px;display:block}
 .v-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px}
 .v-textlink{display:inline-block;font-weight:700;color:var(--accent-dark,var(--accent));border:2px solid var(--accent);border-radius:999px;padding:10px 20px}
-.v-cap{color:var(--soft);font-size:.95rem;margin-top:8px}`;
+.v-cap{color:var(--soft);font-size:.95rem;margin-top:8px}
+.block-newsletter{text-align:center}
+.nl-text{color:var(--soft);max-width:56ch;margin:8px auto 0}
+.nl-cta{margin-top:14px}
+ul.social{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:12px}
+ul.social a{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;border:2px solid var(--accent);color:var(--accent-dark,var(--accent))}
+ul.social svg{display:block}
+ul.events{list-style:none;margin:10px 0 0;padding:0}
+ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ev-when{flex:0 0 92px;font-weight:700;color:var(--accent-dark,var(--accent))}
+.ev-time{display:block;font-weight:400;color:var(--soft);font-size:.9rem}
+.ev-name{display:block;font-weight:700}
+.ev-detail{display:block;color:var(--soft);font-size:.95rem;margin-top:2px}
+.block-map .map-img img{width:100%;border-radius:12px;display:block}
+.map-addr{margin:10px 0 0;font-size:1.05rem}
+.map-dir{margin-top:6px}
+.map-dir a{font-weight:700;color:var(--accent-dark,var(--accent))}`;

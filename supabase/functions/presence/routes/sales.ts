@@ -7,11 +7,11 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink } from '../commerce/account.ts';
+import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
-import { ensureProjectForDeal } from '../lib/service_bridge.ts';
+import { ensureProjectForDeal, ensureBridge, linksForCustomer } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink } from '../commerce/stripe.ts';
@@ -195,6 +195,16 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     }
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
     return json({ data: rows(up)[0] }, 200, cors);
+  }
+  if (req.method === 'DELETE') {
+    // Soft-delete: the deal leaves the pipeline but its history (events,
+    // proposals, contracts, invoices) is retained — deleted_at is the same
+    // pattern every other soft-deleted entity uses (0074 partial indexes).
+    // A converted/won deal is NOT deletable (it produced a real customer).
+    if (deal.stage === 'converted' || deal.converted_at) return json({ error: 'won_deal', message: 'This deal became a customer — it can’t be deleted. Manage the customer from Projects.' }, 409, cors);
+    const del = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
+    if (!del.ok || !rows(del)[0]) return json({ error: 'write_failed' }, 502, cors);
+    return json({ data: { ok: true, deleted: true } }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
@@ -637,50 +647,23 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const email = clean(contact?.email, 160).toLowerCase();
   const plan = pickPlan(cb.plan); // selectable edition (default 'presence'); billing formalized in P2-E (active access, unbilled — a deliberate P2-C decision)
 
-  // 1) resolve/create the customer ACCOUNT so they can actually LOG IN. When we
-  //    create a fresh login the customer never chose a password, so we email a
-  //    signed set-password link (below). Track what WE created for clean rollback.
-  let clientId: string | null = null;
-  // `createdClient` = WE inserted the clients row on THIS convert (any of the three
-  // creation paths below) → safe to delete on rollback. It is NEVER set for a REUSED
-  // existing customer (findClientByEmail hit), so rollback can never delete someone
-  // else's account. `createdAuthId` separately gates deleting a login we minted.
-  let createdAuthId: string | null = null, createdClient = false, isNewLogin = false;
-  if (email) {
-    const existing = await findClientByEmail(email);
-    if (existing) { clientId = existing.id; }                       // reuse — never duplicate a customer
-    else {
-      const auth = await createAuthUser(email, crypto.randomUUID() + 'Aa1!');
-      if ('id' in auth) {
-        createdAuthId = auth.id;
-        const chain = await createContactAndClient(auth.id, email, businessName);
-        if ('error' in chain) { await deleteAuthUser(auth.id); await unclaim(); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
-        clientId = chain.clientId; createdClient = true; isNewLogin = true;
-      } else if (auth.error === 'account_exists') {                 // they already sign in; link a client by email if missing
-        clientId = (await findClientByEmail(email))?.id || null;
-        if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true; }
-      } else { await unclaim(); return json({ error: 'auth_failed', message: 'We couldn’t set up the customer’s login — please try again.' }, 502, cors); }
-    }
-  } else {
-    // no email on the deal → a studio-managed workspace (no self-serve login yet; invite later)
-    const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, status: 'active' }) });
-    clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true;
-  }
-  if (!clientId) { await unclaim(); return json({ error: 'client_failed', message: 'We couldn’t create the customer account — please try again.' }, 502, cors); }
-
-  // 2) reuse the ONE idempotent provisioning path (entitlement + site + hosting + seeds + first-run)
-  const prov = await provisionForSignup({ clientId, businessName, plan, patch: { status: 'active' } as any, actorEmail: principal.email });
-  if (!prov.ok) {
-    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created (cascade drops site+entitlement)
+  // 1+2) resolve/create the customer ACCOUNT (login) and run the ONE idempotent
+  //    provisioning path (entitlement + site + hosting + seeds). This is the SHARED
+  //    provisioning internal — the exact same helper the direct "Add a customer"
+  //    path calls, so there is never a second provisioner. It rolls back only what
+  //    IT created on failure; convert holds the deal claim around it.
+  const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email });
+  if (!acct.ok || !acct.clientId) {
     await unclaim();
-    const msg = prov.error === 'hosting_unconfigured' ? 'The account was created but hosting isn’t available in this environment.' : 'We created the account but hit a snag provisioning the workspace.';
-    return json({ error: 'provision_incomplete', message: msg }, 502, cors);
+    return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t set up the customer’s account — please try again.' }, acct.httpStatus || 502, cors);
   }
+  const clientId = acct.clientId;
+  const createdClient = acct.createdClient, createdAuthId = acct.createdAuthId, isNewLogin = acct.isNewLogin;
 
   // 3) stamp the chain onto the deal (we hold the claim; converted_client_id UNIQUE
   //    also blocks a client already converted from ANOTHER deal).
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&converted_client_id=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ converted_client_id: clientId, converted_site_id: prov.siteId, stage: 'won' }) });
+    body: JSON.stringify({ converted_client_id: clientId, converted_site_id: acct.siteId, stage: 'won' }) });
   if (!up.ok || !rows(up)[0]) {
     // stamp failed (e.g. this customer is already linked to another deal). Roll back
     // ONLY what WE created (never a reused existing customer); release the claim.
@@ -690,42 +673,15 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     if (fresh?.converted_client_id) return json({ data: { converted: true, client_id: fresh.converted_client_id, site_id: fresh.converted_site_id, idempotent: true } }, 200, cors);
     return json({ error: 'convert_conflict', message: 'That customer is already linked to another deal.' }, 409, cors);
   }
-  await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: prov.siteId } });
+  await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
   // Seam 1: if the converting operator runs an AGENCY, add the new customer to
-  // their managed portfolio (presence_agency_clients) so the Studio App can
-  // service it via scope-switching — completing the Studio→Client loop. Idempotent
-  // (site_id PK). Best-effort; a solo (non-agency) owner simply skips this.
-  let managed = false;
-  try {
-    if (principal.jwt) {
-      const am = await resolveAgencyMember(principal.jwt);
-      if (am) {
-        const link = await svc('presence_agency_clients?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify({ site_id: prov.siteId, agency_id: am.agency_id, status: 'active', owner_email: email || am.email }) });
-        managed = link.ok;
-      }
-    }
-  } catch { /* portfolio link is best-effort */ }
+  // their managed portfolio (shared helper). Idempotent; solo owners skip it.
+  const managed = await linkAgencyPortfolio(principal, acct.siteId, email);
 
-  // 4) ACCESS + onboarding handoff. A brand-new login gets a signed set-password
-  //    link (they never chose a password) that lands them straight in the EXISTING
-  //    guided first-run (via ?next=); an existing login gets a welcome. Best-effort.
-  let invited = false;
-  if (email) {
-    if (isNewLogin) {
-      const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html?next=/get-started.html`);
-      invited = !!link;
-      sendEmail(email, 'Welcome to Studio OS — set up your login',
-        `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
-      undefined, { critical: true }).catch(() => {});   // login access = transactional
-    } else {
-      sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
-        `<p>Welcome! Your workspace is set up and ready.</p><p>Sign in at <a href="${siteUrl()}/portal.html">your portal</a>, then open <a href="${siteUrl()}/get-started.html">your guided setup</a>.</p>`,
-      undefined, { critical: true }).catch(() => {});   // login access = transactional
-    }
-  }
+  // 4) ACCESS + onboarding handoff — the one-tap sign-in invite (shared helper).
+  const invited = await sendCustomerInvite(email, isNewLogin);
 
   // 5) SERVICE-DELIVERY HANDOFF (Agency–Client Bridge): create the authoritative
   //    project on THIS (agency) site for the new customer + link the tenant-safe
@@ -736,15 +692,170 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const selfConvert = clientId === site.client_id;
   const handoff = selfConvert
     ? { project: null }
-    : await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId, customerSiteId: prov.siteId || null, actor: actorOf(principal).actor, actorKind: actorOf(principal).actor_kind });
+    : await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId, customerSiteId: acct.siteId || null, actor: actorOf(principal).actor, actorKind: actorOf(principal).actor_kind });
 
   // 5b) BILLING BACKFILL: deposits/invoices sent BEFORE convert were written with
   //     customer_client_id NULL (the customer didn't exist yet). Stamp them now so
   //     the client's own Billing view shows the full money story. Idempotent.
   try {
     await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&customer_client_id=is.null`, {
-      method: 'PATCH', body: JSON.stringify({ customer_client_id: clientId, customer_site_id: prov.siteId || null }),
+      method: 'PATCH', body: JSON.stringify({ customer_client_id: clientId, customer_site_id: acct.siteId || null }),
     });
   } catch { /* best-effort — the studio-side record is already correct */ }
-  return json({ data: { converted: true, client_id: clientId, site_id: prov.siteId, project_id: handoff.project?.id || null, hosted: prov.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
+  return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
+}
+
+// ═══ SHARED PROVISIONING INTERNALS ═══════════════════════════════════════════
+// The account + workspace provisioning that BOTH the deal→convert ceremony and
+// the direct "Add a customer" path run — extracted so there is exactly ONE
+// provisioner, never a parallel one. Placed after handleSalesConvert so the
+// convert flow reads top-to-bottom; both callers reference these by name.
+
+interface CustomerAccountResult {
+  ok: boolean;
+  error?: string; message?: string; httpStatus?: number;
+  clientId?: string; siteId?: string; hosted?: boolean;
+  isNewLogin: boolean;            // a login we just minted (needs a set-password invite)
+  alreadyExisted: boolean;        // an account for this email already existed (reused, never duplicated)
+  createdClient: boolean;         // WE inserted the clients row → safe to roll back
+  createdAuthId: string | null;   // WE minted the auth login → safe to roll back
+}
+
+/** Resolve or create the customer's login + client record, then run the ONE
+ *  idempotent provisioning path (entitlement + site + hosting + seeds + first-run).
+ *  Reuses an existing account by email — NEVER duplicates a customer. Rolls back
+ *  ONLY what it created if provisioning fails, so a partial run never lingers.
+ *  Shared by convert and the direct add-customer route (no second provisioner). */
+async function provisionCustomerAccount(opts: {
+  email: string; businessName: string; plan: PlanKey; actorEmail?: string | null;
+}): Promise<CustomerAccountResult> {
+  const { email, businessName, plan } = opts;
+  // Track what WE created for clean rollback. `createdClient` is NEVER set for a
+  // REUSED existing customer, so rollback can never delete someone else's account.
+  let clientId: string | null = null, createdAuthId: string | null = null;
+  let createdClient = false, isNewLogin = false, alreadyExisted = false;
+  const fail = (error: string, message: string, httpStatus = 502): CustomerAccountResult =>
+    ({ ok: false, error, message, httpStatus, isNewLogin, alreadyExisted, createdClient, createdAuthId });
+
+  if (email) {
+    const existing = await findClientByEmail(email);
+    if (existing) { clientId = existing.id; alreadyExisted = true; }  // reuse — never duplicate a customer
+    else {
+      const auth = await createAuthUser(email, crypto.randomUUID() + 'Aa1!');
+      if ('id' in auth) {
+        createdAuthId = auth.id;
+        const chain = await createContactAndClient(auth.id, email, businessName);
+        if ('error' in chain) { await deleteAuthUser(auth.id); return fail('client_failed', 'We couldn’t create the customer account — please try again.'); }
+        clientId = chain.clientId; createdClient = true; isNewLogin = true;
+      } else if (auth.error === 'account_exists') {                 // they already sign in; link a client by email if missing
+        alreadyExisted = true;
+        clientId = (await findClientByEmail(email))?.id || null;
+        if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true; }
+      } else { return fail('auth_failed', 'We couldn’t set up the customer’s login — please try again.'); }
+    }
+  } else {
+    // no email → a studio-managed workspace (no self-serve login yet; invite later)
+    const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, status: 'active' }) });
+    clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true;
+  }
+  if (!clientId) return fail('client_failed', 'We couldn’t create the customer account — please try again.');
+
+  // reuse the ONE idempotent provisioning path (entitlement + site + hosting + seeds + first-run)
+  const prov = await provisionForSignup({ clientId, businessName, plan, patch: { status: 'active' } as any, actorEmail: opts.actorEmail });
+  if (!prov.ok) {
+    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created (cascade drops site+entitlement)
+    const msg = prov.error === 'hosting_unconfigured' ? 'The account was created but hosting isn’t available in this environment.' : 'We created the account but hit a snag provisioning the workspace.';
+    return { ok: false, error: 'provision_incomplete', message: msg, httpStatus: 502, isNewLogin, alreadyExisted, createdClient, createdAuthId };
+  }
+  return { ok: true, clientId, siteId: prov.siteId, hosted: prov.hosted, isNewLogin, alreadyExisted, createdClient, createdAuthId };
+}
+
+/** Seam 1: if the operator runs an AGENCY, add the customer to their managed
+ *  portfolio (presence_agency_clients) so the Studio App can service them via
+ *  scope-switching. Idempotent (site_id PK). Best-effort; solo owners skip it. */
+async function linkAgencyPortfolio(principal: Principal, siteId: string | undefined, email: string): Promise<boolean> {
+  try {
+    if (!siteId || !principal.jwt) return false;
+    const am = await resolveAgencyMember(principal.jwt);
+    if (!am) return false;
+    const link = await svc('presence_agency_clients?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ site_id: siteId, agency_id: am.agency_id, status: 'active', owner_email: email || am.email }) });
+    return link.ok;
+  } catch { return false; } // portfolio link is best-effort
+}
+
+/** The one-tap sign-in invite. A brand-new login gets a signed set-password link
+ *  (they never chose a password) that lands them straight in the EXISTING guided
+ *  first-run (via ?next=); an existing login gets a welcome. Best-effort. */
+async function sendCustomerInvite(email: string, isNewLogin: boolean): Promise<boolean> {
+  if (!email) return false;
+  if (isNewLogin) {
+    const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html?next=/get-started.html`);
+    sendEmail(email, 'Welcome to Studio OS — set up your login',
+      `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
+    undefined, { critical: true }).catch(() => {});   // login access = transactional
+    return !!link;
+  }
+  sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
+    `<p>Welcome! Your workspace is set up and ready.</p><p>Sign in at <a href="${siteUrl()}/portal.html">your portal</a>, then open <a href="${siteUrl()}/get-started.html">your guided setup</a>.</p>`,
+  undefined, { critical: true }).catch(() => {});   // login access = transactional
+  return true;
+}
+
+// ═══ ADD A CUSTOMER (direct — no sales ceremony) ═════════════════════════════
+// The owner already has customers (people he's served for years). This sets one
+// up + invites them WITHOUT the deal→sign→convert theater: reuse the SAME
+// provisioning internals (account + workspace + service-role entitlement + agency
+// bridge + invite). A SERVICE customer — active access, no Stripe subscription
+// (billing stays the studio's own invoicing, P2-E). Idempotent: an email that
+// already has a workspace returns a friendly "already set up", never a duplicate.
+export async function handleSalesAddCustomer(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const email = clean(b.email, 160).toLowerCase();
+  const name = clean(b.name, 120);
+  const businessNameIn = clean(b.business_name, 120);
+  if (!email || !validEmail(email)) return json({ error: 'validation', message: 'Enter the customer’s email — that’s where their sign-in invitation goes.' }, 422, cors);
+  const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
+  const plan = pickPlan(b.edition);   // "what they get" (default presence); reuse the convert whitelist
+
+  const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email });
+  if (!acct.ok || !acct.clientId) return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t set up the customer’s account — please try again.' }, acct.httpStatus || 502, cors);
+  const clientId = acct.clientId;
+
+  // managed portfolio (Seam 1) + agency bridge (one primary agency per customer).
+  const managed = await linkAgencyPortfolio(principal, acct.siteId, email);
+
+  // Agency–Client Bridge: ONE authoritative delivery project on THIS agency site,
+  // linked to the customer's own workspace (ensureBridge claims presence_customer_agency
+  // = one primary agency per customer). Idempotent — reuse an existing link for this
+  // customer instead of minting a second empty project. Self-guard: never bridge the
+  // studio to itself. A customer already owned by ANOTHER agency is refused by ensureBridge.
+  let projectId: string | null = null, bridged = false, ownedElsewhere = false;
+  if (clientId !== site.client_id) {
+    const links = await linksForCustomer(clientId);
+    const mine = links.find((l) => l.agency_site_id === site.id);
+    if (mine) { projectId = mine.project_id; bridged = true; }
+    else if (links.length) { ownedElsewhere = true; }   // linked to a DIFFERENT agency already
+    else {
+      const ins = await svc('presence_projects', { method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ site_id: site.id, client_id: clientId, name: String(businessName).slice(0, 200), description: '', status: 'active', client_visible: true }) });
+      const project = rows(ins)[0];
+      if (project) {
+        bridged = await ensureBridge(site.id, project.id, clientId, acct.siteId || null, null);
+        if (bridged) projectId = project.id;
+        else { ownedElsewhere = true; await svc(`presence_projects?id=eq.${project.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {}); } // customer belongs to another agency — drop our orphan
+      }
+    }
+  }
+
+  const portalUrl = `${siteUrl()}/portal.html`;
+  // Already had a workspace → friendly "they're already set up" (with a link), no
+  // duplicate, no fresh invite (they already have access).
+  if (acct.alreadyExisted) {
+    return json({ data: { already_exists: true, created: false, client_id: clientId, site_id: acct.siteId, project_id: projectId, managed, portal_url: portalUrl, message: 'They already have a workspace — nothing was duplicated.' } }, 200, cors);
+  }
+  const invited = await sendCustomerInvite(email, acct.isNewLogin);
+  await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'create', summary: `Added ${businessName} as a customer`, principal, provenance: 'human' }).catch(() => {});
+  return json({ data: { created: true, client_id: clientId, site_id: acct.siteId, project_id: projectId, hosted: acct.hosted, invited, managed, bridged, owned_elsewhere: ownedElsewhere, plan, portal_url: portalUrl } }, 201, cors);
 }

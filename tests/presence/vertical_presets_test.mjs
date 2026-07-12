@@ -25,6 +25,14 @@ ok('beauty shows transformations (before_after)', has('salon', 'before_after') &
 ok('retail + community recommend the partners strip', has('boutique', 'partners') && has('nonprofit', 'partners'));
 ok('generic / unknown → a safe baseline (features)', has('generic', 'features') && has('zzz-unknown', 'features') && has(null, 'features'));
 
+// r2 growth blocks — newsletter / social / events / map woven where they earn a place
+ok('newsletter reaches most families', has('salon', 'newsletter') && has('gym', 'newsletter') && has('law', 'newsletter') && has('boutique', 'newsletter') && has('restaurant', 'newsletter') && has('nonprofit', 'newsletter') && has('generic', 'newsletter'));
+ok('social links reach every family', ['plumber', 'salon', 'gym', 'law', 'dental', 'retail', 'restaurant', 'nonprofit', 'generic', 'photography'].every((k) => has(k, 'social')));
+ok('events → food / fitness / community / creative, not trades or law', has('restaurant', 'events') && has('gym', 'events') && has('church', 'events') && has('photography', 'events') && !has('plumber', 'events') && !has('law', 'events'));
+ok('map → storefront families people travel to, not mobile trades', has('salon', 'map') && has('restaurant', 'map') && has('dental', 'map') && has('boutique', 'map') && !has('plumber', 'map'));
+ok('creative studios lead with their work (gallery first)', suggestedBlocksFor('photography')[0] === 'gallery' && has('event_planning', 'gallery'));
+ok('community leads with events', suggestedBlocksFor('nonprofit')[0] === 'events');
+
 ok('every suggested block is a REALIZED block type', allIndustryKeys().concat(['zzz']).every((k) => suggestedBlocksFor(k).every((b) => REALIZED_BLOCK_TYPES.includes(b))));
 ok('every suggested block exists in the site_components catalog', allIndustryKeys().every((k) => suggestedBlocksFor(k).every((b) => COMPONENTS.some((c) => c.key === b))));
 ok('suggestions are deduped', allIndustryKeys().every((k) => { const s = suggestedBlocksFor(k); return new Set(s).size === s.length; }));

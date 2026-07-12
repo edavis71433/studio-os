@@ -233,6 +233,38 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
   .card,.item,.lead,.rowitem,.note,.answer,.panel,.client,.ev{ overflow-wrap:anywhere; }
 }
 
+/* ── First-login tour (shell.js): a soft ring + one small card per step ──────
+   Both live above the shell chrome; display:none when closed so the shared
+   dialog focus-trap only sees the card while it's actually open. Theme-aware
+   via the shell tokens; reduced motion turns the follow-transition off. */
+.dds-tour-ring{position:fixed;z-index:2147483004;pointer-events:none;display:none;
+  border:2px solid var(--dds-p);border-radius:13px;box-shadow:0 0 0 5px var(--dds-p-soft);
+  transition:top .18s ease,left .18s ease,width .18s ease,height .18s ease}
+.dds-tour-ring.open{display:block}
+.dds-tour-card{position:fixed;z-index:2147483005;display:none;width:min(330px,calc(100vw - 24px));
+  background:var(--dds-card);color:var(--dds-ink);border:1px solid var(--dds-line);border-radius:14px;
+  box-shadow:var(--dds-shadow);padding:15px 17px;font-family:var(--dds-sans);font-size:14px;line-height:1.5;
+  transition:top .18s ease,left .18s ease}
+.dds-tour-card.open{display:block}
+.dds-tour-card:focus{outline:none}
+.dds-tour-card h3{margin:0 0 4px;font-family:var(--dds-serif);font-weight:600;font-size:16.5px;letter-spacing:-.01em}
+.dds-tour-card p{margin:0;color:var(--dds-soft);font-size:13.5px}
+.dds-tour-card .dots{display:flex;gap:5px;margin:12px 0 0}
+.dds-tour-card .dots span{width:6px;height:6px;border-radius:50%;background:var(--dds-line)}
+.dds-tour-card .dots span.on{background:var(--dds-p)}
+.dds-tour-card .btns{display:flex;align-items:center;gap:8px;margin-top:12px}
+.dds-tour-card .btns .grow{flex:1}
+.dds-tour-card button{font:inherit;font-size:13px;font-weight:600;cursor:pointer;border-radius:999px;
+  padding:7px 14px;border:1px solid var(--dds-line);background:var(--dds-card);color:var(--dds-ink)}
+.dds-tour-card button.next{background:var(--dds-p);border-color:var(--dds-p);color:#fff}
+.dds-tour-card button.skip{border:none;background:none;color:var(--dds-faint);padding:7px 4px;font-weight:500}
+.dds-tour-card button:focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
+/* dark mode: the accent lightens (#b79ceb), so the filled Next needs dark ink */
+@media (prefers-color-scheme:dark){.dds-tour-card button.next{color:#171320}}
+:root[data-theme="dark"] .dds-tour-card button.next{color:#171320}
+:root[data-theme="light"] .dds-tour-card button.next{color:#fff}
+@media (prefers-reduced-motion:reduce){.dds-tour-ring,.dds-tour-card{transition:none}}
+
 /* Skip link (shell-injected) — visually hidden until focused */
 .dds-skip{position:fixed;top:-60px;left:8px;z-index:2147483003;background:var(--dds-p);color:#fff;
   padding:10px 16px;border-radius:0 0 10px 10px;font:600 14px/1 var(--dds-sans);text-decoration:none;transition:top .12s}

@@ -50,7 +50,11 @@ ok('access: convert rolls back only what it created on provision failure', /if \
 // deep-review fixes:
 ok('concurrency: convert CLAIMS the deal (converted_at) BEFORE creating any account/workspace', (() => { const claimAt = sales.indexOf('converted_client_id=is.null&converted_at=is.null&select=id'); const provAt = sales.indexOf('provisionForSignup({ clientId'); return claimAt > 0 && provAt > 0 && claimAt < provAt && /const claimBody = \(\) => JSON\.stringify\(\{ converted_at: nowIso\(\) \}\)/.test(sales); })());
 ok('concurrency: a stale claim (>5min) is reclaimable (self-healing)', /converted_at=lt\.\$\{encodeURIComponent\(staleBefore\)\}/.test(sales));
-ok('concurrency: releases the claim (unclaim) on every failure path after claiming', (sales.match(/await unclaim\(\)/g) || []).length >= 3);
+// Post-refactor the account+provision failure paths consolidated into the shared
+// provisionCustomerAccount helper (which does its OWN rollback); convert now has
+// two post-claim failure returns — the helper-failure return and the stamp-failure
+// return — and BOTH release the claim.
+ok('concurrency: releases the claim (unclaim) on every failure path after claiming', (() => { const claimAt = sales.indexOf('const unclaim ='); const conv = sales.slice(claimAt, sales.indexOf('provisionCustomerAccount', claimAt) + 4000); return (conv.match(/await unclaim\(\)/g) || []).length >= 2 && /if \(!acct\.ok[\s\S]{0,80}await unclaim\(\)/.test(sales); })());
 ok('safety: NEVER deletes a reused existing customer — both rollback DELETEs are guarded by createdClient', (() => { const dels = sales.match(/svc\(`clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}\)/g) || []; const guarded = sales.match(/if \(createdClient\) \{ await svc\(`clients\?id=eq\.\$\{clientId\}`/g) || []; return dels.length >= 2 && dels.length === guarded.length; })());
 ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan on failure)', (() => { const inserts = sales.match(/svc\('clients', \{ method: 'POST'/g) || []; const tracked = sales.match(/createdClient = true/g) || []; return inserts.length >= 2 && tracked.length >= inserts.length + 1; })()); // +1: the createContactAndClient chain path also sets it; every direct clients POST is followed by a createdClient=true
 
@@ -75,6 +79,44 @@ ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan 
 ok('convert: reuses provisionForSignup (idempotent)', /provisionForSignup\(\{ clientId/.test(sales));
 ok('convert: rolls back the client on provision failure', /clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}/.test(sales));
 ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-started\.html/.test(sales));
+
+// ── ADD A CUSTOMER (direct — no sales ceremony): shared provisioning, gated, idempotent ──
+{
+  // the SHARED provisioning internal exists and is the SINGLE provisioner —
+  // provisionForSignup is only ever called from inside provisionCustomerAccount.
+  ok('add-customer: a shared provisionCustomerAccount helper wraps the ONE provisioner', /async function provisionCustomerAccount\(/.test(sales) && (sales.match(/provisionForSignup\(\{ clientId/g) || []).length === 1);
+  // BOTH the convert ceremony and the direct route reuse it — no duplicated body
+  ok('add-customer: convert AND add-customer both call the shared helper (no 2nd provisioner)', (sales.match(/provisionCustomerAccount\(\{ email/g) || []).length >= 2);
+  // the account-creation primitives live ONCE, inside the shared helper (not duplicated per route)
+  ok('add-customer: account primitives (createAuthUser/createContactAndClient) appear once (shared)', (sales.match(/createAuthUser\(/g) || []).length === 1 && (sales.match(/createContactAndClient\(/g) || []).length === 1);
+  // route + handler wired, POST only
+  ok('add-customer: handler exported + dispatched at POST /sales/customers', /export async function handleSalesAddCustomer/.test(sales) && /route === '\/sales\/customers' && method === 'POST'/.test(idx));
+  // studio-gated exactly like the rest of /sales/* (relationship feature) and
+  // dispatched in the AUTHED block (after the entitlement + reviewer gate), never
+  // as a pre-auth public route.
+  ok('add-customer: gated to the relationship edition (same /sales gate)', /case 'sales':[\s\S]{0,80}return 'relationship'/.test(feat));
+  ok('add-customer: dispatched in the authed block (after checkEntitlement gate)', idx.indexOf("route === '/sales/customers'") > idx.indexOf('checkEntitlement(principal'));
+  // reuses the frozen bridge + one-primary-agency (ensureBridge), never a parallel bridge
+  ok('add-customer: reuses ensureBridge (one primary agency per customer)', /ensureBridge\(site\.id, project\.id, clientId/.test(sales) && /import \{ ensureProjectForDeal, ensureBridge, linksForCustomer \}/.test(sales));
+  // SERVICE customer: entitlement without a Stripe subscription (active access, no checkout)
+  ok('add-customer: SERVICE billing boundary — provisions active access, no Stripe subscription created', !/createServicePaymentLink|createCheckout|stripe/i.test(sales.slice(sales.indexOf('handleSalesAddCustomer'))));
+  // IDEMPOTENT existing-email: returns a friendly already_exists (with a link), never a duplicate
+  ok('add-customer: existing email → friendly already_exists (no duplicate, no new invite)', /if \(acct\.alreadyExisted\)/.test(sales) && /already_exists: true/.test(sales) && /alreadyExisted = true/.test(sales));
+  // the invite only fires for a genuinely new setup (after the already-exists early return)
+  ok('add-customer: sends the sign-in invite only for a new setup', (() => { const h = sales.indexOf('handleSalesAddCustomer'); const already = sales.indexOf('if (acct.alreadyExisted)', h); const invite = sales.indexOf('sendCustomerInvite(email, acct.isNewLogin)', h); return already > 0 && invite > already; })());
+  // reuses an existing bridge instead of minting a duplicate empty project on retry
+  ok('add-customer: idempotent bridge — reuses an existing link (no duplicate project)', /linksForCustomer\(clientId\)/.test(sales) && /links\.find\(\(l\) => l\.agency_site_id === site\.id\)/.test(sales));
+}
+
+// ── UI: contacts.html "Add a customer" (service language; success + already-exists states) ──
+{
+  const contacts = read('contacts.html');
+  ok('ui: a prominent "+ Add a customer" action + dialog', /id="addCust"/.test(contacts) && /openAddCustomer/.test(contacts) && /id="custDlg"/.test(contacts));
+  ok('ui: posts to /sales/customers with name/business_name/email/edition', /api\('\/sales\/customers','POST'/.test(contacts) && /business_name/.test(contacts) && /edition:\$\('cu-edition'\)\.value/.test(contacts));
+  ok('ui: SERVICE language (never SaaS plan words) + "never pay for software"', /never pay for software/.test(contacts) && /What they get/.test(contacts) && !/subscription|SaaS|per month|\/mo/i.test(contacts.slice(contacts.indexOf('custDlg'), contacts.indexOf('custDlg') + 1400)));
+  ok('ui: success state shows "Invitation sent to {email}" + the already-exists case', /Invitation sent to/.test(contacts) && /already_exists/.test(contacts) && /already have a workspace/.test(contacts));
+  ok('ui: labels wired to inputs (for/id) + focus managed', /for="cu-email"/.test(contacts) && /id="cu-email"/.test(contacts) && /\$\('cu-name'\)\.focus\(\)/.test(contacts));
+}
 
 // ── dispatch wired (authed + public) ──
 ok('wiring: authed /sales/* dispatched after site resolution', /route === '\/sales\/deals'/.test(idx) && /\\\/sales\\\/deals\\\/.*\\\/convert/.test(idx));

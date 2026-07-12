@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesInvoice, handleSalesTemplates, handleSalesTemplateDelete, handleSalesPublicView } from './routes/sales.ts';
+import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesTemplates, handleSalesTemplateDelete, handleSalesPublicView } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
@@ -503,6 +503,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── P2-C: Sales & Customer Lifecycle (authed, site-scoped). One coherent
   //    /sales/* resource surface. Public token actions are handled pre-auth above. ──
   if (route === '/sales/contacts') return handleSalesContacts(req, site, principal, cors);
+  // Add an EXISTING customer directly — no deal/sign/convert ceremony. Studio-gated
+  // like every /sales/* route (relationship feature + the reviewer boundary above).
+  if (route === '/sales/customers' && method === 'POST') return handleSalesAddCustomer(req, site, principal, cors);
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   {
     let m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})$/);

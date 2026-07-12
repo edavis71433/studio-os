@@ -17,15 +17,22 @@ import type { SiteBlockType } from './render_types.ts';
 // Later realized types (reviews, appointment, partners, video, gallery,
 // before_after) are woven in where they earn their place — same engine, richer
 // out-of-the-box recommendations, zero render changes.
-const HOME_TRADES: SiteBlockType[] = ['before_after', 'reviews', 'service_areas', 'gallery', 'process', 'certifications', 'stats', 'features'];
-const BEAUTY: SiteBlockType[] = ['appointment', 'before_after', 'team', 'gallery', 'pricing', 'reviews', 'features'];
-const FITNESS: SiteBlockType[] = ['appointment', 'pricing', 'gallery', 'team', 'reviews', 'stats', 'features'];
-const PROFESSIONAL: SiteBlockType[] = ['team', 'process', 'reviews', 'appointment', 'stats', 'certifications', 'features'];
-const MEDICAL: SiteBlockType[] = ['appointment', 'team', 'certifications', 'reviews', 'features', 'process'];
-const RETAIL: SiteBlockType[] = ['gallery', 'reviews', 'partners', 'features', 'stats'];
-const FOOD: SiteBlockType[] = ['gallery', 'reviews', 'features'];  // the menu is already the core page
-const COMMUNITY: SiteBlockType[] = ['gallery', 'stats', 'partners', 'video', 'features', 'cta'];
-const GENERIC: SiteBlockType[] = ['features', 'reviews', 'stats', 'cta'];
+// r2 additions: 'social' everywhere (every business has profiles worth linking);
+// 'newsletter' for most (skipped for trades + medical, where booking/proof lead);
+// 'events' where gatherings are the rhythm (food, fitness, community, creative);
+// 'map' for storefront families people travel TO (never mobile trades — they
+// already carry service_areas). Map + social are link-out only, zero embeds.
+const HOME_TRADES: SiteBlockType[] = ['before_after', 'reviews', 'service_areas', 'gallery', 'process', 'certifications', 'stats', 'features', 'social'];
+const BEAUTY: SiteBlockType[] = ['appointment', 'before_after', 'team', 'gallery', 'pricing', 'reviews', 'features', 'map', 'social', 'newsletter'];
+const FITNESS: SiteBlockType[] = ['appointment', 'pricing', 'events', 'gallery', 'team', 'reviews', 'stats', 'features', 'map', 'social', 'newsletter'];
+const PROFESSIONAL: SiteBlockType[] = ['team', 'process', 'reviews', 'appointment', 'stats', 'certifications', 'features', 'social', 'newsletter'];
+// creative studios: the work leads, and shows/bookings follow (split from professional)
+const CREATIVE: SiteBlockType[] = ['gallery', 'reviews', 'events', 'process', 'appointment', 'stats', 'features', 'social', 'newsletter'];
+const MEDICAL: SiteBlockType[] = ['appointment', 'team', 'certifications', 'reviews', 'features', 'process', 'map', 'social'];
+const RETAIL: SiteBlockType[] = ['gallery', 'reviews', 'partners', 'features', 'stats', 'map', 'social', 'newsletter'];
+const FOOD: SiteBlockType[] = ['gallery', 'events', 'reviews', 'features', 'map', 'social', 'newsletter'];  // the menu is already the core page
+const COMMUNITY: SiteBlockType[] = ['events', 'gallery', 'stats', 'partners', 'video', 'features', 'newsletter', 'social', 'map', 'cta'];
+const GENERIC: SiteBlockType[] = ['features', 'reviews', 'stats', 'newsletter', 'social', 'cta'];
 
 const FAMILY: Record<string, SiteBlockType[]> = {
   // home & trades
@@ -37,9 +44,10 @@ const FAMILY: Record<string, SiteBlockType[]> = {
   fitness: FITNESS, gym: FITNESS, yoga: FITNESS,
   // professional
   professional: PROFESSIONAL, law: PROFESSIONAL, accounting: PROFESSIONAL, insurance: PROFESSIONAL,
-  consulting: PROFESSIONAL, marketing: PROFESSIONAL, real_estate: PROFESSIONAL, photography: PROFESSIONAL,
-  videography: PROFESSIONAL, interior_design: PROFESSIONAL, event_planning: PROFESSIONAL,
+  consulting: PROFESSIONAL, marketing: PROFESSIONAL, real_estate: PROFESSIONAL,
   childcare: PROFESSIONAL, tutoring: PROFESSIONAL,
+  // creative (the work itself is the pitch)
+  photography: CREATIVE, videography: CREATIVE, interior_design: CREATIVE, event_planning: CREATIVE,
   // medical
   medical: MEDICAL, dental: MEDICAL, veterinary: MEDICAL,
   // retail / product
@@ -68,6 +76,7 @@ export function suggestionNoteFor(industryKey: string | null | undefined): strin
   if (FAMILY[k] === BEAUTY) return 'Show your team, your space, and simple pricing.';
   if (FAMILY[k] === FITNESS) return 'Lead with your classes or packages and the people who teach them.';
   if (FAMILY[k] === PROFESSIONAL) return 'Credibility comes from your people, your process, and your track record.';
+  if (FAMILY[k] === CREATIVE) return 'Lead with your work — then make it easy to follow you and book you.';
   if (FAMILY[k] === MEDICAL) return 'Reassure with your practitioners and their credentials.';
   if (FAMILY[k] === RETAIL) return 'Let your products and a few standout details do the talking.';
   if (FAMILY[k] === FOOD) return 'A few great photos go a long way alongside your menu.';

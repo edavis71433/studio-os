@@ -120,6 +120,76 @@ const ctx = { esc, attr, safeHref };
   ok("every media block type is catalog-declared", ["gallery", "before_after", "video"].every((t) => COMPONENTS.some((c) => c.key === t)));
 }
 
+// ═══ 6. growth blocks (r2) — newsletter, social, events, map ═══
+{
+  // newsletter — same link-out posture as appointment
+  ok('newsletter requires an http(s) url', validateBlocks([{ type: 'newsletter', text: 'hi' }]).length === 0
+    && validateBlocks([{ type: 'newsletter', url: 'javascript:alert(1)' }]).length === 0
+    && validateBlocks([{ type: 'newsletter', url: 'https://esp.example/signup' }]).length === 1);
+  const nl = renderSiteBlocks(validateBlocks([{ type: 'newsletter', url: 'https://esp.example/signup', text: 'Monthly news, no spam.' }]), ctx)[0];
+  ok('newsletter renders calm default copy + a link-out button', nl.html.includes('Get updates from us') && nl.html.includes('href="https://esp.example/signup"') && nl.html.includes('rel="noopener"') && nl.html.includes('Sign up') && nl.html.includes('Monthly news, no spam.'));
+  ok('newsletter emits no schema + never a form/iframe', !nl.ld && !/<form|<iframe|<input/i.test(nl.html));
+
+  // social — icon strip, link-out only
+  const manyLinks = Array.from({ length: 15 }, (_, i) => ({ network: 'instagram', url: `https://instagram.com/a${i}` }));
+  ok('social caps at 8 links', validateBlocks([{ type: 'social', links: manyLinks }])[0].links.length === 8);
+  ok('social drops non-http(s) links; all-bad → block skipped', validateBlocks([{ type: 'social', links: [{ network: 'x', url: 'javascript:alert(1)' }] }]).length === 0);
+  const so = renderSiteBlocks(validateBlocks([{ type: 'social', links: [
+    { network: 'Instagram', url: 'https://instagram.com/b' },   // case-normalized → brand icon
+    { network: 'twitter', url: 'https://x.com/b' },             // alias → the X icon + label
+    { network: 'myspace', url: 'https://myspace.com/b' },       // unknown → generic link icon
+  ] }]), ctx)[0];
+  ok('social renders one inline SVG per link, labelled, noopener + new tab', (so.html.match(/<svg /g) || []).length === 3 && so.html.includes('aria-label="Instagram"') && so.html.includes('aria-label="X"') && so.html.includes('rel="noopener" target="_blank"'));
+  ok('unknown network falls back to a generic icon with its own label', so.html.includes('aria-label="Myspace"'));
+  ok('social emits no schema + loads nothing external (no src/iframe)', !so.ld && !/src=|<iframe|url\(/i.test(so.html));
+
+  // events — clean list, human dates, honest per-item Event schema
+  ok('events require name + date per item; cap 12', (() => {
+    const e = validateBlocks([{ type: 'events', items: Array.from({ length: 20 }, (_, i) => ({ name: `E${i}`, date: '2026-08-01' })).concat([{ name: 'NoDate' }, { date: '2026-08-02' }]) }])[0];
+    return e.items.length === 12 && e.items.every((it) => it.name && it.date);
+  })());
+  ok('events with no valid items are skipped entirely (calm empty-skip)', validateBlocks([{ type: 'events', items: [{ name: '', date: '' }] }]).length === 0 && validateBlocks([{ type: 'events', items: [] }]).length === 0);
+  const evR = renderSiteBlocks(validateBlocks([{ type: 'events', items: [
+    { name: 'Live jazz night', date: '2026-07-26', time: '19:00', detail: 'On the patio', url: 'https://tickets.example/jazz' },
+    { name: 'Open mic', date: 'every Friday' },
+  ] }]), ctx)[0];
+  ok('ISO date shows human ("Jul 26") inside a machine-readable <time>', evR.html.includes('>Jul 26</time>') && evR.html.includes('datetime="2026-07-26"'));
+  ok('a non-ISO date shows exactly as the owner wrote it', evR.html.includes('every Friday'));
+  ok('honest Event JSON-LD: only ISO-dated items, only the fields present', (() => {
+    const items = evR.ld && evR.ld.itemListElement;
+    return items && items.length === 1 && items[0].item['@type'] === 'Event' && items[0].item.name === 'Live jazz night'
+      && items[0].item.startDate === '2026-07-26T19:00' && items[0].item.description === 'On the patio' && items[0].item.url === 'https://tickets.example/jazz';
+  })());
+  ok('events with no machine-readable date emit NO schema at all', !renderSiteBlocks(validateBlocks([{ type: 'events', items: [{ name: 'Open mic', date: 'Fridays' }] }]), ctx)[0].ld);
+  ok('fields absent stay absent in schema (no fabricated description/url)', (() => {
+    const one = renderSiteBlocks(validateBlocks([{ type: 'events', items: [{ name: 'Tasting', date: '2026-09-03' }] }]), ctx)[0].ld.itemListElement[0].item;
+    return one.startDate === '2026-09-03' && !('description' in one) && !('url' in one);
+  })());
+
+  // map — privacy-safe static only
+  const MID = '33333333-3333-3333-3333-333333333333';
+  const MREF = () => ({ alt: 'Map to our shop', variants: { w800: '/img/map-800.webp' }, width: 800, height: 600 });
+  ok('map requires an address or an image (directions alone is not a block)', validateBlocks([{ type: 'map', directions_url: 'https://maps.example/x' }]).length === 0 && validateBlocks([{ type: 'map', address: '12 Oak St, Burbank' }]).length === 1 && validateBlocks([{ type: 'map', image_media_id: MID }]).length === 1);
+  const mapR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'map', address: '12 Oak St, Burbank', image_media_id: MID }]), MREF), ctx)[0];
+  ok('map renders the self-hosted image + the address as text', mapR.html.includes('/img/map-800.webp') && mapR.html.includes('12 Oak St, Burbank'));
+  ok('default directions link is built from the address (URL-encoded)', mapR.html.includes('https://www.google.com/maps/search/?api=1&amp;query=12%20Oak%20St%2C%20Burbank') && mapR.html.includes('Get directions'));
+  ok('map NEVER embeds a third-party map (no iframe, no tile/script origins)', !/<iframe|<script|maps\.googleapis|gstatic|openstreetmap|tile/i.test(mapR.html));
+  const mapCustom = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'map', address: '12 Oak St', directions_url: 'https://maps.apple.com/?q=me' }]), () => null), ctx)[0];
+  ok('an owner-supplied directions link wins; address-only still renders', mapCustom.html.includes('maps.apple.com') && mapCustom.html.includes('12 Oak St') && !mapCustom.html.includes('map-img'));
+  ok('map with an unresolvable image but an address keeps the block', renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'map', address: '9 Elm', image_media_id: MID }]), () => null), ctx).length === 1);
+  ok('map emits no schema (a free-text address is not decomposed)', !mapR.ld);
+
+  // escaping + zero-external-origins across all four
+  const hostile = renderSiteBlocks(resolveBlockMedia(validateBlocks([
+    { type: 'newsletter', url: 'https://x.example', text: '<script>alert(1)</script>' },
+    { type: 'social', links: [{ network: '"><script>', url: 'https://x.example/p' }] },
+    { type: 'events', items: [{ name: '<img src=x onerror=alert(1)>', date: '<b>now</b>' }] },
+    { type: 'map', address: '<script>alert(1)</script> St' },
+  ]), () => null), ctx);
+  ok('hostile strings in all four blocks are escaped, never live markup', hostile.length === 4 && hostile.every((r) => !/<script>|<img\s|<b>/.test(r.html)) && hostile.filter((r) => r.html.includes('&lt;')).length === 4);
+  ok('all four are catalog-declared + realized', ['newsletter', 'social', 'events', 'map'].every((t) => COMPONENTS.some((c) => c.key === t) && REALIZED_BLOCK_TYPES.includes(t)));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SITE BLOCKS: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

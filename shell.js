@@ -339,6 +339,8 @@
     // Light / Dark / System — the styling for both themes has always shipped;
     // this row makes the choice reachable (clients get it too — it's their eyes).
     rows += '<a class="row" href="#" id="dds-theme-toggle">' + esc(themeLabel()) + '</a>';
+    // Re-take the first-login tour any time (it marks itself seen on finish/skip)
+    if (tourAvailable()) rows += '<a class="row" href="#" id="dds-tour-again">Show me around</a>';
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;
@@ -347,6 +349,8 @@
     if (nt) nt.addEventListener('click', function (e) { e.preventDefault(); togglePush(); });
     var th = document.getElementById('dds-theme-toggle');
     if (th) th.addEventListener('click', function (e) { e.preventDefault(); cycleTheme(); th.textContent = themeLabel(); });
+    var ta = document.getElementById('dds-tour-again');
+    if (ta) ta.addEventListener('click', function (e) { e.preventDefault(); var op = document.getElementById('dds-profile'); closeProfile(); try { startTour(op); } catch (_) { /* */ } });
     var so = document.getElementById('dds-signout');
     // Sign out to the RIGHT door: clients back to the client door, everyone else
     // (owners, team, agency) to the Studio OS door.
@@ -534,6 +538,142 @@
   };
   window.ddsScanHints = scanHints;
 
+  // ── First-login tour: a short walk around the chrome, once per role ─────────
+  // PT-5 hints teach page-by-page; nothing TOURED the chrome on first arrival.
+  // Trigger: after /portal/context loads, if 'dds-toured:<role>' is absent and
+  // this isn't the setup wizard (get-started stays single-purpose). Every step
+  // points at the REAL element; a step whose target isn't on screen (the desktop
+  // nav on a phone) falls back to its mobile-bar equivalent or is skipped.
+  // Finish OR skip marks it seen — it never nags. Re-runnable from the profile
+  // menu ("Show me around"). Every entry point is wrapped: a tour bug must
+  // never break the shell.
+  var tour = null; // { steps, i, ring, card, opener }
+  function tourKey() { return 'dds-toured:' + ((CTX && CTX.site_role) || 'member'); }
+  function tourSeen() { try { return !!localStorage.getItem(tourKey()); } catch (_) { return true; } }
+  function tourMark() { try { localStorage.setItem(tourKey(), '1'); } catch (_) { /* */ } }
+  function tourStepList() {
+    if (isReviewerCtx()) {
+      // a reviewer's whole world is client.html — tour it there, nowhere else
+      if (normalizePath(location.pathname) !== '/client') return [];
+      return [
+        { sel: ['#main'], title: 'Your updates', text: 'Everything your studio shares with you lands on this one page — updates, files, and anything waiting for your OK.' },
+        { sel: ['.card.approve'], title: 'Your OK matters', text: 'When something is ready for you, it appears as a card like this. Approve it or ask for changes — nothing happens without you.' },
+        { sel: ['#dds-bell'], title: 'The bell', text: 'When something new arrives, the bell will let you know. Quiet means you’re all caught up.' }
+      ];
+    }
+    return [
+      { sel: ['.dds-nav .sec > button[data-href^="/today"]', '#dds-mbar a[href^="/today"]'], title: 'Today', text: 'This is Today — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
+      { sel: ['.dds-nav .sec > button[data-sec="website"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives in this group — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
+      { sel: ['.dds-nav .sec > button[data-sec="customers"]'], title: 'Customers', text: 'Enquiries, contacts, and your pipeline — the people side of your business, all in one place.' },
+      { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
+      { sel: ['#dds-profile'], title: 'Your account', text: 'Notifications, light or dark appearance, settings, and help live here — and you can take this tour again any time.' }
+    ];
+  }
+  // resolve a step to a VISIBLE element (selectors in order; later = fallback)
+  function tourFind(step) {
+    for (var i = 0; i < step.sel.length; i++) {
+      var els = document.querySelectorAll(step.sel[i]);
+      for (var j = 0; j < els.length; j++) { if (els[j].getClientRects().length) return { el: els[j], fb: i > 0 }; }
+    }
+    return null;
+  }
+  function tourAvailable() {
+    try {
+      if (normalizePath(location.pathname) === '/get-started') return false;
+      var steps = tourStepList();
+      for (var i = 0; i < steps.length; i++) if (tourFind(steps[i])) return true;
+    } catch (_) { /* */ }
+    return false;
+  }
+  // position ring + card to the CURRENT step's live element (re-resolved every
+  // time — mountFrame/pages re-render via innerHTML, so cached nodes go stale)
+  function tourPlace() {
+    if (!tour) return;
+    var found = tourFind(tour.steps[tour.i]); if (!found) return;
+    var r = found.el.getBoundingClientRect(), pad = 6;
+    var rs = tour.ring.style;
+    rs.top = (r.top - pad) + 'px'; rs.left = (r.left - pad) + 'px';
+    rs.width = (r.width + pad * 2) + 'px'; rs.height = (r.height + pad * 2) + 'px';
+    var c = tour.card, vw = window.innerWidth, vh = window.innerHeight;
+    var cw = c.offsetWidth || 320, ch = c.offsetHeight || 160;
+    var top = r.bottom + pad + 12;                                   // below the ring…
+    if (top + ch > vh - 12) top = Math.max(12, r.top - pad - 12 - ch); // …or above if no room
+    var left = Math.min(Math.max(12, r.left), Math.max(8, vw - cw - 12));
+    c.style.top = top + 'px'; c.style.left = left + 'px';
+  }
+  function tourShow(i) {
+    if (!tour) return;
+    var dir = i >= tour.i ? 1 : -1, idx = i, found = null;
+    // a target can leave the page between steps — keep skipping in the travel direction
+    while (idx >= 0 && idx < tour.steps.length && !(found = tourFind(tour.steps[idx]))) idx += dir;
+    if (!found) { endTour(true); return; }
+    tour.i = idx;
+    var step = tour.steps[idx], last = idx === tour.steps.length - 1;
+    tour.card.setAttribute('aria-label', step.title + ' — step ' + (idx + 1) + ' of ' + tour.steps.length);
+    tour.card.querySelector('#dds-tour-t').textContent = step.title;
+    tour.card.querySelector('#dds-tour-p').textContent = (found.fb && step.mtext) ? step.mtext : step.text;
+    var dots = ''; for (var d = 0; d < tour.steps.length; d++) dots += '<span class="' + (d === idx ? 'on' : '') + '"></span>';
+    tour.card.querySelector('.dots').innerHTML = dots;
+    var back = tour.card.querySelector('.back');
+    back.style.display = idx === 0 ? 'none' : '';
+    tour.card.querySelector('.next').textContent = last ? 'Done' : 'Next';
+    tour.ring.classList.add('open'); tour.card.classList.add('open');
+    // bring an off-screen target into view first (approve cards live mid-page)
+    var r = found.el.getBoundingClientRect();
+    if (r.top < 60 || r.bottom > window.innerHeight - 40) { try { found.el.scrollIntoView({ block: 'center' }); } catch (_) { try { found.el.scrollIntoView(); } catch (__) { /* */ } } }
+    tourPlace();
+    // Back just vanished under the focused finger — keep focus inside the card
+    if (idx === 0 && document.activeElement === back) tour.card.querySelector('.next').focus();
+  }
+  function startTour(opener) {
+    if (tour) return;
+    var steps = [], all = tourStepList();
+    for (var i = 0; i < all.length; i++) if (tourFind(all[i])) steps.push(all[i]); // only steps whose target is really on screen
+    if (!steps.length) return;
+    var ring = el('<div class="dds-tour-ring" aria-hidden="true"></div>');
+    // role=dialog + aria-modal + display:none-when-closed → the shell's shared
+    // focus trap handles Tab; Escape (below) skips.
+    var card = el('<div class="dds-tour-card" role="dialog" aria-modal="true" aria-describedby="dds-tour-p" tabindex="-1">' +
+      '<h3 id="dds-tour-t"></h3><p id="dds-tour-p"></p><div class="dots" aria-hidden="true"></div>' +
+      '<div class="btns"><button type="button" class="skip">Skip the tour</button><span class="grow"></span>' +
+      '<button type="button" class="back">Back</button><button type="button" class="next">Next</button></div></div>');
+    document.body.appendChild(ring); document.body.appendChild(card);
+    tour = { steps: steps, i: 0, ring: ring, card: card, opener: opener || null };
+    card.querySelector('.skip').addEventListener('click', function () { endTour(true); });
+    card.querySelector('.back').addEventListener('click', function () { try { tourShow(tour ? tour.i - 1 : 0); } catch (_) { endTour(true); } });
+    card.querySelector('.next').addEventListener('click', function () {
+      try { if (tour && tour.i >= tour.steps.length - 1) endTour(true); else tourShow(tour.i + 1); } catch (_) { endTour(true); }
+    });
+    tourShow(0);
+    try { card.focus(); } catch (_) { /* */ }
+  }
+  function endTour(mark) {
+    if (!tour) return;
+    if (mark) tourMark();                       // finish OR skip — never nag again
+    var op = tour.opener;
+    tour.ring.remove(); tour.card.remove(); tour = null;
+    if (op && op.focus) { try { op.focus(); } catch (_) { /* */ } }
+  }
+  function maybeTour() {
+    if (tourSeen()) return;
+    if (normalizePath(location.pathname) === '/get-started') return; // never stack onto the setup wizard
+    // small pause: let the page paint so the tour arrives calm, not mid-load
+    setTimeout(function () { try { if (!tour && !tourSeen()) startTour(); } catch (_) { /* */ } }, 600);
+  }
+  window.ddsTour = function () { try { startTour(); } catch (_) { /* */ } };
+  // Escape = skip (capture: the tour is the front-most layer while it's open)
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && tour) { e.stopPropagation(); endTour(true); }
+  }, true);
+  // the page scrolls/resizes under the tour — follow the target
+  var tourRz;
+  window.addEventListener('resize', function () { if (!tour) return; clearTimeout(tourRz); tourRz = setTimeout(function () { try { tourPlace(); } catch (_) { /* */ } }, 120); });
+  var tourScrollPend = false;
+  window.addEventListener('scroll', function () {
+    if (!tour || tourScrollPend) return; tourScrollPend = true;
+    (window.requestAnimationFrame || setTimeout)(function () { tourScrollPend = false; try { tourPlace(); } catch (_) { /* */ } });
+  }, true);
+
   // ── BR-1: shared state helpers — one empty / loading / error / success set for
   //    every surface. Additive; pages opt in. Markup uses the canonical shell
   //    classes above, so it's theme-aware and consistent everywhere it's used.
@@ -630,6 +770,7 @@
           // queries incl. 3× auth). The shell already fetched it — publish it so
           // a page can reuse it instead of firing an identical second request.
           try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
+          try { maybeTour(); } catch (_) { /* the tour must never break the shell */ }
         });
       }).catch(minimalShell);
     });
