@@ -157,8 +157,29 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
     CLIENTS=(pf.ok&&Array.isArray(pf.body.data))?pf.body.data:[];
     renderList('');
     mountQueues();   // "what needs me today" — the cross-client morning cockpit
+    mountHealthDoor();   // staff-only doorway to the platform Health Center
   }catch(_){trouble();}
 })();
+
+// ── Platform health doorway (staff only). admin-health.html existed with no way
+//    in from any page; the Studio surface is its natural parent. We probe the
+//    staff-only route once — a non-staff agency member simply never sees the link.
+async function mountHealthDoor(){
+  try{
+    const r=await api('/admin/health-center');
+    if(!r.ok)return;
+    if(document.getElementById('healthDoor'))return;
+    const host=document.createElement('div');
+    host.id='healthDoor';
+    host.style.cssText='max-width:980px;margin:0 auto 26px;padding:0 20px;font-size:13.5px';
+    host.innerHTML='<a href="/admin-health.html" style="color:var(--p,#5b3fa0);font-weight:600;text-decoration:none">Platform health — background jobs, errors, email posture →</a>';
+    // OUTSIDE #main (same reason as the queues panel): the client-search re-render
+    // rewrites #main.innerHTML on every keystroke and would wipe this doorway.
+    const list=document.getElementById('main');
+    if(list&&list.parentNode)list.parentNode.appendChild(host);
+    else document.body.appendChild(host);
+  }catch(_){/* the door is a nicety, never a blocker */}
+}
 
 // ── Work queues: the backend has aggregated cross-client queues since L5.7 —
 //    this is their first UI. One calm panel; each row jumps into that client. ──

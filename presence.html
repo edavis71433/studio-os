@@ -317,6 +317,31 @@ h5.rune .whisper.ok{color:var(--sage)}
 .gate h1{font-family:var(--serif);font-weight:500;font-size:25px;line-height:1.25;margin-bottom:12px}
 .gate p{color:var(--ink-2);margin-bottom:26px;font-size:14px}
 
+/* ── the design studio: full width — controls in a grid beside a resizable proof ── */
+.content:has(#view-design.on){max-width:1240px}
+.designwrap{display:flex;gap:30px;align-items:flex-start}
+#designHost{flex:1;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:0 28px;align-items:start}
+#designHost .field{min-width:0;max-width:none;margin-bottom:26px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+/* the whole-site restylers (Complete looks + the studio's fine controls) lead, full-width;
+   the template switcher and brand kit follow; content blocks span the row at the end */
+#designHost #designCard{grid-column:1/-1;order:-3}
+#designHost #lookCard{order:-2}
+#designHost #brandKitCard{order:-1}
+#designHost #blocksCard{grid-column:1/-1}
+#designPreviewWrap{flex:0 0 400px;min-width:280px;position:sticky;top:14px}
+html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
+.dp-title{font-size:12px;font-weight:600;margin-bottom:6px}
+.dp-frame{position:relative;height:440px;min-height:240px;max-height:82vh;resize:vertical;overflow:hidden;border:1px solid var(--hair-2);border-radius:12px;background:#fff;box-shadow:0 6px 24px rgba(60,45,20,.08)}
+.dp-frame iframe{width:200%;height:200%;border:none;transform:scale(.5);transform-origin:0 0;pointer-events:none;display:block}
+#designPreviewEmpty{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:26px 30px;background:var(--sheet)}
+#designPreviewEmpty .eq{font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.5;max-width:26ch}
+#designPreviewEmpty .eh{font-size:13px;color:var(--ink-2);margin-top:10px;line-height:1.7;max-width:40ch}
+#designPreviewEmpty .ea{margin-top:16px;display:flex;gap:20px;flex-wrap:wrap}
+@media(max-width:1040px){
+  .designwrap{flex-direction:column-reverse}
+  .designwrap #designPreviewWrap{position:static;flex:none;width:100%;max-width:560px}
+}
+
 /* ── mobile: the dock ── */
 .dock{display:none;position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:rgba(33,29,25,.95);border-radius:100px;padding:6px;z-index:60;box-shadow:0 14px 44px rgba(33,29,25,.35)}
 .dock button{flex:1;text-align:center;font-size:12px;font-weight:600;padding:15px 0;border-radius:100px;color:#cfc7b8;white-space:nowrap}
@@ -537,21 +562,30 @@ h5.rune .whisper.ok{color:var(--sage)}
         <div class="mediagrid" id="mediaGrid"></div>
       </section>
 
-      <!-- HISTORY -->
+      <!-- DESIGN -->
       <section class="view" id="view-design">
         <h1 class="doc" role="heading" aria-level="2">Design</h1>
         <p class="docsub">How your website looks — colors, type, layout, and what appears on your home page. Every choice is designed to stay readable; nothing applies until you publish, and every previous look stays restorable.</p>
-        <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
-          <div id="designHost" style="flex:1;min-width:300px"></div>
-          <div id="designPreviewWrap" style="flex:0 1 400px;min-width:280px;position:sticky;top:14px">
-            <div style="font-size:12px;font-weight:600;margin-bottom:6px">Your home page, as it would publish</div>
-            <div style="border:1px solid var(--line,#ddd);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.07)">
-              <iframe id="designPreview" title="Live design preview of your draft home page" style="width:200%;height:840px;border:none;transform:scale(.5);transform-origin:0 0;pointer-events:none" aria-hidden="true"></iframe>
+        <div class="designwrap">
+          <div id="designHost"></div>
+          <div id="designPreviewWrap">
+            <div class="dp-title">Your home page, as it would publish</div>
+            <div class="dp-frame">
+              <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true"></iframe>
+              <div id="designPreviewEmpty" hidden>
+                <p class="eq" id="dpEmptyTitle">Your preview appears once your pages have content.</p>
+                <p class="eh" id="dpEmptyBody">The proof draws itself from your real words — nothing is invented. Start with the basics, or add what you offer.</p>
+                <div class="ea">
+                  <button class="textact" type="button" onclick="go('business')">Start in Business →</button>
+                  <button class="textact" type="button" onclick="go('offerings')">Add what you offer →</button>
+                </div>
+              </div>
             </div>
-            <div class="hint" style="margin-top:6px">A live proof of your draft — it updates as you choose.</div>
+            <div class="hint" style="margin-top:6px">A live proof of your draft — it updates as you choose. Drag the bottom-right corner to make it taller.</div>
           </div>
         </div>
       </section>
+      <!-- HISTORY -->
       <section class="view" id="view-history">
         <h1 class="doc" role="heading" aria-level="2">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
@@ -830,7 +864,7 @@ function routeHash() {
   if (!h) return;
   if (h === "publish") { openRitual(); return; }
   if (h === "preview") { openPreview("draft"); return; }
-  if (h === "foundations") { openFoundationsDesk(); return; }   // deep-link the technical desk (Today/bell/⌘K → approve here)
+  if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   const v = HASH_VIEWS[h];
   if (v && $("view-" + v)) go(v);
 }
@@ -3145,8 +3179,15 @@ async function mountDesignCard() {
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Design studio"));
   const T = DESIGN_TOKENS;
-  // FD-T3: complete looks — a coordinated one-tap starting point (then fine-tune below)
-  pillRow(card, "Complete looks", STYLE_LOOKS, () => false, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " look"));
+  // FD-T3: complete looks — a coordinated one-tap starting point (then fine-tune below).
+  // This is the front door the owner reaches for first, so it leads the card and
+  // explains itself (a look restyles the whole site; publishing stays approval-first).
+  const looksRow = pillRow(card, "Complete looks", STYLE_LOOKS, () => false, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " look"));
+  if (looksRow && looksRow.parentNode) {
+    looksRow.parentNode.insertBefore(
+      el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."),
+      looksRow);
+  }
   // colors
   pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
     (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"));
@@ -3552,11 +3593,38 @@ async function mountLookCard() {
 }
 // ── CP-2.5: live style preview — the EXISTING /preview pipeline, nothing new ──
 let designPreviewTimer = null;
+// A brand-new workspace has nothing to draw yet — the proof must say so honestly
+// instead of sitting as a blank white sheet (the empty state is also the doorway
+// to the two places that fill it: Business and what you offer).
+function draftLooksEmpty() {
+  const i = S.identity || {};
+  return !(i.business_name || i.tagline || i.description) &&
+    !(S.offerings || []).length && !(S.posts || []).length && !(S.faqs || []).length && !(S.testimonials || []).length;
+}
+function dpNote(title, body) {
+  const box = $("designPreviewEmpty"); if (!box) return;
+  const t = $("dpEmptyTitle"), b = $("dpEmptyBody");
+  if (t) t.textContent = title;
+  if (b) b.textContent = body;
+  box.hidden = false;
+}
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
   clearTimeout(designPreviewTimer);
   designPreviewTimer = setTimeout(async () => {
-    try { frame.srcdoc = await apiHtml("/preview?version=draft&page=%2F"); } catch (_) { /* quiet — the big proof still works */ }
+    if (draftLooksEmpty()) {
+      dpNote("Your preview appears once your pages have content.",
+        "The proof draws itself from your real words — nothing is invented. Start with the basics, or add what you offer.");
+      return;
+    }
+    try {
+      frame.srcdoc = await apiHtml("/preview?version=draft&page=%2F");
+      const box = $("designPreviewEmpty"); if (box) box.hidden = true;
+    } catch (_) {
+      // the big proof ("See your site") still works — say so rather than staying blank
+      if (!frame.srcdoc) dpNote("The proof couldn’t draw just now.",
+        "Your content is safe. It’ll appear here on your next change — or open “See your site” above for the full proof.");
+    }
   }, 350);
 }
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
@@ -3628,7 +3696,7 @@ const NOTICE_ACTION = {
   domain_expiry:    { label: "Manage domain",           href: "presence.html#business" },
   search_setup:     { label: "Finish search setup",     href: "presence.html#search" },
   renewal_reminder: { label: "See plans",               href: "pricing.html" },
-  winddown_reminder:{ label: "Download everything",     href: "presence.html#settings" },
+  winddown_reminder:{ label: "Download everything",     href: "presence.html#foundations" },   // the export button lives in the technical desk
   win_back:         { label: "See plans",               href: "pricing.html" },
   trial_ending:     { label: "See plans",               href: "pricing.html" },
   trial_ended:      { label: "See plans",               href: "pricing.html" },

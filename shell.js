@@ -14,6 +14,25 @@
   var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
   var FN = SUPABASE_URL + "/functions/v1/presence";
   var TOKEN = "";
+
+  // ── Appearance: every app page ships light + dark tokens keyed on
+  // :root[data-theme]; this is the ONE control that sets it. Default (no
+  // choice stored) follows the device via prefers-color-scheme, exactly as
+  // before — applying nothing changes nothing. Applied before boot so a saved
+  // choice doesn't flash the wrong theme.
+  var THEME = '';
+  try { THEME = localStorage.getItem('dds-theme') || ''; } catch (_) { /* */ }
+  function applyTheme(mode) {
+    if (mode === 'light' || mode === 'dark') document.documentElement.setAttribute('data-theme', mode);
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  applyTheme(THEME);
+  function themeLabel() { return 'Appearance: ' + (THEME === 'light' ? 'Light' : THEME === 'dark' ? 'Dark' : 'System'); }
+  function cycleTheme() {
+    THEME = THEME === '' ? 'light' : THEME === 'light' ? 'dark' : '';
+    try { THEME ? localStorage.setItem('dds-theme', THEME) : localStorage.removeItem('dds-theme'); } catch (_) { /* */ }
+    applyTheme(THEME);
+  }
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
 
   // ── pure nav helpers (mirror of lib/shell.ts — locked by shell_test.mjs) ──
@@ -317,12 +336,17 @@
     if (!isReviewerCtx() && 'serviceWorker' in navigator && 'PushManager' in window) {
       rows += '<a class="row" href="#" id="dds-notif-toggle">' + (pushOn ? 'Turn off notifications' : 'Turn on notifications') + '</a>';
     }
+    // Light / Dark / System — the styling for both themes has always shipped;
+    // this row makes the choice reachable (clients get it too — it's their eyes).
+    rows += '<a class="row" href="#" id="dds-theme-toggle">' + esc(themeLabel()) + '</a>';
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;
     prof.classList.add('open');
     var nt = document.getElementById('dds-notif-toggle');
     if (nt) nt.addEventListener('click', function (e) { e.preventDefault(); togglePush(); });
+    var th = document.getElementById('dds-theme-toggle');
+    if (th) th.addEventListener('click', function (e) { e.preventDefault(); cycleTheme(); th.textContent = themeLabel(); });
     var so = document.getElementById('dds-signout');
     // Sign out to the RIGHT door: clients back to the client door, everyone else
     // (owners, team, agency) to the Studio OS door.
