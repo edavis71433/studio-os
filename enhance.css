@@ -178,3 +178,20 @@ img[width][height] { height: auto; }
    default OS blue highlight. Tint it to match.
    ------------------------------------------------------------ */
 ::selection { background: rgba(91, 63, 160, 0.18); color: var(--ink); }
+
+/* ------------------------------------------------------------
+   8. DARK MODE — this file loads AFTER each page's own <style>
+   block, so its light scrolled-nav surface was silently beating
+   the dark remaps the pages (audit, contact, and now the whole
+   marketing surface via styles.css) declare. Same family values
+   as those blocks (rgba(23,19,32,.85) is audit.html's nav), so
+   whichever rule wins the cascade, the result is identical.
+   ------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  .nav.is-scrolled {
+    background: rgba(23, 19, 32, 0.85);
+    border-bottom: 1px solid rgba(196, 174, 232, 0.14);
+    box-shadow: 0 1px 24px rgba(0, 0, 0, 0.35);
+  }
+  ::selection { background: rgba(196, 174, 232, 0.3); }
+}

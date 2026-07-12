@@ -77,6 +77,15 @@ body[data-page="how"] .hww-step-card .feel::before{
   content:""; width:5px; height:5px; border-radius:50%; background:var(--brass);
 }
 
+/* Dark mode: the white step cards become card surfaces; shadows
+   deepen so the zig-zag still reads as elevation. Light untouched. */
+@media (prefers-color-scheme: dark){
+  body[data-page="how"] .hww-step-card{
+    background:#241d38;
+    box-shadow:0 22px 46px -32px rgba(0,0,0,.55);
+  }
+}
+
 @media(max-width:760px){
   body[data-page="how"] .hww-rail{ left:24px; transform:none; }
   body[data-page="how"] .hww-step,

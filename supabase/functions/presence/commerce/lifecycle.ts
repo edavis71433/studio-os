@@ -250,6 +250,38 @@ export async function runWeeklyDigest(): Promise<{ sent: boolean }> {
   return { sent: ok };
 }
 
+// ── P3-CRO: the day-7 free-review follow-up (OWNER-GATED outbound) ────────────
+// A free-score lead who left an email gets the report and then silence. This
+// sends ONE calm second touch, 7–21 days later, referencing their actual score.
+// HARD GATE: NURTURE_DRIP=1 must be set by the owner (automated outbound in the
+// owner's name is never activated by a deploy). Send-once via nurture_sent_at
+// (0092); suppression list respected (marketing — no critical flag); a pre-0092
+// environment errors on the select and no-ops cleanly.
+export async function runProspectNurture(limit = 10): Promise<{ sent: number; skipped_off?: boolean }> {
+  if (Deno.env.get('NURTURE_DRIP') !== '1') return { sent: 0, skipped_off: true };
+  const from = new Date(Date.now() - 21 * 86400_000).toISOString();  // not stale
+  const to = new Date(Date.now() - 7 * 86400_000).toISOString();     // aged a week
+  const q = await svc(`audit_leads?client_email=not.is.null&nurture_sent_at=is.null&status=eq.new&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,client_email,business_name,url,score&order=created_at.asc&limit=${limit}`);
+  if (!q.ok) return { sent: 0 };
+  let sent = 0;
+  for (const lead of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_email: string; business_name?: string; url?: string; score?: number }>) {
+    const scoreLine = typeof lead.score === 'number'
+      ? `it scored <strong>${lead.score}/100</strong> at the time`
+      : 'we sent you the findings at the time';
+    const html = `<p>Hi${lead.business_name ? ' — this is about ' + lead.business_name : ''},</p>
+<p>About a week ago you ran the free site review on <strong>${(lead.url || 'your website').replace(/[<>&"]/g, '')}</strong> — ${scoreLine}.</p>
+<p>If you've made changes since, it's worth <a href="https://davisdigitalstudio.com/audit.html">running it again</a> to see the score move. And if any of the findings felt hard to act on, I'm happy to talk them through — a short call, no charge, no pitch.</p>
+<p><a href="https://davisdigitalstudio.com/contact.html">Book a free 15-minute call</a></p>
+<p>— Eric<br>Davis Digital Studio</p>`;
+    const ok = await sendEmail(lead.client_email, 'Your website review, a week later', html);
+    // Stamp regardless of send outcome (a suppressed/bounced address must not
+    // be retried every tick — that's the whole point of the suppression list).
+    await svc(`audit_leads?id=eq.${lead.id}`, { method: 'PATCH', body: JSON.stringify({ nurture_sent_at: new Date().toISOString() }) }).catch(() => {});
+    if (ok) sent++;
+  }
+  return { sent };
+}
+
 // ── Phase INF (CP-8): the domain watch — RDAP expiry + registrar, daily ──────
 export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number }> {
   const nowIso = new Date().toISOString();

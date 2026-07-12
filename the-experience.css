@@ -84,3 +84,25 @@ body[data-page="experience"] .cta-band{
   padding:96px 24px;
   text-align:center;
 }
+
+/* ---------------------------------------------------------------
+   DARK MODE — the six white beat-cards and the screenshot frame
+   become card surfaces; the light portal screenshot inside keeps
+   its own colors, softly ringed so it doesn't glare. Light mode
+   untouched.
+   --------------------------------------------------------------- */
+@media (prefers-color-scheme: dark){
+  body[data-page="experience"] .xp-beat{
+    background:#241d38;
+    box-shadow:0 22px 46px -32px rgba(0,0,0,.55);
+  }
+  body[data-page="experience"] .xp-beat:hover{
+    box-shadow:0 30px 56px -30px rgba(0,0,0,.6);
+  }
+  body[data-page="experience"] .xp-beat .xp-felt{ background:#171320; }
+  body[data-page="experience"] .xp-proof{
+    background:#241d38;
+    box-shadow:0 40px 76px -36px rgba(0,0,0,.6);
+  }
+  body[data-page="experience"] .xp-proof img{ box-shadow:0 0 0 1px rgba(196,174,232,.12); }
+}

@@ -315,3 +315,30 @@ body[data-page="home"] .final-cta .secondary-link:hover{ color:var(--paper); bor
 @media print{
   body[data-page="home"] .conv-overlay{ display:none !important; }
 }
+
+/* ---------------------------------------------------------------
+   DARK MODE — homepage residuals over the styles.css token remap.
+   Cards that were paper-on-paper (separated by shadow alone) step
+   up to the shared card tone #241d38; the plum focus ring lifts to
+   lavender so it survives the dark canvas. Light mode untouched.
+   --------------------------------------------------------------- */
+@media (prefers-color-scheme: dark){
+  body[data-page="home"] a:focus-visible,
+  body[data-page="home"] button:focus-visible{
+    box-shadow:0 0 0 3px rgba(196,174,232,.45);
+  }
+  body[data-page="home"] .panel-dark a:focus-visible,
+  body[data-page="home"] .final-cta a:focus-visible{
+    box-shadow:0 0 0 3px rgba(255,255,255,.55);
+  }
+  body[data-page="home"] .promise{
+    background:#241d38;
+    box-shadow:0 20px 44px -30px rgba(0,0,0,.5);
+  }
+  body[data-page="home"] .hero-card.reply-card{
+    box-shadow:0 30px 60px -34px rgba(0,0,0,.55);
+  }
+  body[data-page="home"] .final-cta .secondary-link:hover{
+    color:#EFEAF7; border-color:#EFEAF7;
+  }
+}

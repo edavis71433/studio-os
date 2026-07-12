@@ -157,6 +157,52 @@ body{padding-top:68px;}
 .legal-summary li::before{content:"";position:absolute;left:2px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--pxl);}
 .legal-summary .ls-foot{font-size:12px !important;color:var(--muted) !important;margin:12px 0 0 !important;padding-top:12px;border-top:1px solid rgba(91,63,160,0.1);}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;}}
+
+/* ── Dark-mode variant (page-scoped; this legacy template doesn't
+   load styles.css, so the whole flip lives here). Same family
+   values as audit.html/contact.html and the styles.css remap:
+   surfaces #171320/#241d38, ink #EFEAF7, muted #A79DBE, plum-as-
+   text lifted to #b39ce6/#c4aee8; the plum CTA buttons stay
+   #5b3fa0 with white text. Light mode untouched. The !important
+   overrides beat inline styles (including the hover colors the
+   Client Login link sets via onmouseover JS). ── */
+@media (prefers-color-scheme: dark){
+  :root{--ink:#EFEAF7;--muted:#A79DBE;}
+  body{background:#171320;color:#EFEAF7;}
+  .nav{background:rgba(23,19,32,.92);border-bottom-color:rgba(196,174,232,.14);box-shadow:0 1px 20px rgba(0,0,0,.4);}
+  .nav-logo{color:#EFEAF7;}
+  .nav-logo span{color:#c4aee8;}
+  .nav-links>a,.nav-drop>button{color:#A79DBE;}
+  .nav-links>a:hover,.nav-drop>button:hover,.nav-links>a.active{color:#c4aee8;background:#241d38;}
+  .nav-links>a[href="/portal"]{color:#A79DBE !important;background:transparent !important;}
+  .nav-links>a[href="/portal"]:hover{color:#c4aee8 !important;background:#241d38 !important;}
+  .nav-report{color:#c4aee8 !important;background:rgba(196,174,232,.14) !important;border-color:rgba(196,174,232,.4);}
+  .nav-drop-menu{background:#241d38;border-color:rgba(196,174,232,.16);box-shadow:0 16px 48px rgba(0,0,0,.5);}
+  .nav-drop-menu a{color:#EFEAF7;}
+  .nav-drop-menu a:hover{background:#2c2344;color:#c4aee8;}
+  .nav-drop-menu a svg{color:#b39ce6;}
+  .nav-drop-divider{background:rgba(196,174,232,.12);}
+  .bar,.nav-ham .bar{background:#EFEAF7;}
+  .nav-mob{background:#171320;border-bottom-color:rgba(196,174,232,.14);box-shadow:0 8px 32px rgba(0,0,0,.5);}
+  .nav-mob a,.nav-mob>a,.nav-mob-group-btn{color:#EFEAF7;}
+  .nav-mob>a:hover,.nav-mob-group-btn:hover{background:#241d38;color:#c4aee8;}
+  .nav-mob>a[href="/portal"]{color:#EFEAF7 !important;}
+  .nav-mob-sub{border-left-color:#332B49;}
+  .nav-mob-sub a{color:#A79DBE;}
+  .nav-mob-sub a:hover{background:#241d38;color:#c4aee8;}
+  .nav-mob .mob-cta,.mob-cta{background:#5b3fa0;color:#fff !important;}
+  .nav-back{color:#A79DBE;}
+  .nav-back:hover{color:#c4aee8;}
+  .content a{color:#b39ce6;}
+  .updated{background:rgba(196,174,232,.14);color:#c4aee8;}
+  .divider{border-top-color:rgba(196,174,232,.16);}
+  .legal-summary{background:#241d38;border-color:rgba(196,174,232,.16);border-left-color:#b39ce6;}
+  .legal-summary .ls-label{color:#c4aee8;}
+  .legal-summary .ls-foot{border-top-color:rgba(196,174,232,.14);}
+  p[style*="color:#5e5270"]{color:#A79DBE !important;}
+  *:focus-visible{outline-color:#c4aee8;}
+  ::selection{background:rgba(196,174,232,.3);color:#EFEAF7;}
+}
 </style>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"TermsOfService","name":"Portal Terms | Davis Digital Studio","url":"https://davisdigitalstudio.com/portal-terms","isPartOf":{"@type":"WebSite","name":"Davis Digital Studio","url":"https://davisdigitalstudio.com"}}

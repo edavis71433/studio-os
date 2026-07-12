@@ -25,3 +25,9 @@ body[data-page="404"] .p404-ghost{
   user-select:none;
   z-index:0;
 }
+
+/* Dark mode: #5b3fa0 at 5% is invisible on #171320 — lift the ghost
+   numeral to lavender at a matching whisper. Light mode untouched. */
+@media (prefers-color-scheme: dark){
+  body[data-page="404"] .p404-ghost{ color:#c4aee8; opacity:.07; }
+}

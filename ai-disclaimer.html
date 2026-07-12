@@ -72,6 +72,25 @@ body{}
 .legal-summary li::before{content:"";position:absolute;left:2px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--pxl);}
 .legal-summary .ls-foot{font-size:12px !important;color:var(--muted) !important;margin:12px 0 0 !important;padding-top:12px;border-top:1px solid rgba(91,63,160,0.1);}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;}}
+
+/* ── Dark-mode variant (page-scoped token flip over styles.css) ──
+   This page's own :root re-declares --ink/--muted after styles.css,
+   so the shared dark remap must be re-stated here with the same
+   family values (surfaces #171320/#241d38, ink #EFEAF7, muted
+   #A79DBE, plum-as-text lifted). Light mode untouched. */
+@media (prefers-color-scheme: dark){
+  :root{--ink:#EFEAF7;--muted:#A79DBE;}
+  body{background:#171320;color:#EFEAF7;}
+  .content a{color:#b39ce6;}
+  .updated{background:rgba(196,174,232,.14);color:#c4aee8;}
+  .divider{border-top-color:rgba(196,174,232,.16);}
+  .legal-summary{background:#241d38;border-color:rgba(196,174,232,.16);border-left-color:#b39ce6;}
+  .legal-summary .ls-label{color:#c4aee8;}
+  .legal-summary .ls-foot{border-top-color:rgba(196,174,232,.14);}
+  p[style*="color:#5e5270"]{color:#A79DBE !important;}
+  *:focus-visible{outline-color:#c4aee8;}
+  ::selection{background:rgba(196,174,232,.3);color:#EFEAF7;}
+}
 </style>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebPage","name":"AI Disclaimer | Davis Digital Studio","url":"https://davisdigitalstudio.com/ai-disclaimer","isPartOf":{"@type":"WebSite","name":"Davis Digital Studio","url":"https://davisdigitalstudio.com"}}

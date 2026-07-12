@@ -122,3 +122,21 @@ body[data-page="services"] .sol-panel-lead .sol-panel-num{ font-size:150px; top:
   body[data-page="services"] .sol-panel-lead{ padding:38px 30px 34px; }
   body[data-page="services"] .sol-diagram{ padding:28px 24px; }
 }
+
+/* ---------------------------------------------------------------
+   DARK MODE — page residuals over the styles.css token remap:
+   the hardcoded white panels become card surfaces, the diagram
+   steps up off the page, and the plum ghost numerals lift to
+   lavender so they still register. Light mode untouched.
+   --------------------------------------------------------------- */
+@media (prefers-color-scheme: dark){
+  body[data-page="services"] .sol-panel{
+    background:#241d38;
+    box-shadow:0 28px 56px -34px rgba(0,0,0,.55);
+  }
+  body[data-page="services"] .sol-panel:hover{
+    box-shadow:0 40px 72px -32px rgba(0,0,0,.6);
+  }
+  body[data-page="services"] .sol-diagram{ background:#1f1a2e; }
+  body[data-page="services"] .sol-panel-num{ color:#c4aee8; opacity:.09; }
+}

@@ -38,3 +38,13 @@ body[data-page="industries"] .svc-icon{ margin-bottom:6px; }
   body[data-page="industries"] .ind-hero-grid{ grid-template-columns:1fr; gap:32px; }
   body[data-page="industries"] .ind-hero-icons{ max-width:280px; margin:0 auto; }
 }
+
+/* Dark mode: the white icon tray becomes a card surface (the icons'
+   ink strokes are already relit by the shared svg rule in
+   styles.css). Light mode untouched. */
+@media (prefers-color-scheme: dark){
+  body[data-page="industries"] .ind-hero-icons{
+    background:#241d38;
+    box-shadow:0 34px 64px -36px rgba(0,0,0,.55);
+  }
+}

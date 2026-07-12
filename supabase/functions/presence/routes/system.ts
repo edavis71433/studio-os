@@ -12,7 +12,7 @@ import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
-import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture } from '../commerce/lifecycle.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
@@ -49,6 +49,8 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'RESEND_KEY', required: false, enables: 'ALL email — lead notifications, one-tap approvals, digests, receipts (without it: email silently no-ops, logged)' },
     { name: 'EMAIL_FROM', required: false, enables: 'the From address (defaults to a studio address)' },
     { name: 'OPS_ALERT_EMAIL', required: false, enables: 'operational failure alerts (defaults to a studio address)' },
+    { name: 'RESEND_WEBHOOK_SECRET', required: false, enables: 'the Resend bounce/complaint webhook (/email/events) — bounces auto-suppress (without it: the endpoint 404s)' },
+    { name: 'NURTURE_DRIP', required: false, enables: 'the day-7 free-review follow-up email (owner-approved outbound; set to 1 to activate)' },
   ],
   hosting: [
     { name: 'NETLIFY_AUTH_TOKEN', required: false, enables: 'publishing customer sites (without it: publish fails with a clear config error — nothing goes live)' },
@@ -270,6 +272,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['renewals', () => runRenewalReminders(50)],
             ['invoice_nudges', () => runInvoiceReminders(20)],
             ['doc_reminders', () => runSalesDocReminders(20)],
+            ['nurture', () => runProspectNurture(10)],
           ],
           hygiene: [
             ['digest', () => runWeeklyDigest()],
@@ -327,6 +330,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const renewals = await step('renewals', () => runRenewalReminders(50));      // PP-2: annual renewal heads-up
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
+      await step('nurture', () => runProspectNurture(10));                        // CRO: day-7 free-review follow-up (owner-gated NURTURE_DRIP=1)
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots

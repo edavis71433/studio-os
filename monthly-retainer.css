@@ -94,6 +94,27 @@ body[data-page="retainer"] .gp-timeline-card h3{ font-size:22px; margin:10px 0 8
 body[data-page="retainer"] .gp-timeline-card p{ color:var(--muted); font-size:15px; }
 body[data-page="retainer"] .gp-timeline-stop-3 .gp-timeline-card{ opacity:.94; }
 
+/* ---------------------------------------------------------------
+   DARK MODE — page residuals over the styles.css token remap: the
+   curve panel steps off the page, the white timeline cards become
+   card surfaces, and the "week one" curve label lifts from plum to
+   lavender. Light mode untouched.
+   --------------------------------------------------------------- */
+@media (prefers-color-scheme: dark){
+  body[data-page="retainer"] .gp-curve{
+    background:#1f1a2e;
+    box-shadow:0 34px 64px -36px rgba(0,0,0,.55);
+  }
+  body[data-page="retainer"] .gp-curve-labels span:first-child{ color:#c4aee8; }
+  body[data-page="retainer"] .gp-timeline-card{
+    background:#241d38;
+    box-shadow:0 24px 48px -32px rgba(0,0,0,.55);
+  }
+  body[data-page="retainer"] .gp-timeline-card:hover{
+    box-shadow:0 32px 60px -30px rgba(0,0,0,.6);
+  }
+}
+
 @media(max-width:880px){
   body[data-page="retainer"] .gp-hero-grid{ grid-template-columns:1fr; gap:32px; }
   body[data-page="retainer"] .gp-curve{ order:2; padding:26px 22px 22px; }

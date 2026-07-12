@@ -55,6 +55,11 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none}
   .toast.show{opacity:1}
+  /* a11y: the Concierge answer is a live region — it stays in the accessibility
+     tree from first render (never display:none) so the FIRST answer is announced;
+     while empty it is zero-height/invisible */
+  .answer{margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap}
+  .answer:empty{padding:0;margin:0;background:transparent}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 </style>
@@ -177,7 +182,7 @@ function render(surface){
     <div class="svc">
       <p class="purpose" style="margin-top:0">Ask anything — why connect a service, what it helps with, whether Studio OS can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
       <div class="row"><input id="cq" type="text" placeholder="e.g. why would I connect my Google listing?" aria-label="Ask about connecting" style="flex:1;min-width:200px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="primary" id="cask">Ask</button></div>
-      <div class="answer" id="cans" aria-live="polite" style="display:none;margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap"></div>
+      <div class="answer" id="cans" aria-live="polite"></div>
     </div></section>`;
   $('main').innerHTML = html;
   wire();
@@ -194,7 +199,7 @@ function wire(){
 async function askConcierge(){
   const cq=$('cq'), box=$('cans'), btn=$('cask');
   const question=(cq.value||'').trim(); if(!question) return;
-  btn.disabled=true; btn.textContent='…'; box.style.display='block'; box.textContent='Thinking about your presence…';
+  btn.disabled=true; btn.textContent='…'; box.textContent='Thinking about your presence…';
   const r = await apiPost('/concierge/ask', { question });
   box.textContent = (r.ok && r.body && r.body.data && r.body.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess. The “About this connection” note above answers the essentials.';
   btn.disabled=false; btn.textContent='Ask';

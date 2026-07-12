@@ -427,3 +427,93 @@ footer.site a:focus-visible{
 @media (max-width:760px){
   input:not([type=checkbox]):not([type=radio]),textarea,select{font-size:16px !important}
 }
+
+/* ============================================================
+   DARK MODE — sitewide token-level remap (prefers-color-scheme
+   only; there is no manual toggle on the public site, so light
+   mode above is untouched).
+
+   Same recipe already proven page-locally on audit.html and
+   contact.html: remap the shared tokens to the plum-dark family,
+   then lift the handful of plum-as-text accents that #5b3fa0 is
+   too dark to carry on a dark surface. Values are IDENTICAL to
+   the audit/contact blocks for every shared token, so pages that
+   ship their own dark block simply re-state the same numbers —
+   no fighting, whichever wins the cascade.
+
+   Surfaces: page #171320 · panel #1f1a2e · card #241d38
+   Text: ink #EFEAF7 · muted #A79DBE · brass lifted #C9A468
+   Plum-as-text lifted to #b39ce6 / #c4aee8; plum-as-button
+   background stays #5b3fa0 with white text.
+   ============================================================ */
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#EFEAF7;
+    --paper:#171320;
+    --paper-2:#1f1a2e;
+    --p-mist:#241d38;
+    --muted:#A79DBE;
+    --hair:#332B49;
+    --brass:#C9A468;
+    --brass-deep:#C9A468;
+  }
+  /* chrome */
+  header.nav,.nav.is-scrolled{background:rgba(23,19,32,.85)}
+  .nav a:focus-visible,.nav button:focus-visible{box-shadow:0 0 0 3px rgba(196,174,232,.45)}
+  .nav-sub{background:#241d38;border-color:#332B49;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+  .nav-sub a:hover{background:#2c2344}
+  footer.site{background:#0f0c18}
+  /* the brand mark and the industry line-icons draw their "ink"
+     strokes as presentation attributes; CSS wins over those, so
+     one rule relights every dark-on-dark stroke sitewide */
+  svg [stroke="#1B1525"]{stroke:#EFEAF7}
+  /* type accents — .eyebrow's light-mode color is a darkened
+     brass (#836539) that vanishes on dark; plum italics and the
+     "now" chip are #5b3fa0-as-text and need the lift */
+  .eyebrow{color:#C9A468}
+  .hero h1 em{color:#b39ce6}
+  .hc-tick.now{color:#c4aee8}
+  /* buttons — with the tokens flipped, .btn-primary resolves to a
+     light button with dark text exactly like audit.html's dark
+     block; only its hover needs re-stating (its light-mode hover
+     is deep plum, which would swallow the dark label) */
+  .btn-primary{background:#EFEAF7;color:#171320}
+  .btn-primary:hover{background:#c4aee8;color:#1B1525}
+  .btn-light{background:#EFEAF7;color:#171320}
+  /* elevated card surfaces — in light mode these are paper-on-
+     paper separated by shadows; shadows can't separate two
+     #171320 surfaces, so cards step up to the card tone */
+  .hero-card,.svc,.feature-box,.ns-item{background:#241d38}
+  .svc li{color:var(--ink)}
+  .ind-page-icon{background:#241d38;box-shadow:0 20px 42px -28px rgba(0,0,0,.5)}
+  /* dark CTA panels — --paper now resolves dark, so the panel's
+     token-colored text (and the inline color:var(--paper) on its
+     headings and ghost buttons) must stay literally light */
+  .panel-dark{color:#EFEAF7}
+  .panel-dark h2{color:#EFEAF7}
+  .panel-dark [style*="color:var(--paper)"],
+  .cta-band [style*="color:var(--paper)"]{color:#EFEAF7 !important}
+  /* inline plum-as-text accents (mono labels, prices) — same
+     treatment audit.html gives its own inline accents. Matched on
+     the terminated token ("...--p);" mid-attribute or "...--p)"
+     at attribute end) so the longer --paper/--p-mist/--p-deep
+     tokens can't be swallowed by a bare substring match. */
+  [style*="color:var(--p);"],[style$="color:var(--p)"]{color:#b39ce6 !important}
+  /* forms */
+  .field input:focus,.field textarea:focus,.field select:focus{box-shadow:0 0 0 3px rgba(196,174,232,.3)}
+  .field input::placeholder,.field textarea::placeholder{color:rgba(239,234,247,.38)}
+  /* marketing screenshots are light-themed images: keep them, but
+     frame them on a card surface so they don't glare */
+  .portal-proof{background:#241d38;border-color:#332B49;box-shadow:0 30px 60px -34px rgba(0,0,0,.55)}
+  .portal-proof figcaption{background:#241d38;border-top-color:#332B49}
+  .portal-proof img,.hww-shot img,.about-portrait img,.about-life img{box-shadow:0 0 0 1px rgba(196,174,232,.12)}
+  /* the shared "free site review" box (inline-styled, identical
+     markup on nine pages) — box flips to a card, the plum button
+     inside stays #5b3fa0 + white */
+  div[style*="background:#EDE8F7"]{background:#241d38 !important}
+  div[style*="background:#EDE8F7"] h2{color:#EFEAF7 !important}
+  div[style*="background:#EDE8F7"] p{color:#A79DBE !important}
+  div[style*="background:#EDE8F7"] input{background:#171320 !important;color:#EFEAF7 !important;border-color:#3a3153 !important}
+  div[style*="background:#EDE8F7"] input::placeholder{color:rgba(239,234,247,.38)}
+  ::selection{background:rgba(196,174,232,.3);color:var(--ink)}
+}

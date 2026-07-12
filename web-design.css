@@ -23,3 +23,11 @@ body[data-page="web-design"] .wd-card p{ color:var(--muted); font-size:14.5px; }
 @media(max-width:760px){
   body[data-page="web-design"] .wd-grid{ grid-template-columns:1fr; }
 }
+
+/* Dark mode: white cards become card surfaces. Light untouched. */
+@media (prefers-color-scheme: dark){
+  body[data-page="web-design"] .wd-card{
+    background:#241d38;
+    box-shadow:0 20px 42px -30px rgba(0,0,0,.55);
+  }
+}

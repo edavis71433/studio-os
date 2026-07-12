@@ -68,6 +68,9 @@ button:disabled{opacity:.55;cursor:default}
 
 /* ── editorial primitives ── */
 h1.doc{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin-bottom:6px}
+/* a11y: the page's single H1, present for screen readers on every view/breakpoint
+   (the wordmark hides under the shell and on mobile; section titles are level 2) */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .docsub{color:var(--ink-2);font-size:13.5px;max-width:54ch;margin-bottom:38px}
 h5.rune{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:48px 0 18px;display:flex;align-items:center;gap:14px}
 h5.rune::after{content:"";flex:1;height:1px;background:var(--hair)}
@@ -354,7 +357,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 <!-- signed-out / no-site gate -->
 <div class="gate" id="gate" hidden>
   <div class="card">
-    <h1 id="gateTitle">One moment…</h1>
+    <h1 id="gateTitle" role="heading" aria-level="2">One moment…</h1>
     <p id="gateMsg">Finding your room.</p>
     <a class="pillbtn inked" id="gateBtn" href="/studio.html" hidden style="display:inline-block;text-decoration:none">Go to your account</a>
   </div>
@@ -386,6 +389,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <button class="pillbtn inked" id="btnPublish">Publish</button>
     </header>
     <main class="content">
+      <h1 class="sr-only">Website</h1>
 
       <!-- TODAY -->
       <section class="view on" id="view-today">
@@ -410,7 +414,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- BUSINESS -->
       <section class="view" id="view-business">
-        <h1 class="doc">Business</h1>
+        <h1 class="doc" role="heading" aria-level="2">Business</h1>
         <p class="docsub">The facts customers rely on. Everything here keeps itself saved as you write — nothing reaches your website until you publish.</p>
         <div id="bizWaiting"></div>
 
@@ -478,7 +482,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- MENU -->
       <section class="view" id="view-offerings">
-        <h1 class="doc">Menu</h1>
+        <h1 class="doc" role="heading" aria-level="2">Menu</h1>
         <p class="docsub">This page reads the way your menu reads. Choose any line to change it; anything you take off the menu stays kept here, never lost.</p>
         <div id="offeringsWrap"></div>
         <div id="newSectionWrap"></div>
@@ -486,7 +490,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- QUESTIONS -->
       <section class="view" id="view-faqs">
-        <h1 class="doc">Questions</h1>
+        <h1 class="doc" role="heading" aria-level="2">Questions</h1>
         <p class="docsub">The questions customers actually ask, answered once, in your words.</p>
         <div id="faqList"></div>
         <button class="addline" id="btnAddFaq">＋ Answer a new question</button>
@@ -496,7 +500,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- KIND WORDS -->
       <section class="view" id="view-testimonials">
-        <h1 class="doc">Kind words</h1>
+        <h1 class="doc" role="heading" aria-level="2">Kind words</h1>
         <p class="docsub">What customers have said about you, kept in their words.</p>
         <div id="tesList"></div>
         <button class="addline" id="btnAddTes">＋ Keep a kind word</button>
@@ -505,7 +509,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- UPDATES -->
       <section class="view" id="view-updates">
-        <h1 class="doc">Updates</h1>
+        <h1 class="doc" role="heading" aria-level="2">Updates</h1>
         <p class="docsub">News, seasonal notes, announcements. Drafts stay private; what you choose to show appears on your Updates page when you publish.</p>
         <div id="postList"></div>
         <button class="addline" id="btnAddPost">＋ Write an update</button>
@@ -515,7 +519,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- PHOTOGRAPHS -->
       <section class="view" id="view-media">
-        <h1 class="doc">Photos</h1>
+        <h1 class="doc" role="heading" aria-level="2">Photos</h1>
         <p class="docsub">The images on your website. Anything marked “on your site” is at work; the rest wait here. Your full library — photos, brand, documents — lives in <a class="link" href="/files.html">Files</a>.</p>
         <div id="assetHealth" style="margin:2px 0 8px" hidden></div>
         <div style="display:flex;align-items:baseline;gap:20px">
@@ -535,7 +539,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- HISTORY -->
       <section class="view" id="view-design">
-        <h1 class="doc">Design</h1>
+        <h1 class="doc" role="heading" aria-level="2">Design</h1>
         <p class="docsub">How your website looks — colors, type, layout, and what appears on your home page. Every choice is designed to stay readable; nothing applies until you publish, and every previous look stays restorable.</p>
         <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
           <div id="designHost" style="flex:1;min-width:300px"></div>
@@ -549,7 +553,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         </div>
       </section>
       <section class="view" id="view-history">
-        <h1 class="doc">History</h1>
+        <h1 class="doc" role="heading" aria-level="2">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
         <div id="previewBox"></div>
         <div id="launchBox"></div>
@@ -572,7 +576,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 <div class="ritualwrap" id="ritualWrap" role="dialog" aria-modal="true" aria-labelledby="ritTitle">
   <div class="ritual">
     <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your room</button></div>
-    <h1 id="ritTitle">Here’s what changes.</h1>
+    <h1 id="ritTitle" role="heading" aria-level="2">Here’s what changes.</h1>
     <p class="rsub" id="ritSub" aria-live="polite"></p>
     <div id="ritBody" aria-live="polite"></div>
     <div id="ritBlockers"></div>

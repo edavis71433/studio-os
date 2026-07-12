@@ -41,6 +41,9 @@
   button.ghost{border-color:transparent;color:var(--soft);padding-left:6px;padding-right:6px}
   button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .answer{margin-top:14px;padding:14px 16px;background:var(--accent-soft);border-radius:12px;font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
+  /* a11y: live regions stay in the accessibility tree from first render (never
+     display:none) so the FIRST answer is announced; empty = zero-height/invisible */
+  .answer:empty{padding:0;margin:0;background:transparent}
   .tag{display:inline-block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:8px}
   .calm{background:var(--good-soft);border-color:transparent}
   .calm h2{color:var(--good)}
@@ -171,7 +174,7 @@ function render(moments, features, feed, ctx){
           ${celebrate ? '' : `<button class="primary" data-explain="${esc(m.id)}">Walk me through it</button>`}
           ${m.dismissable ? `<button class="ghost" data-dismiss="${esc(m.id)}">Not now</button>` : ''}
         </div>
-        <div class="answer" id="ans-${esc(m.id)}" aria-live="polite" hidden></div>
+        <div class="answer" id="ans-${esc(m.id)}" aria-live="polite"></div>
       </article>`;
     }
   }
@@ -185,7 +188,7 @@ function render(moments, features, feed, ctx){
   html += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
-    <div class="answer" id="askAns" aria-live="polite" hidden></div></div>`;
+    <div class="answer" id="askAns" aria-live="polite"></div></div>`;
   // (Navigation to Connections and Visual Studio now lives in the persistent top nav.)
   $('main').innerHTML = '<div class="stack">' + html + '</div>';   // .stack gives the cards their breathing room
   wire();
@@ -204,7 +207,7 @@ async function explain(id, btn){
   try{ const r = await apiPost('/concierge/ask', { question: 'What does this mean, and what should I do about it?', topic_id: id });
     box.textContent = (r && r.data && r.data.text) || 'Open it when you have a minute — nothing changes until you decide.';
   }catch(_){ box.textContent = 'I couldn’t load the details just now — nothing’s wrong, try again in a moment.'; }
-  box.hidden = false; btn.disabled = false; btn.textContent = 'Walk me through it';
+  btn.disabled = false; btn.textContent = 'Walk me through it';
 }
 async function dismiss(id, btn){
   const card = btn.closest('.moment'); btn.disabled = true;
@@ -221,7 +224,7 @@ async function dismiss(id, btn){
 async function ask(){
   const q = $('q'), box = $('askAns'), btn = $('askBtn');
   const question = (q.value||'').trim(); if(!question) return;
-  btn.disabled = true; btn.textContent = '…'; box.hidden = false; box.textContent = 'Thinking about your presence…';
+  btn.disabled = true; btn.textContent = '…'; box.textContent = 'Thinking about your presence…';
   try{ const r = await apiPost('/concierge/ask', { question }); box.textContent = (r && r.data && r.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess.'; }
   catch(_){ box.textContent = 'I couldn’t answer just now — nothing’s wrong, please try again in a moment.'; }
   btn.disabled = false; btn.textContent = 'Ask';

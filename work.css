@@ -76,3 +76,10 @@ body[data-page="work"] .wk-decision-b{
   body[data-page="work"] .wk-decisions{ gap:44px; }
   body[data-page="work"] .wk-decision + .wk-decision{ padding-top:40px; }
 }
+
+/* Dark mode: the toggle icon's darkened-brass (#836539, tuned for
+   warm paper) is too dim on #171320 — lift it to the same bright
+   brass the shared tokens use. Light mode untouched. */
+@media (prefers-color-scheme: dark){
+  body[data-page="work"] .decision-reveal .toggle-icon{ color:#C9A468; }
+}
