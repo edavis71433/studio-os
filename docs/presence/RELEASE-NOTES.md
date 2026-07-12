@@ -36,12 +36,12 @@ Honest inventory. **None is a V1 correctness blocker.**
 
 | Item | Impact | Disposition |
 |---|---|---|
-| Baseline `deno check` type errors (`rollback` on `OrgPlan`/`MarketplacePlan`; a marketplace_ops comparison) | Pre-existing, in enterprise/marketplace types; edge runtime doesn't type-check and suites are green | V1.1 cleanup (cosmetic) |
+| ~~Baseline `deno check` type errors (`rollback` on `OrgPlan`/`MarketplacePlan`; a marketplace_ops comparison)~~ ✅ **STALE — closed (verified Jul 12 2026):** all three functions typecheck clean, and the Jul 11–12 audit-campaign rounds gate on it — e.g. commit `9df037c` "Gates: … typecheck ×3 clean" (also `1cd7ff1`); TD-1 recorded the clever-api 46→0 pass | ~~Pre-existing, in enterprise/marketplace types~~ resolved | ~~V1.1 cleanup~~ done |
 | `ENGINEERING-ATLAS.md` / `API-INVENTORY-v1-FROZEN.md` deep depth stops at M8.5/M5 | Superseded by the current [V1 System Reference](V1-SYSTEM-REFERENCE.md) / [API Reference](API-REFERENCE.md) | Historical; keep for provenance |
 | `connected_data` cache is one-deep (`+prev`) | No trend/time-series features | V1.1 (unlocks trends) |
 | Pack intelligence intentionally shallow (restaurant/coffee_shop) | Fewer industry-specific moments | V1.1 depth |
 | 3 connected providers are label-only stubs (Apple, Tag Manager, Meta) | Those read no numbers yet | V1.1 (additive) |
-| Baseline `email_templates` permissive RLS policy | Not referenced by any Presence code | V1.1 security tidy (verify/tighten) |
+| ~~Baseline `email_templates` permissive RLS policy~~ ✅ **FIXED (verified Jul 12 2026):** `supabase/migrations/0006_rls_holes.sql` drops the permissive `"authenticated full access"` policy and replaces it with the tenant-scoped `email_templates_staff` policy (adds `tenant_id` + FK) | ~~Not referenced by any Presence code~~ closed at the DB layer regardless | ~~V1.1 security tidy~~ done |
 | Visual "edit" = instruction-guided regeneration | No pixel-level inpainting | V1.1 (needs a capable model) |
 | No CI harness for the live security/accessibility/load passes | Those passes are manual/pre-launch | V1.1 tooling |
 
@@ -55,7 +55,7 @@ Honest inventory. **None is a V1 correctness blocker.**
 - **Broader connected coverage** — the 3 placeholder providers + write workflows beyond GBP/GSC.
 - **Deeper pack intelligence** and the **`connected_data` time-series**.
 - **Automated live security / accessibility / load** test harnesses in CI.
-- **Baseline type-error and `email_templates` policy** cleanup.
+- ~~**Baseline type-error and `email_templates` policy** cleanup.~~ ✅ both done (see the Technical Debt Register annotations, Jul 12 2026).
 - **Public-site / positioning** work (a separate track: homepage, nav, the Monitor demo, SEO-page consolidation).
 
 ---

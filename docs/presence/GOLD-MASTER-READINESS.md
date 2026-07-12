@@ -21,7 +21,7 @@
 - **The workspace is already ~95% unified on one visual language** (the plum `#5b3fa0` palette + Iowan/​system type): today, connections, crm, leads, schedule, files, visual-studio, client, projects, portal, and **all 8 CMS-UX pages** share it.
 - **The 8 CMS-UX pages are a coherent, consistent design system by construction** — identical tokens, reset, primitives, card/spacing language, and states (loading/empty/signed-out/trouble).
 - ✅ **Shared design system extracted (`cms.css`):** the 8 CMS-UX pages' byte-identical design tokens (17-var superset) + shared primitives (reset, `body`, `.wrap`, `a.back`, `header h1`, `a.link`, `.spin`/keyframes/reduced-motion) were consolidated into one `cms.css` — ~155 duplicated lines removed, now a single source of truth for the palette. Behavior-preserving (cascade order kept: `cms.css` → bespoke `<style>` → `shell.css`), verified: 15/15 tokens covered, braces balanced, bespoke component CSS intact, regression 148 green, backend untouched. Safe because these pages are behind the push fence (never live).
-- 🟡 **Lone remaining holdout:** `presence.html` (the editor) still uses the legacy `--dds-*`/serif shell-token system. Unifying it (ideally onto `cms.css`) is the one real design-debt item — but it is the most complex *live* surface, so it needs **visual QA in a browser**, not a blind headless restyle. Recommended as the first task of a browser-QA session.
+- ~~🟡 **Lone remaining holdout:** `presence.html` (the editor) still uses the legacy `--dds-*`/serif shell-token system. Unifying it (ideally onto `cms.css`) is the one real design-debt item — but it is the most complex *live* surface, so it needs **visual QA in a browser**, not a blind headless restyle. Recommended as the first task of a browser-QA session.~~ ✅ **CLOSED (verified Jul 12 2026):** `presence.html` is now on the plum palette (22× `#5b3fa0`, ~60 plum-family token refs) with its deliberate Fraunces/Inter editorial typography (owner-confirmed EC-1 design direction, not debt). The only two remaining `--dds-` references (lines 49/52) are the `--dds-shell-h` shell-height offset variable — layout plumbing, not styling debt.
 
 ## 4. Accessibility 🟢 code-verified / 👤 AT pass still required
 Across all 8 CMS-UX pages, code-verified consistent: `lang="en"`, a single `<h1>`, loading `role="status"` with `aria-label`, `aria-label` on controls, `:focus-visible` outlines, `prefers-reduced-motion` handling, and **colour-independence** (every status carries an icon glyph *and* a text word — never colour alone). Semantic sections, labelled action links, theme-aware light/dark.
@@ -59,11 +59,11 @@ This keeps the refinement **safe and truthful**: everything reported as done was
 **👤 Human QA (one focused session):**
 1. Browser + mobile pass over the 8 CMS-UX pages and the workspace hub (layout, touch targets, overflow).
 2. Screen-reader / keyboard pass (editor tab-order especially).
-3. Unify `presence.html` onto the plum palette **with** visual verification.
+3. ~~Unify `presence.html` onto the plum palette **with** visual verification.~~ ✅ done (verified Jul 12 2026 — see §3; the visual/browser confirmation folds into pass 1 above).
 4. Live cross-tenant test with two staging tenants (owner-held `SALES_E2E_*` creds).
 
 **🔑 Owner activation (unchanged from prior milestones):**
 5. Apply prod migrations `0075`–`0079` (routes dormant on prod until then).
-6. Lift the push fence when ready; Stripe live-mode confirm, Resend domain verify, PITR, external monitor, OAuth URIs.
+6. ~~Lift the push fence when ready~~ *(fence lifted Jul 11 2026 — launched)*; Stripe live-mode confirm, Resend domain verify, PITR, external monitor, OAuth URIs.
 
 Nothing in the engineering surface blocks Private Beta. The remaining work is verification with a browser and owner activation — exactly the items every milestone has parked, now consolidated into one readiness checklist.

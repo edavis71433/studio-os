@@ -544,6 +544,47 @@
     return t;
   };
 
+  // ── Offline awareness (B-5): a save that silently dies mid-edit is data loss
+  // to a non-technical owner. One central banner: appears offline, retracts on
+  // reconnect with a toast. Pages need nothing — fetch failures already surface
+  // their own errors; this explains WHY.
+  var offBanner;
+  function setOffline(off) {
+    if (off) {
+      if (!offBanner) {
+        offBanner = el('<div id="dds-offline" role="alert" style="position:fixed;top:var(--dds-shell-h,54px);left:0;right:0;z-index:2147483003;background:#8a6d3b;color:#fff;font-family:var(--dds-sans,sans-serif);font-size:13px;font-weight:600;text-align:center;padding:8px 14px">You’re offline — changes can’t save until the connection returns. Keep this tab open.</div>');
+        document.body.appendChild(offBanner);
+      }
+      offBanner.style.display = 'block';
+    } else if (offBanner && offBanner.style.display !== 'none') {
+      offBanner.style.display = 'none';
+      if (window.ddsToast) window.ddsToast('Back online.');
+    }
+  }
+  window.addEventListener('offline', function () { setOffline(true); });
+  window.addEventListener('online', function () { setOffline(false); });
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) setOffline(true);
+
+  // ── Draft preservation (opt-in): long-form fields marked data-dds-draft keep
+  // a local draft (this browser only), restored while the field is empty and
+  // cleared by the page via window.ddsDraftClear(el) after a successful send.
+  document.addEventListener('input', function (e) {
+    var f = e.target;
+    if (!f || !f.hasAttribute || !f.hasAttribute('data-dds-draft')) return;
+    var key = 'dds-draft:' + location.pathname + ':' + (f.id || f.getAttribute('data-dds-draft'));
+    try { f.value ? localStorage.setItem(key, f.value) : localStorage.removeItem(key); } catch (_) { /* */ }
+  });
+  window.ddsDraftRestore = function (f) {
+    if (!f || f.value) return;
+    var key = 'dds-draft:' + location.pathname + ':' + (f.id || f.getAttribute('data-dds-draft'));
+    try { var v = localStorage.getItem(key); if (v) f.value = v; } catch (_) { /* */ }
+  };
+  window.ddsDraftClear = function (f) {
+    if (!f) return;
+    var key = 'dds-draft:' + location.pathname + ':' + (f.id || f.getAttribute('data-dds-draft'));
+    try { localStorage.removeItem(key); } catch (_) { /* */ }
+  };
+
   function boot() {
     mountFrame();
     scanHints();

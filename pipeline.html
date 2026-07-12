@@ -49,6 +49,9 @@
   textarea{min-height:90px;resize:vertical}
   label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
   .mut{color:var(--soft);font-size:13px}
+  .hrow{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--soft);padding:5px 0;border-bottom:1px solid var(--line)}
+  .hrow:last-child{border-bottom:none}
+  .hrow .hd{white-space:nowrap;color:var(--faint);font-variant-numeric:tabular-nums}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
@@ -95,6 +98,18 @@ const STAGES=['lead','qualified','proposal','contract','won','lost'];
 // calm, human stage labels (the raw enum never reaches the owner's eyes)
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
 const stageLabel=(s)=>STAGE_LABEL[s]||s;
+// calm, human labels for the deal's history strip (the raw event kinds stay backstage)
+const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project'};
+function evtLabel(e){
+  const d=(e&&e.detail)||{};
+  if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
+  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?'Proposal accepted':'Proposal declined';
+  if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
+  if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
+  if(e.kind==='invoice_paid'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
+  return EVT_LABEL[e.kind]||String(e.kind||'').replace(/_/g,' ');
+}
+const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:'short',day:'numeric'};if(t.getFullYear()!==new Date().getFullYear())o.year='numeric';return t.toLocaleDateString('en-US',o);};
 let TOKEN="",FILTER="",DEALS=[];
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
@@ -156,9 +171,13 @@ function miniForm(host, fields, onSubmit){
   const f=document.createElement('form'); f.className='mini';
   const inputs={};
   fields.forEach(fl=>{
-    const lab=document.createElement('label'); lab.textContent=fl.label; lab.htmlFor='mf-'+fl.name; f.appendChild(lab);
-    const el=document.createElement(fl.type==='textarea'?'textarea':'input'); el.id='mf-'+fl.name;
+    // fl.draft (a stable, e.g. per-deal, suffix) opts the field into shell.js
+    // draft preservation — long-form work survives an accidental Esc/refresh.
+    const fid='mf-'+fl.name+(fl.draft?'-'+fl.draft:'');
+    const lab=document.createElement('label'); lab.textContent=fl.label; lab.htmlFor=fid; f.appendChild(lab);
+    const el=document.createElement(fl.type==='textarea'?'textarea':'input'); el.id=fid;
     if(fl.type&&fl.type!=='textarea') el.type=fl.type; if(fl.placeholder)el.placeholder=fl.placeholder; if(fl.step)el.step=fl.step;
+    if(fl.draft)el.setAttribute('data-dds-draft','1');
     f.appendChild(el); inputs[fl.name]=el;
   });
   const row=document.createElement('div'); row.className='row2'; row.style.justifyContent='flex-end';
@@ -166,7 +185,8 @@ function miniForm(host, fields, onSubmit){
   const save=document.createElement('button'); save.type='submit'; save.className='btn'; save.textContent='Save';
   row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
   cancel.onclick=()=>host.innerHTML='';
-  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{await onSubmit(Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()])));}catch(err){toast(err.message,true);save.disabled=false;}};
+  if(window.ddsDraftRestore)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));
+  f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{await onSubmit(Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value.trim()])));if(window.ddsDraftClear)f.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));}catch(err){toast(err.message,true);save.disabled=false;}};
   setTimeout(()=>{const first=f.querySelector('input,textarea'); if(first)first.focus();},20);
 }
 
@@ -208,8 +228,8 @@ async function openDeal(id){
           <input id="ed-close" type="date" value="${esc(d.expected_close||'')}" style="padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
           <label class="mut" for="ed-next" style="display:block;margin-top:8px">Next step</label>
           <div class="row2"><input type="text" id="ed-next" placeholder="e.g. Call Friday about the proposal" value="${esc(d.next_step||'')}" style="flex:1"><input type="date" id="ed-nextat" value="${esc(d.next_step_at||'')}" style="max-width:160px" aria-label="Next step date"></div>
-          <label class="mut" for="ed-notes" style="display:block;margin-top:8px">Notes</label>
-          <textarea id="ed-notes" rows="3" placeholder="Anything worth remembering about this deal…" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">${esc(d.notes||'')}</textarea>
+          <label class="mut" for="ed-notes-${d.id}" style="display:block;margin-top:8px">Notes</label>
+          <textarea id="ed-notes-${d.id}" data-dds-draft="1" rows="3" placeholder="Anything worth remembering about this deal…" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">${esc(d.notes||'')}</textarea>
           <div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ed-save">Save details</button></div>
         </div>
         <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}</div><div id="propForm"></div></div>
@@ -221,13 +241,15 @@ async function openDeal(id){
           ${d.converted_client_id?`<div class="mut">Converted — their workspace is ready. The customer was invited to set their login and welcomed into onboarding.</div>${d.created_project_id?`<div class="row2" style="margin-top:8px"><a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a></div>`:''}`:
             `<div id="convWrap"><button class="btn" id="convert" ${canConvert?'':'disabled'}>${canConvert?'Convert — set up their workspace':'Sign the agreement first'}</button></div>`}
         </div>
+        ${(data.events||[]).length?`<div class="sec"><h3>History</h3>${(data.events||[]).map(e=>`<div class="hrow"><span>${esc(evtLabel(e))}</span><span class="hd">${esc(evtDate(e.created_at))}</span></div>`).join('')}</div>`:''}
       </div>`;
     $('closeD').onclick=()=>dlg.close();
     // ONE cleanup for every way the dialog closes (✕, Esc, form-close) — else a
     // refresh after Esc unexpectedly reopens the deal from the stale ?deal= URL.
     if(!dlg.dataset.wiredClose){dlg.dataset.wiredClose='1';dlg.addEventListener('close',()=>history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():'')));}
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(e.message,true);}});
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:$('ed-notes').value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});toast('Saved');openDeal(id);load();}catch(e){toast(e.message,true);eds.disabled=false;}};
+    const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(e.message,true);eds.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/proposals/'+b.dataset.sendProposal+'/send','POST',{});toast('Proposal sent'+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(e.message,true);}});
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{try{const r=await api('/sales/contracts/'+b.dataset.sendContract+'/send','POST',{});
       // The sign→pay moment only works if a deposit is WAITING when they sign —
@@ -238,17 +260,20 @@ async function openDeal(id){
     // Multi-line proposal form — real projects have design + build + care, not one line.
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{
       const host=$('propForm');
-      const rowHtml=()=>`<div class="row2 prop-line" style="margin-top:6px"><input type="text" class="pl-label" placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price" placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div>`;
+      let ln=0; // per-deal, per-line draft keys — typed line items survive an accidental Esc
+      const rowHtml=()=>{ln++;return `<div class="row2 prop-line" style="margin-top:6px"><input type="text" class="pl-label" data-dds-draft="prop-${id}-label-${ln}" placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price" data-dds-draft="prop-${id}-price-${ln}" placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div>`;};
       host.innerHTML=`<div style="margin-top:8px">${rowHtml()}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button><span style="flex:1"></span><button type="button" class="btn" id="plSave">Draft proposal</button></div></div>`;
-      $('plMore').onclick=()=>{$('plSave').closest('div').insertAdjacentHTML('beforebegin',rowHtml());};
+      const restoreDrafts=()=>{if(window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
+      restoreDrafts();
+      $('plMore').onclick=()=>{$('plSave').closest('div').insertAdjacentHTML('beforebegin',rowHtml());restoreDrafts();};
       $('plSave').onclick=async()=>{
         const items=[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
         if(!items.length){toast('Add at least one line item.',true);return;}
-        try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});toast('Proposal drafted');openDeal(id);}catch(e){toast(e.message,true);}
+        try{await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));toast('Proposal drafted');openDeal(id);}catch(e){toast(e.message,true);}
       };
       host.querySelector('.pl-label').focus();
     };
-    const addCon=$('addCon'); if(addCon) addCon.onclick=()=>miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…'}],async(v)=>{if(!v.body){toast('Add the agreement text.',true);return;}await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});toast('Agreement drafted');openDeal(id);});
+    const addCon=$('addCon'); if(addCon) addCon.onclick=()=>miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…',draft:'con-'+id}],async(v)=>{if(!v.body){toast('Add the agreement text.',true);return;}await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});toast('Agreement drafted');openDeal(id);});
     // saved templates: one-tap draft-from-template + save-as-template
     $('detailInner').querySelectorAll('[data-use-ptpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/proposals','POST',{template_id:b.dataset.usePtpl});toast('Proposal drafted from your template');openDeal(id);}catch(e){toast(e.message,true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-use-ctpl]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/contracts','POST',{template_id:b.dataset.useCtpl});toast('Agreement drafted from your template');openDeal(id);}catch(e){toast(e.message,true);b.disabled=false;}});

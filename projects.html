@@ -249,8 +249,11 @@ async function loadMessages(id){
     const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
     $('msgList').innerHTML=items;
     const host=$('msgForm');
-    host.innerHTML=`<form class="mini"><label for="mm-body">Message</label><textarea id="mm-body" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send</button></div></form>`;
-    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=host.querySelector('#mm-body').value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});loadMessages(id);}catch(err){toast(err.message,true);}};
+    // per-project id + data-dds-draft: a half-written message survives an accidental close/refresh (shell.js draft preservation)
+    host.innerHTML=`<form class="mini"><label for="mm-body-${id}">Message</label><textarea id="mm-body-${id}" data-dds-draft="1" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send</button></div></form>`;
+    const ta=host.querySelector('textarea');
+    if(window.ddsDraftRestore)window.ddsDraftRestore(ta);
+    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=ta.value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});if(window.ddsDraftClear)window.ddsDraftClear(ta);loadMessages(id);}catch(err){toast(err.message,true);}};
   }catch(e){ $('msgList').innerHTML='<div class="mut">Couldn’t load messages.</div>'; }
 }
 async function loadSurveys(id){
@@ -278,9 +281,10 @@ async function openStudioSupport(rid,pid){
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
     const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
-    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body">Reply to the client</label><textarea id="sr-body" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
+    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body-${rid}">Reply to the client</label><textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
     $('sup-back').onclick=()=>loadSupport(pid);
-    const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=$('sr-body').value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});openStudioSupport(rid,pid);}catch(err){toast(err.message,true);}};
+    const sta=$('sr-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta); // a half-written reply survives an accidental close/refresh
+    const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid);}catch(err){toast(err.message,true);}};
     const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid);}catch(e){toast(e.message,true);}};
   }catch(e){ toast('Couldn’t open that request.',true); }
 }

@@ -10,11 +10,11 @@ Studio OS is an **unusually coherent, deeply-tested backend** with a rare archit
 
 The gap is not the architecture. It is the distance between a **superb backend** and a **shippable product**:
 
-- **25 commits are unpushed.** Everything from L1 (commerce) through L5.7 (agency) is deployed to the Supabase backends (staging + prod) but **not published to the website** — the site still predates self-serve commerce. The go-live gate (owner must confirm prices, register Stripe subscription events, add nav links) has never been crossed.
-- **The L4/L5 capabilities are API-only.** Connected Platform, Marketplace, Enterprise, Industry Packs, and the new Agency orchestration have **no customer or operator UI**. They are proven backends with no front door.
-- **The OAuth `connections-callback.html` does not exist**, so even a fully-configured connected provider can't complete a connect.
-- **Legal is incomplete** (no Cookie Policy, no DPA/sub-processor list — a hard enterprise blocker).
-- **Operations are immature** (no CI, a manual + error-prone migration ritual, no documented monitoring / alerting / backup / DR / incident response).
+- ~~**25 commits are unpushed.**~~ ✅ **SUPERSEDED (Jul 12 2026):** the go-live gate was crossed — **launched Jul 11 2026** (fence lifted, 344 commits pushed). A **new 13-commit divergence** (the Jul 11–12 audit campaign, incl. the publish-root security fix) is tracked as the #1 owner action on `STUDIO-OS-ROADMAP.md` "Do Now". *(original)* Everything from L1 (commerce) through L5.7 (agency) is deployed to the Supabase backends (staging + prod) but **not published to the website** — the site still predates self-serve commerce. The go-live gate (owner must confirm prices, register Stripe subscription events, add nav links) has never been crossed.
+- **The L4/L5 capabilities are API-only.** Connected Platform, Marketplace, Enterprise, Industry Packs, and the new Agency orchestration have **no customer or operator UI**. They are proven backends with no front door. *(Jul 12 2026: partly overtaken — `connections.html` shipped for Connected (L5.9); Marketplace/Enterprise/Agency UIs remain deliberately deferred per the P12 scope decision.)*
+- ~~**The OAuth `connections-callback.html` does not exist**, so even a fully-configured connected provider can't complete a connect.~~ ✅ **BUILT (verified Jul 12 2026):** `connections-callback.html` exists at the site root (Launch Track 2 / L5.9), completing the OAuth round-trip into `connections.html`.
+- **Legal is incomplete** (no Cookie Policy, no DPA/sub-processor list — a hard enterprise blocker). *(Jul 12 2026: consent flow half shipped — `analytics.js` default-deny consent gating; the policy documents remain open — see LAUNCH-BOARD P2/P3.)*
+- ~~**Operations are immature** (no CI, a manual + error-prone migration ritual, no documented monitoring / alerting / backup / DR / incident response).~~ 🟢 **Largely overtaken (verified Jul 12 2026):** CI workflows exist (`ci.yml` + `deploy.yml` + `e2e.yml` + `rollback.yml`; branch-protection required checks still owner-pending), monitoring/alerting largely shipped (cross-region watchdog cron, `ops_errors` ledger + global catch, honest `/system/health`), and the incident runbook now exists (`docs/presence/INCIDENT-RUNBOOK.md`). **Still open:** the migration ritual (B5), backups **restore drill** + PITR, external non-email monitor.
 
 **Readiness by dimension:** Architecture 9/10 · Security 8/10 · Backend correctness 9/10 · **Customer-facing 4/10** · **Legal 5/10** · **Operations 4/10**. **Overall: 6.5/10 — a beta-ready engine, not a public-launch-ready product.** The remaining work is front-end, legal, and ops — *not* redesign.
 
@@ -27,7 +27,7 @@ The gap is not the architecture. It is the distance between a **superb backend**
 **Duplication / debt found:**
 - **Two per-vertical registries not yet unified at the call site.** L5.0 declared the writer pack + coach pack as *layers* of the Industry Pack, but the live call sites (`writer/pack.ts:packFor`, `coach/packs.ts:growthPackFor`) are still called directly by the writer/coach engines. The umbrella *subsumes* them but hasn't *replaced* their resolution. Low risk, real debt.
 - **`opt_dormant` is a graveyard.** It holds unrelated silent evidence types (slowing testimonials, location-term heuristics, Twitter cards) emitted only to be suppressed. The platform *generates observations solely to hide them*. Either stop emitting them or split into honestly-named silent buckets.
-- **Operator auth for the new surfaces is unresolved.** Marketplace and Enterprise operator routes gate on `staff || system`, but service-role resolves to `public` and `system` requires the scheduler secret — so there is no clean programmatic operator path, and the full operator HTTP lifecycle is only exercisable by a real staff login (which has no UI). This is an architecture *and* a product gap.
+- ~~**Operator auth for the new surfaces is unresolved.** Marketplace and Enterprise operator routes gate on `staff || system`, but service-role resolves to `public` and `system` requires the scheduler secret — so there is no clean programmatic operator path, and the full operator HTTP lifecycle is only exercisable by a real staff login (which has no UI). This is an architecture *and* a product gap.~~ ✅ **CLOSED (P5, verified Jul 12 2026):** dedicated `OPERATOR_SECRET` via the `x-operator-secret` header (`_shared/auth.ts` — resolves to a system-kind principal tagged role `operator`, fail-closed when unset; service-role deliberately still resolves to `public` as defense-in-depth). Regression: `operator_auth_test.mjs` 7/7. Owner sets the secret when a programmatic caller is wired.
 - **Migration history is load-bearing tribal knowledge.** Applying one migration needs the hold-back ritual because remote `schema_migrations` only records some files. Documented, but manual and error-prone.
 
 **Recommend:** reconcile migration history; migrate writer/coach resolution to the umbrella; retire or rename `opt_dormant`; design a first-class operator/agency auth path for the management surfaces.
@@ -99,14 +99,14 @@ Consistency can't be fully assessed because the new surfaces have no UI. The exi
 
 | # | Debt | Severity | Note |
 |---|---|---|---|
-| 1 | 25 unpushed commits / go-live gate uncrossed | **Blocker** | website predates all of L1–L5.7 |
-| 2 | No UI for Connected/Marketplace/Enterprise/Industry/Agency | **Blocker** | API-only |
-| 3 | Missing `connections-callback.html` | **Blocker (if OAuth)** | connect can't complete |
-| 4 | No CI; test runner needs `$TMPDIR` incantation | High | no automated gate |
-| 5 | Migration history reconciliation (hold-back ritual) | High | manual, risky |
-| 6 | Operator/agency auth path for management surfaces | High | service-role→public |
-| 7 | Legal: Cookie Policy, DPA + sub-processors | High | enterprise blocker |
-| 8 | No monitoring / alerting / backup / DR / incident response | High | ops maturity |
+| 1 | ~~25 unpushed commits / go-live gate uncrossed~~ ✅ superseded — **launched Jul 11 2026** (344 commits pushed); NEW 13-commit divergence tracked on `STUDIO-OS-ROADMAP.md` "Do Now" (Jul 12 2026) | ~~**Blocker**~~ | ~~website predates all of L1–L5.7~~ live |
+| 2 | No UI for Connected/Marketplace/Enterprise/Industry/Agency *(Jul 12 2026: Connected UI shipped — `connections.html`; the rest deferred by the P12 scope decision)* | ~~**Blocker**~~ scoped | API-only → partly closed |
+| 3 | ~~Missing `connections-callback.html`~~ ✅ built (file exists at site root; verified Jul 12 2026) | ~~**Blocker (if OAuth)**~~ | ~~connect can't complete~~ round-trip complete |
+| 4 | ~~No CI~~ 🟢 largely shipped (Jul 12 2026): `ci.yml`/`deploy.yml`/`e2e.yml`/`rollback.yml`; residue = branch-protection required checks (+ FD-E1 harness before required-gating integration suites) | ~~High~~ | automated gates exist, not yet *required* |
+| 5 | Migration history reconciliation (hold-back ritual) *(re-verified open Jul 12 2026 — prod still applies via paste runbooks, e.g. `APPLY-0086-0092-prod.sql`)* | High | manual, risky |
+| 6 | ~~Operator/agency auth path for management surfaces~~ ✅ closed (P5 `OPERATOR_SECRET`, `x-operator-secret` → operator principal, fail-closed; operator_auth 7/7) | ~~High~~ | ~~service-role→public~~ resolved |
+| 7 | Legal: Cookie Policy, DPA + sub-processors *(Jul 12 2026: consent-gated analytics shipped; the documents remain)* | High | enterprise blocker |
+| 8 | ~~No monitoring / alerting / backup / DR / incident response~~ 🟢 largely shipped (Jul 12 2026): watchdog cron + `ops_errors` + honest `/system/health` + `INCIDENT-RUNBOOK.md`; residue = backups **restore drill** + PITR + external non-email monitor | ~~High~~ | ops maturity → mostly in place |
 | 9 | `pg_cron` not applied | Medium | scheduled ops external |
 | 10 | writer/coach not migrated to Industry umbrella | Medium | latent duplication |
 | 11 | `opt_dormant` graveyard (emit-to-suppress) | Low | tidy or remove |

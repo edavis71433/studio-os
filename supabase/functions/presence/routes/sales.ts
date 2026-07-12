@@ -529,9 +529,10 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const signerName = clean(b.signer_name, 120);
   const signerEmail = clean(b.signer_email, 160).toLowerCase();
   if (!signerName) return json({ error: 'validation', message: 'Please type your name to sign.' }, 422, cors);
-  const evidence = { hash: c.content_hash, at: nowIso(), token_exp: tok.exp, ip_hash: await hmacHex(secret, clientIp(req)) }; // R3: hashed signer IP for legal signing evidence
+  const signedAt = nowIso();   // ONE timestamp — the evidence, the stored row, and the emailed certificate all agree
+  const evidence = { hash: c.content_hash, at: signedAt, token_exp: tok.exp, ip_hash: await hmacHex(secret, clientIp(req)) }; // R3: hashed signer IP for legal signing evidence
   const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&content_hash=eq.${c.content_hash}&select=deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: nowIso(), signed_evidence: evidence }) });
+    body: JSON.stringify({ status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: signedAt, signed_evidence: evidence }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'This agreement changed — reload and sign again.' }, 409, cors); // hash guard in WHERE = version integrity
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
@@ -552,10 +553,16 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     if (to) {
       const brand = await loadEmailBrand(tok.site_id);
       const escHtml = (s: string) => s.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
+      // Signature certificate: name · timestamp (UTC) · document fingerprint —
+      // only facts this request already holds; deliberately no IP or device data.
       copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
         `<p>Here's your copy of the agreement, exactly as signed. Keep this email — it's your record.</p>` +
         `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;white-space:pre-wrap;font-size:14px">${escHtml(String(c.body || ''))}</div>` +
-        `<p style="font-size:13px;color:#6b6478">Signed by <strong>${escHtml(signerName)}</strong> on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} · document fingerprint ${String(c.content_hash || '').slice(0, 12)}</p>`,
+        `<p style="font-size:13px;color:#6b6478;margin:14px 0 4px"><strong>Signature certificate</strong></p>` +
+        `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:12px 18px;font-size:13px;color:#6b6478;line-height:1.7">` +
+        `Signed by: <strong>${escHtml(signerName)}</strong><br>` +
+        `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
+        `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>`,
         brand).catch(() => false);
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
