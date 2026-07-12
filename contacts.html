@@ -108,7 +108,13 @@ function render(){
         <button data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
       </div></div>`;
   }
+  // A search keystroke re-renders the page — if an import panel was open, its
+  // handlers can't survive the innerHTML swap, so say so honestly instead of
+  // leaving a dead-looking panel (or silently vanishing mid-preview).
+  const zPrev=document.getElementById('csvZone');
+  const zWasOpen=!!(zPrev&&zPrev.innerHTML.trim());
   $('main').innerHTML=h;wire();
+  if(zWasOpen){const z=document.getElementById('csvZone');if(z)z.innerHTML='<p class="muted" style="margin:8px 0">Import paused while you searched — tap “Import CSV” to pick your file again.</p>';}
 }
 function wire(){
   const q=$('q');if(q)q.addEventListener('input',()=>{Q=q.value;const p=q.selectionStart;render();const nq=$('q');if(nq){nq.focus();try{nq.setSelectionRange(p,p);}catch(_){}}});

@@ -265,7 +265,7 @@ async function openDeal(id){
         if(e.status===409&&e.body&&e.body.error==='amount_mismatch'){
           const open=e.body.open_invoice||{};
           $('invForm').innerHTML=`<div class="mut" style="margin:8px 0" role="alert">${esc(e.body.message||'An open one already exists.')} <span class="mut">If you send another, both links stay payable until one is paid.</span></div>
-            <div class="row2"><button class="btn ghost" id="resendOpen">Resend the ${money(open.amount_cents)} link</button>
+            <div class="row2"><button class="btn ghost" id="resendOpen">Resend the ${money(open.amount_cents)||'previous'} link</button>
             <button class="btn ghost" id="forceNew">Send another for the new amount</button></div>`;
           $('resendOpen').focus();
           // Resend passes the OPEN amount explicitly (an ad-hoc deposit may have no
