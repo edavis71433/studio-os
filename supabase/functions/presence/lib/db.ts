@@ -21,6 +21,23 @@ export async function svc(path: string, init: RequestInit = {}) {
   return { ok: r.ok, status: r.status, json, text };
 }
 
+/** Exact row count without fetching rows (HEAD + Prefer: count=exact →
+ *  Content-Range). Flat cost at any table size — the count-by-fetch pattern
+ *  this replaces silently saturated at PostgREST's max-rows cap, so counts
+ *  went WRONG at scale, not just slow. Returns null on any failure. */
+export async function svcCount(path: string): Promise<number | null> {
+  try {
+    const r = await fetch(`${REST}/${path}${path.includes('?') ? '&' : '?'}select=id`, {
+      method: 'HEAD',
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, Prefer: 'count=exact' },
+    });
+    if (!r.ok) return null;
+    const range = r.headers.get('content-range') || '';   // e.g. "0-24/117" or "*/0"
+    const total = Number(range.split('/')[1]);
+    return Number.isFinite(total) ? total : null;
+  } catch { return null; }
+}
+
 export async function asUser(jwt: string, path: string, init: RequestInit = {}) {
   const r = await fetch(`${REST}/${path}`, {
     ...init,

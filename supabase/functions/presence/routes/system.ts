@@ -6,7 +6,7 @@
 //   POST /system/run     {secret, task?: 'cycle'|'retry'|'coach', limit?}
 //   GET  /system/health  ?secret=…   (or x-system-secret header)
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes } from '../ops/scheduler.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
@@ -121,24 +121,31 @@ function authorized(req: Request, body: any): boolean {
   return fromBody === SCHEDULER_SECRET || fromHeader === SCHEDULER_SECRET;
 }
 
+const CRON_STALE_MS = 45 * 60_000;   // 3 missed 15-min ticks = the scheduler is dead
+const FAILURE_ALARM_24H = 10;        // sustained failures = something systemic
+
 async function health(): Promise<any> {
   const secrets = validateSecrets();
-  // db reachability + a couple of cheap operational reads
+  // db reachability + cheap operational reads (exact counts — never fetch-to-count)
   let dbOk = false, activeSites = 0, lastCycle: any = null, failures24h = 0;
   try {
     const ping = await svc('presence_sites?select=id&limit=1');
     dbOk = ping.ok;
-    const ent = await svc('presence_entitlements?product=eq.presence&status=eq.active&select=client_id');
-    activeSites = (ent.ok && Array.isArray(ent.json)) ? ent.json.length : 0;
+    activeSites = (await svcCount('presence_entitlements?product=eq.presence&status=eq.active')) ?? 0;
     const last = await svc('presence_scheduled_runs?run_type=eq.cycle&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1');
     lastCycle = last.json?.[0] || null;
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const fails = await svc(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}&select=id`);
-    failures24h = (fails.ok && Array.isArray(fails.json)) ? fails.json.length : 0;
+    failures24h = (await svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}`)) ?? 0;
   } catch { /* dbOk stays false */ }
-  const ok = secrets.ok && dbOk;
+  // Top-level ok is what the external watchdog pages on, so it must reflect the
+  // failures a human needs to hear about — not just "the box is on". A dead cron
+  // (no cycle in 45 min, once one has EVER run) or sustained failures degrade it.
+  const lastCycleAt = lastCycle ? Date.parse(lastCycle.finished_at || lastCycle.started_at || '') : NaN;
+  const cronStale = Number.isFinite(lastCycleAt) && (Date.now() - lastCycleAt) > CRON_STALE_MS;
+  const failureAlarm = failures24h >= FAILURE_ALARM_24H;
+  const ok = secrets.ok && dbOk && !cronStale && !failureAlarm;
   const health_center = await computeHealthCenter().catch(() => null);
-  return { ok, secrets, db_ok: dbOk, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
+  return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
 }
 
 // ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).
@@ -153,40 +160,51 @@ export async function computeHealthCenter(): Promise<any> {
   const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []);
   const cronQ = await svc('presence_scheduled_runs?run_type=eq.cycle&order=created_at.desc&select=status,started_at,finished_at&limit=1');
   const lastCycle = arr(cronQ)[0] || null;
-  const failQ = await svc(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}&select=id`);
-  const failedRuns = arr(failQ).length;
-  const [live, doms, domsSoon, ents, aiUse, notices, failPub] = await Promise.all([
-    svc('presence_sites?status=eq.live&select=id'),
-    svc('presence_sites?custom_domain=not.is.null&select=id'),
-    svc(`presence_sites?custom_domain=not.is.null&domain_expires_at=lte.${encodeURIComponent(soon)}&domain_expires_at=gte.${encodeURIComponent(nowIso)}&select=id`),
-    svc('presence_entitlements?product=eq.presence&select=status'),
-    svc(`presence_ai_usage?period=eq.${period}&select=generative_ops,assistive_ops`),
-    svc('presence_plan_notices?status=eq.active&select=id'),
-    svc(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since)}&select=id`),
+  // Exact counts (HEAD + count=exact) — fetch-to-count went WRONG past the
+  // PostgREST max-rows cap, silently under-reporting at scale.
+  const [failedRuns, live, doms, domsSoon, entActive, entPaused, entLapsed, notices, failPub, aiUseQ] = await Promise.all([
+    svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}`),
+    svcCount('presence_sites?status=eq.live'),
+    svcCount('presence_sites?custom_domain=not.is.null'),
+    svcCount(`presence_sites?custom_domain=not.is.null&domain_expires_at=lte.${encodeURIComponent(soon)}&domain_expires_at=gte.${encodeURIComponent(nowIso)}`),
+    svcCount('presence_entitlements?product=eq.presence&status=eq.active'),
+    svcCount('presence_entitlements?product=eq.presence&status=eq.paused'),
+    svcCount('presence_entitlements?product=eq.presence&status=eq.lapsed'),
+    svcCount('presence_plan_notices?status=eq.active'),
+    svcCount(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since)}`),
+    svc(`presence_ai_usage?period=eq.${period}&select=generative_ops,assistive_ops&limit=1000`),
   ]);
-  const entRows = arr(ents) as Array<{ status: string }>;
-  const aiOps = (arr(aiUse) as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0);
+  const aiOps = (arr(aiUseQ) as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0);
   const missing = Object.values(SECRET_GROUPS).flat().filter((d) => d.required && !envPresent(d.name)).map((d) => d.name);
   return summarizeHealthCenter({
     nowIso,
     cronLastRunAt: lastCycle?.finished_at || lastCycle?.started_at || null,
     secretsMissingRequired: missing,
-    domainsWatched: arr(doms).length,
-    domainsExpiringSoon: arr(domsSoon).length,
-    billing: {
-      active: entRows.filter((e) => e.status === 'active').length,
-      paused: entRows.filter((e) => e.status === 'paused').length,
-      lapsed: entRows.filter((e) => e.status === 'lapsed').length,
-    },
+    domainsWatched: doms ?? 0,
+    domainsExpiringSoon: domsSoon ?? 0,
+    billing: { active: entActive ?? 0, paused: entPaused ?? 0, lapsed: entLapsed ?? 0 },
     aiConfigured: envPresent('ANTHROPIC_KEY'),
     aiOpsThisMonth: aiOps,
     emailConfigured: envPresent('RESEND_KEY'),
-    sitesLive: arr(live).length,
-    failedPublishes: arr(failPub).length,
-    failedRuns,
-    activeNotices: arr(notices).length,
+    sitesLive: live ?? 0,
+    failedPublishes: failPub ?? 0,
+    failedRuns: failedRuns ?? 0,
+    activeNotices: notices ?? 0,
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
   });
+}
+
+// Keep the ledgered tick progress compact: per-sweep counters only, never the
+// per-site result arrays (the cycle already ledgers those per site).
+function summarizeProgress(progress: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(progress)) {
+    if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      out[k] = Object.fromEntries(Object.entries(o).filter(([, val]) => typeof val === 'number' || typeof val === 'boolean').slice(0, 12));
+    } else out[k] = v;
+  }
+  return out;
 }
 
 export async function handleSystem(req: Request, route: string, method: string, cors: Record<string, string>): Promise<Response> {
@@ -208,26 +226,45 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
       if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
       if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
-      // default cycle ALSO fires any due scheduled publishes, so a single cron tick covers both
-      const cycle = await runOperationsCycle({ limit });
-      const scheduled = await runDuePublishes(limit);
-      const reconcile = await runReconcileStuckPublishes(50);   // M5: finalize stuck publishes every tick (no owner cron change)
+      // ── The default tick: one chain covering observation + revenue + hygiene.
+      // OBSERVABILITY: the whole chain is ledgered in ONE presence_scheduled_runs
+      // row (run_type 'tick'), progressively updated after EVERY sweep — so if
+      // the invocation dies mid-chain (wall-clock limit, crash), the row stays
+      // 'running' and result.progress shows exactly which sweep died. Previously
+      // the sub-sweeps' outcomes lived only in this (unstored) HTTP response.
+      const progress: Record<string, unknown> = {};
+      const tickRow = await svc('presence_scheduled_runs', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ run_type: 'tick', site_id: null, status: 'running', started_at: new Date().toISOString(), attempts: 1 }),
+      }).then((r) => r.json?.[0]?.id || null).catch(() => null);
+      const step = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+        const res = await fn();
+        progress[name] = res;
+        if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
+        return res;
+      };
+
+      const cycle = await step('cycle', () => runOperationsCycle({ limit }));
+      const scheduled = await step('scheduled_publishes', () => runDuePublishes(limit));
+      const reconcile = await step('reconcile', () => runReconcileStuckPublishes(50));   // M5: finalize stuck publishes every tick
       // P2-E: reconcile billing BEFORE the lifecycle sweep so grace-clock
       // enforcement (W9) acts on Stripe-fresh state (a recovered customer already
       // had grace_until cleared) rather than possibly-stale data.
-      const reconcile_billing = await runBillingReconcile(30);   // P2-E W7: correct any entitlement drift vs Stripe (missed webhooks)
-      const lifecycle = await runLifecycleSweep(limit);   // Phase RL: one cron tick covers the revenue lifecycle too
-      const deletion = await runDeletionSweep(25);        // P2-E W2: complete eligible account deletions (past cooling-off)
-      const digest = await runWeeklyDigest();             // CP-3: the Monday routine, automated (7-day dedupe)
-      const domains = await runDomainWatch(10);           // INF: RDAP expiry+registrar, 24h per-domain dedupe
-      const leads = await runLeadFollowups(20);            // CRM: nudge un-replied leads (1–7d old), once per lead
-      const dealNudges = await runDealFollowups(20);       // CRM: nudge stale deals (qualified/proposal/contract, 3–30d quiet)
-      const renewals = await runRenewalReminders(50);      // PP-2: annual renewal heads-up (30d + 7d, once per window)
-      const invoiceNudges = await runInvoiceReminders(20); // MONEY: one gentle reminder per unpaid invoice/deposit (7d+ or past due)
-      const docReminders = await runSalesDocReminders(20); // SALES: one fresh-link reminder per unsigned proposal/agreement (3-21d)
-      const retention = await runRetentionSweep();          // keep analytics detail tables bounded (visits 180d, search terms 13mo)
-      const media_gc = await reapMedia(100);                 // M6: reap soft-deleted (past retention) + never-uploaded orphan media
-      const snapshot_gc = await reapSnapshots(200);          // M7: prune OLD unreferenced snapshots (keep live/last-20/referenced), bounded per tick
+      const reconcile_billing = await step('reconcile_billing', () => runBillingReconcile(30));
+      const lifecycle = await step('lifecycle', () => runLifecycleSweep(limit));   // Phase RL: the revenue lifecycle
+      const deletion = await step('deletion', () => runDeletionSweep(25));         // P2-E W2: eligible account deletions
+      const digest = await step('digest', () => runWeeklyDigest());                // CP-3: the Monday routine (7-day dedupe)
+      const domains = await step('domains', () => runDomainWatch(10));             // INF: RDAP expiry+registrar, 24h dedupe
+      const leads = await step('leads', () => runLeadFollowups(20));               // CRM: nudge un-replied leads, once per lead
+      const dealNudges = await step('deal_nudges', () => runDealFollowups(20));    // CRM: nudge stale deals
+      const renewals = await step('renewals', () => runRenewalReminders(50));      // PP-2: annual renewal heads-up
+      const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
+      const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
+      const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
+      const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
+      const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots
+
+      if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: cycle.failures ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: cycle.failures ? `${cycle.failures} site cycle failure(s)` : '', result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
       return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);

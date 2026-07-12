@@ -5,20 +5,14 @@
 // (today's behavior), so nothing regresses. Only an explicit client_reviewer
 // membership narrows the view. Never touches tenant isolation (still site-scoped).
 import { svc } from './db.ts';
+import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
 import { isSiteRole } from './site_roles.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
 
-const SB_URL = Deno.env.get('SUPABASE_URL') || '';
-const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
 async function callerOf(jwt: string): Promise<{ id?: string; email?: string } | null> {
-  if (!jwt) return null;
-  try {
-    const r = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { return null; }
+  // shared memoized resolver — the auth boundary already validated this JWT
+  return await authUser(jwt);
 }
 
 /** The caller's role on this site. staff/system operate as the owner (full view).

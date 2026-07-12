@@ -25,6 +25,13 @@ export interface SiteExport {
   website: Record<string, string> | null; // the rendered site: path → HTML/CSS, hostable anywhere
   cover_html: string;                     // BR-1: a branded cover (Brand Kit), openable in any browser
   terms_acceptances: Array<{ terms_version: string; privacy_version: string; accepted_at: string; method: string; context: string }>; // M4: the customer's own consent record, portable
+  // P2-D: the working relationship is the customer's data too — their projects,
+  // messages, deliverable records, support threads, and survey answers.
+  projects: unknown[];
+  project_messages: unknown[];
+  deliverables: unknown[];
+  support_requests: unknown[];
+  survey_responses: unknown[];
 }
 
 export async function buildExport(site: SiteRow): Promise<SiteExport> {
@@ -41,6 +48,21 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
   const acceptQ = site.client_id
     ? await svc(`presence_terms_acceptances?client_id=eq.${encodeURIComponent(site.client_id)}&select=terms_version,privacy_version,accepted_at,method,context&order=accepted_at.desc&limit=50`)
     : { json: [] as any[] };
+
+  // P2-D: the working relationship — projects on THIS site plus everything
+  // client-visible inside them. Internal-audience messages stay internal (they
+  // are the studio's notes, not the customer's data); deliverable rows carry
+  // the record, not the file bytes (files are in their media export already).
+  const projQ = await svc(`presence_projects?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status,created_at&order=created_at.asc&limit=200`);
+  const projects = Array.isArray(projQ.json) ? projQ.json : [];
+  const projIds = projects.map((p: any) => p.id);
+  const inProj = projIds.length ? `project_id=in.(${projIds.join(',')})` : 'project_id=eq.00000000-0000-0000-0000-000000000000';
+  const [msgsQ, delivQ, supportQ, surveyQ] = await Promise.all([
+    svc(`presence_project_messages?${inProj}&audience=eq.client&deleted_at=is.null&select=project_id,body,author_kind,created_at&order=created_at.asc&limit=2000`),
+    svc(`presence_deliverables?${inProj}&deleted_at=is.null&client_visible=eq.true&select=project_id,title,note,status,created_at&order=created_at.asc&limit=500`),
+    svc(`presence_support_requests?site_id=eq.${site.id}&select=subject,status,created_at&order=created_at.asc&limit=500`),
+    svc(`presence_survey_responses?site_id=eq.${site.id}&select=survey_id,answers,created_at&order=created_at.asc&limit=500`),
+  ]);
 
   // the rendered site — portable, framework-free HTML through the ONE renderer
   let website: Record<string, string> | null = null;
@@ -73,5 +95,10 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
     website,
     cover_html,
     terms_acceptances: acceptQ.json ?? [],
+    projects,
+    project_messages: msgsQ.json ?? [],
+    deliverables: delivQ.json ?? [],
+    support_requests: supportQ.json ?? [],
+    survey_responses: surveyQ.json ?? [],
   };
 }

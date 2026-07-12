@@ -9,31 +9,42 @@ import { svc } from '../lib/db.ts';
 
 const VISITS_DAYS = 180;        // presence_visits — 6 months of first-party traffic
 const SEARCH_TERM_MONTHS = 13;  // presence_search_terms — 13 months (year-over-year headroom)
+const SCHEDULED_RUNS_DAYS = 90; // presence_scheduled_runs — ops forensics window
+const OPS_ERRORS_DAYS = 90;     // ops_errors — request-path error ledger
+const RATE_LIMIT_DAYS = 1;      // rate_limit_state — windows are minutes; a day is generous
+const EVIDENCE_DAYS = 180;      // presence_evidence_runs — readers only use the latest per site
 
-export async function runRetentionSweep(now: Date = new Date()): Promise<{ visits_pruned: number | null; search_terms_pruned: number | null }> {
-  const out = { visits_pruned: null as number | null, search_terms_pruned: null as number | null };
+export async function runRetentionSweep(now: Date = new Date()): Promise<Record<string, boolean | number | null>> {
+  const out: Record<string, boolean | number | null> = {};
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString();
+  const prune = async (key: string, path: string) => {
+    try { const r = await svc(path, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); out[key] = r.ok; }
+    catch { out[key] = false; }
+  };
 
-  // presence_visits older than 180 days
-  try {
-    const cutoff = new Date(now.getTime() - VISITS_DAYS * 86_400_000).toISOString();
-    const r = await svc(`presence_visits?ts=lt.${cutoff}`, { method: 'DELETE', headers: { Prefer: 'return=minimal,count=exact' } });
-    out.visits_pruned = countFrom(r);
-  } catch { /* non-fatal */ }
+  await prune('visits', `presence_visits?ts=lt.${daysAgo(VISITS_DAYS)}`);
 
   // presence_search_terms older than 13 months (period is 'YYYY-MM')
   try {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - SEARCH_TERM_MONTHS, 1));
     const cutoffPeriod = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    const r = await svc(`presence_search_terms?period=lt.${cutoffPeriod}`, { method: 'DELETE', headers: { Prefer: 'return=minimal,count=exact' } });
-    out.search_terms_pruned = countFrom(r);
-  } catch { /* non-fatal */ }
+    const r = await svc(`presence_search_terms?period=lt.${cutoffPeriod}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    out.search_terms = r.ok;
+  } catch { out.search_terms = false; }
+
+  // Growth-forever tables (round-5 audit): the ops ledger, the request-error
+  // ledger, and the per-minute rate-limit windows all accumulated unbounded.
+  await prune('scheduled_runs', `presence_scheduled_runs?created_at=lt.${daysAgo(SCHEDULED_RUNS_DAYS)}&status=in.(done,failed,skipped)`);
+  await prune('ops_errors', `ops_errors?created_at=lt.${daysAgo(OPS_ERRORS_DAYS)}`);
+  await prune('rate_limit_state', `rate_limit_state?window_start=lt.${daysAgo(RATE_LIMIT_DAYS)}`);
+
+  // Evidence: needs "all but each site's latest run" — SQL, not REST (0091 RPC).
+  // presence_evidence cascades from runs. A pre-0091 environment 404s → recorded
+  // false, never throws.
+  try {
+    const r = await svc(`rpc/prune_evidence_runs`, { method: 'POST', body: JSON.stringify({ keep_days: EVIDENCE_DAYS }) });
+    out.evidence_runs = r.ok ? Number(r.json ?? 0) : false;
+  } catch { out.evidence_runs = false; }
 
   return out;
-}
-
-// PostgREST returns the affected count in the Content-Range header when count=exact.
-function countFrom(r: { text?: string; json?: unknown }): number | null {
-  // svc() doesn't surface headers; fall back to null (the sweep still ran). The
-  // count is informational only — the DELETE itself is the point.
-  return null;
 }

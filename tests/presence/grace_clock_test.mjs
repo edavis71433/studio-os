@@ -17,12 +17,12 @@ ok('anchor: reads the prior grace_until', /select=status,grace_until&limit=1/.te
 ok('anchor: keeps the EARLIER grace_until when still past-due (no sliding window)', /if \(patch\.grace_until && priorGrace && Date\.parse\(priorGrace\) < Date\.parse\(patch\.grace_until\)\)/.test(sync) && /body\['grace_until'\] = priorGrace/.test(sync));
 
 // ── enforcement: when grace passes, the account lapses ──
-ok('enforce: sweep reads grace_until', /select=client_id,status,trial_ends_at,stripe_subscription_id,updated_at,grace_until/.test(life));
+ok('enforce: sweep reads grace_until', /client_id,status,trial_ends_at,stripe_subscription_id,updated_at,grace_until/.test(life));
 ok('enforce: active + grace_until in the past → lapse', /e\.status === 'active' && e\.grace_until && Date\.parse\(e\.grace_until\) < Date\.parse\(nowIso\)/.test(life) && /status: 'lapsed'/.test(life));
 ok('enforce: counted as grace_lapsed in the result (observable)', /grace_lapsed\+\+/.test(life) && /grace_lapsed: number/.test(life) && /grace_lapsed \}/.test(life));
 
 // ── ordering: reconcile runs BEFORE lifecycle so enforcement sees fresh state ──
-ok('order: billing reconcile runs before the lifecycle sweep in the tick', system.indexOf('const reconcile_billing = await runBillingReconcile(30)') < system.indexOf('const lifecycle = await runLifecycleSweep(limit)'));
+ok('order: billing reconcile runs before the lifecycle sweep in the tick', system.indexOf("await step('reconcile_billing'") > 0 && system.indexOf("await step('reconcile_billing'") < system.indexOf("await step('lifecycle'"));
 
 // ── recovery still clears grace (via the pure mapper, unchanged) ──
 ok('recovery: a non-past-due active status clears grace_until (patch mapper)', /status === 'active' && stripeStatus !== 'trialing'/.test(read('supabase/functions/presence/commerce/subscriptions.ts')));

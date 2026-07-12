@@ -99,8 +99,19 @@ export interface ReconcileResult { checked: number; corrected: number; errors: n
 export async function runBillingReconcile(limit = 40): Promise<ReconcileResult> {
   if (!stripeConfigured()) return { checked: 0, corrected: 0, errors: 0, skipped_no_stripe: true };
   const now = new Date();
-  const q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=client_id,status,plan,current_period_end,cancel_at_period_end,grace_until,stripe_subscription_id&order=updated_at.asc&limit=${Math.max(1, Math.min(100, limit))}`);
+  // FAIRNESS (0091): order by the last_synced_at rotation cursor and stamp every
+  // row considered. updated_at ordering starved subscription #limit+1 forever
+  // (non-drifted rows never got PATCHed, so they permanently held the window).
+  const COLS = 'client_id,status,plan,current_period_end,cancel_at_period_end,grace_until,stripe_subscription_id';
+  const lim = Math.max(1, Math.min(100, limit));
+  let q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=${COLS}&order=last_synced_at.asc.nullsfirst&limit=${lim}`);
+  if (!q.ok) q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=${COLS}&order=updated_at.asc&limit=${lim}`);
   const rows: any[] = Array.isArray(q.json) ? q.json : [];
+  if (rows.length) {
+    await svc(`presence_entitlements?product=eq.presence&client_id=in.(${rows.map((r) => r.client_id).join(',')})`, {
+      method: 'PATCH', body: JSON.stringify({ last_synced_at: now.toISOString() }),
+    }).catch(() => {});
+  }
   let checked = 0, corrected = 0, errors = 0;
   for (const row of rows) {
     const subId = String(row.stripe_subscription_id || '');

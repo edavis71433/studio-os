@@ -29,7 +29,7 @@ ok('observe: provision failure is logged loud + specific, not just echoed 502', 
 ok('observe: no-client + successful sync both log a structured line', /could not resolve a client/.test(commerce) && /\[billing-sync\] \$\{type\} client=\$\{clientId\} → status=/.test(commerce));
 
 // ── wired into the cron (owner scheduler) ──
-ok('wiring: reconcile runs each default cron tick + has a named task', /const reconcile_billing = await runBillingReconcile\(30\)/.test(system) && /task === 'reconcile_billing'/.test(system) && /reconcile_billing,/.test(system));
+ok('wiring: reconcile runs each default cron tick + has a named task', /const reconcile_billing = await step\('reconcile_billing', \(\) => runBillingReconcile\(30\)\)/.test(system) && /task === 'reconcile_billing'/.test(system) && /reconcile_billing,/.test(system));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E W7 BILLING RECONCILE + OBSERVABILITY (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

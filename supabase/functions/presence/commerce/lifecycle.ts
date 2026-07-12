@@ -125,8 +125,18 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
   const nowIso = new Date().toISOString();
   let expired = 0, notices = 0, emails = 0, wound_down = 0, grace_lapsed = 0;
 
-  const ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=client_id,status,trial_ends_at,stripe_subscription_id,updated_at,grace_until&limit=${limit * 4}`);
+  // FAIRNESS (0091): ordered by the last_swept_at rotation cursor + stamped on
+  // consideration, so trial-expiry/grace/wind-down reach EVERY entitlement at
+  // any scale (the unordered fetch depended on row order beyond limit*4).
+  const ECOLS = 'client_id,status,trial_ends_at,stripe_subscription_id,updated_at,grace_until';
+  let ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=${ECOLS}&order=last_swept_at.asc.nullsfirst&limit=${limit * 4}`);
+  if (!ents.ok) ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=${ECOLS}&limit=${limit * 4}`);
   const rows: EntitlementView[] = Array.isArray(ents.json) ? ents.json : [];
+  if (rows.length) {
+    await svc(`presence_entitlements?product=eq.presence&client_id=in.(${rows.map((r) => r.client_id).join(',')})`, {
+      method: 'PATCH', body: JSON.stringify({ last_swept_at: nowIso }),
+    }).catch(() => {});
+  }
 
   for (const e of rows.slice(0, limit * 4)) {
     // enforce trial expiry first (the revenue bug: nothing else ever flips it)

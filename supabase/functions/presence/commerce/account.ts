@@ -105,6 +105,12 @@ export async function createContactAndClient(
 export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email to', to); return false; }
   try {
+    // Honor the suppression list (opt-outs, bounces, complaints) at the ONE send
+    // point — continuing to mail a bounced/complained address junks the whole
+    // domain's reputation, and mailing an opt-out breaks the promise we printed.
+    const { isSuppressed, unsubscribeUrl } = await import('../routes/email_infra.ts');
+    if (await isSuppressed(to)) { console.warn(`[email] suppressed — not sending to ${to}`); return false; }
+    const unsubUrl = await unsubscribeUrl(to);
     // BR-1: every email flows through the ONE branded shell (Studio OS default, or
     // the customer's Brand Kit when the caller passes it). No second email engine.
     const wrapped = brandEmailShell(html, brand || EMAIL_BRAND_DEFAULT);
@@ -118,13 +124,13 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      // List-Unsubscribe: one-click opt-out header (Gmail/Yahoo bulk-sender rules +
-      // CAN-SPAM). A mailto is the honest minimum for a solo studio — no list server
-      // needed; the reply lands with Eric who honors it.
+      // List-Unsubscribe: RFC 8058 one-click HTTPS endpoint (what Gmail/Yahoo
+      // bulk-sender rules actually honor) + mailto fallback. The POST lands on
+      // /unsubscribe which writes the ONE suppression store this send checks.
       body: JSON.stringify({
         from: EMAIL_FROM, to, subject, html: wrapped, text, reply_to: 'eric@davisdigitalstudio.com',
         headers: {
-          'List-Unsubscribe': '<mailto:support@davisdigitalstudio.com?subject=unsubscribe>',
+          'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       }),

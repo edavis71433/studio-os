@@ -43,7 +43,7 @@ ok('abandon threshold is generous (15 min)', ABANDON_MS === 15 * 60_000);
   ok('wiring: handlePublishHistory reuses the shared reconcileSitePublishes', /reconcileSitePublishes\(site\.id\)/.test(pub) && !/deployState\(p\.netlify_deploy_id\)/.test(pub));
 
   const sys = read('supabase/functions/presence/routes/system.ts');
-  ok('wiring: reconcile runs on the default cron cycle (no owner cron change)', /const reconcile = await runReconcileStuckPublishes\(/.test(sys));
+  ok('wiring: reconcile runs on the default cron cycle (no owner cron change)', /const reconcile = await step\('reconcile', \(\) => runReconcileStuckPublishes\(/.test(sys));
   ok('wiring: reconcile also has a dedicated task', /task === 'reconcile'/.test(sys));
 
   const net = read('supabase/functions/presence/lib/netlify.ts');

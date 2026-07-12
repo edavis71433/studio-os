@@ -238,6 +238,18 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     return json({ data: { enabled: pushConfigured(), key: pushConfigured() ? (Deno.env.get('VAPID_PUBLIC_KEY') || '') : '' } }, 200, cors);
   }
 
+  // Email infrastructure (public by design): the one-click unsubscribe a
+  // recipient reaches from any email (no account needed — token-authenticated),
+  // and the Resend bounce/complaint webhook (svix-signed, gated on its secret).
+  if (route === '/unsubscribe' && (method === 'GET' || method === 'POST')) {
+    const { handleUnsubscribe } = await import('./routes/email_infra.ts');
+    return handleUnsubscribe(req, method);
+  }
+  if (route === '/email/events' && method === 'POST') {
+    const { handleResendEvents } = await import('./routes/email_infra.ts');
+    return handleResendEvents(req);
+  }
+
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
     return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
   }
@@ -356,7 +368,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const needed = featureForRoute(route, method);
     if (needed) {
-      const edition = await loadEdition(site.client_id, site.edition);
+      const edition = await loadEdition(principal, site.client_id, site.edition);
       const denial = requireFeature(edition, needed, cors);
       if (denial) return denial;
     }

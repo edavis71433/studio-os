@@ -23,7 +23,7 @@ ok('ceiling: brand/guardian likewise gates only the paid tier', /ceilingClear = 
 ok('ceiling: concierge polish is skipped over ceiling (optional paid enhancement)', /if \(meter && !\(await checkAiCeiling\(meter\.clientId\)\)\.allowed\) return \{ text, polished: false \}/.test(polish));
 
 // ── reconcile grace-clock fix: don't lapse a recovered paying customer ──
-ok('reconcile: selects grace_until', /select=client_id,status,plan,current_period_end,cancel_at_period_end,grace_until,stripe_subscription_id/.test(sync));
+ok('reconcile: selects grace_until', /client_id,status,plan,current_period_end,cancel_at_period_end,grace_until,stripe_subscription_id/.test(sync));
 ok('reconcile: driftsFrom compares grace PRESENCE (clears a stale anchor on recovery)', /graceState = /.test(sync) && /graceState\(stored\.grace_until\) !== graceState\(patch\.grace_until\)\) diffs\.push\('grace_until'\)/.test(sync));
 
 // ── deletion executor: stop billing BEFORE revoking access ──

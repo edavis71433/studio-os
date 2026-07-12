@@ -13,13 +13,15 @@ const stripe = read('supabase/functions/presence/commerce/stripe.ts');
 const mig = read('supabase/migrations/0082_account_deletion.sql');
 
 // executor completes the lifecycle (not just a write-only request)
-ok('executor: exists + wired into the cron (task=deletion + default cycle)', /export async function runDeletionSweep/.test(del) && /task === 'deletion'.*runDeletionSweep/.test(system) && /const deletion = await runDeletionSweep\(25\)/.test(system));
+ok('executor: exists + wired into the cron (task=deletion + default cycle)', /export async function runDeletionSweep/.test(del) && /task === 'deletion'.*runDeletionSweep/.test(system) && /const deletion = await step\('deletion', \(\) => runDeletionSweep\(25\)\)/.test(system));
 ok('executor: atomic claim (pending → executing, guarded) so two ticks can’t double-run', /status=eq\.pending&select=id`, \{ method: 'PATCH'[\s\S]*?status: 'executing'/.test(del));
 ok('executor: revokes access (entitlement status → deleted)', /product=eq\.presence[\s\S]*?status: 'deleted'/.test(del));
 ok('executor: cancels Stripe billing (keeps customer + invoices)', /cancelSubscription\(ent\.stripe_subscription_id\)/.test(del) && /export async function cancelSubscription/.test(stripe));
 ok('executor: takes the hosted site down + soft-deletes the workspace (staged, recoverable)', /deleteSite\(s\.netlify_site_id\)/.test(del) && /status: 'deleting'/.test(del));
 ok('executor: anonymizes customer PII', /name: 'Deleted account', email: `deleted-\$\{clientId\}@deleted\.invalid`/.test(del));
-ok('executor: RETAINS financial evidence (only PATCH/anonymize — no hard DELETE of any row)', !del.includes("method: 'DELETE'") && /status: 'deleted'/.test(del) && /status: 'deleting'/.test(del));
+// The ONE allowed DELETE is the GoTrue admin auth-user delete (privacy requires
+// the LOGIN to actually die); no REST-table row is ever hard-deleted.
+ok('executor: RETAINS financial evidence (no hard DELETE of any table row; auth-user delete only)', (del.match(/method: 'DELETE'/g) || []).length === 1 && /auth\/v1\/admin\/users\/\$\{u\.id\}`, \{ method: 'DELETE'/.test(del) && /status: 'deleted'/.test(del) && /status: 'deleting'/.test(del));
 ok('executor: a failed run is retryable (status back to pending + error recorded)', /status: 'pending', error: res\.error/.test(del));
 ok('executor: cross-tenant safe (every op scoped to the row’s client_id)', (del.match(/client_id=eq\.\$\{enc\(clientId\)\}/g) || []).length >= 3);
 

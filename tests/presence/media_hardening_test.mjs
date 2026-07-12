@@ -108,7 +108,7 @@ ok('short: truncated JPEG (2 bytes) declared image/jpeg → REJECTED', magicMatc
   ok('delete-guard: logo/og/cover/block references block the delete with a named reason', /logo_media_id === mediaId/.test(media) && /your logo/.test(media) && /a section on your website/.test(media));
 
   const sys = read('supabase/functions/presence/routes/system.ts');
-  ok('wiring: media GC runs on the default cron cycle (no owner cron change)', /const media_gc = await reapMedia\(/.test(sys));
+  ok('wiring: media GC runs on the default cron cycle (no owner cron change)', /const media_gc = await step\('media_gc', \(\) => reapMedia\(/.test(sys));
   ok('wiring: media GC also has a dedicated task', /task === 'media_gc'/.test(sys));
 
   // ONE store / no second pipeline: variants still come from the render transform (EXIF-safe output path)

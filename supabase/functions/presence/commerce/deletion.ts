@@ -58,8 +58,34 @@ async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
       if (s.netlify_site_id) await deleteSite(s.netlify_site_id).catch(() => {});
       await svc(`presence_sites?id=eq.${s.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'deleting', netlify_site_id: null, custom_domain: null }) }).catch(() => {});
     }
-    // 4) anonymize the customer PII (retain the row so entitlement/payment FKs survive for tax/audit)
+    // 4) DELETE THE AUTH USER — without this the login (and its email/last-IP
+    //    metadata) survived "deletion". Runs BEFORE anonymization: a failure here
+    //    retries with the lookup email intact (after anonymizing, the user would
+    //    be unfindable and orphaned forever). GoTrue admin API; 404 = already done.
+    const before = rows(await svc(`clients?id=eq.${enc(clientId)}&select=email,contact_email&limit=1`))[0] || {};
+    for (const em of [before.email].filter((e: string) => e && !e.endsWith('@deleted.invalid'))) {
+      try {
+        const SB = Deno.env.get('SUPABASE_URL') || '';
+        const KEY = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        const uq = await fetch(`${SB}/auth/v1/admin/users?page=1&per_page=10&filter=${enc(em)}`, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+        const users = (await uq.json())?.users || [];
+        const u = users.find((x: any) => String(x.email || '').toLowerCase() === String(em).toLowerCase());
+        if (u?.id) {
+          const del = await fetch(`${SB}/auth/v1/admin/users/${u.id}`, { method: 'DELETE', headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+          if (!del.ok && del.status !== 404) return { ok: false, error: `auth_delete: ${del.status}` };
+        }
+      } catch (e) { return { ok: false, error: `auth_delete: ${String((e as Error)?.message || e)}` }; }
+    }
+    // 5) anonymize the customer PII (retain the row so entitlement/payment FKs survive for tax/audit)
     await svc(`clients?id=eq.${enc(clientId)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, contact_email: null, status: 'deleted' }) }).catch(() => {});
+    // 6) anonymize the CRM traces that carry the person's PII outside the client
+    //    row (contacts + signups keyed by email) — retention there has no
+    //    business basis once the account is deleted.
+    for (const em of [before.email, before.contact_email].filter(Boolean).map((e: string) => e.trim().toLowerCase())) {
+      if (em.endsWith('@deleted.invalid')) continue;
+      await svc(`contacts?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, phone: null, owner_notes: '' }) }).catch(() => {});
+      await svc(`presence_signups?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }).catch(() => {});
+    }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: String((e as Error)?.message || e) };

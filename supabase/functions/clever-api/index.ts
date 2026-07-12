@@ -662,7 +662,21 @@ async function sendEmail(to: string, subject: string, html: string, opts?: { fro
     return new Response(JSON.stringify({ error: 'resend_not_configured' }), { status: 500 });
   }
   try {
-    const payload: Record<string, unknown> = { from: (opts && opts.from) || FROM, to: [to], subject, html };
+    // Domain-wide deliverability: honor the SAME suppression store + one-click
+    // unsubscribe as the presence sender (suppressed_emails + /unsubscribe).
+    // One sender ignoring bounces junks the whole domain's reputation.
+    const { isSuppressed, unsubscribeUrl } = await import('../presence/routes/email_infra.ts');
+    if (await isSuppressed(to)) {
+      console.warn('[email] suppressed — not sending to', to, '| subject:', subject);
+      return new Response(JSON.stringify({ error: 'recipient_suppressed' }), { status: 200 });
+    }
+    const payload: Record<string, unknown> = {
+      from: (opts && opts.from) || FROM, to: [to], subject, html,
+      headers: {
+        'List-Unsubscribe': `<${await unsubscribeUrl(to)}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+    };
     if (opts && opts.replyTo) payload.reply_to = opts.replyTo;
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -6948,6 +6962,10 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
       const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1523;white-space:pre-wrap;">${safe}</div>`;
 
       try {
+        // Outreach is the send that MOST needs suppression + unsubscribe: it's
+        // 1:1 prospecting, so a bounced/opted-out address must never be re-mailed.
+        const { isSuppressed, unsubscribeUrl } = await import('../presence/routes/email_infra.ts');
+        if (await isSuppressed(to)) return json({ error: 'recipient_suppressed', detail: 'This address unsubscribed or bounced previously. Nothing was sent.' }, 200, reqCors);
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
@@ -6958,6 +6976,10 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
             subject,
             html,
             text,
+            headers: {
+              'List-Unsubscribe': `<${await unsubscribeUrl(to)}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            },
           }),
         });
         if (!r.ok) {

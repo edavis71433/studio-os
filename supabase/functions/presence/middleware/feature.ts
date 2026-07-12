@@ -18,7 +18,7 @@
 //   • The map MUST agree with lib/navigation.ts buildNav (proven by the test
 //     matrix): a nav-hidden area is server-denied; a nav-shown area is allowed.
 
-import { svc } from '../lib/db.ts';
+import type { Principal } from '../../_shared/auth.ts';
 import { json } from '../../_shared/http.ts';
 import { isPlanKey } from '../commerce/catalog.ts';
 import { editionFromPlan, editionFromSite, editionIncludes, type EditionKey, type EditionFeature } from '../commerce/editions.ts';
@@ -119,13 +119,14 @@ export function requireFeature(edition: EditionKey, feature: EditionFeature, cor
 }
 
 /** Resolve the caller-site's FEATURE edition from its entitlement plan, falling
- *  open to the site's natural edition (never wrongly denies). One svc read; only
- *  called when a route actually requires a feature. */
-export async function loadEdition(clientId: string | null, siteEdition: string): Promise<EditionKey> {
+ *  open to the site's natural edition (never wrongly denies). Uses the shared
+ *  per-request entitlement memo (entitlementFor) — the boundary gate already
+ *  read this row, so this is free on the hot path. */
+export async function loadEdition(principal: Principal, clientId: string | null, siteEdition: string): Promise<EditionKey> {
   if (clientId) {
     try {
-      const r = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(clientId)}&product=eq.presence&select=plan&limit=1`);
-      const p = r.ok && Array.isArray(r.json) && r.json.length ? r.json[0].plan : null;
+      const { entitlementFor } = await import('./entitlement.ts');
+      const p = (await entitlementFor(principal, clientId)).plan;
       if (isPlanKey(p)) return editionFromPlan(p);
     } catch { /* fall through to the site's natural edition */ }
   }

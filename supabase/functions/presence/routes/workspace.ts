@@ -21,7 +21,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
-import { resolveSiteRole, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
+import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
  *  Everything else in the client gate is 403 for a reviewer — so the simplified
@@ -43,7 +43,7 @@ export function reviewerAllowed(route: string, method: string): boolean {
 }
 
 async function requireManager(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ role: SiteRole } | Response> {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   // Managing PEOPLE (members + what clients see) is the 'invite' capability
   // alone. 'configure' is settings power, deliberately NOT people power — a
   // developer can configure the site but must never add members or reshape
@@ -55,7 +55,7 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
 }
 
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
   // agency membership drives the Agency nav section (reviewers never need it)
   let isAgency = false;
@@ -69,8 +69,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   let planKey: string | null = null;
   try {
     if (site.client_id) {
-      const ent = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=plan&limit=1`);
-      const plan = ent.ok && Array.isArray(ent.json) && ent.json[0]?.plan;
+      // shared per-request memo — the boundary gate already read this row
+      const { entitlementFor } = await import('../middleware/entitlement.ts');
+      const plan = (await entitlementFor(principal, site.client_id)).plan;
       if (plan) { planKey = String(plan); editionKey = editionFromPlan(planKey); }
     }
   } catch { /* keep the fallback edition */ }
@@ -189,7 +190,7 @@ export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html'
  *  Business Moments, the site's publish status, and the plans awaiting their OK.
  *  Computed server-side with the visibility model, so it can never over-expose. */
 export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const shares = await loadShares(site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
   const [momQ, pubQ, infraQ, writeQ, noticeQ, fileQ] = await Promise.all([

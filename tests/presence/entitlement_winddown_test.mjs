@@ -29,7 +29,7 @@ ok('winddown: NO hard delete of workspace/content (export + resubscribe survive)
 ok('winddown: counted + surfaced in the sweep result (observable)', /wound_down\+\+/.test(life) && /wound_down: number/.test(life) && /return \{ expired_trials: expired, notices, emails, wound_down/.test(life));
 
 // ── wiring: the sweep runs every cron tick (owner scheduler) ──
-ok('wiring: runLifecycleSweep is in the default cron cycle', /const lifecycle = await runLifecycleSweep\(limit\)/.test(system) && /lifecycle,/.test(system));
+ok('wiring: runLifecycleSweep is in the default cron cycle', /const lifecycle = await step\('lifecycle', \(\) => runLifecycleSweep\(limit\)\)/.test(system) && /lifecycle,/.test(system));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E W3 LAPSE GATE + WIND-DOWN (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

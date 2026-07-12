@@ -72,7 +72,7 @@ step(28, 'AI usage is metered + a HARD ceiling blocks before provider spend', /e
 
 // ── DELETION ──
 step(29, 'Deletion: request → cooling-off → executor (revoke/cancel/takedown/anonymize)', /export async function requestDeletion/.test(deletion) && /export async function runDeletionSweep/.test(deletion) && /status: 'deleted'/.test(deletion) && /cancelSubscription\(ent\.stripe_subscription_id\)/.test(deletion));
-step(30, 'Deletion RETAINS financial evidence (no hard DELETE of any row)', !deletion.includes("method: 'DELETE'"));
+step(30, 'Deletion RETAINS financial evidence (no table-row hard DELETE; the one DELETE is the GoTrue auth-user)', (deletion.match(/method: 'DELETE'/g) || []).length === 1 && deletion.includes('auth/v1/admin/users'));
 
 // ── billing surfaces authoritative + SaaS vs service distinct ──
 const saasVsService = /billing_type: 'saas'/.test(commerce) && /billing_type: 'service'/.test(client);

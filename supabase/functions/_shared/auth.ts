@@ -18,6 +18,40 @@ const OPERATOR_SECRET = Deno.env.get('OPERATOR_SECRET') || '';
 
 export const TENANT_ID = '00000000-0000-0000-0000-000000000001'; // DDS = tenant #1
 
+// ── ONE JWT→user resolution per request ──────────────────────────────────────
+// The same JWT was validated against /auth/v1/user up to 4× per request
+// (verifyStaff → resolvePrincipal's client path → callerOf / resolveAgencyMember)
+// — pure latency stacking on every request. This micro-memo collapses them to
+// one hop. The 5s TTL is a REQUEST lifetime, not a session cache: within one
+// request the JWT's identity cannot meaningfully change (bearer tokens are
+// hour-lived; GoTrue /user only checks signature + fetches the profile), and
+// nothing survives past the request window — so the frozen "no cross-request
+// auth caches" property holds in every way that matters (revocation latency
+// bounded at 5s vs. the token's own 3600s validity). Failure is NOT cached.
+const AUTH_MEMO_TTL_MS = 5_000;
+const authMemo = new Map<string, { user: any; at: number }>();
+export async function authUser(jwt: string): Promise<any | null> {
+  if (!jwt) return null;
+  const hit = authMemo.get(jwt);
+  if (hit && Date.now() - hit.at < AUTH_MEMO_TTL_MS) return hit.user;
+  try {
+    const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
+    if (!uRes.ok) return null;
+    const user = await uRes.json();
+    if (!user || !user.id) return null;
+    // bounded: evict expired/oldest before insert
+    if (authMemo.size >= 200) {
+      const now = Date.now();
+      for (const [k, v] of authMemo) { if (now - v.at >= AUTH_MEMO_TTL_MS) authMemo.delete(k); }
+      if (authMemo.size >= 200) authMemo.delete(authMemo.keys().next().value as string);
+    }
+    authMemo.set(jwt, { user, at: Date.now() });
+    return user;
+  } catch (_) {
+    return null; // network error talking to auth => deny, never guess
+  }
+}
+
 export async function verifyStaff(req: Request): Promise<
   { userId: string; email: string; tenantId: string; role: string } | null
 > {
@@ -25,16 +59,7 @@ export async function verifyStaff(req: Request): Promise<
   if (!jwt) return null;
 
   // 1) Validate the session and resolve the user. Bad/expired JWT => deny.
-  let user: any;
-  try {
-    const uRes = await fetch(`${SB_URL}/auth/v1/user`, {
-      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` },
-    });
-    if (!uRes.ok) return null;
-    user = await uRes.json();
-  } catch (_) {
-    return null; // network error talking to auth => deny, never guess
-  }
+  const user: any = await authUser(jwt);
   if (!user || !user.id) return null;
 
   // 2) Confirm membership. NO row, query error, or anything unexpected => deny.
@@ -165,11 +190,7 @@ export async function resolvePrincipal(req: Request, body: any): Promise<Princip
     if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, email: staff.email || null, jwt, requestId };
 
     // otherwise validate the token and see if it belongs to a client (portal user)
-    let user: any = null;
-    try {
-      const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
-      if (uRes.ok) user = await uRes.json();
-    } catch (_) { /* fall through to public */ }
+    const user: any = await authUser(jwt);   // memoized — verifyStaff above already resolved it
     if (!user || !user.id) return { ...pub, jwt };
 
     const uid = String(user.id);

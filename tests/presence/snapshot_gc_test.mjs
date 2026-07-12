@@ -102,7 +102,7 @@ Deno.env.delete('SNAPSHOT_KEEP_RECENT');
   ok('wiring: DELETE is site-scoped (tenant guard)', /presence_snapshots\?site_id=eq\.\$\{siteId\}&id=in\./.test(gc));
 
   const sys = read('supabase/functions/presence/routes/system.ts');
-  ok('wiring: snapshot GC runs on the default cron cycle (reuses existing scheduler — no new one)', /const snapshot_gc = await reapSnapshots\(/.test(sys));
+  ok('wiring: snapshot GC runs on the default cron cycle (reuses existing scheduler — no new one)', /const snapshot_gc = await step\('snapshot_gc', \(\) => reapSnapshots\(/.test(sys));
   ok('wiring: snapshot GC also has a dedicated task', /task === 'snapshot_gc'/.test(sys));
 }
 

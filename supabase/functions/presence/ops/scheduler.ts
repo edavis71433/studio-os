@@ -33,13 +33,25 @@ export interface CycleResult {
 
 // Active sites = serviceable ones: status ready/live, backed by an active
 // entitlement. (Monitor sites qualify — observation is their whole point.)
+//
+// FAIRNESS (0091): ordered by the last_observed_at rotation cursor (nulls
+// first), and every site CONSIDERED gets the cursor stamped — a true
+// round-robin, so no site starves however many exist. updated_at ordering was
+// wrong here: nothing in the cycle bumps it, so the same window repeated
+// forever. Falls back to the old ordering until 0091 is applied.
 async function activeSites(limit: number): Promise<SiteRow[]> {
   const er = await svc('presence_entitlements?product=eq.presence&status=eq.active&select=client_id');
   const activeClients = new Set((er.ok && Array.isArray(er.json) ? er.json : []).map((r: any) => String(r.client_id)));
   if (!activeClients.size) return [];
-  const sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);
-  const sites = (sr.ok && Array.isArray(sr.json) ? sr.json : []).filter((s: any) => activeClients.has(String(s.client_id)));
-  return sites.slice(0, limit) as SiteRow[];
+  let sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
+  if (!sr.ok) sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);
+  const sites = (sr.ok && Array.isArray(sr.json) ? sr.json : []).filter((s: any) => activeClients.has(String(s.client_id))).slice(0, limit) as SiteRow[];
+  if (sites.length) {
+    await svc(`presence_sites?id=in.(${sites.map((s) => s.id).join(',')})`, {
+      method: 'PATCH', body: JSON.stringify({ last_observed_at: new Date().toISOString() }),
+    }).catch(() => {});
+  }
+  return sites;
 }
 
 // ── FD-1: fire due scheduled publishes/reverts through the ONE publish pipeline.
@@ -53,8 +65,10 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const results: SiteRunResult[] = [];
   const sysPrincipal: Principal = { kind: 'system', userId: 'scheduler', tenantId: null, role: null, email: null, jwt: null, requestId: 'scheduled-publish' };
   for (const row of rows) {
-    // claim it (pending → running-ish) so a concurrent cycle can't double-fire
-    const claim = await svc(`presence_scheduled_publishes?id=eq.${row.id}&status=eq.pending`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ fired_at: nowIso }) });
+    // claim it (pending → running-ish) so a concurrent cycle can't double-fire.
+    // fired_at=is.null makes the claim ATOMIC: two overlapping ticks both match
+    // status=pending, but only the first PATCH finds fired_at still null.
+    const claim = await svc(`presence_scheduled_publishes?id=eq.${row.id}&status=eq.pending&fired_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ fired_at: nowIso }) });
     if (!claim.ok || !claim.json?.[0]) continue;   // someone else took it
     let ok = false, err = '';
     try {

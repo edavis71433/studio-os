@@ -54,12 +54,9 @@ export const can = (role: AgencyRole, cap: Capability): boolean => (CAPS[role] |
 /** Resolve an authenticated JWT to an active agency membership. Fail-closed. */
 export async function resolveAgencyMember(jwt: string): Promise<AgencyMember | null> {
   if (!jwt) return null;
-  let user: { id?: string; email?: string } | null = null;
-  try {
-    const r = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
-    if (!r.ok) return null;
-    user = await r.json();
-  } catch { return null; }
+  // shared memoized resolver — the auth boundary already validated this JWT
+  const { authUser } = await import('../../_shared/auth.ts');
+  const user: { id?: string; email?: string } | null = await authUser(jwt);
   if (!user?.id) return null;
   const email = (user.email || '').toLowerCase();
   const m = await svc(`presence_agency_members?status=eq.active&or=(user_id.eq.${user.id},email.eq.${encodeURIComponent(email)})&select=id,agency_id,email,role&limit=1`);
