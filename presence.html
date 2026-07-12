@@ -1577,7 +1577,7 @@ async function openFoundationsDesk() {
   if (window.ddsHint) setTimeout(() => window.ddsHint("foundations", "The technical side — domain, email, security — is handled with plans you approve. Nothing changes on its own."), 400);
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
   $("deskTitle").textContent = "The technical side, handled";
-  $("deskSub").textContent = "Domain, DNS, security certificate, email protection, hosting — what’s true right now, in plain words. Any change arrives as a plan you approve first.";
+  $("deskSub").textContent = "Your domain, its records, the padlock, email, and hosting — what’s true right now, in plain words. Any change arrives as a plan you approve first.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
   $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading the foundations…</div><div class="shimmer"></div></div>`;
   $("deskGo").hidden = true;
@@ -1738,16 +1738,19 @@ function renderFoundations(f, plans, launch, dom) {
       const card = el("div", "deskopt");
       card.appendChild(el("div", "dol", p.status === "approved" ? "approved — being handled" : "your decision"));
       card.appendChild(el("div", "dop", p.title));
-      const sum = el("p", "aihint", p.summary + " Risk: " + p.risk); sum.style.marginTop = "6px";
+      const riskWord = p.risk === "low" ? "Safe to approve — easily undone." : p.risk === "medium" ? "Worth a careful look before approving." : p.risk === "high" ? "Bigger change — read the steps first." : "";
+      const sum = el("p", "aihint", p.summary + (riskWord ? " " + riskWord : "")); sum.style.marginTop = "6px";
       card.appendChild(sum);
       (p.steps || []).forEach((s) => {
-        const st = el("p", "aihint", (s.automated ? "handled for you: " : "one small step for you: ") + s.what);
+        const st = el("p", "aihint", (s.automated ? "Handled for you: " : "One small step for you: ") + s.what);
         st.style.marginTop = "4px";
         card.appendChild(st);
         (s.records || []).forEach((r) => {
-          const rec = el("p", "aihint", `　${r.type} record · ${r.name} → ${r.value}`);
-          rec.style.marginTop = "2px";
-          card.appendChild(rec);
+          // same copy-friendly record row as the domain wizard — no hand-typing DNS values
+          const row = el("div"); row.style.cssText = "display:flex;gap:8px;align-items:center;margin:4px 0 0 14px;flex-wrap:wrap";
+          const code = el("span", null, `${r.type}   ${r.name}   →   ${r.value}`); code.style.cssText = "font:12.5px/1.4 ui-monospace,monospace;background:var(--soft-bg,#f4f2ef);color:var(--ink,#1b1525);padding:5px 9px;border-radius:6px;word-break:break-all";
+          const cp = el("button", "textact", "Copy"); cp.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(String(r.value)).then(() => toast("Copied")).catch(() => {}); });
+          row.appendChild(code); row.appendChild(cp); card.appendChild(row);
         });
       });
       if (p.status === "proposed") {
