@@ -113,10 +113,12 @@ export function validateSecrets() {
 
 function authorized(req: Request, body: any): boolean {
   if (!SCHEDULER_SECRET) return false;
+  // FD-AUD16: body or header ONLY — never the query string (query strings land in
+  // edge/proxy access logs, and this secret is high-value). The pg_cron job passes
+  // it in the body, so nothing legitimate used the query path.
   const fromBody = body && typeof body.secret === 'string' ? body.secret : '';
   const fromHeader = req.headers.get('x-system-secret') || '';
-  const fromQuery = (() => { try { return new URL(req.url).searchParams.get('secret') || ''; } catch { return ''; } })();
-  return fromBody === SCHEDULER_SECRET || fromHeader === SCHEDULER_SECRET || fromQuery === SCHEDULER_SECRET;
+  return fromBody === SCHEDULER_SECRET || fromHeader === SCHEDULER_SECRET;
 }
 
 async function health(): Promise<any> {

@@ -73,7 +73,7 @@ async function advanceStage(siteId: string, dealId: string, to: Stage, from: Sta
 export async function handleSalesContacts(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
     const u = new URL(req.url);
-    const q = clean(u.searchParams.get('q'), 80);
+    const q = clean(u.searchParams.get('q'), 80).replace(/[(),*"\\]/g, ' ').trim();   // L2: neutralize PostgREST filter grammar
     const limit = clampLimit(u.searchParams.get('limit'));
     const offset = Math.max(0, Math.trunc(Number(u.searchParams.get('offset'))) || 0);
     let path = `presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,email,phone,company,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
@@ -105,7 +105,7 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
   if (req.method === 'GET') {
     const u = new URL(req.url);
     const stage = u.searchParams.get('stage');
-    const q = clean(u.searchParams.get('q'), 80);
+    const q = clean(u.searchParams.get('q'), 80).replace(/[(),*"\\]/g, ' ').trim();   // L2: neutralize PostgREST filter grammar
     const limit = clampLimit(u.searchParams.get('limit'));
     const offset = Math.max(0, Math.trunc(Number(u.searchParams.get('offset'))) || 0);
     let path = `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;

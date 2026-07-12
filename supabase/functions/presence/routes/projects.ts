@@ -79,7 +79,7 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
   if (req.method === 'GET') {
     const u = new URL(req.url);
     const status = u.searchParams.get('status');
-    const q = clean(u.searchParams.get('q'), 80);
+    const q = clean(u.searchParams.get('q'), 80).replace(/[(),*"\\]/g, ' ').trim();   // L2: neutralize PostgREST filter grammar
     const limit = clampLimit(u.searchParams.get('limit'));
     const offset = clampOffset(u.searchParams.get('offset'));
     let path = `presence_projects?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status,client_visible,client_id,deal_id,owner_user_id,start_date,target_date,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
