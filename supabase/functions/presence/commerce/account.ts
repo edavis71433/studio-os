@@ -108,6 +108,13 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     // BR-1: every email flows through the ONE branded shell (Studio OS default, or
     // the customer's Brand Kit when the caller passes it). No second email engine.
     const wrapped = brandEmailShell(html, brand || EMAIL_BRAND_DEFAULT);
+    // A plain-text alternative improves deliverability (spam-scoring) and serves
+    // text-only clients — derived from the body HTML (tags stripped, entities decoded).
+    const text = String(html || '')
+      .replace(/<\s*(br|\/p|\/div|\/tr|\/h[1-6])\s*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/\n{3,}/g, '\n\n').trim();
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
@@ -115,13 +122,15 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       // CAN-SPAM). A mailto is the honest minimum for a solo studio — no list server
       // needed; the reply lands with Eric who honors it.
       body: JSON.stringify({
-        from: EMAIL_FROM, to, subject, html: wrapped, reply_to: 'eric@davisdigitalstudio.com',
+        from: EMAIL_FROM, to, subject, html: wrapped, text, reply_to: 'eric@davisdigitalstudio.com',
         headers: {
           'List-Unsubscribe': '<mailto:support@davisdigitalstudio.com?subject=unsubscribe>',
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       }),
     });
+    // Log failures (mirrors clever-api) so a Resend outage isn't invisible.
+    if (!r.ok) { try { console.error(`[email] Resend ${r.status} to ${to}: ${(await r.text()).slice(0, 300)}`); } catch { /* */ } }
     return r.ok;
-  } catch { return false; }
+  } catch (e) { console.error(`[email] send threw for ${to}: ${String((e as Error)?.message || e)}`); return false; }
 }

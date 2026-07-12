@@ -1,3 +1,21 @@
+# ── SECURITY: never serve source, docs, tests, or artifacts from the site root ──
+# Forced (!) so they win even though the files physically exist in the publish dir.
+/supabase/*        /404.html   404!
+/tests/*           /404.html   404!
+/sql/*             /404.html   404!
+/docs/*            /404.html   404!
+/memory/*          /404.html   404!
+/scripts/*         /404.html   404!
+/_internal/*       /404.html   404!
+/_stale/*          /404.html   404!
+/.github/*         /404.html   404!
+/*.zip             /404.html   404!
+/*.diff            /404.html   404!
+/*.yml             /404.html   404!
+/*.md              /404.html   404!
+/package.json      /404.html   404!
+/deno.json         /404.html   404!
+
 # Free Site Review maps to the real diagnostic tool specifically
 # (matches the nav label "Free site review" -> audit.html)
 /free-site-review  /audit              301

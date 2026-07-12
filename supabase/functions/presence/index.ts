@@ -87,7 +87,29 @@ function routeOf(url: string): string {
 serve(async (req) => {
   const cors = corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  try {
+    return await route_(req, cors);
+  } catch (e) {
+    // OBSERVABILITY: a request-path exception must land somewhere a human looks,
+    // not just an ephemeral edge log. Best-effort ledger write; always returns a
+    // clean 500 (never leaks a stack to the caller).
+    const msg = String((e as Error)?.stack || (e as Error)?.message || e).slice(0, 800);
+    try {
+      const SB = Deno.env.get('SUPABASE_URL') || '';
+      const KEY = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      if (SB && KEY) {
+        await fetch(`${SB}/rest/v1/ops_errors`, {
+          method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ kind: `presence:${req.method} ${routeOf(req.url)}`, detail: msg }),
+        });
+      }
+    } catch { /* the ledger write is itself best-effort */ }
+    console.error(`[presence] unhandled: ${msg}`);
+    return json({ error: 'server_error', message: 'Something went wrong on our side — please try again in a moment.' }, 500, cors);
+  }
+});
 
+async function route_(req: Request, cors: Record<string, string>): Promise<Response> {
   const route = routeOf(req.url);
   const method = req.method.toUpperCase();
 
@@ -208,10 +230,28 @@ serve(async (req) => {
     if (ov && method === 'GET') return handleEnterpriseOverview(ov[1], principal, cors);
   }
 
+  // Web Push: the VAPID public key is public by design (the browser needs it to
+  // subscribe). Served before the auth gate so the enable-notifications prompt
+  // can read it without a round-trip through context.
+  if (route === '/push/key' && method === 'GET') {
+    const { pushConfigured } = await import('./lib/webpush.ts');
+    return json({ data: { enabled: pushConfigured(), key: pushConfigured() ? (Deno.env.get('VAPID_PUBLIC_KEY') || '') : '' } }, 200, cors);
+  }
+
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
     return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
   }
   const jwt = principal.jwt || '';
+
+  // Web Push subscribe/unsubscribe — authed; stores the caller's browser endpoint.
+  if (route === '/push/subscribe' && method === 'POST') {
+    const { handlePushSubscribe } = await import('./routes/push.ts');
+    return handlePushSubscribe(req, principal, cors);
+  }
+  if (route === '/push/unsubscribe' && method === 'POST') {
+    const { handlePushUnsubscribe } = await import('./routes/push.ts');
+    return handlePushUnsubscribe(req, principal, cors);
+  }
 
   // ── ADMIN routes (M6): staff-only, operate on any site by id, sit BEFORE
   //    the caller-site resolution (staff own no site). Entitlement never
@@ -737,4 +777,4 @@ serve(async (req) => {
   }
 
   return json({ error: 'not_found', message: `No route for ${method} ${route}.` }, 404, cors);
-});
+}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v13'; // bumped: studio door + every app/token page excluded from cache-first — a stale signing page is a correctness bug
+const CACHE_NAME = 'dds-v14'; // bumped: studio door + every app/token page excluded from cache-first — a stale signing page is a correctness bug
 const PRECACHE = [
   '/about',
   '/services',
@@ -100,6 +100,37 @@ self.addEventListener('fetch', function(e) {
         return response;
       });
       return cached || networkFetch;
+    })
+  );
+});
+
+// ── Web Push (Studio OS notifications) ───────────────────────────────────────
+// Shows a notification when the platform pushes one (a lead waiting, an approval,
+// a payment). Tapping it focuses/open the page that resolves it. Best-effort:
+// if a push arrives without a body, we still show a calm generic notice.
+self.addEventListener('push', function (e) {
+  var data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (_) { try { data = { body: e.data.text() }; } catch (__) { data = {}; } }
+  var title = data.title || 'Studio OS';
+  var opts = {
+    body: data.body || 'Something needs a look.',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || undefined,
+    data: { url: data.url || '/today.html' },
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || '/today.html';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if ('focus' in c) { c.navigate(url); return c.focus(); }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });

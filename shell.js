@@ -279,10 +279,17 @@
       if (sec.items.length > 1) rows += '<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
       sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + '</a>'; });
     });
+    // Notifications toggle (Web Push) — reviewers don't get it (their world is
+    // one calm page). Label reflects current permission/subscription state.
+    if (!isReviewerCtx() && 'serviceWorker' in navigator && 'PushManager' in window) {
+      rows += '<a class="row" href="#" id="dds-notif-toggle">' + (pushOn ? 'Turn off notifications' : 'Turn on notifications') + '</a>';
+    }
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;
     prof.classList.add('open');
+    var nt = document.getElementById('dds-notif-toggle');
+    if (nt) nt.addEventListener('click', function (e) { e.preventDefault(); togglePush(); });
     var so = document.getElementById('dds-signout');
     // Sign out to the RIGHT door: clients back to the client door, everyone else
     // (owners, team, agency) to the Studio OS door.
@@ -291,6 +298,46 @@
   }
   function closeProfile() { if (prof) prof.classList.remove('open'); }
   document.addEventListener('click', function () { closeNotifications(); closeProfile(); });
+
+  // ── Web Push opt-in (notifications when the app is closed) ──────────────────
+  var pushOn = false;
+  function isReviewerCtx() { return CTX && CTX.site_role === 'client_reviewer'; }
+  function urlB64ToU8(s) { var pad = '='.repeat((4 - s.length % 4) % 4); var b = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/')); var u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function refreshPushState() {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.ready) return;
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); })
+      .then(function (s) { pushOn = !!s; }).catch(function () { pushOn = false; });
+  }
+  function togglePush() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription().then(function (existing) {
+        if (existing) {
+          // turn OFF
+          var ep = existing.endpoint;
+          return existing.unsubscribe().then(function () {
+            pushOn = false;
+            return fetch(FN + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN }, body: JSON.stringify({ endpoint: ep }) }).then(function () { window.ddsToast && window.ddsToast('Notifications turned off'); closeProfile(); });
+          });
+        }
+        // turn ON — fetch the VAPID key, request permission, subscribe, save.
+        return fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            var key = j && j.data && j.data.key;
+            if (!j || !j.data || !j.data.enabled || !key) { window.ddsToast && window.ddsToast('Notifications aren’t switched on yet.', 'err'); return; }
+            return Notification.requestPermission().then(function (perm) {
+              if (perm !== 'granted') { window.ddsToast && window.ddsToast('Notifications need permission — allow them in your browser.', 'err'); return; }
+              return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) }).then(function (sub) {
+                var j2 = sub.toJSON();
+                return fetch(FN + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN }, body: JSON.stringify({ endpoint: j2.endpoint, keys: j2.keys }) })
+                  .then(function () { pushOn = true; window.ddsToast && window.ddsToast('Notifications on — we’ll ping you when something needs you.'); closeProfile(); });
+              });
+            });
+          });
+      });
+    }).catch(function () { window.ddsToast && window.ddsToast('Couldn’t change notifications just now.', 'err'); });
+  }
 
   // ── mobile drawer ──
   var drawer;
@@ -330,10 +377,47 @@
   })();
 
   // ── boot ──
+  // Make every signed-in page installable as the "Studio OS" app — inject the
+  // workspace manifest + iOS install meta into <head> centrally (the public site
+  // keeps its own manifest; these tags only exist on shelled pages).
+  function ensureInstallable() {
+    try {
+      var head = document.head; if (!head) return;
+      if (!head.querySelector('link[rel="manifest"][href="/manifest-app.json"]')) {
+        // replace any existing (public-site) manifest link so the app identity wins
+        var old = head.querySelector('link[rel="manifest"]'); if (old) old.remove();
+        var m = document.createElement('link'); m.rel = 'manifest'; m.href = '/manifest-app.json'; head.appendChild(m);
+      }
+      var add = function (sel, make) { if (!head.querySelector(sel)) head.appendChild(make()); };
+      add('link[rel="apple-touch-icon"]', function () { var l = document.createElement('link'); l.rel = 'apple-touch-icon'; l.href = '/icon-192.png'; return l; });
+      add('meta[name="apple-mobile-web-app-capable"]', function () { var t = document.createElement('meta'); t.name = 'apple-mobile-web-app-capable'; t.content = 'yes'; return t; });
+      add('meta[name="apple-mobile-web-app-title"]', function () { var t = document.createElement('meta'); t.name = 'apple-mobile-web-app-title'; t.content = 'Studio OS'; return t; });
+      add('meta[name="mobile-web-app-capable"]', function () { var t = document.createElement('meta'); t.name = 'mobile-web-app-capable'; t.content = 'yes'; return t; });
+      if (!head.querySelector('meta[name="theme-color"]')) { var tc = document.createElement('meta'); tc.name = 'theme-color'; tc.content = '#5b3fa0'; head.appendChild(tc); }
+    } catch (_) { /* best-effort */ }
+  }
+
   function mountFrame() {
+    ensureInstallable();
     root = document.getElementById('dds-shell');
     if (!root) { root = document.createElement('div'); root.id = 'dds-shell'; document.body.insertBefore(root, document.body.firstChild); }
     document.documentElement.classList.add('dds-has-shell');
+    // A11y (central): give EVERY shelled page a skip link + a main landmark
+    // without editing each one. The page's primary container is #main on most
+    // pages; fall back to .wrap or a real <main>. role=main is the ARIA landmark
+    // screen-reader users jump to; the skip link is the first focusable element.
+    try {
+      var mainEl = document.getElementById('main') || document.querySelector('main') || document.querySelector('.wrap');
+      if (mainEl) {
+        if (mainEl.tagName !== 'MAIN' && !mainEl.getAttribute('role')) mainEl.setAttribute('role', 'main');
+        if (!mainEl.id) mainEl.id = 'dds-main-target';
+        if (!mainEl.hasAttribute('tabindex')) mainEl.setAttribute('tabindex', '-1');
+        if (!document.getElementById('dds-skip')) {
+          var skip = el('<a id="dds-skip" href="#' + mainEl.id + '" class="dds-skip">Skip to content</a>');
+          document.body.insertBefore(skip, document.body.firstChild);
+        }
+      }
+    } catch (_) { /* a11y enhancement is best-effort */ }
   }
   function minimalShell() {
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
@@ -433,6 +517,13 @@
       }).catch(minimalShell);
     });
   }
+  // Register the service worker on app pages too — this is what makes the
+  // workspace installable (manifest + SW) and enables push. sw.js already
+  // excludes every app/token page from stale caching, so registration is safe.
+  if ('serviceWorker' in navigator) {
+    try { navigator.serviceWorker.register('/sw.js').then(function () { refreshPushState(); }).catch(function () {}); } catch (_) { /* */ }
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 

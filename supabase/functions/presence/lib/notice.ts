@@ -29,7 +29,17 @@ export async function raiseNotice(n: NoticeInput): Promise<boolean> {
         headline: n.headline.slice(0, 200), body: n.body.slice(0, 1000), status: 'active',
       }),
     });
-    return ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
+    const created = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
+    // A NEW notice also pushes to the owner's device (best-effort, gated on VAPID
+    // keys). Only on first creation so a re-raise never re-pushes.
+    if (created) {
+      try {
+        const { pushToSite } = await import('../routes/push.ts');
+        const href = (await import('../routes/workspace.ts')).noticeHref(n.kind);
+        pushToSite(n.siteId, { title: n.headline.slice(0, 80), body: n.body.slice(0, 140), url: href, tag: `notice:${n.kind}` }).catch(() => {});
+      } catch { /* push is best-effort */ }
+    }
+    return created;
   } catch (e) {
     console.error(`[notice] failed to raise ${n.kind} for ${n.clientId}: ${String((e as Error)?.message || e)} (non-fatal)`);
     return false;

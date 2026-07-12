@@ -165,16 +165,14 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
 /* ── A11y global fixes (WCAG 2.1 AA), applied from the ONE shared stylesheet ──
    1) Dark-mode primary buttons: pages fill them with the light accent (#b79ceb)
       and white text = 2.34:1 (fail). The light accent + DARK ink = 7.6:1 (pass).
-      Explicit-toggle blocks win in both directions so a forced theme is correct. */
+      Explicit-toggle blocks win in both directions so a forced theme is correct.
+      NOTE: `button.approve` only — a BARE `.approve` also matches non-button cards
+      (.card.approve, .item.approve) and would blacken their titles in dark mode. */
 @media (prefers-color-scheme:dark){
-  .btn.primary,button.primary,.primary,.approve,button.approve,.form-submit-btn,.btn-review{
-    color:#171320 !important;
-  }
+  .btn.primary,button.primary,button.approve,.form-submit-btn,.btn-review{ color:#171320 !important; }
 }
 :root[data-theme="dark"] .btn.primary,
 :root[data-theme="dark"] button.primary,
-:root[data-theme="dark"] .primary,
-:root[data-theme="dark"] .approve,
 :root[data-theme="dark"] button.approve,
 :root[data-theme="dark"] .form-submit-btn,
 :root[data-theme="dark"] .btn-review{ color:#171320 !important; }
@@ -182,13 +180,41 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
    deep-plum light-mode button */
 :root[data-theme="light"] .btn.primary,
 :root[data-theme="light"] button.primary,
-:root[data-theme="light"] .primary,
-:root[data-theme="light"] .approve,
 :root[data-theme="light"] button.approve,
-:root[data-theme="light"] .form-submit-btn{ color:#fff !important; }
+:root[data-theme="light"] .form-submit-btn,
+:root[data-theme="light"] .btn-review{ color:#fff !important; }
 
 /* 2) iOS focus-zoom: any sub-16px form control zooms the page on focus. Floor
       every control to 16px on phones — cross-cutting, zero-risk. */
 @media (max-width:760px){
   input:not([type=checkbox]):not([type=radio]),textarea,select{ font-size:16px !important; }
 }
+
+/* 3) Forced-dark token completion (WCAG 1.4.3): many pages' [data-theme=dark]
+      blocks omit surface tokens they set in their media-dark block, so a forced
+      dark theme yields ~1:1 status banners. The palette is unified, so ONE block
+      backfills the defaults; pages that already set these override via their own
+      later inline blocks. Covers client/help/projects/sharing/crm/inbox/pipeline/
+      contacts/get-started/leads/schedule/agency/developer. */
+:root[data-theme="dark"]{
+  --good:#8bbf9f; --good-soft:#1f2a24; --warn:#d3ac6e; --warn-soft:#2a2316;
+  --faint:#948bad; --p-soft:#241d38; --bad:#e08b83; --danger:#e08b83;
+}
+
+/* 4) Minimum touch target (WCAG 2.5.8) on phones — one central floor kills the
+      ~26–32px offenders across pages. Excludes the shell's own 34px chrome icons. */
+@media (max-width:760px){
+  .btn,a.btn,a.act,a.reply,.chip,button.pri,[role="button"]:not(.dds-ic):not(.dds-burger){ min-height:44px; }
+}
+
+/* 5) Page-local toasts sit behind the mobile bar; lift them centrally (shell.css
+      loads only on app pages, so this is scoped to the app). */
+@media (max-width:760px){
+  .toast{ bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important; }
+}
+
+/* Skip link (shell-injected) — visually hidden until focused */
+.dds-skip{position:fixed;top:-60px;left:8px;z-index:2147483003;background:var(--dds-p);color:#fff;
+  padding:10px 16px;border-radius:0 0 10px 10px;font:600 14px/1 var(--dds-sans);text-decoration:none;transition:top .12s}
+.dds-skip:focus{top:0;outline:2px solid #fff;outline-offset:-4px}
+@media (prefers-reduced-motion:reduce){.dds-skip{transition:none}}
