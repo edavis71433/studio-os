@@ -140,7 +140,7 @@ async function openProject(id){
   if(s&&s.progress&&s.milestones) html+=`<div class="status"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${(s.open_client_actions||0)} action${s.open_client_actions===1?'':'s'} for you</div>`;
   // approvals that need the client
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
-  if(aps.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   // your tasks
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
   if(acts.length){html+=`<section><h2>Your to-dos</h2>`;for(const t of acts){html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${t.derived&&t.derived.overdue?'Overdue · ':''}${esc(t.status.replace('_',' '))}</p></div>`;}html+=`</section>`;}
@@ -151,7 +151,7 @@ async function openProject(id){
   // milestones
   if((data.milestones||[]).length){html+=`<section><h2>Milestones</h2>`;for(const m of data.milestones){html+=`<div class="card"><h3>${esc(m.title)}</h3><p>${m.status==='complete'?'✓ Complete':'In progress'}${m.due_date?` · due ${esc(m.due_date)}`:''}</p></div>`;}html+=`</section>`;}
   // messages
-  html+=`<section><h2>Messages</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div id="thread"></div><div class="card"><textarea id="msg" rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
+  html+=`<section><h2>Messages</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div id="thread"></div><div class="card"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
   // support — the client can now SEE their requests + the studio's replies, not just fire one off
   const sup=((supRes&&supRes.body&&supRes.body.data)||[]).filter(r=>!r.project_id||r.project_id===id);
   html+=`<section><h2>Support</h2>`;
@@ -180,7 +180,7 @@ async function openSupportThread(rid,pid){
   pid=pid||rq.project_id;
   const resolved=rq.status==='resolved'||rq.status==='closed';
   let html=`<p><a class="link" href="#" id="back">← Back</a></p><header><h1>${esc(rq.subject||'Support request')}</h1><p class="sub"><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span></p></header><section><div id="sthread"></div>`;
-  if(!resolved)html+=`<div class="card"><textarea id="smsg" rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Add to this request…"></textarea><div class="row"><button class="approve" id="ssend">Send</button></div></div>`;
+  if(!resolved)html+=`<div class="card"><textarea id="smsg" rows="2" aria-label="Add to this request" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Add to this request…"></textarea><div class="row"><button class="approve" id="ssend">Send</button></div></div>`;
   else html+=`<div class="card"><p class="muted">This request is resolved. Open a new one if you need anything else.</p></div>`;
   html+=`</section>`;
   $('main').innerHTML=html;

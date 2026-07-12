@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Website — Studio OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -364,7 +364,7 @@ h5.rune .whisper.ok{color:var(--sage)}
   <aside class="rail">
     <div class="wordmark">Studio OS<small>Davis Digital Studio</small></div>
     <nav class="rooms" id="nav">
-      <button class="navitem on" data-view="today">Today</button>
+      <button class="navitem on" data-view="today" aria-current="page">Today</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="business">Business</button>
       <button class="navitem" data-view="offerings">Menu</button>
@@ -456,7 +456,7 @@ h5.rune .whisper.ok{color:var(--sage)}
         <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
         <div class="hoursgrid" id="hoursGrid"></div>
         <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
-        <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
+        <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
 
         <div id="monitorCard" hidden>
           <h5 class="rune">Your website</h5>
@@ -561,11 +561,11 @@ h5.rune .whisper.ok{color:var(--sage)}
 </div>
 
 <!-- mobile dock -->
-<nav class="dock" id="dock">
-  <button data-tab="today" class="on">Today</button>
-  <button data-tab="sections">Sections</button>
-  <button data-tab="preview">Preview</button>
-  <button data-tab="publish" id="dockPublish">Publish</button>
+<nav class="dock" id="dock" aria-label="Editor sections">
+  <button data-tab="today" class="on" aria-pressed="true">Today</button>
+  <button data-tab="sections" aria-pressed="false">Sections</button>
+  <button data-tab="preview" aria-pressed="false">Preview</button>
+  <button data-tab="publish" id="dockPublish" aria-pressed="false">Publish</button>
 </nav>
 
 <!-- publish ritual (full page) -->
@@ -573,8 +573,8 @@ h5.rune .whisper.ok{color:var(--sage)}
   <div class="ritual">
     <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your room</button></div>
     <h1 id="ritTitle">Here’s what changes.</h1>
-    <p class="rsub" id="ritSub"></p>
-    <div id="ritBody"></div>
+    <p class="rsub" id="ritSub" aria-live="polite"></p>
+    <div id="ritBody" aria-live="polite"></div>
     <div id="ritBlockers"></div>
     <div id="ritActions"></div>
   </div>
@@ -794,7 +794,7 @@ function go(view) {
     b.classList.toggle("on", on);
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
-  document.querySelectorAll("#dock button").forEach((b) => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today")));
+  document.querySelectorAll("#dock button").forEach((b) => { const on = b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   window.scrollTo({ top: 0 });
   if (view === "today") loadToday();
   if (view === "history") loadHistory();
@@ -1024,7 +1024,7 @@ function dishEditor(o) {
   ed.innerHTML = `
     <div class="erow">
       <div class="field"><label>Dish</label><input type="text" data-k="name" value="${esc(o.name)}" maxlength="120"></div>
-      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" value="${esc(o.price_text || "")}" maxlength="40" placeholder="$18 · MP"></div>
+      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" aria-label="Price" value="${esc(o.price_text || "")}" maxlength="40" placeholder="$18 · MP"></div>
     </div>
     <div class="field"><label>Description</label><textarea data-k="description" maxlength="500" style="min-height:52px">${esc(o.description || "")}</textarea></div>
     <div class="erow">
@@ -1063,9 +1063,9 @@ function addDishLine(afterNode, cat) {
   ed.innerHTML = `
     <div class="erow">
       <div class="field"><label>Dish</label><input type="text" data-k="name" maxlength="120"></div>
-      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" maxlength="40" placeholder="$18 · MP"></div>
+      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" aria-label="Price" maxlength="40" placeholder="$18 · MP"></div>
     </div>
-    ${cat === "" ? `<div class="field"><label>Section</label><input type="text" data-k="category" maxlength="60" placeholder="Desserts, Drinks, Specials…"></div>` : ""}
+    ${cat === "" ? `<div class="field"><label>Section</label><input type="text" data-k="category" aria-label="Section" maxlength="60" placeholder="Desserts, Drinks, Specials…"></div>` : ""}
     <div class="eacts"><button class="pillbtn inked" data-act="add">${VOCAB.addBtn}</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
   ed.querySelector('[data-act="cancel"]').addEventListener("click", () => ed.remove());
   ed.querySelector('[data-act="add"]').addEventListener("click", async () => {
@@ -1287,8 +1287,8 @@ function inlineAdd(wrapId, fields, onAdd, addLabel) {
   const ed = el("div", "editor");
   ed.innerHTML = fields.map(([k, label, kind, max, ph]) => `
     <div class="field"><label>${label}</label>${kind === "textarea"
-      ? `<textarea data-k="${k}" maxlength="${max}" placeholder="${ph || ""}"></textarea>`
-      : `<input type="text" data-k="${k}" maxlength="${max}" placeholder="${ph || ""}">`}</div>`).join("") + `
+      ? `<textarea data-k="${k}" aria-label="${label}" maxlength="${max}" placeholder="${ph || ""}"></textarea>`
+      : `<input type="text" data-k="${k}" aria-label="${label}" maxlength="${max}" placeholder="${ph || ""}">`}</div>`).join("") + `
     <div class="eacts"><button class="pillbtn inked" data-act="add">${addLabel}</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
   ed.querySelector('[data-act="cancel"]').addEventListener("click", () => wrap.innerHTML = "");
   ed.querySelector('[data-act="add"]').addEventListener("click", async () => {
@@ -3585,7 +3585,7 @@ function mountAnnouncementCard() {
     <input type="text" id="ann-text" maxlength="140" placeholder="e.g. Closed July 4th — back Monday!">
     <div class="hint">One short notice at the top of every page of your website. Leave empty for none.</div>
     <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center">
-      <input type="url" id="ann-url" placeholder="Link (optional)" style="flex:1;min-width:160px">
+      <input type="url" id="ann-url" aria-label="Announcement link (optional)" placeholder="Link (optional)" style="flex:1;min-width:160px">
       <label for="ann-until" style="margin:0;font-size:12px">Until</label>
       <input type="date" id="ann-until">
       <button class="btn" id="ann-save" type="button">Save notice</button>

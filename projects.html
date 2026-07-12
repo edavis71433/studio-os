@@ -13,6 +13,9 @@
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d8b878;--warn-soft:#2a2338}}
   :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  :root[data-theme="dark"] .btn:not(.ghost){color:#171320}
   *{box-sizing:border-box;margin:0}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
   .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
@@ -121,7 +124,7 @@ async function api(path,method,body){
 
 function renderFilters(){
   const opts=[['','All'],...STATUSES.map(s=>[s,s[0].toUpperCase()+s.slice(1).replace('_',' ')])];
-  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
+  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" aria-selected="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.status;renderFilters();load();});
 }
 
@@ -246,7 +249,7 @@ async function loadMessages(id){
     const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
     $('msgList').innerHTML=items;
     const host=$('msgForm');
-    host.innerHTML=`<form class="mini"><label>Message</label><textarea id="mm-body" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send</button></div></form>`;
+    host.innerHTML=`<form class="mini"><label for="mm-body">Message</label><textarea id="mm-body" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send</button></div></form>`;
     host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=host.querySelector('#mm-body').value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});loadMessages(id);}catch(err){toast(err.message,true);}};
   }catch(e){ $('msgList').innerHTML='<div class="mut">Couldn’t load messages.</div>'; }
 }
@@ -275,7 +278,7 @@ async function openStudioSupport(rid,pid){
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
     const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
-    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label>Reply to the client</label><textarea id="sr-body" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
+    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body">Reply to the client</label><textarea id="sr-body" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
     $('sup-back').onclick=()=>loadSupport(pid);
     const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=$('sr-body').value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});openStudioSupport(rid,pid);}catch(err){toast(err.message,true);}};
     const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid);}catch(e){toast(e.message,true);}};

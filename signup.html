@@ -43,6 +43,20 @@
   .trustline{font-size:12px;color:var(--muted);margin-top:18px;text-align:center;}
   .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px;}
   @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ── Dark-mode variant (token-level) ─────────────────────────── */
+  @media (prefers-color-scheme: dark){
+    :root{--ink:#EFEAF7;--muted:#A79DBE;--line:#372e50;--cream:#171320;--bad:#f2a6a0;--ok:#8fd3ae;}
+    .card{background:#241d38;box-shadow:0 18px 50px rgba(0,0,0,.45);}
+    input{background:#171320;color:var(--ink);}
+    input::placeholder{color:rgba(239,234,247,.35);}
+    input:focus{box-shadow:0 0 0 3px rgba(196,174,232,.25);}
+    .aside .card{background:linear-gradient(180deg,#241d38,#2a2145);}
+    .msg.err{background:rgba(179,38,30,.16);border-color:rgba(242,166,160,.35);}
+    .msg.ok{background:rgba(46,125,82,.16);border-color:rgba(143,211,174,.35);}
+    ul.mini li{color:#cfc7e0;}
+    ul.mini li::before,.switchline a{color:#c4aee8;}
+  }
 </style>
 </head>
 <body>

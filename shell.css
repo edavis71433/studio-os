@@ -213,6 +213,13 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
   .toast{ bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important; }
 }
 
+/* 6) No horizontal scroll at 360px: long unbroken strings (emails, URLs, file
+      names) inside content containers must wrap instead of pushing the page
+      wide. `anywhere` only breaks when a token would otherwise overflow. */
+@media (max-width:760px){
+  .card,.item,.lead,.rowitem,.note,.answer,.panel,.client,.ev{ overflow-wrap:anywhere; }
+}
+
 /* Skip link (shell-injected) — visually hidden until focused */
 .dds-skip{position:fixed;top:-60px;left:8px;z-index:2147483003;background:var(--dds-p);color:#fff;
   padding:10px 16px;border-radius:0 0 10px 10px;font:600 14px/1 var(--dds-sans);text-decoration:none;transition:top .12s}

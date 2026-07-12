@@ -27,6 +27,9 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `BILLING_SYNC_SECRET` | gates the Stripe webhook sync tier | recommended | |
 | `NETLIFY_AUTH_TOKEN` | site publish/deploy | yes (publish) | rotation runbook exists |
 | Provider OAuth: `GOOGLE_CLIENT_ID`/`_SECRET`, and per-provider `CONNECTED_<KEY>_CLIENT_ID`/`_SECRET`, `CONNECTED_<KEY>_WRITE=1` | per connected provider | **activation** (per provider) | absent → that provider reads "not available yet" |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | **Web Push** (device notifications) | **activation** (push) | base64url raw P-256 point / scalar. Absent → push cleanly off (`/push/key` reports disabled) |
+| `VAPID_SUBJECT` | push contact (`mailto:`/`https:`) | optional | defaults to support@davisdigitalstudio.com |
+| `RESEND_WEBHOOK_SECRET` | Resend bounce/complaint webhook (`/email/events`, svix) | recommended (email on) | absent → the endpoint 404s (surface doesn't exist); bounces then don't auto-suppress |
 
 ## Required vs Activation
 

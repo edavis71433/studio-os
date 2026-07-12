@@ -13,6 +13,9 @@
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e}}
   :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  :root[data-theme="dark"] .btn:not(.ghost){color:#171320}
   *{box-sizing:border-box;margin:0}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
   .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
@@ -105,7 +108,7 @@ async function api(path,method,body){
 
 function renderFilters(){
   const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
-  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
+  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" aria-selected="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;renderFilters();load();});
 }
 

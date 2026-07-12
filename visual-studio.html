@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Visual Studio — Studio OS</title>
 <meta name="description" content="Make brand-aware images for your website — you approve every one before it's saved. Your own photos always work too.">
 <style>
@@ -17,6 +17,9 @@
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
   :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9}
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .kind[aria-pressed="true"]{color:#171320}}
+  :root[data-theme="dark"] .kind[aria-pressed="true"]{color:#171320}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:760px;margin:0 auto;padding:44px 22px 96px}
@@ -95,7 +98,7 @@ function composer(available){
   return `<div class="panel">
     <p class="label">What do you need?</p>
     <div class="kinds" id="kinds">${KINDS.map(k=>`<button class="kind" data-kind="${esc(k.kind)}" aria-pressed="false">${esc(k.label)}<small>${esc(k.aspect)} · ${esc(k.purpose)}</small></button>`).join('')}</div>
-    <div class="field"><textarea id="subject" rows="3" placeholder="Describe it in your own words — e.g. “our corner table by the window, warm evening light, a couple of coffees”"></textarea></div>
+    <div class="field"><textarea id="subject" rows="3" aria-label="Describe the image you need" placeholder="Describe it in your own words — e.g. “our corner table by the window, warm evening light, a couple of coffees”"></textarea></div>
     <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="primary" id="go">Make a few options</button>
       <span class="muted">You’ll pick and approve one — nothing saves until then.</span>
@@ -133,7 +136,7 @@ function planView(plan){
       <button class="ghost" data-discard>Discard these</button>
     </div>
     <div id="editbox" style="display:none;margin-top:12px;gap:9px" >
-      <input id="editin" placeholder="What should change? e.g. “warmer light”, “less busy”, “more of the food”">
+      <input id="editin" aria-label="What should change" placeholder="What should change? e.g. “warmer light”, “less busy”, “more of the food”">
       <div style="margin-top:9px"><button class="primary" data-editgo>Try that</button></div>
     </div>
   </div>`;

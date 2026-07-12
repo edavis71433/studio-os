@@ -45,9 +45,14 @@ async function activeSites(limit: number): Promise<SiteRow[]> {
   if (!activeClients.size) return [];
   let sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
   if (!sr.ok) sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);
-  const sites = (sr.ok && Array.isArray(sr.json) ? sr.json : []).filter((s: any) => activeClients.has(String(s.client_id))).slice(0, limit) as SiteRow[];
-  if (sites.length) {
-    await svc(`presence_sites?id=in.(${sites.map((s) => s.id).join(',')})`, {
+  const fetched = (sr.ok && Array.isArray(sr.json) ? sr.json : []) as SiteRow[];
+  const sites = fetched.filter((s: any) => activeClients.has(String(s.client_id))).slice(0, limit);
+  // Stamp EVERY row fetched, not just the selected ones: a ready/live site whose
+  // client has no active entitlement would otherwise sit unstamped at the
+  // nulls-first front of the window forever and (past limit*3 of them) starve
+  // the active sites — the exact defect this cursor exists to fix.
+  if (fetched.length) {
+    await svc(`presence_sites?id=in.(${fetched.map((s) => s.id).join(',')})`, {
       method: 'PATCH', body: JSON.stringify({ last_observed_at: new Date().toISOString() }),
     }).catch(() => {});
   }

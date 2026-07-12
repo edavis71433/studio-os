@@ -71,7 +71,7 @@ function insightCard(i){
   const tag=i.href?'a':'div';const href=i.href?` href="${esc(i.href)}"`:'';
   return `<${tag} class="card ${cls}"${href}>${num}<div class="s">${esc(i.sentence)}</div>${i.detail?`<div class="d">${esc(i.detail)}</div>`:''}${go}</${tag}>`;
 }
-function seg(){return `<div class="seg noprint"><button data-p="week" class="${PERIOD==='week'?'on':''}">This week</button><button data-p="month" class="${PERIOD==='month'?'on':''}">This month</button></div>`;}
+function seg(){return `<div class="seg noprint" role="tablist" aria-label="Time period"><button role="tab" aria-selected="${PERIOD==='week'?'true':'false'}" data-p="week" class="${PERIOD==='week'?'on':''}">This week</button><button role="tab" aria-selected="${PERIOD==='month'?'true':'false'}" data-p="month" class="${PERIOD==='month'?'on':''}">This month</button></div>`;}
 
 function renderHome(d){
   let h=`<header><h1>Analytics</h1><p class="sub">${esc(d.headline||'How your business is doing.')}</p>${seg()}</header>`;

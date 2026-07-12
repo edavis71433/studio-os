@@ -24,9 +24,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
-<script>(function(){if(localStorage.getItem('cookie_consent')==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}})();</script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-V4WF04NX7F',{anonymize_ip:true});</script>
+<script src="/analytics.js" defer></script>
 <link rel="stylesheet" href="styles.css">
 <style>
 
@@ -368,13 +366,6 @@ input[type=range]{width:100%;accent-color:var(--p);height:6px;cursor:pointer;mar
 </div>
 </footer>
 
-<div id="cookieBanner" role="dialog" aria-label="Cookie consent" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99998;background:#2A1B4A;border-top:1px solid rgba(196,174,232,0.2);padding:16px 24px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-  <p style="font-size:13px;color:rgba(255,255,255,0.65);margin:0;flex:1;min-width:200px;">We use cookies and Google Analytics to understand how visitors use our site. <a href="/privacy" style="color:#c4aee8;text-decoration:underline;">Privacy Policy</a></p>
-  <div style="display:flex;gap:10px;flex-shrink:0;">
-    <button onclick="acceptCookies()" style="background:#5b3fa0;color:#fff;border:none;padding:8px 20px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Got it</button>
-    <button onclick="declineCookies()" style="background:transparent;color:rgba(255,255,255,0.55);border:1px solid rgba(255,255,255,0.2);padding:8px 16px;border-radius:100px;font-size:13px;cursor:pointer;font-family:var(--sans);">Decline</button>
-  </div>
-</div>
 
 <script>
 function fmt(n){return '$'+Math.round(n).toLocaleString();}
@@ -462,13 +453,6 @@ function submitLead(ev, source, toolName){
   return false;
 }
 
-(function(){
-  var consent=localStorage.getItem('cookie_consent');
-  if(!consent){setTimeout(function(){var b=document.getElementById('cookieBanner');if(b)b.style.display='flex';},2000);}
-  if(consent==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}
-})();
-function acceptCookies(){localStorage.setItem('cookie_consent','accepted');document.getElementById('cookieBanner').style.display='none';}
-function declineCookies(){localStorage.setItem('cookie_consent','declined');window['ga-disable-G-V4WF04NX7F']=true;document.getElementById('cookieBanner').style.display='none';}
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}
 calc();

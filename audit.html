@@ -27,8 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
-<script>(function(){if(localStorage.getItem('cookie_consent')==='declined'){window['ga-disable-G-V4WF04NX7F']=true;}})()</script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-V4WF04NX7F"></script>
+<script src="/analytics.js" defer></script>
 <link rel="stylesheet" href="styles.css">
 <style>
 
@@ -264,6 +263,51 @@ a{color:inherit;}
    breakpoint. */
 .tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
 @media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
+
+/* ── Dark-mode variant (page-scoped, token-level) ─────────────── */
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#171320; --ink:#EFEAF7; --muted:#A79DBE;
+    --pxxxl:#241d38; --pxxl:#2c2344;
+    /* styles.css tokens the shared nav/footer read on this page */
+    --paper-2:#1f1a2e; --hair:#332B49; --p-mist:#241d38; --brass-deep:#C9A468;
+  }
+  header.nav,.nav.is-scrolled{background:rgba(23,19,32,.85);}
+  .eyebrow{color:#C9A468;}
+  .btn-primary{background:#EFEAF7;color:#171320;}
+  .btn-primary:hover{background:#c4aee8;color:#1B1525;}
+  footer.site{background:#0f0c18;}
+  nav[aria-label="Breadcrumb"]{background:#171320 !important;border-bottom-color:rgba(196,174,232,.12) !important;}
+  .page-hero-v2{background:linear-gradient(180deg,#171320 0%,#241d38 100%) !important;}
+  /* inline color:var(--p) accents are unreadable on dark — lift them */
+  .page-hero-v2 [style*="color:var(--p)"],nav[aria-label="Breadcrumb"] [style*="color:var(--p)"]{color:#c4aee8 !important;}
+  /* the sample-audit specimen card flips to a dark surface so its
+     token-colored text (var(--ink)/var(--muted)) stays readable */
+  .page-hero-v2 .tool-hero-grid > div:last-child > div{background:#241d38 !important;border-color:rgba(196,174,232,.16) !important;}
+  .audit-section{background:#1c1729;}
+  .audit-header h2 em,.section-header h2 em{color:#b39ce6;}
+  .audit-header .hero-label,.results-label,.section-label-sm{color:#c4aee8;}
+  .audit-card,.loading-card,.results-card{background:#241d38;border-color:#332B49;}
+  .form-input,.form-select{border-color:#3a3153;}
+  .form-input:focus,.form-select:focus{background:#171320;}
+  .form-input::placeholder{color:rgba(239,234,247,.38);}
+  .form-select option{background:#241d38;color:#EFEAF7;}
+  .error-box{background:rgba(224,85,85,.12);color:#f2a6a0;}
+  .score-summary,.analysis-text{color:#cfc7e0;}
+  .score-good{color:#7ed6a2;}
+  .score-ok{color:#f0b429;}
+  .score-poor{color:#f28b82;}
+  .gate-input{background:#171320;border-color:#3a3153;color:var(--ink);}
+  .gate-box{border-color:rgba(196,174,232,.28);}
+  .pricing-section,.tool-switch-section{background:#171320;}
+  .tier,.tool-switch-item{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 20px 42px -32px rgba(0,0,0,.5);}
+  .tier-badge{background:rgba(196,174,232,.14);color:#c4aee8;}
+  .tier-badge.free{background:rgba(106,191,105,.16);color:#8fd3a0;}
+  .tier-cta.ghost{color:#c4aee8;border-color:rgba(196,174,232,.4);}
+  .tier-cta.ghost:hover{background:#2c2344;}
+  .tool-switch-head span,.tool-switch-head p a{color:#c4aee8;}
+  ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -404,7 +448,7 @@ a{color:inherit;}
     <div class="audit-header">
       <span class="hero-label">Try it free</span>
       <h2>Get your free <em>site score.</em></h2>
-      <p>Enter your details and get real Google Lighthouse scores in 20–60 seconds. Personalized findings for your specific site, not generic advice.</p>
+      <p>Enter your site and get real Google Lighthouse scores in 20–60 seconds — no email required. Personalized findings for your specific site, not generic advice.</p>
     </div>
 
     <!-- STEP 1: FORM -->
@@ -438,7 +482,7 @@ a{color:inherit;}
           <input class="form-input" type="text" id="fCity" placeholder="Los Angeles" autocomplete="address-level2">
         </div>
         <div class="form-field full">
-          <label class="form-label" for="fEmail">Your email <span style="color:rgba(255,255,255,0.35);font-weight:400;">(results sent here too)</span></label>
+          <label class="form-label" for="fEmail">Your email <span style="color:rgba(255,255,255,0.35);font-weight:400;">(optional — add it if you'd like the results emailed too)</span></label>
           <input class="form-input" type="email" id="fEmail" placeholder="you@yourbusiness.com" autocomplete="email">
         </div>
       </div>
@@ -685,13 +729,6 @@ a{color:inherit;}
 </div>
 </footer>
 
-<div class="cookie-banner" id="cookieBanner" role="dialog" aria-label="Cookie consent">
-  <p class="cookie-text">We use cookies and Google Analytics to understand how visitors use our site. <a href="/privacy">Privacy Policy</a></p>
-  <div class="cookie-btns">
-    <button class="cookie-accept" onclick="acceptCookies()">Got it</button>
-    <button class="cookie-decline" onclick="declineCookies()">Decline</button>
-  </div>
-</div>
 
 <script>
 // ── CONFIG ──
@@ -779,7 +816,7 @@ function runAudit() {
   errBox.style.display = 'none';
 
   if (!url) { showErr('Please enter your website URL.'); return; }
-  if (!email || !email.includes('@')) { showErr('Please enter a valid email address.'); return; }
+  if (email && !email.includes('@')) { showErr('That email doesn\'t look quite right — fix it or leave it blank.'); return; }
   if (!type) { showErr('Please select your business type.'); return; }
   if (!city) { showErr('Please enter your city.'); return; }
   if (!url.match(/^https?:\/\//)) url = 'https://' + url;
@@ -1306,13 +1343,19 @@ function showResults(d) {
       body.appendChild(el);
     });
 
-    // Gate the rest
-    if (issues.length > 2) {
+    // Soft ask, after the value: full report by email (also shown when no
+    // email was left on the form, so the instant check never demands one).
+    if (issues.length > 2 || !d.email) {
+      var hidden = issues.length > 2 ? issues.length - 2 : 0;
+      var gateTitle = hidden > 0 ? hidden + ' more issue' + (hidden === 1 ? '' : 's') + ' found' : 'Want the full findings + a walkthrough?';
+      var gateDesc = hidden > 0
+        ? 'Your full report includes all ' + issues.length + ' findings with specific fixes, Core Web Vitals breakdown, and a personalized action plan, sent to your inbox instantly.'
+        : 'Leave your email and this report lands in your inbox with a plain-language walkthrough of what to fix first. One email, no follow-up unless you ask.';
       var gate = document.createElement('div');
       gate.className = 'gate-box';
-      gate.innerHTML = '<div style="font-size:28px;margin-bottom:10px;">🔒</div>' +
-        '<div class="gate-title">' + (issues.length - 2) + ' more issues found</div>' +
-        '<div class="gate-desc">Your full report includes all ' + issues.length + ' findings with specific fixes, Core Web Vitals breakdown, and a personalized action plan, sent to your inbox instantly.</div>' +
+      gate.innerHTML = (hidden > 0 ? '<div style="font-size:28px;margin-bottom:10px;">🔒</div>' : '') +
+        '<div class="gate-title">' + gateTitle + '</div>' +
+        '<div class="gate-desc">' + gateDesc + '</div>' +
         '<div class="gate-form">' +
           '<input type="email" class="gate-input" id="gateEmail" aria-label="Email address" value="'+eh(d.email||'')+'" placeholder="Your email address">' +
           '<button class="gate-btn" onclick="unlockReport()">Email me the full report →</button>' +
@@ -1355,6 +1398,7 @@ function unlockReport() {
   if (msg) { msg.style.color='rgba(255,255,255,0.35)'; msg.textContent='Sending your full report...'; }
 
   var d = window._audit || {};
+  d.email = email; // remember it so re-renders and notifications carry it
   var issues = window._auditIssues || [];
   var typeLabels = {restaurant:'Restaurant/Bar',retail:'Retail',service:'Home Services',health:'Health & Wellness',salon:'Salon/Spa',realestate:'Real Estate',legal:'Legal',creative:'Creative/Freelance',other:'Other'};
   var bizLabel = typeLabels[d.type] || d.type || '';
@@ -1512,7 +1556,7 @@ function sendNotification(d, bizLabel, issues, deep) {
       '<h2 style="font-family:Georgia,serif;font-size:24px;font-weight:400;color:#fff;margin:0 0 4px;">'+eh(d.name||'(unnamed)')+'</h2>'+
       '<a href="'+eh(d.url)+'" target="_blank" style="display:block;color:#c4aee8;text-decoration:none;font-size:13px;margin-bottom:18px;" rel="noopener">'+eh(d.url)+'</a>'+
       '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;">'+
-        '<tr><td style="padding:4px 0;color:rgba(255,255,255,0.4);width:90px;">Email</td><td><a href="mailto:'+eh(d.email)+'" style="color:#c4aee8;text-decoration:none;">'+eh(d.email)+'</a></td></tr>'+
+        '<tr><td style="padding:4px 0;color:rgba(255,255,255,0.4);width:90px;">Email</td><td>'+(d.email?'<a href="mailto:'+eh(d.email)+'" style="color:#c4aee8;text-decoration:none;">'+eh(d.email)+'</a>':'<span style="color:rgba(255,255,255,0.4);">not provided</span>')+'</td></tr>'+
         '<tr><td style="padding:4px 0;color:rgba(255,255,255,0.4);">Business type</td><td style="color:#fff;">'+eh(bizLabel)+'</td></tr>'+
         '<tr><td style="padding:4px 0;color:rgba(255,255,255,0.4);">City</td><td style="color:#fff;">'+eh(d.city)+'</td></tr>'+
       '</table>'+
@@ -1529,7 +1573,7 @@ function sendNotification(d, bizLabel, issues, deep) {
       findingsHtml+
     '</div>'+
     '<div style="text-align:center;">'+
-      '<a href="mailto:'+d.email+'" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:11px 22px;border-radius:100px;text-decoration:none;margin-right:6px;">Reply to lead →</a>'+
+      (d.email?'<a href="mailto:'+eh(d.email)+'" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:13px;font-weight:600;padding:11px 22px;border-radius:100px;text-decoration:none;margin-right:6px;">Reply to lead →</a>':'')+
       '<a href="'+eh(d.url)+'" target="_blank" style="display:inline-block;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:13px;font-weight:600;padding:11px 22px;border-radius:100px;text-decoration:none;" rel="noopener">Visit site →</a>'+
     '</div>'+
     '</div></body></html>';
@@ -1574,13 +1618,6 @@ document.querySelectorAll('.faq-item').forEach(function(item, idx) {
   q.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
 });
 
-// Cookie
-(function(){
-  var c = localStorage.getItem('cookie_consent');
-  if (!c) setTimeout(function(){ var b=document.getElementById('cookieBanner'); if(b) b.style.display='flex'; }, 2000);
-})();
-function acceptCookies(){ localStorage.setItem('cookie_consent','accepted'); document.getElementById('cookieBanner').style.display='none'; }
-function declineCookies(){ localStorage.setItem('cookie_consent','declined'); window['ga-disable-G-V4WF04NX7F']=true; document.getElementById('cookieBanner').style.display='none'; }
 
 // PWA
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
@@ -1596,6 +1633,12 @@ window.addEventListener('scroll', function(){ var h=document.documentElement.scr
   var el = document.getElementById(id);
   if (el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') runAudit(); });
 });
+
+// Prefill from the soft-capture blocks on service pages (?email=...)
+try {
+  var qEmail = new URLSearchParams(location.search).get('email');
+  if (qEmail && document.getElementById('fEmail')) document.getElementById('fEmail').value = qEmail;
+} catch (e) {}
 </script>
   <script src="/concierge.js" defer></script>
 <script src="/enhance.js" defer></script>

@@ -15,7 +15,7 @@
 | `portal-workspace.html` | JS redirect → `portal.html#growth` (post-migration compat) | Linked from nowhere; catches old bookmarks | 🟡 **RETAIN — compat shim** (documented; delete when a server 301 replaces it) |
 | `portal.html` service sections | Older service-delivery UI, superseded by the `client.html` bridge | `portal.html` is the **live** DDS client portal (on clever-api) | 🟡 **RETAIN** — portal.html itself is live; the sections retire with clever-api |
 | `pipeline.html` | Deal-detail view reached from `leads.html` after convert | Referenced by `leads.html` | ✅ **RETAIN — reachable/live** |
-| `_internal/*.html` (function-test, email-nurture-sequence) | Dev/reference pages | Linked nowhere; `_internal/` namespace | 🟡 **RETAIN** — intentional internal references, zero ship/maintenance cost |
+| `_internal/*.html` (function-test, email-nurture-sequence) | Dev/reference pages | Linked nowhere; `_internal/` namespace | 🟡 ~~RETAIN~~ **superseded Jul 12 2026: `_internal/` DELETED** in the publish-root security purge (it was publicly fetchable; git history retains) |
 | presence migrations `0000–0085` | Additive schema history | The product | ✅ **RETAIN** — additive history; not removable without rewriting applied state |
 
 **Dependency reality:** `presence` (the product) and `clever-api` (the agency's own site + ops) are two independent stacks. Phase 2 built the *customer product* on `presence`; the *agency's own operations* still run on `clever-api`. They do not import each other.
@@ -29,7 +29,7 @@
 ## 3. Retirement (only verified, safe)
 
 - **Deleted:** `client-archive-ui.html` (orphan duplicate; capability in the console; git-reversible).
-- **Deliberately NOT deleted (with reasons):** `clever-api` + its tables (live agency ops, no replacement); `portal.html` + service sections (live client portal); `pipeline.html` (reachable); `portal-workspace.html` (compat redirect for old links); `_internal/*` (intentional references); presence migrations (additive history). Piecemeal excision of the *dead* routes *inside* the clever-api monolith was rejected as unsafe — it mixes live and dead code with shared tables, and there is no test harness for clever-api; it retires wholesale at the DDS migration.
+- **Deliberately NOT deleted (with reasons):** `clever-api` + its tables (live agency ops, no replacement); `portal.html` + service sections (live client portal); `pipeline.html` (reachable); `portal-workspace.html` (compat redirect for old links); `_internal/*` (~~intentional references~~ — later DELETED Jul 12 2026, publish-root exposure); presence migrations (additive history). Piecemeal excision of the *dead* routes *inside* the clever-api monolith was rejected as unsafe — it mixes live and dead code with shared tables, and there is no test harness for clever-api; it retires wholesale at the DDS migration.
 
 ## 4. Regression validation — all green
 

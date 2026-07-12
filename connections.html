@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Connections — Studio OS</title>
 <meta name="description" content="Connect the services you already use — read-only, always with your approval, and yours to disconnect any time.">
 <style>
@@ -177,7 +177,7 @@ function render(surface){
     <div class="svc">
       <p class="purpose" style="margin-top:0">Ask anything — why connect a service, what it helps with, whether Studio OS can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
       <div class="row"><input id="cq" type="text" placeholder="e.g. why would I connect my Google listing?" aria-label="Ask about connecting" style="flex:1;min-width:200px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="primary" id="cask">Ask</button></div>
-      <div class="answer" id="cans" style="display:none;margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap"></div>
+      <div class="answer" id="cans" aria-live="polite" style="display:none;margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap"></div>
     </div></section>`;
   $('main').innerHTML = html;
   wire();

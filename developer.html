@@ -146,9 +146,9 @@ function themeEditor(){
     const m=TOKEN_META[key]||{label:key,type:'text'};const val=t[key]||'';
     if(m.type==='color'){
       const cv=/^#[0-9a-fA-F]{6}$/.test(val)?val:'#5b3fa0';
-      toks+=`<div class="tok"><label>${esc(m.label)}</label><div class="cin"><input type="color" data-tokcolor="${esc(key)}" value="${cv}"><input type="text" data-tok="${esc(key)}" value="${esc(val)}" placeholder="#5b3fa0"></div></div>`;
+      toks+=`<div class="tok"><label>${esc(m.label)}</label><div class="cin"><input type="color" data-tokcolor="${esc(key)}" aria-label="${esc(m.label)} color picker" value="${cv}"><input type="text" data-tok="${esc(key)}" aria-label="${esc(m.label)}" value="${esc(val)}" placeholder="#5b3fa0"></div></div>`;
     }else{
-      toks+=`<div class="tok"><label>${esc(m.label)}</label><input type="text" data-tok="${esc(key)}" value="${esc(val)}" placeholder="${esc(m.ph||'')}"></div>`;
+      toks+=`<div class="tok"><label>${esc(m.label)}</label><input type="text" data-tok="${esc(key)}" aria-label="${esc(m.label)}" value="${esc(val)}" placeholder="${esc(m.ph||'')}"></div>`;
     }
   }
   return `<label class="fld" style="margin-bottom:12px">Theme tokens</label>
@@ -158,12 +158,12 @@ function themeEditor(){
 function cssEditor(){
   return `<label class="fld">Custom CSS</label>
     <p class="hint" style="margin-bottom:8px">Layered on top of the template. <code>@import</code>, <code>expression()</code> and code-bearing URLs are removed on save.</p>
-    <textarea id="css" spellcheck="false" placeholder=".hero h1 { letter-spacing: -0.02em; }">${esc(STATE.cust.custom_css||'')}</textarea>${previewBlock()}${approvalBlock()}`;
+    <textarea id="css" spellcheck="false" aria-label="Custom CSS" placeholder=".hero h1 { letter-spacing: -0.02em; }">${esc(STATE.cust.custom_css||'')}</textarea>${previewBlock()}${approvalBlock()}`;
 }
 function htmlEditor(){
   return `<label class="fld">Custom HTML block</label>
     <p class="hint" style="margin-bottom:8px">Inert markup for a designated slot. Scripts, event handlers, iframes and code-bearing URLs are stripped on save — this can never run code.</p>
-    <textarea id="html" spellcheck="false" placeholder="<p class=&quot;note&quot;>Family-owned since 1998.</p>">${esc(STATE.cust.custom_html||'')}</textarea>${previewBlock()}${approvalBlock()}`;
+    <textarea id="html" spellcheck="false" aria-label="Custom HTML block" placeholder="<p class=&quot;note&quot;>Family-owned since 1998.</p>">${esc(STATE.cust.custom_html||'')}</textarea>${previewBlock()}${approvalBlock()}`;
 }
 function assetView(){
   return `<div class="readonly"><h2>Assets</h2><div class="box">Your photos and documents are managed in Files. <a class="link" href="/files.html">Open Files →</a><br><br>Developer Mode styles what the template does with those files; it doesn't replace Files.</div></div>`;

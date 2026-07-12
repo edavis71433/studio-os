@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Today — Studio OS</title>
 <meta name="description" content="What needs you today — at most a few calm things, in plain words.">
 <style>
@@ -171,7 +171,7 @@ function render(moments, features, feed, ctx){
           ${celebrate ? '' : `<button class="primary" data-explain="${esc(m.id)}">Walk me through it</button>`}
           ${m.dismissable ? `<button class="ghost" data-dismiss="${esc(m.id)}">Not now</button>` : ''}
         </div>
-        <div class="answer" id="ans-${esc(m.id)}" hidden></div>
+        <div class="answer" id="ans-${esc(m.id)}" aria-live="polite" hidden></div>
       </article>`;
     }
   }
@@ -185,7 +185,7 @@ function render(moments, features, feed, ctx){
   html += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
-    <div class="answer" id="askAns" hidden></div></div>`;
+    <div class="answer" id="askAns" aria-live="polite" hidden></div></div>`;
   // (Navigation to Connections and Visual Studio now lives in the persistent top nav.)
   $('main').innerHTML = '<div class="stack">' + html + '</div>';   // .stack gives the cards their breathing room
   wire();
@@ -236,7 +236,7 @@ function signedOut(){
 function trouble(){
   $('main').innerHTML = `<div class="center"><h2>We couldn’t load your day just now.</h2>
     <p class="muted">Nothing’s wrong on your site — this is only this page.</p>
-    <p style="margin-top:18px"><button onclick="location.reload()" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></p>
+    <p style="margin-top:18px"><button onclick="location.reload()" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></p>
     <p style="margin-top:14px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;
 }
 

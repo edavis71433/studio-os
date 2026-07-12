@@ -11,7 +11,9 @@ is:
     supabase/functions/clever-api/index.ts
 
 in this repository. No other copy, anywhere, may be edited or deployed. All
-other copies are quarantined in `_stale/` and exist for history only.
+other copies were quarantined in `_stale/` — which was itself DELETED on
+Jul 12 2026 in the publish-root security purge (the site publishes from the
+repo root, so the quarantine was publicly fetchable). History lives in git.
 
 The same rule applies to `stripe-webhook`:
 

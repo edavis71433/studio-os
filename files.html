@@ -76,6 +76,7 @@
   .scrim{position:fixed;inset:0;background:rgba(27,21,37,.42);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
   .scrim.on{opacity:1;pointer-events:auto}
   .panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--bg);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .2s;z-index:41;overflow-y:auto;padding:20px 22px 60px}
+  @media (max-width:760px){.panel{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}}  /* keep the last controls clear of the shell's bottom bar */
   .panel.on{transform:translateX(0)}
   .panel .x{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;color:var(--soft);cursor:pointer;line-height:1}
   .pv{border-radius:12px;overflow:hidden;background:var(--p-soft);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin:14px 0 16px}
@@ -222,7 +223,7 @@ function renderStock(){
     : `<div class="empty" style="grid-column:1/-1"><h2>${S.stockQ?'No photos match that search.':'Find a professional photo.'}</h2><p>Try “office”, “coffee”, “construction”, “salon”…</p></div>`;
   const note = S.stockLicense ? `Royalty-free from ${esc(S.stockProvider)} · ${esc(S.stockLicense)} · added to your Files and hosted on your own site.` : 'Professional royalty-free photos, added straight to your Files.';
   $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail">${railHtml()}</nav><div>
-    <div class="bar"><div class="search">${svg(IC.search)}<input id="sq" type="search" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div></div>
+    <div class="bar"><div class="search">${svg(IC.search)}<input id="sq" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div></div>
     <p style="margin:2px 0 12px;color:var(--faint);font-size:12.5px">${note}</p>
     <div class="grid">${grid}</div></div></div>`;
   document.querySelectorAll('#rail .col').forEach(b=>b.addEventListener('click',()=>{S.col=b.dataset.col;load();}));
@@ -263,7 +264,7 @@ function render(){
       <nav class="rail" id="rail">${rail}</nav>
       <div>
         <div class="bar">
-          <div class="search">${svg(IC.search)}<input id="q" type="search" placeholder="Search files — try “logo”" value="${esc(S.q)}" autocomplete="off"></div>
+          <div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="Search files" placeholder="Search files — try “logo”" value="${esc(S.q)}" autocomplete="off"></div>
           <select class="sort" id="sort"><option value="recent"${S.sort==='recent'?' selected':''}>Recent</option><option value="name"${S.sort==='name'?' selected':''}>Name</option><option value="size"${S.sort==='size'?' selected':''}>Largest</option></select>
           ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
         </div>
@@ -307,15 +308,25 @@ function wire(){
 }
 
 /* ── detail panel ── */
+let detailOpener=null;   // a11y: where focus returns when the slide-over closes
+function focusPanel(){const x=$('panel').querySelector('.x');if(x)x.focus();}
 async function openDetail(id){
   const scrim=$('scrim'),panel=$('panel');
-  panel.innerHTML=`<button class="x" onclick="closeDetail()">×</button><div class="spin"></div>`;
+  detailOpener=document.activeElement;
+  panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="spin"></div>`;
   scrim.classList.add('on');panel.classList.add('on');
+  focusPanel();   // move focus INTO the dialog (Escape already closes it)
   const r=await api('GET','/assets/'+id);
-  if(!r.ok){panel.innerHTML=`<button class="x" onclick="closeDetail()">×</button><div class="empty"><h2>Couldn’t open that file.</h2></div>`;return;}
+  if(!r.ok){panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="empty"><h2>Couldn’t open that file.</h2></div>`;focusPanel();return;}
   S.current=r.body.data;renderDetail();
+  if(!$('panel').contains(document.activeElement))focusPanel();   // re-render replaced the focused node
 }
-function closeDetail(){$('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;}
+function closeDetail(){
+  const wasOpen=$('panel').classList.contains('on');
+  $('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;
+  if(wasOpen&&detailOpener&&detailOpener.focus&&document.contains(detailOpener))detailOpener.focus();   // return focus to the opener
+  detailOpener=null;
+}
 function renderDetail(){
   const d=S.current,a=d.asset;const ed=S.canEdit;
   const pv=a.thumb?`<img src="${esc(a.thumb)}" alt="${esc(a.alt_text||'')}">`:svg(a.kind==='document'?IC.doc:IC.photo);
@@ -333,7 +344,7 @@ function renderDetail(){
   const approvedLine=ap.approved_by?`<div class="amuted">Approved by ${esc(ap.approved_by)}${ap.approved_at?' · '+when(ap.approved_at):''}</div>`:(ap.submitted_by&&st==='pending'?`<div class="amuted">Submitted by ${esc(ap.submitted_by)}${ap.submitted_at?' · '+when(ap.submitted_at):''}</div>`:'');
   const approveCtrls=(st==='pending'&&ed)?`<div class="vrow" style="background:var(--warn-soft);color:var(--warn)">This replacement is waiting to go live.<span style="margin-left:auto;display:flex;gap:8px"><button class="btn" onclick="decideFile('${a.id}','approve')">Approve</button><button class="btn warn" onclick="decideFile('${a.id}','reject')">Ask for changes</button></span></div>`:'';
   $('panel').innerHTML=`
-    <button class="x" onclick="closeDetail()">×</button>
+    <button class="x" onclick="closeDetail()" aria-label="Close file details">×</button>
     <div class="pv">${pv}</div>
     <div>${stateBadge}</div>${approvedLine}${approveCtrls}
     <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}</div>

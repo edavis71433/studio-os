@@ -309,7 +309,7 @@ The paid-audit tiers reach Stripe AND record the order. Items in original order:
 3. ⏳ **OPTIONAL (not built).** No proactive "new paid audit" alert — a paid order lands in the admin panel + Stripe's receipt but doesn't email Eric. Reuse the audit_lead email pattern if wanted. Deliberately left (owner call, not a gate).
 4. ✅ **DONE — success page is audit-aware.** payment-success.html swaps the invoice/project copy for the audit message ("emailed in 24h–7 business days") when `?kind=audit`.
 5. ✅ **DONE — structured data reconciled.** audit.html JSON-LD offers now match the real tiers (Starter / Digital Health Check / Competitive Intelligence) with correct prices + turnarounds.
-6. ⏳ **LOW (not built).** Nurture sequence still a template (_internal/email-nurture-sequence.html), not wired. Fine if follow-up is manual; owner call.
+6. ⏳ **LOW (not built).** Nurture sequence not wired (the old `_internal/email-nurture-sequence.html` template was DELETED Jul 12 2026 in the publish-root security purge — recover from git history if wanted). `runLeadFollowups` covers the basic automated nudge; a full drip stays an owner call.
 Solid already: free Site Score (psi_fetch/deep_audit + audit_leads store + email-to-Eric), the tier UI, server-side price, the webhook (invoice+audit+subscription), the audit_orders/audit_leads/stripe_payments tables. **Public pages (audit.html/buy-audit.html/payment-success.html) remain committed LOCAL/unpublished behind the go-live fence.**
 
 ### TD-1 — Code health / tech debt (Jul 9 2026 FE+BE sweep — mostly CLOSED)

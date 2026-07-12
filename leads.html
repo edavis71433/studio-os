@@ -11,6 +11,9 @@
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
   :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .lead .acts a.reply{color:#171320}}
+  :root[data-theme="dark"] .lead .acts a.reply{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
@@ -75,10 +78,10 @@ function render(){
   const rows=ALL.filter(l=>FILTER==='open'?l.status!=='archived':FILTER==='new'?l.status==='new':true);
   let h=`<div class="rolebadge">● Website enquiries</div>
     <header><h1>Website enquiries</h1><p class="sub">${unread?unread+' new · ':''}Everyone who reached out through your website.</p></header>
-    <div class="filters">
-      <button data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
-      <button data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
-      <button data-f="all" class="${FILTER==='all'?'on':''}">All</button>
+    <div class="filters" role="tablist" aria-label="Filter enquiries">
+      <button role="tab" aria-selected="${FILTER==='open'?'true':'false'}" data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
+      <button role="tab" aria-selected="${FILTER==='new'?'true':'false'}" data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
+      <button role="tab" aria-selected="${FILTER==='all'?'true':'false'}" data-f="all" class="${FILTER==='all'?'on':''}">All</button>
     </div>`;
   if(!rows.length){h+=`<div class="center"><h2>Nothing yet.</h2><p class="muted">When someone fills in your website's contact form, it lands here — and in Customers.</p><p style="margin-top:16px"><a class="link" href="/crm.html">Open Customers →</a></p></div>`;}
   else for(const l of rows){
@@ -135,7 +138,7 @@ async function createDeal(id){
   }catch(_){toast('Couldn’t start that deal.');}
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){const r=await api('/forms/inbox');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Enquiries live in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}ALL=(r.body.data&&r.body.data.submissions)||[];render();}
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>
