@@ -100,7 +100,7 @@ let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 
 let STUDIO=false, NEWAUD='internal';
@@ -189,7 +189,7 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 
 async function load(){
   const [p,tl,nt]=await Promise.all([api('/crm/profile'),api('/crm/timeline'),api('/crm/notes')]);
-  if(p.status===403||tl.status===403){const m=(p.body&&p.body.message)||(tl.body&&tl.body.message)||"";$('main').innerHTML=`<div class="center"><h2>${/plan|includ/i.test(m)?"Not part of your plan yet.":"This view lives in your studio workspace."}</h2><p class="muted">${m||"Your client view shows what your studio shares with you."}</p></div>`;return;}
+  if(p.status===403||tl.status===403){const m=(p.body&&p.body.message)||(tl.body&&tl.body.message)||"";$('main').innerHTML=`<div class="center"><h2>${/plan|includ/i.test(m)?"Not part of your plan yet.":"This view lives in your studio workspace."}</h2><p class="muted">${esc(m)||"Your client view shows what your studio shares with you."}</p></div>`;return;}
   if(!p.ok){trouble();return;}
   const d=p.body.data||{};
   render(Object.assign(d.profile||{},{_ctx:d.context||{}}),d.summary||'',(nt.ok&&nt.body.data.notes)||[],(tl.ok&&tl.body.data.items)||[],!!d.is_studio_view);

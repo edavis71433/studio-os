@@ -20,7 +20,7 @@ alter table public.presence_plan_notices
     'deletion_requested','domain_expiry','lead_followup','renewal_reminder',
     -- added by 0088:
     'deal_signed','deal_followup','publish_failed','invoice_paid',
-    'connection_expired','website_enquiry'
+    'connection_expired','website_enquiry','approval_decided'
   ));
 
 -- Same latent gap on the deal-event ledger: 0074's check predates invoices.

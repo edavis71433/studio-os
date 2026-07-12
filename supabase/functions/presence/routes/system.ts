@@ -12,7 +12,7 @@ import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
-import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders } from '../commerce/lifecycle.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
@@ -223,10 +223,12 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const leads = await runLeadFollowups(20);            // CRM: nudge un-replied leads (1–7d old), once per lead
       const dealNudges = await runDealFollowups(20);       // CRM: nudge stale deals (qualified/proposal/contract, 3–30d quiet)
       const renewals = await runRenewalReminders(50);      // PP-2: annual renewal heads-up (30d + 7d, once per window)
+      const invoiceNudges = await runInvoiceReminders(20); // MONEY: one gentle reminder per unpaid invoice/deposit (7d+ or past due)
+      const docReminders = await runSalesDocReminders(20); // SALES: one fresh-link reminder per unsigned proposal/agreement (3-21d)
       const retention = await runRetentionSweep();          // keep analytics detail tables bounded (visits 180d, search terms 13mo)
       const media_gc = await reapMedia(100);                 // M6: reap soft-deleted (past retention) + never-uploaded orphan media
       const snapshot_gc = await reapSnapshots(200);          // M7: prune OLD unreferenced snapshots (keep live/last-20/referenced), bounded per tick
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, retention } }, 200, cors);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

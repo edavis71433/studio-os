@@ -49,7 +49,7 @@
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Messages — everyone who reached out through your website, in one calm place.</footer>
+  <footer>Studio OS · Enquiries — everyone who reached out through your website, in one calm place.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <!-- PT-5: one-time contextual tip -->
@@ -66,7 +66,7 @@ let TOKEN="",ALL=[],FILTER='open';
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 function when(iso){const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 

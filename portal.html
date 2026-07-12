@@ -73,7 +73,7 @@
   <div id="noAccess" class="panel">
     <div class="eyebrow">Almost there</div>
     <h1>You're signed in ✓</h1>
-    <p class="sub">Your workspace is still being set up. Your studio has been building it — if you expected to see your project here, just reply to any email from us or write to
+    <p class="sub" id="naMsg">Your account isn't connected to a workspace here yet. If you have a project with us — past or present — just reply to any email from us or write to
       <a href="mailto:support@davisdigitalstudio.com" style="color:var(--p)">support@davisdigitalstudio.com</a> and we'll connect you right away.</p>
     <p class="muted"><button class="linky" id="retry" type="button">Try again</button> · <button class="linky" id="signout1" type="button">Sign out</button></p>
   </div>
@@ -108,6 +108,14 @@ if (typeof supabase !== "undefined") {
   err("Connection problem — check your internet and refresh this page.");
 }
 
+var NA_DEFAULT = null;   // the panel's honest default copy (captured once, restored on every retry)
+function noAccess(msg){
+  var n = $('naMsg');
+  if (NA_DEFAULT === null) NA_DEFAULT = n.innerHTML;
+  if (msg) n.textContent = msg; else n.innerHTML = NA_DEFAULT;
+  show('noAccess');
+}
+
 async function route(token){
   show('routing');
   var sawNetworkTrouble = false;
@@ -118,7 +126,8 @@ async function route(token){
     }), 9000);
     var j = await r.json().catch(function(){ return {}; });
     if (r.ok && j && j.data && j.data.landing) { location.href = j.data.landing; return; }
-    if (r.status === 403 && j && j.message) { show('noAccess'); return; } // paused/lapsed — honest, no dead end
+    // paused/lapsed — show the server's OWN words (what happened + how to fix it)
+    if (r.status === 403 && j && j.message) { noAccess(j.message); return; }
   } catch (e) { sawNetworkTrouble = true; }
   // 2) team member → the Studio OS door
   try {
@@ -131,8 +140,8 @@ async function route(token){
     if (wj && wj.isTeam) { location.href = "/studio.html"; return; }
   } catch (e) { sawNetworkTrouble = true; }
   // 3) nothing connected (or the network is flaky) — honest panel, never a dead spinner
-  if (sawNetworkTrouble) { show('noAccess'); $('noAccess').querySelector('.sub').textContent = "We couldn't reach the studio just now — it's probably your connection. Try again in a moment."; return; }
-  show('noAccess');
+  if (sawNetworkTrouble) { noAccess("We couldn't reach the studio just now — it's probably your connection. Try again in a moment."); return; }
+  noAccess(null);
 }
 
 $('f').addEventListener('submit', async function(ev){

@@ -90,7 +90,7 @@ async function sendInviteLink(email: string, siteId: string): Promise<boolean> {
   const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
   const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand (never the platform name)
   const sent = await sendEmail(email, `You’ve been invited to help run ${name}`,
-    `<p>You’ve been invited to help run <strong>${name}</strong>.</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type. You can set a password afterwards from your account.</p>`, brand).catch(() => false);
+    `<p>You’ve been invited to help run <strong>${name}</strong>.</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, brand).catch(() => false);
   return sent !== false;
 }
 

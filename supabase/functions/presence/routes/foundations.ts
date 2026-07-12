@@ -20,6 +20,7 @@ import { planEmailSetup } from '../platform/email_providers.ts';
 import { diffZones, planDnsRepair } from '../platform/zone.ts';
 import { registrarFor, hostFor } from '../platform/contract.ts';
 import { decidePlan, claimApprovedPlan, releaseApprovedPlanClaim } from '../lib/approved_plan.ts';
+import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 import type { InfraPlan } from '../platform/plans.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -168,6 +169,7 @@ export async function handleFoundationsDecide(req: Request, site: SiteRow, planI
   });
   if (!w.ok || !w.json?.[0]) return json({ error: 'not_found', message: 'That plan isn’t open for a decision.' }, 404, cors);
   await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: `${decision === 'approved' ? 'Approved' : 'Set aside'} the plan: ${w.json[0].title}`, principal, provenance: 'human', fields: ['infra_plan'] });
+  await notifyOwnerOfReviewerDecision(site, principal, `${decision === 'approved' ? 'Approved' : 'Passed on'}: ${w.json[0].title}`, `plan:${planId}`);
   return json({ data: { id: planId, status: decision } }, 200, cors);
 }
 

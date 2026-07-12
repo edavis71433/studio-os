@@ -24,8 +24,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 // ── portal-workspace.html retired via a REVERSIBLE redirect (zero inbound links) ──
 {
   const w = read('portal-workspace.html');
-  ok('portal-workspace.html is a reversible redirect (RETIRED toggle)', /var RETIRED = true/.test(w) && /if \(RETIRED\) \{ location\.replace\('\/portal\.html#growth'\)/.test(w));
-  ok('portal-workspace.html preserves the Growth capability (redirects to its live home)', /\/portal\.html#growth/.test(w));
+  // Two-door consolidation: the legacy portal APP (and its #growth tab) is retired —
+  // the stub now lands on the client DOOR, which routes each account to its home.
+  ok('portal-workspace.html is a reversible redirect (RETIRED toggle)', /var RETIRED = true/.test(w) && /if \(RETIRED\) \{ location\.replace\('\/portal\.html'\)/.test(w));
+  ok('portal-workspace.html points at the client door (no dead #growth anchor)', /\/portal\.html/.test(w) && !/#growth/.test(w));
   ok('portal-workspace.html documents rollback (git history)', /git show HEAD~1:portal-workspace\.html/.test(w));
   // it must be tiny now (retired stub), not the old duplicate app that fetched clever-api
   ok('portal-workspace.html is a small stub, not the old duplicate app', w.length < 2500);

@@ -107,8 +107,16 @@ serve(async (req) => {
   //    operation inside is fenced to the agency's own linked sites. Staff
   //    and clients continue through the existing boundary untouched.
   if (route === '/agency' || route.startsWith('/agency/')) {
-    const member = await resolveAgencyMember(req.headers.get('x-dds-user-jwt') || '');
-    if (!member) return json({ error: 'unauthorized', message: 'Please sign in with an agency account.' }, 401, cors);
+    const agencyJwt = req.headers.get('x-dds-user-jwt') || '';
+    const member = await resolveAgencyMember(agencyJwt);
+    if (!member) {
+      // Distinguish "not signed in" (401 → the door) from "signed in, but this
+      // account has no agency" (403 → honest copy) — a valid session must never
+      // be told to sign in again.
+      const authed = agencyJwt && (principal.kind === 'client' || principal.kind === 'staff');
+      if (authed) return json({ error: 'forbidden', message: 'This account isn’t part of an agency.' }, 403, cors);
+      return json({ error: 'unauthorized', message: 'Please sign in with an agency account.' }, 401, cors);
+    }
     return handleAgency(req, route, method, member, principal, cors);
   }
 

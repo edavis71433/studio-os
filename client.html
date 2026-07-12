@@ -71,7 +71,7 @@ let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // relative "when" — calm, human, no clock precision
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 
@@ -97,10 +97,25 @@ async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api
 function renderProjects(projects,unread){
   let html=`<div class="rolebadge">● Your projects</div><header><h1>Your projects</h1><p class="sub">${projects.length?'What your studio is working on with you.':'Your studio hasn’t started a project with you yet.'}${unread?` · <strong>${unread}</strong> new update${unread===1?'':'s'}`:''}</p></header><section>`;
   if(!projects.length) html+=`<div class="card"><p class="muted">When your studio starts a project, it’ll appear here with your tasks, files, and approvals.</p></div>`;
-  for(const p of projects){html+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace('_',' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p></div>`;}
+  for(const p of projects){html+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   html+=`</section>`;
   $('main').innerHTML=html;
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
+  // Glanceable list: progress % and "N things need your OK" WITHOUT a click —
+  // the report endpoint already computes both. Best-effort per card.
+  projects.slice(0,6).forEach(async(p)=>{
+    try{
+      const r=await api('/client/projects/'+p.id+'/report');
+      const d=(r&&r.body&&r.body.data)||{};
+      const el=document.getElementById('glance-'+p.id);if(!el)return;
+      const pct=d.progress&&d.progress.pct;
+      const waiting=(Number(d.pending_approvals)||0)+(Number(d.open_client_actions)||0);
+      const bits=[];
+      if(pct!=null&&d.progress.total>0)bits.push(pct+'% along');
+      if(waiting>0)bits.push(`<strong style="color:var(--warn,#775d31)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);
+      el.innerHTML=bits.join(' · ');
+    }catch(_){/* the card still opens */}
+  });
 }
 // Service billing — the studio's invoices for project work, SEPARATE from the
 // Studio OS software subscription. Appended below the projects; hidden if none.

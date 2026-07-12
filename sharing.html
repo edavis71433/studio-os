@@ -62,7 +62,7 @@ let TOKEN="";
 sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; });
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(p,m,b){const r=await fetch(FN+p,{method:m||'GET',headers:H(),body:b?JSON.stringify(b):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
 // surfaces the owner can share with a client reviewer + their default posture
 const SURFACES=[

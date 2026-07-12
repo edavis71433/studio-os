@@ -85,7 +85,7 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') });
 async function apiGet(p){ try { const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
 async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
-function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 3000); }
+function toast(m){ if(window.ddsToast)return void ddsToast(m);const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 3000); }
 
 function composer(available){
   if(!available){

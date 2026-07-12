@@ -119,8 +119,9 @@ function render(moments, features, feed, ctx){
   const approvals = (feed && feed.pending_approvals) || [];
   const needs = notices.length + approvals.length;
   let html = '';
+  const _scopeHref = (base)=>{const _c=new URLSearchParams(location.search).get('client');if(!_c||!base||base.charAt(0)!=='/')return base;const h=base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');};
   for(const n of notices){
-    html += `<a class="moment attn todo" href="${esc(n.href||'/today.html')}">
+    html += `<a class="moment attn todo" href="${esc(_scopeHref(n.href||'/today.html'))}">
       <span class="tag">Needs you</span>
       <h2>${esc(n.headline||'Something needs a look')}</h2>
       ${n.body?`<p>${esc(n.body)}</p>`:''}
@@ -186,7 +187,7 @@ function render(moments, features, feed, ctx){
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
     <div class="answer" id="askAns" hidden></div></div>`;
   // (Navigation to Connections and Visual Studio now lives in the persistent top nav.)
-  $('main').innerHTML = html;
+  $('main').innerHTML = '<div class="stack">' + html + '</div>';   // .stack gives the cards their breathing room
   wire();
 }
 
@@ -266,9 +267,12 @@ function trouble(){
 // find their own project. One calm card, only when a linked project exists. ──
 function studioProjectCard(d){
   try{
+    // Operators drilled into a client (?client=) see the client's OWN Today —
+    // the delivery view belongs to the customer; showing it scoped is confusing.
+    if(new URLSearchParams(location.search).get('client')) return;
     const projects = (d && (d.projects || d)) || [];
     if(!Array.isArray(projects) || !projects.length) return;
-    const host = document.querySelector('main') || document.body;
+    const host = document.getElementById('main') || document.body;
     const card = document.createElement('a');
     card.href = '/client.html';
     card.style.cssText = 'display:block;max-width:860px;margin:18px auto 0;padding:16px 20px;border:1px solid var(--accent-soft,#e5ddf5);border-radius:14px;background:var(--card,#fff);font-size:14px;color:inherit;text-decoration:none';
@@ -332,7 +336,7 @@ async function healthLine(){
   } else {
     line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(sugg.href) + '" style="color:var(--accent);font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:var(--muted)">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
   }
-  host.insertBefore(line, host.firstChild ? host.firstChild.nextSibling : null);
+  host.insertBefore(line, host.firstChild);   // the health line leads the page — never splits the needs-you stack
 }
 
 // ── PT-2C: the Customer Journey (PT-7) — celebrate milestones, never a score ──

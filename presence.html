@@ -371,7 +371,7 @@ h5.rune .whisper.ok{color:var(--sage)}
       <button class="navitem" data-view="faqs">Questions</button>
       <button class="navitem" data-view="testimonials">Kind words</button>
       <button class="navitem" data-view="updates">Updates</button>
-      <button class="navitem" data-view="media">Files</button>
+      <button class="navitem" data-view="media">Photos</button>
       <button class="navitem" data-view="design">Design</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
@@ -433,10 +433,15 @@ h5.rune .whisper.ok{color:var(--sage)}
           <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
           <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
         </select><div class="hint">Sets the right words (“Services” vs “Menu”) and the right behind-the-scenes search markup. Applies when you next publish.</div></div>
+        <details style="margin:14px 0;border:1px solid var(--hair,#eee9e0);border-radius:12px;padding:12px 16px">
+          <summary style="cursor:pointer;font-weight:600;font-size:14px">For search engines — optional, we handle the rest</summary>
+          <div style="margin-top:12px">
         <div class="field"><label for="f-seo_title">Search headline (SEO title)</label><input type="text" id="f-seo_title" data-sing="identity" data-field="seo_title" maxlength="60"><div class="hint">What Google shows as your page title. Empty = your business name.</div></div>
         <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="160"><div class="hint">The line under the headline in search results. Empty = your description.</div></div>
         <div class="field"><label for="f-gsv">Google Search Console code</label><input type="text" id="f-gsv" maxlength="100" placeholder='paste the content="…" value'><div class="hint">Search Console → Settings → Ownership verification → HTML tag. Paste just the code, publish, then click Verify at Google — unlocks indexing reports and sitemap submission.</div></div>
         <div class="field"><label for="f-bsv">Bing Webmaster code</label><input type="text" id="f-bsv" maxlength="100" placeholder="optional"><div class="hint">Same idea for Bing (also powers Copilot search).</div></div>
+          </div>
+        </details>
         <h2 style="font-size:14px;margin:22px 0 2px;color:var(--ink-2,#666);letter-spacing:.04em;text-transform:uppercase">Links &amp; booking</h2>
         <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
         <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
@@ -510,7 +515,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 
       <!-- PHOTOGRAPHS -->
       <section class="view" id="view-media">
-        <h1 class="doc">Files</h1>
+        <h1 class="doc">Photos</h1>
         <p class="docsub">The images on your website. Anything marked “on your site” is at work; the rest wait here. Your full library — photos, brand, documents — lives in <a class="link" href="/files.html">Files</a>.</p>
         <div id="assetHealth" style="margin:2px 0 8px" hidden></div>
         <div style="display:flex;align-items:baseline;gap:20px">
@@ -770,7 +775,11 @@ function showGate(title, msg, showBtn) {
   $("app").hidden = true; $("dock").style.display = "none";
   $("gate").hidden = false;
   $("gateTitle").textContent = title; $("gateMsg").textContent = msg;
-  $("gateBtn").hidden = !showBtn;
+  const b = $("gateBtn");
+  b.hidden = !showBtn;
+  // A client reviewer who wandered in has their OWN page — send them there,
+  // never to the owner door.
+  if (/client view|shares with you/i.test(String(msg || ""))) { b.href = "/client.html"; b.textContent = "Go to your view"; }
 }
 
 /* ── navigation ── */
@@ -2041,12 +2050,25 @@ $("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if
    (business_moments/connected/ai) even while it keeps full website drafting. ── */
 function hasFeature(f) { return !S.features || S.features.indexOf(f) >= 0; }
 function applyEditionGating() {
+  const isMonitor = !!(S.site && S.site.edition === "monitor");
   const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
-  const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("website");          // Visual Studio makes site imagery — website feature (matches the server route gate)
-  // A watch-plan (monitor) site OBSERVES — it never publishes. Hide the button
+  // Visual Studio makes site imagery — website feature AND a drafting site
+  // (matches the nav: a watch-plan can read the site but never generates for it).
+  const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("website") || isMonitor;
+  // A watch-plan (monitor) site OBSERVES — it never publishes. Hide BOTH publish
+  // affordances (desktop button + mobile dock tab) and say so once, calmly,
   // instead of letting every tap end in a server refusal.
-  if (S.site && S.site.edition === "monitor") {
+  if (isMonitor) {
     const p = $("btnPublish"); if (p) p.style.display = "none";
+    const dp = $("dockPublish"); if (dp) dp.style.display = "none";
+    if (!document.getElementById("monitorNote")) {
+      const n = document.createElement("div");
+      n.id = "monitorNote";
+      n.style.cssText = "max-width:900px;margin:10px auto 0;padding:10px 16px;border-radius:10px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px";
+      n.textContent = "This plan watches your website — viewing everything, changing nothing. To edit and publish from here, ask us about upgrading.";
+      const host = document.querySelector(".main") || document.body;
+      host.insertBefore(n, host.firstChild);
+    }
   }
 }
 
@@ -2732,6 +2754,7 @@ async function refreshAll() {
   // website + drafting surfaces, never the Business-OS "brains" it doesn't include.
   // null = no entitlement recorded → all features (studio_os default, unchanged).
   S.features = (ctxR && ctxR.data && ctxR.data.edition_features) || null;
+  S.upsell = (ctxR && ctxR.data && ctxR.data.upsell) || null;   // the honest next rung (Settings shows it — this tier's one organic offer surface)
   applyEditionGating();
   applyVocab();
   fillSingles(); await loadToday();
@@ -2767,6 +2790,21 @@ async function mountBillingCard() {
     card.appendChild(b);
   } else if (s.has_service_billing) {
     card.appendChild(el("div", "hint", "Invoices for project work from your studio are billed separately."));
+  }
+  // The honest next rung — for CMS-only this Settings card is the ONE surface
+  // that organically shows what upgrading adds (gains AND what switches off).
+  if (S.upsell && S.upsell.name) {
+    const gains = (S.upsell.gains || []).map((g) => String(g).replace(/_/g, " ")).join(", ");
+    const losses = (S.upsell.gives_up || []).map((g) => String(g).replace(/_/g, " ")).join(", ");
+    const u = el("div", "hint");
+    u.style.marginTop = "10px";
+    u.textContent = `${S.upsell.name}${S.upsell.monthly ? ` (from $${S.upsell.monthly}/mo)` : ""}${gains ? ` adds ${gains}.` : "."}` +
+      (losses ? ` Heads up: it switches off ${losses} — ask us about keeping both.` : "");
+    const a = document.createElement("a");
+    a.href = "mailto:support@davisdigitalstudio.com?subject=" + encodeURIComponent("Upgrading to " + S.upsell.name);
+    a.textContent = " Ask about upgrading →"; a.style.color = "var(--accent,#5b3fa0)";
+    u.appendChild(a);
+    card.appendChild(u);
   }
   host.appendChild(card);
 }
@@ -2805,7 +2843,7 @@ async function mountSearchCard() {
   const status = el("div", "hint", "Checking your search setup…"); card.appendChild(status);
   host.appendChild(card);
   let h = null;
-  try { h = (await api("GET", "/search/health")).data; } catch (_) { status.textContent = "The search check couldn’t run just now."; return; }
+  try { h = (await api("GET", "/search/health")).data; } catch (e) { status.textContent = (e && e.status === 403) ? "Search insights aren’t part of your plan yet — everything else here still works." : "The search check couldn’t run just now."; return; }
   status.remove();
   // 1. the health sentences
   const line = (ok2, good, fix) => {

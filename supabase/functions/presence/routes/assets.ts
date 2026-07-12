@@ -32,6 +32,7 @@ import {
   fileKind, isFavorite, replaceNeedsApproval, fileState, type Asset, type ApprovalPolicy, type UsageRef,
 } from '../lib/dam.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
+import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 
 const ASSET_COLS = 'id,storage_path,alt_text,width,height,bytes,mime,tags,collection,metadata,content_hash,brand,asset_status,focal_x,focal_y,created_at';
 const LIST_THUMB_CAP = 160;   // sign at most this many thumbnails per list call (bounded latency)
@@ -259,6 +260,7 @@ export async function handleAssetStatus(req: Request, site: SiteRow, principal: 
   const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(stamp) });
   if (!(r.ok && arr(r)[0])) return json({ error: 'write_failed', message: 'That didn’t save — try again.' }, 502, cors);
   await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: `File ${action} → ${to}`, principal, provenance: 'human', fields: ['asset_status'] });
+  if (action === 'approve' || action === 'reject') await notifyOwnerOfReviewerDecision(site, principal, `File ${action === 'approve' ? 'approved' : 'declined'}`, `file:${id}:${action}`);
   return json({ data: { ok: true, status: to, policy } }, 200, cors);
 }
 

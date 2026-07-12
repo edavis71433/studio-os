@@ -42,3 +42,24 @@ export async function clearNotice(clientId: string, kind: string, period?: strin
   const scope = `client_id=eq.${encodeURIComponent(clientId)}&kind=eq.${encodeURIComponent(kind)}&status=eq.active${period ? `&period=eq.${encodeURIComponent(period)}` : ''}`;
   await svc(`presence_plan_notices?${scope}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
 }
+
+/** When a CLIENT REVIEWER decides something (a plan, a connected write, a file,
+ *  a launch), the owner must be actively told — "your studio has been told" was
+ *  silently untrue before this. Owner deciding their own item = no notice (noise).
+ *  Best-effort; idempotent per subject via the period key. */
+export async function notifyOwnerOfReviewerDecision(
+  site: { id: string; client_id: string },
+  principal: { kind: string },
+  headline: string,
+  period: string,
+): Promise<void> {
+  try {
+    const { resolveSiteRoleCached } = await import('./workspace.ts');
+    const role = await resolveSiteRoleCached(principal as never, '', site.id);
+    if (role !== 'client_reviewer') return;
+    await raiseNotice({
+      siteId: site.id, clientId: site.client_id, kind: 'approval_decided', period,
+      headline, body: 'Your reviewer made a decision. Nothing needed from you — it’s on the timeline if you want the details.',
+    });
+  } catch { /* never block a decision on its echo */ }
+}

@@ -36,7 +36,7 @@
 </style>
 </head>
 <body>
-<div class="wrap"><div id="main" aria-live="polite"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div><div id="sr-status" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></div></div>
 <script>
 // The public review & sign page. The email's "Review & sign" link lands here with
 // ?t=<signed token>. Reads the proposal/contract via the token-gated public view,
@@ -52,22 +52,40 @@ function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’
 // A RECOVERABLE problem (version changed, too many tries) keeps the page — the
 // person shouldn't lose the document they just read over a retryable hiccup.
 function softFail(msg){
+  const m=msg||'That didn’t go through — give it another try in a moment.';
   let n=$('softErr');
   if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='#a3423a';$('main').appendChild(n);}
-  n.textContent=msg||'That didn’t go through — give it another try in a moment.';
+  n.textContent=m;
+  // A version change can NEVER succeed on retry — swap the actions for a reload.
+  if(/reload|updated/i.test(m)){
+    const row=document.querySelector('.row');
+    if(row)row.innerHTML='<button id="reloadBtn">Load the latest version</button>';
+    const rb=$('reloadBtn'); if(rb)rb.onclick=()=>location.reload();
+    return;
+  }
   document.querySelectorAll('button:disabled').forEach(b=>b.disabled=false);
+  // Disarm a half-armed decline so the label matches reality again.
+  const dd=$('decline'); if(dd&&dd.dataset.armed==='1'){dd.dataset.armed='0';dd.textContent='Decline this proposal';}
 }
-function thanks(t,s){$('main').innerHTML=`<div class="center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`;}
+function announce(t){try{$('sr-status').textContent=t;}catch(_){/* */}}
+function thanks(t,s){$('main').innerHTML=`<div class="center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`;announce(t);}
 async function load(){
   if(!TOKEN){fail();return;}
   const r=await api('/sales/p/'+encodeURIComponent(TOKEN));
   if(!r.ok||!r.body.data){fail(r.body&&r.body.message);return;}
   const d=r.body.data;
+  // The studio's own identity, not a generic page.
+  if(d.brand){
+    if(d.brand.accent)document.documentElement.style.setProperty('--p',d.brand.accent);
+    if(d.brand.name)document.title=`Review & sign — ${d.brand.name}`;
+    window.__brandName=d.brand.name||'';
+  }
   if(d.kind==='proposal')renderProposal(d);else renderContract(d);
 }
+function preparedBy(){return window.__brandName?`<p class="muted" style="margin-top:2px">Prepared by ${esc(window.__brandName)}</p>`:'';}
 function renderProposal(p){
   const items=(p.line_items||[]).map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
-  let h=`<h1>${esc(p.title||'Your proposal')}</h1><p class="sub">Take your time — nothing is final until you accept.</p>
+  let h=`<h1>${esc(p.title||'Your proposal')}</h1>${preparedBy()}<p class="sub">Take your time — nothing is final until you accept.</p>
   <div class="card"><table>${items}<tr class="total"><td>Total</td><td>${money(p.subtotal_cents)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}</div>`;
   if(p.status==='accepted'){h+=`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`;}
   else if(p.status==='declined'){h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;}
@@ -82,9 +100,9 @@ function renderProposal(p){
     if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else softFail(r.body&&r.body.message);};
 }
 function renderContract(c){
-  let h=`<h1>${esc(c.title||'Your agreement')}</h1><p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
+  let h=`<h1>${esc(c.title||'Your agreement')}</h1>${preparedBy()}<p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
   <div class="card"><div class="body">${esc(c.body)}</div></div>`;
-  if(c.status==='signed'){h+=`<div class="ok">✓ Signed${c.signed_at?' on '+esc(new Date(c.signed_at).toLocaleDateString()):''} — you’re all set.</div>`;}
+  if(c.status==='signed'){h+=`<div class="ok">✓ Signed${c.signed_at?' on '+esc(new Date(c.signed_at).toLocaleDateString()):''} — you’re all set.</div><div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div>`;}
   else h+=`<div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
     <label for="em">Your email (optional)</label><input id="em" type="email" autocomplete="email" placeholder="you@business.com">
     <div class="row"><button id="sign">Sign the agreement</button></div>
@@ -94,7 +112,22 @@ function renderContract(c){
     if(!nm){softFail('Type your full name in the box above — that’s your signature.');$('nm').focus();return;}
     s.disabled=true;
     const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
-    if(r.ok)thanks('Signed — welcome aboard! 🎉','Your studio has been told and will kick things off. Anything sent to you next lands in your email.');
+    if(r.ok){
+      const pay=r.body&&r.body.data&&r.body.data.pay_url;
+      const amt=r.body&&r.body.data&&r.body.data.pay_amount_cents;
+      if(pay){
+        // Sign → pay, one session: the deposit is already waiting — offer it now.
+        $('main').innerHTML=`<div class="center"><h1>Signed — welcome aboard! 🎉</h1>
+          <p class="sub">A copy of your signed agreement is on its way to your email.</p>
+          <div class="card" style="text-align:left"><p style="font-weight:600;margin-bottom:6px">One more step to lock in your start</p>
+          <p class="muted" style="margin-top:0">Your ${money(amt)} deposit is ready — paying it now secures your place in the schedule.</p>
+          <div class="row"><a href="${esc(pay)}" style="display:inline-block;background:var(--p);color:#fff;font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none">Pay the ${money(amt)} deposit →</a></div>
+          <p class="muted">Prefer later? The same secure link is in your email — nothing expires today.</p></div></div>`;
+        announce('Signed. Your deposit link is ready.');
+      } else {
+        thanks('Signed — welcome aboard! 🎉','A copy of your signed agreement is on its way to your email. Your studio has been told and will kick things off.');
+      }
+    }
     else{softFail(r.body&&r.body.message);}};
 }
 load();

@@ -340,9 +340,61 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
       method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
       body: JSON.stringify({ site_id: deal.site_id, client_id: clientId, kind: 'deal_followup', period: `deal:${deal.id}`, headline: `Follow up on ${title}`, body, status: 'active' }),
     });
-    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) nudged++;
+    if (ins.ok && Array.isArray(ins.json) && ins.json.length > 0) {
+      nudged++;
+      // Parity with lead follow-ups: a quiet $5k proposal deserves at least the
+      // email a fresh $0 lead gets. Send-once (gated on the notice insert above).
+      try {
+        const ident = await svc(`presence_identity?site_id=eq.${deal.site_id}&select=email&limit=1`);
+        const owner = ident.json?.[0]?.email;
+        if (owner) {
+          const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+          const brand = await loadEmailBrand(deal.site_id);
+          const safeBody = body.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+          sendEmail(String(owner), `Follow up on ${title}`, `<p>${safeBody}</p><p class="cta"><a href="${base}/pipeline.html?deal=${deal.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the deal →</a></p>`, brand).catch(() => {});
+        }
+      } catch { /* the notice already carries it */ }
+    }
   }
   return { nudged };
+}
+
+// ── MONEY FOLLOW-UPS: unpaid invoices/deposits get ONE gentle reminder ────────
+// presence_invoices rows carry due_date and a stored payment link, but nothing
+// ever swept them — an unpaid deposit simply sat. One reminder per invoice
+// (send-once via the notices dedupe), re-using the stored Stripe link, to the
+// deal's contact; the owner gets the notice on the same rail.
+export async function runInvoiceReminders(limit = 20): Promise<{ reminded: number }> {
+  const cutoff = new Date(Date.now() - 7 * 86400_000).toISOString();   // open for 7+ days
+  const today = new Date().toISOString().slice(0, 10);
+  const q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&or=(due_date.lt.${today},and(due_date.is.null,created_at.lt.${encodeURIComponent(cutoff)}))&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url&order=created_at.asc&limit=${limit}`);
+  let reminded = 0;
+  for (const inv of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string }>) {
+    const siteQ = await svc(`presence_sites?id=eq.${inv.site_id}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+    const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const what = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
+    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ site_id: inv.site_id, client_id: clientId, kind: 'deal_followup', period: `invremind:${inv.id}`, headline: `Still unpaid — ${inv.title || what} (${amount})`, body: 'We nudged the client once with the same secure link. If it stays quiet, a personal note usually lands best.', status: 'active' }),
+    });
+    if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;   // already reminded once — never nag
+    reminded++;
+    try {
+      if (inv.deal_id) {
+        const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=contact_id&limit=1`)).json?.[0];
+        const email = deal?.contact_id ? (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=email&limit=1`)).json?.[0]?.email : '';
+        if (email) {
+          const brand = await loadEmailBrand(inv.site_id);
+          const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
+          sendEmail(String(email), `A gentle reminder — ${inv.title || what} (${amount})`,
+            `<p>Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
+        }
+      }
+    } catch { /* the owner notice already carries it */ }
+  }
+  return { reminded };
 }
 
 // ── PP-2 / CP-3.1: the annual renewal heads-up ───────────────────────────────
@@ -375,6 +427,49 @@ export async function runRenewalReminders(limit = 50): Promise<{ reminded: numbe
       const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=email&limit=1`);
       const owner = ident.json?.[0]?.email;
       if (owner) sendEmail(String(owner), copy.subject, `<p>${copy.body}</p><p><a href="${base}/portal.html">Review or manage your plan →</a></p>`).catch(() => {});
+    }
+  }
+  return { reminded };
+}
+
+// ── UNSIGNED-DOC REMINDERS: one fresh link to the CLIENT per sent doc ─────────
+// A proposal/agreement sitting "sent" for 3+ days gets exactly ONE reminder to
+// the client with a freshly minted link (the original may be buried or expiring).
+// Capped at one-ever per document via the notices dedupe; respects nothing older
+// than 21 days (a dead deal shouldn't get a ghost nudge).
+export async function runSalesDocReminders(limit = 20): Promise<{ reminded: number }> {
+  const { linkSecret, signSalesToken } = await import('../routes/sales.ts');
+  const secret = linkSecret();
+  if (!secret) return { reminded: 0 };
+  const from = new Date(Date.now() - 21 * 86400_000).toISOString();
+  const to = new Date(Date.now() - 3 * 86400_000).toISOString();
+  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  let reminded = 0;
+  for (const kind of ['contract', 'proposal'] as const) {
+    const table = kind === 'contract' ? 'presence_contracts' : 'presence_proposals';
+    const q = await svc(`${table}?status=eq.sent&deleted_at=is.null&sent_at=gte.${encodeURIComponent(from)}&sent_at=lte.${encodeURIComponent(to)}&select=id,site_id,deal_id,title&order=sent_at.asc&limit=${limit}`);
+    for (const doc of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string; title?: string }>) {
+      const siteQ = await svc(`presence_sites?id=eq.${doc.site_id}&select=client_id&limit=1`);
+      const clientId = siteQ.json?.[0]?.client_id;
+      if (!clientId) continue;
+      const what = kind === 'contract' ? 'agreement' : 'proposal';
+      // send-once gate FIRST (the notice doubles as the owner's heads-up)
+      const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+        method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+        body: JSON.stringify({ site_id: doc.site_id, client_id: clientId, kind: 'deal_followup', period: `remind:${doc.id}`, headline: `Reminder sent — ${doc.title || `the ${what}`}`, body: `The ${what} has been out a few days, so we sent the client one gentle reminder with a fresh link. If it stays quiet, a personal note lands best.`, status: 'active' }),
+      });
+      if (!(ins.ok && Array.isArray(ins.json) && ins.json.length > 0)) continue;
+      try {
+        const deal = (await svc(`presence_deals?id=eq.${doc.deal_id}&site_id=eq.${doc.site_id}&select=contact_id&limit=1`)).json?.[0];
+        const email = deal?.contact_id ? (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${doc.site_id}&select=email&limit=1`)).json?.[0]?.email : '';
+        if (!email) continue;
+        const token = await signSalesToken({ t: kind, id: doc.id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
+        const brand = await loadEmailBrand(doc.site_id);
+        const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'contract' ? 'Review & sign' : 'Review the proposal'} →</a>`;
+        sendEmail(String(email), `Still there for you — ${doc.title || `your ${what}`}`,
+          `<p>Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
+        reminded++;
+      } catch { /* the owner notice already recorded the attempt */ }
     }
   }
   return { reminded };

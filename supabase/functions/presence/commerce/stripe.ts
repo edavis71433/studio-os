@@ -120,6 +120,9 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
     // ONE payment per invoice — after it completes, Stripe deactivates the link,
     // so a client double-clicking the email can never pay the same invoice twice.
     'restrictions[completed_sessions][limit]': '1',
+    // Land the payer back on OUR branded thank-you, not Stripe's generic screen.
+    'after_completion[type]': 'redirect',
+    'after_completion[redirect][url]': `${SITE_URL}/payment-success.html`,
   }, `plink-${p.invoiceId}`);
   return { url: String(link.url), id: String(link.id) };
 }

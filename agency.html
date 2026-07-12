@@ -156,8 +156,30 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
     const pf=await api('/agency/portfolio');
     CLIENTS=(pf.ok&&Array.isArray(pf.body.data))?pf.body.data:[];
     renderList('');
+    mountQueues();   // "what needs me today" — the cross-client morning cockpit
   }catch(_){trouble();}
 })();
+
+// ── Work queues: the backend has aggregated cross-client queues since L5.7 —
+//    this is their first UI. One calm panel; each row jumps into that client. ──
+async function mountQueues(){
+  try{
+    const r=await api('/agency/queues');
+    if(!r.ok||!r.body.data)return;
+    const queues=(r.body.data.queues||[]).filter(q=>q.items&&q.items.length);
+    if(!queues.length)return;
+    const host=document.createElement('section');
+    host.style.cssText='max-width:980px;margin:8px auto 22px;padding:0 20px';
+    host.innerHTML='<h2 style="font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft,#6b6478);font-weight:600;margin:0 0 10px">What needs you today</h2>'+
+      queues.map(q=>`<div style="background:var(--card,#fff);border:1px solid var(--line,#eee9e0);border-radius:14px;padding:14px 16px;margin-bottom:10px">
+        <p style="font-weight:600;font-size:14px;margin:0 0 6px">${esc(q.title)} <span style="color:var(--soft,#6b6478);font-weight:400">· ${q.items.length}</span></p>
+        ${q.items.slice(0,5).map(it=>`<a href="/today.html?client=${encodeURIComponent(it.site_id)}" style="display:block;padding:6px 0;color:inherit;text-decoration:none;font-size:13.5px"><strong>${esc(it.name)}</strong> — ${esc(it.why)} <span style="color:var(--p,#5b3fa0)">→</span></a>`).join('')}
+        ${q.items.length>5?`<p style="color:var(--soft,#6b6478);font-size:12.5px;margin:6px 0 0">+ ${q.items.length-5} more</p>`:''}
+      </div>`).join('');
+    const list=document.getElementById('main')||document.body;
+    list.insertBefore(host,list.firstChild?list.firstChild.nextSibling:null);
+  }catch(_){/* the portfolio list is the fallback */}
+}
 </script>
 </body>
 </html>

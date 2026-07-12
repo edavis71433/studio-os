@@ -30,7 +30,7 @@
   .c .contact{font-size:13.5px;color:var(--soft);margin-top:3px}
   .c .contact a{color:var(--p);text-decoration:none}
   .c .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:10px 15px;cursor:pointer;text-decoration:none}
+  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:12px 16px;cursor:pointer;text-decoration:none}
   .c .acts a.reply{background:var(--p);color:#fff;border-color:var(--p)}
   .c .acts button:hover{border-color:var(--p);color:var(--p)}
   .muted{color:var(--soft);font-size:14.5px}
@@ -87,14 +87,14 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
 function render(){
   const q=Q.trim().toLowerCase();
   const rows=q?ALL.filter(c=>((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)):ALL;
   let h=`<div class="rolebadge">● Contacts</div>
     <header><h1>Contacts</h1><p class="sub">${ALL.length?ALL.length+' '+(ALL.length===1?'contact':'contacts')+' · everyone you do business with.':'Everyone you do business with, in one place.'}</p></header>
-    <div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ New</button></div>`;
+    <div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ New</button><button class="btn" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button></div><div id="csvZone"></div>`;
   if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
   else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">No contacts match “${esc(Q)}”.</p>`;}
   else for(const c of rows){
@@ -115,6 +115,7 @@ function wire(){
   const nb=$('new');if(nb)nb.addEventListener('click',openNew);
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>newDeal(b.getAttribute('data-deal'))));
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
+  const ic=$('importCsv');if(ic)ic.addEventListener('click',openImport);
 }
 function openNew(){$('c-name').value='';$('c-email').value='';$('c-phone').value='';$('c-company').value='';$('newDlg').showModal();setTimeout(()=>$('c-name').focus(),20);}
 $('c-cancel').onclick=()=>$('newDlg').close();
@@ -129,6 +130,57 @@ $('newForm').onsubmit=async(e)=>{
     $('newDlg').close();toast(r.body&&r.body.deduped?'That contact already existed.':'Contact added.');await load();
   }catch(_){toast('That didn’t save.');}finally{if(btn)btn.disabled=false;}
 };
+// ── CSV IMPORT: bring an existing contact list in one go. Pure frontend — the
+// server already dedupes per email and validates every row, so this simply
+// parses, previews, and POSTs. Handles quoted fields; maps common headers. ──
+function parseCsv(text){
+  const rows=[];let row=[],cell='',inQ=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(inQ){if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else inQ=false;}else cell+=ch;}
+    else if(ch==='"')inQ=true;
+    else if(ch===','){row.push(cell);cell='';}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cell);cell='';if(row.some(c=>c.trim()!==''))rows.push(row);row=[];}
+    else cell+=ch;}
+  if(cell!==''||row.length){row.push(cell);if(row.some(c=>c.trim()!==''))rows.push(row);}
+  return rows;
+}
+function mapHeader(h){h=h.toLowerCase().trim();
+  if(/^(full ?name|name|contact)$/.test(h))return'name';
+  if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';
+  if(/e-?mail/.test(h))return'email';if(/phone|mobile|tel/.test(h))return'phone';
+  if(/company|business|organi[sz]ation/.test(h))return'company';return null;}
+function openImport(){
+  const z=$('csvZone');
+  z.innerHTML=`<div class="card" style="margin:10px 0;padding:14px 16px"><p style="font-weight:600;margin-bottom:4px">Import contacts from a CSV</p>
+    <p class="muted" style="margin-top:0">Export from anywhere (Google Contacts, a spreadsheet, another tool) — we look for name, email, phone, and company columns. Duplicates are skipped automatically.</p>
+    <input type="file" id="csvFile" accept=".csv,text/csv" aria-label="Choose a CSV file"><div id="csvPrev"></div></div>`;
+  $('csvFile').addEventListener('change',async(e)=>{
+    const f=e.target.files&&e.target.files[0];if(!f)return;
+    const text=await f.text();const rows=parseCsv(text);
+    if(rows.length<2){$('csvPrev').innerHTML='<p class="muted">That file looks empty (or has only a header row).</p>';return;}
+    const cols=rows[0].map(mapHeader);
+    if(!cols.includes('email')&&!cols.includes('name')&&!cols.includes('first')){$('csvPrev').innerHTML='<p class="muted">We couldn’t find a name or email column. Check the first row has headers like “Name” and “Email”.</p>';return;}
+    const items=rows.slice(1).map(r=>{const o={};cols.forEach((c,i)=>{if(c)o[c]=(r[i]||'').trim();});
+      const name=o.name||[o.first,o.last].filter(Boolean).join(' ');
+      return{name:name||undefined,email:(o.email||'').toLowerCase()||undefined,phone:o.phone||undefined,company:o.company||undefined};
+    }).filter(x=>x.name||x.email).slice(0,500);
+    $('csvPrev').innerHTML=`<p class="muted" style="margin:10px 0 6px">${items.length} contact${items.length===1?'':'s'} found — first few: ${esc(items.slice(0,3).map(i=>i.name||i.email).join(', '))}${items.length>3?'…':''}</p>
+      <button class="btn" id="csvGo">Import ${items.length}</button> <button class="btn" id="csvCancel" style="border-color:transparent">Cancel</button>`;
+    $('csvCancel').onclick=()=>{z.innerHTML='';};
+    $('csvGo').onclick=async()=>{
+      const btn=$('csvGo');btn.disabled=true;let added=0,existed=0,failed=0;
+      for(let i=0;i<items.length;i++){
+        btn.textContent=`Importing ${i+1}/${items.length}…`;
+        try{const r=await api('/sales/contacts','POST',items[i]);
+          if(r.ok){if(r.body&&r.body.deduped)existed++;else added++;}else failed++;
+        }catch(_){failed++;}
+      }
+      z.innerHTML='';toast(`${added} added${existed?`, ${existed} already existed`:''}${failed?`, ${failed} couldn’t be read`:''}.`);
+      await load();
+    };
+  });
+}
+
 // Start a pipeline deal straight from a contact — no re-typing.
 async function newDeal(cid){
   const c=ALL.find(x=>x.id===cid);if(!c)return;

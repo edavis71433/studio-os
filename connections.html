@@ -89,7 +89,7 @@ const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+
 async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
 async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
 
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
+function toast(msg){ if(window.ddsToast)return void ddsToast(msg);const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
 
 // connection state → a simple, human status (never technical)
 function statusOf(e){

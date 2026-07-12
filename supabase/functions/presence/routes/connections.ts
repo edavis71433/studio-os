@@ -26,6 +26,7 @@ import { buildWritePlan, writeSpec, writeWorkflowsForProvider } from '../connect
 import type { WriteWorkflow } from '../connected/writes.ts';
 import { saveWritePlan, listWritePlans, getWritePlan, decideWritePlan, markWriteOutcome, claimWriteForExecution, releaseWriteClaim, auditWrite } from '../connected/writestore.ts';
 import { executeWrite } from '../connected/execute.ts';
+import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 
 const CATEGORY_LABEL: Record<string, string> = {
   search: 'Being found', local_listing: 'Your listings', analytics: 'Your numbers',
@@ -179,6 +180,7 @@ export async function handleWriteDecide(req: Request, site: SiteRow, key: string
   const row = await decideWritePlan(site.id, planId, verb);
   if (!row) return json({ error: 'not_found', message: 'That plan isn’t open for a decision.' }, 404, cors);
   await auditWrite(site.id, key, verb === 'approve' ? 'write_approve' : 'write_abandon', `${row.status}: ${row.title}`, actorOf(principal));
+  await notifyOwnerOfReviewerDecision(site, principal, `${verb === 'approve' ? 'Approved' : 'Passed on'}: ${row.title}`, `write:${planId}`);
   return json({ data: row }, 200, cors);
 }
 

@@ -306,10 +306,20 @@ Deno.serve(async (req: Request) => {
       console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} is '${inv.status}', not flipping (via ${via})`);
       return new Response('ok (not open)', { status: 200 });
     }
-    const wrote = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, 'PATCH', { status: 'paid', paid_at: eventTime, updated_at: eventTime });
-    if (!wrote) {
+    // return=representation so ONLY the write that actually flipped the row (the
+    // race winner) emits the owner echo — a concurrent duplicate matches 0 rows.
+    const flipped = await fetch(`${SB_URL}/rest/v1/presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, {
+      method: 'PATCH',
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'paid', paid_at: eventTime, updated_at: eventTime }),
+    });
+    if (!flipped.ok) {
       console.error(`[stripe-webhook] ${type} FAILED to mark presence_invoice ${invoiceId} paid (via ${via}) — returning 500 so Stripe retries`);
       return new Response('db write failed', { status: 500 });
+    }
+    const flippedRows = await flipped.json().catch(() => []);
+    if (!Array.isArray(flippedRows) || flippedRows.length === 0) {
+      return new Response('ok (already flipped by a concurrent event)', { status: 200 });
     }
     // The owner-facing echo: a deal event (Pipeline history) + a notice (bell /
     // Today / Inbox) — without these, payment was invisible inside the app.

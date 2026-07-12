@@ -167,7 +167,7 @@ const COLS=[
 let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null,
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
 function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
 
 async function loadContext(){
@@ -190,7 +190,7 @@ function qstr(){
 async function load(){
   if(S.col==='stock'){ if(S.stockState==null) return loadStock(); return renderStock(); }   // FD-T10: stock has its own surface
   const [a,col,h]=await Promise.all([api('GET','/assets?'+qstr()),api('GET','/assets/collections'),api('GET','/assets/health')]);
-  if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${(a.body&&a.body.message)||"Your client view shows what you’ve chosen to share."}</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
+  if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${esc((a.body&&a.body.message)||"")||"Your client view shows what you’ve chosen to share."}</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
   let rows=(a.ok&&a.body.data&&a.body.data.assets)||[];
   const c=COLS.find(x=>x.key===S.col);
   if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);

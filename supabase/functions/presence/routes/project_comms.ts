@@ -49,11 +49,19 @@ export async function handleMessages(req: Request, jwt: string, site: SiteRow, p
     // a client-audience message participates in the ONE activity log (feeds notifications)
     await projectEvent(site.id, projectId, 'message', principal, audience === 'client', { message_id: rows(ins)[0].id, from: studio ? 'studio' : 'client' });
     // A studio→client message must reach the client's EMAIL, not only a portal
-    // they may not be watching. Best-effort; the message itself is already saved.
+    // they may not be watching. Throttled: if another client-audience message went
+    // out in the last 15 minutes, the earlier email already carries them to the
+    // full thread — don't stack one email per line of a conversation.
     if (studio && audience === 'client') {
-      const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
-      emailBridgedCustomer(site.id, projectId, 'A message from your studio',
-        `<p>Your studio wrote to you about your project:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote>`).catch(() => {});
+      try {
+        const prev = rows(await svc(`presence_project_messages?project_id=eq.${projectId}&site_id=eq.${site.id}&audience=eq.client&deleted_at=is.null&id=neq.${rows(ins)[0].id}&select=created_at,author_kind&order=created_at.desc&limit=1`))[0];
+        const recent = prev && prev.author_kind !== 'client' && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000;
+        if (!recent) {
+          const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+          emailBridgedCustomer(site.id, projectId, 'A message from your studio',
+            `<p>Your studio wrote to you about your project:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote>`).catch(() => {});
+        }
+      } catch { /* best-effort */ }
     }
     return json({ data: rows(ins)[0] }, 201, cors);
   }

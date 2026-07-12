@@ -4702,7 +4702,7 @@ serve(async (req) => {
           lines = yourTurn
             ? [
                 `Your project just moved to <strong>${stage}</strong>, and I need something from you to keep going.`,
-                payload.note ? String(payload.note) : `Check your portal for what’s needed.`,
+                payload.note ? String(payload.note) : `Sign in to see what’s needed.`,
                 `Whenever you get a chance, it keeps us right on schedule.`,
               ]
             : [
@@ -4712,19 +4712,19 @@ serve(async (req) => {
         } else if (eventType === 'message.sent') {
           subject = `New message from Eric`;
           heading = `You have a new message`;
-          lines = [ payload.preview ? String(payload.preview) : `Eric sent you a message in your portal.` ];
+          lines = [ payload.preview ? String(payload.preview) : `Eric sent you a message about your project.` ];
         } else if (eventType === 'approval.requested') {
           subject = `Something’s ready for your approval`;
           heading = `Ready for your review`;
-          lines = [ payload.title ? `“${payload.title}” is ready for you to approve.` : `Something’s ready for your approval in the portal.` ];
+          lines = [ payload.title ? `“${payload.title}” is ready for you to approve.` : `Something’s ready for your approval.` ];
         } else if (eventType === 'invoice.sent') {
           subject = `Your invoice from Davis Digital Studio`;
           heading = `A new invoice`;
-          lines = [ payload.amount ? `An invoice for $${payload.amount} is ready in your portal.` : `A new invoice is ready in your portal.` ];
+          lines = [ payload.amount ? `An invoice for $${payload.amount} is ready for you.` : `A new invoice is ready for you.` ];
         } else if (eventType === 'file.shared') {
           subject = `Eric shared a file with you`;
           heading = `A new file for you`;
-          lines = [ payload.name ? `“${payload.name}” was just added to your portal.` : `A new file is waiting in your portal.` ];
+          lines = [ payload.name ? `“${payload.name}” was just shared with you.` : `A new file was shared with you.` ];
         } else if (eventType === 'project.launched') {
           subject = `Your site is live 🎉`;
           heading = `Congratulations, ${name}!`;
@@ -7528,11 +7528,39 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         if (lead && lead.id && (lmessage || lsubject)) {
           await leadDb('lead_messages', 'POST', { lead_id: lead.id, who: 'them', body: lmessage || lsubject });
         }
+
+        // TWO-DOOR BRIDGE: the owner's working inbox is now leads.html, which
+        // reads presence_form_submissions on the STUDIO's own workspace. Without
+        // this insert, marketing-site enquiries reached only an email — never the
+        // product's Leads/Pipeline. Resolve the studio workspace via the same
+        // ownership chain the connect-workspace SQL creates; skip quietly if the
+        // workspace isn't connected yet (the email above still goes out).
+        try {
+          const H2 = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' };
+          const cl = await fetch(`${SB_URL}/rest/v1/clients?email=eq.${encodeURIComponent('eric@davisdigitalstudio.com')}&select=id&limit=1`, { headers: H2 });
+          const clientId = ((await cl.json().catch(() => []))[0] || {}).id;
+          if (clientId) {
+            const st = await fetch(`${SB_URL}/rest/v1/presence_sites?client_id=eq.${clientId}&select=id&limit=1`, { headers: H2 });
+            const studioSiteId = ((await st.json().catch(() => []))[0] || {}).id;
+            if (studioSiteId) {
+              await fetch(`${SB_URL}/rest/v1/presence_form_submissions`, {
+                method: 'POST', headers: { ...H2, Prefer: 'return=minimal' },
+                body: JSON.stringify({
+                  site_id: studioSiteId, form_kind: 'contact',
+                  name: lname || '', email: lemail || '', phone: lphone || '',
+                  message: [lsubject, lmessage].filter(Boolean).join(' — ').slice(0, 4000),
+                  source_page: String(body.source_page || 'davisdigitalstudio.com/contact'),
+                }),
+              });
+            }
+          }
+        } catch (_) { /* the legacy row + owner email above already captured the lead */ }
+
         try { await sendEmail(ERIC, `New lead: ${lname || lemail || 'someone'}`,
           notifyShell('New lead in your inbox', [
             `${lname || 'Someone'} just reached out${lsubject ? ` about “${lsubject}”` : ''}.`,
             lmessage ? lmessage.slice(0, 300) : '',
-          ], { label: 'Open Studio OS →', href: 'https://davisdigitalstudio.com/portal' })); } catch (_) {}
+          ], { label: 'Open your enquiries →', href: 'https://davisdigitalstudio.com/leads.html' })); } catch (_) {}
 
         return json({ ok: true, id: lead && lead.id }, 200, reqCors);
       }
@@ -10791,51 +10819,13 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
       } catch (e) { result.errors.push(`anniversary job: ${String(e)}`); }
 
       // ── APPROVAL AUTO-REMINDERS ──
-      // Pending approvals 3+ days old get a friendly nudge to the client,
-      // every 4 days, capped at 3 total. Respects clients.automation_paused.
-      // Stamps approvals.last_reminder_at / reminder_count (07b SQL).
+      // RETIRED (two-door consolidation): the legacy approvals surface (old client
+      // portal + old admin console) no longer exists, so this nudge emailed clients
+      // toward a page that can't show the approval — and no operator UI remained to
+      // act on or cancel the loop. The presence platform has its own approval flow
+      // (presence_approvals → client.html + email). Kept as a no-op for the cron's
+      // result shape; the legacy `approvals` table is untouched.
       (result as any).approval_reminders_sent = 0;
-      try {
-        const apR = await fetch(
-          `${SB_URL}/rest/v1/approvals?status=eq.pending&select=id,title,client_id,created_at,last_reminder_at,reminder_count&order=created_at.asc&limit=200`,
-          { headers: { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` } },
-        );
-        const pendA = apR.ok ? await apR.json() : [];
-        const cliR = await fetch(
-          `${SB_URL}/rest/v1/clients?deleted_at=is.null&select=id,name,email,contact_email,automation_paused&limit=300`,
-          { headers: { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` } },
-        );
-        const cliRows2 = cliR.ok ? await cliR.json() : [];
-        const cliMap: Record<string, any> = {};
-        for (const c of (Array.isArray(cliRows2) ? cliRows2 : [])) cliMap[String(c.id)] = c;
-        for (const a of (Array.isArray(pendA) ? pendA : [])) {
-          try {
-            const ageDays = (now - new Date(a.created_at).getTime()) / DAY;
-            if (!isFinite(ageDays) || ageDays < 3) continue;
-            const count = Number(a.reminder_count) || 0;
-            if (count >= 3) continue;
-            if (a.last_reminder_at && (now - new Date(a.last_reminder_at).getTime()) / DAY < 4) continue;
-            const c = cliMap[String(a.client_id)];
-            if (!c || c.automation_paused) continue;
-            const to = String(c.contact_email || c.email || '').trim();
-            if (!to) continue;
-            await sendEmail(
-              to,
-              `Quick one: "${a.title || 'an item'}" is waiting on your OK`,
-              notifyShell(`Waiting on your review`, [
-                `Hi ${c.name || 'there'} — "${a.title || 'an item'}" is sitting in your portal waiting for a decision.`,
-                `A quick approve (or a note on what to change) keeps your project moving. It takes under a minute.`,
-              ], { label: 'Review it now', href: PORTAL_URL }), CLIENT_OPTS,
-            );
-            await fetch(`${SB_URL}/rest/v1/approvals?id=eq.${encodeURIComponent(a.id)}`, {
-              method: 'PATCH',
-              headers: { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-              body: JSON.stringify({ last_reminder_at: new Date().toISOString(), reminder_count: count + 1 }),
-            });
-            (result as any).approval_reminders_sent++;
-          } catch (e) { result.errors.push(`appr-remind ${a.id}: ${String(e)}`); }
-        }
-      } catch (e) { result.errors.push(`approval reminder job: ${String(e)}`); }
 
       // ── MONTHLY REPORT NUDGE ──
       // On the 1st of the month: one email to Eric listing which recurring

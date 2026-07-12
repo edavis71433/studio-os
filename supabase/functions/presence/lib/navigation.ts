@@ -73,7 +73,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // sales Pipeline fold in here as sub-items (the primary bar stays outcomes-only).
   if (f.hasRelationship) {
     const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/crm.html' }];
-    customers.push({ key: 'leads', label: 'Leads', href: '/leads.html' });
+    customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html' });
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html' });
     customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });
     sections.push({ key: 'customers', label: 'Customers', items: customers });

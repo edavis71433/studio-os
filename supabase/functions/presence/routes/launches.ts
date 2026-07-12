@@ -15,6 +15,7 @@ import { captureDraftSnapshot, loadStagedSnapshot } from '../lib/staging.ts';
 import { cleanLaunchName, isValidSchedule, canApprove, canSchedule, canPromote, canRollback, canCancel, canRecapture, statusAfterRecapture, launchStatusLabel, type LaunchStatus } from '../lib/launches.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 
 // The one capture/load path, shared with the Preview Environment (lib/staging.ts).
 const captureDraft = captureDraftSnapshot;
@@ -100,6 +101,7 @@ export async function handleLaunchDecide(req: Request, jwt: string, site: SiteRo
   } else {
     return json({ error: 'bad_request', message: 'Decision must be approve or reject.' }, 400, cors);
   }
+  await notifyOwnerOfReviewerDecision(site, principal, `${decision === 'approve' ? 'Approved' : 'Asked for changes on'} launch: ${l.name}`, `launch:${id}:${decision}`);
   return json({ data: shape(await getLaunch(site, id)) }, 200, cors);
 }
 

@@ -116,12 +116,17 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
       const [sup, seenQ, msgQ] = await Promise.all([
         svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id&limit=50`),
         svc(`presence_activity_reads?site_id=eq.${site.id}&reader=eq.${encodeURIComponent(reader)}&select=last_seen_at&limit=1`),
-        // FD-N: a client's project message must reach the bell/Today, not only the Inbox
-        svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=created_at,detail&order=created_at.desc&limit=50`),
+        // FD-N: a client's message — AND their approval decisions / survey answers —
+        // must reach the bell/Today, not only the Inbox.
+        svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,survey_submitted)&select=created_at,kind,detail,actor_kind&order=created_at.desc&limit=50`),
       ]);
       attention_count += ((sup.json as any[])?.length || 0);
       const lastSeen = (seenQ.json as any[])?.[0]?.last_seen_at || null;
-      attention_count += ((msgQ.json as any[]) || []).filter((e) => (e.detail || {}).from === 'client' && (!lastSeen || String(e.created_at) > String(lastSeen))).length;
+      attention_count += ((msgQ.json as any[]) || []).filter((e) => {
+        if (lastSeen && String(e.created_at) <= String(lastSeen)) return false;
+        if (e.kind === 'message') return (e.detail || {}).from === 'client';
+        return e.actor_kind === 'client';   // an approval decided / survey answered by the client
+      }).length;
     } else if (site.client_id) { // bridged customer: their UNREAD client-visible delivery activity
       const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
       if (links.length) {
@@ -169,11 +174,12 @@ const NOTICE_HREF: Record<string, string> = {
   domain_expiry: '/presence.html#business',
   search_setup: '/presence.html#search',
   welcome_back: '/today.html',
-  // account/billing notices land on Today (the plan card + billing live there;
-  // the legacy portal app is retired — portal.html is now just the sign-in door)
-  capacity: '/today.html', trial_ending: '/today.html', trial_ended: '/today.html',
-  payment_trouble: '/today.html', account_lapsed: '/today.html',
-  winddown_reminder: '/today.html', win_back: '/today.html', deletion_requested: '/today.html',
+  // account/billing notices land where billing can actually be FIXED — the
+  // billing card in Settings (presence.html), which every edition's nav carries.
+  capacity: '/presence.html#settings', trial_ending: '/presence.html#settings', trial_ended: '/presence.html#settings',
+  payment_trouble: '/presence.html#settings', account_lapsed: '/presence.html#settings',
+  winddown_reminder: '/presence.html#settings', win_back: '/presence.html#settings', deletion_requested: '/presence.html#settings',
+  approval_decided: '/timeline.html',   // a reviewer/client decided something — the story lives on the timeline
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 
@@ -210,7 +216,8 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // Bridged customer: their unread delivery activity lives on the AGENCY site
   // (counted into the bell by /portal/context) — without a findable row here the
   // badge points at nothing. One calm row that links where the items actually are.
-  if (site.client_id) {
+  // Owners only: a client_reviewer can't open /client/* (403), so never show them the row.
+  if (seesFull && site.client_id) {
     try {
       const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
       if (links.length) {

@@ -111,7 +111,7 @@
       '<button class="dds-ic dds-burger" id="dds-burger" aria-label="Menu">☰</button>' +
       brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
-      '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>⌘K</kbd></div>' +
+      '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications">🔔' + (att > 0 ? '<span class="dot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</button>' +
         '<a class="dds-ic" href="/help.html" aria-label="Help">?</a>' +
@@ -119,6 +119,26 @@
       '</div>';
 
     wire(nav);
+    mountMobileBar(nav, activeKey, att);
+  }
+
+  // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·
+  //    Menu. presence.html keeps its own dock, so we stay out of its way. ──
+  function mountMobileBar(nav, activeKey, att) {
+    if (location.pathname.indexOf('/presence') === 0) return;
+    var isReviewer = CTX && CTX.site_role === 'client_reviewer';
+    var old = document.getElementById('dds-mbar'); if (old) old.remove();
+    var bar = document.createElement('nav');
+    bar.id = 'dds-mbar'; bar.setAttribute('aria-label', 'Quick navigation');
+    var home = isReviewer ? { href: '/client.html', label: 'Updates' } : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
+    var inbox = isReviewer ? null : { href: '/inbox.html', label: 'Inbox' };
+    bar.innerHTML =
+      '<a href="' + esc(withScope(home.href)) + '">' + esc(home.label) + '</a>' +
+      (inbox ? '<a href="' + esc(withScope(inbox.href)) + '">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</a>' : '') +
+      '<button type="button" id="dds-mbar-menu">Menu</button>';
+    document.body.appendChild(bar);
+    var mb = document.getElementById('dds-mbar-menu');
+    if (mb) mb.addEventListener('click', function (e) { e.stopPropagation(); toggleDrawer(nav); });
   }
 
   function wire(nav) {
@@ -211,7 +231,12 @@
       // Phase FLOW: notices first (a lead waiting, a domain expiring) — each taps
       // straight through to the page that resolves it, from any screen.
       (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
-      (d.pending_approvals || []).forEach(function (p) { out += '<a class="row" href="' + esc(withScope((CTX && CTX.landing) || '/today.html')) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>'; });
+      // An approval tap lands on the thing that RESOLVES it (file → Files,
+      // connected → Connections, infra → the Foundations desk) — never a generic landing.
+      (d.pending_approvals || []).forEach(function (p) {
+        var target = p.href ? p.href : p.kind === 'connected' ? '/connections.html' : p.kind === 'file' ? '/files.html' : '/presence.html#foundations';
+        out += '<a class="row" href="' + esc(withScope(target)) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>';
+      });
       (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
       // W4: the bell is the quick glance; the Inbox is the complete "everything that
       // needs you" (also client messages, surveys, new leads). Send them to the one
@@ -238,7 +263,11 @@
     var rows = '';
     if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>';
     // Architecture v1.0: utility destinations (Connections, Settings, Help) live here.
-    UTILS.forEach(function (sec) { sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + '</a>'; }); });
+    // Multi-item groups get a quiet header so a long menu stays scannable.
+    UTILS.forEach(function (sec) {
+      if (sec.items.length > 1) rows += '<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
+      sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + '</a>'; });
+    });
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;

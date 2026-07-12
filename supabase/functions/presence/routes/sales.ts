@@ -36,12 +36,12 @@ const siteUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.c
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 
 // ── signed accept/sign links (reuse the house HMAC idiom; new sales scope) ──
-function linkSecret(): string | null {
+export function linkSecret(): string | null {
   return Deno.env.get('APPROVAL_SECRET') || Deno.env.get('STATE_SIGNING_SECRET') || Deno.env.get('SCHEDULER_SECRET') || null;
 }
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
-async function signSalesToken(payload: { t: 'proposal' | 'contract'; id: string; site_id: string; exp: number }, secret: string): Promise<string> {
+export async function signSalesToken(payload: { t: 'proposal' | 'contract'; id: string; site_id: string; exp: number }, secret: string): Promise<string> {
   const body = b64url(JSON.stringify(payload));
   return `${body}.${await hmacHex(secret, body)}`;
 }
@@ -178,6 +178,10 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0));
     if (b.expected_close !== undefined) { const cd = b.expected_close ? clean(b.expected_close, 10) : ''; if (cd && !DATE_RE.test(cd)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors); patch.expected_close = cd || null; }
     if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
+    // "Next step + when" — the one field that keeps a solo seller's pipeline
+    // honest (columns arrive with migration 0089; harmless to omit before then).
+    if (b.next_step !== undefined) patch.next_step = clean(b.next_step, 200);
+    if (b.next_step_at !== undefined) { const nd = b.next_step_at ? clean(b.next_step_at, 10) : ''; if (nd && !DATE_RE.test(nd)) return json({ error: 'validation', message: 'The next-step date must be a date (YYYY-MM-DD).' }, 422, cors); patch.next_step_at = nd || null; }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     const up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
@@ -331,9 +335,19 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   // IDEMPOTENT: a double-tap (or a retry after a link failure) must never mint a
   // second open invoice. Reuse the existing open row for this deal+purpose —
   // repair its missing link if that's why the operator is retrying.
+  // (Deliberate tradeoff: no DB unique index on open deal+purpose, because
+  // `force: true` legitimately opens a second one — e.g. milestone 2 while
+  // milestone 1 is still unpaid. A simultaneous double-POST race can therefore
+  // still double-insert; the UI path can't produce it.)
   let inv = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.${purpose}&status=eq.open&deleted_at=is.null&select=*&order=created_at.desc&limit=1`))[0];
   let reused = !!inv;
   if (inv && b.force === true) { reused = false; inv = null; }   // explicit "yes, another one"
+  // HONESTY GUARD: an open invoice exists and the operator typed a DIFFERENT
+  // amount — never silently send the old amount. Tell them, let them choose.
+  if (inv && b.amount_cents !== undefined && Number(inv.amount_cents) !== amountCents) {
+    const openAmt = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    return json({ error: 'amount_mismatch', open_invoice: inv, message: `There's already an open ${purpose === 'deposit' ? 'deposit request' : 'invoice'} for ${openAmt} on this deal. Resend that one, or send another for the new amount.` }, 409, cors);
+  }
   if (!inv) {
     const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' }) });
@@ -341,18 +355,26 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     if (!inv) return json({ error: 'write_failed', message: 'That invoice didn’t save — please try again.' }, 502, cors);
   }
   let payUrl: string | null = inv.stripe_url || null;
+  let repaired = false;
   if (!payUrl) {
     try {
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description, invoiceId: inv.id });
-      payUrl = link.url;
+      // Use the STORED row's description so a retry sends Stripe identical params
+      // under the per-row idempotency key (changed params + same key = hard error).
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id });
+      payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
       return json({ data: { ...inv, stripe_url: null }, warning: 'link_failed', message: 'Invoice saved, but the payment link didn’t generate — tap Send again (it will finish this same invoice, not make another).' }, 200, cors);
     }
   }
-  const emailed = await emailInvoice(site.id, dealId, title, payUrl, Number(inv.amount_cents));
+  // Email throttle: a reuse within 2 minutes of the last touch is a double-tap,
+  // not a deliberate resend — don't send the client two identical emails.
+  const lastTouch = Date.parse(String(inv.updated_at || inv.created_at || '')) || 0;
+  const doubleTap = reused && !repaired && (Date.now() - lastTouch) < 120000;
+  const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents));
+  if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
   if (!reused) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
-  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused }, reused ? 200 : 201, cors);
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, amount_cents: Number(inv.amount_cents) }, reused ? 200 : 201, cors);
 }
 
 /** W1: a client just accepted a proposal / signed a contract via the token link.
@@ -502,7 +524,35 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
   await raiseDealReady(tok.site_id, dealId, 'signed');   // W1: "ready to convert {name}" → operator Today/Attention/bell
-  return json({ data: { status: 'signed' } }, 200, cors);
+
+  // EXECUTED COPY: the email is the durable record ("you'll always be able to ask
+  // for a copy" — now they don't have to ask). Full agreement text + signature
+  // facts, on the studio's brand, to the signer (falls back to the deal contact).
+  try {
+    let to = signerEmail;
+    if (!to) {
+      const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=contact_id&limit=1`))[0];
+      to = deal?.contact_id ? String(rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${tok.site_id}&select=email&limit=1`))[0]?.email || '') : '';
+    }
+    if (to) {
+      const brand = await loadEmailBrand(tok.site_id);
+      const escHtml = (s: string) => s.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
+      await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
+        `<p>Here's your copy of the agreement, exactly as signed. Keep this email — it's your record.</p>` +
+        `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;white-space:pre-wrap;font-size:14px">${escHtml(String(c.body || ''))}</div>` +
+        `<p style="font-size:13px;color:#6b6478">Signed by <strong>${escHtml(signerName)}</strong> on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} · document fingerprint ${String(c.content_hash || '').slice(0, 12)}</p>`,
+        brand).catch(() => {});
+    }
+  } catch { /* the signature stands; the copy email is best-effort */ }
+
+  // SIGN → PAY, one session: if a deposit is already waiting on this deal, hand
+  // its payment link straight back — the moment of "yes" is the moment to pay.
+  let pay: { url: string; amount_cents: number } | null = null;
+  try {
+    const dep = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`))[0];
+    if (dep?.stripe_url) pay = { url: String(dep.stripe_url), amount_cents: Number(dep.amount_cents) || 0 };
+  } catch { /* optional */ }
+  return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null } }, 200, cors);
 }
 
 // ═══ PUBLIC VIEW (token) — a prospect reviews the proposal/contract before acting ═══
@@ -512,14 +562,18 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
   if (!secret) return json({ error: 'unavailable' }, 503, cors);
   const tok = await verifySalesToken(token, secret, Math.floor(Date.now() / 1000));
   if (!tok) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
+  // The page carries the STUDIO's identity — a prospect should see who they're
+  // hiring, not a generic plum. Accent is Brand-Kit contrast-safe already.
+  let brand: { name: string; accent: string } | null = null;
+  try { const eb = await loadEmailBrand(tok.site_id); brand = { name: eb.name, accent: eb.accent }; } catch { /* neutral fallback */ }
   if (tok.t === 'proposal') {
     const p = rows(await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&limit=1`))[0];
     if (!p) return json({ error: 'not_found' }, 404, cors);
-    return json({ data: { kind: 'proposal', ...p } }, 200, cors);
+    return json({ data: { kind: 'proposal', brand, ...p } }, 200, cors);
   }
   const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at&limit=1`))[0];
   if (!c) return json({ error: 'not_found' }, 404, cors);
-  return json({ data: { kind: 'contract', ...c } }, 200, cors); // content_hash is presented back on sign (version integrity)
+  return json({ data: { kind: 'contract', brand, ...c } }, 200, cors); // content_hash is presented back on sign (version integrity)
 }
 
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══
@@ -655,7 +709,12 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   //    project on THIS (agency) site for the new customer + link the tenant-safe
   //    bridge to their own workspace, so post-sale delivery is connected with no
   //    manual step. Idempotent (deal.created_project_id UNIQUE + bridge UNIQUE).
-  const handoff = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId, customerSiteId: prov.siteId || null, actor: actorOf(principal).actor, actorKind: actorOf(principal).actor_kind });
+  //    Self-guard: a deal whose contact IS the studio itself must not bridge the
+  //    studio to itself ("your studio is on it" on the studio's own Today).
+  const selfConvert = clientId === site.client_id;
+  const handoff = selfConvert
+    ? { project: null }
+    : await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId, customerSiteId: prov.siteId || null, actor: actorOf(principal).actor, actorKind: actorOf(principal).actor_kind });
 
   // 5b) BILLING BACKFILL: deposits/invoices sent BEFORE convert were written with
   //     customer_client_id NULL (the customer didn't exist yet). Stamp them now so

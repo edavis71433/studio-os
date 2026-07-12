@@ -150,7 +150,7 @@ function render(){
       priceHtml = `<div class="price"><span class="amt">$${amt}</span><span class="per">${per}</span>${listHtml}</div>`
         + `<div class="annualnote">${TERM==='annual' ? 'Billed yearly' : 'Billed monthly'}${p.price.founder ? ' · founders rate, locked' : ''}</div>`;
       ctaHtml = `<a class="cta primary" href="/signup.html${envSuffix}${envSuffix?'&':'?'}plan=${p.key}&term=${TERM}">Get started</a>`;
-      if (p.trial_eligible) tryHtml = `<div class="trybar">or start a ${TRIAL_DAYS}-day trial — no card</div>`;
+      if (p.trial_eligible) tryHtml = `<div class="trybar"><a href="/signup.html${envSuffix}${envSuffix?'&':'?'}plan=${p.key}&term=${TERM}&trial=1" style="color:inherit">or start a ${TRIAL_DAYS}-day trial — no card needed →</a></div>`;
     } else {
       priceHtml = `<div class="contact-amt">Let’s talk</div><div class="annualnote">Set up with our team</div>`;
       ctaHtml = `<a class="cta ghost" href="/contact.html?about=${p.key}">Contact us</a>`;
