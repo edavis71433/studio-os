@@ -15,12 +15,12 @@
   --dds-shell-h:54px;
 }
 @media (prefers-color-scheme:dark){:root{
-  --dds-bg:#171320; --dds-card:#1f1a2b; --dds-ink:#efeaf7; --dds-soft:#a79ebc; --dds-faint:#7a7192; --dds-line:#2a2338;
+  --dds-bg:#171320; --dds-card:#1f1a2b; --dds-ink:#efeaf7; --dds-soft:#a79ebc; --dds-faint:#948bad; --dds-line:#2a2338;
   --dds-p:#b79ceb; --dds-p-soft:#241d38; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316;
   --dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);
 }}
 :root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-p:#5b3fa0;--dds-p-soft:#efeafa}
-:root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#7a7192;--dds-line:#2a2338;--dds-p:#b79ceb;--dds-p-soft:#241d38}
+:root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#948bad;--dds-line:#2a2338;--dds-p:#b79ceb;--dds-p-soft:#241d38}
 
 /* pages get top-room for the fixed shell once it mounts */
 html.dds-has-shell body{padding-top:var(--dds-shell-h)}
@@ -87,6 +87,13 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
   .dds-nav{display:none}
   .dds-burger{display:grid}
   .dds-brand .ctx{display:none}
+}
+/* Very narrow phones: the 44px icon floor makes brand+burger+search+3 icons
+   overflow a 360px bar. Help moves to the profile menu (it's in UTILS there);
+   the brand may truncate rather than push the controls off-screen. */
+@media (max-width:420px){
+  a.dds-ic[href="/help.html"]{display:none}
+  .dds-brand{min-width:0;overflow:hidden;white-space:nowrap}
 }
 @media (prefers-reduced-motion:reduce){#dds-shell,.dds-pop,.dds-palette{transition:none}}
 

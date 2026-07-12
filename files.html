@@ -348,11 +348,11 @@ function renderDetail(){
     <div class="pv">${pv}</div>
     <div>${stateBadge}</div>${approvedLine}${approveCtrls}
     <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}</div>
-    <div class="field"><label>Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
+    <div class="field"><label for="f-name">Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
     ${a.kind==='image'?`<div class="field"><label for="f-alt">Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers.">${esc(a.alt_text||'')}</textarea></div>`:''}
-    <div class="field"><label>Caption</label><input id="f-cap" value="${esc(meta.caption||'')}" ${ed?'':'disabled'}></div>
+    <div class="field"><label for="f-cap">Caption</label><input id="f-cap" value="${esc(meta.caption||'')}" ${ed?'':'disabled'}></div>
     <div class="field"><label for="f-col">Collection</label><input id="f-col" value="${esc(a.collection||'')}" placeholder="e.g. Brand, Contracts" ${ed?'':'disabled'}></div>
-    <div class="field"><label>Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
+    <div class="field"><label for="f-tags">Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
     <div class="where"><div class="hl">Where it’s used</div><ul>${usage}</ul><div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div></div>
     ${ver}
     ${ed?`<div class="acts">

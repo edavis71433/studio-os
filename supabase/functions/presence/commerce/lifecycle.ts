@@ -220,12 +220,17 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
 }
 
 // ── Phase CP-3 (CP-5): the weekly owner digest — the Monday routine, automated ──
-export async function runWeeklyDigest(): Promise<{ sent: boolean }> {
+// Return shape matters: sweepIssues() treats a non-skipped FALSE boolean as a
+// tick failure, so the ~671-of-672 weekly ticks where the digest correctly
+// does nothing must read as skipped_* (informational), never `sent: false` —
+// that shape marked every healthy tick failed and would page the watchdog
+// permanently. Numeric `sent` + explicit skip/failure flags.
+export async function runWeeklyDigest(): Promise<{ sent: number; skipped_no_email?: boolean; skipped_dedupe?: boolean; failures?: number }> {
   const to = Deno.env.get('OPS_ALERT_EMAIL') || '';
-  if (!to) return { sent: false };
+  if (!to) return { sent: 0, skipped_no_email: true };
   const st = await svc('presence_ops_state?id=eq.1&select=last_digest_at');
   const last = st.json?.[0]?.last_digest_at ? Date.parse(st.json[0].last_digest_at) : 0;
-  if (Date.now() - last < 7 * 86400_000) return { sent: false };
+  if (Date.now() - last < 7 * 86400_000) return { sent: 0, skipped_dedupe: true };
   const since = new Date(Date.now() - 7 * 86400_000).toISOString();
   const twoDays = new Date(Date.now() - 2 * 86400_000).toISOString();
   // Exact counts (svcCount) — fetch-to-count saturates at PostgREST max-rows,
@@ -247,7 +252,8 @@ export async function runWeeklyDigest(): Promise<{ sent: boolean }> {
 </ul><p>Details live in Stripe, the leads inbox, and /system/health. The watchdog emails you separately if production ever goes dark.</p>`;
   const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html);
   await svc('presence_ops_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ last_digest_at: new Date().toISOString() }) });
-  return { sent: ok };
+  // a failed weekly send IS tick-worthy (failures>0 → sweepIssues flags it)
+  return ok ? { sent: 1 } : { sent: 0, failures: 1 };
 }
 
 // ── P3-CRO: the day-7 free-review follow-up (OWNER-GATED outbound) ────────────

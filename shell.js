@@ -125,7 +125,7 @@
       : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
 
     root.innerHTML =
-      '<button class="dds-ic dds-burger" id="dds-burger" aria-label="Menu">☰</button>' +
+      '<button class="dds-ic dds-burger" id="dds-burger" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer">☰</button>' +
       brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
@@ -214,7 +214,12 @@
     }
     pal.classList.add('open'); var inp = pal.querySelector('input'); inp.value = ''; paintResults(''); setTimeout(function () { inp.focus(); }, 20);
   }
-  function closePalette() { if (pal) pal.classList.remove('open'); }
+  function closePalette() {
+    if (!pal || !pal.classList.contains('open')) return;
+    pal.classList.remove('open');
+    // return focus to the control that opened it (same pattern as bell/profile)
+    var s = document.getElementById('dds-search'); if (s) s.focus();
+  }
   function hasFiles() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'files'; }); }
   var fileSearchTok = 0;
   function paintResults(q) {
@@ -233,11 +238,17 @@
         var cur = pal.querySelector('.results'); if (!cur) return;
         var have = !!navHtml;
         if (!files.length) { if (!have) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
+        // file rows join the SAME listbox contract as nav rows (role=option +
+        // id + aria-selected) — arrowing onto one must announce, not go silent.
+        var base = (navHtml.match(/id="dds-res-/g) || []).length;
         var fhtml = files.map(function (a, i) {
           var sub = a.in_use ? 'Files · on your site' : 'Files';
-          return '<a class="res' + (!have && i === 0 ? ' sel' : '') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>';
+          var sel = !have && i === 0;
+          return '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + (base + i) + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>';
         }).join('');
         cur.innerHTML = navHtml + fhtml;
+        var inpF = pal.querySelector('input'); var firstSel = cur.querySelector('.res.sel');
+        if (inpF) inpF.setAttribute('aria-activedescendant', firstSel ? firstSel.id : '');
       });
     } else if (!list.length) {
       box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>';
@@ -370,14 +381,26 @@
 
   // ── mobile drawer ──
   var drawer;
+  function closeDrawer() {
+    if (drawer && drawer.classList.contains('open')) {
+      drawer.classList.remove('open');
+      setExpanded('dds-burger', false); setExpanded('dds-mbar-menu', false);
+    }
+  }
+  // Escape closes the drawer and returns focus to the burger (WCAG 1.4.13)
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !drawer || !drawer.classList.contains('open')) return;
+    closeDrawer(); var b = document.getElementById('dds-burger'); if (b) b.focus();
+  });
   function toggleDrawer(nav) {
-    if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return; }
+    if (drawer && drawer.classList.contains('open')) { closeDrawer(); return; }
     var activeKey = activeItemKey(location.pathname, nav);
     var html = (nav || []).map(function (s) {
       return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
-    if (!drawer) { drawer = el('<div class="dds-drawer" id="dds-drawer"></div>'); document.body.appendChild(drawer); }
+    if (!drawer) { drawer = el('<div class="dds-drawer" id="dds-drawer" role="navigation" aria-label="Workspace menu"></div>'); document.body.appendChild(drawer); }
     drawer.innerHTML = html; drawer.classList.add('open');
+    setExpanded('dds-burger', true); setExpanded('dds-mbar-menu', true);
   }
 
   // ── SC-1 (global): carry the agency drill-in scope on EVERY static app link ──

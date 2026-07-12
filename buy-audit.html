@@ -40,6 +40,9 @@
   label { display:block; font-size:12.5px; font-weight:600; margin:0 0 6px; }
   input, textarea { width:100%; font-family:inherit; font-size:14px; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px; background:var(--cream); outline:none; margin-bottom:15px; }
   input:focus, textarea:focus { border-color:var(--p); background:#fff; }
+  /* iOS focus-zoom: sub-16px controls zoom the page on focus — worst possible
+     place for it is the purchase form. Floor to 16px on phones. */
+  @media (max-width:760px){ input, textarea, select { font-size:16px; } }
   textarea { resize:vertical; min-height:64px; }
   button { width:100%; background:var(--p); color:#fff; border:none; padding:14px; border-radius:100px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
   button:disabled { opacity:.6; cursor:default; }

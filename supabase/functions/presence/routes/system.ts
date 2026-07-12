@@ -202,7 +202,11 @@ export async function computeHealthCenter(): Promise<any> {
 // What in this tick deserves a human's attention? ok:false, failures/errors>0,
 // or a prune that returned false — but NOT informational falses (skipped_*,
 // feature-off flags). Returns human-readable issue strings, empty = clean tick.
-function sweepIssues(progress: Record<string, unknown>): string[] {
+// EXPORTED for the predicate test: this function gates what pages the watchdog,
+// so its judgment over every sweep's real return shape is pinned by
+// tests/presence/sweep_issues_test.mjs (a false positive here = permanent
+// alert fatigue; a false negative = silent failures — both have happened).
+export function sweepIssues(progress: Record<string, unknown>): string[] {
   const issues: string[] = [];
   for (const [name, v] of Object.entries(progress)) {
     if (!v || typeof v !== 'object') continue;

@@ -6999,14 +6999,14 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         if (!r.ok) {
           let detail = '';
           try { detail = await r.text(); } catch (_) { /* ignore */ }
-          console.error('Outreach send failed', r.status, 'to', to, detail);
+          console.error('Outreach send failed', r.status, 'to', maskAddr(to), detail);
           return json({ error: 'send_failed', status: r.status, detail: 'The email service rejected the send. Nothing was sent.' }, 200, reqCors);
         }
         let id = '';
         try { const j = await r.json(); id = j && j.id ? String(j.id) : ''; } catch (_) { /* id optional */ }
         return json({ data: { ok: true, id } }, 200, reqCors);
       } catch (e) {
-        console.error('Outreach send threw to', to, String(e));
+        console.error('Outreach send threw to', maskAddr(to), String(e));
         return json({ error: 'send_threw', detail: 'Could not reach the email service. Nothing was sent.' }, 200, reqCors);
       }
     }
