@@ -15,17 +15,19 @@ import type {
   SiteBlock, SiteBlockType, SiteBlockFeatures, SiteBlockStats, SiteBlockTeam,
   SiteBlockProcess, SiteBlockPricing, SiteBlockCertifications, SiteBlockServiceAreas, SiteBlockCtaBanner,
   SiteBlockGallery, SiteBlockBeforeAfter, SiteBlockVideo, MediaRef,
+  SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment,
 } from './render_types.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'features', 'stats', 'team', 'process', 'pricing', 'certifications', 'service_areas', 'cta',
   'gallery', 'before_after', 'video',
+  'partners', 'reviews', 'appointment',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too.
 const MAX_BLOCKS = 14;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12 };
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const arr = (x: unknown): any[] => (Array.isArray(x) ? x : []);
@@ -38,10 +40,12 @@ interface StoredTeam { type: 'team'; title?: string; members: Array<{ name: stri
 interface StoredGallery { type: 'gallery'; title?: string; image_ids: string[] }
 interface StoredBeforeAfter { type: 'before_after'; title?: string; items: Array<{ before_id: string; after_id: string; caption?: string }> }
 interface StoredVideo { type: 'video'; title?: string; url: string; caption?: string; poster_id?: string }
+interface StoredPartners { type: 'partners'; title?: string; image_ids: string[] }
 export type StoredBlock =
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
-  | StoredGallery | StoredBeforeAfter | StoredVideo;
+  | StoredGallery | StoredBeforeAfter | StoredVideo
+  | StoredPartners | SiteBlockReviews | SiteBlockAppointment;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
@@ -125,6 +129,22 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         }
         break;
       }
+      case 'partners': {   // "trusted by" logo strip — same media path as gallery
+        const image_ids = arr((b as any).image_ids).map(uid).filter(Boolean).slice(0, CAP.partners);
+        if (image_ids.length) block = { type: 'partners', title, image_ids };
+        break;
+      }
+      case 'reviews': {    // a rating badge — honest numbers only, bounded 0–5
+        const rating = Math.round(Math.min(5, Math.max(0, Number((b as any).rating) || 0)) * 10) / 10;
+        const count = Math.min(1000000, Math.max(0, Math.trunc(Number((b as any).count) || 0)));
+        if (rating > 0 && count > 0) block = { type: 'reviews', title, rating, count, source: s((b as any).source, 40) || undefined } as SiteBlockReviews;
+        break;
+      }
+      case 'appointment': {   // booking button — link-out only (zero external origins)
+        const url = s((b as any).url, 300);
+        if (/^https?:\/\//i.test(url)) block = { type: 'appointment', title, url, text: s((b as any).text, 200) || undefined, button: s((b as any).button, 40) || undefined } as SiteBlockAppointment;
+        break;
+      }
     }
     if (block) { out.push(block); seen.add(type); }
     if (out.length >= MAX_BLOCKS) break;
@@ -160,6 +180,11 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       case 'video':
         out.push({ type: 'video', title: b.title, url: b.url, caption: b.caption, poster: b.poster_id ? ref(b.poster_id) : null });
         break;
+      case 'partners': {
+        const logos = b.image_ids.map((id) => ref(id)).filter((x): x is MediaRef => !!x);
+        if (logos.length) out.push({ type: 'partners', title: b.title, logos });
+        break;
+      }
       default:
         out.push(b);
     }
@@ -266,6 +291,18 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         break;
       }
     }
+    if (b.type === 'partners') {
+      html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
+    }
+    if (b.type === 'reviews') {
+      const full = Math.round(b.rating);
+      const stars = '★'.repeat(Math.min(5, full)) + '☆'.repeat(Math.max(0, 5 - full));
+      html = `<section class="block alt block-reviews"><div class="wrap rev-inner">${h2(b.title, 'What customers say')}<p class="rev-stars" aria-hidden="true">${stars}</p><p class="rev-text">${esc(String(b.rating))} out of 5 — from ${esc(String(b.count))} reviews${b.source ? ` on ${esc(b.source)}` : ''}</p></div></section>`;
+    }
+    if (b.type === 'appointment') {
+      const href = safeHref(b.url);
+      html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment')}${b.text ? `<p class="appt-text">${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Book now')}</a></p></section>` : '';
+    }
     if (html) out.push({ key: `block_${b.type}`, type: b.type, html, ...(ld ? { ld } : {}) });
   }
   return out;
@@ -287,6 +324,15 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .block-cta .cta-text{font-size:1.2rem;font-weight:700;margin:0}
 .team-card .team-photo{margin:-2px 0 10px}
 .team-card .team-photo img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;display:block}
+.partners{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:26px;align-items:center}
+.partners li{margin:0}
+.partners img{height:44px;width:auto;max-width:150px;object-fit:contain;display:block}
+.block-reviews .rev-inner{text-align:center}
+.rev-stars{font-size:1.6rem;letter-spacing:4px;color:var(--accent);margin:6px 0 2px}
+.rev-text{color:var(--soft);margin:0;font-size:1.02rem}
+.block-appt{text-align:center}
+.appt-text{color:var(--soft);max-width:56ch;margin:8px auto 0}
+.appt-cta{margin-top:14px}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .gallery .ga{margin:0}
 .gallery .ga img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block}

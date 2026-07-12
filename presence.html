@@ -3109,6 +3109,9 @@ const BLOCK_DEFS = [
   { type: "gallery", name: "Photo gallery", mediaKind: "gallery", hint: "A grid of photos from your library." },
   { type: "before_after", name: "Before & after", mediaKind: "ba", hint: "Pairs of photos that show your work." },
   { type: "video", name: "Video", mediaKind: "video", hint: "A poster image that links out to your video — nothing external loads on your site." },
+  { type: "partners", name: "Trusted by (logo strip)", mediaKind: "gallery", hint: "Logos of brands you work with — instant credibility. Pick them from your files." },
+  { type: "reviews", name: "Review rating badge", reviewsSimple: true, hint: "" },
+  { type: "appointment", name: "Booking button", apptSimple: true, hint: "" },
 ];
 function mediaThumb(id) {
   const m = (S.media || []).find((x) => x.id === id);
@@ -3149,6 +3152,8 @@ function textToBlock(def, title, text) {
 function emptyBlock(def) {
   const b = { type: def.type };
   if (def.ctaSimple) { b.text = ""; return b; }
+  if (def.reviewsSimple) { b.rating = 5; b.count = 0; return b; }
+  if (def.apptSimple) { b.url = ""; return b; }
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
   if (def.mediaKind === "video") { b.url = ""; return b; }
   if (def.mediaKind === "ba") { b.items = []; return b; }
@@ -3204,6 +3209,26 @@ function renderBlocksCard() {
       const commit = () => { BLOCKS_WORK[idx] = { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, bt, u);
+    } else if (def.reviewsSimple) {
+      const rt = el("input"), ct = el("input"), sc = el("input");
+      rt.type = "number"; rt.min = "1"; rt.max = "5"; rt.step = "0.1"; rt.placeholder = "Your rating (e.g. 4.9)"; rt.value = blk.rating || "";
+      ct.type = "number"; ct.min = "1"; ct.step = "1"; ct.placeholder = "How many reviews (e.g. 120)"; ct.value = blk.count || "";
+      sc.type = "text"; sc.placeholder = "Where from (e.g. Google) — optional"; sc.value = blk.source || "";
+      [rt, ct, sc].forEach((inp) => { inp.style.cssText = inputCss; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "reviews", title: ti.value.trim(), rating: parseFloat(rt.value) || 0, count: parseInt(ct.value, 10) || 0, source: sc.value.trim() }; };
+      [rt, ct, sc].forEach((inp) => inp.addEventListener("change", commit));
+      sub.append(rt, ct, sc);
+      sub.appendChild(el("div", "hint", "Use your real rating — it shows as stars with the count (e.g. “4.9 out of 5 — from 120 reviews on Google”)."));
+    } else if (def.apptSimple) {
+      const t = el("input"), bt = el("input"), u = el("input");
+      t.placeholder = "A short line (optional) — e.g. Ready when you are."; t.value = blk.text || "";
+      bt.placeholder = "Button label (e.g. Book now)"; bt.value = blk.button || "";
+      u.placeholder = "Your booking link (e.g. your Calendly or booking page)"; u.value = blk.url || "";
+      [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "appointment", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
+      [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
+      sub.append(t, bt, u);
+      sub.appendChild(el("div", "hint", "Visitors tap the button and land on your booking page — nothing external loads on your site."));
     } else if (def.mediaKind) {
       renderMediaBlockBody(def, blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));

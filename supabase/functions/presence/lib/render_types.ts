@@ -117,10 +117,15 @@ export interface SiteBlockCtaBanner { type: 'cta'; text: string; button?: string
 export interface SiteBlockGallery { type: 'gallery'; title?: string; images: MediaRef[] }
 export interface SiteBlockBeforeAfter { type: 'before_after'; title?: string; items: Array<{ before: MediaRef; after: MediaRef; caption?: string }> }
 export interface SiteBlockVideo { type: 'video'; title?: string; url: string; caption?: string; poster?: MediaRef | null }
+// Trust/action blocks (previously dormant catalog entries, now realized)
+export interface SiteBlockPartners { type: 'partners'; title?: string; logos: MediaRef[] }
+export interface SiteBlockReviews { type: 'reviews'; title?: string; rating: number; count: number; source?: string }
+export interface SiteBlockAppointment { type: 'appointment'; title?: string; text?: string; button?: string; url: string }
 export type SiteBlock =
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
-  | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo;
+  | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
+  | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment;
 export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */
