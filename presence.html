@@ -1691,8 +1691,16 @@ function renderFoundations(f, plans, launch, dom) {
     dnsCard.appendChild(list);
   }
   section("security — the padlock in the browser", f.ssl.sentence);
+  // ── Email — the same step-by-step treatment as the domain wizard. Four states,
+  //    each with a plain next step (never a dead end).
   const emailCard = section("email", f.email.sentence);
-  if (f.email.has_mail && !(f.email.spf && f.email.dmarc)) {
+  if (!dstat) {
+    const p = el("p", "aihint", "Once your domain is connected above, everything email lives here too — a business address and spam protection."); p.style.marginTop = "5px"; emailCard.appendChild(p);
+  } else if (!f.email.has_mail) {
+    const p = el("p", "aihint", "No email runs on this domain yet. Want an address like you@" + String(dstat.custom_domain).replace(/^www\./, "") + "? Two easy routes:"); p.style.marginTop = "5px"; emailCard.appendChild(p);
+    const s1 = el("p", "aihint", "1. The company you bought your domain from usually sells email for a few dollars a month — or Google Workspace works with any domain."); s1.style.marginTop = "4px"; emailCard.appendChild(s1);
+    const s2 = el("p", "aihint", "2. Once it’s set up, come back here — we’ll notice it automatically and help you protect it so your mail never lands in spam."); s2.style.marginTop = "4px"; emailCard.appendChild(s2);
+  } else if (!(f.email.spf && f.email.dmarc)) {
     const why = el("p", "aihint", "Emails you send from your domain can land in people’s spam. Setting this up adds a few small records that tell inboxes your mail is really from you."); why.style.marginTop = "5px"; emailCard.appendChild(why);
     const acts = el("div", "doa"); acts.style.marginTop = "6px";
     const b = el("button", "textact", "Set up email protection");
@@ -1702,6 +1710,9 @@ function renderFoundations(f, plans, launch, dom) {
     });
     acts.appendChild(b);
     emailCard.appendChild(acts);
+    const after = el("p", "aihint", "You’ll get a short list of records to copy-paste where you bought your domain — same as connecting it. We check the rest."); after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
+  } else {
+    const okp = el("p", "aihint", "✓ All set — inboxes can trust mail from your domain. Nothing to do."); okp.style.marginTop = "5px"; okp.style.fontWeight = "600"; emailCard.appendChild(okp);
   }
   section("where your site lives (hosting)", f.hosting.sentence);
 
