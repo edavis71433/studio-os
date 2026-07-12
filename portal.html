@@ -1628,6 +1628,21 @@ async function fetchClientRow(email) {
   } catch { return null; }
 }
 
+// The one team-membership probe (whoami). Only called when no client row was
+// found, so real clients never pay for it. Times out rather than hangs.
+async function isTeamAccount(token) {
+  try {
+    var to = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error("timeout")); }, 6000); });
+    var who = await Promise.race([fetch(SUPABASE_URL + "/functions/v1/clever-api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token },
+      body: JSON.stringify({ type: "whoami" })
+    }), to]);
+    var wj = await who.json();
+    return !!(wj && wj.isTeam);
+  } catch (e) { return false; }
+}
+
 // On page load, restore an existing session (like the admin does). Simple and
 // non-overlapping: one getSession, one row fetch, done.
 (async function restoreSessionOnLoad() {
@@ -1635,7 +1650,9 @@ async function fetchClientRow(email) {
     var { data } = await sb.auth.getSession();
     if (data && data.session && data.session.user) {
       var row = await fetchClientRow(data.session.user.email);
-      if (row) enterPortal(row);
+      if (row) { enterPortal(row); return; }
+      // A signed-in team/owner account landed on the client door — route it home.
+      if (await isTeamAccount(data.session.access_token)) location.href = "/studio.html";
     }
   } catch (e) { /* stay on login screen */ }
 })();
@@ -1677,6 +1694,8 @@ async function login() {
   reset();
 
   if (!row) {
+    // Not a client — a team/owner account belongs in Studio OS, not this door.
+    if (await isTeamAccount(data.session.access_token)) { location.href = "/studio.html"; return; }
     showErr("Signed in, but no project data was found for this account. Contact eric@davisdigitalstudio.com.");
     try { await sb.auth.signOut(); } catch (e) {}
     return;

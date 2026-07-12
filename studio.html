@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Studio OS — Sign in</title>
+<meta name="theme-color" content="#5b3fa0">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:38px 34px;width:100%;max-width:420px;
+    box-shadow:0 1px 2px rgba(27,21,37,.04),0 14px 40px rgba(27,21,37,.08)}
+  .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:var(--p);color:#fff;font-weight:700;
+    align-items:center;justify-content:center;font-size:17px;margin-bottom:14px}
+  h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:2px}
+  .sub{color:var(--soft);font-size:14px;margin-bottom:22px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:14px 0 5px}
+  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+    border-radius:10px;padding:11px 13px;outline:none}
+  input:focus{border-color:var(--p)}
+  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);
+    background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;width:100%;margin-top:20px}
+  button.ghost{background:transparent;color:var(--ink);border-color:var(--line);margin-top:10px}
+  button:disabled{opacity:.55;cursor:default}
+  .err{background:#fbeaea;color:#8a2f2f;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
+  @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
+  .muted{color:var(--soft);font-size:13px;margin-top:16px;text-align:center}
+  .muted a{color:var(--p);text-decoration:none;cursor:pointer}
+  .panel{display:none}
+  .panel h2{font-family:var(--serif);font-weight:500;font-size:21px;margin-bottom:6px}
+  .panel p{color:var(--soft);font-size:14px;margin-bottom:6px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:8px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="mark">P</span>
+
+  <!-- SIGN IN -->
+  <div id="loginPanel">
+    <h1>Studio OS</h1>
+    <p class="sub">Sign in to run your studio — website, customers, projects, all in one place.</p>
+    <form id="f" novalidate>
+      <label for="em">Email</label>
+      <input id="em" type="email" autocomplete="email" placeholder="you@yourstudio.com" required>
+      <label for="pw">Password</label>
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required>
+      <button id="go" type="submit">Sign in</button>
+    </form>
+    <div class="err" id="err" role="alert"></div>
+    <p class="muted"><a id="forgot">Forgot your password?</a></p>
+    <p class="muted">A client of the studio? <a href="/portal.html">Your sign-in is here</a>.</p>
+  </div>
+
+  <!-- ROUTING -->
+  <div id="routing" class="panel" style="text-align:center">
+    <div class="spin" role="status" aria-label="Signing you in"></div>
+    <p class="muted">Opening your workspace…</p>
+  </div>
+
+  <!-- SIGNED IN, NO WORKSPACE CONNECTED (honest state — never a dead spinner) -->
+  <div id="noWorkspace" class="panel">
+    <h2>You're signed in ✓</h2>
+    <p>This account is on the team, but its Studio OS workspace isn't connected on this environment yet.</p>
+    <p>Everything still runs — use the admin console while we finish connecting the workspace.</p>
+    <button id="toAdmin" type="button">Open the admin console</button>
+    <button class="ghost" id="retry" type="button">Try the workspace again</button>
+    <p class="muted"><a id="signout1">Sign out</a></p>
+  </div>
+
+  <!-- RESET SENT -->
+  <div id="resetSent" class="panel">
+    <h2>Check your email</h2>
+    <p>If that address has an account, a reset link is on its way. It lands you on a page to choose a new password.</p>
+    <p class="muted"><a id="backToLogin">Back to sign in</a></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+<script>
+// ── Studio OS — the ONE owner front door ─────────────────────────────────────
+// Signs in, asks the platform who you are, and lands you in the right place:
+//   • workspace member  → your landing page (Today / Website / Studio), where
+//     the shared shell nav carries Website·Customers·Projects·Files·Inbox — one app.
+//   • team w/o workspace → honest panel + admin console (never a dead spinner).
+//   • a client           → their door (/portal.html).
+// Session is shared with every app page (storageKey 'dds-portal-auth').
+var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+var FN = SUPABASE_URL + "/functions/v1";
+var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+var $ = function(id){ return document.getElementById(id); };
+function show(id){ ['loginPanel','routing','noWorkspace','resetSent'].forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); }
+function err(m){ var e=$('err'); e.textContent=m; e.style.display='block'; }
+
+function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
+
+async function route(token){
+  show('routing');
+  // 1) the unified workspace — /portal/context knows role, tier, and landing
+  try {
+    var r = await withTimeout(fetch(FN + "/presence/portal/context", {
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token }
+    }), 9000);
+    var j = await r.json().catch(function(){ return {}; });
+    if (r.ok && j && j.data && j.data.landing) { location.href = j.data.landing; return; }
+  } catch (e) { /* fall through — never strand the user on a spinner */ }
+  // 2) team member without a connected workspace → honest panel
+  try {
+    var w = await withTimeout(fetch(FN + "/clever-api", {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token },
+      body: JSON.stringify({ type: "whoami" })
+    }), 9000);
+    var wj = await w.json().catch(function(){ return {}; });
+    if (wj && wj.isTeam) { show('noWorkspace'); return; }
+  } catch (e) { /* fall through */ }
+  // 3) a client — their door is the portal
+  location.href = "/portal.html";
+}
+
+$('f').addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  var em = $('em').value.trim(), pw = $('pw').value;
+  if (!em || !pw) { err('Enter your email and password.'); return; }
+  var b = $('go'); b.disabled = true; b.textContent = 'Signing in…'; $('err').style.display='none';
+  try {
+    var r = await sb.auth.signInWithPassword({ email: em, password: pw });
+    if (r.error || !r.data || !r.data.session) { err('That email or password isn’t right. Try again, or use “Forgot your password?” below.'); b.disabled=false; b.textContent='Sign in'; return; }
+    route(r.data.session.access_token);
+  } catch (e) { err('Something went wrong signing in. Give it another try.'); b.disabled=false; b.textContent='Sign in'; }
+});
+
+$('forgot').addEventListener('click', async function(){
+  var em = $('em').value.trim();
+  if (!em) { err('Type your email above first, then tap “Forgot your password?” again.'); $('em').focus(); return; }
+  try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html' }); } catch(e){}
+  show('resetSent');
+});
+$('backToLogin').addEventListener('click', function(){ show('loginPanel'); });
+$('toAdmin').addEventListener('click', function(){ location.href = '/dds-studio-manage-9k2p.html'; });
+$('retry').addEventListener('click', async function(){
+  var s = await sb.auth.getSession(); var t = s && s.data && s.data.session && s.data.session.access_token;
+  if (t) route(t); else show('loginPanel');
+});
+$('signout1').addEventListener('click', async function(){ try{ await sb.auth.signOut(); }catch(e){} show('loginPanel'); });
+
+// Already signed in? Route straight through — this page is a door, not a stop.
+(async function(){
+  try {
+    var s = await sb.auth.getSession();
+    var t = s && s.data && s.data.session && s.data.session.access_token;
+    if (t) route(t);
+  } catch (e) { /* stay on the login form */ }
+})();
+</script>
+</body>
+</html>
