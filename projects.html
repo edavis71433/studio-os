@@ -187,7 +187,11 @@ function miniForm(host, fields, onSubmit){
 
 async function openProject(id){
   history.replaceState(null,'','?project='+id+(scope()?'&client='+scope():''));
-  const dlg=$('detail'); $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; dlg.showModal();
+  // a11y: in-dialog actions re-open the same project to refresh. Remember whether the
+  // dialog was already up so we can restore keyboard focus after the re-render (and
+  // never call showModal() on an open dialog — that throws).
+  const dlg=$('detail'); const wasOpen=dlg.open;
+  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; if(!wasOpen)dlg.showModal();
   try{
     const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
     const p=data.project; STUDIO=data.is_studio_view!==false;
@@ -199,7 +203,7 @@ async function openProject(id){
     const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="mut">No files yet.</div>';
     const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="mut">No approvals yet.</div>';
     $('detailInner').innerHTML=`
-      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(p.name)}</div>
+      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px" id="dtitle" tabindex="-1">${esc(p.name)}</div>
         <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div>
         <button class="btn ghost sm" id="closeDetail">Close</button></div>
       <div class="dbody">
@@ -231,6 +235,8 @@ async function openProject(id){
     // surveys + support (studio triage/review)
     if($('addSurvey'))$('addSurvey').onclick=()=>miniForm($('svForm'),[{name:'title',label:'Survey title'},{name:'q',label:'A question to ask'}],async v=>{await api('/projects/'+id+'/surveys','POST',{title:v.title,questions:[{label:v.q||'Your feedback',type:'text'}]});loadSurveys(id);});
     loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);}
+    // a11y: the re-render replaced whatever control had focus — land on the dialog title
+    if(wasOpen){const t=$('dtitle');if(t)t.focus();}
   }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="document.getElementById(\'detail\').close()">Close</button></div>'; }
 }
 
@@ -266,12 +272,15 @@ async function loadSurveys(id){
   }catch(e){ $('svList').innerHTML='<div class="mut">Couldn’t load surveys.</div>'; }
 }
 const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);return d<7?d+'d ago':new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
-async function loadSupport(id){
+async function loadSupport(id,focusRid){
   try{
     const {data}=await api('/support'); const items=(data||[]).filter(r=>r.project_id===id);
     $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="mut">No support requests for this project.</div>';
-    $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id);}catch(e){toast(nice(e),true);}});
+    $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id,b.dataset.res);}catch(e){toast(nice(e),true);}});
     $('supList').querySelectorAll('[data-sopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.sopen,id));
+    // a11y: the list re-render dropped focus — return it to the same request (its
+    // View & reply button survives resolving), or the dialog title if it's gone.
+    if(focusRid){const el=$('supList').querySelector('[data-sopen="'+focusRid+'"]')||$('dtitle');if(el)el.focus();}
   }catch(e){ $('supList').innerHTML='<div class="mut">Couldn’t load support.</div>'; }
 }
 // The owner can now READ the request + the client's messages and REPLY — the
@@ -284,10 +293,10 @@ async function openStudioSupport(rid,pid){
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
     const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
     $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body-${rid}">Reply to the client</label><textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
-    $('sup-back').onclick=()=>loadSupport(pid);
+    $('sup-back').onclick=()=>loadSupport(pid,rid);
     const sta=$('sr-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta); // a half-written reply survives an accidental close/refresh
     const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid);}catch(err){toast(nice(err),true);}};
-    const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid);}catch(e){toast(nice(e),true);}};
+    const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid,rid);}catch(e){toast(nice(e),true);}};
   }catch(e){ toast('Couldn’t open that request.',true); }
 }
 

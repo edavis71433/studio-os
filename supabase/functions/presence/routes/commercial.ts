@@ -206,9 +206,11 @@ export async function handleApproveSend(site: SiteRow, principal: Principal, cor
     const link = `${siteBase()}/approve.html?token=${encodeURIComponent(tok)}`;
     rows += `<div style="margin:14px 0;padding:14px;border:1px solid #eee9e0;border-radius:10px"><b>${esc(it.title || 'A change is ready')}</b><br>${esc(it.summary || '')}<br><span class="cta"><a href="${link}" style="display:inline-block;margin-top:8px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Review &amp; approve →</a></span></div>`;
   }
+  // critical: an approval request is transactional — the client's approval loop must
+  // not stall because they unsubscribed from updates (bounces still suppress).
   const sent = await sendEmail(String(to), 'Something is ready for your approval',
-    `<p>Your studio has ${items.length} ${items.length === 1 ? 'change' : 'changes'} ready. Tap to review and approve — nothing happens until you do.</p>${rows}`, brand);
-  return json({ data: { ok: true, sent: items.length, delivered: sent, message: sent ? `Sent ${items.length} to ${to}.` : 'Prepared, but email isn’t configured on this environment.' } }, 200, cors);
+    `<p>Your studio has ${items.length} ${items.length === 1 ? 'change' : 'changes'} ready. Tap to review and approve — nothing happens until you do.</p>${rows}`, brand, { critical: true });
+  return json({ data: { ok: true, sent: items.length, delivered: sent, message: sent ? `Sent ${items.length} to ${to}.` : 'Prepared, but the email couldn’t be sent (email may be off in this environment, or that address can’t receive mail right now).' } }, 200, cors);
 }
 
 /** PUBLIC — the one-tap page reads the pending item from a signed token. */

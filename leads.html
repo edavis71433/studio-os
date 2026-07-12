@@ -77,7 +77,7 @@ function render(){
   const unread=ALL.filter(l=>l.status==='new').length;
   const rows=ALL.filter(l=>FILTER==='open'?l.status!=='archived':FILTER==='new'?l.status==='new':true);
   let h=`<div class="rolebadge">● Website enquiries</div>
-    <header><h1>Website enquiries</h1><p class="sub">${unread?unread+' new · ':''}Everyone who reached out through your website.</p></header>
+    <header><h1 id="pagehead" tabindex="-1">Website enquiries</h1><p class="sub">${unread?unread+' new · ':''}Everyone who reached out through your website.</p></header>
     <div class="filters" role="tablist" aria-label="Filter enquiries">
       <button role="tab" aria-selected="${FILTER==='open'?'true':'false'}" data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
       <button role="tab" aria-selected="${FILTER==='new'?'true':'false'}" data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
@@ -118,7 +118,10 @@ function wire(){
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
 }
-async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();}}else if(!silent)toast('That didn’t update.');}
+async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();
+  // a11y: render() rebuilt #main and dropped focus — return it to the same lead's
+  // remaining control (Archive survives a mark-read), or the page heading if the row left the list.
+  const nx=document.querySelector('[data-arch="'+id+'"]')||$('pagehead');if(nx)nx.focus();}}else if(!silent)toast('That didn’t update.');}
 // P2-C (Seam 3): promote a captured inquiry into a pipeline deal — no re-typing.
 // Reuses the existing form submission as the deal's source (source_submission_id).
 async function createDeal(id){

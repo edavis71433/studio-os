@@ -117,7 +117,7 @@ function render(profile,summary,notes,items,studio){
     ['Team', String(profile.members), 'with access'],
   ];
   let html=`<div class="rolebadge">● ${studio?'Studio view':'Your account'}</div>
-    <header><h1>${esc(profile.business_name||'This business')}</h1>
+    <header><h1 id="pagehead" tabindex="-1">${esc(profile.business_name||'This business')}</h1>
       <div style="margin:6px 0 10px"><span class="chip ${esc(h)}"><span class="d"></span>${h==='attention'?'Needs attention':h==='new'?'Getting set up':h==='quiet'?'Quiet':'Healthy'}</span></div>
       <p class="summary">${esc(summary)}</p></header>`;
 
@@ -173,15 +173,18 @@ function wire(){
   const ex=$('exportlink');if(ex)ex.addEventListener('click',(e)=>{e.preventDefault();doExport();});
   const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'));});
 }
+// a11y: load() rebuilds #main, which drops keyboard focus to <body> — after an
+// action, put focus back on the recreated control (or the page heading if it's gone).
+function refocus(sel){const el=(sel&&document.querySelector(sel))||$('pagehead');if(el)el.focus();}
 async function addNote(){
   const t=$('nb');const body=(t&&t.value||'').trim();if(!body){toast('Write a little something first.');return;}
   const btn=$('addnote');btn.disabled=true;
   const r=await api('/crm/notes','POST',{audience:STUDIO?NEWAUD:'shared',body});
   btn.disabled=false;
-  if(r.ok){toast(r.body.data&&r.body.data.message||'Saved.');load();}else{toast(r.body.message||'That didn’t save.');}
+  if(r.ok){toast(r.body.data&&r.body.data.message||'Saved.');await load();refocus('#addnote');}else{toast(r.body.message||'That didn’t save.');}
 }
-async function pin(id,on){const r=await api('/crm/notes/'+id+'/pin','POST',{pinned:on});if(r.ok)load();else toast('Couldn’t update that note.');}
-async function del(id){const r=await api('/crm/notes/'+id,'DELETE');if(r.ok){toast('Removed.');load();}else toast('Couldn’t remove that note.');}
+async function pin(id,on){const r=await api('/crm/notes/'+id+'/pin','POST',{pinned:on});if(r.ok){await load();refocus('[data-pin="'+id+'"]');}else toast('Couldn’t update that note.');}
+async function del(id){const r=await api('/crm/notes/'+id,'DELETE');if(r.ok){toast('Removed.');await load();refocus();}else toast('Couldn’t remove that note.');}
 async function doExport(){toast('Preparing your export…');const r=await fetch(FN+'/export',{headers:H()});if(!r.ok){toast('Export isn’t available right now.');return;}const blob=await r.blob();const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='website-export.json';a.click();URL.revokeObjectURL(u);}
 
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open Customers.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

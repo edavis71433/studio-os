@@ -24,6 +24,16 @@
   .verify{margin-top:20px;font-size:13px;color:var(--ok);min-height:18px;}
   .spinner{width:22px;height:22px;border:2.5px solid #e0d4f5;border-top-color:var(--p);border-radius:50%;display:inline-block;animation:spin .8s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.spinner{animation:none;}}
+  /* ── Dark-mode variant (token-level; mirrors payment-success.html's recipe).
+     The button keeps #5b3fa0 + white — that pairing passes in both themes. ── */
+  @media (prefers-color-scheme:dark){
+    :root{--ink:#EFEAF7;--muted:#A79DBE;--cream:#171320;--line:rgba(183,156,235,.18);}
+    .card{background:#241d38;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+    .mark.wait{background:#2a2140;color:#b79ceb;}
+    .verify{color:#8bbf9f;}
+    .spinner{border-color:#3a2f55;border-top-color:#b79ceb;}
+  }
 </style>
 </head>
 <body>
@@ -32,7 +42,7 @@
     <h1 id="title">Setting up your workspace…</h1>
     <p id="body">Your payment went through securely. We’re getting everything ready — this only takes a moment.</p>
     <div id="actions"></div>
-    <div class="verify" id="verify"></div>
+    <div class="verify" id="verify" role="status"></div>
   </div>
 
 <script>

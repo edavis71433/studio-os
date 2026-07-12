@@ -326,6 +326,10 @@ function closeDetail(){
   $('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;
   if(wasOpen&&detailOpener&&detailOpener.focus&&document.contains(detailOpener))detailOpener.focus();   // return focus to the opener
   detailOpener=null;
+  // a11y: empty the closed dialog. The panel is only translated off-screen, so it
+  // still returns client rects — shell.js's focus trap would otherwise keep pulling
+  // Tab into its invisible buttons. Safe: openDetail always re-renders innerHTML.
+  $('panel').innerHTML='';
 }
 function renderDetail(){
   const d=S.current,a=d.asset;const ed=S.canEdit;
