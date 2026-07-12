@@ -39,10 +39,10 @@ async function clientEvent(agencySiteId: string, projectId: string, kind: string
 export async function handleClientBilling(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const me = customerOf(site);
   if (!me) return json({ data: { billing_type: 'service', invoices: [], summary: { open_count: 0, paid_count: 0 } }, message: 'No service billing is linked to your account yet.' }, 200, cors);
-  const r = await svc(`invoices?client_id=eq.${me}&deleted_at=is.null&select=id,name,description,amount,status,due_date,paid_at,stripe_url,created_at&order=created_at.desc&limit=200`);
+  const r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at&order=created_at.desc&limit=200`);
   const list = rows(r).map((i) => ({
-    id: i.id, name: clean(i.name, 200), description: clean(i.description, 1000),
-    amount: i.amount, status: i.status, due_date: i.due_date, paid_at: i.paid_at,
+    id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
+    amount: (Number(i.amount_cents) || 0) / 100, status: i.status, due_date: i.due_date, paid_at: i.paid_at,
     // only expose a pay link for something that isn't already paid
     pay_url: (i.status !== 'paid' && i.stripe_url) ? i.stripe_url : null,
     created_at: i.created_at,

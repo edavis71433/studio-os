@@ -290,6 +290,18 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { status: 200 });
   };
 
+  // Multi-tenant service invoices/deposits (presence_invoices) — same one authority,
+  // flipped via metadata.presence_invoice_id (threaded onto the Payment Link's intent).
+  const markPresenceInvoicePaid = async (invoiceId: string, via: string): Promise<Response> => {
+    const wrote = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}`, 'PATCH', { status: 'paid', paid_at: eventTime, updated_at: eventTime });
+    if (!wrote) {
+      console.error(`[stripe-webhook] ${type} FAILED to mark presence_invoice ${invoiceId} paid (via ${via}) — returning 500 so Stripe retries`);
+      return new Response('db write failed', { status: 500 });
+    }
+    console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} paid (via ${via})`);
+    return new Response('ok', { status: 200 });
+  };
+
   // Dispatch returns the Response; the claim is settled ONCE afterward — done on
   // 200, failed on anything else — so a Stripe retry of a failed event re-runs
   // (claim === 'retry') instead of being swallowed as a duplicate.
@@ -312,6 +324,7 @@ Deno.serve(async (req: Request) => {
           console.log(`[stripe-webhook] ${type} → audit order ${md.order_id} paid`);
           return new Response('ok', { status: 200 });
         }
+        if (md.presence_invoice_id) return await markPresenceInvoicePaid(String(md.presence_invoice_id), 'checkout.session metadata');
         console.log(`[stripe-webhook] ${type} with no invoice_id/order_id metadata (session ${obj.id || '?'}) — payment recorded, nothing to flip`);
         return new Response('ok', { status: 200 });
       }
@@ -319,6 +332,7 @@ Deno.serve(async (req: Request) => {
       if (type === 'payment_intent.succeeded') {
         const md = obj.metadata || {};
         if (md.invoice_id) return await markInvoicePaid(String(md.invoice_id), 'payment_intent metadata');
+        if (md.presence_invoice_id) return await markPresenceInvoicePaid(String(md.presence_invoice_id), 'payment_intent metadata');
         console.log(`[stripe-webhook] ${type} with no invoice metadata (${obj.id || '?'}) — acknowledged`);
         return new Response('ok', { status: 200 });
       }

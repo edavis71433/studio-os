@@ -47,7 +47,7 @@ step(18, 'Lapsed/read-only denies paid actions but keeps view + export', /status
 step(19, 'Recovery is reachable in-app (billing portal button) + reconciled', /\/commerce\/portal/.test(review) && /can_manage_billing/.test(commerce));
 
 // tenant isolation (20) — the new seams are all site/client scoped
-step(20, 'New seams are tenant-scoped (forms→deal, inbox, oversight, client billing)', /presence_deals\?site_id=eq\.\$\{site\.id\}&source_submission_id/.test(sales) && /invoices\?client_id=eq\.\$\{me\}/.test(clientd) && /agencySiteIds\(member\.agency_id\)/.test(analytics));
+step(20, 'New seams are tenant-scoped (forms→deal, inbox, oversight, client billing)', /presence_deals\?site_id=eq\.\$\{site\.id\}&source_submission_id/.test(sales) && /presence_invoices\?customer_client_id=eq\.\$\{me\}/.test(clientd) && /agencySiteIds\(member\.agency_id\)/.test(analytics));
 
 // idempotency across the board (21)
 step(21, 'Retries do not duplicate: deal (dedupe), notice (unique key), webhook (claim)', /if \(existing\) return json\(\{ data: existing, already_converted: true \}/.test(sales) && /resolution=ignore-duplicates/.test(notice));

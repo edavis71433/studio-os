@@ -14,6 +14,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice } from '../lib/notice.ts';
+import { stripeConfigured, createServicePaymentLink } from '../commerce/stripe.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import {
@@ -237,6 +238,57 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
     return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand);
   } catch { return false; }
+}
+
+/** Email the customer their invoice/deposit pay link, on the studio's brand. Best-effort. */
+async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number): Promise<boolean> {
+  try {
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
+    const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
+    if (!email) return false;
+    const brand = await loadEmailBrand(siteId);
+    const amount = '$' + (amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${title.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand);
+  } catch { return false; }
+}
+
+/** Turn a deal (its accepted proposal, or an explicit amount) into a payable invoice
+ *  or deposit: create the presence_invoices row, generate a non-expiring Stripe
+ *  payment link, email the customer, record the event. Service billing — kept
+ *  separate from the SaaS subscription, on the one Stripe authority. */
+export async function handleSalesInvoice(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before sending invoices.' }, 503, cors);
+  const deal = await loadDeal(site.id, dealId);
+  if (!deal) return json({ error: 'not_found' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { /* body optional */ }
+  let amountCents: number | null = Number.isFinite(Number(b.amount_cents)) ? Math.trunc(Number(b.amount_cents)) : null;
+  if (amountCents === null) {   // default to the accepted proposal's total
+    const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=subtotal_cents&order=decided_at.desc&limit=1`))[0];
+    amountCents = prop ? Number(prop.subtotal_cents) : null;
+  }
+  if (!amountCents || amountCents < 50) return json({ error: 'validation', message: 'Enter an amount to invoice (or accept a proposal first).' }, 422, cors);
+  amountCents = Math.min(100000000, amountCents);
+  const purpose = b.purpose === 'deposit' ? 'deposit' : 'service';
+  const title = clean(b.title, 200) || (purpose === 'deposit' ? 'Deposit' : 'Invoice');
+  const description = clean(b.description, 1000) || `${title} — ${deal.title || 'project'}`;
+  const dueDate = (typeof b.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.due_date)) ? b.due_date : null;
+  const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' }) });
+  const inv = rows(ins)[0];
+  if (!inv) return json({ error: 'write_failed', message: 'That invoice didn’t save — please try again.' }, 502, cors);
+  let payUrl: string | null = null;
+  try {
+    const link = await createServicePaymentLink({ amountCents, currency: 'usd', description, invoiceId: inv.id });
+    payUrl = link.url;
+    await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+  } catch {
+    return json({ data: { ...inv, stripe_url: null }, warning: 'link_failed', message: 'Invoice saved, but the payment link didn’t generate — tap Send again.' }, 200, cors);
+  }
+  const emailed = await emailInvoice(site.id, dealId, title, payUrl, amountCents);
+  await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: amountCents, purpose } });
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed }, 201, cors);
 }
 
 /** W1: a client just accepted a proposal / signed a contract via the token link.

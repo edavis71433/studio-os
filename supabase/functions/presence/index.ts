@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesPublicView } from './routes/sales.ts';
+import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesInvoice, handleSalesPublicView } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
@@ -439,6 +439,8 @@ serve(async (req) => {
     if (m && method === 'POST') return handleSalesContractCreate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/convert$/);
     if (m && method === 'POST') return handleSalesConvert(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/invoice$/);
+    if (m && method === 'POST') return handleSalesInvoice(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/send$/);

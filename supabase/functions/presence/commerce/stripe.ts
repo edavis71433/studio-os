@@ -97,6 +97,30 @@ export async function createSubscriptionCheckout(p: CheckoutParams): Promise<{ i
   return { id: String(session.id), url: String(session.url) };
 }
 
+/** A one-time SERVICE invoice payment link (a deposit / project charge). A Payment
+ *  Link (NOT a 24h Checkout session), so it never expires — a customer can pay
+ *  whenever. Inline price_data → no pre-created Price needed. The webhook flips the
+ *  invoice to paid via metadata.presence_invoice_id, threaded onto both the link and
+ *  the PaymentIntent (payment_intent.succeeded + checkout.session.completed).
+ *  Idempotent per invoice (re-sending returns the same price + link). */
+export async function createServicePaymentLink(p: { amountCents: number; currency?: string; description: string; invoiceId: string }): Promise<{ url: string; id: string }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const price = await stripeReq('prices', {
+    'unit_amount': String(Math.max(1, Math.round(p.amountCents))),
+    'currency': (p.currency || 'usd').toLowerCase(),
+    'product_data[name]': (p.description || 'Invoice').slice(0, 250),
+  }, `price-${p.invoiceId}`);
+  const link = await stripeReq('payment_links', {
+    'line_items[0][price]': String(price.id),
+    'line_items[0][quantity]': '1',
+    'metadata[presence_invoice_id]': p.invoiceId,
+    'metadata[kind]': 'service_invoice',
+    'payment_intent_data[metadata][presence_invoice_id]': p.invoiceId,
+    'payment_intent_data[metadata][kind]': 'service_invoice',
+  }, `plink-${p.invoiceId}`);
+  return { url: String(link.url), id: String(link.id) };
+}
+
 // A Billing Portal session — the customer manages payment method, cancels,
 // or changes plan through Stripe's own hosted surface. Requires a customer id.
 export async function createBillingPortal(customerId: string, returnUrl?: string): Promise<{ url: string }> {

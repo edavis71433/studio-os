@@ -23,7 +23,7 @@ ok('saas: points to service billing when the customer has invoices', /has_servic
 // ── Client SERVICE surface: separate, scoped, amounts shown, pay link ──
 ok('service: /client/billing handler exists + is routed', /export async function handleClientBilling/.test(client) && /route === '\/client\/billing' && method === 'GET'/.test(index));
 ok('service: labeled billing_type "service" + explicitly separate from SaaS', /billing_type: 'service'/.test(client) && /billed separately/i.test(client));
-ok('service: scoped to the caller\'s own client_id (tenant-safe)', /invoices\?client_id=eq\.\$\{me\}&deleted_at=is\.null/.test(client));
+ok('service: scoped to the caller\'s own customer (tenant-safe, multi-tenant presence_invoices)', /presence_invoices\?customer_client_id=eq\.\$\{me\}&deleted_at=is\.null/.test(client));
 ok('service: exposes a pay link ONLY for unpaid invoices', /i\.status !== 'paid' && i\.stripe_url\) \? i\.stripe_url : null/.test(client));
 
 // ── Studio surface: sees the customer's SaaS status, read-only, distinguished ──
