@@ -656,22 +656,31 @@ const CLIENT_OPTS: { from: string; replyTo: string } = { from: CLIENT_FROM, repl
 // that ignore the return value keep working unchanged. New code should prefer
 // emailOk() below, which returns a clean boolean. Failures are always logged
 // with the exact Resend status + body so they're visible in dev/prod logs.
+// Recipients are MASKED in logs (edge logs are operator-visible + provider-retained).
+function maskAddr(e: string): string { return String(e || '').replace(/^(.).*@/, '$1***@'); }
 async function sendEmail(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string }) {
   if (!RESEND_KEY) {
-    console.error('[email] skipped send to', to, '— RESEND_KEY not configured. Subject:', subject);
+    console.error('[email] skipped send to', maskAddr(to), '— RESEND_KEY not configured. Subject:', subject);
     return new Response(JSON.stringify({ error: 'resend_not_configured' }), { status: 500 });
   }
   try {
     // Domain-wide deliverability: honor the SAME suppression store + one-click
-    // unsubscribe as the presence sender (suppressed_emails + /unsubscribe).
-    // One sender ignoring bounces junks the whole domain's reputation.
-    const { isSuppressed, unsubscribeUrl } = await import('../presence/routes/email_infra.ts');
+    // unsubscribe as the presence sender (_shared/email_infra — ONE module for
+    // both functions). One sender ignoring bounces junks the whole domain.
+    const { isSuppressed, unsubscribeUrl, maskEmail } = await import('../_shared/email_infra.ts');
     if (await isSuppressed(to)) {
-      console.warn('[email] suppressed — not sending to', to, '| subject:', subject);
+      console.warn('[email] suppressed — not sending to', maskEmail(to), '| subject:', subject);
       return new Response(JSON.stringify({ error: 'recipient_suppressed' }), { status: 200 });
     }
+    // Plain-text alternative (spam-scoring + text-only clients), same strip as
+    // the presence sender.
+    const text = String(html || '')
+      .replace(/<\s*(br|\/p|\/div|\/tr|\/h[1-6])\s*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/\n{3,}/g, '\n\n').trim();
     const payload: Record<string, unknown> = {
-      from: (opts && opts.from) || FROM, to: [to], subject, html,
+      from: (opts && opts.from) || FROM, to: [to], subject, html, text,
       headers: {
         'List-Unsubscribe': `<${await unsubscribeUrl(to)}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -686,13 +695,13 @@ async function sendEmail(to: string, subject: string, html: string, opts?: { fro
     if (!r.ok) {
       let detail = '';
       try { detail = await r.text(); } catch (_) { /* ignore */ }
-      console.error('[email] Resend send FAILED', r.status, 'to', to, '| subject:', subject, '| detail:', detail);
+      console.error('[email] Resend send FAILED', r.status, 'to', maskAddr(to), '| subject:', subject, '| detail:', detail);
     } else {
-      console.log('[email] sent to', to, '| subject:', subject);
+      console.log('[email] sent to', maskAddr(to), '| subject:', subject);
     }
     return r;
   } catch (e) {
-    console.error('[email] Resend send THREW to', to, '| subject:', subject, '|', String(e));
+    console.error('[email] Resend send THREW to', maskAddr(to), '| subject:', subject, '|', String(e));
     return new Response(null, { status: 500 });
   }
 }
@@ -1041,7 +1050,7 @@ function critiqueEmailHtml(domain: string, result: any) {
       <div style="text-align:center;margin-top:24px;">
         <a href="https://davisdigitalstudio.com/contact" style="display:inline-block;background:#5b3fa0;color:#fff;font-size:14px;font-weight:600;padding:13px 26px;border-radius:100px;text-decoration:none;">Book a free 15-minute call →</a>
       </div>
-      <p style="text-align:center;font-size:12px;color:rgba(255,255,255,0.3);margin-top:22px;line-height:1.6;">This was a free first-pass review of ${domain}. Happy to talk through any of it, no charge.<br>Eric Davis · Davis Digital Studio · Los Angeles</p>
+      <p style="text-align:center;font-size:12px;color:rgba(255,255,255,0.3);margin-top:22px;line-height:1.6;">This was a free first-pass review of ${domain}. Happy to talk through any of it, no charge.<br>Eric Davis · Davis Digital Studio LLC · Burbank, California</p>
     </div>
   `);
 }
@@ -6963,9 +6972,14 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
 
       try {
         // Outreach is the send that MOST needs suppression + unsubscribe: it's
-        // 1:1 prospecting, so a bounced/opted-out address must never be re-mailed.
-        const { isSuppressed, unsubscribeUrl } = await import('../presence/routes/email_infra.ts');
+        // 1:1 prospecting — commercial mail — so a bounced/opted-out address must
+        // never be re-mailed, and CAN-SPAM wants a VISIBLE opt-out + postal
+        // address in the body, not just headers.
+        const { isSuppressed, unsubscribeUrl } = await import('../_shared/email_infra.ts');
         if (await isSuppressed(to)) return json({ error: 'recipient_suppressed', detail: 'This address unsubscribed or bounced previously. Nothing was sent.' }, 200, reqCors);
+        const unsub = await unsubscribeUrl(to);
+        const footer = `<p style="font-size:12px;color:#8a8198;margin-top:22px;border-top:1px solid #eee9e0;padding-top:12px;">Davis Digital Studio LLC · Burbank, California · <a href="${unsub}" style="color:#8a8198;">unsubscribe</a></p>`;
+        const textFooter = `\n\n—\nDavis Digital Studio LLC · Burbank, California\nUnsubscribe: ${unsub}`;
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
@@ -6974,10 +6988,10 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
             to: [to],
             reply_to: ERIC,
             subject,
-            html,
-            text,
+            html: html + footer,
+            text: text + textFooter,
             headers: {
-              'List-Unsubscribe': `<${await unsubscribeUrl(to)}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
+              'List-Unsubscribe': `<${unsub}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
               'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
             },
           }),

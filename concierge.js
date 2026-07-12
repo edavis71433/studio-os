@@ -14,7 +14,7 @@
       (see clever-api-concierge-ADD.ts).
 
    That's it. No build step, no dependencies. It styles itself and matches
-   your site (dark purple, DM Serif Display + DM Sans).
+   your site (dark purple, Fraunces + Inter).
    ============================================================================ */
 (function () {
   'use strict';
@@ -31,20 +31,20 @@
 
   // ---- styles -------------------------------------------------------------
   var css = `
-  .dds-cc-launch{position:fixed;bottom:24px;right:24px;z-index:99995;display:inline-flex;align-items:center;gap:9px;background:#5b3fa0;color:#fff;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;font-size:14.5px;font-weight:600;padding:13px 20px 13px 17px;border-radius:100px;border:none;cursor:pointer;box-shadow:0 10px 30px rgba(91,63,160,0.38);transition:transform .14s ease,box-shadow .14s ease;}
+  .dds-cc-launch{position:fixed;bottom:24px;right:24px;z-index:99995;display:inline-flex;align-items:center;gap:9px;background:#5b3fa0;color:#fff;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:14.5px;font-weight:600;padding:13px 20px 13px 17px;border-radius:100px;border:none;cursor:pointer;box-shadow:0 10px 30px rgba(91,63,160,0.38);transition:transform .14s ease,box-shadow .14s ease;}
   .dds-cc-launch:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(91,63,160,0.46);}
   .dds-cc-launch svg{width:19px;height:19px;flex-shrink:0;}
   .dds-cc-launch.dds-hide{opacity:0;pointer-events:none;transform:translateY(8px);}
 
-  .dds-cc-panel{position:fixed;bottom:24px;right:24px;z-index:99996;width:380px;max-width:calc(100vw - 32px);height:560px;max-height:calc(100vh - 48px);background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(15,8,32,0.45);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(16px) scale(.98);pointer-events:none;transition:opacity .2s ease,transform .2s ease;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;}
+  .dds-cc-panel{position:fixed;bottom:24px;right:24px;z-index:99996;width:380px;max-width:calc(100vw - 32px);height:560px;max-height:calc(100vh - 48px);background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(15,8,32,0.45);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(16px) scale(.98);pointer-events:none;transition:opacity .2s ease,transform .2s ease;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;}
   .dds-cc-panel.dds-open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
 
   .dds-cc-head{background:#1e1338;padding:18px 18px 17px;position:relative;overflow:hidden;flex-shrink:0;}
   .dds-cc-head::before{content:'';position:absolute;top:-60px;right:-40px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.5) 0%,transparent 65%);pointer-events:none;}
   .dds-cc-head-row{display:flex;align-items:center;gap:11px;position:relative;}
-  .dds-cc-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#5b3fa0,#7c5dc4);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'DM Serif Display',Georgia,serif;font-size:18px;color:#fff;}
+  .dds-cc-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#5b3fa0,#7c5dc4);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Fraunces',Georgia,serif;font-size:18px;color:#fff;}
   .dds-cc-htext{flex:1;min-width:0;}
-  .dds-cc-htext h3{font-family:'DM Serif Display',Georgia,serif;font-size:17px;font-weight:400;color:#fff;margin:0;line-height:1.2;}
+  .dds-cc-htext h3{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:400;color:#fff;margin:0;line-height:1.2;}
   .dds-cc-htext p{font-size:12px;color:rgba(255,255,255,0.55);margin:2px 0 0;line-height:1.3;}
   .dds-cc-status{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5bd08a;margin-right:5px;vertical-align:middle;}
   .dds-cc-close{background:rgba(255,255,255,0.1);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .14s;}

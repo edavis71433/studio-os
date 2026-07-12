@@ -10,7 +10,7 @@
 //   • send-once → the notices table's unique(client,kind,period) IS the dedupe:
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
@@ -132,10 +132,9 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
   let ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=${ECOLS}&order=last_swept_at.asc.nullsfirst&limit=${limit * 4}`);
   if (!ents.ok) ents = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&select=${ECOLS}&limit=${limit * 4}`);
   const rows: EntitlementView[] = Array.isArray(ents.json) ? ents.json : [];
-  if (rows.length) {
-    await svc(`presence_entitlements?product=eq.presence&client_id=in.(${rows.map((r) => r.client_id).join(',')})`, {
-      method: 'PATCH', body: JSON.stringify({ last_swept_at: nowIso }),
-    }).catch(() => {});
+  {
+    const { stampCursor } = await import('../ops/scheduler.ts');
+    await stampCursor('presence_entitlements', 'client_id', rows.map((r) => String(r.client_id)), { last_swept_at: nowIso }, '&product=eq.presence');
   }
 
   for (const e of rows.slice(0, limit * 4)) {
@@ -229,20 +228,22 @@ export async function runWeeklyDigest(): Promise<{ sent: boolean }> {
   if (Date.now() - last < 7 * 86400_000) return { sent: false };
   const since = new Date(Date.now() - 7 * 86400_000).toISOString();
   const twoDays = new Date(Date.now() - 2 * 86400_000).toISOString();
-  const [subsQ, pausedQ, lapsedQ, leadsQ, failsQ] = await Promise.all([
-    svc(`presence_entitlements?product=eq.presence&created_at=gt.${since}&select=client_id`),
-    svc('presence_entitlements?product=eq.presence&status=eq.paused&select=client_id'),
-    svc('presence_entitlements?product=eq.presence&status=eq.lapsed&select=client_id'),
-    svc(`presence_form_submissions?status=eq.new&spam=is.false&created_at=lt.${twoDays}&select=id`),
-    svc(`presence_publishes?status=eq.failed&created_at=gt.${since}&select=id`),
+  // Exact counts (svcCount) — fetch-to-count saturates at PostgREST max-rows,
+  // so the digest would silently under-report at scale.
+  const [subs, paused, lapsed, leads, fails] = await Promise.all([
+    svcCount(`presence_entitlements?product=eq.presence&created_at=gt.${since}`),
+    svcCount('presence_entitlements?product=eq.presence&status=eq.paused'),
+    svcCount('presence_entitlements?product=eq.presence&status=eq.lapsed'),
+    svcCount(`presence_form_submissions?status=eq.new&spam=is.false&created_at=lt.${twoDays}`),
+    svcCount(`presence_publishes?status=eq.failed&created_at=gt.${since}`),
   ]);
-  const n = (r: { json?: unknown }) => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: unknown[] }).json.length : 0);
+  const n = (c: number | null) => c ?? 0;
   const html = `<p>Your Studio OS week, in one glance:</p><ul>
-<li><strong>${n(subsQ)}</strong> new subscription${n(subsQ) === 1 ? '' : 's'}</li>
-<li><strong>${n(pausedQ)}</strong> with payment trouble${n(pausedQ) ? ' — they were told their site is still up' : ''}</li>
-<li><strong>${n(lapsedQ)}</strong> lapsed (wind-down comms run automatically)</li>
-<li><strong>${n(leadsQ)}</strong> lead${n(leadsQ) === 1 ? '' : 's'} waiting more than 2 days for a reply</li>
-<li><strong>${n(failsQ)}</strong> failed publish${n(failsQ) === 1 ? '' : 'es'} this week</li>
+<li><strong>${n(subs)}</strong> new subscription${n(subs) === 1 ? '' : 's'}</li>
+<li><strong>${n(paused)}</strong> with payment trouble${n(paused) ? ' — they were told their site is still up' : ''}</li>
+<li><strong>${n(lapsed)}</strong> lapsed (wind-down comms run automatically)</li>
+<li><strong>${n(leads)}</strong> lead${n(leads) === 1 ? '' : 's'} waiting more than 2 days for a reply</li>
+<li><strong>${n(fails)}</strong> failed publish${n(fails) === 1 ? '' : 'es'} this week</li>
 </ul><p>Details live in Stripe, the leads inbox, and /system/health. The watchdog emails you separately if production ever goes dark.</p>`;
   const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html);
   await svc('presence_ops_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ last_digest_at: new Date().toISOString() }) });

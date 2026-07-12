@@ -69,6 +69,21 @@
       .catch(function () { return { ok: false, status: 0, body: {} }; });
   }
 
+  // ── THE shared API helper for app pages ──────────────────────────────────────
+  // Every app page historically defines its own api() fetch wrapper (~28 copies);
+  // any auth-header or error-shape change means ~28 coordinated edits. This is
+  // the ONE canonical helper: same headers (incl. scope carry), same normalized
+  // {ok,status,body} shape, plus method/body support. New code MUST use it;
+  // existing pages migrate opportunistically after human browser QA.
+  window.ddsApi = function (path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': scopeId() } };
+    if (opts.body !== undefined) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+    return fetch(FN + path, init)
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
+      .catch(function () { return { ok: false, status: 0, body: {} }; });
+  };
+
   // ── DOM ──
   var root, sb, CTX = null, DESTS = [];
   function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
@@ -115,9 +130,9 @@
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
-        '<button class="dds-ic" id="dds-bell" aria-label="Notifications">🔔' + (att > 0 ? '<span class="dot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</button>' +
+        '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">🔔' + (att > 0 ? '<span class="dot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</button>' +
         '<a class="dds-ic" href="/help.html" aria-label="Help">?</a>' +
-        '<button class="dds-ic" id="dds-profile" aria-label="Account">◐</button>' +
+        '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">◐</button>' +
       '</div>';
 
     wire(nav);
@@ -179,7 +194,7 @@
   var pal;
   function openPalette() {
     if (!pal) {
-      pal = el('<div class="dds-palette"><div class="box"><input placeholder="Search Studio OS…" aria-label="Search"><div class="results"></div></div></div>');
+      pal = el('<div class="dds-palette"><div class="box" role="dialog" aria-modal="true" aria-label="Search Studio OS"><input placeholder="Search Studio OS…" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="dds-pal-list" aria-autocomplete="list"><div class="results" id="dds-pal-list" role="listbox" aria-label="Results"></div></div></div>');
       document.body.appendChild(pal);
       pal.addEventListener('click', function (e) { if (e.target === pal) closePalette(); });
       pal.querySelector('input').addEventListener('input', function (e) { paintResults(e.target.value); });
@@ -190,7 +205,10 @@
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault(); var all = [].slice.call(pal.querySelectorAll('.res')); if (!all.length) return;
           var i = all.indexOf(sel); i = e.key === 'ArrowDown' ? Math.min(all.length - 1, i + 1) : Math.max(0, i - 1);
-          all.forEach(function (r) { r.classList.remove('sel'); }); all[i < 0 ? 0 : i].classList.add('sel');
+          all.forEach(function (r) { r.classList.remove('sel'); r.setAttribute('aria-selected', 'false'); });
+          var pick = all[i < 0 ? 0 : i]; pick.classList.add('sel'); pick.setAttribute('aria-selected', 'true');
+          e.target.setAttribute('aria-activedescendant', pick.id);
+          if (pick.scrollIntoView) pick.scrollIntoView({ block: 'nearest' });
         }
       });
     }
@@ -203,8 +221,9 @@
     var qq = String(q || '').trim().toLowerCase();
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0; }) : DESTS;
     var box = pal.querySelector('.results');
-    var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
+    var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" id="dds-res-' + i + '" role="option" aria-selected="' + (i === 0 ? 'true' : 'false') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
     box.innerHTML = navHtml || (qq ? '' : '');
+    var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', navHtml ? 'dds-res-0' : '');
     // ── Files: search actual files by name/tag/description (reuses GET /assets?q=) ──
     var tok = ++fileSearchTok;
     if (qq.length >= 2 && hasFiles()) {
@@ -227,11 +246,13 @@
 
   // ── notifications (lazy; reuses /portal/feed — no new system) ──
   var notif;
+  function setExpanded(id, open) { var b = document.getElementById(id); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
   function toggleNotifications() {
     closeProfile();
-    if (notif && notif.classList.contains('open')) { notif.classList.remove('open'); return; }
-    if (!notif) { notif = el('<div class="dds-pop"><h4>Needs a look</h4><div class="body"><div class="muted">Loading…</div></div></div>'); document.body.appendChild(notif); notif.addEventListener('click', function (e) { e.stopPropagation(); }); }
+    if (notif && notif.classList.contains('open')) { notif.classList.remove('open'); setExpanded('dds-bell', false); return; }
+    if (!notif) { notif = el('<div class="dds-pop" role="region" aria-label="Notifications"><h4>Needs a look</h4><div class="body"><div class="muted">Loading…</div></div></div>'); document.body.appendChild(notif); notif.addEventListener('click', function (e) { e.stopPropagation(); }); }
     notif.classList.add('open');
+    setExpanded('dds-bell', true);
     api('/portal/feed').then(function (r) {
       var body = notif.querySelector('.body');
       if (!r.ok) { body.innerHTML = '<div class="muted">You’re all caught up.</div>'; return; }
@@ -260,14 +281,15 @@
       body.innerHTML = (out || '<div class="muted">You’re all caught up.</div>') + footer;
     });
   }
-  function closeNotifications() { if (notif) notif.classList.remove('open'); }
+  function closeNotifications() { if (notif) notif.classList.remove('open'); setExpanded('dds-bell', false); }
 
   // ── profile / context menu (role, edition, agency, sign out) ──
   var prof;
   function toggleProfile() {
     closeNotifications();
-    if (prof && prof.classList.contains('open')) { prof.classList.remove('open'); return; }
-    if (!prof) { prof = el('<div class="dds-pop"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); }
+    if (prof && prof.classList.contains('open')) { prof.classList.remove('open'); setExpanded('dds-profile', false); return; }
+    if (!prof) { prof = el('<div class="dds-pop" role="region" aria-label="Account menu"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); }
+    setExpanded('dds-profile', true);
     var email = (sb && sb.__email) || 'Signed in';
     var role = (CTX && CTX.site_role) || '';
     var edition = (CTX && CTX.edition) || '';
@@ -296,8 +318,15 @@
     var door = (CTX && CTX.site_role === 'client_reviewer') ? '/portal.html' : '/studio.html';
     if (so) so.addEventListener('click', function (e) { e.preventDefault(); if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door; });
   }
-  function closeProfile() { if (prof) prof.classList.remove('open'); }
+  function closeProfile() { if (prof) prof.classList.remove('open'); setExpanded('dds-profile', false); }
   document.addEventListener('click', function () { closeNotifications(); closeProfile(); });
+  // Escape closes whatever shell popover is open (WCAG 1.4.13) and returns
+  // focus to its trigger so a keyboard user isn't stranded.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
+    if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
+  });
 
   // ── Web Push opt-in (notifications when the app is closed) ──────────────────
   var pushOn = false;
@@ -532,8 +561,9 @@
    <tr> with an onclick but no keyboard support. This makes every such element
    keyboard-operable (role=button + tabindex + Enter/Space activates) and traps
    Tab inside a visible modal. Additive + delegated, so it survives the constant
-   innerHTML re-renders. Included automatically wherever shell.js loads; the two
-   standalone big surfaces (portal, admin console) inline the same block. */
+   innerHTML re-renders. Included automatically wherever shell.js loads. (The
+   standalone doors — portal.html, the admin console — do NOT load shell.js and
+   do not inline this; they are transitional surfaces slated for retirement.) */
 (function () {
   'use strict';
   if (window.__ddsA11y) return; window.__ddsA11y = true;

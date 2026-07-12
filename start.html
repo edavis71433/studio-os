@@ -30,6 +30,9 @@
   .req{color:var(--p);}
   textarea,input,select{width:100%;padding:12px 14px;border:1.5px solid rgba(91,63,160,0.15);
     border-radius:11px;font-size:14px;font-family:var(--sans);outline:none;resize:vertical;background:#fff;}
+  @media (max-width:760px){ input,select,textarea{font-size:16px !important} } /* iOS focus-zoom floor */
+  .skip-link{position:absolute;left:-9999px;top:0;background:#EFEAF7;color:#171320;padding:10px 16px;border-radius:0 0 8px 0;z-index:999}
+  .skip-link:focus{left:0}
   textarea:focus,input:focus,select:focus{border-color:var(--p);}
   .fg{margin-bottom:22px;}
   .btn{background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;
@@ -52,8 +55,8 @@
   }
 </style>
 </head>
-<body>
-  <div class="wrap">
+<body><a href="#main-content" class="skip-link">Skip to main content</a>
+  <main id="main-content"><div class="wrap">
     <div class="brand">Davis Digital Studio</div>
 
     <div class="card" id="intakeForm">
@@ -121,7 +124,7 @@
         <p class="sub">I'll review this before our call so we can hit the ground running. See you then. If you need to reach me in the meantime, just reply to your confirmation email.</p>
       </div>
     </div>
-  </div>
+  </div></main>
 
 <script>
   var SB_URL = "https://qksstlqzbhesadrrofgn.supabase.co";

@@ -38,6 +38,11 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   await prune('ops_errors', `ops_errors?created_at=lt.${daysAgo(OPS_ERRORS_DAYS)}`);
   await prune('rate_limit_state', `rate_limit_state?window_start=lt.${daysAgo(RATE_LIMIT_DAYS)}`);
 
+  // Free-tool submissions: the privacy policy promises inquiry/tool data is
+  // "cleared out periodically" — this is the mechanism behind that sentence.
+  // A lead that hasn't turned into a conversation in a year has no basis left.
+  await prune('audit_leads', `audit_leads?created_at=lt.${daysAgo(365)}`);
+
   // Evidence: needs "all but each site's latest run" — SQL, not REST (0091 RPC).
   // presence_evidence cascades from runs. A pre-0091 environment 404s → recorded
   // false, never throws.

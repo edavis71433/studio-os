@@ -6,7 +6,7 @@
    and the CANONICAL design tokens (this is the one place the shell's palette,
    type, spacing and radii live — pages inherit the frame from here). */
 :root{
-  --dds-bg:#faf8f5; --dds-card:#fff; --dds-ink:#1b1525; --dds-soft:#6b6478; --dds-faint:#938ba3; --dds-line:#eee9e0;
+  --dds-bg:#faf8f5; --dds-card:#fff; --dds-ink:#1b1525; --dds-soft:#6b6478; --dds-faint:#746b8a; --dds-line:#eee9e0;
   --dds-p:#5b3fa0; --dds-p-deep:#2a1b4a; --dds-p-soft:#efeafa;
   --dds-good:#3f7a5a; --dds-good-soft:#e7f1ea; --dds-warn:#8a6d3b; --dds-warn-soft:#f3ead9;
   --dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09);
@@ -19,7 +19,7 @@
   --dds-p:#b79ceb; --dds-p-soft:#241d38; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316;
   --dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);
 }}
-:root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#938ba3;--dds-line:#eee9e0;--dds-p:#5b3fa0;--dds-p-soft:#efeafa}
+:root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-p:#5b3fa0;--dds-p-soft:#efeafa}
 :root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#7a7192;--dds-line:#2a2338;--dds-p:#b79ceb;--dds-p-soft:#241d38}
 
 /* pages get top-room for the fixed shell once it mounts */
@@ -202,9 +202,11 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
 }
 
 /* 4) Minimum touch target (WCAG 2.5.8) on phones — one central floor kills the
-      ~26–32px offenders across pages. Excludes the shell's own 34px chrome icons. */
+      ~26–32px offenders across pages. On phones the shell chrome icons
+      (bell/profile/help/burger — the most-tapped controls) get the floor too. */
 @media (max-width:760px){
   .btn,a.btn,a.act,a.reply,.chip,button.pri,[role="button"]:not(.dds-ic):not(.dds-burger){ min-height:44px; }
+  .dds-ic{ width:44px; height:44px; }
 }
 
 /* 5) Page-local toasts sit behind the mobile bar; lift them centrally (shell.css

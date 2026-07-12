@@ -421,3 +421,9 @@ footer.site a:focus-visible{
   .burger{padding:13px;margin:-5px -8px -5px 0}
   footer.site .fcol a{padding:9px 0}
 }
+
+/* iOS focus-zoom: any sub-16px form control zooms the page on focus. Floor all
+   controls to 16px on phones (mirrors the app-side rule in shell.css). */
+@media (max-width:760px){
+  input:not([type=checkbox]):not([type=radio]),textarea,select{font-size:16px !important}
+}

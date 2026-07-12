@@ -315,8 +315,8 @@ h5.rune .whisper.ok{color:var(--sage)}
 .gate p{color:var(--ink-2);margin-bottom:26px;font-size:14px}
 
 /* ── mobile: the dock ── */
-.dock{display:none;position:fixed;left:16px;right:16px;bottom:16px;background:rgba(33,29,25,.95);border-radius:100px;padding:6px;z-index:60;box-shadow:0 14px 44px rgba(33,29,25,.35)}
-.dock button{flex:1;text-align:center;font-size:12px;font-weight:600;padding:10px 0;border-radius:100px;color:#cfc7b8;white-space:nowrap}
+.dock{display:none;position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:rgba(33,29,25,.95);border-radius:100px;padding:6px;z-index:60;box-shadow:0 14px 44px rgba(33,29,25,.35)}
+.dock button{flex:1;text-align:center;font-size:12px;font-weight:600;padding:13px 0;border-radius:100px;color:#cfc7b8;white-space:nowrap}
 .dock button.on{background:var(--paper);color:var(--ink)}
 @media(max-width:760px){
   .rail{display:none}

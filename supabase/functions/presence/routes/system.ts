@@ -7,7 +7,7 @@
 //   GET  /system/health  ?secret=…   (or x-system-secret header)
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
-import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes } from '../ops/scheduler.ts';
+import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns } from '../ops/scheduler.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
@@ -132,7 +132,10 @@ async function health(): Promise<any> {
     const ping = await svc('presence_sites?select=id&limit=1');
     dbOk = ping.ok;
     activeSites = (await svcCount('presence_entitlements?product=eq.presence&status=eq.active')) ?? 0;
-    const last = await svc('presence_scheduled_runs?run_type=eq.cycle&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1');
+    // Liveness reads the TICK row (written unconditionally every tick), not just
+    // 'cycle' (written only per active-entitled site — with zero active sites a
+    // healthy scheduler would look dead, or a dead one undetectable).
+    const last = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1');
     lastCycle = last.json?.[0] || null;
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     failures24h = (await svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}`)) ?? 0;
@@ -158,7 +161,7 @@ export async function computeHealthCenter(): Promise<any> {
   const since = new Date(Date.now() - 7 * 86400_000).toISOString();
   const since24 = new Date(Date.now() - 24 * 3600_000).toISOString();
   const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []);
-  const cronQ = await svc('presence_scheduled_runs?run_type=eq.cycle&order=created_at.desc&select=status,started_at,finished_at&limit=1');
+  const cronQ = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&order=created_at.desc&select=status,started_at,finished_at&limit=1');
   const lastCycle = arr(cronQ)[0] || null;
   // Exact counts (HEAD + count=exact) — fetch-to-count went WRONG past the
   // PostgREST max-rows cap, silently under-reporting at scale.
@@ -194,6 +197,23 @@ export async function computeHealthCenter(): Promise<any> {
   });
 }
 
+// What in this tick deserves a human's attention? ok:false, failures/errors>0,
+// or a prune that returned false — but NOT informational falses (skipped_*,
+// feature-off flags). Returns human-readable issue strings, empty = clean tick.
+function sweepIssues(progress: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  for (const [name, v] of Object.entries(progress)) {
+    if (!v || typeof v !== 'object') continue;
+    const o = v as Record<string, unknown>;
+    if (o.ok === false) { issues.push(`${name}: ok=false`); continue; }
+    for (const [k, val] of Object.entries(o)) {
+      if ((k === 'failures' || k === 'errors' || k === 'failed') && typeof val === 'number' && val > 0) issues.push(`${name}.${k}=${val}`);
+      else if (val === false && !k.startsWith('skipped') && k !== 'ok') issues.push(`${name}.${k} failed`);
+    }
+  }
+  return issues;
+}
+
 // Keep the ledgered tick progress compact: per-sweep counters only, never the
 // per-site result arrays (the cycle already ledgers those per site).
 function summarizeProgress(progress: Record<string, unknown>): Record<string, unknown> {
@@ -226,6 +246,53 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
       if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
       if (task === 'gsc_sync') return json({ data: await runGscSync(limit) }, 200, cors);          // AN-3.1: Search Console scheduled sync
+
+      // ── SPLIT MODE (the scaling knob): run one GROUP of the default chain as
+      // its own ledgered tick. As the fleet grows, the single 15-min tick's
+      // observation cycle can eat the invocation wall-clock and silently starve
+      // everything after it — split mode gives each group its own invocation
+      // (and its own pg_cron job; see supabase/ops/schedule-presence-cron.sql).
+      // The default single tick below stays for small fleets. run_type stays
+      // 'tick' so the health liveness read covers both modes.
+      if (task === 'observe' || task === 'revenue' || task === 'hygiene') {
+        const GROUPS: Record<string, Array<[string, () => Promise<unknown>]>> = {
+          observe: [
+            ['cycle', () => runOperationsCycle({ limit })],
+            ['scheduled_publishes', () => runDuePublishes(limit)],
+            ['reconcile', () => runReconcileStuckPublishes(50)],
+          ],
+          revenue: [
+            ['reconcile_billing', () => runBillingReconcile(30)],
+            ['lifecycle', () => runLifecycleSweep(limit)],
+            ['deletion', () => runDeletionSweep(25)],
+            ['leads', () => runLeadFollowups(20)],
+            ['deal_nudges', () => runDealFollowups(20)],
+            ['renewals', () => runRenewalReminders(50)],
+            ['invoice_nudges', () => runInvoiceReminders(20)],
+            ['doc_reminders', () => runSalesDocReminders(20)],
+          ],
+          hygiene: [
+            ['digest', () => runWeeklyDigest()],
+            ['domains', () => runDomainWatch(10)],
+            ['retention', () => runRetentionSweep()],
+            ['media_gc', () => reapMedia(100)],
+            ['snapshot_gc', () => reapSnapshots(200)],
+            ['stale_runs', () => reapStaleRuns()],
+          ],
+        };
+        const progress: Record<string, unknown> = { group: task };
+        const row = await svc('presence_scheduled_runs', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ run_type: 'tick', site_id: null, status: 'running', started_at: new Date().toISOString(), attempts: 1 }),
+        }).then((r) => r.json?.[0]?.id || null).catch(() => null);
+        for (const [name, fn] of GROUPS[task]) {
+          progress[name] = await fn();
+          if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
+        }
+        const issues = sweepIssues(progress);
+        if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
+        return json({ data: summarizeProgress(progress) }, 200, cors);
+      }
       // ── The default tick: one chain covering observation + revenue + hygiene.
       // OBSERVABILITY: the whole chain is ledgered in ONE presence_scheduled_runs
       // row (run_type 'tick'), progressively updated after EVERY sweep — so if
@@ -263,8 +330,14 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots
+      await step('stale_runs', () => reapStaleRuns());                             // resolve runs stuck 'running' >2h → failed (alarms)
 
-      if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: cycle.failures ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: cycle.failures ? `${cycle.failures} site cycle failure(s)` : '', result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
+      // Terminal status reflects EVERY sweep, not just the cycle: a persistently
+      // failing prune/reminder marks the tick failed → counts toward
+      // failures_last_24h → the watchdog pages. Previously visible only inside
+      // result.progress, which nobody reads until something else breaks.
+      const issues = sweepIssues(progress);
+      if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
       return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);

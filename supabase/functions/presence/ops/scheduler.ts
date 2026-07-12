@@ -51,12 +51,34 @@ async function activeSites(limit: number): Promise<SiteRow[]> {
   // client has no active entitlement would otherwise sit unstamped at the
   // nulls-first front of the window forever and (past limit*3 of them) starve
   // the active sites — the exact defect this cursor exists to fix.
-  if (fetched.length) {
-    await svc(`presence_sites?id=in.(${fetched.map((s) => s.id).join(',')})`, {
-      method: 'PATCH', body: JSON.stringify({ last_observed_at: new Date().toISOString() }),
+  await stampCursor('presence_sites', 'id', fetched.map((s) => s.id), { last_observed_at: new Date().toISOString() });
+  return sites;
+}
+
+/** Stamp a rotation cursor on a set of rows, CHUNKED at 50 ids per PATCH — a
+ *  200-UUID in.(...) list brushes the ~8KB URI limit, and a 414 on a
+ *  best-effort call would silently stop the cursor advancing (starvation
+ *  quietly returns). Exported for the other two sweeps. Best-effort. */
+export async function stampCursor(table: string, key: string, ids: string[], body: Record<string, string>, extraFilter = ''): Promise<void> {
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    if (!chunk.length) continue;
+    await svc(`${table}?${key}=in.(${chunk.join(',')})${extraFilter}`, {
+      method: 'PATCH', body: JSON.stringify(body),
     }).catch(() => {});
   }
-  return sites;
+}
+
+/** Resolve runs stuck 'running' past any plausible invocation lifetime (the
+ *  invocation died before its terminal PATCH). Marking them failed makes them
+ *  count toward failures_last_24h — a repeatedly-dying tick now ALARMS instead
+ *  of accreting silent forensics rows forever. */
+export async function reapStaleRuns(): Promise<{ ok: boolean }> {
+  const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString();
+  const r = await svc(`presence_scheduled_runs?status=eq.running&started_at=lt.${encodeURIComponent(twoHoursAgo)}`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'failed', finished_at: new Date().toISOString(), last_error: 'interrupted: still running after 2h (invocation died before finishing)' }),
+  }).catch(() => ({ ok: false }));
+  return { ok: !!(r as { ok?: boolean }).ok };
 }
 
 // ── FD-1: fire due scheduled publishes/reverts through the ONE publish pipeline.
@@ -65,6 +87,15 @@ async function activeSites(limit: number): Promise<SiteRow[]> {
 // is recorded; one failure never stops the others.
 export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const nowIso = new Date().toISOString();
+  // A publish claimed (fired_at set) but never finalized — the invocation died
+  // mid-run — would otherwise sit status=pending FOREVER: unclaimable (the
+  // atomic claim filters fired_at=is.null), unledgered, and still shown to the
+  // customer as an upcoming change. At-most-once is right for publishes, so we
+  // surface it as failed (visible + alertable) rather than silently retrying.
+  const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+  await svc(`presence_scheduled_publishes?status=eq.pending&fired_at=not.is.null&fired_at=lt.${encodeURIComponent(hourAgo)}`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'failed', last_error: 'interrupted: claimed but never finalized (invocation died mid-publish)' }),
+  }).catch(() => {});
   const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary&order=scheduled_for.asc&limit=${limit}`);
   const rows = (q.ok && Array.isArray(q.json)) ? q.json : [];
   const results: SiteRunResult[] = [];

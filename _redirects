@@ -13,8 +13,12 @@
 /*.diff            /404.html   404!
 /*.yml             /404.html   404!
 /*.md              /404.html   404!
+/*.sql             /404.html   404!
+/*.docx            /404.html   404!
 /package.json      /404.html   404!
 /deno.json         /404.html   404!
+/deno.lock         /404.html   404!
+/playwright.config.ts /404.html 404!
 
 # Free Site Review maps to the real diagnostic tool specifically
 # (matches the nav label "Free site review" -> audit.html)

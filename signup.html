@@ -22,6 +22,9 @@
   .sub{font-size:14px;color:var(--muted);margin-bottom:24px;}
   label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px;}
   input{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 14px;font:15px var(--sans);background:#fff;transition:.15s;}
+  @media (max-width:760px){ input,select,textarea{font-size:16px !important} } /* iOS focus-zoom floor */
+  .skip-link{position:absolute;left:-9999px;top:0;background:#EFEAF7;color:#171320;padding:10px 16px;border-radius:0 0 8px 0;z-index:999}
+  .skip-link:focus{left:0}
   input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(91,63,160,.12);}
   .hint{font-size:12px;color:var(--muted);margin-top:5px;}
   .go{margin-top:24px;width:100%;background:var(--p);color:#fff;border:none;border-radius:100px;padding:14px;font:600 15px var(--sans);cursor:pointer;transition:.18s;}
@@ -59,8 +62,8 @@
   }
 </style>
 </head>
-<body>
-<div class="wrap">
+<body><a href="#main-content" class="skip-link">Skip to main content</a>
+<main id="main-content"><div class="wrap">
   <div>
     <div class="brand">Studio OS</div>
     <div class="card">
@@ -91,7 +94,7 @@
       <div class="trustline">🔒 Payments are handled securely by Stripe. Cancel any time — you own everything you make.</div>
     </div>
   </div>
-</div>
+</div></main>
 
 <script>
 const ENVS = {

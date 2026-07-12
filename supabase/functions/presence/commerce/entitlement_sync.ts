@@ -107,10 +107,9 @@ export async function runBillingReconcile(limit = 40): Promise<ReconcileResult> 
   let q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=${COLS}&order=last_synced_at.asc.nullsfirst&limit=${lim}`);
   if (!q.ok) q = await svc(`presence_entitlements?product=eq.presence&status=in.(active,paused,lapsed)&stripe_subscription_id=not.is.null&select=${COLS}&order=updated_at.asc&limit=${lim}`);
   const rows: any[] = Array.isArray(q.json) ? q.json : [];
-  if (rows.length) {
-    await svc(`presence_entitlements?product=eq.presence&client_id=in.(${rows.map((r) => r.client_id).join(',')})`, {
-      method: 'PATCH', body: JSON.stringify({ last_synced_at: now.toISOString() }),
-    }).catch(() => {});
+  {
+    const { stampCursor } = await import('../ops/scheduler.ts');
+    await stampCursor('presence_entitlements', 'client_id', rows.map((r) => String(r.client_id)), { last_synced_at: now.toISOString() }, '&product=eq.presence');
   }
   let checked = 0, corrected = 0, errors = 0;
   for (const row of rows) {

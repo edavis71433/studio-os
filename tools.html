@@ -24,6 +24,30 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="tools.css">
+<style>
+/* ── Dark-mode variant (page-scoped token flip over styles.css/tools.css,
+     same recipe as audit.html/contact.html) ── */
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#EFEAF7; --paper:#171320; --paper-2:#241d38; --p-mist:#241d38;
+    --muted:#A79DBE; --hair:#332B49; --brass:#C9A468; --brass-deep:#C9A468;
+  }
+  header.nav,.nav.is-scrolled{background:rgba(23,19,32,.85);}
+  .eyebrow{color:#C9A468;}
+  .hero h1 em{color:#b39ce6;}
+  .btn-primary{background:#EFEAF7;color:#171320;}
+  .btn-primary:hover{background:#c4aee8;color:#1B1525;}
+  .btn-ghost:hover{border-color:var(--ink);}
+  .nav-sub{box-shadow:0 12px 34px rgba(0,0,0,.5);}
+  .skip-link{background:#EFEAF7;color:#171320;}
+  footer.site{background:#0f0c18;}
+  body[data-page="tools"] .res-card{background:#241d38;box-shadow:0 22px 46px -32px rgba(0,0,0,.55);}
+  body[data-page="tools"] .res-card:hover{box-shadow:0 30px 56px -30px rgba(0,0,0,.6);}
+  .textlink{border-bottom-color:rgba(201,164,104,.55);}
+  .textlink:hover{color:#C9A468;}
+  ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
+}
+</style>
 </head>
 <body data-page="tools"><a href="#main-content" class="skip-link">Skip to main content</a>
 <header class="nav">

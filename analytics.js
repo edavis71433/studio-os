@@ -50,15 +50,41 @@
       '<button type="button" id="ddsCookieNo" style="background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);padding:9px 16px;border-radius:100px;font-size:13px;cursor:pointer;font-family:inherit">No thanks</button>' +
       '</span>';
     document.body.appendChild(b);
+
+    // The full-width banner (z-index 99998) sits on top of the concierge
+    // launcher (.dds-cc-launch, fixed bottom:24px, z-index 99995). While the
+    // banner is visible, lift the launcher above it; restore on dismiss.
+    // The launcher may be injected after the banner (concierge.js loads
+    // independently), and the banner's height changes when its text wraps,
+    // so re-check on an interval while the banner is on screen.
+    function shiftLauncher() {
+      var l = document.querySelector('.dds-cc-launch');
+      if (!l) return;
+      var h = b.offsetHeight || 0;
+      l.style.bottom = (24 + h) + 'px';
+    }
+    var launcherWatch = setInterval(function () {
+      if (!document.body.contains(b)) { clearInterval(launcherWatch); return; }
+      shiftLauncher();
+    }, 500);
+    shiftLauncher();
+    function restoreLauncher() {
+      clearInterval(launcherWatch);
+      var l = document.querySelector('.dds-cc-launch');
+      if (l) l.style.bottom = '';
+    }
+
     document.getElementById('ddsCookieOk').addEventListener('click', function () {
       try { localStorage.setItem('cookie_consent', 'accepted'); } catch (e) {}
       b.remove();
+      restoreLauncher();
       loadGA();
     });
     document.getElementById('ddsCookieNo').addEventListener('click', function () {
       try { localStorage.setItem('cookie_consent', 'declined'); } catch (e) {}
       window['ga-disable-' + GA_ID] = true;
       b.remove();
+      restoreLauncher();
     });
   }
 

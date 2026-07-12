@@ -71,5 +71,33 @@ $$);
 -- SEARCH_CONSOLE_CLIENT_ID/_SECRET + CONNECTION_ENC_KEY are set and at least one
 -- customer has connected Search Console (each unconnected site is skipped).
 
+-- ── SPLIT MODE (apply when the fleet outgrows the single tick, ~30-50 sites) ──
+-- The single 15-min tick runs observation + revenue + hygiene in ONE invocation;
+-- as sites grow, the observation cycle can eat the wall clock and starve the
+-- rest. Split mode gives each group its own invocation and cadence. To switch:
+-- unschedule presence_ops_cycle above, then run:
+--
+-- select cron.schedule('presence_ops_observe', '*/15 * * * *', $$
+--   select net.http_post(
+--     url    := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
+--     headers:= '{"Content-Type":"application/json"}'::jsonb,
+--     body   := jsonb_build_object('secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scheduler_secret'), 'task', 'observe')
+--   );
+-- $$);
+-- select cron.schedule('presence_ops_revenue', '7,37 * * * *', $$
+--   select net.http_post(
+--     url    := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
+--     headers:= '{"Content-Type":"application/json"}'::jsonb,
+--     body   := jsonb_build_object('secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scheduler_secret'), 'task', 'revenue')
+--   );
+-- $$);
+-- select cron.schedule('presence_ops_hygiene', '52 * * * *', $$
+--   select net.http_post(
+--     url    := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
+--     headers:= '{"Content-Type":"application/json"}'::jsonb,
+--     body   := jsonb_build_object('secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scheduler_secret'), 'task', 'hygiene')
+--   );
+-- $$);
+
 -- to inspect:   select jobname, schedule, active from cron.job where jobname like 'presence_%';
 -- to remove:    select cron.unschedule('presence_ops_cycle'); (etc.)

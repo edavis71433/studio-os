@@ -8,14 +8,15 @@
 <meta name="theme-color" content="#5b3fa0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --p:#5b3fa0; --pdark:#1e1338; --ink:#1a1523; --muted:#5e5270; --cream:#faf8f5;
-    --pxl:#c4aee8; --pxxxl:#f3eefb; --serif:'DM Serif Display',Georgia,serif;
+    --pxl:#c4aee8; --pxxxl:#f3eefb; --serif:'Fraunces',Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   }
   *{box-sizing:border-box;}
-  body{margin:0;overflow-x:hidden;max-width:100vw;font-family:"DM Sans",sans-serif;background:var(--cream);color:var(--ink);
+  body{margin:0;overflow-x:hidden;max-width:100vw;font-family:var(--sans);background:var(--cream);color:var(--ink);
     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;line-height:1.6;}
   .card{background:#fff;border-radius:22px;border:1px solid rgba(91,63,160,0.1);
     max-width:540px;width:100%;padding:40px 36px;box-shadow:0 20px 60px rgba(30,19,56,0.08);}
@@ -29,11 +30,11 @@
   .star:hover{transform:scale(1.12);}
   .star.on{color:#f5a623;}
   textarea,input{width:100%;padding:12px 14px;border:1.5px solid rgba(91,63,160,0.15);
-    border-radius:11px;font-size:16px;font-family:"DM Sans",sans-serif;outline:none;resize:vertical;}
+    border-radius:11px;font-size:16px;font-family:var(--sans);outline:none;resize:vertical;}
   textarea:focus,input:focus{border-color:var(--p);}
   .fg{margin-bottom:20px;}
   .btn{background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;
-    font-size:14px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;width:100%;}
+    font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);width:100%;}
   .btn:hover{background:#4a3284;}
   .consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);margin-bottom:22px;}
   .consent input{width:auto;margin-top:3px;}

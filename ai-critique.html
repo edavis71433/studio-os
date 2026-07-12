@@ -420,6 +420,48 @@ a{color:inherit;}
   .crit-spinner{animation:none;}
   .crit-next:active,.crit-go:active{transform:none;}
 }
+
+/* ── Dark-mode variant (page-scoped, token-level — same recipe as audit.html) ── */
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#171320; --ink:#EFEAF7; --muted:#A79DBE;
+    --pxxxl:#241d38; --pxxl:#2c2344;
+    /* styles.css tokens the shared nav/footer read on this page */
+    --paper-2:#1f1a2e; --hair:#332B49; --p-mist:#241d38; --brass-deep:#C9A468;
+  }
+  header.nav,.nav.is-scrolled{background:rgba(23,19,32,.85);}
+  .eyebrow{color:#C9A468;}
+  .btn-primary{background:#EFEAF7;color:#171320;}
+  .btn-primary:hover{background:#c4aee8;color:#1B1525;}
+  footer.site{background:#0f0c18;}
+  nav[aria-label="Breadcrumb"]{background:#171320 !important;border-bottom-color:rgba(196,174,232,.12) !important;}
+  nav[aria-label="Breadcrumb"] [style*="color:var(--p)"],.crit-result-head [style*="color:var(--p)"]{color:#c4aee8 !important;}
+  .crit-hero{background:linear-gradient(180deg,#171320 0%,#241d38 100%);}
+  .crit-card{background:#241d38;box-shadow:0 24px 60px rgba(0,0,0,.55);}
+  .crit-input{background:#171320;color:var(--ink);border-color:rgba(196,174,232,.22);}
+  .crit-input::placeholder{color:rgba(239,234,247,.38);}
+  .crit-url-wrap{background:#171320;border-color:rgba(196,174,232,.22);}
+  .crit-url-prefix{background:#241d38;color:#8f84a8;border-right-color:rgba(196,174,232,.14);}
+  .crit-email-row .crit-input{background:#171320;}
+  .crit-chip{background:#171320;border-color:rgba(196,174,232,.3);}
+  .crit-loading{background:#1c1729;}
+  .crit-results{background:linear-gradient(180deg,#171320 0%,#241d38 100%);}
+  .crit-block{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 4px 20px rgba(0,0,0,.35);}
+  .crit-block p{color:#cfc7e0;}
+  .crit-tag.win{background:rgba(30,122,69,.25);color:#7ed6a2;}
+  .crit-tag.fix{background:rgba(181,101,29,.22);color:#f0b078;}
+  .crit-tag.watch{background:rgba(168,52,64,.22);color:#f2a6a0;}
+  .crit-block .crit-why strong{color:#c4aee8;}
+  .crit-trust{background:#171320;border-top-color:rgba(196,174,232,.08);}
+  .crit-trust-num{color:#c4aee8;}
+  .crit-error{background:rgba(224,85,85,.12);border-color:rgba(224,85,85,.35);color:#f2a6a0;}
+  .crit-restart{color:#c4aee8;border-color:rgba(196,174,232,.35);}
+  .crit-back:hover{color:#c4aee8;}
+  .tool-switch-section{background:#171320;}
+  .tool-switch-item{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 20px 42px -32px rgba(0,0,0,.5);}
+  .tool-switch-head span,.tool-switch-head p a{color:#c4aee8;}
+  ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
+}
 </style>
 <main id="main-content" tabindex="-1">
 
@@ -618,6 +660,18 @@ a{color:inherit;}
   </div>
 </section>
 
+
+<!-- Soft capture: free site review (no popup, one calm ask) -->
+<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
+  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
+    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
+    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
+      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
+      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+    </form>
+  </div>
+</section>
 </main>
 <footer class="site">
 <div class="wrap">

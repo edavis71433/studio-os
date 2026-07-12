@@ -1,3 +1,7 @@
+-- ⚠️ LEGACY (clever-api daily scheduler). The LIVE scheduler is the presence
+-- 15-min pg_cron tick — see supabase/ops/schedule-presence-cron.sql and
+-- docs/presence/OPERATIONS.md. Kept for the clever-api surfaces it still
+-- serves; retires wholesale with clever-api (P2-G).
 -- ============================================================================
 --  SCHEDULER TRACKING COLUMNS
 --  Run once in Supabase -> SQL Editor. Safe to run more than once.

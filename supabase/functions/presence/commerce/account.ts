@@ -102,14 +102,17 @@ export async function createContactAndClient(
 // A recovery/verify email link the customer can click. Uses Supabase's own
 // recover endpoint so the link is a real, signed one that lands on
 // set-password.html (the existing flow) — used here as "confirm it's you".
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand): Promise<boolean> {
-  if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email to', to); return false; }
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean }): Promise<boolean> {
+  if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
-    // Honor the suppression list (opt-outs, bounces, complaints) at the ONE send
-    // point — continuing to mail a bounced/complained address junks the whole
-    // domain's reputation, and mailing an opt-out breaks the promise we printed.
-    const { isSuppressed, unsubscribeUrl } = await import('../routes/email_infra.ts');
-    if (await isSuppressed(to)) { console.warn(`[email] suppressed — not sending to ${to}`); return false; }
+    // Honor the suppression list at the ONE send point. critical:true =
+    // transactional mail (receipts, security, deletion confirmations) — it
+    // survives an OPT-OUT (exactly what the unsubscribe page promises) but
+    // NEVER a bounce/complaint (dead/hostile address; re-sending only burns
+    // the domain). Recipients are MASKED in logs (edge logs are retained).
+    const { maySend, maskEmail, unsubscribeUrl } = await import('../routes/email_infra.ts');
+    const gate = await maySend(to, opts);
+    if (!gate.ok) { console.warn(`[email] suppressed (${gate.reason}) — not sending to ${maskEmail(to)}`); return false; }
     const unsubUrl = await unsubscribeUrl(to);
     // BR-1: every email flows through the ONE branded shell (Studio OS default, or
     // the customer's Brand Kit when the caller passes it). No second email engine.
@@ -136,7 +139,7 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       }),
     });
     // Log failures (mirrors clever-api) so a Resend outage isn't invisible.
-    if (!r.ok) { try { console.error(`[email] Resend ${r.status} to ${to}: ${(await r.text()).slice(0, 300)}`); } catch { /* */ } }
+    if (!r.ok) { try { const { maskEmail } = await import('../routes/email_infra.ts'); console.error(`[email] Resend ${r.status} to ${maskEmail(to)}: ${(await r.text()).slice(0, 300)}`); } catch { /* */ } }
     return r.ok;
-  } catch (e) { console.error(`[email] send threw for ${to}: ${String((e as Error)?.message || e)}`); return false; }
+  } catch (e) { console.error(`[email] send threw: ${String((e as Error)?.message || e)}`); return false; }
 }

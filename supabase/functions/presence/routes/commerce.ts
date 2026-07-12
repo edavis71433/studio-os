@@ -131,6 +131,7 @@ async function handleSignup(req: Request, cors: Record<string, string>) {
   const verifyUrl = `${siteUrl()}/welcome.html?verify=${encodeURIComponent(verifyToken)}`;
   sendEmail(email, 'Welcome to Studio OS — confirm your email',
     `<p>Welcome. Your workspace is being set up.</p><p>Please confirm this is you: <a href="${verifyUrl}">confirm my email</a>.</p><p>You can sign in any time at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
+    undefined, { critical: true },   // account verification = transactional; survives an opt-out
   ).catch(() => {});
 
   // ── Trial: provision immediately, no card. ──
@@ -436,7 +437,8 @@ export async function handleCommerce(req: Request, route: string, method: string
     if (reqd.created) {
       const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`);
       if (cl.json?.[0]?.email) emailed = await sendEmail(cl.json[0].email, 'Your deletion request is recorded',
-        `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes after ${days} days (on or after ${new Date(reqd.scheduled_for).toDateString()}). Until then, everything you own is still downloadable from your workspace — and if you change your mind, you can cancel the request from your account.</p>`).catch(() => false);
+        `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes after ${days} days (on or after ${new Date(reqd.scheduled_for).toDateString()}). Until then, everything you own is still downloadable from your workspace — and if you change your mind, you can cancel the request from your account.</p>`,
+        undefined, { critical: true }).catch(() => false);   // deletion confirmation = transactional; survives an opt-out
       const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
       if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion; scheduled ${reqd.scheduled_for}. The executor completes it after the cooling-off.</p>`).catch(() => {});
     }

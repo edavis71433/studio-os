@@ -34,7 +34,7 @@ export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAN
 <tr><td style="height:6px;background:${brand.accent};font-size:0;line-height:0">&nbsp;</td></tr>
 <tr><td style="padding:22px 30px 6px"><div style="font-family:'Iowan Old Style',Palatino,Georgia,serif;font-weight:600;font-size:19px;color:${brand.accentDark};letter-spacing:-.01em">${name}</div></td></tr>
 <tr><td style="padding:6px 30px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1b1525">${b}</td></tr>
-<tr><td style="padding:16px 30px;border-top:1px solid #eee9e0;font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;line-height:1.5;color:#938ba3">${brand.name === EMAIL_BRAND_DEFAULT.name ? 'Sent by Studio OS.' : `Sent by ${name} on Studio OS.`} You’re receiving this because of activity on your account. To stop these, reply and let us know.</td></tr>
+<tr><td style="padding:16px 30px;border-top:1px solid #eee9e0;font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;line-height:1.5;color:#938ba3">${brand.name === EMAIL_BRAND_DEFAULT.name ? 'Sent by Studio OS.' : `Sent by ${name} on Studio OS.`} You’re receiving this because of activity on your account. To stop these, use the unsubscribe link in your email app or reply and let us know.<br>Davis Digital Studio LLC · Burbank, California</td></tr>
 </table></td></tr></table></body></html>`;
 }
 

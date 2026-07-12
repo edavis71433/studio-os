@@ -1,3 +1,5 @@
+> ⚠️ **LEGACY** (clever-api daily scheduler). The LIVE scheduler is the presence 15-min pg_cron tick — see `supabase/ops/schedule-presence-cron.sql` and `docs/presence/OPERATIONS.md`. This document is kept for the clever-api surfaces it still serves; it retires wholesale with clever-api (P2-G).
+
 # Davis Digital Studio — Scheduler Setup
 
 This turns on the "automate later" layer: automated post-launch survey + Google review

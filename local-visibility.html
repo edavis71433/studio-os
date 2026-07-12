@@ -167,6 +167,46 @@ body{}
    breakpoint. */
 .tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
 @media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
+
+/* ── Dark-mode variant (page-scoped, token-level — same recipe as audit.html) ── */
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#171320; --ink:#EFEAF7; --muted:#A79DBE;
+    --pxxxl:#241d38; --pxxl:#2c2344;
+    /* styles.css tokens the shared nav/footer read on this page */
+    --paper-2:#1f1a2e; --hair:#332B49; --p-mist:#241d38; --brass-deep:#C9A468;
+  }
+  header.nav,header.nav.is-scrolled{background:rgba(23,19,32,.85);}
+  .eyebrow{color:#C9A468;}
+  .btn-primary{background:#EFEAF7;color:#171320;}
+  .btn-primary:hover{background:#c4aee8;color:#1B1525;}
+  .btn-light{background:#EFEAF7;color:#171320;}
+  footer.site{background:#0f0c18;}
+  [style*="color:var(--p)"]{color:#c4aee8 !important;}
+  .page-hero-v2{background:linear-gradient(180deg,#171320 0%,#241d38 100%) !important;}
+  /* the sample-score specimen card flips to a dark surface */
+  .page-hero-v2 .tool-hero-grid > div:last-child{background:#241d38 !important;}
+  .page-hero-v2 [style*="background:#f7f4fd"]{background:#171320 !important;}
+  .step-dot{background:#241d38;border-color:#3a3153;}
+  .step-dot.active{color:#c4aee8;}
+  .step-line{background:rgba(196,174,232,.35);}
+  .step-line.done{background:var(--p);}
+  .q-card{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 4px 40px rgba(0,0,0,.4);}
+  .q-num{color:#c4aee8;}
+  .opt{background:#171320;border-color:rgba(196,174,232,.2);}
+  .text-input{background:#171320;border-color:#3a3153;}
+  .text-input::placeholder{color:rgba(239,234,247,.38);}
+  .signal-card{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 18px 38px -30px rgba(0,0,0,.5);}
+  .opp-card{background:linear-gradient(135deg,#241d38,#1c1729);border-color:#7c5cc4;box-shadow:0 24px 48px -32px rgba(0,0,0,.5);}
+  .opp-card .opp-label{color:#c4aee8;}
+  .actions-list{background:#241d38;border-color:rgba(196,174,232,.12);}
+  #leadCard{background:#241d38 !important;border-color:rgba(196,174,232,.18) !important;}
+  #leadCard input{background:#171320;color:var(--ink);}
+  .tool-switch-section{background:#171320;}
+  .tool-switch-item{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 20px 42px -32px rgba(0,0,0,.5);}
+  .tool-switch-head span,.tool-switch-head p a{color:#c4aee8;}
+  ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
+}
 </style>
 <link rel="stylesheet" href="/enhance.css">
 <script type="application/ld+json">
@@ -504,6 +544,18 @@ body{}
   </div>
 </section>
 
+
+<!-- Soft capture: free site review (no popup, one calm ask) -->
+<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
+  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
+    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
+    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
+      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
+      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+    </form>
+  </div>
+</section>
 </main>
 
 

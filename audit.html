@@ -107,7 +107,7 @@ a{color:inherit;}
 .analysis-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
 .analysis-text{font-size:13px;color:#4a4258;line-height:1.7;}
 .vitals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;}
-.vital-card{background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;text-align:center;}
+.vital-card{background:var(--pxxl);border-radius:8px;padding:10px;text-align:center;}
 .vital-val{font-size:14px;font-weight:600;}
 .vital-name{font-size:10px;color:var(--muted);margin-top:2px;}
 .section-label-sm{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
@@ -138,7 +138,7 @@ a{color:inherit;}
 .upsell-title{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px;}
 .upsell-desc{font-size:12px;color:var(--muted);line-height:1.7;}
 .upsell-price-side{text-align:center;flex-shrink:0;}
-.upsell-price{font-family:var(--serif);font-size:32px;color:var(--pxl);line-height:1;}
+.upsell-price{font-family:var(--serif);font-size:32px;color:var(--p);line-height:1;}
 .upsell-note{font-size:10px;color:var(--muted);margin-top:2px;}
 .upsell-link{display:inline-block;background:var(--p);color:#fff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:100px;text-decoration:none;margin-top:10px;transition:opacity 0.15s;}
 .upsell-link:hover{opacity:0.88;}
@@ -306,6 +306,9 @@ a{color:inherit;}
   .tier-cta.ghost{color:#c4aee8;border-color:rgba(196,174,232,.4);}
   .tier-cta.ghost:hover{background:#2c2344;}
   .tool-switch-head span,.tool-switch-head p a{color:#c4aee8;}
+  /* light-ink ring track + AA-in-light upsell price get their dark lifts here */
+  .score-ring svg circle:first-child{stroke:rgba(239,234,247,.14);}
+  .upsell-price{color:#c4aee8;}
   ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
 }
 </style>
@@ -482,7 +485,7 @@ a{color:inherit;}
           <input class="form-input" type="text" id="fCity" placeholder="Los Angeles" autocomplete="address-level2">
         </div>
         <div class="form-field full">
-          <label class="form-label" for="fEmail">Your email <span style="color:rgba(255,255,255,0.35);font-weight:400;">(optional — add it if you'd like the results emailed too)</span></label>
+          <label class="form-label" for="fEmail">Your email <span style="color:var(--muted);font-weight:400;">(optional — add it if you'd like the results emailed too)</span></label>
           <input class="form-input" type="email" id="fEmail" placeholder="you@yourbusiness.com" autocomplete="email">
         </div>
       </div>
@@ -518,7 +521,7 @@ a{color:inherit;}
         </div>
         <div class="score-ring">
           <svg viewBox="0 0 80 80">
-            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="6"/>
+            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(27,21,37,.1)" stroke-width="6"/>
             <circle cx="40" cy="40" r="34" fill="none" stroke="#c4aee8" stroke-width="6"
               stroke-dasharray="213.6" stroke-dashoffset="213.6" stroke-linecap="round"
               transform="rotate(-90 40 40)" id="scoreArc"/>
@@ -1358,7 +1361,7 @@ function showResults(d) {
         '<div class="gate-desc">' + gateDesc + '</div>' +
         '<div class="gate-form">' +
           '<input type="email" class="gate-input" id="gateEmail" aria-label="Email address" value="'+eh(d.email||'')+'" placeholder="Your email address">' +
-          '<button class="gate-btn" onclick="unlockReport()">Email me the full report →</button>' +
+          '<button class="gate-btn" id="gateBtn" onclick="unlockReport()">Email me the full report →</button>' +
           '<div class="gate-msg" id="gateMsg">No spam. Unsubscribe anytime.</div>' +
         '</div>';
       body.appendChild(gate);
@@ -1395,7 +1398,9 @@ function unlockReport() {
   var msg = document.getElementById('gateMsg');
   var email = (emailEl ? emailEl.value : '').trim();
   if (!email || !email.includes('@')) { if(msg){msg.style.color='#e05555';msg.textContent='Please enter a valid email.';} return; }
-  if (msg) { msg.style.color='rgba(255,255,255,0.35)'; msg.textContent='Sending your full report...'; }
+  if (msg) { msg.style.color='var(--muted)'; msg.textContent='Sending your full report...'; }
+  var gateBtn = document.getElementById('gateBtn');
+  if (gateBtn) { gateBtn.disabled = true; gateBtn.style.opacity = '0.6'; gateBtn.style.cursor = 'default'; }
 
   var d = window._audit || {};
   d.email = email; // remember it so re-renders and notifications carry it
@@ -1456,9 +1461,11 @@ function unlockReport() {
     body: JSON.stringify({type:'audit_lead', clientName:d.name||'', clientEmail:email, meta:{url:d.url||'', bizType:bizLabel, city:d.city||'', score:d.overall||0, perf:d.perf||null, seo:d.seo||null, a11y:d.a11y||null, lcp:d.lcp||null, fcp:d.fcp||null, cls:d.cls||null, tbt:d.tbt||null, fallback:false, topIssues:issues.slice(0,3).map(function(i){return{title:i.title,sev:i.sev};}), userConfirmHtml:reportHtml}})
   }).then(function() {
     if (msg) { msg.style.color='#6abf69'; msg.textContent='Full report sent! Check your inbox.'; }
+    if (gateBtn) { gateBtn.disabled = false; gateBtn.style.opacity = ''; gateBtn.style.cursor = ''; }
     if (typeof gtag==='function') gtag('event','unlock_audit_report',{event_category:'lead'});
   }).catch(function() {
     if (msg) { msg.style.color='#e05555'; msg.textContent='Something went wrong. Please try again.'; }
+    if (gateBtn) { gateBtn.disabled = false; gateBtn.style.opacity = ''; gateBtn.style.cursor = ''; }
   });
 }
 
