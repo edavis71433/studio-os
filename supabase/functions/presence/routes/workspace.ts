@@ -100,14 +100,21 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     const seesFull = siteCan(role, 'view_all');
     const showApprovals = visibleTo(role, 'approvals');
     const none = Promise.resolve({ ok: true, json: [] as any[] });
-    const [nQ, iQ, wQ, fQ] = await Promise.all([
-      seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id`) : none,
+    const [nQ, iQ, wQ, fQ, eQ] = await Promise.all([
+      seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind`) : none,
       showApprovals ? svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
       showApprovals ? svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
       showApprovals ? svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,metadata`) : none, // DAM-2: files awaiting approval
+      // FIX 1: brand-new website enquiries must ring the bell too (owner surfaces only).
+      seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`) : none,
     ]);
     const filesPending = ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length;
-    attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0) + filesPending;
+    // FIX 1 dedupe: the lead-followup cron already raises a per-lead notice for AGED
+    // 'new' leads (counted via nQ). Count only the still-fresh new enquiries not yet
+    // represented by a follow-up notice, so a single lead never stacks two signals.
+    const leadFollowups = ((nQ.json as any[]) || []).filter((n) => n.kind === 'lead_followup').length;
+    const newEnquiries = Math.max(0, ((eQ.json as any[])?.length || 0) - leadFollowups);
+    attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0) + filesPending + newEnquiries;
   } catch { /* the badge is best-effort — never block the shell on it */ }
 
   // P2-D: fold service delivery into the ONE attention surface (no second bell).
@@ -170,6 +177,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 // straight to the page that resolves it, not a generic landing (one fewer hop).
 const NOTICE_HREF: Record<string, string> = {
   lead_followup: '/leads.html',
+  website_enquiry: '/leads.html',      // FIX 1: a brand-new website enquiry → the leads inbox
+  connection_expired: '/connections.html', // FIX 2: a degraded connection → reconnect
+  missing_required: '/content-tree.html',  // FIX 4: a section blocking publish → the website map
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
   invoice_paid: '/pipeline.html',  // money landed → the deal it landed on
@@ -193,13 +203,23 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const shares = await loadShares(site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
-  const [momQ, pubQ, infraQ, writeQ, noticeQ, fileQ] = await Promise.all([
+  const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
+  // FIX 4: kick off the Content Tree read CONCURRENTLY with the feed's own queries
+  // (owner-only, best-effort) so surfacing missing-required content adds no serial
+  // latency to this bell hot path. Dynamic import avoids any top-level import cycle.
+  const treeP: Promise<any> = seesFull
+    ? import('./room.ts').then((m) => m.siteContentTree(site)).catch(() => null)
+    : Promise.resolve(null);
+  const [momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ] = await Promise.all([
     svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id,title,summary,risk&limit=10`),
     svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id,provider_key,title,summary&limit=10`),
     seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,headline,body,created_at&order=created_at.desc&limit=10`) : Promise.resolve({ ok: true, json: [] as any[] }),
     svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,storage_path,alt_text,metadata&limit=10`), // DAM-2: files awaiting approval
+    // FIX 1: brand-new website enquiries (owner surfaces only) — one synthetic feed
+    // row so the bell + Inbox surface them like every other needs-you item.
+    seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`) : noEnq,
   ]);
   const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
@@ -217,6 +237,39 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // so "a lead is waiting" / "your domain expires soon" surface on every page —
   // not only in the portal card. Each carries the href that resolves it.
   const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, headline: n.headline, body: n.body, href: noticeHref(n.kind) }));
+
+  // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
+  // bell popup + the Inbox the same way every other needs-you item does — nothing
+  // else raised this signal into the ONE feed before. Deduped against the
+  // lead-followup cron notice (which covers AGED 'new' leads): the synthetic row
+  // counts only still-fresh enquiries not yet represented by a follow-up notice,
+  // so one submission never stacks two rows. (inbox.html renders per-lead detail
+  // from /forms/inbox and filters this aggregate kind to avoid a double listing.)
+  if (seesFull) {
+    const leadFollowups = notices.filter((n) => n.kind === 'lead_followup').length;
+    const newEnquiries = Math.max(0, (((enqQ.ok && enqQ.json) || []) as any[]).length - leadFollowups);
+    if (newEnquiries > 0) notices.unshift({
+      id: 'new-enquiries', kind: 'website_enquiry',
+      headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,
+      body: 'Someone reached out through your website and is waiting to hear back.',
+      href: noticeHref('website_enquiry'),
+    });
+
+    // FIX 4: a section that BLOCKS publishing (missing required content) should show
+    // in the main Inbox/bell, not only the Attention Center. Reuse the Content Tree's
+    // existing missing_required signal (no new store); the read was started above,
+    // concurrently — awaiting it here adds no serial latency. Best-effort.
+    try {
+      const tree = await treeP;
+      const missing = tree ? tree.pages.flatMap((p: any) => p.sections.filter((s: any) => s.status === 'missing_required')) : [];
+      if (missing.length > 0) notices.push({
+        id: 'missing-required', kind: 'missing_required',
+        headline: missing.length === 1 ? 'A section needs filling in before you can publish' : `${missing.length} sections need filling in before you can publish`,
+        body: 'Add the missing details and your website is ready to go live.',
+        href: noticeHref('missing_required'),
+      });
+    } catch { /* best-effort — the feed still works without the content-tree row */ }
+  }
 
   // Bridged customer: their unread delivery activity lives on the AGENCY site
   // (counted into the bell by /portal/context) — without a findable row here the

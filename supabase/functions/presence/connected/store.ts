@@ -4,6 +4,11 @@
 import { svc } from '../lib/db.ts';
 import { seal, open } from './crypto.ts';
 import type { ConnectionStatus } from './contract.ts';
+import { raiseNotice, clearNotice } from '../lib/notice.ts';
+import { CONNECTED_PROVIDERS } from './providers.ts';
+
+// friendly label per provider for the notice copy (the customer never sees a key)
+const CONN_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
 
 export interface TokenBundle {
   access_token: string;
@@ -56,6 +61,27 @@ export async function markStatus(siteId: string, providerKey: string, status: Co
   await svc(`presence_connections?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}`, {
     method: 'PATCH', body: JSON.stringify({ status, health, last_error: error.slice(0, 300) }),
   });
+  // FIX 2: a degraded connection must reach the ONE notice model (bell + Inbox),
+  // not only connections.html — mirroring publish.ts's raise/clear pattern. Keyed
+  // per provider (`conn:<provider>`) and idempotent: raiseNotice no-ops after the
+  // first, and recovery clears it exactly once. Best-effort; never blocks a read.
+  try {
+    const degraded = ['expired', 'error', 'revoked'].includes(status) || ['attention', 'down'].includes(health);
+    const s = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`);
+    const clientId = s.json?.[0]?.client_id;
+    if (!clientId) return;
+    const period = `conn:${providerKey}`;
+    if (degraded) {
+      const label = CONN_LABEL[providerKey] || 'A connected service';
+      await raiseNotice({
+        siteId, clientId, kind: 'connection_expired', period,
+        headline: `${label} needs a quick reconnect`,
+        body: 'It stopped updating — reconnecting keeps your numbers current. Nothing on your website changed.',
+      });
+    } else if (status === 'connected' && health === 'ok') {
+      await clearNotice(clientId, 'connection_expired', period);
+    }
+  } catch { /* the notice is best-effort — a connection status write must never fail on it */ }
 }
 
 export async function saveConnectedData(siteId: string, providerKey: string, data: unknown): Promise<void> {

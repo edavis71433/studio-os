@@ -130,7 +130,14 @@ function render(moments, features, feed, ctx){
   //    straight through to the page that resolves it. ──────────────────────────
   const notices = (feed && feed.notices) || [];
   const approvals = (feed && feed.pending_approvals) || [];
-  const needs = notices.length + approvals.length;
+  const shown = notices.length + approvals.length;   // needs-you cards we render inline
+  // FIX 3: Today and the bell must never disagree on the number. The bell badge is
+  // ctx.attention_count, which also counts support requests + unread client messages
+  // that have no feed card. Source the subtitle count from it so they always match;
+  // when nothing is renderable inline but the bell still rings, a single calm line
+  // routes to the Inbox (the full list) rather than a misleading "all clear".
+  const bellCount = (ctx && typeof ctx.attention_count === 'number') ? ctx.attention_count : shown;
+  const needs = Math.max(shown, bellCount);
   let html = '';
   const _scopeHref = (base)=>{const _c=new URLSearchParams(location.search).get('client');if(!_c||!base||base.charAt(0)!=='/')return base;const h=base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');};
   for(const n of notices){
@@ -149,6 +156,16 @@ function render(moments, features, feed, ctx){
       <h2>${esc(p.title||'A change is ready')}</h2>
       ${p.summary?`<p>${esc(p.summary)}</p>`:''}
       <div class="row"><span class="golink">Review &amp; approve →</span></div></a>`;
+  }
+  // FIX 3: the bell counts things with no inline card here (client messages, support
+  // requests). If there's nothing to render but the bell still rings, don't fall
+  // through to "all clear" — point to the Inbox where those items actually live.
+  if(shown === 0 && bellCount > 0){
+    html += `<a class="moment attn todo" href="${esc(_scopeHref('/inbox.html'))}">
+      <span class="tag">Needs you</span>
+      <h2>${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</h2>
+      <p>Messages, approvals and updates that are waiting on you — all in one place.</p>
+      <div class="row"><span class="golink">Open your Inbox →</span></div></a>`;
   }
   if(!items.length && !needs){
     $('sub').textContent = "Nothing needs your attention today.";

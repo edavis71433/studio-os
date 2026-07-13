@@ -62,7 +62,10 @@ function scoped(href){const c=new URLSearchParams(location.search).get('client')
 function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/([0-9a-f-]{36})/);if(m){const anc=h.split('#')[1];return '/projects.html?project='+m[1]+(anc?'#'+anc:'');}if(h&&h.charAt(0)==='/')return h;return '/today.html';}
 function render(feed,leads,notifs){
   const approvals=(feed.pending_approvals||[]);
-  const notices=(feed.notices||[]);
+  // The feed now carries a synthetic 'website_enquiry' aggregate row so the BELL can
+  // surface new leads; the Inbox already lists each lead in its own "New enquiries"
+  // section (from /forms/inbox), so drop the aggregate here to avoid a double listing.
+  const notices=(feed.notices||[]).filter(n=>n.kind!=='website_enquiry');
   const moments=(feed.moments||[]);
   const newLeads=(leads||[]).filter(l=>l.status==='new');
   // Keep recently-read activity VISIBLE (dimmed) — glancing at the Inbox must
