@@ -12,13 +12,15 @@
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc, svcCount } from '../lib/db.ts';
 import { deleteSite } from '../lib/netlify.ts';
+import { getSite } from '../lib/netlify.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
+import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { supportAgingDue, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
-import { raiseNotice } from '../lib/notice.ts';
+import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
 import { planReminder, noShowNudgeDue, humanSlot, priceText, REMINDER_DAY_HRS } from '../lib/booking.ts';
@@ -785,4 +787,190 @@ export async function runBookingFollowups(limit = 50): Promise<{ nudged: number 
     if (fresh) nudged++;
   }
   return { nudged };
+}
+
+// ── EMAIL-AUTH ESCALATION: turn a passive finding into ONE calm owner nudge (DNS #5) ─
+// The observation engine already DETECTS unauthenticated email (infrastructure.
+// spf_missing / dmarc_missing, and — where a guided email_setup plan named the
+// selector — a DKIM record that was never published). But a customer whose mail is
+// forgeable only found out passively, buried in the Foundations page. This sweep
+// ESCALATES it: when a gap has PERSISTED for EMAIL_AUTH_NUDGE_DAYS, raise exactly
+// ONE owner nudge onto the ONE notice model (bell + push), send-once via the notice
+// dedupe (period = the site → once ever; a persistent config gap earns one calm
+// tap, never a monthly nag). Owner-facing only — the customer is never messaged
+// about their own DNS. Best-effort + graceful: pre-0102 the 'email_auth' kind fails
+// the CHECK and raiseNotice returns false (no push, no throw) — exactly the
+// no-op-until-owner-apply behaviour of 0094–0101.
+//
+// PURE decision core (tested in dns_hardening_test.mjs); impure runner below.
+export const EMAIL_AUTH_NUDGE_DAYS = 7;
+
+export interface EmailAuthState {
+  spfMissing: boolean;
+  dmarcMissing: boolean;
+  dkimMissing: boolean;
+  sinceIso: string | null;      // earliest date any ACTIVE gap was first observed
+  nowIso: string;
+}
+
+/** The named gaps, in a stable order, for the copy. Pure. */
+export function emailAuthGaps(s: Pick<EmailAuthState, 'spfMissing' | 'dmarcMissing' | 'dkimMissing'>): string[] {
+  const g: string[] = [];
+  if (s.spfMissing) g.push('SPF');
+  if (s.dmarcMissing) g.push('DMARC');
+  if (s.dkimMissing) g.push('DKIM');
+  return g;
+}
+
+/** Is an email-auth nudge due? Only when at least one gap is UNAUTHENTICATED and it
+ *  has persisted `thresholdDays` — so a freshly-detected gap gets a grace period to
+ *  self-resolve (records propagating) before the owner is tapped. Pure. */
+export function emailAuthNudgeDue(s: EmailAuthState, thresholdDays = EMAIL_AUTH_NUDGE_DAYS): { due: boolean; gaps: string[] } {
+  const gaps = emailAuthGaps(s);
+  if (!gaps.length || !s.sinceIso) return { due: false, gaps };
+  const since = Date.parse(s.sinceIso);
+  if (!Number.isFinite(since)) return { due: false, gaps };
+  const days = (Date.parse(s.nowIso) - since) / 86400_000;
+  return { due: days >= thresholdDays, gaps };
+}
+
+/** One calm voice for the bell card + the owner email. Pure. */
+export function emailAuthNudgeCopy(gaps: string[], businessName: string): { headline: string; body: string; subject: string; html: string } {
+  const name = businessName || 'your business';
+  const list = gaps.length <= 1 ? (gaps[0] || 'a key record')
+    : gaps.slice(0, -1).join(', ') + ' and ' + gaps[gaps.length - 1];
+  return {
+    headline: 'Your email isn’t fully set up — messages may go to spam',
+    body: `Email sent from your domain is missing ${list}, the record${gaps.length > 1 ? 's' : ''} that prove${gaps.length > 1 ? '' : 's'} your mail is really you. Without ${gaps.length > 1 ? 'them' : 'it'}, inboxes trust your email less and some messages can land in spam. It’s a small, one-time DNS fix — the platform prepares the exact records and checks them for you.`,
+    subject: `${name}: a quick fix so your email doesn’t land in spam`,
+    html: `<p>Email sent from your domain for <strong>${name}</strong> is missing ${list} — the record${gaps.length > 1 ? 's' : ''} that prove your mail is really you.</p><p>Without ${gaps.length > 1 ? 'them' : 'it'}, inboxes trust your email less and some messages can go to spam. It’s a small, one-time fix: the platform prepares the exact DNS records and verifies them. Nothing about how you send email changes.</p>`,
+  };
+}
+
+// ── the impure runner (called from /system/run) ──
+export async function runEmailAuthNudges(limit = 20): Promise<{ nudged: number }> {
+  const nowIso = new Date().toISOString();
+  // "still current" window — a gap re-confirmed by an observation run within this
+  // span is treated as present now (tolerates a slower run cadence than the sweep).
+  const recentFrom = new Date(Date.now() - 10 * 86400_000).toISOString();
+
+  // Candidate sites #1: latest observation runs still flag SPF/DMARC missing.
+  const evQ = await svc(`presence_evidence?type=in.(infrastructure.spf_missing,infrastructure.dmarc_missing)&observed_at=gte.${encodeURIComponent(recentFrom)}&select=site_id,type&order=observed_at.desc&limit=${limit * 30}`);
+  const cand = new Map<string, { spf: boolean; dmarc: boolean }>();
+  for (const r of (Array.isArray(evQ.json) ? evQ.json : []) as Array<{ site_id: string; type: string }>) {
+    const c = cand.get(r.site_id) || { spf: false, dmarc: false };
+    if (r.type === 'infrastructure.spf_missing') c.spf = true;
+    if (r.type === 'infrastructure.dmarc_missing') c.dmarc = true;
+    cand.set(r.site_id, c);
+  }
+  // Candidate sites #2 (DKIM-only): a guided email_setup plan means the owner
+  // INTENDED full authentication — so a DKIM record still absent is a real gap even
+  // when SPF/DMARC are fine. The selector host is named inside the plan's steps.
+  const planQ = await svc(`presence_infra_plans?kind=eq.email_setup&status=in.(approved,applied)&select=site_id&order=created_at.desc&limit=${limit * 5}`);
+  for (const p of (Array.isArray(planQ.json) ? planQ.json : []) as Array<{ site_id: string }>) {
+    if (!cand.has(p.site_id)) cand.set(p.site_id, { spf: false, dmarc: false });
+  }
+
+  let nudged = 0;
+  for (const [siteId, cur] of [...cand].slice(0, limit)) {
+    const siteQ = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+
+    // firstSeen for the active SPF/DMARC gaps (how long has it been unauthenticated?)
+    const activeTypes: string[] = [];
+    if (cur.spf) activeTypes.push('infrastructure.spf_missing');
+    if (cur.dmarc) activeTypes.push('infrastructure.dmarc_missing');
+    let sinceMs = Infinity;
+    if (activeTypes.length) {
+      const fsQ = await svc(`presence_evidence?site_id=eq.${encodeURIComponent(siteId)}&type=in.(${activeTypes.join(',')})&select=observed_at&order=observed_at.asc&limit=1`);
+      const fs = fsQ.json?.[0]?.observed_at;
+      if (fs && Number.isFinite(Date.parse(fs))) sinceMs = Math.min(sinceMs, Date.parse(fs));
+    }
+
+    // DKIM — honestly detectable only when a plan names the selector host. A failed
+    // lookup (null) is NOT treated as missing; the "expected" clock starts when the
+    // plan was applied/created.
+    let dkimMissing = false;
+    {
+      const dpQ = await svc(`presence_infra_plans?site_id=eq.${encodeURIComponent(siteId)}&kind=eq.email_setup&status=in.(approved,applied)&select=steps,applied_at,created_at&order=created_at.desc&limit=1`);
+      const plan = dpQ.json?.[0];
+      if (plan) {
+        const host = (JSON.stringify(plan.steps || '').match(/([a-z0-9_]+\._domainkey\.[a-z0-9.-]+?)(?=[)"'\s\\])/i) || [])[1];
+        if (host && (await dkimPresent(host)) === false) {
+          dkimMissing = true;
+          const planSince = plan.applied_at || plan.created_at;
+          if (planSince && Number.isFinite(Date.parse(planSince))) sinceMs = Math.min(sinceMs, Date.parse(planSince));
+        }
+      }
+    }
+
+    const decision = emailAuthNudgeDue({
+      spfMissing: cur.spf, dmarcMissing: cur.dmarc, dkimMissing,
+      sinceIso: Number.isFinite(sinceMs) ? new Date(sinceMs).toISOString() : null,
+      nowIso,
+    });
+    if (!decision.due) continue;
+
+    const clientQ = await svc(`clients?id=eq.${encodeURIComponent(clientId)}&select=name,email&limit=1`);
+    const bizName = clientQ.json?.[0]?.name || '';
+    const email = clientQ.json?.[0]?.email || '';
+    const copy = emailAuthNudgeCopy(decision.gaps, bizName);
+    // send-once per site (period = the site) — one calm nudge for a persistent gap.
+    const fresh = await raiseNotice({ siteId, clientId, kind: 'email_auth', period: `emailauth:${siteId}`, headline: copy.headline, body: copy.body });
+    if (fresh) {
+      nudged++;
+      if (email) { const brand = await loadEmailBrand(siteId); sendEmail(email, copy.subject, copy.html, brand).catch(() => {}); }
+    }
+  }
+  return { nudged };
+}
+
+// ── APEX-DRIFT WATCH: de-risk the hard-coded apex IP (DNS business-continuity) ──
+// A guided-connected customer's bare domain points home via an apex A record (the
+// ONE constant NETLIFY_APEX_IP) OR a self-updating ALIAS/CNAME-flatten to the site's
+// netlify target. If that apex ever drifts to a WRONG value (a typo, an old host, a
+// stale record), the site is unreachable at the bare domain and nobody is told. This
+// sweep VERIFIES the live apex against what it should be (readZone), and surfaces a
+// resolving-but-wrong apex as ONE calm owner finding on the ONE notice model
+// (monthly period → a persistent break re-alerts monthly, and clears on recovery).
+// A NON-resolving apex is left alone — that's the separate dns_apex_unresolved
+// observation the engine already emits. Rotation rides the domain_checked_at cursor
+// that runDomainWatch advances (no second cursor, no interference: apex watch never
+// stamps it). Best-effort + graceful: pre-0102 the 'apex_drift' kind fails the CHECK
+// and raiseNotice returns false (no throw).
+export async function runApexDriftWatch(limit = 10): Promise<{ checked: number; drifted: number; recovered: number }> {
+  const nowIso = new Date().toISOString();
+  const q = await svc(`presence_sites?custom_domain=not.is.null&netlify_site_id=not.is.null&status=in.(live,ready,paused)&select=id,client_id,custom_domain,netlify_site_id&order=domain_checked_at.asc.nullsfirst&limit=${limit}`);
+  let checked = 0, drifted = 0, recovered = 0;
+  for (const site of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_id: string; custom_domain: string; netlify_site_id: string }>) {
+    const nf = await getSite(site.netlify_site_id).catch(() => ({ ok: false as const, site: undefined }));
+    const target = nf.ok && nf.site ? nf.site.default_domain : null;
+    const res = await verifyApex(site.custom_domain, { target, ip: NETLIFY_APEX_IP }, nowIso).catch(() => null);
+    if (!res) continue;
+    checked++;
+    if (res.resolved && !res.ok) {
+      const fresh = await raiseNotice({
+        siteId: site.id, clientId: site.client_id, kind: 'apex_drift', period: `apex:${periodOf(nowIso)}`,
+        headline: 'Your domain isn’t pointing at your site',
+        body: `${res.reason} Visitors typing ${site.custom_domain} may reach the wrong place. The platform can prepare the exact record to fix it — the preferred setup follows your site automatically.`,
+      });
+      if (fresh) {
+        drifted++;
+        const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`);
+        if (cl.json?.[0]?.email) {
+          const brand = await loadEmailBrand(site.id);   // BR-1: on the customer's brand
+          // Transactional (the domain is actively broken) → critical, survives an opt-out.
+          sendEmail(cl.json[0].email, `Action needed: ${site.custom_domain} isn’t pointing at your site`,
+            `<p><strong>${site.custom_domain}</strong> isn’t pointing at your website right now.</p><p>${res.reason}</p><p>The platform can prepare the exact DNS record to fix it — the preferred setup (an ALIAS/CNAME-flattening record where your host supports it) follows your site automatically and never needs updating.</p>`, brand, { critical: true }).catch(() => {});
+        }
+        const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
+        if (ops) sendEmail(ops, `[Studio OS ops] Apex drift: ${site.custom_domain}`, `<p>${site.custom_domain}: ${res.reason} (expected ${target || NETLIFY_APEX_IP}; observed A=[${res.aRecords.join(', ')}] CNAME=[${res.cnames.join(', ')}]). Customer notified.</p>`).catch(() => {});
+      }
+    } else if (res.ok) {
+      await clearNotice(site.client_id, 'apex_drift');   // recovered — the bell tells the truth
+      recovered++;
+    }
+  }
+  return { checked, drifted, recovered };
 }

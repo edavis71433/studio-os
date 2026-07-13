@@ -26,6 +26,7 @@ import {
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
+import { NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { describeEngine } from '../optimization/engine.ts';
 import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
@@ -178,7 +179,9 @@ async function handleList(cors: Record<string, string>) {
 // ═══ 3. DOMAIN OPERATIONS ═════════════════════════════════════════════════════
 // DNS is checked via DNS-over-HTTPS (Google resolver): a CNAME to the site's
 // netlify.app hostname, or the Netlify apex load-balancer A record.
-const NETLIFY_APEX_IPS = new Set(['75.2.60.5']);
+// Sourced from the ONE authoritative constant (platform/dns.ts) — never a second
+// literal, so an apex-IP change is a one-line edit in exactly one place.
+const NETLIFY_APEX_IPS = new Set([NETLIFY_APEX_IP]);
 
 async function dnsLookup(name: string, type: 'A' | 'CNAME'): Promise<string[]> {
   try {

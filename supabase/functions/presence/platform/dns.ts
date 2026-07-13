@@ -70,10 +70,78 @@ export function explainRecord(r: DnsRecord): string {
   return 'A DNS record.';
 }
 
+/* ── the apex target — ONE authoritative source (business-continuity hardening) ──
+ * The bare-domain (apex) A record for a Netlify-hosted site points at Netlify's
+ * load-balancer IP. That value used to be a bare literal (75.2.60.5) copied into
+ * the point-domain template AND the domain-health check — so if Netlify ever
+ * retired the IP, every guided-connected customer's apex would break SILENTLY,
+ * with the fix scattered across files. Two defenses now live here:
+ *   1. ONE named constant — the single place to change if the IP ever moves,
+ *      instead of a literal duplicated across templates and health checks.
+ *   2. PREFER the self-updating path — an ALIAS / ANAME / CNAME-flattening record
+ *      at the apex, pointed at the site's own <name>.netlify.app hostname, follows
+ *      Netlify automatically and is immune to an IP change. The fixed A record is
+ *      the universal LAST RESORT for DNS hosts that can't flatten at the apex.
+ *      `apexGuidance()` expresses that preference; `apexMatchesExpected()` verifies
+ *      a live apex still points home (drift detection). */
+export const NETLIFY_APEX_IP = '75.2.60.5';
+
+export interface ApexExpectation { target: string | null; ip?: string }
+
+/** The apex setup we hand a customer: the universally-valid A record (sourced from
+ *  the ONE constant) plus a plain-language recommendation to prefer an ALIAS/ANAME/
+ *  CNAME-flattening record to the netlify target where the DNS host supports it
+ *  (self-updating, never needs a value change). PURE. `target` is the site's
+ *  <name>.netlify.app hostname when known. */
+export function apexGuidance(domain: string, target?: string | null): { record: DnsRecord; recommended: string } {
+  const record: DnsRecord = { type: 'A', name: domain, value: NETLIFY_APEX_IP, ttl: 3600 };
+  const recommended = target
+    ? `Preferred: if your DNS host offers an ALIAS, ANAME, or CNAME-flattening record at the apex, point ${domain} at ${target.replace(/\.$/, '')} — it follows your site automatically and never needs updating. Otherwise add the A record to ${NETLIFY_APEX_IP}.`
+    : `Add an A record for ${domain} to ${NETLIFY_APEX_IP}. If your DNS host offers an ALIAS/ANAME/CNAME-flattening record at the apex, that self-updating path is preferred once the hosting target is known.`;
+  return { record, recommended };
+}
+
+/** PURE apex verification — does the live apex still point at the site? Formalizes
+ *  (and is the single source for) the domain-health check: a CNAME/ALIAS-flattened
+ *  value equal to the netlify `target`, OR an A record equal to the expected IP,
+ *  counts as correct. Anything else that RESOLVES is drift (a wrong/stale record);
+ *  nothing resolving is "unresolved" (a different, already-observed condition). */
+export function apexMatchesExpected(
+  observed: { aRecords: string[]; cnames: string[] },
+  expected: ApexExpectation,
+): { ok: boolean; resolved: boolean; reason: string } {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\.$/, '');
+  const a = observed.aRecords.map(norm).filter(Boolean);
+  const c = observed.cnames.map(norm).filter(Boolean);
+  const target = expected.target ? norm(expected.target) : null;
+  const ip = (expected.ip ?? NETLIFY_APEX_IP).toLowerCase();
+  const resolved = a.length > 0 || c.length > 0;
+  if (!resolved) return { ok: false, resolved: false, reason: 'The bare domain doesn’t answer yet.' };
+  if ((target !== null && c.includes(target)) || a.includes(ip)) {
+    return { ok: true, resolved: true, reason: 'The bare domain points at your site.' };
+  }
+  const where = [...c, ...a].slice(0, 3).join(', ') || 'an unexpected address';
+  return { ok: false, resolved: true, reason: `The bare domain points at ${where} instead of ${target || ip}.` };
+}
+
+/** Read the live apex through the DoH zone read and compare it to what it SHOULD
+ *  be. Fenced I/O + a pure comparison. Returns drift with the observed values so a
+ *  caller can surface a plain-language finding. */
+export async function verifyApex(domain: string, expected: ApexExpectation, nowIso: string): Promise<{ ok: boolean; resolved: boolean; reason: string; aRecords: string[]; cnames: string[] }> {
+  const zone = await readZone(domain, nowIso);
+  const aRecords = zone.records.filter((r) => r.type === 'A' && r.name === domain).map((r) => r.value);
+  const cnames = zone.records.filter((r) => r.type === 'CNAME' && r.name === domain).map((r) => r.value);
+  const cmp = apexMatchesExpected({ aRecords, cnames }, expected);
+  return { ...cmp, aRecords, cnames };
+}
+
 /* ── templates — goals become exact records (PURE) ── */
 export function templateRecords(goal: 'point_domain' | 'email_auth' | 'verify_ownership', p: { domain: string; target?: string; token?: string; mailNote?: string }): DnsRecord[] {
   if (goal === 'point_domain') return [
-    { type: 'A', name: p.domain, value: '75.2.60.5', ttl: 3600 },
+    // Apex A record from the ONE authoritative constant. Prefer an ALIAS/ANAME to
+    // p.target where the host supports it (see apexGuidance) — this A record is the
+    // universal fallback and the single place to update if Netlify's IP ever moves.
+    { type: 'A', name: p.domain, value: NETLIFY_APEX_IP, ttl: 3600 },
     { type: 'CNAME', name: `www.${p.domain}`, value: p.target || `${p.domain}.`, ttl: 3600 },
   ];
   if (goal === 'email_auth') return [
@@ -89,6 +157,20 @@ export function templateRecords(goal: 'point_domain' | 'email_auth' | 'verify_ow
 export interface ZoneSnapshot { domain: string; records: DnsRecord[]; taken_at: string }
 const DOH = 'https://cloudflare-dns.com/dns-query';
 const TYPES: Array<[RecordType, number]> = [['A', 1], ['AAAA', 28], ['CNAME', 5], ['MX', 15], ['TXT', 16], ['NS', 2], ['CAA', 257]];
+
+/** Is a DKIM record actually published at `host` (e.g. google._domainkey.acme.com)?
+ *  Fenced DoH TXT read. Returns true (a v=DKIM1 record answers), false (the host
+ *  resolves nothing DKIM-shaped), or null (the lookup itself failed — never claim
+ *  "missing" from a failed probe). PURE-adjacent: one read-only lookup, no writes. */
+export async function dkimPresent(host: string): Promise<boolean | null> {
+  try {
+    const r = await fetch(`${DOH}?name=${encodeURIComponent(host)}&type=16`, { headers: { accept: 'application/dns-json' }, signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const answers = Array.isArray(j?.Answer) ? j.Answer : [];
+    return answers.some((a: { data?: string }) => /v=DKIM1/i.test(String(a?.data || '')));
+  } catch { return null; }
+}
 
 export async function readZone(domain: string, nowIso: string): Promise<ZoneSnapshot> {
   const records: DnsRecord[] = [];

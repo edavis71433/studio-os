@@ -198,6 +198,9 @@ const NOTICE_HREF: Record<string, string> = {
   new_booking: '/presence.html#bookings',   // a customer booked online → the Bookings desk (confirm/cancel)
   booking_followup: '/presence.html#bookings', // #164: a past appointment needs marking done / no-show
   booking_reminder: '/presence.html#bookings', // #164: silent send-once ledger (dismissed; never shown) — mapped for completeness
+  new_review: '/presence.html#reviews',   // a customer left a review → the Reviews desk (approve/hide/reply)
+  email_auth: '/presence.html#foundations',   // DNS #5: unauthenticated email → the Foundations desk (email/DNS setup)
+  apex_drift: '/presence.html#foundations',   // DNS: apex points at the wrong place → Foundations (domain/DNS)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 
