@@ -33,6 +33,36 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  /* Support toolkit + editors (saved replies, customer FAQ) */
+  .item.tool{border-left:3px solid var(--p)}
+  .toolbtn{margin-top:12px;font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:var(--p);border:none;border-radius:9px;padding:9px 14px;cursor:pointer}
+  .toolbtn:hover{filter:brightness(1.06)}
+  .sheet-back{position:fixed;inset:0;background:rgba(20,15,30,.5);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto;z-index:1000}
+  .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:560px;padding:22px;margin:auto}
+  .sheet-head{display:flex;align-items:center;gap:10px}
+  .sheet-head h3{font-family:var(--serif);font-weight:500;font-size:21px;margin:0}
+  .sheet .x{margin-left:auto;background:none;border:none;font-size:24px;line-height:1;color:var(--soft);cursor:pointer;padding:2px 6px;border-radius:7px}
+  .sheet .x:hover{color:var(--ink)}
+  .sheet-intro{color:var(--soft);font-size:14px;margin:8px 0 16px}
+  .sheet-list{display:flex;flex-direction:column;gap:14px}
+  .erow{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .erow .mv{display:flex;flex-direction:column;gap:4px}
+  .erow .mv button{width:30px;height:26px;border:1px solid var(--line);background:var(--card);border-radius:7px;cursor:pointer;color:var(--ink);font-size:13px}
+  .erow .mv button:disabled{opacity:.35;cursor:default}
+  .erow .ef{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .fl{display:flex;flex-direction:column;gap:4px}
+  .fl>span{font-size:12px;font-weight:600;color:var(--faint)}
+  .fl input,.fl textarea,#sheet-extra input{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%;resize:vertical}
+  .fl input:focus,.fl textarea:focus,#sheet-extra input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .erow .del{align-self:flex-start;background:none;border:1px solid var(--line);border-radius:8px;color:var(--soft);font-size:12.5px;padding:6px 10px;cursor:pointer}
+  .erow .del:hover{color:#a4342b;border-color:#a4342b}
+  #sheet-extra:not(:empty){margin-bottom:14px}
+  .addbtn{margin-top:14px;background:var(--p-soft);color:var(--p);border:1px dashed var(--p);border-radius:10px;padding:10px;width:100%;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+  .sheet-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+  .sheet-foot .ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+  .sheet-foot .save{background:var(--p);color:#fff;border:none;border-radius:9px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
+  .sheet-foot .save:disabled{opacity:.6;cursor:default}
+  .empty{padding:10px 2px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -41,6 +71,7 @@
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · Inbox — everything that needs you, in one calm place.</footer>
 </div>
+<div id="sheet-host"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
@@ -74,7 +105,7 @@ function render(feed,leads,notifs){
   const unreadCount=activity.filter(n=>!n.read).length;
   const total=approvals.length+notices.length+moments.length+newLeads.length+unreadCount;
   let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;
-  if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div><p style="text-align:center;margin-top:14px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p>`;$('main').innerHTML=h;return;}
+  if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div><p style="text-align:center;margin-top:14px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p>`;h+=toolkit();$('main').innerHTML=h;return;}
   if(!total&&activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing new — recent activity is below.</div>`;}
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
@@ -93,7 +124,106 @@ function render(feed,leads,notifs){
     for(const n of notices){h+=`<a class="item notice" href="${esc(scoped(n.href||'/today.html'))}"><div class="who">${esc(n.headline||'Something needs a look')}</div>${n.body?`<div class="body">${esc(n.body)}</div>`:''}<div class="go">Take care of it →</div></a>`;}
     for(const m of moments){h+=`<a class="item" href="${esc(scoped('/today.html'))}"><div class="who">${esc(m.headline||'A moment')}</div>${m.summary?`<div class="body">${esc(m.summary)}</div>`:''}<div class="go">Open Today →</div></a>`;}}
 
+  h+=toolkit();
   $('main').innerHTML=h;
+}
+// ── Support toolkit: two owner-managed tools that live right here in the Inbox.
+//   • Saved replies — canned answers you reuse when replying to enquiries.
+//   • Customer FAQ  — common Q&A your clients can read anytime in their portal.
+// Both save only when you press Save; nothing sends or publishes on its own.
+function toolkit(){return `<h2>Your support toolkit</h2>`+
+  `<div class="item tool"><div class="who">Saved replies</div><div class="body">Write your best answers once, then drop them into a reply in one click — no retyping.</div><button class="toolbtn" type="button" onclick="openSaved()">Manage saved replies</button></div>`+
+  `<div class="item tool"><div class="who">Customer FAQ</div><div class="body">Common questions and answers your clients can read anytime in their portal, so they ask you less.</div><button class="toolbtn" type="button" onclick="openFaq()">Edit your FAQ</button></div>`;}
+const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
+
+// ── Editor sheet (shared shell for both tools) ──────────────────────────────
+function sheetKey(e){if(e.key==='Escape')closeSheet();}
+function closeSheet(){const host=$('sheet-host');if(host){host.innerHTML='';host.onclick=null;}document.removeEventListener('keydown',sheetKey);}
+function mountSheet(html){const host=$('sheet-host');host.innerHTML=html;document.addEventListener('keydown',sheetKey);
+  host.onclick=function(e){if(e.target.classList.contains('sheet-back')||e.target.closest('[data-x]'))closeSheet();};
+  const x=host.querySelector('.x');if(x)x.focus();}
+function sheetShell(title,intro,addLabel){return `<div class="sheet-back"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t">`+
+  `<div class="sheet-head"><h3 id="sh-t">${esc(title)}</h3><button type="button" class="x" data-x aria-label="Close">×</button></div>`+
+  `<p class="sheet-intro">${esc(intro)}</p><div id="sheet-extra"></div><div id="sheet-list" class="sheet-list"></div>`+
+  `<button type="button" id="sheet-add" class="addbtn">+ ${esc(addLabel)}</button>`+
+  `<div class="sheet-foot"><button type="button" class="ghost" data-x>Cancel</button><button type="button" id="sheet-save" class="save">Save changes</button></div>`+
+  `</div></div>`;}
+// Shared up/down/remove handling. readFn snapshots the typed values into state
+// BEFORE any structural change, so nothing you've typed is lost on reorder.
+function listClick(e,readFn,arrGet,drawFn){
+  const row=e.target.closest('[data-row]');if(!row)return;
+  const rows=[...$('sheet-list').querySelectorAll('[data-row]')];const i=rows.indexOf(row);
+  if(e.target.closest('[data-del]')){readFn();const a=arrGet();a.splice(i,1);drawFn();}
+  else if(e.target.closest('[data-mv=up]')&&i>0){readFn();const a=arrGet();[a[i-1],a[i]]=[a[i],a[i-1]];drawFn();}
+  else if(e.target.closest('[data-mv=down]')){readFn();const a=arrGet();if(i<a.length-1){[a[i+1],a[i]]=[a[i],a[i+1]];drawFn();}}
+}
+function mvCells(i,n){return `<div class="mv"><button type="button" data-mv="up" ${i===0?'disabled':''} aria-label="Move up">↑</button><button type="button" data-mv="down" ${i===n-1?'disabled':''} aria-label="Move down">↓</button></div>`;}
+function focusNewRow(){const rows=$('sheet-list').querySelectorAll('[data-row]');const last=rows[rows.length-1];if(last){const f=last.querySelector('input,textarea');if(f)f.focus();}}
+
+// ── Saved replies ───────────────────────────────────────────────────────────
+let SR=[];
+async function openSaved(){
+  mountSheet(sheetShell('Saved replies','These are canned answers you can reuse when you reply to an enquiry. Nothing sends automatically — you choose when to use them.','Add a saved reply'));
+  $('sheet-list').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  const r=await api('/service/saved-replies');
+  SR=(r.ok&&r.body.data&&r.body.data.replies)||[];
+  drawSaved();
+  $('sheet-list').onclick=(e)=>listClick(e,readSaved,()=>SR,drawSaved);
+  $('sheet-add').onclick=()=>{readSaved();SR.push({id:'',title:'',body:''});drawSaved();focusNewRow();};
+  $('sheet-save').onclick=saveSaved;
+}
+function srRow(r,i){return `<div class="erow" data-row data-id="${esc(r.id||'')}">${mvCells(i,SR.length)}`+
+  `<div class="ef"><label class="fl"><span>Title</span><input type="text" data-f="title" maxlength="80" value="${esc(r.title)}" placeholder="e.g. Our opening hours"></label>`+
+  `<label class="fl"><span>Message</span><textarea data-f="body" maxlength="4000" rows="3" placeholder="Write the reply you send most often…">${esc(r.body)}</textarea></label></div>`+
+  `<button type="button" class="del" data-del aria-label="Remove this reply">Remove</button></div>`;}
+function drawSaved(){const b=$('sheet-list');b.innerHTML=SR.length?SR.map((r,i)=>srRow(r,i)).join(''):'<p class="muted empty">No saved replies yet. Add your first one below.</p>';}
+function readSaved(){SR=[...$('sheet-list').querySelectorAll('[data-row]')].map(row=>({id:row.getAttribute('data-id')||'',title:row.querySelector('[data-f=title]').value,body:row.querySelector('[data-f=body]').value}));}
+async function saveSaved(){
+  readSaved();
+  const cleaned=SR.filter(r=>r.title.trim()||r.body.trim());
+  for(const r of cleaned){if(!r.title.trim()){toast('Each saved reply needs a short title.','err');return;}if(!r.body.trim()){toast('“'+(r.title.trim()||'A reply')+'” needs some text.','err');return;}}
+  const btn=$('sheet-save');btn.disabled=true;btn.textContent='Saving…';
+  const r=await api('/service/saved-replies','PUT',{replies:cleaned});
+  btn.disabled=false;btn.textContent='Save changes';
+  if(r.ok){toast('Saved replies updated.');closeSheet();}
+  else if(r.status===422)toast('Please check your replies and try again.','err');
+  else if(r.status===503)toast('Saved replies aren’t switched on for this site yet.','err');
+  else toast('Couldn’t save just now — try again in a moment.','err');
+}
+
+// ── Customer FAQ ────────────────────────────────────────────────────────────
+let FQ={intro:'',items:[]};
+async function openFaq(){
+  mountSheet(sheetShell('Customer FAQ','Answer the questions your clients ask most. They’ll see these in their portal — you decide what goes here. Nothing publishes until you press Save.','Add a question'));
+  $('sheet-extra').innerHTML='<label class="fl"><span>Intro (optional)</span><input type="text" id="faq-intro" maxlength="500" placeholder="A friendly line above your questions…"></label>';
+  $('sheet-list').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  const r=await api('/service/faq');
+  const d=(r.ok&&r.body.data)||{items:[]};
+  FQ={intro:d.intro||'',items:(d.items||[]).map(x=>({q:x.q||'',a:x.a||''}))};
+  $('faq-intro').value=FQ.intro;
+  drawFaq();
+  $('sheet-list').onclick=(e)=>listClick(e,readFaq,()=>FQ.items,drawFaq);
+  $('sheet-add').onclick=()=>{readFaq();FQ.items.push({q:'',a:''});drawFaq();focusNewRow();};
+  $('sheet-save').onclick=saveFaq;
+}
+function faqRow(it,i){return `<div class="erow" data-row>${mvCells(i,FQ.items.length)}`+
+  `<div class="ef"><label class="fl"><span>Question</span><input type="text" data-f="q" maxlength="200" value="${esc(it.q)}" placeholder="e.g. How do I request a change?"></label>`+
+  `<label class="fl"><span>Answer</span><textarea data-f="a" maxlength="4000" rows="3" placeholder="Write a clear, friendly answer…">${esc(it.a)}</textarea></label></div>`+
+  `<button type="button" class="del" data-del aria-label="Remove this question">Remove</button></div>`;}
+function drawFaq(){const b=$('sheet-list');b.innerHTML=FQ.items.length?FQ.items.map((it,i)=>faqRow(it,i)).join(''):'<p class="muted empty">No questions yet. Add your first one below.</p>';}
+function readFaq(){const intro=$('faq-intro');FQ.intro=intro?intro.value:FQ.intro;FQ.items=[...$('sheet-list').querySelectorAll('[data-row]')].map(row=>({q:row.querySelector('[data-f=q]').value,a:row.querySelector('[data-f=a]').value}));}
+async function saveFaq(){
+  readFaq();
+  const partial=FQ.items.some(x=>(x.q.trim()&&!x.a.trim())||(!x.q.trim()&&x.a.trim()));
+  if(partial){toast('Each question needs both a question and an answer.','err');return;}
+  const items=FQ.items.filter(x=>x.q.trim()&&x.a.trim());
+  const btn=$('sheet-save');btn.disabled=true;btn.textContent='Saving…';
+  const r=await api('/service/faq','PUT',{intro:FQ.intro.trim(),items});
+  btn.disabled=false;btn.textContent='Save changes';
+  if(r.ok){toast('Your FAQ is saved.');closeSheet();}
+  else if(r.status===422)toast('Please check your questions and try again.','err');
+  else if(r.status===503)toast('The FAQ isn’t switched on for this site yet.','err');
+  else toast('Couldn’t save just now — try again in a moment.','err');
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h1>Sign in to see your inbox.</h1><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h1>We couldn’t load your inbox just now.</h1><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
