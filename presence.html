@@ -151,6 +151,13 @@ h5.rune .whisper.ok{color:var(--sage)}
 .field input:focus,.field textarea:focus{outline:none;border-bottom-color:var(--plum)}
 .field .hint{font-size:12px;color:var(--ink-2);margin-top:6px}
 .consequence{font-size:13px;color:var(--amber-text);margin-top:6px;font-style:italic;font-family:var(--serif);max-width:56ch}
+/* ── rich-text formatting toolbar (writes plain markdown into the field) ── */
+.rtbar{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.rtbtn{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--ink-2);background:var(--sheet);border:1px solid var(--hair-2);border-radius:6px;padding:4px 9px;line-height:1.4;cursor:pointer;transition:background var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.rtbtn:hover{background:var(--plum-soft);color:var(--plum);border-color:var(--plum-soft)}
+.rtbtn:active{background:var(--plum);color:#fff;border-color:var(--plum)}
+.rtbtn .i{font-style:italic}.rtbtn .b{font-weight:800}
+.rthint{font-size:11.5px;color:var(--ink-2);margin:-2px 0 9px;font-family:var(--serif);font-style:italic}
 .field input.mono{font-family:var(--mono);font-size:15px}
 
 /* hours */
@@ -756,6 +763,93 @@ function toast(msg, bad) {
   $("toasts").appendChild(t);
   setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
 }
+/* ══ Rich-text writing toolbar ═══════════════════════════════════════════════
+   Owner need: "normal website writing tools" on the long-form fields — Heading,
+   Subheading, Bold, Italic, Link, lists, Quote — easy and intuitive. The buttons
+   WRITE plain markdown into the field (over the current selection); the published
+   renderer (lib/markdown.ts renderMarkdown) turns it into real semantic <h2>/<h3>/
+   <a>/<ul>. No markdown knowledge required. Only the prose fields that actually
+   render markdown get a toolbar (story · FAQ answers · update bodies); short and
+   SEO fields (name, tagline, description, item text) stay plain. */
+function rtFire(ta) { ta.dispatchEvent(new Event("input", { bubbles: true })); ta.focus(); }
+// wrap the selection (or a placeholder) with inline markers — Bold / Italic
+function rtWrap(ta, mark, placeholder) {
+  const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value;
+  const sel = v.slice(s, e) || placeholder;
+  ta.value = v.slice(0, s) + mark + sel + mark + v.slice(e);
+  ta.setSelectionRange(s + mark.length, s + mark.length + sel.length);
+  rtFire(ta);
+}
+// add/remove a line-level marker across every line the selection touches —
+// Heading / Subheading / Bullets / Numbers / Quote (toggles off if already set)
+function rtLine(ta, prefix, numbered) {
+  const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+  const ls = v.lastIndexOf("\n", s - 1) + 1;
+  let le = v.indexOf("\n", e); if (le === -1) le = v.length;
+  const lines = v.slice(ls, le).split("\n");
+  const bare = (ln) => ln.replace(/^(#{1,6}\s|>\s?|[-*]\s|\d+\.\s)/, "");
+  const already = lines.every((ln) => numbered ? /^\d+\.\s/.test(ln) : ln.startsWith(prefix));
+  let n = 0;
+  const out = lines.map((ln) => already ? bare(ln) : (numbered ? (++n) + ". " : prefix) + bare(ln)).join("\n");
+  ta.value = v.slice(0, ls) + out + v.slice(le);
+  ta.setSelectionRange(ls, ls + out.length);
+  rtFire(ta);
+}
+// Link: ask for the URL via the styled dialog, insert [text](url)
+async function rtLink(ta) {
+  const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value;
+  const sel = v.slice(s, e);
+  const url = await askText("Add a link", { hint: "Where should this link go?", placeholder: "https://…", ok: "Add link" });
+  if (!url) { ta.focus(); return; }
+  // Make links "just work": a bare domain gets https:// so the renderer accepts it
+  // (published links must be https / mailto: / tel: — anything else renders as text).
+  let u = url.trim();
+  if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
+  const text = sel || u;
+  const md = "[" + text + "](" + u + ")";
+  ta.value = v.slice(0, s) + md + v.slice(e);
+  ta.setSelectionRange(s + 1, s + 1 + text.length);
+  rtFire(ta);
+}
+const RT_BUTTONS = [
+  { html: '<span class="b">H2</span>', label: "Heading", run: (ta) => rtLine(ta, "## ") },
+  { html: '<span class="b">H3</span>', label: "Subheading", run: (ta) => rtLine(ta, "### ") },
+  { html: '<span class="b">B</span>', label: "Bold", run: (ta) => rtWrap(ta, "**", "bold text") },
+  { html: '<span class="i">I</span>', label: "Italic", run: (ta) => rtWrap(ta, "*", "italic text") },
+  { html: "Link", label: "Add a link", run: (ta) => rtLink(ta) },
+  { html: "• List", label: "Bullet list", run: (ta) => rtLine(ta, "- ") },
+  { html: "1. List", label: "Numbered list", run: (ta) => rtLine(ta, "", true) },
+  { html: "&ldquo; Quote", label: "Quote", run: (ta) => rtLine(ta, "> ") },
+];
+function attachRich(ta) {
+  if (!ta || ta.dataset.rich) return; ta.dataset.rich = "1";
+  const bar = el("div", "rtbar"); bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Text formatting");
+  RT_BUTTONS.forEach((cfg) => {
+    const b = el("button", "rtbtn"); b.type = "button"; b.innerHTML = cfg.html;
+    b.setAttribute("aria-label", cfg.label); b.title = cfg.label;
+    // mousedown so the textarea keeps its selection; preventDefault stops focus loss
+    b.addEventListener("mousedown", (e) => { e.preventDefault(); cfg.run(ta); });
+    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cfg.run(ta); } });
+    bar.appendChild(b);
+  });
+  const hint = el("div", "rthint", "These format your text — headings help readers and screen readers.");
+  ta.parentNode.insertBefore(bar, ta);
+  ta.parentNode.insertBefore(hint, ta);
+}
+function enhanceRich(root) {
+  (root || document).querySelectorAll('textarea[data-field="story"],textarea[data-k="answer"],textarea[data-k="body_md"]').forEach(attachRich);
+}
+// Static prose fields exist now (this script is at the end of <body>); dynamic
+// editors (FAQ answers, update bodies) are added later, so watch for them too.
+enhanceRich(document);
+new MutationObserver((muts) => {
+  for (const m of muts) for (const node of m.addedNodes) {
+    if (node.nodeType !== 1) continue;
+    if (node.matches && node.matches('textarea[data-field="story"],textarea[data-k="answer"],textarea[data-k="body_md"]')) attachRich(node);
+    if (node.querySelectorAll) enhanceRich(node);
+  }
+}).observe(document.body, { childList: true, subtree: true });
+
 // Server errors that read like a sentence still show; raw technical junk doesn't.
 function nice(e) {
   const m = e && e.message ? String(e.message) : "";

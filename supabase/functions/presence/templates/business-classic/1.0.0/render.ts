@@ -126,6 +126,13 @@ form.card p{margin-bottom:14px}
 .post-meta{color:var(--soft);font-size:.9rem;margin:4px 0 8px}
 article.post{max-width:720px}
 article.post p{margin-bottom:16px}
+.prose>:first-child{margin-top:0}.prose>:last-child{margin-bottom:0}
+.prose h2,.prose h3{margin:1.3em 0 .4em}
+.prose p{margin:0 0 1em}
+.prose ul,.prose ol{margin:0 0 1em;padding-left:1.4em}
+.prose li{margin:.2em 0}
+.prose blockquote{border-left:3px solid var(--accent);padding-left:16px;margin:0 0 1em;color:var(--soft)}
+.prose a{color:var(--accent);text-decoration:underline}
 footer.site{background:var(--ink);color:#dfe4e1;padding:46px 0 32px;margin-top:64px}
 footer.site a{color:#bfe3da}
 footer.site h2{font-size:1.1rem}
@@ -347,7 +354,7 @@ ${(() => {
   <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
 </div></section>` : '',
     faqs: faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
-  `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}
+  `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd class="prose">${renderMarkdown(f.answer)}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
   };
   for (const b of blocks) parts[b.key] = b.html;   // Phase T-BLOCKS: enabled structured blocks
@@ -368,13 +375,13 @@ function aboutBody(c: SnapshotContent): string {
   const i = c.identity;
   return `<section class="block wrap"><h1>About ${esc(i.business_name)}</h1>
 <p>${esc(i.description)}</p>
-${i.story ? i.story.split(/\n{2,}/).map((p) => `<p>${esc(p).replaceAll('\n', '<br>')}</p>`).join('') : ''}
+${i.story ? `<div class="prose">${renderMarkdown(i.story)}</div>` : ''}
 ${i.service_area ? `<h2>Where we work</h2><p>${esc(i.service_area)}</p>` : ''}</section>`;
 }
 
 function faqBody(c: SnapshotContent): string {
   return `<section class="block wrap"><h1>Frequently asked questions</h1><dl class="faq">${bySort(c.faqs).map((f) =>
-    `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd>${esc(f.answer).replaceAll('\n', '<br>')}</dd>`).join('')}</dl>
+    `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd class="prose">${renderMarkdown(f.answer)}</dd>`).join('')}</dl>
 ${c.faqs.length === 0 ? '<p>Questions? Get in touch — we answer fast.</p>' : ''}</section>`;
 }
 
@@ -416,7 +423,7 @@ ${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''
 }
 
 function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): string {
-  return `<section class="block wrap"><article class="post">
+  return `<section class="block wrap"><article class="post prose">
 <h1>${esc(p.title)}</h1>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
 ${p.hero ? `<div style="margin:20px 0;border-radius:14px;overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
