@@ -21,7 +21,7 @@ export function isEditionKey(x: unknown): x is EditionKey { return typeof x === 
 export type EditionFeature =
   | 'website'          // CMS: pages/media/templates/SEO/publishing/preview/versioning/rollback
   | 'developer'        // Developer Mode (still capability-gated by use_developer_mode)
-  | 'forms'            // Forms / Lead Capture — packaged here, BUILD pending (FD-2)
+  | 'forms'            // Forms / Lead Capture — BUILT (lib/forms.ts: typed form builder + rules)
   | 'business_moments' // the daily intelligence surface
   | 'connected'        // Connected Platform (read + approved writes)
   | 'ai'               // Concierge / Growth / Visual Studio brains
