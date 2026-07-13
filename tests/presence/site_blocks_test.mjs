@@ -7,6 +7,8 @@
 import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES, BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { COMPONENTS } from '../../supabase/functions/presence/lib/site_components.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
+import { brandTint } from '../../supabase/functions/presence/lib/palettes.ts';
+import { contrastRatio } from '../../supabase/functions/presence/lib/brand_kit.ts';
 import { render as businessClassic } from '../../supabase/functions/presence/templates/business-classic/1.0.0/render.ts';
 import manifest from '../../supabase/functions/presence/templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
 import fixture from '../../supabase/functions/presence/templates/business-classic/1.0.0/fixture.json' with { type: 'json' };
@@ -321,6 +323,50 @@ const ctx = { esc, attr, safeHref };
   // — dedupe posture: MULTI for columns/cards; single-instance for download/toc —
   ok('download + toc stay single-instance (first kept, one-per-type)', validateBlocks([{ type: 'download', file_id: G }, { type: 'download', file_id: H }]).length === 1 && validateBlocks([{ type: 'toc' }, { type: 'toc' }]).length === 1);
   ok('all four r4 blocks are catalog-declared AND realized', ['columns', 'cards', 'download', 'toc'].every((t) => COMPONENTS.some((c) => c.key === t) && REALIZED_BLOCK_TYPES.includes(t)));
+}
+
+// ═══ 9. per-section style options (Phase T-STYLE) — validate/coerce → classes ═══
+{
+  // — validation: enumerated only; unknown → default (dropped); empty → no `look` —
+  const full = validateBlocks([{ type: 'features', items: [{ title: 'A' }], look: { background: 'tinted', width: 'full', spacing: 'roomy', align: 'center' } }])[0];
+  ok('look: valid options validate + store on the block', JSON.stringify(full.look) === JSON.stringify({ background: 'tinted', width: 'full', spacing: 'roomy', align: 'center' }));
+  const junk = validateBlocks([{ type: 'features', items: [{ title: 'A' }], look: { background: 'rainbow', width: 'huge', spacing: 'xxl', align: 'left' } }])[0];
+  ok('look: unknown values drop to default (no look key at all)', !('look' in junk) || junk.look === undefined);
+  const partial = validateBlocks([{ type: 'features', items: [{ title: 'A' }], look: { background: 'plain', width: 'nope' } }])[0];
+  ok('look: partial — only the valid keys survive', JSON.stringify(partial.look) === JSON.stringify({ background: 'plain' }));
+  ok('look: a non-object / missing look leaves the block untouched', !('look' in validateBlocks([{ type: 'features', items: [{ title: 'A' }], look: 'tinted' }])[0]) && !('look' in validateBlocks([{ type: 'features', items: [{ title: 'A' }] }])[0]));
+
+  // — render: each option → exactly one class on the section; default → NONE —
+  const styled = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }], look: { background: 'tinted', width: 'full', spacing: 'roomy', align: 'center' } }]), ctx)[0].html;
+  ok('look: classes emitted onto the section (bg-tint/full/space-roomy/align-center)',
+    styled.includes('block--bg-tint') && styled.includes('block--full') && styled.includes('block--space-roomy') && styled.includes('block--align-center') && /class="block block--/.test(styled));
+  const plainR = renderSiteBlocks(validateBlocks([{ type: 'stats', items: [{ value: '9', label: 'Yrs' }], look: { background: 'plain', spacing: 'tight' } }]), ctx)[0].html;
+  ok('look: plain background + tight spacing → their classes (on an auto-alternate block)', plainR.includes('block--bg-plain') && plainR.includes('block--space-tight'));
+  const def = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }] }]), ctx)[0].html;
+  ok('look: a DEFAULT block emits NO block-- classes (page structure unchanged)', !def.includes('block--') && def.includes('class="block wrap block-features"'));
+
+  // — look rides through resolveBlockMedia on a media-bearing block —
+  const IMG = '55555555-5555-5555-5555-555555555555';
+  const IREF = () => ({ alt: 'Shop', variants: { w800: '/img/x-800.webp' }, width: 800, height: 600 });
+  const resolvedLook = resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG, look: { background: 'tinted', align: 'center' } }]), IREF)[0].look;
+  ok('look: survives resolveBlockMedia (media block rebuild carries it)', JSON.stringify(resolvedLook) === JSON.stringify({ background: 'tinted', align: 'center' }));
+
+  // — BLOCK_CSS carries the matching rules (one CSS-hash cascade, no per-block markup) —
+  ok('look CSS: tint (with color-mix upgrade), plain, spacing, full-bleed + align rules present', (() => {
+    return /\.block\.block--bg-tint\{background:#[0-9a-f]{6}\}/.test(BLOCK_CSS)
+      && /@supports \(background:color-mix/.test(BLOCK_CSS) && BLOCK_CSS.includes('color-mix(in srgb,var(--accent) 8%,var(--paper')
+      && BLOCK_CSS.includes('.block.block--bg-plain{background:none')
+      && BLOCK_CSS.includes('.block--space-tight{') && BLOCK_CSS.includes('.block--space-roomy{')
+      && BLOCK_CSS.includes('.block--full{max-width:none') && BLOCK_CSS.includes('.block--full>*{') && BLOCK_CSS.includes('.block--align-center{text-align:center}');
+  })());
+
+  // — palettes.ts is the SOURCE of the tint + it's contrast-safe with a neutral fallback —
+  const tint = brandTint('#5b3fa0');
+  ok('palettes.brandTint: a light, brand-derived tint that keeps dark body text ≥ 4.5:1', /^#[0-9a-f]{6}$/.test(tint) && contrastRatio('#1c2430', tint) >= 4.5);
+  ok('palettes.brandTint: wired as the BLOCK_CSS fallback (color-mix-less browsers)', BLOCK_CSS.includes(`.block.block--bg-tint{background:${tint}}`));
+  const tooLight = brandTint('#ffffff');   // a pathological, ultra-light accent
+  ok('palettes.brandTint: a too-light accent falls back to a neutral (not white) contrast-safe wash', tooLight !== '#ffffff' && contrastRatio('#1c2430', tooLight) >= 4.5);
+  ok('palettes.brandTint: deterministic (same accent → same tint)', brandTint('#23635a') === brandTint('#23635a'));
 }
 
 const passed = results.filter((r) => r.p).length;

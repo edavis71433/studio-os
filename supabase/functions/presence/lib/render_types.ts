@@ -152,7 +152,27 @@ export interface SiteBlockToc { type: 'toc'; title?: string }
 // types), each keyed by its own id. See lib/forms.ts for the normalization gate.
 export type { FormDefinition as SiteBlockForm } from './forms.ts';
 import type { FormDefinition } from './forms.ts';
-export type SiteBlock =
+// ── Phase T-STYLE: curated per-section style options (owner picks from an enumerated
+// set; never raw CSS). Optional + orthogonal to a block's content, so a block with no
+// `look` renders byte-identically to before. Each field maps to ONE emitted CSS class
+// (see lib/site_blocks.ts): background (brand-tint / plain vs the auto-alternate default),
+// full-bleed width, vertical spacing, and center alignment. Contrast stays a platform
+// guarantee — the tint is derived + contrast-checked (lib/palettes.ts brandTint). ──
+export interface BlockLook {
+  /** 'tinted' = a brand-derived, contrast-safe light wash; 'plain' = no background
+   *  (clears the auto-alternate band); omitted = the template's default. */
+  background?: 'tinted' | 'plain';
+  /** 'full' = edge-to-edge section; inner content still capped for readability. */
+  width?: 'full';
+  /** vertical padding vs the default. */
+  spacing?: 'tight' | 'roomy';
+  /** 'center' = center the section heading + short text. */
+  align?: 'center';
+}
+/** Distributive conditional: adds an optional `look` to EVERY union member while
+ *  preserving the `type` discriminant (so `switch (b.type)` narrowing keeps working). */
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook } : never;
+export type SiteBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
@@ -160,7 +180,8 @@ export type SiteBlock =
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
   | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc
-  | FormDefinition;
+  | FormDefinition
+>;
 export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */

@@ -19,9 +19,11 @@ import type {
   SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
+  BlockLook,
 } from './render_types.ts';
 import { renderMarkdown } from './markdown.ts';
 import { normalizeFormDefinition, renderForm, type FormDefinition } from './forms.ts';
+import { brandTint } from './palettes.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -55,6 +57,21 @@ const uid = (x: unknown): string => { const v = String(x ?? '').trim(); return U
 // mirrors lib/forms.ts slug(): lowercase, non-alphanumerics → '_', trimmed, capped.
 const slugId = (x: unknown): string => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
 
+// ── Phase T-STYLE: validate a block's optional `look` (per-section style options).
+// Enumerated ONLY — any unknown value is dropped (→ the template default), never
+// stored. Returns undefined when nothing non-default was chosen, so a default block
+// keeps NO `look` key and renders byte-identically (goldens only drift by CSS).
+function parseLook(raw: unknown): BlockLook | undefined {
+  const l = (raw && typeof raw === 'object') ? (raw as any).look : undefined;
+  if (!l || typeof l !== 'object') return undefined;
+  const out: BlockLook = {};
+  if (l.background === 'tinted' || l.background === 'plain') out.background = l.background;
+  if (l.width === 'full') out.width = 'full';
+  if (l.spacing === 'tight' || l.spacing === 'roomy') out.spacing = l.spacing;
+  if (l.align === 'center') out.align = 'center';
+  return Object.keys(out).length ? out : undefined;
+}
+
 // ── Stored (pre-resolution) shapes for media blocks — carry media by ID; the
 //    serializer's resolveBlockMedia() turns IDs into MediaRefs (reusing ref()). ──
 interface StoredTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media_id?: string }> }
@@ -73,7 +90,10 @@ interface StoredImageText { type: 'image_text'; title?: string; image_id?: strin
 interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string } }> }
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
-export type StoredBlock =
+// Same distributive WithLook as render_types: the owner-chosen per-section style
+// (Phase T-STYLE) rides on the stored block, orthogonal to its content.
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook } : never;
+export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | StoredGallery | StoredBeforeAfter | StoredVideo
@@ -81,7 +101,8 @@ export type StoredBlock =
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
   | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
-  | FormDefinition;
+  | FormDefinition
+>;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
@@ -314,7 +335,11 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         break;
       }
     }
-    if (block) { out.push(block); if (!MULTI.has(type)) seen.add(type); }
+    if (block) {
+      const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
+      if (look) (block as any).look = look;
+      out.push(block); if (!MULTI.has(type)) seen.add(type);
+    }
     if (out.length >= MAX_BLOCKS) break;
   }
   return out;
@@ -326,14 +351,17 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
  *  keeps its text even without photos. StoredBlock[] → render-facing SiteBlock[]. */
 export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null): SiteBlock[] {
   const out: SiteBlock[] = [];
+  // Phase T-STYLE: the media-bearing branches rebuild their block object, so carry
+  // the owner-chosen per-section style across the rebuild (default `out.push(b)` keeps it).
+  const lk = (b: StoredBlock) => (b.look ? { look: b.look } : {});
   for (const b of blocks) {
     switch (b.type) {
       case 'team':
-        out.push({ type: 'team', title: b.title, members: b.members.map((m) => ({ name: m.name, role: m.role, bio: m.bio, media: m.media_id ? ref(m.media_id) : null })) });
+        out.push({ type: 'team', title: b.title, members: b.members.map((m) => ({ name: m.name, role: m.role, bio: m.bio, media: m.media_id ? ref(m.media_id) : null })), ...lk(b) });
         break;
       case 'gallery': {
         const images = b.image_ids.map((id) => ref(id)).filter((x): x is MediaRef => !!x);
-        if (images.length) out.push({ type: 'gallery', title: b.title, images });
+        if (images.length) out.push({ type: 'gallery', title: b.title, images, ...lk(b) });
         break;
       }
       case 'before_after': {
@@ -342,41 +370,41 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
           const before = ref(it.before_id), after = ref(it.after_id);
           if (before && after) items.push({ before, after, ...(it.caption ? { caption: it.caption } : {}) });
         }
-        if (items.length) out.push({ type: 'before_after', title: b.title, items });
+        if (items.length) out.push({ type: 'before_after', title: b.title, items, ...lk(b) });
         break;
       }
       case 'video':
-        out.push({ type: 'video', title: b.title, url: b.url, caption: b.caption, poster: b.poster_id ? ref(b.poster_id) : null });
+        out.push({ type: 'video', title: b.title, url: b.url, caption: b.caption, poster: b.poster_id ? ref(b.poster_id) : null, ...lk(b) });
         break;
       case 'partners': {
         const logos = b.image_ids.map((id) => ref(id)).filter((x): x is MediaRef => !!x);
-        if (logos.length) out.push({ type: 'partners', title: b.title, logos });
+        if (logos.length) out.push({ type: 'partners', title: b.title, logos, ...lk(b) });
         break;
       }
       case 'map': {   // an address keeps the block valuable even if the image can't resolve
         const image = b.image_media_id ? ref(b.image_media_id) : null;
-        if (image || b.address) out.push({ type: 'map', title: b.title, image, address: b.address, directions_url: b.directions_url });
+        if (image || b.address) out.push({ type: 'map', title: b.title, image, address: b.address, directions_url: b.directions_url, ...lk(b) });
         break;
       }
       case 'image': {   // an image with no resolvable media is nothing to show — drop it
         const image = b.image_id ? ref(b.image_id) : null;
-        if (image) out.push({ type: 'image', title: b.title, image, caption: b.caption, alt: b.alt, link: b.link, decorative: b.decorative });
+        if (image) out.push({ type: 'image', title: b.title, image, caption: b.caption, alt: b.alt, link: b.link, decorative: b.decorative, ...lk(b) });
         break;
       }
       case 'columns':   // prose/button ride through; each column's image resolves (or drops to null)
-        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button })) });
+        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button })), ...lk(b) });
         break;
       case 'cards':
-        out.push({ type: 'cards', id: b.id, title: b.title, cards: b.cards.map((c) => ({ heading: c.heading, text: c.text, image: c.image_id ? ref(c.image_id) : null, link: c.link })) });
+        out.push({ type: 'cards', id: b.id, title: b.title, cards: b.cards.map((c) => ({ heading: c.heading, text: c.text, image: c.image_id ? ref(c.image_id) : null, link: c.link })), ...lk(b) });
         break;
       case 'download': {   // a download with no resolvable file is nothing to offer — drop it
         const file = b.file_id ? ref(b.file_id) : null;
-        if (file) out.push({ type: 'download', title: b.title, file, label: b.label });
+        if (file) out.push({ type: 'download', title: b.title, file, label: b.label, ...lk(b) });
         break;
       }
       case 'image_text': {   // prose keeps the block valuable even if the image can't resolve
         const image = b.image_id ? ref(b.image_id) : null;
-        if (image || b.body) out.push({ type: 'image_text', title: b.title, image, body: b.body, side: b.side, button: b.button });
+        if (image || b.body) out.push({ type: 'image_text', title: b.title, image, body: b.body, side: b.side, button: b.button, ...lk(b) });
         break;
       }
       default:
@@ -475,6 +503,30 @@ function effHeading(b: SiteBlock): string | null {
 /** A stable, human-ish anchor slug (deterministic — same text → same id). */
 function slugifyAnchor(t: string): string {
   return t.toLowerCase().replace(/&[a-z]+;/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'section';
+}
+
+// ── Phase T-STYLE: an owner-chosen `look` → a small set of deterministic CSS
+// classes stamped onto the section's `class="block …"`. Enumerated only (validated
+// upstream), so this never emits arbitrary CSS. A block with no `look` (the default)
+// gets NO extra class, so its markup is byte-identical to before this feature. The
+// matching rules live in BLOCK_CSS. ──
+function lookClasses(look?: BlockLook): string {
+  if (!look) return '';
+  const c: string[] = [];
+  if (look.background === 'tinted') c.push('block--bg-tint');
+  else if (look.background === 'plain') c.push('block--bg-plain');
+  if (look.width === 'full') c.push('block--full');
+  if (look.spacing === 'tight') c.push('block--space-tight');
+  else if (look.spacing === 'roomy') c.push('block--space-roomy');
+  if (look.align === 'center') c.push('block--align-center');
+  return c.join(' ');
+}
+/** Inject the look classes into a section's `class="block …"` (first occurrence).
+ *  No-op when no non-default look is set — the default render is untouched. */
+function applyLook(html: string, look?: BlockLook): string {
+  const cls = lookClasses(look);
+  if (!cls || !html) return html;
+  return html.replace('class="block ', `class="block ${cls} `);
 }
 
 /** Render validated blocks to deterministic HTML sections + optional JSON-LD.
@@ -702,7 +754,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       const href = safeHref(b.url);
       html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment')}${b.text ? `<p class="appt-text">${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    built.push({ b, html, ld });
+    built.push({ b, html: applyLook(html, (b as { look?: BlockLook }).look), ld });
   }
 
   // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
@@ -726,8 +778,8 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     if (e.b.type !== 'toc') continue;
     if (!tocEntries.length) { e.html = ''; continue; }
     const title = (e.b as SiteBlockToc).title || 'On this page';
-    e.html = `<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2>${esc(title)}</h2><ol class="toc">${
-      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`;
+    e.html = applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2>${esc(title)}</h2><ol class="toc">${
+      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`, (e.b as { look?: BlockLook }).look);
   }
 
   const out: RenderedBlock[] = [];
@@ -743,6 +795,12 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   }
   return out;
 }
+
+// Phase T-STYLE: the no-`color-mix` fallback for a tinted section background —
+// DERIVED from lib/palettes.ts brandTint (contrast-checked), so palettes.ts is the
+// single source of the tint. Modern browsers upgrade to a live, brand-adaptive
+// color-mix of var(--accent) (see the @supports rule in BLOCK_CSS below).
+const TINT_FALLBACK = brandTint('#5b3fa0');
 
 /** The extra CSS the block sections need — appended once to a template's stylesheet.
  *  Reuses existing tokens (--accent, --line, --soft…); no external assets. */
@@ -851,4 +909,23 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 .block-download .dl-row{margin:8px 0 0}
 .block-download .dl{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--accent);border-radius:12px;padding:12px 18px;text-decoration:none;color:var(--accent-dark,var(--accent));font-weight:700}
 .block-download .dl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.block-download .dl svg{flex:0 0 auto}`;
+.block-download .dl svg{flex:0 0 auto}
+/* ── Phase T-STYLE · curated per-section style options (owner picks; never raw CSS) ── */
+/* background: 'tinted' = a brand-derived, contrast-safe wash; 'plain' = clears the
+   auto-alternate band. .block.<class> ties the (0,2,0) specificity of .block.alt and
+   wins by source order (BLOCK_CSS is appended after the template's .block.alt rule). */
+.block.block--bg-tint{background:${TINT_FALLBACK}}
+@supports (background:color-mix(in srgb,red,#fff)){.block.block--bg-tint{background:var(--block-tint,color-mix(in srgb,var(--accent) 8%,var(--paper,#f7f7f5)))}}
+.block.block--bg-plain{background:none;border-top:0;border-bottom:0}
+/* spacing: vertical padding, honouring the site's --spacing-scale like .block does */
+.block--space-tight{padding-top:calc(28px * var(--spacing-scale,1));padding-bottom:calc(28px * var(--spacing-scale,1))}
+.block--space-roomy{padding-top:calc(84px * var(--spacing-scale,1));padding-bottom:calc(84px * var(--spacing-scale,1))}
+/* width: full-bleed section; inner content re-capped to a readable measure + padded
+   (so full-width backgrounds reach the edges but text never touches the screen). */
+.block--full{max-width:none;padding-left:0;padding-right:0}
+.block--full>*{max-width:1000px;margin-left:auto;margin-right:auto;padding-left:22px;padding-right:22px}
+/* align: center the section's heading + short text; structured content (grids,
+   lists, tables, prose bodies) stays left-aligned so it never turns ragged. */
+.block--align-center{text-align:center}
+.block--align-center .svc-grid,.block--align-center .cards,.block--align-center .card-grid,.block--align-center .cols,.block--align-center .accordion,.block--align-center .prose,.block--align-center ul,.block--align-center ol,.block--align-center table,.block--align-center .it-row{text-align:left}
+.block--align-center .btn-row,.block--align-center .cta-inner{justify-content:center}`;

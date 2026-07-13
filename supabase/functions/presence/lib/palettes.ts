@@ -1,7 +1,7 @@
-// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
-// imports; exercised only by its test). It documents a frozen-architecture contract
-// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
-// delete it (with an ADR note) when its phase arrives.
+// ⚠️ PARTIALLY WIRED — the PALETTES array + paletteByKey/currentPaletteKey remain a
+// spec-only contract (owner palette-picker awaiting its phase; no production import).
+// BUT `brandTint()` below IS live: lib/site_blocks.ts BLOCK_CSS uses it as the source
+// of the per-section background tint (Phase T-STYLE). Keep brandTint pure + tested.
 // ── Curated color palettes (Phase COMP — FD-T6-lite) ─────────────────────────
 // The no-code half of styling: an OWNER picks a designed palette; it becomes the
 // SAME theme tokens Developer Mode uses (one machinery, no duplication), rides
@@ -35,6 +35,24 @@ export const PALETTES: Palette[] = [
 
 export function paletteByKey(key: string): Palette | null {
   return PALETTES.find((p) => p.key === key) || null;
+}
+
+// ── Section background tint (Phase T-STYLE) ──────────────────────────────────
+// The no-code "give this section a soft brand background" option. Derives a light
+// wash from the site's brand accent by mixing a SMALL amount of it into the paper,
+// then GUARANTEES the tint is contrast-safe: if dark body text on the tint would
+// fail WCAG AA (< 4.5:1) — e.g. a pathologically light accent — it falls back to a
+// neutral near-paper wash instead. Pure + deterministic. Reuses brand_kit's colour
+// math (one colour engine, no duplication). BLOCK_CSS bakes brandTint('#5b3fa0') as
+// the no-`color-mix` fallback; live sites derive from var(--accent) via color-mix.
+import { mix, contrastRatio } from './brand_kit.ts';
+/** Dark body-text colour the tint must stay legible under (templates' default ink). */
+const TINT_TEXT = '#1c2430';
+export function brandTint(accent: string, paper = '#f7f7f5'): string {
+  const a = /^#[0-9a-f]{6}$/i.test(accent) ? accent.toLowerCase() : '#5b3fa0';
+  const tint = mix(a, paper, 0.92);                 // ~8% brand, 92% paper → a soft wash
+  if (contrastRatio(TINT_TEXT, tint) >= 4.5) return tint;
+  return mix('#000000', paper, 0.05);               // neutral safety wash (accent too light)
 }
 
 /** Which palette (if any) the current tokens correspond to; '' = original/custom. */

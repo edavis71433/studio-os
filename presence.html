@@ -3550,6 +3550,45 @@ function mountBlocksCard() {
   // FD-T4: industry-recommended blocks (server preset — no client duplication)
   if (BLOCK_SUGGEST === null) api("GET", "/blocks/suggested").then((r) => { BLOCK_SUGGEST = r.data || false; renderBlocksCard(); }).catch(() => { BLOCK_SUGGEST = false; });
 }
+// Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
+// orthogonal to its content. The per-type editors below rebuild their block object
+// from their own fields, so carry the chosen look across every rebuild.
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; return o; }
+// A calm, collapsed "Look of this section" control row — plain words, smart defaults,
+// no CSS. Lives INSIDE the block you're already editing (no separate panel). The
+// options are enumerated; the server re-validates and only known values are stored.
+function blockLookRow(idx, blk, sub) {
+  const cur = (blk && blk.look) || {};
+  const chosen = Object.keys(cur).some((k) => cur[k]);
+  const OPTS = [
+    ["background", "Background", [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"]]],
+    ["width", "Width", [["", "Normal"], ["full", "Full width"]]],
+    ["spacing", "Spacing", [["", "Normal"], ["tight", "Tight"], ["roomy", "Roomy"]]],
+    ["align", "Text", [["", "Default"], ["center", "Centered"]]],
+  ];
+  const det = el("details"); det.style.cssText = "margin-top:10px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
+  if (chosen) det.open = true;
+  const sum = el("summary", null, "Look of this section" + (chosen ? "  ·  customised" : ""));
+  sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478)";
+  det.appendChild(sum);
+  const row = el("div"); row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px";
+  const selects = {};
+  OPTS.forEach(([key, label, opts]) => {
+    const w = el("label"); w.style.cssText = "font-size:12px;color:var(--soft,#6b6478)"; w.appendChild(document.createTextNode(label + " "));
+    const se = el("select"); se.style.cssText = "font:inherit;font-size:13px;margin-left:4px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px";
+    opts.forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((cur[key] || "") === v) o.selected = true; se.appendChild(o); });
+    selects[key] = se; w.appendChild(se); row.appendChild(w);
+  });
+  const commit = () => {
+    const look = {};
+    Object.keys(selects).forEach((k) => { const v = selects[k].value; if (v) look[k] = v; });
+    BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], look: Object.keys(look).length ? look : undefined };
+  };
+  Object.values(selects).forEach((se) => se.addEventListener("change", commit));
+  det.appendChild(row);
+  det.appendChild(el("div", "hint", "Optional — give this section a soft background, make it full-width, or change its spacing. It stays readable and accessible on every screen."));
+  sub.appendChild(det);
+}
 function renderBlocksCard() {
   const card = $("blocksCard"); if (!card) return; card.textContent = "";
   const focusIdx = BLOCK_FOCUS; BLOCK_FOCUS = null;   // FD-T-LIB: consume the one-shot focus target
@@ -3579,7 +3618,7 @@ function renderBlocksCard() {
       const t = el("input"), bt = el("input"), u = el("input");
       t.placeholder = "Banner text"; t.value = blk.text || ""; bt.placeholder = "Button label (optional)"; bt.value = blk.button || ""; u.placeholder = "Where the button goes (optional link)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, bt, u);
     } else if (def.reviewsSimple) {
@@ -3588,7 +3627,7 @@ function renderBlocksCard() {
       ct.type = "number"; ct.min = "1"; ct.step = "1"; ct.placeholder = "How many reviews (e.g. 120)"; ct.value = blk.count || "";
       sc.type = "text"; sc.placeholder = "Where from (e.g. Google) — optional"; sc.value = blk.source || "";
       [rt, ct, sc].forEach((inp) => { inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = { type: "reviews", title: ti.value.trim(), rating: parseFloat(rt.value) || 0, count: parseInt(ct.value, 10) || 0, source: sc.value.trim() }; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "reviews", title: ti.value.trim(), rating: parseFloat(rt.value) || 0, count: parseInt(ct.value, 10) || 0, source: sc.value.trim() }); };
       [rt, ct, sc].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(rt, ct, sc);
       sub.appendChild(el("div", "hint", "Use your real rating — it shows as stars with the count (e.g. “4.9 out of 5 — from 120 reviews on Google”)."));
@@ -3598,7 +3637,7 @@ function renderBlocksCard() {
       bt.placeholder = "Button label (e.g. Book now)"; bt.value = blk.button || "";
       u.placeholder = "Your booking link (e.g. your Calendly or booking page)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = { type: "appointment", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "appointment", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, bt, u);
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your booking page — nothing external loads on your site."));
@@ -3608,7 +3647,7 @@ function renderBlocksCard() {
       bt.placeholder = "Button label (e.g. Sign up)"; bt.value = blk.button || "";
       u.placeholder = "Your sign-up link (e.g. your Mailchimp or newsletter page)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, bt, u);
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your sign-up page — nothing external loads on your site."));
@@ -3617,7 +3656,7 @@ function renderBlocksCard() {
       ad.placeholder = "Your address (shown as text)"; ad.value = blk.address || "";
       du.placeholder = "Directions link (optional — if empty, we link to a map search of your address)"; du.value = blk.directions_url || "";
       [ad, du].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = { type: "map", title: ti.value.trim(), address: ad.value.trim(), directions_url: du.value.trim(), image_media_id: BLOCKS_WORK[idx].image_media_id || undefined }; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "map", title: ti.value.trim(), address: ad.value.trim(), directions_url: du.value.trim(), image_media_id: BLOCKS_WORK[idx].image_media_id || undefined }); };
       [ad, du].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(ad, du);
       const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:4px";
@@ -3630,7 +3669,7 @@ function renderBlocksCard() {
       const ta = el("textarea"); ta.value = blk.body || ""; ta.setAttribute("data-k", "body_md");   // hook: rich-text toolbar auto-attaches (MutationObserver)
       ta.placeholder = "Write your text here…"; ta.rows = Math.max(4, (blk.body || "").split("\n").length + 1);
       ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
-      ta.addEventListener("change", () => { BLOCKS_WORK[idx] = { type: "richtext", title: ti.value.trim(), body: ta.value.trim() }; });
+      ta.addEventListener("change", () => { BLOCKS_WORK[idx] = wLook(idx, { type: "richtext", title: ti.value.trim(), body: ta.value.trim() }); });
       sub.appendChild(ta);
       sub.appendChild(el("div", "hint", "Use the formatting buttons above — headings, bold, links and lists all work."));
     } else if (def.imageSimple) {
@@ -3647,7 +3686,7 @@ function renderBlocksCard() {
       const decWrap = el("label"); decWrap.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;margin:2px 0 6px";
       const dec = el("input"); dec.type = "checkbox"; dec.checked = !!blk.decorative; dec.style.cssText = "width:auto;margin:0";
       decWrap.append(dec, document.createTextNode("This image is decorative (screen readers skip it — no alt text needed)"));
-      const commit = () => { BLOCKS_WORK[idx] = { type: "image", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, caption: cap.value.trim(), alt: alt.value.trim(), link: lk.value.trim(), decorative: dec.checked || undefined }; alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1"; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "image", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, caption: cap.value.trim(), alt: alt.value.trim(), link: lk.value.trim(), decorative: dec.checked || undefined }); alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1"; };
       [cap, alt, lk].forEach((inp) => inp.addEventListener("change", commit));
       dec.addEventListener("change", commit);
       alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1";
@@ -3668,7 +3707,7 @@ function renderBlocksCard() {
       bl.placeholder = "Button label (optional)"; bl.value = (blk.button && blk.button.label) || "";
       bu.placeholder = "Button link (optional)"; bu.value = (blk.button && blk.button.url) || "";
       [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = o; };
+      const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
       [ta, side, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
       picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, sideWrap, bl, bu);
@@ -3690,7 +3729,7 @@ function renderBlocksCard() {
       if (blk.file_id) picRow.appendChild(mediaThumb(blk.file_id));
       const pick = el("button", null, blk.file_id ? "Change file" : "Choose a file"); pick.type = "button"; pick.style.cssText = miniBtn;
       const lb = el("input"); lb.type = "text"; lb.placeholder = "Download label (optional — e.g. 2026 Menu)"; lb.value = blk.label || ""; lb.style.cssText = inputCss;
-      const commit = () => { BLOCKS_WORK[idx] = { type: "download", title: ti.value.trim(), file_id: BLOCKS_WORK[idx].file_id || undefined, label: lb.value.trim() || undefined }; };
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "download", title: ti.value.trim(), file_id: BLOCKS_WORK[idx].file_id || undefined, label: lb.value.trim() || undefined }); };
       lb.addEventListener("change", commit);
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].file_id = id || undefined; renderBlocksCard(); }); });
       picRow.appendChild(pick); sub.appendChild(picRow); sub.appendChild(lb);
@@ -3719,10 +3758,13 @@ function renderBlocksCard() {
       const ta = el("textarea"); ta.value = blockText(def, blk);
       ta.rows = Math.max(3, ta.value.split("\n").length + 1);
       ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.5;box-sizing:border-box";
-      ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = textToBlock(def, t2, ta.value); });
+      ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = wLook(idx, textToBlock(def, t2, ta.value)); });
       sub.appendChild(ta);
       sub.appendChild(el("div", "hint", def.hint));
     }
+    // Phase T-STYLE: the shared "Look of this section" options — every content
+    // section, but not the presentational divider or the auto-built table of contents.
+    if (!def.dividerSimple && !def.tocSimple) blockLookRow(idx, blk, sub);
     card.appendChild(sub);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
@@ -3869,7 +3911,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
   } else if (def.mediaKind === "video") {
     const url = el("input"); url.type = "text"; url.placeholder = "Video link (YouTube, Vimeo…)"; url.value = blk.url || ""; url.style.cssText = inputCss;
     const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = blk.caption || ""; cap.style.cssText = inputCss;
-    const commit = () => { BLOCKS_WORK[idx] = { type: "video", title: ti.value.trim(), url: url.value.trim(), caption: cap.value.trim(), poster_id: BLOCKS_WORK[idx].poster_id || undefined }; };
+    const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "video", title: ti.value.trim(), url: url.value.trim(), caption: cap.value.trim(), poster_id: BLOCKS_WORK[idx].poster_id || undefined }); };
     url.addEventListener("change", commit); cap.addEventListener("change", commit);
     sub.append(url, cap);
     const posterRow = el("div"); posterRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:4px";
