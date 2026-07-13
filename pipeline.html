@@ -81,6 +81,39 @@
   .tl-mt{font-size:12px;color:var(--faint);margin-top:2px;font-variant-numeric:tabular-nums}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  /* Path guidance — the calm "where you are · what to do next" line in the drawer */
+  .path{display:flex;gap:8px;align-items:flex-start;background:var(--p-soft);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:13px;line-height:1.5}
+  .path-i{flex:0 0 auto}
+  .path-tip{color:var(--ink)}
+  .path-do{color:var(--p);font-weight:600}
+  /* View toggle (List ⇄ Board) */
+  .viewtog{display:inline-flex;gap:4px}
+  /* Kanban board — columns = open stages, cards = deals, tap/drag to move */
+  .board-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -20px;padding:2px 20px 6px}
+  .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;align-items:start}
+  .col{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:220px}
+  .col-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
+  .col-t{font-weight:600;font-size:13.5px}
+  .col-n{font-size:12px;color:var(--faint);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+  .col-tip{font-size:11.5px;margin-bottom:8px;line-height:1.4}
+  .col-body{display:flex;flex-direction:column;gap:8px;min-height:40px;border-radius:8px;padding:2px;transition:background .12s}
+  .col-body.drop-ok{outline:1px dashed var(--p);outline-offset:-2px}
+  .col-body.drop-over{background:var(--p-soft)}
+  .bempty{font-size:12px;text-align:center;padding:10px 4px;opacity:.7}
+  .bcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;position:relative}
+  .bcard:hover{border-color:var(--p)}
+  .bcard.dragging{opacity:.5}
+  .bc-t{font-weight:600;font-size:13.5px;line-height:1.35}
+  .bc-v{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;margin-top:3px}
+  .bc-m{color:var(--faint);font-size:12px;margin-top:3px}
+  .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:3px}
+  .bc-actions{margin-top:8px;position:relative}
+  .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer}
+  .bc-move:hover{border-color:var(--p)}
+  .bc-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
+  .bc-menu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;border-radius:7px;cursor:pointer}
+  .bc-menu button:hover{background:var(--p-soft)}
+  .board-foot{margin-top:12px;font-size:12.5px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script src="/shell.js" defer></script>
@@ -91,8 +124,9 @@
   <div class="sub">From first enquiry through onboarding — one deal at a time.</div>
   <div class="summary" id="summary" aria-live="polite"></div>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by stage"></div>
-  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span></div>
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span><div class="viewtog" role="tablist" aria-label="View"><button class="chip on" id="viewList" role="tab" aria-selected="true">List</button><button class="chip" id="viewBoard" role="tab" aria-selected="false">Board</button></div></div>
   <div id="list" aria-live="polite"></div>
+  <div id="board" aria-live="polite" hidden></div>
 </div>
 
 <dialog id="formDlg" aria-label="New deal">
@@ -147,6 +181,27 @@ const stageLabel=(s)=>STAGE_LABEL[s]||s;
 // The badge reads as an OUTCOME where one exists: a converted deal is "Won ✓"
 // (calm green), a lost one is a muted "Lost" — active stages keep their labels.
 const stageBadge=(s)=>`<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Lost':esc(stageLabel(s))}</span>`;
+// Per-stage "Path" guidance — the calm one-line tip + suggested next action, so
+// a non-technical owner always knows what to do next. Mirrors the source of
+// truth in lib/pipeline_guidance.ts (which the test imports).
+const PIPELINE_GUIDANCE={
+  lead:{tip:'A new enquiry — reach out while they’re still interested.',action:'Get in touch and learn what they need'},
+  qualified:{tip:'They’re a fit. Show them what working together looks like.',action:'Send a proposal they can accept online'},
+  proposal:{tip:'Your proposal is with them — a gentle nudge often seals it.',action:'Follow up, then send the agreement once they say yes'},
+  contract:{tip:'Agreement’s out — once they sign, they can pay right away.',action:'Get it signed, then request the deposit'},
+  won:{tip:'They’re your customer now. Time to do great work.',action:'Open their project and kick things off'},
+  lost:{tip:'Not every deal fits — the door stays open for later.',action:'Keep the relationship warm; reopen if things change'},
+};
+const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
+// The Kanban board's open-stage columns (won/lost are OUTCOMES, not columns —
+// exactly like the summary's OPEN_STAGES).
+const BOARD_STAGES=['lead','qualified','proposal','contract'];
+// The stages a deal may be MOVED to on the board — mirrors canTransition in
+// lib/sales_lifecycle.ts (forward one · back one · →lost; never →won, which is
+// convert-only). The server re-checks canTransition on every stage POST.
+const BOARD_NEXT={lead:['qualified','lost'],qualified:['proposal','lead','lost'],proposal:['contract','qualified','lost'],contract:['proposal','lost'],won:[],lost:['lead']};
+const boardMoveTargets=(from)=>(BOARD_NEXT[from]||[]).filter(s=>s!=='won');
+const boardCanMove=(from,to)=>from!==to&&to!=='won'&&(BOARD_NEXT[from]||[]).includes(to);
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
 const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project'};
 function evtLabel(e){
@@ -164,7 +219,7 @@ const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:
 function ago(iso){const then=Date.parse(iso),now=Date.now();if(!isFinite(then))return'';const days=Math.floor((now-then)/86400000);if(days<=0)return'today';if(days===1)return'yesterday';if(days<7)return days+' days ago';if(days<14)return'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
 // The activity quick-log kinds (calm, plain — icon + label).
 const ACTKINDS=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 Meeting'],['note','📝 Note']];
-let TOKEN="",FILTER="",DEALS=[];
+let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
 // Signing links returned by /send (emailed OR not), kept for this session so a
 // "not-emailed" doc always shows a persistent "copy the signing link" — never a
 // silently-unsent agreement again. Keyed by proposal/contract id.
@@ -276,12 +331,33 @@ async function renderSummary(){
     +(open.count?`<div class="sum-stages">${cells}</div>`:'');
 }
 
+// List ⇄ Board view toggle. The board is additive — the List view is unchanged
+// and stays the default. The board shows ALL open deals across columns, so the
+// stage filter chips (a list convenience) are hidden while it's open.
+function setView(v){
+  VIEW=v;
+  $('viewList').classList.toggle('on',v==='list');$('viewList').setAttribute('aria-selected',String(v==='list'));
+  $('viewBoard').classList.toggle('on',v==='board');$('viewBoard').setAttribute('aria-selected',String(v==='board'));
+  $('list').hidden=v!=='list'; $('board').hidden=v!=='board';
+  $('filters').style.display=v==='board'?'none':'';
+  load();
+}
+$('viewList').onclick=()=>{if(VIEW!=='list')setView('list');};
+$('viewBoard').onclick=()=>{if(VIEW!=='board')setView('board');};
+// Close any open board move-menu on an outside click (menu/move clicks stop
+// propagation, so they survive; everything else dismisses it).
+document.addEventListener('click',(e)=>{if(e.target&&e.target.closest&&e.target.closest('.bc-move,.bc-menu'))return;document.querySelectorAll('.bc-menu').forEach(m=>m.remove());document.querySelectorAll('.bc-move[aria-expanded="true"]').forEach(b=>b.setAttribute('aria-expanded','false'));});
+
 async function load(){
   renderSummary();   // refresh the numbers whenever the pipeline reloads (add/move/convert)
-  if(window.ddsSkeleton) window.ddsSkeleton($('list'),4);
+  const board=VIEW==='board';
+  const host=board?$('board'):$('list');
+  if(window.ddsSkeleton) window.ddsSkeleton(host,4);
   try{
-    const res=await api('/sales/deals'+(FILTER?('?stage='+FILTER):''));
+    // Board shows every open stage, so it ignores the list's stage filter.
+    const res=await api('/sales/deals'+((!board&&FILTER)?('?stage='+FILTER):''));
     DEALS=res.data||[];
+    if(board){ renderBoard(); return; }
     if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'🧭',title:'No deals yet',body:'New enquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else $('list').innerHTML='<p class="mut">No deals yet.</p>'; return; }
     // Deals with a DUE next step float to the top (overdue first) — the pipeline
     // answers "what do I do today", not just "what exists".
@@ -293,7 +369,68 @@ async function load(){
       return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
     }).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
-  }catch(e){ if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
+  }catch(e){ if(window.ddsError) window.ddsError(host,nice(e),load); else host.innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
+}
+
+// ── Kanban board: columns = open stages, cards = deals (name · value · last
+// contacted). A card opens the same drawer the list uses; moving a card calls
+// the SAME /sales/deals/:id/stage endpoint and only offers canTransition-allowed
+// targets (tap-to-move menu = the primary, accessible path; drag is additive).
+function boardCard(d,today){
+  const val=money(d.expected_value_cents);
+  const lc=d.last_contacted_at?`Last contacted ${esc(ago(d.last_contacted_at))}`:'';
+  const due=(d.next_step&&d.next_step_at&&d.next_step_at<=today)?`<div class="bc-due">Due: ${esc(d.next_step)}</div>`:'';
+  const canMove=boardMoveTargets(d.stage).length>0;
+  const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
+  return `<article class="bcard" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}<div class="bc-actions">${moveBtn}</div></article>`;
+}
+function renderBoard(){
+  const host=$('board');
+  const today=new Date().toISOString().slice(0,10);
+  // Open deals only — won/lost are outcomes (mirrors the summary), shown in List.
+  const open=DEALS.filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);
+  const cols=BOARD_STAGES.map(stg=>{
+    const ds=open.filter(d=>d.stage===stg);
+    const cards=ds.map(d=>boardCard(d,today)).join('')||'<div class="bempty mut">Nothing here yet</div>';
+    return `<section class="col" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span></header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div></section>`;
+  }).join('');
+  const terminal=DEALS.length-open.length;
+  host.innerHTML=`<div class="board-scroll"><div class="board">${cols}</div></div>`
+    +(open.length?'':'<div class="mut" style="margin-top:12px">No open deals yet. Add one to start the pipeline.</div>')
+    +(terminal>0?`<div class="mut board-foot">${terminal} won or closed deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
+  wireBoard();
+}
+function wireBoard(){
+  const host=$('board');
+  const move=async(id,to)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to});toast('Moved to '+stageLabel(to));load();if($('detail').open&&CURRENT_DEAL===id)openDeal(id);}catch(e){toast(nice(e),true);}};
+  host.querySelectorAll('.bcard').forEach(c=>{
+    const isCtrl=(e)=>e&&e.target&&e.target.closest&&e.target.closest('.bc-move,.bc-menu');
+    c.onclick=(e)=>{if(!isCtrl(e))openDeal(c.dataset.id);};
+    c.onkeydown=(e)=>{if((e.key==='Enter'||e.key===' ')&&!isCtrl(e)){e.preventDefault();openDeal(c.dataset.id);}};
+    c.ondragstart=(e)=>{DRAG={id:c.dataset.id,from:c.dataset.stage};c.classList.add('dragging');if(e.dataTransfer){e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',c.dataset.id);}catch(_){}}
+      host.querySelectorAll('.col-body').forEach(b=>{if(boardCanMove(c.dataset.stage,b.dataset.drop))b.classList.add('drop-ok');});};
+    c.ondragend=()=>{c.classList.remove('dragging');host.querySelectorAll('.col-body').forEach(b=>b.classList.remove('drop-ok','drop-over'));DRAG=null;};
+  });
+  // Tap-to-move menu — the accessible, mobile-friendly primary interaction.
+  host.querySelectorAll('.bc-move').forEach(btn=>btn.onclick=(e)=>{
+    e.stopPropagation();
+    const card=btn.closest('.bcard'); const already=card.querySelector('.bc-menu');
+    host.querySelectorAll('.bc-menu').forEach(m=>m.remove());
+    host.querySelectorAll('.bc-move').forEach(b=>b.setAttribute('aria-expanded','false'));
+    if(already) return;   // second tap closes it
+    btn.setAttribute('aria-expanded','true');
+    const menu=document.createElement('div'); menu.className='bc-menu'; menu.setAttribute('role','menu');
+    menu.innerHTML=boardMoveTargets(card.dataset.stage).map(t=>`<button type="button" role="menuitem" data-to="${t}">${t==='lost'?'Mark as not a fit':'Move to '+esc(stageLabel(t))}</button>`).join('');
+    card.querySelector('.bc-actions').appendChild(menu);
+    menu.querySelectorAll('button').forEach(mb=>mb.onclick=(ev)=>{ev.stopPropagation();move(card.dataset.id,mb.dataset.to);});
+  });
+  // Drop targets — only accept a move canTransition allows; a disallowed drop is
+  // gently refused (and the column never lights up as droppable in the first place).
+  host.querySelectorAll('.col-body').forEach(body=>{
+    body.ondragover=(e)=>{if(DRAG&&boardCanMove(DRAG.from,body.dataset.drop)){e.preventDefault();body.classList.add('drop-over');}};
+    body.ondragleave=()=>body.classList.remove('drop-over');
+    body.ondrop=(e)=>{e.preventDefault();body.classList.remove('drop-over');if(!DRAG)return;const to=body.dataset.drop,from=DRAG.from,id=DRAG.id;if(from===to)return;if(!boardCanMove(from,to)){toast('That deal can’t skip straight to '+stageLabel(to)+'.',true);return;}move(id,to);};
+  });
 }
 
 // ── new deal: an accessible in-dialog form (no prompt) ──
@@ -449,7 +586,7 @@ async function openDeal(id){
         <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}${data.last_contacted_at?' · Last contacted '+esc(ago(data.last_contacted_at)):''}</div></div>
         <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
       <div class="dbody">
-        <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Won ✓ — converted to a customer</span>':d.stage==='lost'?`<span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button>`:stepBtns||'<span class="mut">—</span>'}</div><div id="lostForm"></div></div>
+        <div class="sec"><h3>Move stage</h3>${(()=>{const g=guidanceFor(d.converted_client_id?'won':d.stage);return `<div class="path"><span class="path-i" aria-hidden="true">🧭</span><span class="path-tx"><span class="path-tip">${esc(g.tip)}</span> <span class="path-do">${esc(g.suggested_action)}</span></span></div>`;})()}<div class="steps">${d.converted_client_id?'<span class="mut">Won ✓ — converted to a customer</span>':d.stage==='lost'?`<span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button>`:stepBtns||'<span class="mut">—</span>'}</div><div id="lostForm"></div></div>
         <div class="sec"><h3>Details</h3>
           <label class="mut" for="ed-value">Deal value (USD)</label><br>
           <input id="ed-value" type="number" step="0.01" min="0" value="${d.expected_value_cents?(d.expected_value_cents/100):''}" placeholder="2500" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
