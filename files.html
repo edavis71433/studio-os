@@ -67,6 +67,25 @@
   .sbadge.live{background:var(--good-soft);color:var(--good)} .sbadge.pending{background:var(--warn-soft);color:var(--warn)} .sbadge.approved{background:var(--p-soft);color:var(--p)} .sbadge.draft,.sbadge.archived{background:var(--line);color:var(--soft)}
   .amuted{font-size:12.5px;color:var(--faint);margin-top:4px}
 
+  /* multi-select */
+  .tile.sel{border-color:var(--p);box-shadow:0 0 0 2px var(--p) inset,var(--shadow)}
+  .check{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.9);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--p);z-index:2}
+  @media (prefers-color-scheme:dark){.check{background:rgba(31,26,43,.86)}}
+  .tile.sel .check{background:var(--p);border-color:var(--p);color:#fff}
+  .check svg{width:15px;height:15px}
+  .bulkbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--p-soft);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+  .bulkbar .cnt{font-weight:700;color:var(--p);font-size:14px}
+  .bulkbar .sp{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .bulkbar .btn{padding:7px 12px;font-size:13px}
+  /* social sizes */
+  .social{margin:14px 0}
+  .social .hl{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:8px}
+  .social .row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .social figure{margin:0;text-align:center}
+  .social .box{background:var(--p-soft);border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+  .social .box img{width:100%;height:100%;object-fit:cover;display:block}
+  .social figcaption{font-size:10.5px;color:var(--faint);line-height:1.25}
+  .social .ogbtn{margin-top:10px;width:100%}
   .empty{text-align:center;padding:60px 20px;color:var(--soft)}
   .empty h2{font-family:var(--serif);font-weight:500;font-size:22px;color:var(--ink);margin-bottom:8px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:60px auto}
@@ -149,7 +168,8 @@ const IC={
   star:'<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z" fill="currentColor"/>',
   starO:'<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   arch:'<path d="M3 6h18v3H3zM5 9v11h14V9M9 13h6" fill="none" stroke="currentColor" stroke-width="1.6"/>',
-  search:'<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.8"/>'
+  search:'<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.8"/>',
+  check:'<path d="M5 12l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
 };
 const svg=(p,cls)=>`<svg class="${cls||''}" viewBox="0 0 24 24" fill="none">${p}</svg>`;
 
@@ -166,6 +186,7 @@ const COLS=[
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
 let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null,
+  selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
@@ -194,6 +215,31 @@ function askConfirm(title, body, okLabel){
   });
 }
 function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
+// Small styled text prompt — matches askConfirm; resolves the trimmed string, or null on cancel/empty.
+function askPrompt(title, body, okLabel, placeholder){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div'); box.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=80;
+    inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b; };
+    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
+    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    const submit=()=>{ const v=inp.value.trim(); finish(v||null); };
+    cancel.addEventListener('click',()=>finish(null));
+    ok.addEventListener('click',submit);
+    inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
+    dlg.showModal(); setTimeout(()=>inp.focus(),20);
+  });
+}
 
 async function loadContext(){
   const c=await api('GET','/portal/context');
@@ -290,14 +336,33 @@ function render(){
         <div class="bar">
           <div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="Search files" placeholder="Search files — try “logo”" value="${esc(S.q)}" autocomplete="off"></div>
           <select class="sort" id="sort"><option value="recent"${S.sort==='recent'?' selected':''}>Recent</option><option value="name"${S.sort==='name'?' selected':''}>Name</option><option value="size"${S.sort==='size'?' selected':''}>Largest</option></select>
+          ${S.canEdit&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
           ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
         </div>
         <div class="drop" id="drop">Drop to upload</div>
+        ${bulkBar()}
         ${nudge}
         <div class="grid">${tiles}</div>
       </div>
     </div>`;
   wire();
+}
+// The bulk-action bar — one move applied to the current selection. Approve appears
+// only where an approval step actually applies (never as empty friction).
+function bulkBar(){
+  if(!S.selectMode)return'';
+  const n=S.selected.size;
+  const approve=S.policy!=='immediate'?`<button class="btn" data-bulk="approve">Approve</button>`:'';
+  return `<div class="bulkbar">
+    <span class="cnt">${n} selected</span>
+    <button class="btn" data-bulk="all">${n&&n>=S.assets.length?'Clear all':'Select all'}</button>
+    <span class="sp">
+      <button class="btn" data-bulk="tag"${n?'':' disabled'}>Add tag</button>
+      <button class="btn" data-bulk="collection"${n?'':' disabled'}>Move to collection…</button>
+      ${approve?approve.replace('data-bulk="approve"',`data-bulk="approve"${n?'':' disabled'}`):''}
+      <button class="btn" data-bulk="archive"${n?'':' disabled'}>Archive</button>
+    </span>
+  </div>`;
 }
 function renderNudge(){
   if(!S.health.length||S.col==='archive')return'';
@@ -315,6 +380,14 @@ function tile(a){
   const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
   const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not used';
   const badge=a.state==='pending'?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
+  const sel=S.selectMode&&S.selected.has(a.id);
+  if(S.selectMode){
+    return `<div class="tile ${sel?'sel':''}" data-pick="${a.id}" role="button" tabindex="0" aria-pressed="${sel?'true':'false'}" aria-label="${sel?'Deselect':'Select'} ${esc(a.name)}">
+      <div class="check">${sel?svg(IC.check):''}</div>
+      <div class="thumb" ${t}>${inner}</div>${badge}
+      <div class="meta"><div class="nm">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
+    </div>`;
+  }
   const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
   return `<div class="tile" data-open="${a.id}" role="button" tabindex="0" aria-label="Open ${esc(a.name)}">
     <div class="thumb" ${t}>${inner}</div>${badge}${star}
@@ -322,13 +395,33 @@ function tile(a){
   </div>`;
 }
 function wire(){
-  document.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';load();});
+  document.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();});
   document.querySelectorAll('[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});
+  document.querySelectorAll('[data-pick]').forEach(b=>{const pick=()=>togglePick(b.dataset.pick);b.onclick=pick;b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}};});
   document.querySelectorAll('[data-fav]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();toggleFav(b.dataset.fav);});
+  document.querySelectorAll('[data-bulk]').forEach(b=>b.onclick=()=>onBulk(b.dataset.bulk));
+  const selb=$('selbtn');if(selb)selb.onclick=()=>{S.selectMode=!S.selectMode;S.selected.clear();render();};
   const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load().then(()=>{const el=$('q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}});},280);};}
   const sort=$('sort');if(sort)sort.onchange=()=>{S.sort=sort.value;S.assets=sortRows(S.assets);render();};
   const add=$('add');if(add)add.onclick=()=>$('picker').click();
   const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';S.sort='recent';load();};
+}
+function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.selected.add(id); render(); }
+// One bulk move applied to the current selection, via POST /assets/bulk. Reuses the
+// same tag/collection/status logic server-side; here we just gather the input.
+async function onBulk(action){
+  if(action==='all'){ const all=S.selected.size>=S.assets.length; S.selected=all?new Set():new Set(S.assets.map(a=>a.id)); return render(); }
+  const ids=[...S.selected]; if(!ids.length){toast('Select some files first');return;}
+  const body={action,ids};
+  if(action==='tag'){ const tag=await askPrompt('Add a tag','This tag is added to '+ids.length+' file'+(ids.length===1?'':'s')+'.','Add tag','e.g. summer, hero'); if(!tag)return; body.tag=tag; }
+  else if(action==='collection'){ const collection=await askPrompt('Move to a collection','Move '+ids.length+' file'+(ids.length===1?'':'s')+' into a collection.','Move','e.g. Brand, Contracts'); if(!collection)return; body.collection=collection; }
+  else if(action==='archive'){ if(!(await askConfirm('Archive '+ids.length+' file'+(ids.length===1?'':'s')+'?','Archived files leave your library view but aren’t deleted — you can restore them from Archive.','Archive')))return; }
+  const r=await api('POST','/assets/bulk',body);
+  if(!r.ok){toast((r.body&&r.body.message)||'Could not apply that');return;}
+  const d=r.body.data||{}; const done=d.applied||0; const miss=(d.missing||[]).length;
+  const verb=action==='tag'?'Tagged':action==='collection'?'Moved':action==='archive'?'Archived':'Approved';
+  toast(done?`${verb} ${done} file${done===1?'':'s'}${miss?` · ${miss} skipped`:''}`:'Nothing changed');
+  S.selected.clear(); S.selectMode=false; load();
 }
 
 /* ── detail panel ── */
@@ -382,6 +475,7 @@ function renderDetail(){
     <div class="field"><label for="f-col">Collection</label><input id="f-col" value="${esc(a.collection||'')}" placeholder="e.g. Brand, Contracts" ${ed?'':'disabled'}></div>
     <div class="field"><label for="f-tags">Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
     <div class="where"><div class="hl">Where it’s used</div><ul>${usage}</ul><div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div></div>
+    ${a.kind==='image'?`<div class="social" id="social-slot"><div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Preparing crops…</div></div>`:''}
     ${ver}
     ${ed?`<div class="acts">
       <button class="btn" onclick="saveDetail()">Save details</button>
@@ -391,6 +485,33 @@ function renderDetail(){
       ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
       <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
+  if(a.kind==='image')loadSocial(a.id);
+}
+// Focal-aware social crops (square / portrait / story / link-preview). The sizes are
+// the Visual Studio specs; each crop is a signed self-hosted transform. Set the
+// link-preview one as your share image by pointing settings.og_media_id at this file.
+async function loadSocial(id){
+  const slot=$('social-slot'); if(!slot)return;
+  const r=await api('GET','/assets/'+id+'/social');
+  if(!$('social-slot')||!S.current||S.current.asset.id!==id)return;   // panel changed while loading
+  if(!r.ok||!r.body.data){slot.innerHTML=`<div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Not available for this file.</div>`;return;}
+  const crops=r.body.data.crops||[];
+  const cells=crops.map(c=>{
+    const ratio=c.height?(c.width/c.height):1;
+    const box=`padding-bottom:${(100/(ratio||1)).toFixed(1)}%;position:relative`;
+    const img=c.url?`<img src="${esc(c.url)}" alt="${esc(c.label)} preview" loading="lazy" style="position:absolute;inset:0;object-position:${esc(c.object_position||'50% 50%')}">`:'';
+    return `<figure><div class="box" style="${box}">${img}</div><figcaption>${esc(c.label)}<br>${esc(c.aspect||'')}</figcaption></figure>`;
+  }).join('');
+  const isOg=r.body.data.is_share_image;const ed=S.canEdit;
+  const ogBtn=ed?`<button class="btn ogbtn" onclick="setShareImage('${id}',${isOg?'true':'false'})">${isOg?'✓ This is your share image':'Use as share image'}</button>`:'';
+  slot.innerHTML=`<div class="hl">Social sizes</div><div class="row">${cells}</div>
+    <div style="font-size:11.5px;color:var(--faint);margin-top:6px">Cropped from your focus point. Set the focus in the Website editor.</div>${ogBtn}`;
+}
+async function setShareImage(id,isOg){
+  if(isOg){toast('Already your share image');return;}
+  const r=await api('PUT','/settings',{og_media_id:id});
+  if(r.ok){toast('Set as your share image — publish to apply');const slot=$('social-slot');if(slot){const b=slot.querySelector('.ogbtn');if(b){b.textContent='✓ This is your share image';b.setAttribute('onclick',`setShareImage('${id}',true)`);}}}
+  else toast((r.body&&r.body.message)||'Could not set share image');
 }
 async function saveDetail(){
   const a=S.current.asset;

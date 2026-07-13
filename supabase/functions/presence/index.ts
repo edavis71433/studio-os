@@ -36,7 +36,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin, handleDomain } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, SPECS } from './routes/content.ts';
@@ -496,7 +496,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/assets/health' && method === 'GET') return handleAssetsHealth(site, cors);
   if (route === '/assets/duplicates' && method === 'GET') return handleAssetsDuplicates(site, cors);
   if (route === '/assets/usage' && method === 'GET') return handleAssetsUsage(site, cors);
+  if (route === '/assets/bulk' && method === 'POST') return handleAssetsBulk(req, site, principal, cors);
   {
+    const msoc = route.match(/^\/assets\/([0-9a-f-]{36})\/social$/);
+    if (msoc && method === 'GET') return handleAssetSocial(site, msoc[1], cors);
     const ms = route.match(/^\/assets\/([0-9a-f-]{36})\/status$/);
     if (ms && method === 'POST') return handleAssetStatus(req, site, principal, ms[1], cors);
     const mdl = route.match(/^\/assets\/([0-9a-f-]{36})\/download$/);

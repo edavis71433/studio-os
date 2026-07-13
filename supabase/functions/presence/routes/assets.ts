@@ -22,7 +22,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { deleteMedia, signThumb, signDownload, copyObject, isImageMime } from '../lib/media.ts';
+import { deleteMedia, signThumb, signDownload, copyObject, isImageMime, signSocialCrop } from '../lib/media.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { editionFromPlan, editionFromSite } from '../commerce/editions.ts';
@@ -32,8 +32,10 @@ import { checkAiCeiling, ceilingDenial, recordUsage } from '../commerce/metering
 import {
   searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
-  fileKind, isFavorite, replaceNeedsApproval, fileState, type Asset, type ApprovalPolicy, type UsageRef,
+  fileKind, isFavorite, replaceNeedsApproval, fileState,
+  normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef,
 } from '../lib/dam.ts';
+import { socialCropList } from '../lib/social_crops.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
 import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 
@@ -152,6 +154,99 @@ export async function handleAssetsDuplicates(site: SiteRow, cors: Record<string,
 export async function handleAssetsUsage(site: SiteRow, cors: Record<string, string>) {
   const [assets, refMap] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
   return json({ data: { usage: usageMap(assets, refsSet(refMap)) } }, 200, cors);
+}
+
+// ── bulk actions — one move applied to a SELECTION (add a tag / move to a
+//    collection / archive / approve) ─────────────────────────────────────────
+// As the library grows the owner needs to act on many files at once. This is a
+// BATCH of the existing per-asset moves, not a parallel system: tag/collection use
+// the same normalization as the PATCH; archive/approve use the same nextAssetStatus
+// lifecycle + policy + approve stamp. Bounded (≤ MAX_BULK_IDS), site-scoped (a single
+// site-scoped load — any id the site doesn't own lands in `missing`, never touched),
+// and returns a per-id result summary. One summary change event, not N.
+export async function handleAssetsBulk(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  let body: unknown = {}; try { body = await req.json(); } catch { /* */ }
+  const norm = normalizeBulkRequest(body);
+  if (!norm.ok) return json({ error: norm.error, message: norm.message }, 400, cors);
+  const { action, ids } = norm;
+
+  // A client reviewer may only approve; anything else is an owner/editor move.
+  const role = await resolveSiteRole(principal.jwt || '', site.id, principal.kind);
+  if (role === 'client_reviewer' && action !== 'approve') {
+    return json({ error: 'forbidden', message: 'A reviewer can approve — nothing else.' }, 403, cors);
+  }
+
+  // Site-scoped load: the ONLY rows we can touch are this site's, live (not deleted).
+  const loaded = await svc(`presence_media?id=in.(${ids.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,tags,collection,asset_status,metadata`);
+  const rows = arr(loaded) as Array<{ id: string; tags?: string[] | null; collection?: string | null; asset_status?: string | null; metadata?: Record<string, unknown> | null }>;
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const { missing } = partitionOwned(ids, byId.keys());
+
+  const policy = action === 'approve' ? await policyFor(site) : 'immediate';
+  const now = new Date().toISOString();
+  const who = principal.email || principal.userId || '';
+  const results: Array<{ id: string; ok: boolean; status?: string; reason?: string }> = [];
+  let applied = 0;
+
+  for (const id of ids) {
+    const row = byId.get(id);
+    if (!row) { results.push({ id, ok: false, reason: 'not_found' }); continue; }
+    try {
+      if (action === 'tag') {
+        const next = mergeTag(row.tags, norm.tag!);
+        if (!next) { results.push({ id, ok: true, reason: 'unchanged' }); continue; }
+        const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify({ tags: next }) });
+        if (r.ok) { applied++; results.push({ id, ok: true }); } else results.push({ id, ok: false, reason: 'write_failed' });
+      } else if (action === 'collection') {
+        if ((row.collection || '') === norm.collection) { results.push({ id, ok: true, reason: 'unchanged' }); continue; }
+        const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify({ collection: norm.collection }) });
+        if (r.ok) { applied++; results.push({ id, ok: true }); } else results.push({ id, ok: false, reason: 'write_failed' });
+      } else {
+        // archive | approve — the SAME lifecycle transition + policy as the per-asset route
+        const to = nextAssetStatus(row.asset_status || 'approved', action, policy);
+        if (!to) { results.push({ id, ok: true, reason: 'not_applicable' }); continue; }   // e.g. already approved/archived
+        const stamp: Record<string, unknown> = { asset_status: to };
+        if (action === 'approve') stamp.metadata = { ...((row.metadata as Record<string, unknown>) || {}), approved_by: who, approved_at: now };
+        const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify(stamp) });
+        if (r.ok) { applied++; results.push({ id, ok: true, status: to }); } else results.push({ id, ok: false, reason: 'write_failed' });
+      }
+    } catch { results.push({ id, ok: false, reason: 'write_failed' }); }
+  }
+
+  if (applied > 0) {
+    const label = action === 'tag' ? `Tagged ${applied} file${applied === 1 ? '' : 's'} “${norm.tag}”`
+      : action === 'collection' ? `Moved ${applied} file${applied === 1 ? '' : 's'} to “${norm.collection}”`
+      : action === 'archive' ? `Archived ${applied} file${applied === 1 ? '' : 's'}`
+      : `Approved ${applied} file${applied === 1 ? '' : 's'}`;
+    await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: rows[0]?.id || site.id, action: 'update', summary: label, principal, provenance: 'human', fields: ['bulk', action] });
+  }
+  return json({ data: { ok: true, action, applied, requested: ids.length, missing, results } }, 200, cors);
+}
+
+// ── social sizes: focal-aware crops for one image (square / portrait / story / OG)
+// The DIMENSIONS come from visual/contract.ts (Visual Studio's specs). Each URL is a
+// short-lived signed transform from the SAME self-hosted Supabase image pipeline used
+// for the width variants — width + height + cover (a real height crop), never an
+// external origin. object_position gives a faithful focal preview; the focal geometry
+// is exposed for any consumer that crops by rect. To USE one as the share image, point
+// settings.og_media_id at this asset (the existing assignment) — the published site
+// then serves it as the link-preview image. */
+export async function handleAssetSocial(site: SiteRow, id: string, cors: Record<string, string>) {
+  const asset = await loadAsset(site.id, id);
+  if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  if (!isImageMime(asset.mime || '')) {
+    return json({ error: 'not_an_image', message: 'Social sizes are for photos — this file isn’t an image.' }, 400, cors);
+  }
+  const focal = { x: Number((asset as any).focal_x), y: Number((asset as any).focal_y) };
+  const list = socialCropList(focal, { width: asset.width, height: asset.height });
+  // Sign each crop from the private bucket, in parallel (bounded: 4 ratios).
+  const urls = await Promise.all(list.map((c) => signSocialCrop(asset.storage_path, asset.mime || '', { width: c.width, height: c.height })));
+  const crops = list.map((c, i) => ({ ...c, url: urls[i] }));
+  const isShareImage = await isCurrentOg(site, id);
+  return json({ data: { crops, focal: list[0]?.object_position || '50% 50%', is_share_image: isShareImage } }, 200, cors);
+}
+async function isCurrentOg(site: SiteRow, id: string): Promise<boolean> {
+  try { const s = await svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id&limit=1`); return arr(s)[0]?.og_media_id === id; } catch { return false; }
 }
 
 // ── one file: the detail panel (metadata + complete where-used + versions) ────

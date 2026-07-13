@@ -182,6 +182,25 @@ export async function signThumb(storagePath: string, mime: string, width = 320):
   } catch { return null; }
 }
 
+/** DAM (social crops): a short-lived signed URL for one focal/social ratio via the
+ *  SAME self-hosted Supabase image transform used for the width variants — here with
+ *  width AND height + resize=cover, so it's a real height crop to the target ratio
+ *  (not just a width resize). No external origin; documents have no crop → null.
+ *  Supabase cover-crops from centre; on-site/preview focal fidelity is driven by the
+ *  object-position the social-crops core emits (same technique the templates use). */
+export async function signSocialCrop(storagePath: string, mime: string, t: { width: number; height: number; quality?: number }): Promise<string | null> {
+  if (!isImageMime(mime)) return null;
+  try {
+    const objectPath = storagePath.replace(`${BUCKET}/`, '');
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
+      method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600, transform: { width: t.width, height: t.height, resize: 'cover', format: 'webp', quality: t.quality ?? 80 } }),
+    });
+    const j = await r.json().catch(() => null);
+    return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+  } catch { return null; }
+}
+
 /** DAM-1 (Files): a short-lived signed DOWNLOAD URL for the ORIGINAL object (no
  *  transform) — used for "Download" and for previewing documents. Optionally sets
  *  a friendly download filename. */

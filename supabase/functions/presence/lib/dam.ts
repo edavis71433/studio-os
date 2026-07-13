@@ -191,6 +191,68 @@ export function assetHealth(assets: Asset[], referencedIds: Iterable<string>): H
   return findings;
 }
 
+// ── DAM (bulk): multi-select actions over the library — pure validation ───────
+// As a library grows the owner needs to act on MANY files at once. This is not a
+// new capability, only a batch of the EXISTING per-asset moves: add a tag, move to
+// a collection, archive, or approve. The route applies each with the same per-asset
+// logic (tag/collection normalization, nextAssetStatus); this core only validates +
+// bounds the request and partitions requested ids against what the SITE owns (so a
+// cross-site id can never be touched — it lands in `missing`). All pure.
+export const MAX_BULK_IDS = 200;                                  // bounded: one call never sprawls
+export const BULK_ACTIONS = ['tag', 'collection', 'archive', 'approve'] as const;
+export type BulkAction = typeof BULK_ACTIONS[number];
+export function isBulkAction(a: unknown): a is BulkAction { return typeof a === 'string' && (BULK_ACTIONS as readonly string[]).includes(a); }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type BulkRequest =
+  | { ok: true; action: BulkAction; ids: string[]; tag?: string; collection?: string }
+  | { ok: false; error: string; message: string };
+
+/** Validate + normalize a bulk request: whitelisted action, well-formed ids (deduped,
+ *  bounded), and the action's own parameter (a normalized tag / collection). Pure. */
+export function normalizeBulkRequest(body: unknown): BulkRequest {
+  const b = (body || {}) as Record<string, unknown>;
+  if (!isBulkAction(b.action)) return { ok: false, error: 'bad_action', message: 'Choose add a tag, move to a collection, archive, or approve.' };
+  const rawIds = Array.isArray(b.ids) ? b.ids : [];
+  const ids = [...new Set(rawIds.map((x) => String(x)).filter((x) => UUID_RE.test(x)))];
+  if (!ids.length) return { ok: false, error: 'no_ids', message: 'Select at least one file first.' };
+  if (ids.length > MAX_BULK_IDS) return { ok: false, error: 'too_many', message: `That’s a lot at once — please select ${MAX_BULK_IDS} files or fewer.` };
+  const action = b.action as BulkAction;
+  if (action === 'tag') {
+    // same normalization as the per-asset PATCH: trimmed, lowercased, non-empty, bounded
+    const tag = String(b.tag ?? '').trim().toLowerCase().slice(0, 40);
+    if (!tag) return { ok: false, error: 'no_tag', message: 'Type the tag you want to add.' };
+    return { ok: true, action, ids, tag };
+  }
+  if (action === 'collection') {
+    const collection = String(b.collection ?? '').trim().slice(0, 80);
+    if (!collection) return { ok: false, error: 'no_collection', message: 'Type the collection to move these into.' };
+    return { ok: true, action, ids, collection };
+  }
+  return { ok: true, action, ids };
+}
+
+/** Merge a tag into an asset's tags with the same rules the per-asset PATCH uses:
+ *  lowercase, de-duplicated, capped at 40. Returns null when nothing changes. Pure. */
+export function mergeTag(existing: string[] | null | undefined, tag: string): string[] | null {
+  const t = tag.trim().toLowerCase();
+  if (!t) return null;
+  const cur = (existing || []).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+  if (cur.includes(t)) return null;                               // already there → no write
+  return [...new Set([...cur, t])].slice(0, 40);
+}
+
+/** Partition requested ids into those the SITE actually owns vs. missing/foreign.
+ *  `owned` is the id set returned by the site-scoped query — anything not in it
+ *  (a cross-site or deleted id) is refused (never mutated). Pure. */
+export function partitionOwned(requested: string[], owned: Iterable<string>): { present: string[]; missing: string[] } {
+  const have = new Set(owned);
+  const present: string[] = [], missing: string[] = [];
+  for (const id of requested) (have.has(id) ? present : missing).push(id);
+  return { present, missing };
+}
+
 // ── DAM-3/4: collections + tags rollups ───────────────────────────────────────
 export function collectionsOf(assets: Asset[]): Array<{ name: string; count: number }> {
   const m = new Map<string, number>();
