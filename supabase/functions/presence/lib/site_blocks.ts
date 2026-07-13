@@ -414,18 +414,30 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
   return out;
 }
 
-/** Deterministic <img> from a resolved MediaRef — mirrors each template's img():
- *  responsive srcset, lazy, alt, focal crop. Zero external origins. */
+// AVIF sits beside WebP at the same widths: the deterministic variant path only
+// differs by extension (see serializer.variantPath), so we derive the AVIF srcset
+// from the WebP one — zero external origins, self-hosted variants only.
+const avifOf = (webpPath: string): string => webpPath.replace(/\.webp$/, '.avif');
+
+/** Deterministic responsive image from a resolved MediaRef — mirrors each template's
+ *  img(): a <picture> that offers AVIF then WebP (browser picks the first it supports)
+ *  with the <img> as the ultimate fallback. Preserves alt, lazy-load, dimensions, and
+ *  focal crop. Zero external origins. */
 function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => string, sizes: string, opts?: { decorative?: boolean }): string {
   const v = m.variants || {};
-  const srcset = ['w400', 'w800', 'w1600'].filter((k) => v[k]).map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
+  const order = ['w400', 'w800', 'w1600'].filter((k) => v[k]);
+  const webpSrcset = order.map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
   const src = v.w800 || v.w400 || Object.values(v)[0]; if (!src) return '';
   const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
   const focal = m.focal ? ` style="object-position:${m.focal.x}% ${m.focal.y}%"` : '';
   // Decorative → empty alt + role="presentation" (announced by nothing). Otherwise
   // the media's alt describes the image for AT + search.
   const a11y = opts?.decorative ? ` alt="" role="presentation"` : ` alt="${attr(m.alt || '')}"`;
-  return `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''}${a11y}${dims} loading="lazy" decoding="async"${focal}>`;
+  const imgTag = `<img src="${attr(src)}"${webpSrcset ? ` srcset="${webpSrcset}" sizes="${attr(sizes)}"` : ''}${a11y}${dims} loading="lazy" decoding="async"${focal}>`;
+  if (!webpSrcset) return imgTag;   // single-variant edge: nothing to choose between
+  const avifSrcset = order.map((k) => `${attr(avifOf(v[k]))} ${k.slice(1)}w`).join(', ');
+  const sz = ` sizes="${attr(sizes)}"`;
+  return `<picture><source type="image/avif" srcset="${avifSrcset}"${sz}><source type="image/webp" srcset="${webpSrcset}"${sz}>${imgTag}</picture>`;
 }
 
 // ── Render context: the escapers + safe-href a template already has, injected so

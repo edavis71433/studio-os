@@ -47,20 +47,31 @@ function fmtTime(t: string): string {
   return `${hr}${m ? ':' + String(m).padStart(2, '0') : ''}${am ? 'am' : 'pm'}`;
 }
 
+// AVIF variants sit beside WebP at the same widths (self-hosted; the path differs
+// only by extension — see serializer.variantPath), so derive the AVIF srcset here.
+const avifOf = (webpPath: string): string => webpPath.replace(/\.webp$/, '.avif');
 function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = ''): string {
   if (!m || !m.variants) return '';
   const v = m.variants;
-  const srcset = ['w400', 'w800', 'w1600'].filter((k) => v[k]).map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
+  const order = ['w400', 'w800', 'w1600'].filter((k) => v[k]);
+  const srcset = order.map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
   const src = v.w800 || v.w400 || Object.values(v)[0];
   if (!src) return '';
   const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
-  return `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt)}"${dims}${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}${cls ? ` class="${cls}"` : ''}>`;
+  const imgTag = `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt)}"${dims}${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}${cls ? ` class="${cls}"` : ''}>`;
+  if (!srcset) return imgTag;   // single variant: nothing to choose between formats
+  // <picture>: AVIF first (browser picks the first it supports), WebP next, the
+  // <img> is the ultimate fallback. Self-hosted variants only — zero external origins.
+  const avifSrcset = order.map((k) => `${attr(avifOf(v[k]))} ${k.slice(1)}w`).join(', ');
+  const sz = ` sizes="${attr(sizes)}"`;
+  return `<picture><source type="image/avif" srcset="${avifSrcset}"${sz}><source type="image/webp" srcset="${srcset}"${sz}>${imgTag}</picture>`;
 }
 
 // ═════════ CSS — a modern, confident, industry-neutral look (zero external assets) ═════════
 const CSS = `:root{--ink:#1a1a1c;--soft:#5f5a52;--paper:var(--bg,#f6f3ec);--card:#fbf9f4;--accent:#6d232a;--accent-dark:#4f181d;--line:#ddd6c8;--wash:#efe9dc}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
+picture{display:contents}
 body{font-family:var(--font-body,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:1.06rem;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--font-display,"Iowan Old Style",Palatino,Georgia,serif);line-height:1.1;letter-spacing:-.01em;font-weight:600}
 h1{font-size:clamp(2.6rem,7vw,4.6rem)}h2{font-size:clamp(1.5rem,3.4vw,2.1rem);margin-bottom:18px}h3{font-size:1.2rem}

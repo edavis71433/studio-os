@@ -43,6 +43,10 @@ export interface WebsiteHealthInput {
   // inference below. `true`=answered, `false`=didn't answer just now.
   online_now?: boolean | null;
   uptime_checked_at?: string | null;
+  // Custom-domain TLS certificate expiry (ISO), best-effort from Netlify. Optional:
+  // when absent (no custom domain / lookup failed) the secure-connection check stays
+  // exactly as before. Netlify auto-renews, so this is reassurance + early warning.
+  ssl_expires_at?: string | null;
 }
 
 export type CheckState = 'ok' | 'attention' | 'coming' | 'off';
@@ -75,6 +79,16 @@ function checkedAgo(now: string, checkedAt: string | null | undefined): string {
   const hrs = Math.round(mins / 60);
   return hrs === 1 ? 'about an hour ago' : `${hrs} hours ago`;
 }
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** Calm, plain-English date ("12 July 2027") from an ISO string. PURE. Returns null
+ *  when the input isn't a parseable date, so the caller degrades cleanly (omits it). */
+function calmDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(t);
+  return `${d.getUTCDate()} ${MONTHS_LONG[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
 const check = (title: string, why: string, state: CheckState, action?: { label: string; href: string }): HealthCheck =>
   ({ title, why, state, status_label: STATUS_WORD[state], ...(action ? { action_label: action.label, action_href: action.href } : {}) });
 
@@ -103,6 +117,12 @@ export function buildWebsiteHealth(i: WebsiteHealthInput): WebsiteHealth {
     if (i.domain) c.push(check('Your domain is connected', `Your site answers at ${i.domain}.`, 'ok'));
     else c.push(check('No custom domain yet', 'Your site is live on its Studio address — you can connect your own domain whenever you’re ready.', 'off', { label: 'Connect a domain', href: '/presence.html#foundations' }));
     if (i.contact_form_working) c.push(check('Your contact form is working', 'You’ve received messages through it, so visitors can reach you.', 'ok'));
+    // Always-online reassurance — truthful for any published site (static pages served
+    // from a global CDN, not a single always-on server). No new data; a calm fact.
+    if (i.site_status !== 'never_published') {
+      c.push(check('Your website keeps working even during maintenance',
+        'Its pages live on a global network, not one server — so visitors can reach you even while you’re making changes behind the scenes.', 'ok'));
+    }
     push('website_status', 'Website status', c);
   }
 
@@ -145,9 +165,18 @@ export function buildWebsiteHealth(i: WebsiteHealthInput): WebsiteHealth {
     if (i.domain) {
       const ssl = step('Security certificate active');
       if (ssl && ssl.state !== 'n/a') {
-        c.push(ssl.state === 'done'
-          ? check('Your connection is secure', 'Visitors’ information is protected with a secure (https) connection.', 'ok')
-          : check('Your secure certificate isn’t active yet', 'A secure connection protects your visitors and is expected by every browser.', 'attention', { label: 'See what’s needed', href: '/presence.html#foundations' }));
+        if (ssl.state === 'done') {
+          // Surface the expiry as reassurance + early warning. Netlify auto-renews, so
+          // this is never an owner chore — the copy makes that explicit. Degrades
+          // cleanly to the plain secure-connection line when no date is available.
+          const until = calmDate(i.ssl_expires_at);
+          c.push(check('Your connection is secure',
+            until
+              ? `Visitors’ information is protected with a secure (https) connection. Secure until ${until} — renews automatically.`
+              : 'Visitors’ information is protected with a secure (https) connection.', 'ok'));
+        } else {
+          c.push(check('Your secure certificate isn’t active yet', 'A secure connection protects your visitors and is expected by every browser.', 'attention', { label: 'See what’s needed', href: '/presence.html#foundations' }));
+        }
       }
     }
     const email = step('Email authenticated');

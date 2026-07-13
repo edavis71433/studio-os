@@ -45,20 +45,31 @@ function fmtTime(t: string): string {
   return `${hr}${m ? ':' + String(m).padStart(2, '0') : ''}${am ? 'am' : 'pm'}`;
 }
 
+// AVIF variants sit beside WebP at the same widths (self-hosted; the path differs
+// only by extension — see serializer.variantPath), so derive the AVIF srcset here.
+const avifOf = (webpPath: string): string => webpPath.replace(/\.webp$/, '.avif');
 function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = ''): string {
   if (!m || !m.variants) return '';
   const v = m.variants;
-  const srcset = ['w400', 'w800', 'w1600'].filter((k) => v[k]).map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
+  const order = ['w400', 'w800', 'w1600'].filter((k) => v[k]);
+  const srcset = order.map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
   const src = v.w800 || v.w400 || Object.values(v)[0];
   if (!src) return '';
   const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
-  return `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt)}"${dims}${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}${cls ? ` class="${cls}"` : ''}>`;
+  const imgTag = `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt)}"${dims}${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}${cls ? ` class="${cls}"` : ''}>`;
+  if (!srcset) return imgTag;   // single variant: nothing to choose between formats
+  // <picture>: AVIF first (browser picks the first it supports), WebP next, the
+  // <img> is the ultimate fallback. Self-hosted variants only — zero external origins.
+  const avifSrcset = order.map((k) => `${attr(avifOf(v[k]))} ${k.slice(1)}w`).join(', ');
+  const sz = ` sizes="${attr(sizes)}"`;
+  return `<picture><source type="image/avif" srcset="${avifSrcset}"${sz}><source type="image/webp" srcset="${srcset}"${sz}>${imgTag}</picture>`;
 }
 
 // ═════════ CSS — a modern, confident, industry-neutral look (zero external assets) ═════════
 const CSS = `:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--card:#ffffff;--accent:#23635a;--accent-dark:#17453f;--line:#e2e4e1;--wash:#eef1ee}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
+picture{display:contents}
 body{font-family:var(--font-body,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.65;font-size:1.03rem;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--font-display,inherit);line-height:1.15;letter-spacing:-.015em;font-weight:700}
 h1{font-size:clamp(2.1rem,5.5vw,3.4rem)}h2{font-size:clamp(1.35rem,3vw,1.8rem);margin-bottom:16px}h3{font-size:1.1rem}

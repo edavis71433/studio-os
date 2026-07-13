@@ -15,20 +15,24 @@ export const CONTENT_CONTRACT_VERSION = 1;
 
 interface MediaRow { id: string; storage_path: string; alt_text: string; width: number | null; height: number | null; focal_x?: number | null; focal_y?: number | null }
 
-// deterministic variant output path: /img/<fnv(storage_path)>-<width>.webp
+// deterministic variant output path: /img/<fnv(storage_path)>-<width>.<format>
 function fnv(s: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) { h = (h ^ s.charCodeAt(i)) >>> 0; h = (h * 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, '0');
 }
-export function variantPath(storagePath: string, width: number): string {
-  return `/img/${fnv(storagePath)}-${width}.webp`;
+/** The image formats we publish, in ascending preference (browser picks the first
+ *  it supports, WebP is the universal fallback). AVIF sits alongside WebP at the
+ *  SAME widths — self-hosted variants only, so the render can offer both. */
+export type VariantFormat = 'webp' | 'avif';
+export function variantPath(storagePath: string, width: number, format: VariantFormat = 'webp'): string {
+  return `/img/${fnv(storagePath)}-${width}.${format}`;
 }
 
 export interface MediaManifestEntry {
   media_id: string;
   storage_path: string;
-  variants: Array<{ name: string; width: number; output_path: string }>;
+  variants: Array<{ name: string; width: number; format: VariantFormat; output_path: string }>;
 }
 
 function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | null {
@@ -137,7 +141,12 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     const m = mediaById.get(id)!;
     return {
       media_id: m.id, storage_path: m.storage_path,
-      variants: Object.entries(manifest.image_variants).map(([name, v]) => ({ name, width: v.width, output_path: variantPath(m.storage_path, v.width) })),
+      // Emit BOTH formats at every width: WebP (universal) + AVIF (smaller, modern).
+      // The render offers both via <picture>; fetchVariants generates both files.
+      variants: Object.entries(manifest.image_variants).flatMap(([name, v]) => ([
+        { name, width: v.width, format: 'webp' as VariantFormat, output_path: variantPath(m.storage_path, v.width, 'webp') },
+        { name: `${name}_avif`, width: v.width, format: 'avif' as VariantFormat, output_path: variantPath(m.storage_path, v.width, 'avif') },
+      ])),
     };
   });
 

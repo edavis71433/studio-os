@@ -148,18 +148,20 @@ export async function deleteMedia(siteId: string, mediaId: string) {
 }
 
 /** PUBLISH: fetch every required variant via the transform endpoint (EXIF
- *  stripped, resized, webp) and return bytes keyed by output path. */
+ *  stripped, resized, encoded to the variant's format — webp AND avif) and return
+ *  bytes keyed by output path. The manifest now carries a format per variant, so a
+ *  single pass generates both the WebP and the AVIF file at each width. */
 export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ files: Record<string, Uint8Array>; failed: string[] }> {
   const files: Record<string, Uint8Array> = {};
   const failed: string[] = [];
   await Promise.all(manifest.flatMap((m) => m.variants.map(async (v) => {
     const objectPath = m.storage_path.replace(`${BUCKET}/`, '');
-    const url = `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&format=webp&quality=80`;
+    const url = `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&format=${v.format}&quality=80`;
     try {
       const r = await fetch(url, { headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE } });
-      if (!r.ok) { failed.push(`${m.storage_path} @${v.width}`); return; }
+      if (!r.ok) { failed.push(`${m.storage_path} @${v.width}.${v.format}`); return; }
       files[v.output_path.replace(/^\//, '')] = new Uint8Array(await r.arrayBuffer());
-    } catch { failed.push(`${m.storage_path} @${v.width}`); }
+    } catch { failed.push(`${m.storage_path} @${v.width}.${v.format}`); }
   })));
   return { files, failed };
 }
@@ -223,7 +225,7 @@ export async function previewUrlMap(manifest: MediaManifestEntry[]): Promise<Rec
     const objectPath = m.storage_path.replace(`${BUCKET}/`, '');
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=600`, {
       method: 'POST', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transform: { width: v.width, format: 'webp', quality: 80 } }),
+      body: JSON.stringify({ transform: { width: v.width, format: v.format, quality: 80 } }),
     });
     const j = await r.json().catch(() => null);
     if (j?.signedURL) map[v.output_path] = `${SB_URL}/storage/v1${j.signedURL}`;
