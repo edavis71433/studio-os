@@ -1421,11 +1421,14 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
  *  first-run (via ?next=); an existing login gets a welcome. Best-effort. */
 async function sendCustomerInvite(email: string, _isNewLogin: boolean): Promise<boolean> {
   if (!email) return false;
-  // App links must point where the APP is served — portal/set-password/get-started are
-  // NOT on the public marketing domain (they're excluded from the public allowlist), so
-  // siteUrl()'s davisdigitalstudio.com default 404s them. Use SITE_URL, defaulting to
-  // the presence app base like the booking/form links already do.
-  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  // App pages (set-password/get-started/portal) ARE served on the primary site —
+  // build-public.sh copies every root .html into dist/ and _redirects blocks only
+  // source/doc dirs, not these pages. So the link MUST use the same origin as the
+  // Supabase project's Site URL (davisdigitalstudio.com), matching workspace.ts /
+  // service_bridge.ts. A different host (e.g. a non-configured subdomain) is not in
+  // GoTrue's redirect allow-list, so the recovery link silently falls back to the
+  // Site URL — i.e. lands on the home page. SITE_URL env should be set to this too.
+  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
   // Every provisioned customer needs to CREATE their password. Always send a signed
   // set-password link that lands them in the guided first-run; if it can't be generated
   // they can still get in passwordlessly (one-time email code) at the portal.
