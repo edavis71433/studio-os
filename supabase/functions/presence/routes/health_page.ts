@@ -15,21 +15,28 @@ import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { siteContentTree } from './room.ts';
 import { siteLaunchChecklist } from './services.ts';
 import { buildWebsiteHealth, type WebsiteHealthInput } from '../lib/website_health.ts';
+import { loadVisits } from './analytics.ts';
+import { aggregateVisits } from '../lib/visits.ts';
+import { buildContentPerformance } from '../lib/content_performance.ts';
 
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
 const arr = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
 
 export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, string>) {
   const now = new Date().toISOString();
+  const nowMs = Date.parse(now);
 
   // reused projections + the honest launch probes, in parallel with the small
-  // evidence reads (contact-form message received, a saved version exists)
-  const [tree, launch, connQ, formQ, snapQ] = await Promise.all([
+  // evidence reads (contact-form message received, a saved version exists) and
+  // the already-collected first-party visits (for the plain-English "what this
+  // means" projection — no new tracking, reuses loadVisits + aggregateVisits).
+  const [tree, launch, connQ, formQ, snapQ, visits] = await Promise.all([
     siteContentTree(site),
     siteLaunchChecklist(site),
     svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health`),
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id&limit=1`),
     svc(`presence_snapshots?site_id=eq.${site.id}&select=id&limit=1`),
+    loadVisits(site.id, 'month', nowMs),
   ]);
   if (!tree) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
 
@@ -60,5 +67,10 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
     domain: site.custom_domain || null,
   };
 
-  return json({ data: buildWebsiteHealth(input) }, 200, cors);
+  // Plain-English "what this means" over the visits we already collect (30-day
+  // window — the calmest for an owner). Deterministic, honest empty state, and it
+  // respects the fetch-cap `truncated` flag (never over-reads an incomplete set).
+  const content_performance = buildContentPerformance(aggregateVisits(visits, nowMs, 30));
+
+  return json({ data: { ...buildWebsiteHealth(input), content_performance } }, 200, cors);
 }

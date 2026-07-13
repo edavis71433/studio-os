@@ -33,6 +33,17 @@
   a.act{display:inline-block;font-size:13.5px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;transition:background .15s,border-color .15s}
   a.act:hover{background:var(--accent-soft);border-color:var(--accent)} a.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+  /* "What this means" — plain-English suggestions from real visit data */
+  .means{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow)}
+  .means h2{font-family:var(--serif);font-weight:500;font-size:18px;margin:0 0 4px;display:flex;gap:9px;align-items:center}
+  .means .lede{color:var(--soft);font-size:13.5px;margin:0 0 14px}
+  .means ul{list-style:none;margin:0;padding:0}
+  .means li{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:14.5px;line-height:1.5}
+  .means li:first-of-type{border-top:none}
+  .means li .dot{flex:none;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .means li.good .dot{background:var(--good-soft);color:var(--good)} .means li.neutral .dot{background:var(--accent-soft);color:var(--accent)}
+  .means .empty{color:var(--soft);font-size:14px;line-height:1.5;margin:0}
+
   .center{text-align:center;padding:56px 20px}
   .center .mark{font-size:40px;display:block;margin-bottom:12px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
@@ -97,6 +108,21 @@ function catHtml(cat){
   </section>`;
 }
 
+// "What this means" — plain-English suggestions from the visits we already
+// collect. Read-only, no controls. Honest empty state when there isn't enough.
+function meansHtml(cp){
+  if(!cp) return '';
+  const glyph = { good:'✓', neutral:'→' };
+  const body = (cp.enough && (cp.suggestions||[]).length)
+    ? `<ul>${cp.suggestions.map(s=>`<li class="${esc(s.tone)}"><span class="dot" aria-hidden="true">${glyph[s.tone]||'→'}</span><span>${esc(s.text)}</span></li>`).join('')}</ul>`
+    : `<p class="empty">${esc(cp.note||'We’ll show suggestions here once your site has had a few more visits.')}</p>`;
+  return `<section class="means">
+    <h2>What this means</h2>
+    <p class="lede">A few plain-English notes from how visitors are using your site.</p>
+    ${body}
+  </section>`;
+}
+
 function render(h){
   if(!h || !h.categories || !h.categories.length){
     $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🌱</span>
@@ -110,6 +136,7 @@ function render(h){
     <span class="vmark" aria-hidden="true">${v.mark}</span>
     <div class="vtext"><h2>${esc(h.headline || v.h)}</h2><p>${esc(h.summary||'')}</p></div>
   </div>`;
+  html += meansHtml(h.content_performance);
   html += h.categories.map(catHtml).join('');
   html += `<p class="foot">This is a read-only check-up — it never changes your website. Anything worth doing links to where you can do it.</p>`;
   $('main').innerHTML = html;
