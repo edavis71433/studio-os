@@ -2567,6 +2567,180 @@ async function loadPreview() {
   }
 }
 
+// ══ Click-to-edit in the live proof (AEM Universal-Editor pattern) ════════════
+// The proof (#previewFrame) is a SAME-ORIGIN srcdoc of the real render engine.
+// On each load we inject editor-ONLY chrome INTO the iframe document: hover a
+// section → a floating Edit / Move up / Move down / Hide cluster; click a section
+// → its editor opens (a block panel expands + scrolls, or the core-section tab
+// opens). Nothing here touches the published render (render.ts / site_blocks
+// output) — this chrome exists only in this editor's preview, never on the served
+// site. No external origins, no CSP change: everything is same-origin DOM work.
+//
+// Mapping: renderSiteBlocks stamps `<section id="<anchor-slug>">` on every library
+// block (slug of its heading, de-duped). We mirror the engine's effHeading +
+// slugifyAnchor here so a clicked section id resolves to its block in BLOCKS_WORK.
+// Core sections carry no id and are recognised by stable structural markers.
+const EE_MANDATORY_H2 = {   // must match lib/site_blocks.ts MANDATORY_H2 exactly
+  features: "Why choose us", stats: "By the numbers", team: "Meet the team", process: "How it works",
+  pricing: "Pricing", certifications: "Credentials & certifications", service_areas: "Areas we serve",
+  gallery: "Gallery", before_after: "Before & after", video: "Video", newsletter: "Get updates from us",
+  social: "Find us online", events: "Upcoming events", map: "Find us", accordion: "More information",
+  partners: "Trusted by", reviews: "What customers say", appointment: "Book an appointment",
+};
+function eeEffHeading(b) {   // mirror of site_blocks.ts effHeading()
+  if (Object.prototype.hasOwnProperty.call(EE_MANDATORY_H2, b.type)) return (b.title || EE_MANDATORY_H2[b.type]);
+  if (b.type === "cta" || b.type === "divider" || b.type === "toc") return null;
+  return b.title || null;
+}
+function eeSlug(t) {   // mirror of site_blocks.ts slugifyAnchor()
+  return String(t).toLowerCase().replace(/&[a-z]+;/g, " ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "section";
+}
+function eeBlockKey(b) {   // mirror of site_blocks.ts section key (block_<type>[_<id>])
+  return (b.type === "form" || b.type === "columns" || b.type === "cards") ? `block_${b.type}_${b.id}` : `block_${b.type}`;
+}
+// Greedy-align the actual rendered section ids (DOM order) to BLOCKS_WORK by base
+// slug, skipping empty (unrendered) blocks and resolving `-2/-3` de-dup suffixes.
+// Blocks that emit no <section id> (divider = <div>, toc = <nav>) are excluded.
+let EE_IDMAP = {};
+function eeBuildIdMap(reportedIds) {
+  const cand = [];
+  (BLOCKS_WORK || []).forEach((b, bi) => { if (b.type === "divider" || b.type === "toc") return; cand.push({ bi, base: eeSlug(eeEffHeading(b) || b.type) }); });
+  const map = {}; let j = 0;
+  reportedIds.forEach((id) => {
+    for (let k = j; k < cand.length; k++) {
+      const base = cand[k].base;
+      const dedup = id.length > base.length && id.slice(0, base.length) === base && id.charAt(base.length) === "-" && /^\d+$/.test(id.slice(base.length + 1));
+      if (id === base || dedup) { map[id] = cand[k].bi; j = k + 1; break; }
+    }
+  });
+  return map;
+}
+// ── actions (all REUSE the existing editor logic) ──
+function eeEditBlock(bi) {                       // open the block's editor panel
+  closePreview(); go("design");
+  if (!$("blocksCard")) mountBlocksCard();
+  BLOCK_FOCUS = bi; renderBlocksCard();          // consumes BLOCK_FOCUS → scroll + focus
+}
+function eeEditCore(view) { closePreview(); go(view || "design"); }   // open the core-section tab
+function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder swap + save
+  const o = BLOCKS_WORK; const ni = bi + dir; if (ni < 0 || ni >= o.length) return;
+  [o[ni], o[bi]] = [o[bi], o[ni]];
+  if ($("blocksCard")) renderBlocksCard();
+  saveBlocks().then(() => loadPreview());        // persist, then redraw the proof
+}
+function eeHideKey(key) {                        // reuse the sections-visibility machinery
+  if (!key) return;
+  const hidden = new Set((S.settings && S.settings.sections_hidden) || []);
+  const order = (S.settings && S.settings.sections_order) || [];
+  hidden.add(key);
+  Promise.resolve(saveSections(order, [...hidden])).then(() => loadPreview());
+}
+// Which editor a clicked section belongs to. Library blocks map precisely by id;
+// core/structural sections map to their tab by stable markers, never a dead click.
+function eeClassify(el) {
+  const id = el.getAttribute("id");
+  if (id && EE_IDMAP[id] != null) return { kind: "block", bi: EE_IDMAP[id] };
+  if (el.classList.contains("hero")) return { kind: "core", view: "business", key: null };
+  if (el.querySelector(".svc-grid, .svc")) return { kind: "core", view: "offerings", key: "offerings" };
+  if (el.querySelector("dl.faq")) return { kind: "core", view: "faqs", key: "faqs" };
+  if (el.querySelector("blockquote")) return { kind: "core", view: "testimonials", key: "testimonials" };
+  const h = ((el.querySelector("h1,h2,h3") || {}).textContent || "").toLowerCase();
+  if (/about/.test(h)) return { kind: "core", view: "business", key: "about" };
+  if (/contact|hours|find us|directions|location/.test(h)) return { kind: "core", view: "business", key: null };
+  if (/update|news/.test(h)) return { kind: "core", view: "updates", key: null };
+  if (/question|faq/.test(h)) return { kind: "core", view: "faqs", key: "faqs" };
+  return { kind: "core", view: "design", key: null };   // sensible fallback — the structure studio
+}
+function eeEditTarget(el) { const c = eeClassify(el); if (c.kind === "block") eeEditBlock(c.bi); else eeEditCore(c.view); }
+// Inject the hover/click chrome into the proof document (called on every load).
+function eeInjectChrome(doc, main) {
+  if (!doc.getElementById("dds-ee-style")) {
+    const st = doc.createElement("style"); st.id = "dds-ee-style";
+    st.textContent =
+      ".dds-ee-on{outline:2px solid #5b3fa0!important;outline-offset:-2px;cursor:pointer}" +
+      "#dds-ee-bar{position:absolute;z-index:2147483000;display:none;gap:4px;background:#5b3fa0;border-radius:9px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:system-ui,-apple-system,sans-serif}" +
+      "#dds-ee-bar.on{display:flex}" +
+      "#dds-ee-bar button{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 10px;cursor:pointer}" +
+      "#dds-ee-bar button:hover{background:rgba(255,255,255,.32)}" +
+      "#dds-ee-bar button:disabled{opacity:.4;cursor:default}" +
+      "#dds-ee-bar button:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
+      "[data-dds-ee]:focus-visible{outline:2px solid #5b3fa0;outline-offset:-2px}";
+    (doc.head || doc.documentElement).appendChild(st);
+  }
+  let bar = doc.getElementById("dds-ee-bar");
+  if (!bar) { bar = doc.createElement("div"); bar.id = "dds-ee-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
+  let current = null, hideT = null;
+  const win = doc.defaultView;
+  const place = (el) => {
+    const r = el.getBoundingClientRect();
+    bar.style.top = Math.max(2, r.top + win.scrollY + 4) + "px";
+    bar.style.left = Math.max(2, r.right + win.scrollX - bar.offsetWidth - 6) + "px";
+  };
+  const hideBar = () => { bar.classList.remove("on"); if (current) { current.classList.remove("dds-ee-on"); current = null; } };
+  const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 140); };
+  const keepBar = () => clearTimeout(hideT);
+  bar.addEventListener("mouseenter", keepBar);
+  bar.addEventListener("mouseleave", scheduleHide);
+  const mkBtn = (label, aria, fn, disabled) => {
+    const b = doc.createElement("button"); b.type = "button"; b.textContent = label; b.setAttribute("aria-label", aria);
+    if (disabled) b.disabled = true;
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (!disabled) fn(); });
+    return b;
+  };
+  const showBar = (el) => {
+    clearTimeout(hideT);
+    if (current && current !== el) current.classList.remove("dds-ee-on");
+    current = el; el.classList.add("dds-ee-on");
+    const c = eeClassify(el);
+    bar.textContent = "";
+    if (c.kind === "block") {
+      const len = (BLOCKS_WORK || []).length;
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(c.bi)));
+      bar.appendChild(mkBtn("↑", "Move section up", () => eeMoveBlock(c.bi, -1), c.bi <= 0));
+      bar.appendChild(mkBtn("↓", "Move section down", () => eeMoveBlock(c.bi, 1), c.bi >= len - 1));
+      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[c.bi]))));
+    } else {
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
+      if (c.key) bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(c.key)));
+    }
+    bar.classList.add("on");
+    place(el);
+  };
+  // Build the id→block map for this render, then wire every top-level section.
+  EE_IDMAP = eeBuildIdMap(Array.prototype.map.call(main.querySelectorAll("section[id]"), (s) => s.id));
+  const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
+  Array.prototype.forEach.call(targets, (el) => {
+    if (el.hasAttribute("data-dds-ee")) return;
+    el.setAttribute("data-dds-ee", "1");
+    el.setAttribute("tabindex", "0");
+    const c = eeClassify(el);
+    el.setAttribute("aria-label", (c.kind === "block" ? "Editable section" : "Editable section") + " — press Enter to edit");
+    el.addEventListener("mouseenter", () => showBar(el));
+    el.addEventListener("mouseleave", scheduleHide);
+    el.addEventListener("focus", () => showBar(el));
+    el.addEventListener("blur", scheduleHide);
+    el.addEventListener("click", (e) => {
+      if (e.target.closest("a,button,input,select,textarea,label,summary")) return;   // let real controls behave
+      e.preventDefault(); eeEditTarget(el);
+    });
+    el.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); eeEditTarget(el); }
+    });
+  });
+}
+(function installClickToEdit() {
+  const frame = $("previewFrame"); if (!frame) return;
+  frame.addEventListener("load", () => {
+    let doc; try { doc = frame.contentDocument; } catch (_) { return; }
+    if (!doc || !doc.body) return;
+    // Only the editable draft gets chrome — not a live / kept / launch snapshot.
+    if (!(PV.ver === "draft" && !PV.publishId && !PV.launchId)) return;
+    const main = doc.getElementById("main"); if (!main) return;
+    if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
+    try { eeInjectChrome(doc, main); } catch (_) { /* chrome is best-effort; never break the proof */ }
+  });
+})();
+
 /* ── the publish ritual (identical /changes + /publish + /publishes) ── */
 function openRitual() {
   lastFocus = document.activeElement;
