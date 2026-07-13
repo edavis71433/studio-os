@@ -5161,7 +5161,7 @@ function renderFormsCard() {
     panel.appendChild(kindRow);
 
     // fields
-    panel.appendChild(el("div", "hint", "Fields — drag order with ↑ ↓. Every field is typed and validated for you."));
+    panel.appendChild(el("div", "hint", "Fields — reorder with ↑ ↓. Every field is typed and validated for you. Give fields different “page/step” numbers to split a long form into steps with Back/Next and a progress bar (leave them all on 1 for a single page). Tick “prefilled from a link” to let a link fill a field in — e.g. yoursite.com/contact?email=… on a “reply to this enquiry” link."));
     form.fields.forEach((fld, xi) => {
       const row = el("div"); row.style.cssText = "border:1px solid var(--hair,#eee);border-radius:9px;padding:9px 10px;margin-top:8px;background:var(--sheet,#fbfaf8)";
       const top = el("div"); top.style.cssText = "display:flex;gap:6px;align-items:center;flex-wrap:wrap";
@@ -5203,6 +5203,20 @@ function renderFormsCard() {
         const help = el("input"); help.type = "text"; help.placeholder = "Helper text (optional)"; help.value = fld.help || ""; help.style.cssText = FF_IN + ";margin:0";
         help.addEventListener("change", () => commitField(fi, xi, { help: help.value.trim() })); opts.appendChild(help);
       }
+      // FB-2: multi-step grouping (a "page" number) + prefill-from-link opt-in.
+      const adv = el("div"); adv.style.cssText = "display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:2px";
+      const stepWrap = el("label"); stepWrap.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:6px";
+      const stepIn = el("input"); stepIn.type = "number"; stepIn.min = "1"; stepIn.max = "12"; stepIn.value = fld.step != null ? fld.step : ""; stepIn.placeholder = "1";
+      stepIn.style.cssText = "width:56px;padding:5px 7px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:12px";
+      stepIn.addEventListener("change", () => commitField(fi, xi, { step: stepIn.value === "" ? undefined : Math.max(1, Math.min(12, Math.trunc(Number(stepIn.value)) || 1)) }));
+      stepWrap.append(document.createTextNode("Page/step"), stepIn); adv.appendChild(stepWrap);
+      if (fld.type !== "consent") {
+        const pfL = el("label"); pfL.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:6px";
+        const pf = el("input"); pf.type = "checkbox"; pf.checked = !!fld.prefill; pf.style.cssText = "width:auto;margin:0";
+        pf.addEventListener("change", () => commitField(fi, xi, { prefill: pf.checked }));
+        pfL.append(pf, document.createTextNode("Can be prefilled from a link")); adv.appendChild(pfL);
+      }
+      opts.appendChild(adv);
       row.appendChild(opts); panel.appendChild(row);
     });
     const addF = el("button", null, "+ Add field"); addF.type = "button"; addF.style.cssText = FF_BTN; addF.style.marginTop = "8px";

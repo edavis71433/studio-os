@@ -122,6 +122,45 @@ const sForm = normalizeFormDefinition({
 const sHtml = renderForm(sForm, { formEndpoint: 'https://x/submit' });
 ok('render: rules → a scoped inline enhancer, no external origin', sHtml.includes('<script>') && !/src=/.test(sHtml.split('<script>')[1] || '') && sHtml.includes('presence-form-'));
 
+// ═══ FB-2: multi-step + prefill (presentation-only; server still validates all) ═══
+// A single-step form (no steps, or every field on the same step) carries NO `step`
+// key and renders byte-identically to a plain form — the byte-stability guarantee.
+const single = normalizeFormDefinition({ title: 'x', fields: [{ label: 'A', type: 'text' }, { label: 'B', type: 'text', step: 1 }] }).form;
+ok('multistep: a one-step form strips every step key (byte-stable)', single.fields.every((f) => f.step === undefined));
+ok('multistep: single-step render has no ff-steps wrapper', !renderForm(single, {}).includes('ff-steps'));
+
+const ms = normalizeFormDefinition({
+  title: 'Apply', kind: 'quote', step_titles: ['About you', 'Details'],
+  fields: [
+    { key: 'name', label: 'Name', type: 'text', required: true, step: 1 },
+    { key: 'email', label: 'Email', type: 'email', required: true, step: 1 },
+    { key: 'why', label: 'Why', type: 'textarea', step: 3 },   // gap (no step 2) → remapped to 2
+  ],
+}).form;
+ok('multistep: gappy steps remapped to contiguous 1..N', ms.fields[0].step === 1 && ms.fields[1].step === 1 && ms.fields[2].step === 2);
+ok('multistep: step number capped', normalizeFormDefinition({ title: 'x', fields: [{ label: 'A', type: 'text', step: 1 }, { label: 'B', type: 'text', step: 9999 }] }).form.fields[1].step === 2);
+ok('multistep: step_titles kept + trimmed to used steps', Array.isArray(ms.step_titles) && ms.step_titles.length === 2 && ms.step_titles[0] === 'About you');
+const msHtml = renderForm(ms, { formEndpoint: 'https://x/submit' });
+ok('multistep: render wraps steps + progress enhancer, no external origin', msHtml.includes('ff-steps') && msHtml.includes('data-steps="2"') && msHtml.includes('.ff-steps') && !/<script[^>]*src=/.test(msHtml));
+ok('multistep: step titles escaped into the page', msHtml.includes('About you') && msHtml.includes('data-step="1"') && msHtml.includes('data-step="2"'));
+// steps are presentation-only: validation must be identical to a flat form.
+ok('multistep: server validates ALL fields regardless of step', !validateFormValues(ms, { email: 'a@b.com' }).ok && validateFormValues(ms, { name: 'Ann', email: 'a@b.com' }).ok);
+
+// prefill: an opt-in whitelist; consent can NEVER be prefilled; a hostile value can't inject.
+const pf = normalizeFormDefinition({
+  title: 'x', fields: [
+    { key: 'email', label: 'Email', type: 'email', prefill: true },
+    { key: 'msg', label: 'Msg', type: 'textarea', required: true },
+    { key: 'agree', label: 'Agree', type: 'consent', required: true, prefill: true },
+  ],
+}).form;
+ok('prefill: opt-in flag kept on a normal field', pf.fields[0].prefill === true);
+ok('prefill: consent is never prefillable (dropped)', pf.fields[2].prefill === undefined);
+const pfHtml = renderForm(pf, { formEndpoint: 'https://x/submit' });
+ok('prefill: emits a scoped first-party enhancer naming only whitelisted keys', pfHtml.includes('URLSearchParams') && pfHtml.includes('var K=["email"]'));
+ok('prefill: sets values via DOM property, never innerHTML', !/innerHTML/.test(pfHtml) && !/<script[^>]*src=/.test(pfHtml));
+ok('prefill: no prefill fields → no prefill script', !renderForm(single, {}).includes('URLSearchParams'));
+
 // ═══ presets ═══
 ok('presets: four starters, each normalizes cleanly', FORM_PRESETS.length === 4 && FORM_PRESETS.every((p) => normalizeFormDefinition(p.def).ok));
 ok('presets: getFormPreset finds by key', getFormPreset('booking')?.name === 'Booking intake' && !getFormPreset('nope'));

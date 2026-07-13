@@ -47,6 +47,16 @@ export interface FormField {
   multiple?: boolean;          // checkbox — allow more than one choice
   help?: string;
   placeholder?: string;
+  // Multi-step (Phase FB-2): the page/step this field belongs to. Presentation-only
+  // grouping — the server validates ALL visible fields regardless of step, so steps
+  // add no validation surface. Present ONLY on a genuinely multi-step form (a single-
+  // step form carries no `step` key, so its render stays byte-identical).
+  step?: number;
+  // Prefill (Phase FB-2): this field MAY be filled from a matching URL query param
+  // (?<key>=…). A WHITELIST — only fields the owner opted in can ever be prefilled,
+  // and the value is written via the DOM `.value`/`.checked` property (never HTML),
+  // so a hostile query string can't inject markup.
+  prefill?: boolean;
 }
 
 // ── whitelisted declarative rules (no expressions, no eval) ──────────────────
@@ -70,12 +80,14 @@ export interface FormDefinition {
   confirmation_text?: string;
   redirect_url?: string;
   submit_label?: string;
+  step_titles?: string[];      // optional per-step heading (index 0 = step 1) — multi-step only
 }
 
 // ── caps (bounded, never unbounded) ──────────────────────────────────────────
 const MAX_FIELDS = 30;
 const MAX_RULES = 40;
 const MAX_CHOICES = 30;
+const MAX_STEPS = 12;
 const CAP = { title: 120, label: 200, help: 300, placeholder: 100, choice: 120, confirm: 500, submit: 40, id: 40 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -128,6 +140,12 @@ export function normalizeFormDefinition(raw: unknown):
     if (f.required) field.required = true;
     const help = s(f.help, CAP.help); if (help) field.help = help;
     const placeholder = s(f.placeholder, CAP.placeholder); if (placeholder) field.placeholder = placeholder;
+    // FB-2 multi-step: an integer step ≥ 1 (capped). Non-numeric/absent → step 1.
+    const st = numOrUndef(f.step);
+    if (st !== undefined && st >= 1) field.step = Math.min(MAX_STEPS, Math.trunc(st));
+    // FB-2 prefill: opt-in whitelist (consent is never prefillable — a checkbox that
+    // legally records agreement must be a deliberate act, never pre-ticked by a link).
+    if (f.prefill && type !== 'consent') field.prefill = true;
 
     if (CHOICE_TYPES.includes(type)) {
       const choices = arr(f.choices).map((c) => s(c, CAP.choice)).filter(Boolean).slice(0, MAX_CHOICES);
@@ -147,6 +165,19 @@ export function normalizeFormDefinition(raw: unknown):
   }
   if (seen.size === 0) return { ok: false, error: 'A form needs at least one field.' };
 
+  // FB-2 multi-step normalization: remap the step numbers ACTUALLY used to a
+  // contiguous 1..N (so "Step X of N" is always honest and a gap never leaves an
+  // empty page). A form that ends up with a single step carries NO `step` key on
+  // any field — its render then stays byte-identical to a plain form.
+  const usedSteps = [...new Set(fields.map((f) => f.step ?? 1))].sort((a, b) => a - b);
+  const multiStep = usedSteps.length > 1;
+  if (multiStep) {
+    const remap = new Map(usedSteps.map((v, i) => [v, i + 1]));
+    for (const f of fields) f.step = remap.get(f.step ?? 1)!;
+  } else {
+    for (const f of fields) delete f.step;
+  }
+
   // rules: keep only whitelisted ops/actions that reference real sibling keys.
   const rules: FieldRule[] = [];
   for (const rr of arr(r.rules).slice(0, MAX_RULES)) {
@@ -163,6 +194,11 @@ export function normalizeFormDefinition(raw: unknown):
   }
 
   const form: FormDefinition = { type: 'form', id, title, kind, fields, rules };
+  // FB-2 per-step headings — only meaningful (and only kept) on a multi-step form.
+  if (multiStep) {
+    const titles = arr(r.step_titles).slice(0, usedSteps.length).map((t) => s(t, CAP.label));
+    if (titles.some(Boolean)) form.step_titles = titles;
+  }
   const confirm = s(r.confirmation_text, CAP.confirm); if (confirm) form.confirmation_text = confirm;
   const submit = s(r.submit_label, CAP.submit); if (submit) form.submit_label = submit;
   const redirect = safeHref(String(r.redirect_url ?? '')); if (redirect) form.redirect_url = redirect;   // https/mailto/tel only
@@ -330,7 +366,7 @@ export interface FormRenderCtx { esc: (s: string) => string; attr: (s: string) =
 // stylesheet — and every golden — stays byte-stable when no form is present).
 // Reuses the template's form.card input styling; adds only group/help/consent
 // niceties. Zero external assets.
-const FORM_CSS = `<style>.presence-form{max-width:560px}.presence-form .ff{margin:0}.presence-form .ff[hidden]{display:none}.presence-form .ff-req{color:#b42318}.presence-form .ff-help{display:block;font-size:.85rem;color:var(--soft,#666);margin-top:4px}.presence-form fieldset.ff-group{border:1px solid var(--line,#ddd);border-radius:9px;padding:12px 14px;margin-bottom:14px}.presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}.presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}.presence-form .ff-opt input{width:auto;margin:0}.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:14px}.presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}.presence-form .ff-consent input{width:auto;margin-top:4px}.presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}</style>`;
+const FORM_CSS = `<style>.presence-form{max-width:560px}.presence-form .ff{margin:0}.presence-form .ff[hidden]{display:none}.presence-form .ff-req{color:#b42318}.presence-form .ff-help{display:block;font-size:.85rem;color:var(--soft,#666);margin-top:4px}.presence-form fieldset.ff-group{border:1px solid var(--line,#ddd);border-radius:9px;padding:12px 14px;margin-bottom:14px}.presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}.presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}.presence-form .ff-opt input{width:auto;margin:0}.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:14px}.presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}.presence-form .ff-consent input{width:auto;margin-top:4px}.presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}.presence-form .ff-step[hidden]{display:none}.presence-form .ff-step-title{font-weight:600;font-size:1.02rem;margin:0 0 10px}.presence-form .ff-progress{font-size:.85rem;color:var(--soft,#666);font-weight:600;margin:0 0 8px}.presence-form .ff-bar{display:block;height:5px;border-radius:999px;background:var(--line,#e5e5e5);overflow:hidden;margin:0 0 16px}.presence-form .ff-bar-in{display:block;height:100%;width:0;background:var(--accent,#5b3fa0);transition:width .2s ease}.presence-form .ff-nav{display:flex;gap:10px;margin-top:2px}</style>`;
 
 export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
   const E = ctx?.esc || esc; const A = ctx?.attr || attr;
@@ -400,6 +436,25 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
     return `<div class="ff" data-field="${A(f.key)}"><p>${control}${help}</p></div>`;
   };
 
+  // FB-2 multi-step: the distinct step numbers, in order. Multi-step ONLY when the
+  // definition genuinely carries >1 step (normalize strips the key otherwise), so a
+  // plain form renders byte-identically (no ff-steps wrapper, no step enhancer).
+  const stepNums = [...new Set(def.fields.map((f) => f.step).filter((n): n is number => typeof n === 'number'))].sort((a, b) => a - b);
+  const multi = stepNums.length > 1;
+
+  let fieldsHtml: string;
+  if (multi) {
+    const groups = stepNums.map((n) => {
+      const inner = def.fields.filter((f) => (f.step ?? 1) === n).map(fieldHtml).join('');
+      const t = def.step_titles?.[n - 1];
+      const title = t ? `<p class="ff-step-title">${E(t)}</p>` : '';
+      return `<div class="ff-step" data-step="${n}">${title}${inner}</div>`;
+    }).join('');
+    fieldsHtml = `<div class="ff-steps" data-steps="${stepNums.length}">${groups}</div>`;
+  } else {
+    fieldsHtml = def.fields.map(fieldHtml).join('');
+  }
+
   const action = ctx?.formEndpoint ? ` action="${A(ctx.formEndpoint)}"` : '';
   const submit = E(def.submit_label || 'Send');
   const body =
@@ -410,11 +465,61 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
     `<input type="hidden" name="source_page" value="${A(ctx?.sourcePage || '/')}">` +
     `<p class="hp" aria-hidden="true"><label for="${A(dom)}-hp">Leave this field empty</label>` +
     `<input id="${A(dom)}-hp" name="_hp" tabindex="-1" autocomplete="off"></p>` +
-    def.fields.map(fieldHtml).join('') +
+    fieldsHtml +
     `<p style="font-size:.85rem;color:var(--soft)">Please don’t include sensitive personal, financial, or medical information.</p>` +
     `<button class="btn" type="submit">${submit}</button></form>`;
 
-  return body + ruleScript(def, dom);
+  const prefillKeys = def.fields.filter((f) => f.prefill).map((f) => f.key);
+  return body + ruleScript(def, dom) + stepScript(dom, multi) + prefillScript(dom, prefillKeys);
+}
+
+/** FB-2 multi-step enhancer: PROGRESSIVE — the static HTML shows every step (so with
+ *  JS off the whole form is a single scrollable page the server still validates). This
+ *  scoped, first-party inline script (same zero-external-origin posture as the rule
+ *  enhancer) reveals one step at a time, adds a progress bar + Back/Next, validates the
+ *  current step before advancing, and hides the submit until the last step. */
+function stepScript(dom: string, multi: boolean): string {
+  if (!multi) return '';
+  const js =
+    `(function(){var F=document.getElementById(${JSON.stringify(dom)});if(!F)return;` +
+    `var W=F.querySelector('.ff-steps');if(!W)return;` +
+    `var steps=[].slice.call(W.querySelectorAll('.ff-step'));var total=steps.length;if(total<2)return;` +
+    `var submit=F.querySelector('button[type=submit]');var cur=0;` +
+    `var prog=document.createElement('p');prog.className='ff-progress';prog.setAttribute('aria-live','polite');` +
+    `var bar=document.createElement('span');bar.className='ff-bar';bar.setAttribute('aria-hidden','true');` +
+    `var barIn=document.createElement('span');barIn.className='ff-bar-in';bar.appendChild(barIn);` +
+    `var nav=document.createElement('div');nav.className='ff-nav';` +
+    `var back=document.createElement('button');back.type='button';back.className='btn btn-outline';back.textContent='Back';` +
+    `var next=document.createElement('button');next.type='button';next.className='btn';next.textContent='Next';` +
+    `nav.appendChild(back);nav.appendChild(next);` +
+    `W.parentNode.insertBefore(prog,W);W.parentNode.insertBefore(bar,W);W.parentNode.insertBefore(nav,W.nextSibling);` +
+    `function valid(i){var el=steps[i].querySelectorAll('input,select,textarea');for(var j=0;j<el.length;j++){var e=el[j];var w=e.closest?e.closest('[data-field]'):null;if(w&&w.hidden)continue;if(e.disabled)continue;if(e.checkValidity&&!e.checkValidity()){if(e.reportValidity)e.reportValidity();return false;}}return true;}` +
+    `function show(i,f){cur=Math.max(0,Math.min(total-1,i));for(var k=0;k<total;k++)steps[k].hidden=(k!==cur);` +
+    `back.style.display=cur===0?'none':'';var last=cur===total-1;next.style.display=last?'none':'';if(submit)submit.style.display=last?'':'none';` +
+    `prog.textContent='Step '+(cur+1)+' of '+total;barIn.style.width=Math.round(((cur+1)/total)*100)+'%';` +
+    `if(f){var g=steps[cur].querySelector('input,select,textarea');if(g&&g.focus){try{g.focus();}catch(_){}}}}` +
+    `back.addEventListener('click',function(){show(cur-1,true);});` +
+    `next.addEventListener('click',function(){if(valid(cur))show(cur+1,true);});` +
+    `show(0,false);})();`;
+  return `<script>${js.replace(/</g, '\\u003c')}</script>`;
+}
+
+/** FB-2 prefill enhancer: fills WHITELISTED fields from a matching URL query param
+ *  (?<key>=…). Values are written via the DOM `.value`/`.checked` property — never
+ *  HTML — so a hostile query string can only ever set a plain value, never inject
+ *  markup. Scoped to this form; zero external origins; a no-op with no prefill fields. */
+function prefillScript(dom: string, keys: string[]): string {
+  if (!keys.length) return '';
+  const js =
+    `(function(){var F=document.getElementById(${JSON.stringify(dom)});if(!F)return;` +
+    `var K=${JSON.stringify(keys)};var q;try{q=new URLSearchParams(location.search);}catch(_){return;}` +
+    `for(var i=0;i<K.length;i++){var k=K[i];if(!q.has(k))continue;var v=(q.get(k)||'').slice(0,500);` +
+    `var el=F.querySelectorAll('[name=\"'+k+'\"]');` +
+    `for(var j=0;j<el.length;j++){var e=el[j];` +
+    `if(e.type==='checkbox'||e.type==='radio'){if(e.value===v)e.checked=true;}` +
+    `else if(e.tagName==='SELECT'){for(var o=0;o<e.options.length;o++){if(e.options[o].value===v){e.selectedIndex=o;break;}}}` +
+    `else{e.value=v;}}}})();`;
+  return `<script>${js.replace(/</g, '\\u003c')}</script>`;
 }
 
 /** The minimal inline enhancer: applies the SAME whitelisted rules client-side.
