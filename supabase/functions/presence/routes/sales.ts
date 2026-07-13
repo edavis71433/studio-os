@@ -17,6 +17,7 @@ import { raiseNotice } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink } from '../commerce/stripe.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
+import { signDocToken, verifyDocToken, renderDocument, type DocKind } from '../lib/documents.ts';
 import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
@@ -63,6 +64,18 @@ async function verifySalesToken(token: string, secret: string, nowSec: number): 
   if (!p || (p.t !== 'proposal' && p.t !== 'contract') || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
   if (p.exp < nowSec) return null;
   return p;
+}
+
+/** Mint a URL to the branded, printable Document of Record for an artifact. The
+ *  page is server-rendered by handleSalesDocument (a signed `doc` token, site_id
+ *  inside it) and saved as PDF via the browser. 90-day exp: an emailed copy is a
+ *  keepable record, so it outlives the 30-day accept/sign links. Null when no
+ *  signing secret is configured. */
+async function docLink(kind: DocKind, id: string, siteId: string): Promise<string | null> {
+  const secret = linkSecret();
+  if (!secret) return null;
+  const token = await signDocToken({ t: 'doc', k: kind, id, site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400 }, secret);
+  return `${fnBase()}/functions/v1/presence/sales/doc/${token}`;
 }
 
 // ── deal events (sales audit) + provenance mirror ──
@@ -368,7 +381,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
 }
 
 /** Email the customer their invoice/deposit pay link, on the studio's brand. Best-effort. */
-async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number): Promise<boolean> {
+async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number, invoiceId?: string): Promise<boolean> {
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
     const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
@@ -379,7 +392,10 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     // Operator-typed title → escape it (it lands inside HTML) and mind the article.
     const safeTitle = title.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
     const article = /^[aeiou]/i.test(title) ? 'an' : 'a';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a payment link = transactional
+    // A branded, printable copy of the invoice (a keepable record alongside the pay link).
+    const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
+    const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true });   // a payment link = transactional
   } catch { return false; }
 }
 
@@ -444,7 +460,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   // not a deliberate resend — don't send the client two identical emails.
   const lastTouch = Date.parse(String(inv.updated_at || inv.created_at || '')) || 0;
   const doubleTap = reused && !repaired && (Date.now() - lastTouch) < 120000;
-  const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents));
+  const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
   // `repaired` = the FIRST attempt's link failed before its event could be
   // recorded — the retry that completes it must write the history line.
@@ -614,6 +630,10 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     if (to) {
       const brand = await loadEmailBrand(tok.site_id);
       const escHtml = (s: string) => s.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch] as string));
+      // A branded, print-ready copy of the signed Document of Record (the same
+      // content_hash + evidence, rendered as a certificate) they can save as PDF.
+      const doc = await docLink('contract', id, tok.site_id);
+      const docLine = doc ? `<p style="margin:12px 0 0"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
       // Signature certificate: name · timestamp (UTC) · document fingerprint —
       // only facts this request already holds; deliberately no IP or device data.
       copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
@@ -623,7 +643,8 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:12px 18px;font-size:13px;color:#6b6478;line-height:1.7">` +
         `Signed by: <strong>${escHtml(signerName)}</strong><br>` +
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
-        `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>`,
+        `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
+        docLine,
         brand, { critical: true }).catch(() => false);   // their signed legal record = transactional
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
@@ -657,6 +678,56 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
   const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at&limit=1`))[0];
   if (!c) return json({ error: 'not_found' }, 404, cors);
   return json({ data: { kind: 'contract', brand, ...c } }, 200, cors); // content_hash is presented back on sign (version integrity)
+}
+
+// ═══ BRANDED DOCUMENT OF RECORD (token) — a printable, keepable copy ═════════
+// Server-renders a self-contained, print-optimized branded HTML document for a
+// proposal / invoice / deposit / SIGNED contract, authorized ONLY by a signed
+// `doc` token (its own type — a doc link only RENDERS, it can never mutate; the
+// site_id lives inside the token, so it's tenant-safe pre-auth). It renders the
+// EXISTING immutable rows — the signed contract's exact body + typed signer + UTC
+// timestamp + content_hash + signed_evidence become a visible certificate of
+// record. No new storage, table, column, or migration. Opened directly in a
+// browser (like /p/<token>) and saved as PDF via the page's Print affordance.
+export async function handleSalesDocument(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
+  const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' } });
+  const errPage = (msg: string) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document unavailable</title><div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#1b1525;text-align:center"><h1 style="font-weight:500">This document link isn’t working</h1><p style="color:#6b6478">${msg}</p></div>`;
+  if (!(await rateAllow(`sales_doc:${clientIp(req)}`, 60, 60))) return htmlResp(errPage('Too many requests — try again in a moment.'), 429);
+  const secret = linkSecret();
+  if (!secret) return htmlResp(errPage('This link isn’t available right now.'), 503);
+  const tok = await verifyDocToken(token, secret, Math.floor(Date.now() / 1000));
+  if (!tok) return htmlResp(errPage('It may have expired — ask your studio for a fresh copy. Nothing is lost.'), 403);
+  let brand: { name: string; accent: string; accentDark: string } | undefined;
+  try { brand = await loadEmailBrand(tok.site_id); } catch { /* neutral default in the renderer */ }
+  if (tok.k === 'proposal') {
+    const p = rows(await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,sent_at,decided_at&limit=1`))[0];
+    if (!p) return htmlResp(errPage('This proposal is no longer available.'), 404);
+    return htmlResp(renderDocument('proposal', p, brand));
+  }
+  if (tok.k === 'invoice') {
+    const v = rows(await svc(`presence_invoices?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at&limit=1`))[0];
+    if (!v) return htmlResp(errPage('This invoice is no longer available.'), 404);
+    return htmlResp(renderDocument('invoice', v, brand));
+  }
+  const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`))[0];
+  if (!c) return htmlResp(errPage('This agreement is no longer available.'), 404);
+  return htmlResp(renderDocument('contract', c, brand));
+}
+
+// ═══ DOCUMENT LINK (authed) — mint the printable document URL for the CRM ════
+// The operator opens/prints a branded document from the deal drawer. Verifies the
+// artifact belongs to THIS site (tenant-safe), then mints a 30-day `doc` token and
+// returns the URL to the server-rendered page above. Studio-gated like every
+// authed /sales/* route.
+const DOC_TABLE: Record<DocKind, string> = { proposal: 'presence_proposals', contract: 'presence_contracts', invoice: 'presence_invoices' };
+export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const secret = linkSecret();
+  if (!secret) return json({ error: 'unavailable', message: 'Document links aren’t available in this environment.' }, 503, cors);
+  const exists = rows(await svc(`${DOC_TABLE[kind]}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`))[0];
+  if (!exists) return json({ error: 'not_found', message: 'That document isn’t here.' }, 404, cors);
+  const token = await signDocToken({ t: 'doc', k: kind, id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
+  return json({ url: `${fnBase()}/functions/v1/presence/sales/doc/${token}` }, 200, cors);
 }
 
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══

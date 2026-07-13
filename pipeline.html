@@ -342,7 +342,7 @@ async function openDeal(id){
     const props=(data.proposals||[]).map(p=>{
       const chip=p.status==='accepted'?`<span class="stage won">Accepted ✓</span>`:p.status==='declined'?`<span class="stage lost">Declined</span>`:p.status==='sent'?`<span class="stage">Sent — awaiting decision</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       const act=p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
-      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} ${chip}</span><span>${act}<button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${p.status==='sent'?linkNote('proposal',p.id,'link'):''}</div>`;
+      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} ${chip}</span><span>${act}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${p.status==='sent'?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const cons=(data.contracts||[]).map(k=>{
@@ -350,7 +350,8 @@ async function openDeal(id){
       const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
       const act=k.status==='draft'?`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `:k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
-      return `<div class="row2"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button></span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>`;
+      const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
+      return `<div class="row2"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button></span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>`;
     }).join('')||'<div class="mut">No agreement yet.</div>';
     const conTplBtns=conTpls.map(t=>`<button class="btn ghost" data-use-ctpl="${t.id}" title="Draft an agreement from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
@@ -383,7 +384,7 @@ async function openDeal(id){
         <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
-          ${(data.invoices||[]).map(v=>`<div class="row2"><span class="mut">${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))} — ${money(v.amount_cents)}</span><span>${v.status==='paid'?`<span style="color:var(--good,#33664b);font-weight:700">✓ Paid${v.paid_at?' '+new Date(v.paid_at).toLocaleDateString():''}</span>`:v.status==='void'?`<span class="mut">Voided</span>`:`<span style="color:var(--warn,#775d31);font-weight:600">Awaiting payment</span>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''}`}</span></div>`).join('')}
+          ${(data.invoices||[]).map(v=>`<div class="row2"><span class="mut">${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))} — ${money(v.amount_cents)}</span><span>${v.status==='paid'?`<span style="color:var(--good,#33664b);font-weight:700">✓ Paid${v.paid_at?' '+new Date(v.paid_at).toLocaleDateString():''}</span>`:v.status==='void'?`<span class="mut">Voided</span>`:`<span style="color:var(--warn,#775d31);font-weight:600">Awaiting payment</span>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''}`}<button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`).join('')}
           <div class="mut">Send the client a secure payment link — an invoice (defaults to the accepted proposal's total) or a deposit to start the work.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button></div><div id="invForm"></div></div>
         <div class="sec"><h3>Convert to customer</h3>
           ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html">Manage their access →</a></div>`:
@@ -418,10 +419,17 @@ async function openDeal(id){
       copyToClip(r.url);openDeal(id);};
     // Copy an already-sent doc's link (send is idempotent → re-fetches the link).
     const copyDocLink=async(kind,docId)=>{try{let url=LINKS[docId];if(!url){const r=await api('/sales/'+(kind==='contract'?'contracts':'proposals')+'/'+docId+'/send','POST',{});url=r.url;if(url)LINKS[docId]=url;}if(!url){toast('No signing link is available — check your email settings.',true);return;}copyToClip(url);toast(kind==='contract'?'Signing link copied':'Link copied');}catch(e){toast(nice(e),true);}};
+    // Open the branded, print-ready Document of Record (proposal / agreement /
+    // invoice). Opens a new tab pointed at the server-rendered page (Save-as-PDF
+    // via the page's Print button). `table` is the plural /sales/* segment.
+    const openDoc=async(table,docId,el)=>{if(el)el.disabled=true;try{const r=await api('/sales/'+table+'/'+docId+'/document');if(r&&r.url)window.open(r.url,'_blank','noopener');else toast('Couldn’t open the document just now.',true);}catch(e){toast(nice(e),true);}finally{if(el)el.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendProposalById(b.dataset.sendProposal);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
+    $('detailInner').querySelectorAll('[data-doc-prop]').forEach(b=>b.onclick=()=>openDoc('proposals',b.dataset.docProp,b));
+    $('detailInner').querySelectorAll('[data-doc-con]').forEach(b=>b.onclick=()=>openDoc('contracts',b.dataset.docCon,b));
+    $('detailInner').querySelectorAll('[data-doc-inv]').forEach(b=>b.onclick=()=>openDoc('invoices',b.dataset.docInv,b));
     const mng=$('mngServices'); if(mng) mng.onclick=openManageServices;
     // Multi-line proposal form — real projects have design + build + care, not one line.
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{

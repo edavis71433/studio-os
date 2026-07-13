@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView } from './routes/sales.ts';
+import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
@@ -170,6 +170,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     let m = route.match(/^\/sales\/(?:p|c|view)\/(.+)$/);
     if (m && method === 'GET') return handleSalesPublicView(req, m[1], cors);
+    // The branded, print-ready Document of Record — server-rendered HTML, opened
+    // directly in a browser and saved as PDF. Authorized ONLY by a signed `doc`
+    // token (site_id inside it); renders existing immutable rows, never mutates.
+    m = route.match(/^\/sales\/doc\/(.+)$/);
+    if (m && method === 'GET') return handleSalesDocument(req, m[1], cors);
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleSalesProposalDecide(req, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/sign$/);
@@ -531,6 +536,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesContractSend(req, site, principal, m[1], cors);
+    // Mint the printable Document-of-Record URL for the deal drawer (proposal /
+    // contract / invoice). Studio-gated & site-scoped like every authed /sales/*.
+    m = route.match(/^\/sales\/(proposals|contracts|invoices)\/([0-9a-f-]{36})\/document$/);
+    if (m && method === 'GET') return handleSalesDocumentLink(site, (m[1] === 'invoices' ? 'invoice' : m[1] === 'contracts' ? 'contract' : 'proposal'), m[2], cors);
   }
   // ── P2-D: Service Delivery (authed, site-scoped). One coherent /projects/*
   //    resource surface — projects · tasks · milestones · activity. Studio side
