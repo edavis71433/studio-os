@@ -24,6 +24,9 @@
   .badge.ok{color:var(--good);background:var(--good-soft)} .badge.warn{color:var(--warn);background:var(--warn-soft)}
   .badge.bad{color:var(--bad);background:var(--bad-soft)} .badge.wait{color:var(--accent);background:var(--accent-soft)}
   .badge.off{color:var(--soft);background:transparent;border-color:var(--line)}
+  /* the site-map tree: children indent under their parent with a connector rail */
+  .tree-kids{margin-left:22px;padding-left:20px;border-left:2px solid var(--line)}
+  @media (max-width:560px){ .tree-kids{margin-left:10px;padding-left:12px} }
   /* sections list inside a page */
   ul.sections{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
   ul.sections li{display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line)}
@@ -107,7 +110,7 @@ function sectionRow(s){
     <span class="sec-name">${esc(s.label)}${req}</span>
     <span class="sec-status${attnCls}">${esc(s.status_label)}${count}</span>
     <span class="grow"></span>
-    <a class="edit" href="${esc(editHref(s.editor_link))}">Edit</a>
+    <a class="edit" data-dds-editor href="${esc(editHref(s.editor_link))}">Edit</a>
   </li>`;
 }
 
@@ -133,6 +136,32 @@ function pageCard(p){
   </section>`;
 }
 
+// Build a real site MAP from the flat page list: Home is the root, top-level
+// pages nest under it, and deeper paths (/menu/pasta) nest under their parent
+// (/menu). Derived from each page's path — no new data model.
+function buildHierarchy(pages){
+  const norm = (p) => { let s = String(p==null?'/':p).split('#')[0].split('?')[0]; if(s.charAt(0)!=='/') s='/'+s; if(s.length>1) s=s.replace(/\/$/,''); return s||'/'; };
+  const nodes = pages.map((p)=>({ page:p, path:norm(p.path), children:[] }));
+  nodes.sort((a,b)=> (a.path.split('/').filter(Boolean).length) - (b.path.split('/').filter(Boolean).length) || a.path.localeCompare(b.path));
+  const byPath = {}, roots = [];
+  nodes.forEach((n)=>{
+    let parent = null;
+    const segs = n.path.split('/').filter(Boolean);
+    for(let i=segs.length-1; i>=1; i--){ const cand = '/'+segs.slice(0,i).join('/'); if(byPath[cand]){ parent = byPath[cand]; break; } }
+    if(!parent && n.path!=='/' && byPath['/']) parent = byPath['/'];   // top-level pages hang under Home
+    if(parent) parent.children.push(n); else roots.push(n);
+    byPath[n.path] = n;
+  });
+  return roots;
+}
+function renderHierarchy(roots, depth){
+  depth = depth || 0;
+  return roots.map((n)=>{
+    const kids = (n.children && n.children.length) ? `<div class="tree-kids">${renderHierarchy(n.children, depth+1)}</div>` : '';
+    return `<div class="tree-node"${depth?' data-child="1"':''}>${pageCard(n.page)}${kids}</div>`;
+  }).join('');
+}
+
 function render(tree){
   if(!tree || !Array.isArray(tree.pages) || !tree.pages.length){
     $('main').innerHTML = `<div class="center"><h2>Your site is being set up.</h2>
@@ -149,7 +178,7 @@ function render(tree){
     <span class="state">${esc(st.text)}</span>
     ${attnLine}
   </div>`;
-  html += tree.pages.map(pageCard).join('');
+  html += renderHierarchy(buildHierarchy(tree.pages));
   html += `<p class="foot">This map reads your site — it never changes it. Editing happens in your editor, and nothing goes live until you publish.</p>`;
   $('main').innerHTML = html;
 }

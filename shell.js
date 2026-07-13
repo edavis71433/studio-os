@@ -94,6 +94,29 @@
   // the ONE canonical helper: same headers (incl. scope carry), same normalized
   // {ok,status,body} shape, plus method/body support. New code MUST use it;
   // existing pages migrate opportunistically after human browser QA.
+  // ── Editing opens the full editor in its own FULL-SCREEN window ──────────────
+  // Owner preference: when you open a page/section to edit — from the site map,
+  // Today, Inbox, anywhere — the whole editor pops in its own maximized window so
+  // you don't lose your place. Any link marked [data-dds-editor] or .edit, or a
+  // deep-link into the editor (/presence.html#section), routes through here.
+  window.ddsOpenEditor = function (href) {
+    try {
+      var w = window.open(href, 'dds-editor', 'width=' + screen.availWidth + ',height=' + screen.availHeight + ',left=0,top=0');
+      if (w) { try { w.moveTo(0, 0); w.resizeTo(screen.availWidth, screen.availHeight); } catch (_) { /* */ } w.focus(); return true; }
+    } catch (_) { /* */ }
+    try { window.open(href, '_blank', 'noopener'); } catch (_) { location.href = href; }   // popup blocked → new tab
+    return true;
+  };
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || a.target === '_blank') return;
+    var href = a.getAttribute('href') || '';
+    var isEdit = a.hasAttribute('data-dds-editor') || a.classList.contains('edit') || /\/presence\.html#[a-z]/i.test(href);
+    if (!isEdit) return;
+    e.preventDefault();
+    window.ddsOpenEditor(a.href);
+  }, true);
+
   window.ddsApi = function (path, opts) {
     opts = opts || {};
     var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': scopeId() } };
