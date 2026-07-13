@@ -313,6 +313,14 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
         }
         for (const d of deals) d.last_contacted_at = latest[d.id] || null;
       } catch { /* the list still loads without the last-contacted hint */ }
+      // Agreement-signed flag per card — ONE query for signed contracts among the
+      // page's deals, so a signed deal reads "Agreement signed ✓" instead of the
+      // stale "Agreement out" (the drawer already knew; the list badge didn't).
+      try {
+        const ids = deals.map((d: any) => d.id).filter(Boolean);
+        const signed = new Set(rows(await svc(`presence_contracts?site_id=eq.${site.id}&status=eq.signed&deal_id=in.(${ids.join(',')})&deleted_at=is.null&select=deal_id`)).map((c: any) => c.deal_id));
+        for (const d of deals) d.agreement_signed = signed.has(d.id);
+      } catch { /* badge falls back to the plain stage label */ }
     }
     return json({ data: deals, limit, offset }, 200, cors);
   }

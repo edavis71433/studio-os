@@ -180,7 +180,11 @@ const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent
 const stageLabel=(s)=>STAGE_LABEL[s]||s;
 // The badge reads as an OUTCOME where one exists: a converted deal is "Won ✓"
 // (calm green), a lost one is a muted "Lost" — active stages keep their labels.
-const stageBadge=(s)=>`<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Lost':esc(stageLabel(s))}</span>`;
+const stageBadge=(s,signed)=>{
+  // A signed agreement reads as its own positive state — never the stale "Agreement out".
+  if(s==='contract'&&signed)return `<span class="stage won">Agreement signed ✓</span>`;
+  return `<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Lost':esc(stageLabel(s))}</span>`;
+};
 // Per-stage "Path" guidance — the calm one-line tip + suggested next action, so
 // a non-technical owner always knows what to do next. Mirrors the source of
 // truth in lib/pipeline_guidance.ts (which the test imports).
@@ -366,7 +370,7 @@ async function load(){
     $('list').innerHTML=DEALS.map(d=>{
       const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
       const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
-      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
     }).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   }catch(e){ if(window.ddsError) window.ddsError(host,nice(e),load); else host.innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
