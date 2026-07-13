@@ -30,6 +30,9 @@ import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
   buildActivityDetail, mergeDealTimeline, lastContactedAt, type DealActivityKind,
 } from '../crm/deal_activity.ts';
+import { composeContactDetail } from '../crm/contact_detail.ts';
+import { normalizeFieldDefs, normalizeFieldValues, applyFieldValues, type CustomFieldDef } from '../crm/custom_fields.ts';
+import { findPossibleDuplicates } from '../crm/dedupe.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -43,6 +46,12 @@ const nowIso = () => new Date().toISOString();
 // this sentinel name) so it reuses the existing site-scoped, deny-all, function-
 // mediated sales-templates store with NO new migration. Hidden from the template list.
 const SERVICES_CATALOG_NAME = '__services_catalog__';
+// The site's contact custom-field DEFINITIONS (≤5 owner-defined labeled fields)
+// ride the same reserved-template store as the services catalog — a single row
+// (kind=proposal, this sentinel name) whose `body` holds the definitions JSON.
+// Site-scoped, deny-all, function-mediated — NO new migration for definitions.
+// (Per-contact VALUES live in presence_contacts.custom, migration 0097.)
+const CONTACT_FIELDS_NAME = '__crm_contact_fields__';
 // A machine marker on a presence_contacts row (site-scoped) that says "this studio
 // wants THIS email as a customer — auto-connect them the moment they self-serve
 // sign up". The studio IS its presence site, and presence_contacts.site_id is
@@ -118,16 +127,138 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     const email = clean(b.email, 160).toLowerCase();
     const name = clean(b.name, 120);
     if (!name && !email) return json({ error: 'validation', message: 'A contact needs a name or an email.' }, 422, cors);
+    const phone = clean(b.phone, 40);
     // duplicate protection: reuse an existing contact for this (site, email)
     if (email) {
       const existing = await svc(`presence_contacts?site_id=eq.${site.id}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,name,email,phone,company&limit=1`);
       if (existing.ok && rows(existing)[0]) return json({ data: rows(existing)[0], deduped: true }, 200, cors);
     }
+    // FUZZY near-duplicate: past the exact-email check, a typo'd re-entry
+    // ("Jayne" for "Jane") or an alt format ("Doe, Jane") with the same phone
+    // can still be the same person. When the caller opts in (dedupe_check) and
+    // hasn't yet confirmed, surface the possible matches for a gentle
+    // "Is this the same person as {X}?" prompt — NEVER auto-merge, never block a
+    // deliberate save. Bulk CSV import doesn't set the flag (exact-email dedupe
+    // already covers its common case), so it stays fast.
+    if (b.dedupe_check === true && b.confirm !== true && (name || phone)) {
+      const CAP = 1000;
+      const pool = rows(await svc(`presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,email,phone,company&limit=${CAP}`));
+      const matches = findPossibleDuplicates({ name, phone, email }, pool, 5);
+      if (matches.length) return json({ error: 'possible_duplicate', matches, message: `This looks like someone you already have. Is it the same person?` }, 409, cors);
+    }
     const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, name, email, phone: clean(b.phone, 40), company: clean(b.company, 120), notes: clean(b.notes, 2000) }) });
+      body: JSON.stringify({ site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000) }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That contact didn’t save — please try again.' }, 502, cors);
     return json({ data: rows(ins)[0] }, 201, cors);
   }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+// ═══ CONTACT CUSTOM FIELD DEFINITIONS (site-level, ≤5, no migration) ══════════
+// The owner's own labeled fields (text/number/date/select) live as ONE reserved
+// presence_sales_templates row (kind=proposal, CONTACT_FIELDS_NAME), its `body`
+// holding the definitions JSON — reusing the site-scoped, deny-all, function-
+// mediated store exactly like the services catalog. Per-contact VALUES live in
+// presence_contacts.custom (migration 0097). Studio-gated & site-scoped.
+async function loadContactFieldDefs(siteId: string): Promise<CustomFieldDef[]> {
+  const row = rows(await svc(`presence_sales_templates?site_id=eq.${siteId}&kind=eq.proposal&name=eq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&deleted_at=is.null&select=body&limit=1`))[0];
+  if (!row || !row.body) return [];
+  try { return normalizeFieldDefs(JSON.parse(row.body)); } catch { return []; }
+}
+export async function handleSalesContactFields(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method === 'GET') return json({ data: await loadContactFieldDefs(site.id) }, 200, cors);
+  if (req.method === 'PUT') {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    if (!Array.isArray(b.fields)) return json({ error: 'validation', message: 'Send your fields as a list.' }, 422, cors);
+    const defs = normalizeFieldDefs(b.fields);                      // caps to ≤5, slugs unique keys, validates types
+    const body = JSON.stringify(defs);
+    // upsert the ONE reserved row (find-or-create) — a solo operator edits their
+    // own field set, no concurrent-writer race to design around.
+    const existing = rows(await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.proposal&name=eq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&deleted_at=is.null&select=id&limit=1`))[0];
+    const wrote = existing
+      ? rows(await svc(`presence_sales_templates?id=eq.${existing.id}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ body, updated_at: nowIso() }) }))[0]
+      : rows(await svc('presence_sales_templates', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, kind: 'proposal', name: CONTACT_FIELDS_NAME, title: '', body, created_by: principal.email || principal.userId || 'system' }) }))[0];
+    if (!wrote) return json({ error: 'write_failed', message: 'Your fields didn’t save — please try again.' }, 502, cors);
+    return json({ data: defs }, 200, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+// ═══ CONTACT DETAIL (tap a contact → who they are, their deals, their activity) ═
+// The read the flat contacts list never had: the contact + their deals (stage +
+// value + when last contacted) + a merged recent-activity feed across those
+// deals + "last spoke {when}" + their custom-field values. Reuses the deal-
+// activity timeline machinery (composeContactDetail) so a contact's activity
+// reads identically to a deal's. Site-scoped & studio-gated like every /sales/*.
+async function loadContact(siteId: string, id: string) {
+  // deploy-order tolerant: `custom` lands with migration 0097 — try the full
+  // select, fall back to the pre-0097 shape so a deploy ahead of the migration
+  // never breaks the contacts surface (same posture as the deals next_step cols).
+  let r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom&limit=1`);
+  if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at&limit=1`);
+  return rows(r)[0] || null;
+}
+export async function handleSalesContact(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const contact = await loadContact(site.id, id);
+  if (!contact) return json({ error: 'not_found', message: 'That contact is no longer here.' }, 404, cors);
+
+  if (req.method === 'GET') {
+    const defs = await loadContactFieldDefs(site.id);
+    const deals = rows(await svc(`presence_deals?contact_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,expected_value_cents,expected_close,converted_client_id,updated_at&order=updated_at.desc&limit=100`));
+    let events: any[] = [];
+    if (deals.length) {
+      const ids = deals.map((d: any) => d.id).filter(Boolean);
+      events = rows(await svc(`presence_deal_events?site_id=eq.${site.id}&deal_id=in.(${ids.join(',')})&select=id,deal_id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=200`));
+    }
+    const composed = composeContactDetail(deals, events, { timelineLimit: 30 });
+    const custom = normalizeFieldValues(defs, contact.custom);
+    return json({ data: {
+      contact: { id: contact.id, name: contact.name, email: contact.email, phone: contact.phone, company: contact.company, notes: contact.notes, created_at: contact.created_at, updated_at: contact.updated_at, custom },
+      deals: composed.deals, timeline: composed.timeline, last_contacted_at: composed.last_contacted_at,
+      custom_fields: defs,
+    } }, 200, cors);
+  }
+
+  if (req.method === 'PATCH') {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    const patch: Record<string, unknown> = {};
+    if (b.name !== undefined) patch.name = clean(b.name, 120);
+    if (b.phone !== undefined) patch.phone = clean(b.phone, 40);
+    if (b.company !== undefined) patch.company = clean(b.company, 120);
+    if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
+    if (b.email !== undefined) {
+      const email = clean(b.email, 160).toLowerCase();
+      if (email && email !== String(contact.email || '').toLowerCase()) {
+        // keep the (site, email) uniqueness honest with a plain-language 409
+        const dup = rows(await svc(`presence_contacts?site_id=eq.${site.id}&email=eq.${encodeURIComponent(email)}&id=neq.${id}&deleted_at=is.null&select=id&limit=1`))[0];
+        if (dup) return json({ error: 'email_taken', message: 'Another contact already uses that email.' }, 409, cors);
+      }
+      patch.email = email;
+    }
+    // custom-field values: merge the incoming patch into the stored bag (only
+    // defined keys; an empty value clears a field). Validated per type.
+    let touchesCustom = false;
+    if (b.custom !== undefined) {
+      const defs = await loadContactFieldDefs(site.id);
+      patch.custom = applyFieldValues(defs, contact.custom, b.custom);
+      touchesCustom = true;
+    }
+    if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
+    let up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    // deploy-order tolerance: before 0097 the `custom` column doesn't exist — a
+    // whole detail save (name/phone/notes) must not 502 over it.
+    if (!up.ok && touchesCustom) {
+      delete patch.custom;
+      up = Object.keys(patch).length
+        ? await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) })
+        : up;
+      if (up.ok) return json({ data: rows(up)[0], warning: 'custom_unavailable', message: 'Saved — custom fields need a quick update before they’ll stick.' }, 200, cors);
+    }
+    if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+    return json({ data: rows(up)[0] }, 200, cors);
+  }
+
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
@@ -335,8 +466,8 @@ async function loadTemplate(siteId: string, id: string, kind: 'proposal' | 'cont
 }
 export async function handleSalesTemplates(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
-    // the reserved services-catalog row is NOT a reusable template — keep it out of the list
-    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
+    // the reserved rows (services catalog + contact field defs) are NOT reusable templates — keep them out of the list
+    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
     return r.ok ? json({ data: rows(r) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
   }
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }

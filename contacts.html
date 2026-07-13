@@ -64,6 +64,40 @@
   footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  /* ── contact detail + custom fields ── */
+  .c[role=button]{cursor:pointer}
+  .c[role=button]:hover{border-color:var(--p)}
+  #detailDlg{max-width:560px}
+  .d-head h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0}
+  .d-sub{color:var(--soft);font-size:13.5px;margin-top:3px}
+  .d-links{margin-top:8px;font-size:14px}
+  .d-links a{color:var(--p);text-decoration:none}
+  .d-sec{margin-top:20px}
+  .d-sec h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:0 0 9px;display:flex;justify-content:space-between;align-items:center}
+  .d-sec h4 a{font-size:12px;text-transform:none;letter-spacing:0;color:var(--p);text-decoration:none;font-weight:600;cursor:pointer}
+  .d-stage{display:inline-block;font-size:11px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 9px}
+  .d-deal{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .d-deal .dt{font-weight:600;font-size:14px}
+  .d-deal .dm{font-size:12.5px;color:var(--soft);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .kv{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:5px 0;border-top:1px solid var(--line)}
+  .kv:first-child{border-top:none}
+  .kv .k{color:var(--soft)}.kv .v{text-align:right;word-break:break-word}
+  .tl{list-style:none;margin:0;padding:0}
+  .tl li{display:flex;gap:9px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
+  .tl li:first-child{border-top:none}
+  .tl .ic{flex:none;width:18px;text-align:center}
+  .tl .tx{flex:1}.tl .tx .dl{color:var(--faint);font-size:12px}
+  .tl .wh{color:var(--faint);font-size:12px;white-space:nowrap}
+  .dbody textarea{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none;resize:vertical;min-height:60px}
+  .dbody textarea:focus{border-color:var(--p)}
+  .field-row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+  .field-row .fr-label{flex:1;min-width:0}
+  .field-row .fr-choices{flex:1;min-width:0}
+  .field-row select{width:auto}
+  .field-row .fr-del{border:1px solid var(--line);background:transparent;border-radius:8px;cursor:pointer;padding:8px 11px;color:var(--soft);flex:none}
+  .dupe-match{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+  .dupe-match .dm-name{font-weight:600;font-size:14px}
+  .dupe-match .dm-why{font-size:12px;color:var(--faint)}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -119,6 +153,17 @@
     <div id="cust-done" style="display:none"></div>
   </form>
 </dialog>
+<dialog id="detailDlg" aria-label="Contact details"><div class="dbody" id="detailBody"></div></dialog>
+<dialog id="fieldsDlg" aria-label="Custom fields">
+  <form id="fieldsForm" class="dbody">
+    <h3>Your custom fields</h3>
+    <p class="note" style="margin:0 0 12px">Add up to 5 of your own fields — a label and a type. They show on every contact.</p>
+    <div id="fieldsRows"></div>
+    <button type="button" class="btn ghost" id="fieldsAdd" style="margin-top:4px">+ Add a field</button>
+    <div class="row2"><button type="button" class="btn ghost" id="fields-cancel">Cancel</button><button type="submit" class="btn">Save fields</button></div>
+  </form>
+</dialog>
+<dialog id="dupeDlg" aria-label="Possible duplicate"><div class="dbody" id="dupeBody"></div></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
@@ -146,7 +191,7 @@ function render(){
   else for(const c of rows){
     const who=esc(c.name||c.email||c.phone||'Contact');
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
-    h+=`<div class="c">
+    h+=`<div class="c" role="button" tabindex="0" data-open="${esc(c.id)}" aria-label="Open ${who}">
       <div class="top"><span class="who">${who}</span>${c.company?`<span class="co">${esc(c.company)}</span>`:''}</div>
       <div class="contact">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}${c.email&&c.phone?' · ':''}${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:''}</div>
       <div class="acts">
@@ -166,7 +211,13 @@ function wire(){
   const q=$('q');if(q)q.addEventListener('input',()=>{Q=q.value;const p=q.selectionStart;render();const nq=$('q');if(nq){nq.focus();try{nq.setSelectionRange(p,p);}catch(_){}}});
   const nb=$('new');if(nb)nb.addEventListener('click',openNew);
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
-  document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>newDeal(b.getAttribute('data-deal'))));
+  document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();newDeal(b.getAttribute('data-deal'));}));
+  // Tap a contact card → their detail drawer (deals, activity, last-spoke, fields).
+  // Clicks on the action buttons/links inside .acts don't open the drawer.
+  document.querySelectorAll('.c[data-open]').forEach(card=>{
+    card.addEventListener('click',(e)=>{if(e.target.closest('.acts'))return;openDetail(card.getAttribute('data-open'));});
+    card.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.acts')){e.preventDefault();openDetail(card.getAttribute('data-open'));}});
+  });
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
   const ic=$('importCsv');if(ic)ic.addEventListener('click',openImport);
 }
@@ -176,13 +227,32 @@ $('newForm').onsubmit=async(e)=>{
   e.preventDefault();
   const name=$('c-name').value.trim(),email=$('c-email').value.trim();
   if(!name&&!email){toast('A contact needs a name or an email.');return;}
+  const payload={name,email:email||undefined,phone:$('c-phone').value.trim()||undefined,company:$('c-company').value.trim()||undefined};
   const btn=e.submitter;if(btn)btn.disabled=true;
-  try{
-    const r=await api('/sales/contacts','POST',{name,email:email||undefined,phone:$('c-phone').value.trim()||undefined,company:$('c-company').value.trim()||undefined});
-    if(!r.ok){toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'That didn’t save.'));if(btn)btn.disabled=false;return;}
-    $('newDlg').close();toast(r.body&&r.body.deduped?'That contact already existed.':'Contact added.');await load();
-  }catch(_){toast('That didn’t save.');}finally{if(btn)btn.disabled=false;}
+  try{await createContact(payload,true);}
+  catch(_){toast('That didn’t save.');}
+  finally{if(btn)btn.disabled=false;}
 };
+// Create a contact. With checkDupe, the server also runs FUZZY near-duplicate
+// detection (typo'd name / alt format / same phone) beyond the exact-email skip,
+// and asks before adding a possible repeat — it never auto-merges.
+async function createContact(payload,checkDupe){
+  const body=Object.assign({},payload);if(checkDupe)body.dedupe_check=true;
+  const r=await api('/sales/contacts','POST',body);
+  if(r.status===409&&r.body&&r.body.error==='possible_duplicate'){showDupe(payload,r.body.matches||[]);return;}
+  if(!r.ok){toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'That didn’t save.'));return;}
+  $('newDlg').close();toast(r.body&&r.body.deduped?'That contact already existed.':'Contact added.');await load();
+}
+function showDupe(payload,matches){
+  let h='<h3 style="margin:0 0 6px">Is this someone you already have?</h3><p class="note" style="margin:0 0 12px">“'+esc(payload.name||payload.email||'This contact')+'” looks similar to:</p>';
+  for(const m of matches){const why=(m.reasons||[]).join(', ');h+='<div class="dupe-match"><div><div class="dm-name">'+esc(m.name||m.email||m.phone||'Contact')+'</div>'+(why?'<div class="dm-why">'+esc(why)+'</div>':'')+'</div><button type="button" class="btn ghost" data-open-dupe="'+esc(m.id)+'">Open</button></div>';}
+  h+='<div class="row2"><button type="button" class="btn ghost" id="dupe-cancel">Cancel</button><button type="button" class="btn" id="dupe-add">Add as new anyway</button></div>';
+  $('dupeBody').innerHTML=h;
+  if(!$('dupeDlg').open)$('dupeDlg').showModal();
+  $('dupe-cancel').onclick=()=>$('dupeDlg').close();
+  $('dupe-add').onclick=async()=>{$('dupeDlg').close();await createContact(payload,false);};
+  document.querySelectorAll('[data-open-dupe]').forEach(b=>b.onclick=()=>{$('dupeDlg').close();$('newDlg').close();openDetail(b.getAttribute('data-open-dupe'));});
+}
 // ── ADD A CUSTOMER: set up an existing customer with their own workspace +
 // a sign-in invitation — no deal/sign/convert ceremony. Reuses the shared
 // provisioning path server-side; here we just collect + show the outcome. ──
@@ -324,6 +394,95 @@ async function newDeal(cid){
     if(dealId)setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},700);
   }catch(_){toast('Couldn’t start that deal.');}
 }
+// ── CONTACT DETAIL: tap a contact → their deals, activity, last-spoke, fields ──
+let FIELD_DEFS=[];       // owner-defined custom fields (loaded lazily)
+let CUR_DETAIL=null;     // the contact currently open in the drawer
+const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit',converted:'Customer'};
+function money(cents){cents=Number(cents)||0;if(!cents)return '';return '$'+(cents/100).toLocaleString('en-US',{minimumFractionDigits:0});}
+function relWhen(iso){if(!iso)return '';const then=Date.parse(iso);if(!isFinite(then))return '';const days=Math.floor((Date.now()-then)/86400000);if(days<=0)return 'today';if(days===1)return 'yesterday';if(days<7)return days+' days ago';if(days<14)return 'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
+async function loadFieldDefs(force){if(FIELD_DEFS.length&&!force)return FIELD_DEFS;try{const r=await api('/sales/contacts/fields');if(r.ok)FIELD_DEFS=(r.body&&r.body.data)||[];}catch(_){}return FIELD_DEFS;}
+async function openDetail(id){
+  const dlg=$('detailDlg'),body=$('detailBody');
+  body.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  if(!dlg.open)dlg.showModal();
+  const r=await api('/sales/contacts/'+id);
+  if(!r.ok){body.innerHTML='<h3 style="margin:0 0 10px">'+(r.status===404?'That contact is no longer here.':'We couldn’t open that contact.')+'</h3><div class="row2"><button class="btn" id="dt-close">Close</button></div>';const cl=$('dt-close');if(cl)cl.onclick=()=>dlg.close();return;}
+  CUR_DETAIL=(r.body&&r.body.data)||null;renderDetailView();
+}
+function renderDetailView(){
+  const d=CUR_DETAIL;if(!d)return;const c=d.contact||{};
+  const who=esc(c.name||c.email||c.phone||'Contact');
+  const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
+  const spoke=d.last_contacted_at?('Last spoke '+relWhen(d.last_contacted_at)):'Not spoken yet';
+  let h='<div class="d-head"><h2>'+who+'</h2>';
+  if(c.company)h+='<div class="d-sub">'+esc(c.company)+'</div>';
+  h+='<div class="d-sub">'+spoke+'</div>';
+  h+='<div class="d-links">'+(c.email?'<a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')+(c.email&&c.phone?' · ':'')+(c.phone?'<a href="tel:'+esc(tel)+'">'+esc(c.phone)+'</a>':'')+'</div></div>';
+  const cf=d.custom_fields||[];
+  h+='<div class="d-sec"><h4>Details <a id="dt-fields">'+(cf.length?'Manage fields':'Add fields')+'</a></h4>';
+  if(cf.length){let any=false;for(const f of cf){const v=(d.custom&&d.custom[f.key])||'';if(!v)continue;any=true;h+='<div class="kv"><span class="k">'+esc(f.label)+'</span><span class="v">'+esc(v)+'</span></div>';}if(!any)h+='<p class="muted" style="font-size:13.5px;margin:0">No details filled in yet — tap Edit.</p>';}
+  else h+='<p class="muted" style="font-size:13.5px;margin:0">Add your own fields (like “Referred by” or “Birthday”) to track what matters to you.</p>';
+  h+='</div>';
+  if(c.notes)h+='<div class="d-sec"><h4>Notes</h4><p style="font-size:14px;white-space:pre-wrap;margin:0">'+esc(c.notes)+'</p></div>';
+  h+='<div class="d-sec"><h4>Deals</h4>';
+  if(d.deals&&d.deals.length){for(const dl of d.deals){const val=money(dl.expected_value_cents);const lc=dl.last_contacted_at?('· last contacted '+relWhen(dl.last_contacted_at)):'';h+='<div class="d-deal" data-deal-open="'+esc(dl.id)+'" role="button" tabindex="0"><div class="dt">'+esc(dl.title||'Untitled deal')+'</div><div class="dm"><span class="d-stage">'+esc(STAGE_LABEL[dl.stage]||dl.stage)+'</span>'+(val?'<span>'+val+'</span>':'')+(lc?'<span>'+lc+'</span>':'')+'</div></div>';}}
+  else h+='<p class="muted" style="font-size:13.5px;margin:0">No deals yet. <a class="link" id="dt-newdeal">Start one →</a></p>';
+  h+='</div>';
+  if(d.timeline&&d.timeline.length){h+='<div class="d-sec"><h4>Recent activity</h4><ul class="tl">';for(const t of d.timeline.slice(0,12)){h+='<li><span class="ic">'+(t.icon||'•')+'</span><span class="tx">'+esc(t.text||'')+(t.deal_title?'<span class="dl"> · '+esc(t.deal_title)+'</span>':'')+'</span><span class="wh">'+relWhen(t.at)+'</span></li>';}h+='</ul></div>';}
+  h+='<div class="row2"><button type="button" class="btn ghost" id="dt-editbtn">Edit</button><button type="button" class="btn" id="dt-done">Done</button></div>';
+  $('detailBody').innerHTML=h;
+  const done=$('dt-done');if(done)done.onclick=()=>$('detailDlg').close();
+  const eb=$('dt-editbtn');if(eb)eb.onclick=renderDetailEdit;
+  const mf=$('dt-fields');if(mf)mf.onclick=openFields;
+  const nd=$('dt-newdeal');if(nd)nd.onclick=()=>{$('detailDlg').close();newDeal(c.id);};
+  document.querySelectorAll('[data-deal-open]').forEach(el=>{const go=()=>{const sc=scope();location.href='/pipeline.html?deal='+el.getAttribute('data-deal-open')+(sc?'&client='+sc:'');};el.addEventListener('click',go);el.addEventListener('keydown',(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});});
+}
+function fieldInput(f,val){
+  const id='cf-'+f.key;
+  if(f.type==='select'){let o='<option value="">—</option>';for(const c of (f.choices||[]))o+='<option value="'+esc(c)+'"'+(c===val?' selected':'')+'>'+esc(c)+'</option>';return '<select id="'+esc(id)+'" data-cf="'+esc(f.key)+'">'+o+'</select>';}
+  const type=f.type==='number'?'number':f.type==='date'?'date':'text';
+  return '<input id="'+esc(id)+'" data-cf="'+esc(f.key)+'" type="'+type+'" value="'+esc(val)+'">';
+}
+function renderDetailEdit(){
+  const d=CUR_DETAIL;if(!d)return;const c=d.contact||{};
+  let h='<h3 style="margin:0 0 12px">Edit contact</h3>';
+  h+='<label for="dt-name">Name</label><input id="dt-name" maxlength="120" value="'+esc(c.name||'')+'">';
+  h+='<label for="dt-company">Company</label><input id="dt-company" maxlength="120" value="'+esc(c.company||'')+'">';
+  h+='<label for="dt-email">Email</label><input id="dt-email" type="email" maxlength="160" value="'+esc(c.email||'')+'">';
+  h+='<label for="dt-phone">Phone</label><input id="dt-phone" maxlength="40" value="'+esc(c.phone||'')+'">';
+  for(const f of (d.custom_fields||[])){const v=(d.custom&&d.custom[f.key])||'';h+='<label for="cf-'+esc(f.key)+'">'+esc(f.label)+'</label>'+fieldInput(f,v);}
+  h+='<label for="dt-notes">Notes</label><textarea id="dt-notes" maxlength="2000">'+esc(c.notes||'')+'</textarea>';
+  h+='<div class="row2"><button type="button" class="btn ghost" id="dt-cancel">Cancel</button><button type="button" class="btn" id="dt-save">Save</button></div>';
+  $('detailBody').innerHTML=h;
+  $('dt-cancel').onclick=renderDetailView;$('dt-save').onclick=saveDetail;
+  setTimeout(()=>{const n=$('dt-name');if(n)n.focus();},20);
+}
+async function saveDetail(){
+  const d=CUR_DETAIL;if(!d||!d.contact)return;const id=d.contact.id;
+  const custom={};document.querySelectorAll('[data-cf]').forEach(el=>{custom[el.getAttribute('data-cf')]=(el.value||'').trim();});
+  const patch={name:$('dt-name').value.trim(),company:$('dt-company').value.trim(),email:$('dt-email').value.trim(),phone:$('dt-phone').value.trim(),notes:$('dt-notes').value.trim(),custom:custom};
+  const btn=$('dt-save');if(btn)btn.disabled=true;
+  const r=await api('/sales/contacts/'+id,'PATCH',patch);
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.');if(btn)btn.disabled=false;return;}
+  toast('Saved.');await openDetail(id);await load();
+}
+// ── CUSTOM FIELD DEFINITIONS editor (≤5 labeled fields, site-wide) ──
+function fieldTypeSel(t){const opts=[['text','Text'],['number','Number'],['date','Date'],['select','Choice']];let o='';for(const p of opts)o+='<option value="'+p[0]+'"'+(p[0]===t?' selected':'')+'>'+p[1]+'</option>';return '<select class="fr-type">'+o+'</select>';}
+function fieldRow(f){f=f||{label:'',type:'text',choices:[]};const showCh=f.type==='select';return '<div class="field-row"><input class="fr-label" placeholder="Field name" maxlength="60" value="'+esc(f.label||'')+'">'+fieldTypeSel(f.type)+'<input class="fr-choices" placeholder="Options, comma-separated" value="'+esc((f.choices||[]).join(', '))+'"'+(showCh?'':' style="display:none"')+'><button type="button" class="fr-del" aria-label="Remove field">✕</button></div>';}
+function wireFieldRows(){document.querySelectorAll('#fieldsRows .field-row').forEach(row=>{const type=row.querySelector('.fr-type'),ch=row.querySelector('.fr-choices'),del=row.querySelector('.fr-del');type.onchange=()=>{ch.style.display=type.value==='select'?'':'none';};del.onclick=()=>{row.remove();syncFieldsAdd();};});syncFieldsAdd();}
+function syncFieldsAdd(){const n=document.querySelectorAll('#fieldsRows .field-row').length;const add=$('fieldsAdd');if(add)add.style.display=n>=5?'none':'';}
+async function openFields(){await loadFieldDefs(true);const src=FIELD_DEFS.length?FIELD_DEFS:[{label:'',type:'text'}];$('fieldsRows').innerHTML=src.map(fieldRow).join('');wireFieldRows();$('fieldsDlg').showModal();}
+$('fieldsAdd').onclick=()=>{if(document.querySelectorAll('#fieldsRows .field-row').length>=5)return;$('fieldsRows').insertAdjacentHTML('beforeend',fieldRow());wireFieldRows();};
+$('fields-cancel').onclick=()=>$('fieldsDlg').close();
+$('fieldsForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const fields=[];
+  document.querySelectorAll('#fieldsRows .field-row').forEach(row=>{const label=row.querySelector('.fr-label').value.trim();if(!label)return;const type=row.querySelector('.fr-type').value;const f={label:label,type:type};if(type==='select')f.choices=row.querySelector('.fr-choices').value.split(',').map(s=>s.trim()).filter(Boolean);fields.push(f);});
+  const r=await api('/sales/contacts/fields','PUT',{fields});
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.');return;}
+  FIELD_DEFS=(r.body&&r.body.data)||[];$('fieldsDlg').close();toast('Fields saved.');
+  if(CUR_DETAIL&&CUR_DETAIL.contact&&$('detailDlg').open)await openDetail(CUR_DETAIL.contact.id);
+};
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your contacts.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your contacts just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){
