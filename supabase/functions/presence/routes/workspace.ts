@@ -62,24 +62,6 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   if (role !== 'client_reviewer') { try { isAgency = !!(await resolveAgencyMember(jwt)); } catch { /* */ } }
   const caps = capabilitiesOf(role);
 
-  // Bridged-customer detection (presentation only): the signed-in user is an
-  // agency's CLIENT signed into their OWN site (converted from a deal → provisioned
-  // as its business_owner). They must get the calm CLIENT experience (client.html),
-  // NOT the operator workspace. Signal: site.client_id set AND ≥1 ACTIVE
-  // service_link keyed by THIS customer (customer_client_id) — the CUSTOMER side of
-  // the bridge. Guarded so an agency operator who scope-switched INTO this customer
-  // (isAgency / isOperator / scopedName) KEEPS the operator tools, and a plain
-  // studio owner (no customer-side link) is never mistaken for a client.
-  // The lookup is hoisted here so the attention block below reuses it (no 2nd query).
-  let isManagedClient = false;
-  let customerLinks: any[] | null = null;
-  if (site.client_id && !isOperator && !isAgency && !scopedName) {
-    try {
-      customerLinks = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
-      isManagedClient = customerLinks.length > 0;
-    } catch { /* keep false — a plain owner is unaffected */ }
-  }
-
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
   // the site edition when no entitlement plan is recorded). Navigation adapts to
   // it automatically — one nav, many editions. Never throws on missing rows.
@@ -156,7 +138,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
         return (e.detail || {}).from === 'client';
       }).length;
     } else if (site.client_id) { // bridged customer: their UNREAD client-visible delivery activity
-      const links = customerLinks ?? (((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || []);
+      const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
       if (links.length) {
         const s = links[0].agency_site_id; const ids = links.filter((l) => l.agency_site_id === s).map((l) => l.project_id);
         const [seen, ev] = await Promise.all([
@@ -169,7 +151,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     }
   } catch { /* best-effort */ }
 
-  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient };
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey };
   return json({ data: {
     site_role: role,
     capabilities: caps,
@@ -182,7 +164,6 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     upsell,                              // Phase P: the next rung + honest gains (null at the top)
     is_agency: isAgency,
     is_operator: isOperator,
-    is_managed_client: isManagedClient,  // a converted/bridged customer on their OWN site → client experience (client.html), not operator tools
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
     landing: landingFor(navCtx),

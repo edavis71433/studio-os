@@ -96,20 +96,6 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: reviewer gets ONE calm surface', reviewer.length===1 && reviewer[0].items[0].href==='/client.html');
   ok('nav: reviewer landing = the reviewer surface', landingFor(ctx({role:'client_reviewer',capabilities:caps('client_reviewer')}))==='/client.html');
 
-  // A converted/bridged customer owns their OWN site (role = business_owner) but is
-  // the studio's CLIENT (isManagedClient). They must get the SAME one calm client
-  // surface — never the operator workspace ("Customers"/CRM, "build your site").
-  const managed = buildNav(ctx({ capabilities: caps('business_owner'), isManagedClient:true }));
-  ok('nav: bridged customer (owner + isManagedClient) gets the ONE calm client surface only', managed.length===1 && managed[0].items[0].href==='/client.html');
-  ok('nav: bridged customer sees NO operator areas (no Customers/Website/Projects/Settings)', !managed.some(s=>['customers','website','projects','files','analytics','settings','studio'].includes(s.key)));
-  ok('nav: bridged customer landing = the client surface', landingFor(ctx({capabilities:caps('business_owner'),isManagedClient:true}))==='/client.html');
-  // A plain studio owner (isManagedClient false/absent) is UNCHANGED — full workspace.
-  ok('nav: plain owner (no managed flag) keeps the full operator workspace', owner.some(s=>s.key==='customers') && owner.some(s=>s.key==='website') && landingFor(ctx({capabilities:caps('business_owner')}))==='/today.html');
-  // An agency operator scope-switched INTO a customer keeps operator tools: the
-  // workspace guard yields isManagedClient=false for them, so buildNav is unchanged.
-  const agencyScoped = buildNav(ctx({ capabilities: caps('business_owner'), isAgency:true, isManagedClient:false }));
-  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools + Studio', agencyScoped.some(s=>s.key==='customers') && agencyScoped.some(s=>s.key==='studio'));
-
   const monitor = buildNav(ctx({ edition:'monitor', capabilities: caps('business_owner') }));
   ok('nav: Monitor edition hides Publish (observe-only)', !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
 
