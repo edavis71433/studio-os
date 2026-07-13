@@ -285,3 +285,64 @@ export function priceText(cents?: number | null): string | null {
   const whole = cents % 100 === 0;
   return `$${whole ? String(cents / 100) : (cents / 100).toFixed(2)}`;
 }
+
+// ═════════ reminders + no-show handling — PURE decision cores (task #164) ═════════
+// The data (0099) was made ready; this is the logic the sweeps in commerce/
+// lifecycle.ts run against it. Kept here, pure + unit-tested, exactly like the
+// slot engine: the sweep supplies the clock, the DB, the notice-ledger dedup, and
+// the branded email (all impure), and calls these to DECIDE.
+//
+// A confirmed appointment earns a calm customer reminder in ONE of two mutually-
+// exclusive bands before the slot — so a single appointment is never reminded
+// twice at once, and a very-soon booking gets exactly one nudge, not two:
+//   (2h, 24h]  → 'day_before'  (the ~24h-out reminder)
+//   (0, 2h]    → 'same_day'    (a short "see you soon" nudge)
+// The sweep dedups each band once via the ONE notice model (period
+// `remind:<id>:<band>`); suppression is inherited from sendEmail's ONE gate.
+export const REMINDER_DAY_HRS = 24;      // upper edge of the day-before band
+export const REMINDER_SAMEDAY_HRS = 2;   // upper edge of the same-day band
+
+export type ReminderBand = 'day_before' | 'same_day';
+
+/** Which reminder band (if any) is due for a slot right now. Pure + tz-free (both
+ *  args are epoch-ms). Mutually exclusive bands; null when past or still too far. */
+export function dueReminderBand(slotStartMs: number, nowMs: number): ReminderBand | null {
+  if (!Number.isFinite(slotStartMs) || !Number.isFinite(nowMs)) return null;
+  const hrs = (slotStartMs - nowMs) / 3600_000;
+  if (hrs <= 0) return null;                                   // slot started/past — reminders stop
+  if (hrs <= REMINDER_SAMEDAY_HRS) return 'same_day';
+  if (hrs <= REMINDER_DAY_HRS) return 'day_before';
+  return null;                                                 // too far out yet
+}
+
+export interface ReminderPlanInput {
+  status?: string;
+  slotStartMs: number;
+  customer_email?: string;
+}
+/** The one reminder to send for an appointment now, or null. Encapsulates the
+ *  whole customer-reminder decision so it is testable without any I/O:
+ *    • only 'confirmed' appointments are reminded,
+ *    • only when a band is due (dueReminderBand),
+ *    • send-once — a band already in `sent` (from the notice ledger) yields null,
+ *    • a phone-only booking (no email) has nothing to send.
+ *  The sweep still guards send-once ATOMICALLY via the unique notice insert; this
+ *  `sent` pre-filter just avoids a redundant write on the common path. */
+export function planReminder(
+  a: ReminderPlanInput, nowMs: number, sent: ReadonlySet<string>,
+): { band: ReminderBand } | null {
+  if (a.status !== 'confirmed') return null;                   // only confirmed appointments
+  if (!a.customer_email) return null;                          // phone-only → no email reminder
+  const band = dueReminderBand(a.slotStartMs, nowMs);
+  if (!band) return null;
+  if (sent.has(band)) return null;                             // send-once per band
+  return { band };
+}
+
+/** Is a no-show / completion nudge due for the OWNER? The slot has fully ELAPSED
+ *  and the appointment is still 'confirmed' — i.e. the owner never marked it done,
+ *  no-show, or canceled. Pure; the sweep bounds "not ancient" in SQL and dedups
+ *  once via the notice ledger. */
+export function noShowNudgeDue(a: { status?: string; slotEndMs: number }, nowMs: number): boolean {
+  return a.status === 'confirmed' && Number.isFinite(a.slotEndMs) && a.slotEndMs < nowMs;
+}

@@ -418,8 +418,43 @@ export async function handleBookingCancel(req: Request, site: SiteRow, id: strin
   const appt = rows(up)[0];
   if (!appt) return json({ error: 'not_found', message: 'That booking is no longer active.' }, 404, cors);
   notifyCustomerCanceled(site.id, appt, String(b?.reason || '')).catch(() => {});
-  svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.new_booking&period=eq.${encodeURIComponent(`appt:${id}`)}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+  clearBookingNotices(site.id, id).catch(() => {});
   return json({ data: { ok: true, status: 'canceled' } }, 200, cors);
+}
+
+/** Dismiss any active bell nudges tied to ONE appointment (the "new booking" alert
+ *  and the post-slot "mark it done / no-show" follow-up) once the owner has acted. */
+async function clearBookingNotices(siteId: string, apptId: string): Promise<void> {
+  await svc(`presence_plan_notices?site_id=eq.${siteId}&kind=in.(new_booking,booking_followup)&period=in.(${`"appt:${apptId}","noshow:${apptId}"`})&status=eq.active`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),
+  }).catch(() => {});
+}
+
+/** Mark a past appointment 'completed' or 'no_show' — the OWNER action the
+ *  booking_followup nudge (commerce/lifecycle.runBookingFollowups) asks for. Never
+ *  auto-invoked and never messages the customer. Transitions from pending/confirmed
+ *  (an owner may reconcile either). 'no_show' requires migration 0100's widened
+ *  status CHECK: pre-apply the PATCH fails the CHECK and returns no row → a calm
+ *  "can't be updated" 404, never a throw.
+ *
+ *  NOTE (index.ts boundary): a concurrent agent owns index.ts, so this handler is
+ *  intentionally NOT wired here to avoid clobbering that file. Wiring is a single
+ *  line in the existing booking dispatch block (index.ts ~line 784), widening the
+ *  action regex and dispatching 'complete'/'no_show' to this handler:
+ *    const m = route.match(/^\/bookings\/appointments\/([0-9a-f-]{36})\/(confirm|cancel|complete|no_show)$/);
+ *    if (m[2] === 'complete' || m[2] === 'no_show') return handleBookingMark(site, m[1], m[2], principal, cors);
+ */
+export async function handleBookingMark(site: SiteRow, id: string, action: 'complete' | 'no_show', _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const status = action === 'complete' ? 'completed' : 'no_show';
+  const up = await svc(`presence_appointments?id=eq.${id}&site_id=eq.${site.id}&status=in.(pending,confirmed)&select=id`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+  });
+  if (!up.ok) return json({ error: 'unavailable', message: 'That status needs a one-time database update (0100) before it can be set.' }, 503, cors);
+  if (!rows(up)[0]) return json({ error: 'not_found', message: 'That booking can’t be updated (it may already be handled).' }, 404, cors);
+  // The owner acted → dismiss the "mark it done / no-show" nudge (and any stale new-booking alert).
+  clearBookingNotices(site.id, id).catch(() => {});
+  return json({ data: { ok: true, status } }, 200, cors);
 }
 
 async function notifyCustomerCanceled(siteId: string, appt: any, reason: string): Promise<void> {

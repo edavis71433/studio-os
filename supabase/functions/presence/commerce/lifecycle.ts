@@ -21,6 +21,7 @@ import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
+import { planReminder, noShowNudgeDue, humanSlot, priceText, REMINDER_DAY_HRS } from '../lib/booking.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -652,4 +653,136 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
     }
   }
   return { reminded };
+}
+
+// ── BOOKING REMINDERS: a calm, transactional reminder to the CUSTOMER (task #164) ─
+// Native booking (0099) creates confirmed appointments but nothing reminded the
+// customer. This sweep sends ONE branded reminder per band before the slot — a
+// ~24h-out "day_before" nudge and a short "same_day" nudge (mutually exclusive
+// bands; see lib/booking.ts). It reuses every rail: the ONE send path (sendEmail,
+// suppression + one-click unsubscribe inherited), the customer's Brand Kit
+// (loadEmailBrand), and the ONE notice model as the SEND-ONCE ledger.
+//
+// The reminder is TRANSACTIONAL (a direct consequence of the customer's own
+// booking, exactly like the confirmation) → critical:true, so it survives a
+// marketing opt-out but still respects a hard bounce/complaint. Suppression is
+// enforced once, at sendEmail — never re-implemented here.
+//
+// SEND-ONCE without a schema flag: the notice model's unique (client,kind,period)
+// IS the dedupe. We record the ledger row as 'dismissed' (a silent ledger, not an
+// active bell card) via a direct insert — because a busy salon books many/day and
+// a per-appointment "reminder sent" card would flood the owner's bell. The insert
+// returns a row only on FIRST creation → the email goes out exactly once per band.
+// Deploy-order-tolerant: pre-0099 the table read fails (clean early return); pre-
+// 0100 the 'booking_reminder' kind fails the CHECK so the ledger insert returns no
+// row → we simply DON'T send (never a per-tick re-send). Exactly the 0094–0099
+// no-op-until-owner-apply behaviour.
+export async function runBookingReminders(limit = 50): Promise<{ reminded: number }> {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const horizon = new Date(now + REMINDER_DAY_HRS * 3600_000).toISOString();
+  const q = await svc(`presence_appointments?status=eq.confirmed&slot_start=gt.${encodeURIComponent(nowIso)}&slot_start=lte.${encodeURIComponent(horizon)}&select=id,site_id,type_name,slot_start,slot_start_local,price_cents,customer_name,customer_email&order=slot_start.asc&limit=${limit}`);
+  if (!q.ok) return { reminded: 0 };                          // pre-0099 → clean no-op
+  const appts = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; type_name?: string; slot_start: string; slot_start_local?: string; price_cents?: number | null; customer_name?: string; customer_email?: string }>;
+  if (!appts.length) return { reminded: 0 };
+  // Pre-fetch which bands are already sent (the notice ledger), like invoiceReminders.
+  const periods = appts.flatMap((a) => [`"remind:${a.id}:day_before"`, `"remind:${a.id}:same_day"`]).join(',');
+  const seen = await svc(`presence_plan_notices?kind=eq.booking_reminder&period=in.(${periods})&select=period&limit=${appts.length * 2}`);
+  const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
+  const clientCache = new Map<string, string>();
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  let reminded = 0;
+  for (const a of appts) {
+    const sent = new Set<string>();
+    if (done.has(`remind:${a.id}:day_before`)) sent.add('day_before');
+    if (done.has(`remind:${a.id}:same_day`)) sent.add('same_day');
+    const plan = planReminder({ status: 'confirmed', slotStartMs: Date.parse(a.slot_start), customer_email: a.customer_email }, now, sent);
+    if (!plan) continue;
+
+    let clientId = clientCache.get(a.site_id);
+    if (clientId === undefined) {
+      const site = (await svc(`presence_sites?id=eq.${a.site_id}&select=client_id&limit=1`)).json?.[0];
+      clientId = String(site?.client_id || '');
+      clientCache.set(a.site_id, clientId);
+    }
+    if (!clientId) continue;
+
+    // ATOMIC send-once: a 'dismissed' ledger row (silent — no bell card, no push).
+    // Returns a representation only on first insert; a re-raise (or a pre-0100 CHECK
+    // rejection) returns no row → we don't send.
+    const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({
+        site_id: a.site_id, client_id: clientId, kind: 'booking_reminder',
+        period: `remind:${a.id}:${plan.band}`, status: 'dismissed',
+        headline: `Reminder sent — ${String(a.type_name || 'appointment').slice(0, 60)}`,
+        body: `We reminded ${String(a.customer_name || 'the customer').slice(0, 80)} about their upcoming appointment.`,
+      }),
+    }).catch(() => ({ ok: false, json: null } as { ok: boolean; json: unknown }));
+    const fresh = (ins as { ok?: boolean; json?: unknown }).ok && Array.isArray((ins as { json?: unknown }).json) && ((ins as { json: unknown[] }).json).length > 0;
+    if (!fresh) continue;                                      // already sent, or pre-0100 → no-op
+
+    const to = String(a.customer_email || '');
+    if (!to) { reminded++; continue; }                         // (planReminder already excludes phone-only)
+    try {
+      const ident = (await svc(`presence_identity?site_id=eq.${a.site_id}&select=business_name&limit=1`)).json?.[0];
+      const biz = ident?.business_name || 'the team';
+      const brand = await loadEmailBrand(a.site_id);
+      const when = humanSlot(String(a.slot_start_local || '')) || String(a.slot_start_local || '');
+      const price = priceText(a.price_cents);
+      const lead = plan.band === 'same_day'
+        ? `Just a quick reminder — your appointment with ${esc(biz)} is coming up soon.`
+        : `A friendly reminder that your appointment with ${esc(biz)} is coming up.`;
+      const body =
+        `<p>${lead}</p>` +
+        `<table style="margin:8px 0;border-collapse:collapse"><tr><td style="padding:2px 12px 2px 0;color:#666">Service</td><td><b>${esc(a.type_name)}</b></td></tr>` +
+        `<tr><td style="padding:2px 12px 2px 0;color:#666">When</td><td><b>${esc(when)}</b></td></tr>` +
+        (price ? `<tr><td style="padding:2px 12px 2px 0;color:#666">Price</td><td>${esc(price)}</td></tr>` : '') +
+        `</table>` +
+        `<p style="color:#666;font-size:.9rem">Need to change or cancel? Just reply to this email.</p>`;
+      // Transactional (the customer's own booking) → critical:true; suppression is
+      // enforced inside sendEmail (opt-out survived, bounce/complaint respected).
+      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true });
+      reminded++;
+    } catch { /* the ledger row already marks this band sent — never re-send */ }
+  }
+  return { reminded };
+}
+
+// ── BOOKING FOLLOW-UP: nudge the OWNER after a slot passes (no-show / completion) ─
+// A confirmed appointment whose slot has fully ELAPSED but is still 'confirmed'
+// means the owner never told us what happened. Left alone it sits 'confirmed'
+// forever and skews the upcoming list. We raise ONE calm OWNER notice per
+// appointment (period = its id → once ever) asking them to mark it done or a
+// no-show — an OWNER action. We NEVER auto-mark and NEVER message the customer
+// again here. Same 15-min sweep, same ONE notice model, send-once semantics.
+// Best-effort + graceful: pre-0100 the 'booking_followup' kind fails the CHECK and
+// raiseNotice returns false (no push, no throw) — exactly like support_aging pre-0095.
+export async function runBookingFollowups(limit = 50): Promise<{ nudged: number }> {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const from = new Date(now - 14 * 86400_000).toISOString();  // not ancient (a fresh backlog only)
+  const q = await svc(`presence_appointments?status=eq.confirmed&slot_end=lt.${encodeURIComponent(nowIso)}&slot_end=gte.${encodeURIComponent(from)}&select=id,site_id,type_name,slot_start_local,slot_end,customer_name&order=slot_end.desc&limit=${limit}`);
+  if (!q.ok) return { nudged: 0 };                            // pre-0099 → clean no-op
+  const clientCache = new Map<string, string>();
+  let nudged = 0;
+  for (const a of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; type_name?: string; slot_start_local?: string; slot_end: string; customer_name?: string }>) {
+    if (!noShowNudgeDue({ status: 'confirmed', slotEndMs: Date.parse(a.slot_end) }, now)) continue;  // pure guard
+    let clientId = clientCache.get(a.site_id);
+    if (clientId === undefined) {
+      const site = (await svc(`presence_sites?id=eq.${a.site_id}&select=client_id&limit=1`)).json?.[0];
+      clientId = String(site?.client_id || '');
+      clientCache.set(a.site_id, clientId);
+    }
+    if (!clientId) continue;
+    const who = String(a.customer_name || 'the customer').slice(0, 40);
+    const when = humanSlot(String(a.slot_start_local || '')) || '';
+    const fresh = await raiseNotice({
+      siteId: a.site_id, clientId, kind: 'booking_followup', period: `noshow:${a.id}`,
+      headline: `Did ${who}'s appointment happen?`,
+      body: `${a.type_name || 'The appointment'}${when ? ` on ${when}` : ''} has passed. Mark it done or a no-show so your bookings stay accurate.`,
+    });
+    if (fresh) nudged++;
+  }
+  return { nudged };
 }

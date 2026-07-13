@@ -13,7 +13,7 @@ import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
-import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture, runSupportAging, runAgreementRenewalReminders } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
@@ -305,6 +305,8 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['agreement_renewals', () => runAgreementRenewalReminders(50)],
             ['invoice_nudges', () => runInvoiceReminders(20)],
             ['doc_reminders', () => runSalesDocReminders(20)],
+            ['booking_reminders', () => runBookingReminders(50)],   // #164: calm customer reminders (transactional, send-once)
+            ['booking_followups', () => runBookingFollowups(50)],   // #164: owner no-show/completion nudge (bell only)
             ['nurture', () => runProspectNurture(10)],
             ['broadcasts', () => runScheduledBroadcasts(25)],   // owner-approved scheduled sends, dispatched at due time
           ],
@@ -371,6 +373,8 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const agreementRenewals = await step('agreement_renewals', () => runAgreementRenewalReminders(50)); // signed-agreement term-end heads-up (owner-only)
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
+      const bookingReminders = await step('booking_reminders', () => runBookingReminders(50)); // #164: customer appointment reminders (transactional, send-once)
+      const bookingFollowups = await step('booking_followups', () => runBookingFollowups(50)); // #164: owner no-show/completion nudge (bell only, never auto-mark)
       await step('nurture', () => runProspectNurture(10));                        // CRO: day-7 free-review follow-up (owner-gated NURTURE_DRIP=1)
       await step('broadcasts', () => runScheduledBroadcasts(25));                 // BROADCASTS: dispatch owner-approved scheduled sends at their due time
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
@@ -383,7 +387,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // result.progress, which nobody reads until something else breaks.
       const issues = sweepIssues(progress);
       if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, bookingReminders, bookingFollowups, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }
