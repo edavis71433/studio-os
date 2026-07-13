@@ -478,7 +478,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     files[file] = html;
   };
 
-  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref });   // Phase T-BLOCKS
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint });   // Phase T-BLOCKS (+ FB form blocks)
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
   page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
   page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });

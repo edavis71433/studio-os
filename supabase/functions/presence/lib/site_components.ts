@@ -119,6 +119,12 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('label', 'text', { required: true, repeatable: true, max: 40 }), t('url', 'url', { required: true }), t('style', 'enum')], schema: null, a11y: 'real focusable links, visible focus', seo: 'internal linking', industries: ['*'] },
   { key: 'divider', label: 'Divider / space', category: 'content', purpose: 'A hairline rule or a bit of breathing room between sections.',
     fields: [t('style', 'enum'), t('size', 'enum')], schema: null, a11y: 'presentational only, hidden from assistive tech', seo: 'none (layout)', industries: ['*'] },
+  // Phase FB: the custom form builder — a whitelisted, typed form (contact/quote/
+  // application/booking). Full field schema + validation live in lib/forms.ts; the
+  // catalog just declares the block so the engine may realize it. Multi-instance.
+  { key: 'form', label: 'Custom form', category: 'content', purpose: 'Build any form from typed fields — contact, quote, application, booking.',
+    fields: [t('fields', 'list', { required: true, repeatable: true }), t('rules', 'list', { repeatable: true }), t('confirmation_text', 'text'), t('redirect_url', 'url'), t('submit_label', 'text')],
+    schema: null, a11y: 'labels tied to inputs, required announced, fieldset/legend for groups; works with JS off', seo: 'ContactPoint intent', industries: ['*'] },
 ];
 
 export function componentByKey(key: string): ComponentDef | null { return COMPONENTS.find((c) => c.key === key) || null; }

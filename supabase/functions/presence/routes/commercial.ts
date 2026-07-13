@@ -18,6 +18,8 @@ import {
   signApprovalToken, verifyApprovalToken, type ApprovalTokenPayload,
   leadFollowupResolvesOn, leadFollowupNoticeKey,
 } from '../lib/commercial.ts';
+import { validateBlocks } from '../lib/site_blocks.ts';
+import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -93,17 +95,57 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   const ctype = (req.headers.get('content-type') || '').toLowerCase();
   const isFormPost = ctype.includes('application/x-www-form-urlencoded') || ctype.includes('multipart/form-data');
   let b: any = {};
+  let rawMap: Record<string, string | string[]> = {};   // FB: full field map (keeps multi-value checkboxes)
   if (isFormPost) {
-    try { const fd = await req.formData(); b = formParamsToSubmission((k) => { const x = fd.get(k); return typeof x === 'string' ? x : null; }); } catch { /* */ }
+    try {
+      const fd = await req.formData();
+      for (const key of new Set(fd.keys())) { const all = fd.getAll(key).filter((x) => typeof x === 'string') as string[]; rawMap[key] = all.length > 1 ? all : (all[0] ?? ''); }
+      b = formParamsToSubmission((k) => { const x = rawMap[k]; return typeof x === 'string' ? x : (Array.isArray(x) ? x[0] : null); });
+    } catch { /* */ }
   } else {
-    try { b = await req.json(); } catch { /* */ }
+    try { b = await req.json(); rawMap = (b && typeof b === 'object') ? b : {}; } catch { /* */ }
   }
 
   const site = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id&limit=1`);
   if (!site.json?.[0]) return json({ error: 'not_found' }, 404, cors);
   const siteRow = site.json[0];
   const siteOrigin = siteRow.custom_domain ? `https://${siteRow.custom_domain}` : (siteRow.netlify_site_id ? `https://${siteRow.netlify_site_id}.netlify.app` : '');
-  const redirectTo = (path: string) => new Response(null, { status: 303, headers: { ...cors, Location: `${siteOrigin}${path}` } });
+  const redirectTo = (path: string) => new Response(null, { status: 303, headers: { ...cors, Location: /^https?:\/\//i.test(path) ? path : `${siteOrigin}${path}` } });
+
+  // ── FB: a CUSTOM form (built in the Forms area) posts a `form_id`. Load its
+  //    definition from the site's stored blocks (same JSON storage as content
+  //    blocks — no new table), validate the typed values against it (re-running
+  //    the whitelisted rules so hidden-field values can't be smuggled), then feed
+  //    the SAME inbox + CRM + follow-up flow. The fixed contact form is untouched.
+  const formId = String((rawMap as any)?.form_id ?? b?.form_id ?? '').trim();
+  if (formId) {
+    const settings = await svc(`presence_settings?site_id=eq.${siteId}&select=blocks&limit=1`);
+    const blocks = validateBlocks(settings.json?.[0]?.blocks);
+    const def = blocks.find((bl: any) => bl.type === 'form' && bl.id === formId) as FormDefinition | undefined;
+    if (!def) {   // unknown form — treat as a plain contact fallback (never leak internals)
+      if (isFormPost && siteOrigin) return redirectTo('/contact/');
+      return json({ error: 'not_found', message: 'That form is no longer available.' }, 404, cors);
+    }
+    const spam = !!String((rawMap as any)?._hp ?? b?._hp ?? '').slice(0, 100).trim();
+    const fv = validateFormValues(def, rawMap as any);
+    if (!fv.ok) {
+      if (isFormPost && siteOrigin) return redirectTo('/contact/');
+      return json({ error: fv.error, field: fv.field, message: fv.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : (fv.error === 'empty' ? 'Please fill in the form.' : fv.error) }, 400, cors);
+    }
+    const ipHash2 = await hashIp(req);
+    const src = String((rawMap as any)?.source_page ?? '').slice(0, 300);
+    const ins2 = await svc('presence_form_submissions', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: fv.sub.values, source_page: src, spam, ip_hash: ipHash2 }),
+    });
+    if (!ins2.ok) {
+      if (isFormPost && siteOrigin) return redirectTo('/contact/');
+      return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
+    }
+    if (!spam) { notifyOwnerOfLead(siteId, { form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); }
+    if (isFormPost && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
+    return ok200(def.confirmation_text || 'Thanks — your message was sent.');
+  }
 
   const v = validateSubmission(b);
   if (!v.ok) {

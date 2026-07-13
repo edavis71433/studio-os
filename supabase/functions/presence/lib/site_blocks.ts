@@ -20,6 +20,7 @@ import type {
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
 } from './render_types.ts';
 import { renderMarkdown } from './markdown.ts';
+import { normalizeFormDefinition, renderForm, type FormDefinition } from './forms.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -28,6 +29,7 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'partners', 'reviews', 'appointment',
   'newsletter', 'social', 'events', 'map',
   'richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider',
+  'form',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too
@@ -63,19 +65,25 @@ export type StoredBlock =
   | StoredGallery | StoredBeforeAfter | StoredVideo
   | StoredPartners | SiteBlockReviews | SiteBlockAppointment
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
-  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider;
+  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
+  | FormDefinition;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
  *  type (a site has one Team section, one Pricing section…), preserves owner order.
- *  This is the authoritative boundary — the render trusts only what this returns. */
+ *  EXCEPTION: `form` blocks are the one multi-instance type (a site can have a
+ *  contact form AND a quote form AND …), each de-collided to a unique id so its
+ *  render key + storage never clash. This is the authoritative boundary — the
+ *  render trusts only what this returns. */
 export function validateBlocks(raw: unknown): StoredBlock[] {
   const out: StoredBlock[] = [];
   const seen = new Set<string>();
+  const formIds = new Set<string>();
   for (const b of arr(raw)) {
     if (!b || typeof b !== 'object') continue;
     const type = String((b as any).type || '');
-    if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || seen.has(type)) continue;
+    // `form` is exempt from the one-per-type rule (multiple forms per site).
+    if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || (type !== 'form' && seen.has(type))) continue;
     const title = s((b as any).title, 80) || undefined;
     let block: StoredBlock | null = null;
     switch (type as SiteBlockType) {
@@ -245,8 +253,18 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         block = { type: 'divider', style, size } as SiteBlockDivider;
         break;
       }
+      case 'form': {   // custom form builder — full validation delegated to lib/forms.ts
+        const r = normalizeFormDefinition(b);
+        if (r.ok) {
+          let id = r.form.id;
+          while (formIds.has(id)) id = `${id}_${out.length}`;   // unique id → unique render key + storage
+          formIds.add(id);
+          block = { ...r.form, id };
+        }
+        break;
+      }
     }
-    if (block) { out.push(block); seen.add(type); }
+    if (block) { out.push(block); if (type !== 'form') seen.add(type); }
     if (out.length >= MAX_BLOCKS) break;
   }
   return out;
@@ -324,6 +342,8 @@ export interface BlockRenderCtx {
   esc: (s: string) => string;
   attr: (s: string) => string;
   safeHref: (s: string) => string | null;
+  /** Phase FB: the public submit endpoint for custom form blocks (site.formEndpoint). */
+  formEndpoint?: string;
 }
 
 export interface RenderedBlock { key: string; type: SiteBlockType; html: string; ld?: object }
@@ -531,6 +551,11 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           : `<div class="block wrap block-divider div-line div-${b.size}"><hr></div>`;
         break;
       }
+      case 'form': {   // custom form builder — typed fields → accessible, XSS-safe form
+        const inner = renderForm(b, { esc, attr, safeHref, formEndpoint: ctx.formEndpoint });
+        html = `<section class="block wrap block-form">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
+        break;
+      }
     }
     if (b.type === 'partners') {
       html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
@@ -544,7 +569,12 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       const href = safeHref(b.url);
       html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment')}${b.text ? `<p class="appt-text">${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    if (html) out.push({ key: `block_${b.type}`, type: b.type, html, ...(ld ? { ld } : {}) });
+    if (html) {
+      // `form` is the one multi-instance block type → a per-instance key so the
+      // section-order/visibility machinery never collides two forms.
+      const key = b.type === 'form' ? `block_form_${(b as FormDefinition).id}` : `block_${b.type}`;
+      out.push({ key, type: b.type, html, ...(ld ? { ld } : {}) });
+    }
   }
   return out;
 }

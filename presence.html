@@ -335,6 +335,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 #designHost #designCard{grid-column:1/-1;order:-3}
 #designHost #brandKitCard{order:-1}
 #designHost #blocksCard{grid-column:1/-1}
+#designHost #formsCard{grid-column:1/-1}
 #designPreviewWrap{flex:0 0 400px;min-width:280px;position:sticky;top:14px}
 html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
 .dp-title{font-size:12px;font-weight:600;margin-bottom:6px}
@@ -3326,6 +3327,7 @@ async function mountDesignCard() {
   host.appendChild(card);
   mountSectionsCard();
   mountBlocksCard();
+  mountFormsCard();    // Phase FB — the custom form builder (typed, structured, safe)
   mountDevCssCard();   // "Developer" story, layer 1 — advanced Custom CSS, off the no-code path
 }
 // ── Custom CSS (advanced) — the first layer of the safe "Developer" story ─────
@@ -3930,6 +3932,190 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
     add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].buttons = BLOCKS_WORK[idx].buttons || []).push({ label: "", url: "", style: "primary" }); renderBlocksCard(); });
     sub.appendChild(add);
   }
+}
+
+// ══ Phase FB: the custom form builder — typed fields, no code box ══════════════
+// Forms live in the SAME settings.blocks array as content blocks (as type:"form")
+// so there is ONE storage + one publish pipeline (no new table). The server
+// (lib/forms.ts) is the authoritative safety gate; this UI can only ever produce
+// whitelisted, typed fields — never raw HTML/JS. Local working copy → explicit
+// Save, mirroring the content-block editor above.
+const FF_TYPES = [["text", "Short text"], ["textarea", "Long text (paragraph)"], ["email", "Email"], ["phone", "Phone"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown (pick one)"], ["radio", "Choose one"], ["checkbox", "Checkboxes (pick many)"], ["consent", "Consent checkbox"], ["rating", "Star rating"]];
+const FF_CHOICE = ["select", "radio", "checkbox"];
+const FF_KINDS = [["contact", "Message / contact"], ["quote", "Quote / request"], ["booking", "Booking"]];
+const FF_OPS = [["equals", "equals"], ["notEquals", "does not equal"], ["isEmpty", "is empty"], ["notEmpty", "is not empty"], ["contains", "contains"], ["gt", "greater than"], ["lt", "less than"]];
+const FF_ACTIONS = [["show", "show it"], ["hide", "hide it"], ["require", "make it required"], ["optional", "make it optional"]];
+const FORM_PRESETS_UI = [
+  { key: "contact", name: "Contact form", def: { type: "form", id: "contact", title: "Contact us", kind: "contact", submit_label: "Send message", confirmation_text: "Thanks — we’ll be in touch soon.", fields: [{ key: "name", label: "Your name", type: "text", required: true }, { key: "email", label: "Email", type: "email", required: true }, { key: "phone", label: "Phone (optional)", type: "phone" }, { key: "message", label: "How can we help?", type: "textarea", required: true }] } },
+  { key: "quote", name: "Quote request", def: { type: "form", id: "quote", title: "Request a quote", kind: "quote", submit_label: "Request a quote", confirmation_text: "Got it — we’ll send your quote shortly.", fields: [{ key: "name", label: "Your name", type: "text", required: true }, { key: "email", label: "Email", type: "email", required: true }, { key: "phone", label: "Phone", type: "phone" }, { key: "service", label: "What do you need?", type: "select", required: true, choices: ["General enquiry", "A new project", "Ongoing work", "Something else"] }, { key: "budget", label: "Rough budget", type: "select", choices: ["Not sure yet", "Under $1,000", "$1,000–$5,000", "$5,000+"] }, { key: "details", label: "Tell us more", type: "textarea", required: true }] } },
+  { key: "application", name: "Application", def: { type: "form", id: "application", title: "Apply now", kind: "quote", submit_label: "Submit application", confirmation_text: "Thanks for applying — we’ll review and get back to you.", fields: [{ key: "name", label: "Full name", type: "text", required: true }, { key: "email", label: "Email", type: "email", required: true }, { key: "phone", label: "Phone", type: "phone", required: true }, { key: "position", label: "Position you’re applying for", type: "text", required: true }, { key: "experience", label: "Relevant experience", type: "textarea", required: true }, { key: "start_date", label: "Earliest start date", type: "date" }, { key: "consent", label: "I agree to be contacted about my application.", type: "consent", required: true }] } },
+  { key: "booking", name: "Booking intake", def: { type: "form", id: "booking", title: "Request a booking", kind: "booking", submit_label: "Request booking", confirmation_text: "Thanks — we’ll confirm your booking soon.", fields: [{ key: "name", label: "Your name", type: "text", required: true }, { key: "email", label: "Email", type: "email", required: true }, { key: "phone", label: "Phone", type: "phone", required: true }, { key: "date", label: "Preferred date", type: "date", required: true }, { key: "party_size", label: "How many people?", type: "number", min: 1, max: 100 }, { key: "notes", label: "Anything we should know?", type: "textarea" }] } },
+  { key: "blank", name: "Blank form", def: { type: "form", id: "form", title: "New form", kind: "contact", fields: [{ key: "name", label: "Your name", type: "text", required: true }, { key: "email", label: "Email", type: "email", required: true }] } },
+];
+let FORMS_WORK = null;
+const FF_IN = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box;background:var(--card,#fff)";
+const FF_BTN = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+function currentForms() { return (Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks : []).filter((b) => b && b.type === "form"); }
+function ffSlug(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40); }
+function ffUniqueId(base, taken) { let id = ffSlug(base) || "form"; let n = 1; while (taken.has(id)) id = ffSlug(base) + "_" + (++n); taken.add(id); return id; }
+function ffSel(options, value, onchange) {
+  const s = el("select"); s.style.cssText = FF_IN + ";width:auto;min-width:120px";
+  options.forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if (v === value) o.selected = true; s.appendChild(o); });
+  s.addEventListener("change", () => onchange(s.value)); return s;
+}
+async function saveForms() {
+  try {
+    const others = (Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks : []).filter((b) => !b || b.type !== "form");
+    const next = [...others, ...FORMS_WORK];
+    const r = await api("PUT", "/settings", { blocks: next });
+    S.settings = r.data || { ...S.settings, blocks: next };
+    if (typeof BLOCKS_WORK !== "undefined") BLOCKS_WORK = currentBlocks();   // keep the content-block editor in sync
+    FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+    renderFormsCard();
+    toast("Forms saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
+  } catch (err) { toast(nice(err), true); }
+}
+function mountFormsCard() {
+  const host = $("designHost"); if (!host || $("formsCard")) return;
+  FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+  const card = el("div", "field"); card.id = "formsCard"; card.style.marginTop = "18px";
+  host.appendChild(card);
+  renderFormsCard();
+}
+function renderFormsCard() {
+  const card = $("formsCard"); if (!card) return; card.textContent = "";
+  card.appendChild(el("label", null, "Forms"));
+  card.appendChild(el("div", "hint", "Build any form from typed fields — contact, quote, application or booking. Every form is automatically mobile-friendly, accessible and safe. Each form shows as a section on your home page; reorder or hide it under “Your home page.” Publish to apply."));
+  const commitForm = (fi, patch) => { FORMS_WORK[fi] = { ...FORMS_WORK[fi], ...patch }; };
+  const commitField = (fi, xi, patch) => { const fs = FORMS_WORK[fi].fields.slice(); fs[xi] = { ...fs[xi], ...patch }; FORMS_WORK[fi] = { ...FORMS_WORK[fi], fields: fs }; };
+
+  FORMS_WORK.forEach((form, fi) => {
+    form.fields = form.fields || []; form.rules = form.rules || [];
+    const panel = el("div"); panel.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:12px";
+    const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
+    const nm = el("div", null, form.title || "Form"); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
+    const rm = el("button", null, "Remove form"); rm.type = "button"; rm.style.cssText = FF_BTN;
+    rm.addEventListener("click", () => { if (confirm("Remove this form?")) { FORMS_WORK.splice(fi, 1); renderFormsCard(); } });
+    head.append(nm, rm); panel.appendChild(head);
+
+    // form settings
+    const ti = el("input"); ti.type = "text"; ti.placeholder = "Form title"; ti.value = form.title || ""; ti.style.cssText = FF_IN;
+    ti.addEventListener("change", () => commitForm(fi, { title: ti.value.trim() }));
+    panel.appendChild(el("div", "hint", "Form title (shown above the form)")); panel.appendChild(ti);
+    const kindRow = el("div"); kindRow.style.cssText = "display:flex;gap:10px;align-items:center;margin:2px 0 8px;flex-wrap:wrap";
+    kindRow.appendChild(el("span", "hint", "This is a")); kindRow.appendChild(ffSel(FF_KINDS, form.kind || "contact", (v) => commitForm(fi, { kind: v })));
+    panel.appendChild(kindRow);
+
+    // fields
+    panel.appendChild(el("div", "hint", "Fields — drag order with ↑ ↓. Every field is typed and validated for you."));
+    form.fields.forEach((fld, xi) => {
+      const row = el("div"); row.style.cssText = "border:1px solid var(--hair,#eee);border-radius:9px;padding:9px 10px;margin-top:8px;background:var(--sheet,#fbfaf8)";
+      const top = el("div"); top.style.cssText = "display:flex;gap:6px;align-items:center;flex-wrap:wrap";
+      const lab = el("input"); lab.type = "text"; lab.placeholder = "Question / label"; lab.value = fld.label || ""; lab.style.cssText = FF_IN + ";flex:1;min-width:150px;margin:0";
+      lab.addEventListener("change", () => commitField(fi, xi, { label: lab.value.trim() }));
+      const typeSel = ffSel(FF_TYPES, fld.type || "text", (v) => { commitField(fi, xi, { type: v }); renderFormsCard(); });
+      top.append(lab, typeSel);
+      const up = el("button", null, "↑"), dn = el("button", null, "↓"), del = el("button", null, "✕");
+      [up, dn, del].forEach((b) => { b.type = "button"; b.style.cssText = FF_BTN; });
+      up.disabled = xi === 0; dn.disabled = xi === form.fields.length - 1;
+      up.addEventListener("click", () => { const fs = FORMS_WORK[fi].fields; [fs[xi - 1], fs[xi]] = [fs[xi], fs[xi - 1]]; renderFormsCard(); });
+      dn.addEventListener("click", () => { const fs = FORMS_WORK[fi].fields; [fs[xi + 1], fs[xi]] = [fs[xi], fs[xi + 1]]; renderFormsCard(); });
+      del.addEventListener("click", () => { FORMS_WORK[fi].fields.splice(xi, 1); renderFormsCard(); });
+      top.append(up, dn, del); row.appendChild(top);
+
+      // per-field options
+      const opts = el("div"); opts.style.cssText = "margin-top:7px;display:flex;flex-direction:column;gap:5px";
+      const reqL = el("label"); reqL.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:6px";
+      const req = el("input"); req.type = "checkbox"; req.checked = !!fld.required; req.style.cssText = "width:auto;margin:0";
+      req.addEventListener("change", () => commitField(fi, xi, { required: req.checked }));
+      reqL.append(req, document.createTextNode("Required")); opts.appendChild(reqL);
+      if (FF_CHOICE.includes(fld.type)) {
+        const ch = el("textarea"); ch.placeholder = "One choice per line"; ch.value = (fld.choices || []).join("\n"); ch.rows = Math.max(2, (fld.choices || []).length); ch.style.cssText = FF_IN + ";margin:0";
+        ch.addEventListener("change", () => commitField(fi, xi, { choices: ch.value.split("\n").map((s) => s.trim()).filter(Boolean) }));
+        opts.appendChild(ch);
+        if (fld.type === "checkbox") {
+          const mL = el("label"); mL.style.cssText = reqL.style.cssText; const m = el("input"); m.type = "checkbox"; m.checked = !!fld.multiple; m.style.cssText = "width:auto;margin:0";
+          m.addEventListener("change", () => commitField(fi, xi, { multiple: m.checked })); mL.append(m, document.createTextNode("Allow more than one")); opts.appendChild(mL);
+        }
+      } else if (fld.type === "number" || fld.type === "date") {
+        const mm = el("div"); mm.style.cssText = "display:flex;gap:6px";
+        const mn = el("input"), mx = el("input"); mn.placeholder = "Min (optional)"; mx.placeholder = "Max (optional)";
+        mn.type = mx.type = fld.type === "date" ? "date" : "number"; mn.value = fld.min != null ? fld.min : ""; mx.value = fld.max != null ? fld.max : "";
+        [mn, mx].forEach((i) => { i.style.cssText = FF_IN + ";margin:0"; });
+        const cm = () => commitField(fi, xi, { min: mn.value === "" ? undefined : (fld.type === "date" ? mn.value : Number(mn.value)), max: mx.value === "" ? undefined : (fld.type === "date" ? mx.value : Number(mx.value)) });
+        mn.addEventListener("change", cm); mx.addEventListener("change", cm); mm.append(mn, mx); opts.appendChild(mm);
+      }
+      if (fld.type !== "consent") {
+        const help = el("input"); help.type = "text"; help.placeholder = "Helper text (optional)"; help.value = fld.help || ""; help.style.cssText = FF_IN + ";margin:0";
+        help.addEventListener("change", () => commitField(fi, xi, { help: help.value.trim() })); opts.appendChild(help);
+      }
+      row.appendChild(opts); panel.appendChild(row);
+    });
+    const addF = el("button", null, "+ Add field"); addF.type = "button"; addF.style.cssText = FF_BTN; addF.style.marginTop = "8px";
+    addF.addEventListener("click", () => { FORMS_WORK[fi].fields = (FORMS_WORK[fi].fields || []).concat({ key: "field_" + (form.fields.length + 1), label: "", type: "text" }); renderFormsCard(); });
+    panel.appendChild(addF);
+
+    // smart rules (optional) — the whitelisted conditional logic
+    const rulesBox = el("details"); rulesBox.style.cssText = "margin-top:10px";
+    const rsum = el("summary", null, "Smart rules (optional) — show/hide fields based on answers"); rsum.style.cssText = "cursor:pointer;font-size:12.5px;font-weight:600;color:#3a2470";
+    rulesBox.appendChild(rsum);
+    const fieldOpts = form.fields.filter((f) => f.key).map((f) => [f.key, f.label || f.key]);
+    (form.rules || []).forEach((rule, ri) => {
+      rule.when = rule.when || {}; rule.then = rule.then || {};
+      const rr = el("div"); rr.style.cssText = "display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:7px;font-size:12px";
+      const commitRule = (patch) => { const rs = FORMS_WORK[fi].rules.slice(); rs[ri] = { when: { ...rs[ri].when }, then: { ...rs[ri].then }, ...patch }; if (patch.when) rs[ri].when = { ...rs[ri].when, ...patch.when }; if (patch.then) rs[ri].then = { ...rs[ri].then, ...patch.then }; FORMS_WORK[fi] = { ...FORMS_WORK[fi], rules: rs }; };
+      rr.appendChild(el("span", null, "When"));
+      rr.appendChild(ffSel(fieldOpts.length ? fieldOpts : [["", "—"]], rule.when.field || "", (v) => commitRule({ when: { field: v } })));
+      rr.appendChild(ffSel(FF_OPS, rule.when.op || "equals", (v) => { commitRule({ when: { op: v } }); renderFormsCard(); }));
+      if (rule.when.op !== "isEmpty" && rule.when.op !== "notEmpty") {
+        const val = el("input"); val.type = "text"; val.placeholder = "value"; val.value = rule.when.value != null ? rule.when.value : ""; val.style.cssText = FF_IN + ";width:110px;margin:0";
+        val.addEventListener("change", () => commitRule({ when: { value: val.value } })); rr.appendChild(val);
+      }
+      rr.appendChild(el("span", null, "→"));
+      rr.appendChild(ffSel(FF_ACTIONS, rule.then.action || "show", (v) => commitRule({ then: { action: v } })));
+      rr.appendChild(ffSel(fieldOpts.length ? fieldOpts : [["", "—"]], rule.then.target || "", (v) => commitRule({ then: { target: v } })));
+      const rdel = el("button", null, "✕"); rdel.type = "button"; rdel.style.cssText = FF_BTN;
+      rdel.addEventListener("click", () => { FORMS_WORK[fi].rules.splice(ri, 1); renderFormsCard(); });
+      rr.appendChild(rdel); rulesBox.appendChild(rr);
+    });
+    const addR = el("button", null, "+ Add rule"); addR.type = "button"; addR.style.cssText = FF_BTN; addR.style.marginTop = "8px";
+    addR.addEventListener("click", () => { FORMS_WORK[fi].rules = (FORMS_WORK[fi].rules || []).concat({ when: { field: (fieldOpts[0] || [""])[0], op: "equals", value: "" }, then: { action: "show", target: (fieldOpts[0] || [""])[0] } }); renderFormsCard(); });
+    rulesBox.appendChild(addR);
+    panel.appendChild(rulesBox);
+
+    // after-submit settings
+    const after = el("details"); after.style.cssText = "margin-top:8px";
+    const asum = el("summary", null, "After they send it"); asum.style.cssText = rsum.style.cssText;
+    after.appendChild(asum);
+    const sub = el("input"); sub.type = "text"; sub.placeholder = "Submit button label (e.g. Send)"; sub.value = form.submit_label || ""; sub.style.cssText = FF_IN + ";margin-top:8px";
+    sub.addEventListener("change", () => commitForm(fi, { submit_label: sub.value.trim() })); after.appendChild(sub);
+    const conf = el("input"); conf.type = "text"; conf.placeholder = "Thank-you message"; conf.value = form.confirmation_text || ""; conf.style.cssText = FF_IN;
+    conf.addEventListener("change", () => commitForm(fi, { confirmation_text: conf.value.trim() })); after.appendChild(conf);
+    const redir = el("input"); redir.type = "text"; redir.placeholder = "Or redirect to a link (optional, https://…)"; redir.value = form.redirect_url || ""; redir.style.cssText = FF_IN;
+    redir.addEventListener("change", () => commitForm(fi, { redirect_url: redir.value.trim() })); after.appendChild(redir);
+    panel.appendChild(after);
+
+    card.appendChild(panel);
+  });
+
+  // add a form (from a preset)
+  const addWrap = el("div"); addWrap.style.cssText = "margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+  addWrap.appendChild(el("span", "hint", "Add a form:"));
+  FORM_PRESETS_UI.forEach((p) => {
+    const b = el("button", null, p.name); b.type = "button"; b.style.cssText = FF_BTN;
+    b.addEventListener("click", () => {
+      const taken = new Set(FORMS_WORK.map((f) => f.id));
+      const copy = JSON.parse(JSON.stringify(p.def)); copy.id = ffUniqueId(copy.id, taken); copy.rules = copy.rules || [];
+      FORMS_WORK.push(copy); renderFormsCard();
+    });
+    addWrap.appendChild(b);
+  });
+  card.appendChild(addWrap);
+
+  const save = el("button", null, "Save forms"); save.type = "button";
+  save.style.cssText = "margin-top:14px;font:inherit;font-weight:600;font-size:13px;padding:8px 18px;border-radius:999px;border:none;background:#5b3fa0;color:#fff;cursor:pointer";
+  save.addEventListener("click", saveForms);
+  card.appendChild(save);
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
 const HOME_SECTION_DEFS = [ ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];

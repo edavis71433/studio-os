@@ -134,13 +134,20 @@ export interface SiteBlockImageText { type: 'image_text'; title?: string; image?
 export interface SiteBlockAccordion { type: 'accordion'; title?: string; items: Array<{ summary: string; body: string }> }
 export interface SiteBlockButtons { type: 'buttons'; title?: string; buttons: Array<{ label: string; url: string; style: 'primary' | 'outline' }> }
 export interface SiteBlockDivider { type: 'divider'; style: 'line' | 'space'; size: 'small' | 'medium' | 'large' }
+// Custom form builder (Phase FB): a typed, structured, whitelisted form (never a
+// code box). The full shape + validation live in lib/forms.ts; a form block is a
+// stored FormDefinition. Multiple forms per site are allowed (unlike other block
+// types), each keyed by its own id. See lib/forms.ts for the normalization gate.
+export type { FormDefinition as SiteBlockForm } from './forms.ts';
+import type { FormDefinition } from './forms.ts';
 export type SiteBlock =
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
   | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
-  | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider;
+  | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
+  | FormDefinition;
 export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */
