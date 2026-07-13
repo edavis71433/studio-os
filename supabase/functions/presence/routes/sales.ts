@@ -23,6 +23,10 @@ import {
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
 } from '../lib/sales_lifecycle.ts';
+import {
+  isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
+  buildActivityDetail, mergeDealTimeline, lastContactedAt, type DealActivityKind,
+} from '../crm/deal_activity.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -140,7 +144,25 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pipeline just now.' }, 502, cors);
-    return json({ data: rows(r), limit, offset }, 200, cors);
+    const deals = rows(r);
+    // "Last contacted" per card — ONE extra query over the manual activities
+    // (kind='note') for the page's deals, folded to the latest occurred_at each.
+    // The thing an owner most wants at a glance, without an N+1.
+    if (deals.length) {
+      try {
+        const ids = deals.map((d: any) => d.id).filter(Boolean);
+        const acts = rows(await svc(`presence_deal_events?site_id=eq.${site.id}&kind=eq.note&deal_id=in.(${ids.join(',')})&select=deal_id,detail,created_at&order=created_at.desc&limit=1000`));
+        const latest: Record<string, string> = {};
+        for (const a of acts) {
+          const d = a && typeof a.detail === 'object' ? a.detail : null;
+          if (!d || !isDealActivityKind(d.activity_kind)) continue;   // manual activities only, not future note kinds
+          const at = (typeof d.occurred_at === 'string' && d.occurred_at) || String(a.created_at || '');
+          if (at && (!latest[a.deal_id] || at > latest[a.deal_id])) latest[a.deal_id] = at;
+        }
+        for (const d of deals) d.last_contacted_at = latest[d.id] || null;
+      } catch { /* the list still loads without the last-contacted hint */ }
+    }
+    return json({ data: deals, limit, offset }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -192,10 +214,16 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
       svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version&order=created_at.desc`),
-      svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=50`),
+      svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`),
     ]);
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: rows(events), invoices: rows(invoices) } }, 200, cors);
+    const eventRows = rows(events);
+    // ONE reverse-chronological timeline: manual activities (call/email/meeting/
+    // dated note) + system events live in the same presence_deal_events table, so
+    // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
+    // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
+    const timeline = mergeDealTimeline(eventRows);
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: rows(invoices) } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -231,6 +259,33 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     return json({ data: { ok: true, deleted: true } }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+// ═══ ACTIVITY LOG (quick-log a call / email / meeting / dated note) ═══════════
+// The highest-value CRM gap: let a solo owner answer "when did I last talk to
+// them, and what did we say?". A manual activity rides the EXISTING
+// presence_deal_events ledger as a kind='note' row (permitted since 0074), its
+// jsonb `detail` carrying { activity_kind, body, occurred_at } — NO migration.
+// It merges with system events into the ONE deal timeline the drawer already
+// shows. Studio-gated & site-scoped like every authed /sales/* route.
+export async function handleSalesDealActivity(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  const deal = await loadDeal(site.id, id);
+  if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const kind = b.kind as DealActivityKind;
+  if (!isDealActivityKind(kind)) return json({ error: 'validation', message: 'Pick a call, email, meeting, or note.' }, 422, cors);
+  const body = cleanActivityBody(b.body);
+  if (activityNeedsBody(kind) && !body) return json({ error: 'validation', message: 'Write a short note.' }, 422, cors);
+  const occurredAt = normalizeOccurredAt(b.occurred_at, nowIso());
+  const { actor, actor_kind } = actorOf(principal);
+  const ins = await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ deal_id: id, site_id: site.id, kind: 'note', actor, actor_kind, detail: buildActivityDetail(kind, body, occurredAt) }) });
+  if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  // Bump the deal so a freshly-contacted deal rises in the pipeline list (best-effort).
+  await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  return json({ data: { item: rows(ins)[0], last_contacted_at: occurredAt } }, 201, cors);
 }
 
 export async function handleSalesDealStage(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {

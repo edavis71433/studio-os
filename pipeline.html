@@ -53,6 +53,21 @@
   .hrow{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--soft);padding:5px 0;border-bottom:1px solid var(--line)}
   .hrow:last-child{border-bottom:none}
   .hrow .hd{white-space:nowrap;color:var(--faint);font-variant-numeric:tabular-nums}
+  /* activity quick-log + merged timeline */
+  .qlog{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);margin-bottom:12px}
+  .qlog .kinds{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .qlog .kb{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .qlog .kb.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .qlog textarea{min-height:44px}
+  .qlog .qrow{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  .qlog .qrow input[type=date]{width:auto;flex:0 0 auto}
+  .tl{list-style:none;padding:0;margin:6px 0 0}
+  .tl-i{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .tl-i:last-child{border-bottom:none}
+  .tl-ic{flex:0 0 auto;width:22px;text-align:center;line-height:1.5;color:var(--faint)}
+  .tl-bd{flex:1;min-width:0}
+  .tl-tx{font-size:13.5px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+  .tl-mt{font-size:12px;color:var(--faint);margin-top:2px;font-variant-numeric:tabular-nums}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
@@ -124,6 +139,11 @@ function evtLabel(e){
   return EVT_LABEL[e.kind]||String(e.kind||'').replace(/_/g,' ');
 }
 const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:'short',day:'numeric'};if(t.getFullYear()!==new Date().getFullYear())o.year='numeric';return t.toLocaleDateString('en-US',o);};
+// Calm relative date ("today" / "3 days ago") — mirrors the server's humanWhen so
+// "Last contacted …" reads the same everywhere.
+function ago(iso){const then=Date.parse(iso),now=Date.now();if(!isFinite(then))return'';const days=Math.floor((now-then)/86400000);if(days<=0)return'today';if(days===1)return'yesterday';if(days<7)return days+' days ago';if(days<14)return'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
+// The activity quick-log kinds (calm, plain — icon + label).
+const ACTKINDS=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 Meeting'],['note','📝 Note']];
 let TOKEN="",FILTER="",DEALS=[];
 // Signing links returned by /send (emailed OR not), kept for this session so a
 // "not-emailed" doc always shows a persistent "copy the signing link" — never a
@@ -227,7 +247,8 @@ async function load(){
     DEALS.sort((a,b)=>{const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
     $('list').innerHTML=DEALS.map(d=>{
       const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
-      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}</div><div style="text-align:right">${stageBadge(d.stage)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+      const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
+      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
     }).join('');
     $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   }catch(e){ if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
@@ -364,9 +385,19 @@ async function openDeal(id){
       ? `This adds ${whoName} as your customer — it creates their client workspace and emails ${esc(c.email)} a link to set their password and sign in. Nothing else needed.`
       : `This adds ${whoName} as your customer — it creates their client workspace. There’s no client email on this deal, so no sign-in invitation goes out; you can share access with them later.`)
       +' It’s part of your service: you bill them for your work the usual way — they never subscribe to anything or pay for software.';
+    // Activity: the quick-log (call/email/meeting/dated note) + the ONE merged
+    // timeline (manual activities interleaved with system events, newest first).
+    const todayStr=new Date().toISOString().slice(0,10);
+    const tlItems=data.timeline||[];
+    const tlHtml=tlItems.length?tlItems.map(it=>{
+      const when=it.backdated?`${evtDate(it.at)} · logged ${evtDate(it.logged_at)}`:evtDate(it.at);
+      const who=(it.source==='activity'&&it.who)?(' · '+esc(it.who)):'';
+      return `<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(when)}${who}</div></div></li>`;
+    }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
+    const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
     $('detailInner').innerHTML=`
       <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(d.title||'Deal')}</div>
-        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}</div></div>
+        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}${data.last_contacted_at?' · Last contacted '+esc(ago(data.last_contacted_at)):''}</div></div>
         <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
       <div class="dbody">
         <div class="sec"><h3>Move stage</h3><div class="steps">${d.converted_client_id?'<span class="mut">Won ✓ — converted to a customer</span>':d.stage==='lost'?`<span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button>`:stepBtns||'<span class="mut">—</span>'}</div><div id="lostForm"></div></div>
@@ -394,7 +425,14 @@ async function openDeal(id){
             draftContract?`<div class="mut">Your agreement is drafted but hasn’t been sent yet — ${whoName} can’t sign until it goes out. Send it for signature first; once it’s signed you can add them as your customer.</div><div class="row2" style="margin-top:8px"><button class="btn" data-send-contract="${draftContract.id}">Send the agreement for signature →</button></div>`:
             `<div id="convWrap"><button class="btn" disabled>Sign the agreement first</button></div>`}
         </div>
-        ${(data.events||[]).length?`<div class="sec"><h3>History</h3>${(data.events||[]).map(e=>`<div class="hrow"><span>${esc(evtLabel(e))}</span><span class="hd">${esc(evtDate(e.created_at))}</span></div>`).join('')}</div>`:''}
+        <div class="sec"><h3>Activity</h3>
+          <div class="qlog">
+            <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
+            <textarea id="qlBody" rows="2" placeholder="What happened? (optional for a call, email, or meeting)"></textarea>
+            <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">Log it</button></div>
+          </div>
+          <ul class="tl">${tlHtml}</ul>
+        </div>
         ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
     $('closeD').onclick=()=>dlg.close();
@@ -408,6 +446,12 @@ async function openDeal(id){
     const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');dlg.close();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    // Activity quick-log: pick a kind, jot what happened (optional except a note),
+    // optionally date it, "Log it". A logged activity feeds the merged timeline +
+    // "last contacted", so the drawer + card refresh after saving.
+    let qlKind='call';
+    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;qlKinds.querySelectorAll('.kb').forEach(x=>x.classList.toggle('on',x===btn));const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
+    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:($('qlDate')&&$('qlDate').value)||undefined});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
     // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
     // the convert gate's "send first"). It records the link in LINKS, copies it,
     // and — critically — tells the operator honestly whether it was EMAILED or

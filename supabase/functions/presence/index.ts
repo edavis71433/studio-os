@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
@@ -521,6 +521,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m) return handleSalesDeal(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/stage$/);
     if (m && method === 'POST') return handleSalesDealStage(req, site, principal, m[1], cors);
+    // Log a call / email / meeting / dated note on the deal — the quick-log that
+    // feeds the deal's activity timeline + "last contacted". Site-scoped & authed.
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/activity$/);
+    if (m && method === 'POST') return handleSalesDealActivity(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/proposals$/);
     if (m && method === 'POST') return handleSalesProposalCreate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/contracts$/);
