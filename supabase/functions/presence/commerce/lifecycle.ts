@@ -18,6 +18,7 @@ import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice } from '../lib/notice.ts';
+import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -247,13 +248,45 @@ export async function runWeeklyDigest(): Promise<{ sent: number; skipped_no_emai
     svcCount(`presence_publishes?status=eq.failed&created_at=gt.${since}`),
   ]);
   const n = (c: number | null) => c ?? 0;
+
+  // ── "Your business this week" — the owner's OWN pipeline numbers, folded into
+  // THIS same weekly email (never a second one). Scoped to the site the digest's
+  // recipient actually owns (presence_identity.email == OPS_ALERT_EMAIL), so it is
+  // the owner's sales — NOT a fleet-wide sum of customers' pipelines. Best-effort
+  // and honest: if the owner owns no Presence site (or a read fails), the block is
+  // simply omitted — never a fabricated number, and each figure reads calmly at zero.
+  let numbersHtml = '';
+  try {
+    const ident = await svc(`presence_identity?email=eq.${encodeURIComponent(to)}&select=site_id&limit=1`);
+    const ownSite = Array.isArray(ident.json) ? ident.json[0]?.site_id : null;
+    if (ownSite) {
+      const usd = (c: number) => '$' + (Math.max(0, c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+      const [newLeads, wonCount, paidRows, dealRows] = await Promise.all([
+        svcCount(`presence_form_submissions?site_id=eq.${ownSite}&spam=is.false&created_at=gt.${since}`),
+        svcCount(`presence_deals?site_id=eq.${ownSite}&deleted_at=is.null&converted_at=gt.${since}`),
+        svc(`presence_invoices?site_id=eq.${ownSite}&status=eq.paid&paid_at=gt.${since}&deleted_at=is.null&select=amount_cents&limit=500`),
+        svc(`presence_deals?site_id=eq.${ownSite}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=2000`),
+      ]);
+      const paid = (Array.isArray(paidRows.json) ? paidRows.json : []) as Array<{ amount_cents: number }>;
+      const collected = paid.reduce((a, r) => a + (Number(r.amount_cents) || 0), 0);
+      const summary = summarizePipeline(Array.isArray(dealRows.json) ? dealRows.json : [], new Date().toISOString());
+      const nLeads = n(newLeads), nWon = n(wonCount);
+      numbersHtml = `<p style="margin-top:22px"><strong>Your business this week</strong></p><ul>
+<li>${nLeads ? `<strong>${nLeads}</strong> new website ${nLeads === 1 ? 'enquiry' : 'enquiries'}.` : 'No new website enquiries this week.'}</li>
+<li>${nWon ? `<strong>${nWon}</strong> ${nWon === 1 ? 'deal became a customer' : 'deals became customers'}.` : 'No deals became customers this week.'}</li>
+<li>${collected ? `<strong>${usd(collected)}</strong> collected across ${paid.length} ${paid.length === 1 ? 'payment' : 'payments'}.` : 'No payments collected this week.'}</li>
+<li>${summary.open.count ? `<strong>${usd(summary.open.value_cents)}</strong> in open pipeline across ${summary.open.count} ${summary.open.count === 1 ? 'deal' : 'deals'}.` : 'No open deals in your pipeline right now.'}</li>
+</ul>`;
+    }
+  } catch { /* the ops digest still sends without the numbers block */ }
+
   const html = `<p>Your Studio OS week, in one glance:</p><ul>
 <li><strong>${n(subs)}</strong> new subscription${n(subs) === 1 ? '' : 's'}</li>
 <li><strong>${n(paused)}</strong> with payment trouble${n(paused) ? ' — they were told their site is still up' : ''}</li>
 <li><strong>${n(lapsed)}</strong> lapsed (wind-down comms run automatically)</li>
 <li><strong>${n(leads)}</strong> lead${n(leads) === 1 ? '' : 's'} waiting more than 2 days for a reply</li>
 <li><strong>${n(fails)}</strong> failed publish${n(fails) === 1 ? '' : 'es'} this week</li>
-</ul><p>Details live in Stripe, the leads inbox, and /system/health. The watchdog emails you separately if production ever goes dark.</p>`;
+</ul>${numbersHtml}<p style="margin-top:22px">Details live in Stripe, the leads inbox, and /system/health. The watchdog emails you separately if production ever goes dark.</p>`;
   const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html);
   await svc('presence_ops_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ last_digest_at: new Date().toISOString() }) });
   // a failed weekly send IS tick-worthy (failures>0 → sweepIssues flags it)

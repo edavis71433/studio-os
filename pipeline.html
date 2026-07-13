@@ -21,6 +21,17 @@
   .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
   h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:4px}
   .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
+  /* the calm "your numbers" strip — plain numbers, tabular, no chart */
+  .summary{margin-bottom:18px}
+  .summary:empty{display:none}
+  .sum-line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:13.5px;color:var(--soft);font-variant-numeric:tabular-nums;line-height:1.75}
+  .sum-line strong{color:var(--ink);font-weight:600}
+  .sum-line .dot{color:var(--line);margin:0 5px}
+  .sum-line .mut{color:var(--faint);font-size:12.5px}
+  .sum-stages{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .sum-stages .sc{display:flex;flex-direction:column;gap:1px;padding:6px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);min-width:88px}
+  .sum-stages .sc-l{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+  .sum-stages .sc-n{font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums}
   .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
   .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
@@ -78,6 +89,7 @@
 <div class="wrap">
   <h1>Pipeline</h1>
   <div class="sub">From first enquiry through onboarding — one deal at a time.</div>
+  <div class="summary" id="summary" aria-live="polite"></div>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by stage"></div>
   <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span></div>
   <div id="list" aria-live="polite"></div>
@@ -235,7 +247,29 @@ function renderFilters(){
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;renderFilters();load();});
 }
 
+// The calm "your numbers" strip: open pipeline · won this month · win rate, plus
+// a tiny per-stage breakdown. Whole-pipeline (ignores the stage filter), computed
+// server-side over ALL deals. Best-effort — it must never block or break the list,
+// and it stays honest on empty (each figure reads calmly when zero).
+async function renderSummary(){
+  const host=$('summary'); if(!host) return;
+  let s;
+  try{ const r=await api('/sales/summary'); s=r&&r.data; }
+  catch(_){ host.innerHTML=''; return; }              // never let the summary sink the page
+  if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
+  const plur=(n,w)=>n+' '+w+(n===1?'':'s');
+  const open=s.open||{count:0,value_cents:0}, wm=s.won_month||{count:0,value_cents:0}, wr=s.win_rate||{pct:null,won:0,lost:0};
+  const openPart=open.count?`Open: <strong>${money(open.value_cents)||'$0'}</strong> across ${plur(open.count,'deal')}`:`Open: <strong>no open deals yet</strong>`;
+  const wonPart=wm.count?`Won this month: <strong>${money(wm.value_cents)||'$0'}</strong> (${wm.count})`:`Won this month: <strong>none yet</strong>`;
+  const winPart=(wr.pct===null||wr.pct===undefined)?`Win rate: <strong>—</strong> <span class="mut">(no closed deals yet)</span>`
+    :`Win rate: <strong>${wr.pct}%</strong> <span class="mut">(${wr.won} of ${wr.won+wr.lost}, last 90 days)</span>`;
+  const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
+  host.innerHTML=`<div class="sum-line">${openPart} <span class="dot">·</span> ${wonPart} <span class="dot">·</span> ${winPart}</div>`
+    +(open.count?`<div class="sum-stages">${cells}</div>`:'');
+}
+
 async function load(){
+  renderSummary();   // refresh the numbers whenever the pipeline reloads (add/move/convert)
   if(window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
     const res=await api('/sales/deals'+(FILTER?('?stage='+FILTER):''));

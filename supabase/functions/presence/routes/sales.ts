@@ -22,6 +22,7 @@ import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
+  summarizePipeline,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -126,6 +127,24 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     return json({ data: rows(ins)[0] }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+// ═══ PIPELINE SUMMARY (the calm "your numbers" rollup) ═══════════════════════
+// The missing pipeline TOTAL: open value, won-this-month, win rate, per-stage —
+// computed server-side over ALL the site's deals, because the deals list is PAGED
+// (the browser only ever holds a page of ≤100, so it can't total them honestly).
+// The pure summarizePipeline does the math; this just fetches the minimal columns.
+// Site-scoped & studio-gated like every authed /sales/* route.
+export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
+  // A solo studio's whole pipeline is small; scan a generous cap. `truncated`
+  // tells the truth if we ever hit it — the totals are then a floor, never a
+  // fabricated whole-set sum.
+  const CAP = 2000;
+  const r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`);
+  if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t total your pipeline just now.' }, 502, cors);
+  const deals = rows(r);
+  return json({ data: summarizePipeline(deals, nowIso()), truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ DEALS ═══
