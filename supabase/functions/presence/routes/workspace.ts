@@ -184,6 +184,7 @@ const NOTICE_HREF: Record<string, string> = {
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
   invoice_paid: '/pipeline.html',  // money landed → the deal it landed on
   publish_failed: '/presence.html#publish',
+  site_down: '/presence.html#foundations',   // a confirmed outage → the foundations desk (domain/hosting/health)
   domain_expiry: '/presence.html#business',
   search_setup: '/presence.html#search',
   welcome_back: '/today.html',

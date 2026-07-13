@@ -38,6 +38,11 @@ export interface WebsiteHealthInput {
   contact_form_working: boolean;   // a non-spam submission has been received
   versions_saved: boolean;         // at least one saved version exists
   domain: string | null;
+  // Uptime heartbeat (real, not inferred): the latest live-URL probe. Optional —
+  // when absent (never probed / pre-migration) we fall back to the publish-state
+  // inference below. `true`=answered, `false`=didn't answer just now.
+  online_now?: boolean | null;
+  uptime_checked_at?: string | null;
 }
 
 export type CheckState = 'ok' | 'attention' | 'coming' | 'off';
@@ -60,6 +65,16 @@ export interface WebsiteHealth {
 }
 
 const STATUS_WORD: Record<CheckState, string> = { ok: 'Working', attention: 'Needs a look', coming: 'Scheduled', off: 'Not set up' };
+
+/** Calm "how long ago" for the last uptime check. PURE. */
+function checkedAgo(now: string, checkedAt: string | null | undefined): string {
+  if (!checkedAt) return 'just now';
+  const mins = Math.max(0, Math.round((Date.parse(now) - Date.parse(checkedAt)) / 60000));
+  if (!Number.isFinite(mins) || mins <= 1) return 'less than a minute ago';
+  if (mins < 60) return `${mins} minutes ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs === 1 ? 'about an hour ago' : `${hrs} hours ago`;
+}
 const check = (title: string, why: string, state: CheckState, action?: { label: string; href: string }): HealthCheck =>
   ({ title, why, state, status_label: STATUS_WORD[state], ...(action ? { action_label: action.label, action_href: action.href } : {}) });
 
@@ -73,7 +88,14 @@ export function buildWebsiteHealth(i: WebsiteHealthInput): WebsiteHealth {
   {
     const c: HealthCheck[] = [];
     const online = step('Website published', 'Website connected & verified');
-    if (online) {
+    if (typeof i.online_now === 'boolean') {
+      // The REAL signal: a live-URL probe (uptime heartbeat), not an inference.
+      // When we've actually fetched the site, that truth replaces the publish-state
+      // guess — "is it up right now?" is what an owner actually wants to know.
+      c.push(i.online_now
+        ? check('Your website is online right now', `We check it around the clock — last checked ${checkedAgo(i.now, i.uptime_checked_at)}. Visitors can reach it.`, 'ok')
+        : check('Your website isn’t responding right now', 'We just checked and it didn’t answer. We’re watching closely and will tell you the moment it’s back — often this clears within minutes.', 'attention', { label: 'See what’s happening', href: '/presence.html#foundations' }));
+    } else if (online) {
       c.push(online.state === 'done'
         ? check('Your website is online', 'Visitors can reach your site right now.', 'ok')
         : check('Your website isn’t published yet', 'It won’t be visible to visitors until you publish it.', 'attention', { label: 'Review & publish', href: '/presence.html#history' }));

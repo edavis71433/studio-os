@@ -8,6 +8,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc, svcAll, svcCount } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns } from '../ops/scheduler.ts';
+import { runUptimeHeartbeat } from '../monitor/heartbeat.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
@@ -257,6 +258,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);
       if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
       if (task === 'reconcile') return json({ data: await runReconcileStuckPublishes(limit) }, 200, cors); // M5: finalize stuck publishes
+      if (task === 'heartbeat') return json({ data: await runUptimeHeartbeat(limit ?? 25) }, 200, cors); // uptime: probe live hosted sites
       if (task === 'media_gc') return json({ data: await reapMedia(limit ?? 100) }, 200, cors); // M6: reap soft-deleted + orphaned media
       if (task === 'snapshot_gc') return json({ data: await reapSnapshots(limit ?? 200) }, 200, cors); // M7: prune old unreferenced snapshots
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
@@ -289,6 +291,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['cycle', () => runOperationsCycle({ limit })],
             ['scheduled_publishes', () => runDuePublishes(limit)],
             ['reconcile', () => runReconcileStuckPublishes(50)],
+            ['heartbeat', () => runUptimeHeartbeat(limit ?? 25)],   // uptime: probe live hosted sites, alert on confirmed outage
           ],
           revenue: [
             ['reconcile_billing', () => runBillingReconcile(30)],
@@ -348,6 +351,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const cycle = await step('cycle', () => runOperationsCycle({ limit }));
       const scheduled = await step('scheduled_publishes', () => runDuePublishes(limit));
       const reconcile = await step('reconcile', () => runReconcileStuckPublishes(50));   // M5: finalize stuck publishes every tick
+      const heartbeat = await step('heartbeat', () => runUptimeHeartbeat(25));   // uptime: probe live hosted sites, alert on confirmed outage (2 fails)
       // P2-E: reconcile billing BEFORE the lifecycle sweep so grace-clock
       // enforcement (W9) acts on Stripe-fresh state (a recovered customer already
       // had grace_until cleared) rather than possibly-stale data.
@@ -372,7 +376,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // result.progress, which nobody reads until something else breaks.
       const issues = sweepIssues(progress);
       if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }
