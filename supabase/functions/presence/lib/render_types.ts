@@ -123,6 +123,19 @@ export interface SiteBlockVideo { type: 'video'; title?: string; url: string; ca
 // Trust/action blocks (previously dormant catalog entries, now realized)
 export interface SiteBlockPartners { type: 'partners'; title?: string; logos: MediaRef[] }
 export interface SiteBlockReviews { type: 'reviews'; title?: string; rating: number; count: number; source?: string }
+// Phase RV: the NATIVE reviews wall (distinct from `reviews`, which is a static,
+// owner-typed rating badge). This block shows REAL customer reviews collected +
+// approved through the reputation loop (routes/reviews.ts). The block itself stores
+// only display config (an optional heading + how many to show); the approved reviews
+// + their HONEST aggregate are baked in at serialize time (approved rows only), so
+// the render is pure and the schema.org (AggregateRating + Review) is truthful.
+export interface ReviewDisplayItem { author: string; rating: number; body: string; reply?: string; date?: string }
+export interface SiteBlockReviewsWall {
+  type: 'reviews_wall';
+  title?: string;
+  reviews: ReviewDisplayItem[];                // resolved at serialize time (approved only)
+  aggregate: { count: number; average: number }; // HONEST: only approved rows, real counts
+}
 export interface SiteBlockAppointment { type: 'appointment'; title?: string; text?: string; button?: string; url: string }
 // Phase BK: the NATIVE booking widget (distinct from `appointment`, which is a
 // link-OUT button to a third-party scheduler). This block renders a calm, mobile-
@@ -186,7 +199,7 @@ export type SiteBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
-  | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment | SiteBlockBooking
+  | SiteBlockPartners | SiteBlockReviews | SiteBlockReviewsWall | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
   | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc

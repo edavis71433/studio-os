@@ -4,7 +4,7 @@
 // this file — never author responsibilities. Every interpolation is escaped;
 // markdown passes through the sanitizer; URLs pass through safeHref.
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
-import { renderSiteBlocks, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
+import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest } from '../../../lib/render_types.ts';
@@ -484,7 +484,11 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   };
 
   const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint });   // Phase T-BLOCKS (+ FB form blocks + BK booking)
-  page('/', { title: siteTitle, description: siteDesc, ld: [ldRestaurant(c, site), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, blocks) });
+  // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
+  // only) onto the ONE business node — home only, where the reviews_wall is visible.
+  const rSchema = reviewsSchema(c.settings?.blocks);
+  const ldHomeBiz = rSchema ? { ...ldRestaurant(c, site), ...rSchema } : ldRestaurant(c, site);
+  page('/', { title: siteTitle, description: siteDesc, ld: [ldHomeBiz, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, blocks) });
   page('/menu/', { ...seoOv('offerings', `Menu — ${i.business_name}`, `The menu at ${i.business_name}.`), ld: [ldMenu(c, site)], ogImage: ogImg, active: 'menu', body: menuBody(c) });
   if (noidx.has('offerings')) markNoindex('menu/index.html');
   page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });

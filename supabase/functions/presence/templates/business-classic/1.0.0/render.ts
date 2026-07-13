@@ -9,7 +9,7 @@
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
-import { renderSiteBlocks, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
+import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
@@ -491,7 +491,11 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
 
   const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint });   // Phase T-BLOCKS (+ FB form blocks + BK booking)
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
-  page('/', { title: siteTitle, description: siteDesc, ld: [ldBiz, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
+  // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
+  // only) onto the ONE business node — home only, where the reviews_wall is visible.
+  const rSchema = reviewsSchema(c.settings?.blocks);
+  const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
+  page('/', { title: siteTitle, description: siteDesc, ld: [ldBizHome, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
   page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });
   if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
   page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });

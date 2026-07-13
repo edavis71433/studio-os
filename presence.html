@@ -409,6 +409,7 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
       <button class="navitem" data-view="updates">Updates</button>
       <button class="navitem" data-view="media">Photos</button>
       <button class="navitem" data-view="bookings">Bookings</button>
+      <button class="navitem" data-view="reviews">Reviews</button>
       <button class="navitem" data-view="design">Design</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
@@ -576,6 +577,13 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
         <h1 class="doc" role="heading" aria-level="2">Bookings</h1>
         <p class="docsub">Let customers book real appointments on your website — pick a service, a day, and an open time. Native and calm: no external calendar, nothing to install. Add the “Online booking” section to a page to show the widget.</p>
         <div id="bookingsWrap"><div class="loadline"><div class="lq">Opening the diary…</div><div class="shimmer"></div></div></div>
+      </section>
+
+      <!-- REVIEWS (Phase RV) -->
+      <section class="view" id="view-reviews">
+        <h1 class="doc" role="heading" aria-level="2">Reviews</h1>
+        <p class="docsub">Real reviews from your customers — collected on your own site. Nothing shows until you approve it. Ask a happy customer for one, approve the good ones, and add the “Reviews wall” section to a page to show them (with honest star ratings that help you show up in search).</p>
+        <div id="reviewsWrap"><div class="loadline"><div class="lq">Gathering your reviews…</div><div class="shimmer"></div></div></div>
       </section>
 
       <!-- DESIGN -->
@@ -948,6 +956,7 @@ function go(view) {
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
   if (view === "bookings") loadBookings();
+  if (view === "reviews") loadReviews();
   if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
@@ -964,7 +973,7 @@ function contextHint(view) {
   if (h && window.ddsHint) setTimeout(() => window.ddsHint(h[0], h[1]), 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
 function routeHash() {
   const h = (location.hash || "").replace("#", "").toLowerCase();
   if (!h) return;
@@ -2244,6 +2253,119 @@ function bkApptRow(a) {
   acts.appendChild(canc);
   row.append(info, badge, acts); return row;
 }
+
+/* ── Reviews (Phase RV): the owner's reputation desk — ask for reviews, approve /
+ *    hide / reply. Propose-then-approve: nothing shows on the site until approved,
+ *    then it appears on the next publish. Reuses the same api()/toast()/nice() spine
+ *    as every other view; all safety + honest schema live server-side. ── */
+const RV_ICSS = "width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;font:inherit;box-sizing:border-box";
+async function loadReviews() {
+  const wrap = $("reviewsWrap"); if (!wrap) return;
+  wrap.innerHTML = '<div class="loadline"><div class="lq">Gathering your reviews…</div><div class="shimmer"></div></div>';
+  try {
+    const r = await api("GET", "/reviews");
+    wrap.innerHTML = "";
+    renderReviews(wrap, r.data || {});
+  } catch (err) {
+    wrap.innerHTML = "";
+    const box = el("div", "card"); box.style.cssText = "padding:18px;border:1px solid var(--line,#eee);border-radius:12px";
+    box.appendChild(el("p", null, err.status === 503
+      ? "Reviews need a one-time database update before they can be switched on. Your studio applies it once — then this page comes to life."
+      : nice(err)));
+    wrap.appendChild(box);
+  }
+}
+function rvCard(title, sub) {
+  const c = el("div", "card"); c.style.cssText = "padding:18px 20px;border:1px solid var(--line,#eee);border-radius:12px;margin-bottom:18px";
+  if (title) c.appendChild(el("h3", null, title)).style.cssText = "margin:0 0 4px;font-size:16px";
+  if (sub) c.appendChild(el("p", "hint", sub)).style.margin = "0 0 12px";
+  return c;
+}
+function rvStars(n) {
+  const full = Math.max(0, Math.min(5, Math.round(+n || 0)));
+  const s = el("span", null, "★".repeat(full) + "☆".repeat(5 - full));
+  s.style.cssText = "color:var(--plum,#5b3fa0);letter-spacing:2px;font-size:15px"; s.setAttribute("aria-label", (full) + " out of 5"); return s;
+}
+function renderReviews(wrap, data) {
+  const reviews = data.reviews || [], counts = data.counts || {}, agg = data.aggregate || { count: 0, average: 0 };
+
+  // ── 1. Ask for a review ─────────────────────────────────────────────────────
+  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it; you approve it before it ever shows. (Nothing is posted on their behalf.)");
+  const rowA = el("div"); rowA.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap";
+  const em = el("input"); em.type = "email"; em.placeholder = "Customer email"; em.style.cssText = RV_ICSS;
+  const nm = el("input"); nm.type = "text"; nm.placeholder = "Their name (optional)"; nm.style.cssText = RV_ICSS;
+  const ask = el("button", null, "Send request"); ask.style.cssText = "padding:10px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap";
+  ask.addEventListener("click", async () => {
+    const email = em.value.trim(); if (!email) { toast("Add the customer's email", true); return; }
+    ask.disabled = true;
+    try {
+      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim() });
+      toast(r.data && r.data.sent === false ? "That address has opted out — nothing sent." : "Review request sent");
+      em.value = ""; nm.value = "";
+    } catch (err) { toast(nice(err), true); } finally { ask.disabled = false; }
+  });
+  const fA = (label, node) => { const w = el("label"); w.style.cssText = "display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600"; w.appendChild(el("span", null, label)); w.appendChild(node); return w; };
+  rowA.append(fA("Email", em), fA("Name", nm), ask);
+  c1.appendChild(rowA);
+  c1.appendChild(el("div", "hint", "Tip: the best time to ask is right after a completed job, appointment, or sale.")).style.cssText = "margin-top:10px;font-size:12.5px";
+  wrap.appendChild(c1);
+
+  // ── 2. Waiting for you (pending) ────────────────────────────────────────────
+  const pending = reviews.filter((r) => r.status === "pending");
+  const c2 = rvCard("Waiting for you" + (pending.length ? " (" + pending.length + ")" : ""), "New reviews from your website. Approve the ones you're happy to show, reply if you like, or hide any you'd rather not display. Nothing here is public yet.");
+  if (!pending.length) c2.appendChild(el("p", "hint", "Nothing waiting. When a customer leaves a review, it appears here for your OK."));
+  pending.forEach((r) => c2.appendChild(rvRow(r)));
+  wrap.appendChild(c2);
+
+  // ── 3. Showing on your site (approved) ──────────────────────────────────────
+  const approved = reviews.filter((r) => r.status === "approved");
+  const c3 = rvCard("Showing on your site" + (agg.count ? " · " + (agg.average % 1 === 0 ? agg.average : agg.average.toFixed(1)) + "★ from " + agg.count : ""), "Approved reviews. Add the “Reviews wall” section to a page (Design → add a section) to display them — with honest star ratings for search. Changes appear the next time you publish.");
+  if (!approved.length) c3.appendChild(el("p", "hint", "No approved reviews yet. Approve one above and it’ll show here."));
+  approved.forEach((r) => c3.appendChild(rvRow(r)));
+  wrap.appendChild(c3);
+
+  // ── 4. Hidden (collapsed) ───────────────────────────────────────────────────
+  const hidden = reviews.filter((r) => r.status === "hidden");
+  if (hidden.length) {
+    const c4 = rvCard("Hidden (" + hidden.length + ")", "Kept but never shown. You can approve any of these later.");
+    hidden.forEach((r) => c4.appendChild(rvRow(r)));
+    wrap.appendChild(c4);
+  }
+}
+function rvRow(r) {
+  const row = el("div"); row.style.cssText = "padding:12px 14px;border:1px solid var(--line,#eee);border-radius:10px;margin-bottom:8px";
+  const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+  head.appendChild(rvStars(r.rating));
+  const who = el("span", null, r.reviewer_name || "A customer"); who.style.cssText = "font-weight:600";
+  head.appendChild(who);
+  if (r.created_at) { const d = el("span", "hint", String(r.created_at).slice(0, 10)); d.style.cssText = "font-size:12px;color:var(--soft,#888)"; head.appendChild(d); }
+  row.appendChild(head);
+  if (r.body) { const q = el("p", null, "“" + r.body + "”"); q.style.cssText = "margin:8px 0 0;color:#3d3646;font-size:14px;line-height:1.5"; row.appendChild(q); }
+  if (r.owner_reply) { const rp = el("p", null, "You replied: " + r.owner_reply); rp.style.cssText = "margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--plum,#5b3fa0);color:#6b6478;font-size:13px;background:#faf9fc"; row.appendChild(rp); }
+  const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:10px";
+  if (r.status !== "approved") {
+    const ap = el("button", null, "Approve & show"); ap.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
+    ap.addEventListener("click", async () => { ap.disabled = true; try { await api("POST", "/reviews/" + r.id + "/approve"); toast("Approved — publish to show it on your site"); loadReviews(); } catch (err) { toast(nice(err), true); ap.disabled = false; } });
+    acts.appendChild(ap);
+  }
+  if (r.status !== "hidden") {
+    const hd = el("button", null, "Hide"); hd.style.cssText = BK_BTN;
+    hd.addEventListener("click", async () => { hd.disabled = true; try { await api("POST", "/reviews/" + r.id + "/hide"); toast("Hidden — it won’t show on your site"); loadReviews(); } catch (err) { toast(nice(err), true); hd.disabled = false; } });
+    acts.appendChild(hd);
+  }
+  const rep = el("button", null, r.owner_reply ? "Edit reply" : "Reply"); rep.style.cssText = BK_BTN;
+  rep.addEventListener("click", () => {
+    if (row.querySelector(".rv-replybox")) { row.querySelector(".rv-replybox").remove(); return; }
+    const box = el("div", "rv-replybox"); box.style.cssText = "margin-top:8px;display:flex;gap:8px;flex-wrap:wrap";
+    const ta = el("textarea"); ta.value = r.owner_reply || ""; ta.placeholder = "A short public reply (optional)"; ta.maxLength = 1000; ta.style.cssText = RV_ICSS + ";min-height:60px;flex:1;min-width:220px";
+    const sv = el("button", null, "Save reply"); sv.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
+    sv.addEventListener("click", async () => { sv.disabled = true; try { await api("POST", "/reviews/" + r.id + "/reply", { reply: ta.value.trim() }); toast("Reply saved — publish to update your site"); loadReviews(); } catch (err) { toast(nice(err), true); sv.disabled = false; } });
+    box.append(ta, sv); row.appendChild(box);
+  });
+  acts.appendChild(rep);
+  row.appendChild(acts);
+  return row;
+}
 // Phase DAM: the library's plain-English health — reuses /assets/health (DAM-13).
 async function loadAssetHealth() {
   const host = $("assetHealth"); if (!host) return;
@@ -2850,7 +2972,7 @@ const EE_MANDATORY_H2 = {   // must match lib/site_blocks.ts MANDATORY_H2 exactl
   pricing: "Pricing", certifications: "Credentials & certifications", service_areas: "Areas we serve",
   gallery: "Gallery", before_after: "Before & after", video: "Video", newsletter: "Get updates from us",
   social: "Find us online", events: "Upcoming events", map: "Find us", accordion: "More information",
-  partners: "Trusted by", reviews: "What customers say", appointment: "Book an appointment",
+  partners: "Trusted by", reviews: "What customers say", reviews_wall: "Reviews", appointment: "Book an appointment",
 };
 function eeEffHeading(b) {   // mirror of site_blocks.ts effHeading()
   if (Object.prototype.hasOwnProperty.call(EE_MANDATORY_H2, b.type)) return (b.title || EE_MANDATORY_H2[b.type]);
@@ -3967,6 +4089,7 @@ const BLOCK_DEFS = [
   { type: "video", name: "Video", mediaKind: "video", hint: "A poster image that links out to your video — nothing external loads on your site." },
   { type: "partners", name: "Trusted by (logo strip)", mediaKind: "gallery", hint: "Logos of brands you work with — instant credibility. Pick them from your files." },
   { type: "reviews", name: "Review rating badge", reviewsSimple: true, hint: "" },
+  { type: "reviews_wall", name: "Reviews wall (native)", reviewsWallSimple: true, hint: "Show the real reviews customers leave on your site — with honest star ratings that help you show up in search. Collect + approve them in the Reviews tab." },
   { type: "appointment", name: "Booking button", apptSimple: true, hint: "" },
   { type: "booking", name: "Online booking (native)", bookingSimple: true, hint: "Take real appointments right on your site. Set up your services + hours in the Bookings tab; this section shows the booking widget." },
   // Growth blocks (r2) — every one links OUT; nothing external ever loads on the site.
@@ -3998,7 +4121,7 @@ const SECTION_GROUPS = [
   { label: "Show your work", note: "Photos, video and the people behind the work.",
     types: ["gallery", "before_after", "image", "image_text", "video", "team", "partners"] },
   { label: "Build trust", note: "Proof that turns visitors into customers.",
-    types: ["features", "stats", "cards", "reviews", "certifications", "pricing", "process"] },
+    types: ["features", "stats", "cards", "reviews_wall", "reviews", "certifications", "pricing", "process"] },
   { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
     types: ["cta", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
   { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
@@ -4085,6 +4208,7 @@ function emptyBlock(def) {
   if (def.tocSimple) { return b; }         // nothing to fill — auto-built at render
   if (def.ctaSimple) { b.text = ""; return b; }
   if (def.reviewsSimple) { b.rating = 5; b.count = 0; return b; }
+  if (def.reviewsWallSimple) { b.max = 12; return b; }   // approved reviews injected at publish
   if (def.apptSimple) { b.url = ""; return b; }
   if (def.bookingSimple) { b.intro = ""; return b; }
   if (def.newsletterSimple) { b.url = ""; return b; }
@@ -4246,6 +4370,15 @@ function renderBlocksCard() {
       [rt, ct, sc].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(rt, ct, sc);
       sub.appendChild(el("div", "hint", "Use your real rating — it shows as stars with the count (e.g. “4.9 out of 5 — from 120 reviews on Google”)."));
+    } else if (def.reviewsWallSimple) {
+      const mx = el("input"); mx.type = "number"; mx.min = "1"; mx.max = "50"; mx.step = "1"; mx.placeholder = "How many to show (e.g. 12)"; mx.value = blk.max || 12; mx.style.cssText = inputCss;
+      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "reviews_wall", title: ti.value.trim(), max: parseInt(mx.value, 10) || 12 }); };
+      mx.addEventListener("change", commit);
+      sub.appendChild(mx);
+      const go = el("button", null, "Collect & approve reviews →"); go.type = "button"; go.style.cssText = miniBtn;
+      go.addEventListener("click", () => { location.hash = "#reviews"; });
+      sub.appendChild(go);
+      sub.appendChild(el("div", "hint", "Shows the real, owner-approved reviews from your Reviews tab — with honest star ratings for search. Nothing appears until you approve a review and publish. (If there are none yet, this section stays hidden.)"));
     } else if (def.apptSimple) {
       const t = el("input"), bt = el("input"), u = el("input");
       t.placeholder = "A short line (optional) — e.g. Ready when you are."; t.value = blk.text || "";

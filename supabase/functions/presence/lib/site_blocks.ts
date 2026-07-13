@@ -15,7 +15,7 @@ import type {
   SiteBlock, SiteBlockType, SiteBlockFeatures, SiteBlockStats, SiteBlockTeam,
   SiteBlockProcess, SiteBlockPricing, SiteBlockCertifications, SiteBlockServiceAreas, SiteBlockCtaBanner,
   SiteBlockGallery, SiteBlockBeforeAfter, SiteBlockVideo, MediaRef,
-  SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment, SiteBlockBooking,
+  SiteBlockPartners, SiteBlockReviews, SiteBlockReviewsWall, SiteBlockAppointment, SiteBlockBooking,
   SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
@@ -29,7 +29,7 @@ import { brandTint } from './palettes.ts';
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'features', 'stats', 'team', 'process', 'pricing', 'certifications', 'service_areas', 'cta',
   'gallery', 'before_after', 'video',
-  'partners', 'reviews', 'appointment', 'booking',
+  'partners', 'reviews', 'reviews_wall', 'appointment', 'booking',
   'newsletter', 'social', 'events', 'map',
   'richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider',
   'form',
@@ -80,6 +80,11 @@ interface StoredBeforeAfter { type: 'before_after'; title?: string; items: Array
 interface StoredVideo { type: 'video'; title?: string; url: string; caption?: string; poster_id?: string }
 interface StoredPartners { type: 'partners'; title?: string; image_ids: string[] }
 interface StoredMap { type: 'map'; title?: string; image_media_id?: string; address?: string; directions_url?: string }
+// Phase RV: the reviews wall stores only DISPLAY config — its approved reviews +
+// honest aggregate are injected at serialize time (resolveBlockMedia extras), never
+// stored on the block (so a stale block can't fabricate ratings). `max` bounds how
+// many approved reviews are shown; the aggregate always counts ALL approved rows.
+interface StoredReviewsWall { type: 'reviews_wall'; title?: string; max: number }
 // Text & layout staples: image/image_text carry media by ID (resolved by resolveBlockMedia);
 // richtext/accordion/buttons/divider carry no media (pass straight through).
 interface StoredImage { type: 'image'; title?: string; image_id?: string; caption?: string; alt?: string; link?: string; decorative?: boolean }
@@ -97,7 +102,7 @@ export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | StoredGallery | StoredBeforeAfter | StoredVideo
-  | StoredPartners | SiteBlockReviews | SiteBlockAppointment | SiteBlockBooking
+  | StoredPartners | SiteBlockReviews | StoredReviewsWall | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
   | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
@@ -208,6 +213,13 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         const rating = Math.round(Math.min(5, Math.max(0, Number((b as any).rating) || 0)) * 10) / 10;
         const count = Math.min(1000000, Math.max(0, Math.trunc(Number((b as any).count) || 0)));
         if (rating > 0 && count > 0) block = { type: 'reviews', title, rating, count, source: s((b as any).source, 40) || undefined } as SiteBlockReviews;
+        break;
+      }
+      case 'reviews_wall': {   // NATIVE reviews wall — always valid; approved reviews +
+        // their honest aggregate are injected at serialize time. Stores only how many
+        // to show (bounded); it renders nothing until there are approved reviews.
+        const max = Math.min(50, Math.max(1, Math.trunc(Number((b as any).max) || 12)));
+        block = { type: 'reviews_wall', title, max } as StoredReviewsWall;
         break;
       }
       case 'appointment': {   // booking button — link-out only (zero external origins)
@@ -354,7 +366,15 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
  *  registers them in the media manifest, so variants are generated — the ONE media
  *  pipeline, reused). A media block whose media can't resolve is dropped; a team
  *  keeps its text even without photos. StoredBlock[] → render-facing SiteBlock[]. */
-export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null): SiteBlock[] {
+// Phase RV: the reviews wall's approved reviews + honest aggregate are resolved
+// alongside media (both are impure DB reads the serializer performs once). Passed as
+// `extras` so the pure block engine never itself reads the DB. Absent/empty → the
+// reviews_wall block resolves to nothing (rendered as absent), keeping goldens stable
+// and honoring "shown only after approval".
+export interface BlockResolveExtras {
+  reviewsWall?: { items: import('./render_types.ts').ReviewDisplayItem[]; aggregate: { count: number; average: number } };
+}
+export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null, extras?: BlockResolveExtras): SiteBlock[] {
   const out: SiteBlock[] = [];
   // Phase T-STYLE: the media-bearing branches rebuild their block object, so carry
   // the owner-chosen per-section style across the rebuild (default `out.push(b)` keeps it).
@@ -384,6 +404,14 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       case 'partners': {
         const logos = b.image_ids.map((id) => ref(id)).filter((x): x is MediaRef => !!x);
         if (logos.length) out.push({ type: 'partners', title: b.title, logos, ...lk(b) });
+        break;
+      }
+      case 'reviews_wall': {   // inject approved reviews + honest aggregate; drop when
+        // there are none to show (never render an empty wall / fabricate a rating).
+        const rw = extras?.reviewsWall;
+        if (rw && rw.aggregate.count > 0 && rw.items.length) {
+          out.push({ type: 'reviews_wall', title: b.title, reviews: rw.items.slice(0, b.max || 12), aggregate: rw.aggregate, ...lk(b) });
+        }
         break;
       }
       case 'map': {   // an address keeps the block valuable even if the image can't resolve
@@ -447,6 +475,28 @@ function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => 
 
 // ── Render context: the escapers + safe-href a template already has, injected so
 //    this module stays free of any template's helper imports. ──
+// ── Phase RV: the reviews' HONEST schema.org, folded into the page's ONE business
+//    node. A standalone AggregateRating/Review node would create a SECOND, duplicate
+//    LocalBusiness on the page (Google merges/ignores duplicates); instead a template
+//    spreads this onto its ldBusiness() output, so aggregateRating + review sit on the
+//    real business — the correct rich-results shape. Counts only approved rows (the
+//    resolved block already carries approved-only data). Returns null when there is
+//    nothing approved to show, so a template with no reviews_wall is byte-identical. ──
+export function reviewsSchema(blocks: SiteBlock[] | undefined): { aggregateRating: object; review: object[] } | null {
+  const rw = (blocks || []).find((b) => b.type === 'reviews_wall') as SiteBlockReviewsWall | undefined;
+  if (!rw || !rw.aggregate || rw.aggregate.count < 1 || !rw.reviews.length) return null;
+  return {
+    aggregateRating: { '@type': 'AggregateRating', ratingValue: rw.aggregate.average, reviewCount: rw.aggregate.count, bestRating: 5, worstRating: 1 },
+    review: rw.reviews.slice(0, 20).map((r) => ({
+      '@type': 'Review',
+      reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+      author: { '@type': 'Person', name: r.author },
+      reviewBody: r.body,
+      ...(r.date ? { datePublished: r.date } : {}),
+    })),
+  };
+}
+
 export interface BlockRenderCtx {
   esc: (s: string) => string;
   attr: (s: string) => string;
@@ -512,7 +562,7 @@ const MANDATORY_H2: Record<string, string> = {
   pricing: 'Pricing', certifications: 'Credentials & certifications', service_areas: 'Areas we serve',
   gallery: 'Gallery', before_after: 'Before & after', video: 'Video', newsletter: 'Get updates from us',
   social: 'Find us online', events: 'Upcoming events', map: 'Find us', accordion: 'More information',
-  partners: 'Trusted by', reviews: 'What customers say', appointment: 'Book an appointment',
+  partners: 'Trusted by', reviews: 'What customers say', reviews_wall: 'Reviews', appointment: 'Book an appointment',
   booking: 'Book an appointment',
 };
 /** The effective (displayed) heading of a block, or null when it shows none. */
@@ -772,6 +822,29 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         ld = { '@context': 'https://schema.org', '@type': 'ReserveAction', name: b.title || 'Book an appointment' };
         break;
       }
+      case 'reviews_wall': {   // NATIVE reviews wall — real, owner-approved customer
+        // reviews (rating + quote + name + optional owner reply). The visible content;
+        // the honest schema.org (AggregateRating + Review) is folded into the page's
+        // ONE business node by the template (reviewsSchema() below) to avoid a second,
+        // duplicate LocalBusiness node — so this block emits NO standalone ld.
+        const avg = b.aggregate.average % 1 === 0 ? String(b.aggregate.average) : b.aggregate.average.toFixed(1);
+        const summary = b.aggregate.count > 0
+          ? `<p class="rw-agg"><span class="rw-agg-stars" aria-hidden="true">${'★'.repeat(Math.min(5, Math.round(b.aggregate.average)))}${'☆'.repeat(Math.max(0, 5 - Math.round(b.aggregate.average)))}</span> <span class="rw-agg-num">${esc(avg)} out of 5</span> <span class="rw-agg-count">· ${esc(String(b.aggregate.count))} review${b.aggregate.count === 1 ? '' : 's'}</span></p>`
+          : '';
+        const cards = b.reviews.map((r) => {
+          const full = Math.min(5, Math.max(0, Math.round(r.rating)));
+          const stars = '★'.repeat(full) + '☆'.repeat(5 - full);
+          const reply = r.reply
+            ? `<div class="rw-reply"><p class="rw-reply-lbl">Response from the owner</p><p class="rw-reply-body">${esc(r.reply)}</p></div>`
+            : '';
+          const when = r.date ? `<time class="rw-date" datetime="${attr(r.date)}">${esc(r.date)}</time>` : '';
+          return `<figure class="rw-card"><p class="rw-stars" aria-label="${attr(r.rating + ' out of 5')}">${stars}</p>` +
+            `<blockquote class="rw-body"><p>${esc(r.body)}</p></blockquote>` +
+            `<figcaption class="rw-author">${esc(r.author)}${when}</figcaption>${reply}</figure>`;
+        }).join('');
+        html = `<section class="block alt block-reviews-wall"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-grid">${cards}</div></div></section>`;
+        break;
+      }
       case 'columns': {   // 2–3 equal columns; CSS grid stacks to one column < 620px
         const cols = b.columns.map((c) => {
           const prose = c.body ? renderMarkdown(c.body) : '';
@@ -896,6 +969,21 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .block-reviews .rev-inner{text-align:center}
 .rev-stars{font-size:1.6rem;letter-spacing:4px;color:var(--accent);margin:6px 0 2px}
 .rev-text{color:var(--soft);margin:0;font-size:1.02rem}
+.block-reviews-wall .rw-head{text-align:center;margin-bottom:8px}
+.rw-agg{margin:6px 0 0;font-size:1.05rem}
+.rw-agg-stars{color:var(--accent);letter-spacing:2px}
+.rw-agg-num{font-weight:700;color:var(--ink)}
+.rw-agg-count{color:var(--soft)}
+.rw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
+.rw-card{margin:0;background:var(--wash,#faf9fc);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.rw-stars{color:var(--accent);letter-spacing:2px;margin:0 0 8px;font-size:1.05rem}
+.rw-body{margin:0;border:0;padding:0;font-size:.98rem;color:var(--ink);line-height:1.55}
+.rw-body p{margin:0}
+.rw-author{margin-top:10px;font-weight:700;font-size:.92rem;color:var(--ink);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.rw-date{font-weight:400;color:var(--soft);font-size:.82rem}
+.rw-reply{margin-top:10px;padding:10px 12px;border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent);border-radius:0 8px 8px 0}
+.rw-reply-lbl{margin:0 0 3px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-dark,var(--accent))}
+.rw-reply-body{margin:0;font-size:.9rem;color:var(--soft)}
 .block-appt{text-align:center}
 .appt-text{color:var(--soft);max-width:56ch;margin:8px auto 0}
 .appt-cta{margin-top:14px}

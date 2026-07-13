@@ -57,6 +57,7 @@ import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteA
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
+import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } from './routes/reviews.ts';
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -171,6 +172,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handleBookingSlots(req, m[1], cors);
     m = route.match(/^\/book\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleBookingCreate(req, m[1], cors);
+  }
+  // ── Phase RV: PUBLIC native reviews — a website visitor opens a branded review
+  //    page (GET) and leaves a review (POST). No session; authorized by the site id
+  //    itself (like the form + booking submit). Honeypot + rate-limit + validation +
+  //    ip_hash live in routes/reviews.ts. Stored 'pending' — never shown until the
+  //    owner approves. (Owner /reviews management is post-auth, below.)
+  {
+    const m = route.match(/^\/reviews\/([0-9a-f-]{36})$/);
+    if (m && method === 'GET') return handleReviewPage(req, m[1], cors);
+    if (m && method === 'POST') return handleReviewSubmit(req, m[1], cors);
   }
   // ── AN-2: the first-party analytics collector — PUBLIC, pre-auth, authorized
   //    by the site id itself. Privacy-first, bot-dropping, always 204. ──
@@ -789,6 +800,23 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       if (m[2] === 'confirm') return handleBookingConfirm(site, m[1], principal, cors);
       if (m[2] === 'cancel') return handleBookingCancel(req, site, m[1], principal, cors);
       return handleBookingMark(site, m[1], m[2] as 'complete' | 'no_show', principal, cors);
+    }
+  }
+
+  // ── Phase RV: Reviews (authed, site-scoped) — the owner moderates incoming reviews
+  //    (approve / hide / reply) and invites customers to leave one. Studio-side surface
+  //    (the reviewer boundary above already refuses a client_reviewer). Dormant until
+  //    migration 0101 is owner-applied (handlers degrade to "unavailable"). Note: the
+  //    public review page + submit are UUID-pathed (/reviews/:siteId) and matched
+  //    pre-auth above; these word-pathed owner routes never collide with them.
+  if (route === '/reviews' && method === 'GET') return handleReviewsList(req, site, cors);
+  if (route === '/reviews/request' && method === 'POST') return handleReviewRequest(req, site, principal, cors);
+  {
+    const m = route.match(/^\/reviews\/([0-9a-f-]{36})\/(approve|hide|reply)$/);
+    if (m && method === 'POST') {
+      if (m[2] === 'approve') return handleReviewApprove(site, m[1], principal, cors);
+      if (m[2] === 'hide') return handleReviewHide(site, m[1], principal, cors);
+      return handleReviewReply(req, site, m[1], principal, cors);
     }
   }
 

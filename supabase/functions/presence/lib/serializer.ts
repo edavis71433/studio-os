@@ -10,6 +10,7 @@ import { svc } from './db.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
 import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
+import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -59,7 +60,7 @@ export function buildDevLayer(row: { theme_tokens?: unknown; custom_css?: unknow
 
 export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
-  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr, devArr] = await Promise.all([
+  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr, devArr, reviewsArr] = await Promise.all([
     q(`presence_identity?site_id=eq.${siteId}&limit=1`),
     q(`presence_locations?site_id=eq.${siteId}&order=created_at.asc`),
     q(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
@@ -70,7 +71,18 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
     q(`presence_settings?site_id=eq.${siteId}&limit=1`),
     q(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`),
+    // Phase RV: approved reviews ONLY — baked into the reviews_wall block so the render
+    // is pure and the schema.org is honest. Deploy-order-tolerant: pre-0101 this table
+    // is absent → q() returns [] → no reviews_wall renders (nothing fabricated).
+    q(`presence_reviews?site_id=eq.${siteId}&status=eq.approved&order=approved_at.desc,created_at.desc&select=reviewer_name,rating,body,owner_reply,status,approved_at,created_at&limit=500`),
   ]);
+  // Phase RV: resolve the approved reviews → display items + HONEST aggregate (only
+  // approved rows, real counts). Passed to resolveBlockMedia as extras so the reviews_wall
+  // block can render + carry its schema without the pure engine reading the DB.
+  const approvedReviews = reviewsArr as any[];
+  const reviewsWall = approvedReviews.length
+    ? { items: shapeReviewsForDisplay(approvedReviews, 24), aggregate: aggregateApproved(approvedReviews) }
+    : undefined;
 
   const mediaById = new Map<string, MediaRow>((media as MediaRow[]).map((m) => [m.id, m]));
   const usedMedia = new Set<string>();
@@ -113,7 +125,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       // Phase T-BLOCKS: validated + capped structured blocks (authoritative boundary);
       // FD-T17 resolves any block media IDs → MediaRefs via the SAME ref() (so block
       // photos land in the media manifest and get variants — one media pipeline).
-      blocks: resolveBlockMedia(validateBlocks(settings.blocks), ref),
+      blocks: resolveBlockMedia(validateBlocks(settings.blocks), ref, reviewsWall ? { reviewsWall } : undefined),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],

@@ -57,6 +57,8 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('quote', 'richtext', { required: true }), t('author', 'text', { required: true }), t('source', 'text'), t('date', 'text')], schema: 'Review', a11y: 'blockquote + cite', seo: 'Review schema', industries: ['*'] },
   { key: 'reviews', label: 'Aggregate Reviews', category: 'proof', purpose: 'A star rating summary (from connected sources).',
     fields: [t('rating', 'number'), t('count', 'number'), t('source', 'text')], schema: 'AggregateRating', a11y: 'rating announced as text, not stars alone', seo: 'AggregateRating (rich result)', industries: ['*'] },
+  { key: 'reviews_wall', label: 'Reviews wall (native)', category: 'proof', purpose: 'Show real, owner-approved customer reviews you collect on your own site — with honest star ratings for rich results.',
+    fields: [t('title', 'text')], schema: 'Review + AggregateRating', a11y: 'each rating announced as text; owner reply labelled', seo: 'Review + AggregateRating (rich result, honest counts)', industries: ['*'] },
   { key: 'faq', label: 'FAQ', category: 'content', purpose: 'Answers to common questions.',
     fields: [t('question', 'text', { required: true, repeatable: true, aiAssist: true }), t('answer', 'richtext', { required: true, aiAssist: true })], schema: 'FAQPage', a11y: 'accessible disclosure or plain headings', seo: 'FAQPage (rich result)', industries: ['*'] },
   { key: 'team', label: 'Team', category: 'content', purpose: 'The people behind the business.',
