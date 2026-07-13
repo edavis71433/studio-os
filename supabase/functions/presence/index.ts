@@ -56,6 +56,7 @@ import { handleContentLibraryList, handleContentLibrarySave, handleContentLibrar
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
+import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel } from './routes/booking.ts';
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -158,6 +159,18 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/forms\/([0-9a-f-]{36})\/submit$/);
     if (m && method === 'POST') return handleFormSubmit(req, m[1], cors);
+  }
+  // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
+  //    open slots, and books an appointment. No session; authorized by the site id
+  //    itself (like the form submit + analytics collector). Honeypot + rate-limit +
+  //    validation live in routes/booking.ts, mirroring the form submit's safety.
+  {
+    let m = route.match(/^\/book\/([0-9a-f-]{36})\/types$/);
+    if (m && method === 'GET') return handleBookingTypes(req, m[1], cors);
+    m = route.match(/^\/book\/([0-9a-f-]{36})\/slots$/);
+    if (m && method === 'GET') return handleBookingSlots(req, m[1], cors);
+    m = route.match(/^\/book\/([0-9a-f-]{36})$/);
+    if (m && method === 'POST') return handleBookingCreate(req, m[1], cors);
   }
   // ── AN-2: the first-party analytics collector — PUBLIC, pre-auth, authorized
   //    by the site id itself. Privacy-first, bot-dropping, always 204. ──
@@ -752,6 +765,27 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);
   }
   if (route === '/approve/send' && method === 'POST') return handleApproveSend(site, principal, cors);
+
+  // ── Phase BK: Bookings (authed, site-scoped) — the owner defines services +
+  //    weekly availability, and manages incoming appointments. Studio-side surface
+  //    (the reviewer boundary above already refuses a client_reviewer). Dormant
+  //    until migration 0099 is owner-applied (handlers degrade to "unavailable").
+  if (route === '/bookings/settings' && method === 'GET') return handleBookingSettingsGet(site, cors);
+  if (route === '/bookings/settings' && method === 'PUT') return handleBookingSettingsPut(req, site, principal, cors);
+  if (route === '/bookings/types' && method === 'GET') return handleBookingTypesList(site, cors);
+  if (route === '/bookings/types' && method === 'POST') return handleBookingTypeCreate(req, site, principal, cors);
+  {
+    const m = route.match(/^\/bookings\/types\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') return handleBookingTypeUpdate(req, site, m[1], principal, cors);
+    if (m && method === 'DELETE') return handleBookingTypeDelete(site, m[1], principal, cors);
+  }
+  if (route === '/bookings/appointments' && method === 'GET') return handleBookingAppointments(req, site, cors);
+  {
+    const m = route.match(/^\/bookings\/appointments\/([0-9a-f-]{36})\/(confirm|cancel)$/);
+    if (m && method === 'POST') return m[2] === 'confirm'
+      ? handleBookingConfirm(site, m[1], principal, cors)
+      : handleBookingCancel(req, site, m[1], principal, cors);
+  }
 
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
   if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);

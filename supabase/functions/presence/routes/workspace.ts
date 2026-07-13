@@ -195,6 +195,7 @@ const NOTICE_HREF: Record<string, string> = {
   payment_trouble: '/presence.html#settings', account_lapsed: '/presence.html#settings',
   winddown_reminder: '/presence.html#settings', win_back: '/presence.html#settings', deletion_requested: '/presence.html#settings',
   approval_decided: '/timeline.html',   // a reviewer/client decided something — the story lives on the timeline
+  new_booking: '/presence.html#bookings',   // a customer booked online → the Bookings desk (confirm/cancel)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 

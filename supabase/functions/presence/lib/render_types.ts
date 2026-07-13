@@ -14,6 +14,9 @@ export interface SiteConfig {
   brand?: { credit?: string };
   /** inquiry-form endpoint; when absent the contact page renders a mailto CTA (M5 wires it) */
   formEndpoint?: string;
+  /** Phase BK: the public native-booking API base (…/book/:siteId); the booking
+   *  block's first-party enhancer reads it to call /types, /slots, and POST a booking. */
+  bookEndpoint?: string;
   /** AN-2: the site id, baked into the injected first-party analytics tracker. */
   siteId?: string;
 }
@@ -121,6 +124,13 @@ export interface SiteBlockVideo { type: 'video'; title?: string; url: string; ca
 export interface SiteBlockPartners { type: 'partners'; title?: string; logos: MediaRef[] }
 export interface SiteBlockReviews { type: 'reviews'; title?: string; rating: number; count: number; source?: string }
 export interface SiteBlockAppointment { type: 'appointment'; title?: string; text?: string; button?: string; url: string }
+// Phase BK: the NATIVE booking widget (distinct from `appointment`, which is a
+// link-OUT button to a third-party scheduler). This block renders a calm, mobile-
+// first, first-party booking widget (pick service → day → open slot → details →
+// confirm) driven by the site's own public /book/:siteId endpoints — zero external
+// origins. Services + availability live in the DB (not the block), so the block
+// itself carries only an optional heading + intro.
+export interface SiteBlockBooking { type: 'booking'; title?: string; intro?: string }
 // Growth blocks (T-BLOCKS r2) — link-out only, zero external origins on the page.
 export interface SiteBlockNewsletter { type: 'newsletter'; title?: string; text?: string; button?: string; url: string }
 export interface SiteBlockSocial { type: 'social'; title?: string; links: Array<{ network: string; url: string }> }
@@ -176,7 +186,7 @@ export type SiteBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
-  | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment
+  | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
   | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc

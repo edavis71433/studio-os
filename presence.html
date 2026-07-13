@@ -408,6 +408,7 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
       <button class="navitem" data-view="testimonials">Kind words</button>
       <button class="navitem" data-view="updates">Updates</button>
       <button class="navitem" data-view="media">Photos</button>
+      <button class="navitem" data-view="bookings">Bookings</button>
       <button class="navitem" data-view="design">Design</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
@@ -568,6 +569,13 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
           <div style="display:flex;gap:22px;align-items:baseline"><button class="pillbtn inked" id="btnUploadGo">Add it to the collection</button><button class="quietact" id="btnUploadCancel">Never mind</button></div>
         </div>
         <div class="mediagrid" id="mediaGrid"></div>
+      </section>
+
+      <!-- BOOKINGS (Phase BK) -->
+      <section class="view" id="view-bookings">
+        <h1 class="doc" role="heading" aria-level="2">Bookings</h1>
+        <p class="docsub">Let customers book real appointments on your website — pick a service, a day, and an open time. Native and calm: no external calendar, nothing to install. Add the “Online booking” section to a page to show the widget.</p>
+        <div id="bookingsWrap"><div class="loadline"><div class="lq">Opening the diary…</div><div class="shimmer"></div></div></div>
       </section>
 
       <!-- DESIGN -->
@@ -939,6 +947,7 @@ function go(view) {
   if (view === "today") loadToday();
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
+  if (view === "bookings") loadBookings();
   if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
@@ -955,7 +964,7 @@ function contextHint(view) {
   if (h && window.ddsHint) setTimeout(() => window.ddsHint(h[0], h[1]), 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", design: "design", history: "history", versions: "history" };
 function routeHash() {
   const h = (location.hash || "").replace("#", "").toLowerCase();
   if (!h) return;
@@ -2041,6 +2050,199 @@ $("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
 async function loadMedia() {
   try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); loadAssetHealth(); }
   catch (err) { toast(nice(err), true); }
+}
+
+/* ── Bookings (Phase BK): the owner's native booking desk — services, weekly
+ *    availability, and incoming appointments (confirm / cancel). Reuses the same
+ *    api()/toast()/nice() spine as every other view. All slot logic + safety live
+ *    server-side (routes/booking.ts + lib/booking.ts); this is a calm editor. ── */
+const BK_DAYS = [[1,"Monday"],[2,"Tuesday"],[3,"Wednesday"],[4,"Thursday"],[5,"Friday"],[6,"Saturday"],[0,"Sunday"]];
+const BK_INTERVALS = [10,15,20,30,45,60,90,120];
+const BK_TZS = ["America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","Europe/London","Australia/Sydney"];
+const BK_ICSS = "width:100%;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;box-sizing:border-box";
+const BK_BTN = "padding:7px 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:#fff;font:inherit;font-size:13px;cursor:pointer";
+let BK = { settings: null, types: [] };
+async function loadBookings() {
+  const wrap = $("bookingsWrap"); if (!wrap) return;
+  wrap.innerHTML = '<div class="loadline"><div class="lq">Opening the diary…</div><div class="shimmer"></div></div>';
+  try {
+    const [s, t, a] = await Promise.all([api("GET", "/bookings/settings"), api("GET", "/bookings/types"), api("GET", "/bookings/appointments")]);
+    BK.settings = s.data || {}; BK.types = (t.data && t.data.types) || [];
+    wrap.innerHTML = "";
+    renderBookings(wrap, (a.data && a.data.appointments) || []);
+  } catch (err) {
+    wrap.innerHTML = "";
+    const box = el("div", "card"); box.style.cssText = "padding:18px;border:1px solid var(--line,#eee);border-radius:12px";
+    box.appendChild(el("p", null, err.status === 503
+      ? "Online booking needs a one-time database update before it can be switched on. Your studio applies it once — then this page comes to life."
+      : nice(err)));
+    wrap.appendChild(box);
+  }
+}
+function bkCard(title, sub) {
+  const c = el("div", "card"); c.style.cssText = "padding:18px 20px;border:1px solid var(--line,#eee);border-radius:12px;margin-bottom:18px";
+  if (title) c.appendChild(el("h3", null, title)).style.cssText = "margin:0 0 4px;font-size:16px";
+  if (sub) c.appendChild(el("p", "hint", sub)).style.margin = "0 0 12px";
+  return c;
+}
+function bkField(label, node) {
+  const w = el("label"); w.style.cssText = "display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600";
+  w.appendChild(el("span", null, label)); w.appendChild(node); return w;
+}
+// Collect the full config from the availability form into the API shape.
+function bkGatherSettings(root) {
+  const g = (sel) => root.querySelector(sel);
+  const weekly = [[], [], [], [], [], [], []];
+  BK_DAYS.forEach(([idx]) => {
+    const on = g(`[data-day='${idx}'] .bk-on`).checked;
+    const st = g(`[data-day='${idx}'] .bk-start`).value, en = g(`[data-day='${idx}'] .bk-end`).value;
+    if (on && st && en) weekly[idx] = [{ start: st, end: en }];
+  });
+  const closed = g(".bk-closed").value.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+  return {
+    enabled: g(".bk-enabled").checked,
+    intro: g(".bk-intro").value.trim(),
+    weekly, closed_dates: closed,
+    slot_interval_min: +g(".bk-interval").value,
+    buffer_min: +g(".bk-buffer").value || 0,
+    lead_time_hours: +g(".bk-lead").value || 0,
+    max_days_ahead: +g(".bk-maxdays").value || 60,
+    timezone: g(".bk-tz").value,
+    auto_confirm: g(".bk-autoconfirm").checked,
+  };
+}
+function renderBookings(wrap, appts) {
+  const s = BK.settings || {};
+  // ── 1. On/off + intro ──────────────────────────────────────────────────────
+  const c1 = bkCard("Online booking", "Turn this on when your services and hours are ready. Customers see the booking widget wherever you place the “Online booking” section.");
+  const form = el("div"); form.className = "bk-availform";
+  const enWrap = el("label"); enWrap.style.cssText = "display:flex;align-items:center;gap:10px;font-weight:600;margin-bottom:12px";
+  const en = el("input"); en.type = "checkbox"; en.className = "bk-enabled"; en.checked = !!s.enabled; en.style.width = "auto";
+  enWrap.append(en, el("span", null, "Accept bookings on my website"));
+  form.appendChild(enWrap);
+  const introI = el("input"); introI.type = "text"; introI.className = "bk-intro"; introI.value = s.intro || ""; introI.style.cssText = BK_ICSS;
+  introI.placeholder = "A short welcome line (optional) — e.g. Pick a service and a time that suits you.";
+  form.appendChild(bkField("Intro shown above the widget", introI));
+  c1.appendChild(form); wrap.appendChild(c1);
+
+  // ── 2. Availability + window ────────────────────────────────────────────────
+  const c2 = bkCard("Your hours", "The days and times you take appointments. Slots are offered inside these hours, minus anything already booked.");
+  const grid = el("div"); grid.style.cssText = "display:grid;gap:8px;margin-bottom:14px";
+  BK_DAYS.forEach(([idx, name]) => {
+    const ranges = (Array.isArray(s.weekly) && Array.isArray(s.weekly[idx])) ? s.weekly[idx] : [];
+    const r0 = ranges[0] || {};
+    const row = el("div"); row.setAttribute("data-day", idx);
+    row.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    const on = el("input"); on.type = "checkbox"; on.className = "bk-on"; on.checked = ranges.length > 0; on.style.width = "auto";
+    const lab = el("span", null, name); lab.style.cssText = "width:88px;font-size:13px;font-weight:600";
+    const st = el("input"); st.type = "time"; st.className = "bk-start"; st.value = r0.start || "09:00"; st.style.cssText = "padding:6px;border:1px solid var(--line,#ddd);border-radius:8px";
+    const en2 = el("input"); en2.type = "time"; en2.className = "bk-end"; en2.value = r0.end || "17:00"; en2.style.cssText = st.style.cssText;
+    row.append(on, lab, st, el("span", null, "to"), en2);
+    grid.appendChild(row);
+  });
+  c2.appendChild(grid);
+  const opts = el("div"); opts.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px";
+  const interval = el("select"); interval.className = "bk-interval"; BK_INTERVALS.forEach((m) => { const o = el("option", null, m + " min"); o.value = m; if (+m === +(s.slot_interval_min || 30)) o.selected = true; interval.appendChild(o); }); interval.style.cssText = BK_ICSS;
+  const buffer = el("input"); buffer.type = "number"; buffer.className = "bk-buffer"; buffer.min = 0; buffer.max = 240; buffer.value = s.buffer_min || 0; buffer.style.cssText = BK_ICSS;
+  const lead = el("input"); lead.type = "number"; lead.className = "bk-lead"; lead.min = 0; lead.max = 720; lead.value = s.lead_time_hours != null ? s.lead_time_hours : 2; lead.style.cssText = BK_ICSS;
+  const maxd = el("input"); maxd.type = "number"; maxd.className = "bk-maxdays"; maxd.min = 1; maxd.max = 365; maxd.value = s.max_days_ahead || 60; maxd.style.cssText = BK_ICSS;
+  const tz = el("select"); tz.className = "bk-tz"; BK_TZS.forEach((z) => { const o = el("option", null, z); o.value = z; if (z === (s.timezone || "America/Los_Angeles")) o.selected = true; tz.appendChild(o); }); if (s.timezone && !BK_TZS.includes(s.timezone)) { const o = el("option", null, s.timezone); o.value = s.timezone; o.selected = true; tz.appendChild(o); } tz.style.cssText = BK_ICSS;
+  opts.append(bkField("Time between slots", interval), bkField("Gap between appointments (min)", buffer), bkField("Least notice (hours)", lead), bkField("How far ahead (days)", maxd), bkField("Time zone", tz));
+  c2.appendChild(opts);
+  const closed = el("input"); closed.type = "text"; closed.className = "bk-closed"; closed.value = (s.closed_dates || []).join(", "); closed.style.cssText = BK_ICSS;
+  closed.placeholder = "Closed dates (optional) — e.g. 2026-12-25, 2027-01-01";
+  c2.appendChild(bkField("Days you're closed", closed));
+  const acWrap = el("label"); acWrap.style.cssText = "display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-top:12px";
+  const ac = el("input"); ac.type = "checkbox"; ac.className = "bk-autoconfirm"; ac.checked = !!s.auto_confirm; ac.style.width = "auto";
+  acWrap.append(ac, el("span", null, "Confirm bookings automatically (otherwise they wait for your OK)"));
+  c2.appendChild(acWrap);
+  const saveBtn = el("button", null, "Save booking settings"); saveBtn.style.cssText = "margin-top:16px;padding:9px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;font:inherit;font-size:14px;cursor:pointer";
+  saveBtn.addEventListener("click", async () => {
+    saveBtn.disabled = true;
+    try { const payload = bkGatherSettings(wrap); await api("PUT", "/bookings/settings", payload); BK.settings = { ...BK.settings, ...payload }; toast("Booking settings saved"); }
+    catch (err) { toast(nice(err), true); } finally { saveBtn.disabled = false; }
+  });
+  c2.appendChild(saveBtn);
+  wrap.appendChild(c2);
+
+  // ── 3. Services ─────────────────────────────────────────────────────────────
+  const c3 = bkCard("Services", "What customers can book, and how long each takes. Add a price if you like.");
+  const list = el("div"); list.style.cssText = "display:grid;gap:8px;margin-bottom:12px";
+  if (!BK.types.length) list.appendChild(el("p", "hint", "No services yet — add your first below."));
+  BK.types.forEach((t) => list.appendChild(bkServiceRow(t)));
+  c3.appendChild(list);
+  c3.appendChild(bkServiceAdd());
+  wrap.appendChild(c3);
+
+  // ── 4. Upcoming appointments ────────────────────────────────────────────────
+  const c4 = bkCard("Upcoming appointments", "Bookings customers have made. Confirm the ones waiting, or cancel if plans change (the customer is emailed either way).");
+  const alist = el("div"); alist.style.cssText = "display:grid;gap:10px";
+  if (!appts.length) alist.appendChild(el("p", "hint", "Nothing booked yet. Once your site is live and a service is set up, bookings appear here."));
+  appts.forEach((a) => alist.appendChild(bkApptRow(a)));
+  c4.appendChild(alist);
+  wrap.appendChild(c4);
+}
+function bkServiceRow(t) {
+  const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line,#eee);border-radius:10px" + (t.active === false ? ";opacity:.55" : "");
+  const meta = t.duration_min + " min" + (t.price_text ? " · " + t.price_text : "") + (t.active === false ? " · hidden" : "");
+  const info = el("div"); info.style.cssText = "flex:1;min-width:160px";
+  info.appendChild(el("div", null, t.name)).style.cssText = "font-weight:600";
+  info.appendChild(el("div", "hint", meta)).style.margin = "2px 0 0";
+  const edit = el("button", null, "Edit"); edit.style.cssText = BK_BTN;
+  const del = el("button", null, "Remove"); del.style.cssText = BK_BTN + ";color:#b42318";
+  edit.addEventListener("click", () => row.replaceWith(bkServiceForm(t)));
+  del.addEventListener("click", async () => {
+    if (!confirm("Remove “" + t.name + "”? Existing appointments keep their details.")) return;
+    try { await api("DELETE", "/bookings/types/" + t.id); toast("Service removed"); loadBookings(); }
+    catch (err) { toast(nice(err), true); }
+  });
+  row.append(info, edit, del); return row;
+}
+function bkServiceForm(t) {
+  const box = el("div"); box.style.cssText = "display:grid;gap:8px;padding:12px;border:1px solid var(--plum,#5b3fa0);border-radius:10px";
+  const name = el("input"); name.type = "text"; name.placeholder = "Service name (e.g. Haircut)"; name.value = (t && t.name) || ""; name.style.cssText = BK_ICSS;
+  const dur = el("input"); dur.type = "number"; dur.min = 5; dur.max = 480; dur.placeholder = "Duration (minutes)"; dur.value = (t && t.duration_min) || 30; dur.style.cssText = BK_ICSS;
+  const price = el("input"); price.type = "text"; price.placeholder = "Price (optional) — e.g. 40"; price.value = (t && t.price_cents != null) ? (t.price_cents / 100) : ""; price.style.cssText = BK_ICSS;
+  const desc = el("input"); desc.type = "text"; desc.placeholder = "Short description (optional)"; desc.value = (t && t.description) || ""; desc.style.cssText = BK_ICSS;
+  const save = el("button", null, t && t.id ? "Save" : "Add service"); save.style.cssText = "padding:8px 16px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;font:inherit;cursor:pointer;justify-self:start";
+  save.addEventListener("click", async () => {
+    const body = { name: name.value.trim(), duration_min: +dur.value || 30, description: desc.value.trim() };
+    const p = parseFloat(price.value); if (isFinite(p) && p >= 0) body.price_cents = Math.round(p * 100);
+    if (!body.name) { toast("Give the service a name", true); return; }
+    save.disabled = true;
+    try {
+      if (t && t.id) await api("PATCH", "/bookings/types/" + t.id, body); else await api("POST", "/bookings/types", body);
+      toast("Saved"); loadBookings();
+    } catch (err) { toast(nice(err), true); save.disabled = false; }
+  });
+  box.append(bkField("Name", name), bkField("Duration (minutes)", dur), bkField("Price (optional)", price), bkField("Description (optional)", desc), save);
+  return box;
+}
+function bkServiceAdd() {
+  const add = el("button", null, "＋ Add a service"); add.style.cssText = "background:none;border:none;color:var(--plum,#5b3fa0);font:inherit;font-weight:600;cursor:pointer;padding:4px 0";
+  const holder = el("div");
+  add.addEventListener("click", () => { if (holder.firstChild) { holder.innerHTML = ""; add.textContent = "＋ Add a service"; } else { holder.appendChild(bkServiceForm(null)); add.textContent = "Close"; } });
+  const box = el("div"); box.append(add, holder); return box;
+}
+function bkApptRow(a) {
+  const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line,#eee);border-radius:10px";
+  const info = el("div"); info.style.cssText = "flex:1;min-width:200px";
+  info.appendChild(el("div", null, (a.when || a.slot_start_local || "") + " · " + a.type_name)).style.cssText = "font-weight:600";
+  const who = [a.customer_name, a.customer_email, a.customer_phone].filter(Boolean).join(" · ");
+  info.appendChild(el("div", "hint", who)).style.margin = "2px 0 0";
+  if (a.note) info.appendChild(el("div", "hint", "“" + a.note + "”")).style.margin = "2px 0 0";
+  const badge = el("span", null, a.status === "pending" ? "Waiting for you" : a.status === "confirmed" ? "Confirmed" : a.status);
+  badge.style.cssText = "font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;" + (a.status === "pending" ? "background:#fef3c7;color:#92400e" : a.status === "confirmed" ? "background:#dcfce7;color:#166534" : "background:#eee;color:#555");
+  const acts = el("div"); acts.style.cssText = "display:flex;gap:8px";
+  if (a.status === "pending") {
+    const conf = el("button", null, "Confirm"); conf.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
+    conf.addEventListener("click", async () => { conf.disabled = true; try { await api("POST", "/bookings/appointments/" + a.id + "/confirm"); toast("Confirmed — the customer was emailed"); loadBookings(); } catch (err) { toast(nice(err), true); conf.disabled = false; } });
+    acts.appendChild(conf);
+  }
+  const canc = el("button", null, "Cancel"); canc.style.cssText = BK_BTN + ";color:#b42318";
+  canc.addEventListener("click", async () => { if (!confirm("Cancel this booking? The customer will be emailed.")) return; canc.disabled = true; try { await api("POST", "/bookings/appointments/" + a.id + "/cancel", {}); toast("Canceled — the customer was emailed"); loadBookings(); } catch (err) { toast(nice(err), true); canc.disabled = false; } });
+  acts.appendChild(canc);
+  row.append(info, badge, acts); return row;
 }
 // Phase DAM: the library's plain-English health — reuses /assets/health (DAM-13).
 async function loadAssetHealth() {
@@ -3705,6 +3907,7 @@ const BLOCK_DEFS = [
   { type: "partners", name: "Trusted by (logo strip)", mediaKind: "gallery", hint: "Logos of brands you work with — instant credibility. Pick them from your files." },
   { type: "reviews", name: "Review rating badge", reviewsSimple: true, hint: "" },
   { type: "appointment", name: "Booking button", apptSimple: true, hint: "" },
+  { type: "booking", name: "Online booking (native)", bookingSimple: true, hint: "Take real appointments right on your site. Set up your services + hours in the Bookings tab; this section shows the booking widget." },
   // Growth blocks (r2) — every one links OUT; nothing external ever loads on the site.
   { type: "newsletter", name: "Newsletter sign-up", newsletterSimple: true, hint: "" },
   { type: "social", name: "Social links", field: "links", hint: "One per line:  network | link   (e.g.  instagram | https://instagram.com/yourbusiness — icons appear automatically)",
@@ -3736,7 +3939,7 @@ const SECTION_GROUPS = [
   { label: "Build trust", note: "Proof that turns visitors into customers.",
     types: ["features", "stats", "cards", "reviews", "certifications", "pricing", "process"] },
   { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
-    types: ["cta", "buttons", "appointment", "newsletter", "download", "map"] },
+    types: ["cta", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
   { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
     types: ["richtext", "columns", "accordion", "divider", "toc"] },
   { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
@@ -3749,7 +3952,7 @@ const SECTION_ALIAS = {
   team: "staff / about us", partners: "logo cloud / clients",
   features: "highlights / icon grid", stats: "counters / metrics", reviews: "star rating",
   certifications: "badges / accreditations", pricing: "plans / tiers", process: "steps / timeline",
-  cta: "banner", appointment: "book / schedule", newsletter: "email sign-up", map: "location map",
+  cta: "banner", appointment: "book / schedule (link out)", booking: "appointments / scheduler", newsletter: "email sign-up", map: "location map",
   service_areas: "service area", events: "calendar", social: "social icons",
   richtext: "text / paragraph", image: "photo", image_text: "image + words",
   accordion: "expandable / toggle", buttons: "button / link", divider: "spacer / line",
@@ -3822,6 +4025,7 @@ function emptyBlock(def) {
   if (def.ctaSimple) { b.text = ""; return b; }
   if (def.reviewsSimple) { b.rating = 5; b.count = 0; return b; }
   if (def.apptSimple) { b.url = ""; return b; }
+  if (def.bookingSimple) { b.intro = ""; return b; }
   if (def.newsletterSimple) { b.url = ""; return b; }
   if (def.mapSimple) { b.address = ""; return b; }
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
@@ -3991,6 +4195,15 @@ function renderBlocksCard() {
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, bt, u);
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your booking page — nothing external loads on your site."));
+    } else if (def.bookingSimple) {
+      const t = el("input"); t.type = "text"; t.style.cssText = inputCss;
+      t.placeholder = "A short intro (optional) — e.g. Pick a service and a time that suits you."; t.value = blk.intro || "";
+      t.addEventListener("change", () => { BLOCKS_WORK[idx] = wLook(idx, { type: "booking", title: ti.value.trim(), intro: t.value.trim() }); });
+      sub.appendChild(t);
+      const go = el("button", null, "Set up services & hours →"); go.type = "button"; go.style.cssText = miniBtn;
+      go.addEventListener("click", () => { location.hash = "#bookings"; });
+      sub.appendChild(go);
+      sub.appendChild(el("div", "hint", "This section shows a calm, mobile-friendly booking widget on your site. Your services, hours, and appointments live in the Bookings tab — first-party, no external calendar."));
     } else if (def.newsletterSimple) {
       const t = el("input"), bt = el("input"), u = el("input");
       t.placeholder = "A short line (optional) — e.g. Get updates from us."; t.value = blk.text || "";

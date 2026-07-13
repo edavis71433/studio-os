@@ -483,7 +483,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
     files[file] = html;
   };
 
-  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint });   // Phase T-BLOCKS (+ FB form blocks)
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint });   // Phase T-BLOCKS (+ FB form blocks + BK booking)
   page('/', { title: siteTitle, description: siteDesc, ld: [ldRestaurant(c, site), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, blocks) });
   page('/menu/', { ...seoOv('offerings', `Menu — ${i.business_name}`, `The menu at ${i.business_name}.`), ld: [ldMenu(c, site)], ogImage: ogImg, active: 'menu', body: menuBody(c) });
   if (noidx.has('offerings')) markNoindex('menu/index.html');

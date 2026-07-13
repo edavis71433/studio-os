@@ -148,6 +148,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     baseUrl: site.custom_domain ? `https://${site.custom_domain}` : `https://${site.netlify_site_id}.netlify.app`,
     siteId: site.id,   // AN-2: baked into the injected first-party analytics tracker
     ...(fnBase ? { formEndpoint: `${fnBase}/functions/v1/presence/forms/${site.id}/submit` } : {}),
+    // Phase BK: the native-booking API base — the booking block's first-party enhancer
+    // reads it to call /types, /slots, and POST a booking (all same-origin to the fn).
+    ...(fnBase ? { bookEndpoint: `${fnBase}/functions/v1/presence/book/${site.id}` } : {}),
   };
   let fileMap: Record<string, string | Uint8Array>;
   try { fileMap = renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }

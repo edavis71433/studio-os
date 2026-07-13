@@ -75,6 +75,8 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('text', 'text', { aiAssist: true, max: 200 }), t('url', 'url', { required: true }), t('button', 'text', { max: 40 })], schema: null, a11y: 'a real labelled link out, visible focus', seo: 'engagement', industries: ['*'] },
   { key: 'appointment', label: 'Appointment Booking', category: 'commerce', purpose: 'Book a time (links a scheduler).',
     fields: [t('provider_url', 'url', { required: true }), t('intro', 'text')], schema: 'ReserveAction', a11y: 'clear link out, no trapped focus', seo: 'ReserveAction', industries: ['salon', 'medical', 'dental', 'fitness', 'professional'] },
+  { key: 'booking', label: 'Online Booking (native)', category: 'commerce', purpose: 'Take real appointments on your own site — pick a service, a day, an open time.',
+    fields: [t('intro', 'text', { aiAssist: true, max: 400 })], schema: 'ReserveAction', a11y: 'labelled steps, real buttons + inputs, keyboard-complete, no trapped focus', seo: 'ReserveAction', industries: ['salon', 'medical', 'dental', 'fitness', 'professional', 'home_services', 'restaurant'] },
   { key: 'hours', label: 'Business Hours', category: 'contact', purpose: 'When you\'re open, incl. holidays.',
     fields: [t('hours', 'time', { required: true, repeatable: true }), t('holidays', 'list', { repeatable: true })], schema: 'OpeningHoursSpecification', a11y: 'time announced as text; today highlighted not by color alone', seo: 'OpeningHoursSpecification', industries: ['*'] },
   { key: 'location', label: 'Location + Map', category: 'contact', purpose: 'Address + an embedded map.',

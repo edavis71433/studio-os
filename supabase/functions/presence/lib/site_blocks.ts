@@ -15,7 +15,7 @@ import type {
   SiteBlock, SiteBlockType, SiteBlockFeatures, SiteBlockStats, SiteBlockTeam,
   SiteBlockProcess, SiteBlockPricing, SiteBlockCertifications, SiteBlockServiceAreas, SiteBlockCtaBanner,
   SiteBlockGallery, SiteBlockBeforeAfter, SiteBlockVideo, MediaRef,
-  SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment,
+  SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment, SiteBlockBooking,
   SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
@@ -29,7 +29,7 @@ import { brandTint } from './palettes.ts';
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'features', 'stats', 'team', 'process', 'pricing', 'certifications', 'service_areas', 'cta',
   'gallery', 'before_after', 'video',
-  'partners', 'reviews', 'appointment',
+  'partners', 'reviews', 'appointment', 'booking',
   'newsletter', 'social', 'events', 'map',
   'richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider',
   'form',
@@ -97,7 +97,7 @@ export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | StoredGallery | StoredBeforeAfter | StoredVideo
-  | StoredPartners | SiteBlockReviews | SiteBlockAppointment
+  | StoredPartners | SiteBlockReviews | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
   | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
@@ -213,6 +213,11 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
       case 'appointment': {   // booking button — link-out only (zero external origins)
         const url = s((b as any).url, 300);
         if (/^https?:\/\//i.test(url)) block = { type: 'appointment', title, url, text: s((b as any).text, 200) || undefined, button: s((b as any).button, 40) || undefined } as SiteBlockAppointment;
+        break;
+      }
+      case 'booking': {   // NATIVE booking widget — first-party (its data lives in the
+        // DB, reached via the site's own /book/:siteId endpoints; zero external origins)
+        block = { type: 'booking', title, intro: s((b as any).intro, 400) || undefined } as SiteBlockBooking;
         break;
       }
       case 'newsletter': {   // ESP sign-up button — same link-out posture as appointment
@@ -448,6 +453,9 @@ export interface BlockRenderCtx {
   safeHref: (s: string) => string | null;
   /** Phase FB: the public submit endpoint for custom form blocks (site.formEndpoint). */
   formEndpoint?: string;
+  /** Phase BK: the public native-booking API base (site.bookEndpoint = …/book/:siteId).
+   *  The booking block's first-party enhancer calls /types, /slots, and POSTs here. */
+  bookEndpoint?: string;
 }
 
 export interface RenderedBlock { key: string; type: SiteBlockType; html: string; ld?: object }
@@ -505,6 +513,7 @@ const MANDATORY_H2: Record<string, string> = {
   gallery: 'Gallery', before_after: 'Before & after', video: 'Video', newsletter: 'Get updates from us',
   social: 'Find us online', events: 'Upcoming events', map: 'Find us', accordion: 'More information',
   partners: 'Trusted by', reviews: 'What customers say', appointment: 'Book an appointment',
+  booking: 'Book an appointment',
 };
 /** The effective (displayed) heading of a block, or null when it shows none. */
 function effHeading(b: SiteBlock): string | null {
@@ -539,6 +548,40 @@ function applyLook(html: string, look?: BlockLook): string {
   const cls = lookClasses(look);
   if (!cls || !html) return html;
   return html.replace('class="block ', `class="block ${cls} `);
+}
+
+// ── Phase BK: the booking widget's first-party enhancer ──────────────────────
+// A minimal, self-contained IIFE (same posture as the form block's inline enhancer:
+// scoped to the widget on the page, ZERO external origins). It calls the site's own
+// /book/:siteId endpoints (/types, /slots, POST) — read from data-book. All dynamic
+// UI is built with createElement + textContent, so owner/customer data is never
+// interpolated into HTML. Deterministic string (no clock/random), so goldens stay
+// stable. The only HTML-parser hazard in an inline script is the literal "</" that
+// could close the tag early — guarded below (the script contains none, but we escape
+// defensively). Comparison operators (< >) are safe inside a <script> raw-text element.
+function bookingScript(): string {
+  const js = `(function(){
+var W=document.querySelector('.booking-widget[data-book]');if(!W)return;
+var EP=W.getAttribute('data-book');var stage=W.querySelector('.bk-stage');
+var S={types:[],type:null,date:'',slot:'',cfg:{}};
+var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
+function clr(){while(stage.firstChild)stage.removeChild(stage.firstChild);}
+function msg(t){clr();stage.appendChild(el('p','bk-msg',t));}
+function getj(u){return fetch(u,{headers:{accept:'application/json'}}).then(function(r){return r.json();});}
+function ftime(hm){var p=hm.split(':');var h=+p[0],m=p[1];var ap=h<12?'AM':'PM';var h12=(h%12===0)?12:(h%12);return h12+':'+m+' '+ap;}
+function fdate(d){var p=d.split('-');return MO[(+p[1])-1]+' '+(+p[2]);}
+function back(fn){var b=el('button','bk-back','← Back');b.type='button';b.addEventListener('click',fn);return b;}
+msg('Loading…');
+getj(EP+'/types').then(function(res){var d=(res&&res.data)||{};if(!d.enabled||!d.types||!d.types.length){msg('Online booking isn’t available right now.');return;}S.types=d.types;S.cfg=d;services();}).catch(function(){msg('We couldn’t load booking just now. Please try again later.');});
+function services(){clr();stage.appendChild(el('p','bk-step','1. Choose a service'));var list=el('div','bk-services');S.types.forEach(function(t){var b=el('button','bk-service');b.type='button';b.appendChild(el('span','bk-svc-name',t.name));b.appendChild(el('span','bk-svc-meta',t.duration_min+' min'+(t.price_text?(' · '+t.price_text):'')));if(t.description)b.appendChild(el('span','bk-svc-desc',t.description));b.addEventListener('click',function(){S.type=t;pickDate();});list.appendChild(b);});stage.appendChild(list);}
+function pickDate(){clr();stage.appendChild(back(services));stage.appendChild(el('p','bk-step','2. Pick a day for '+S.type.name));var inp=el('input','bk-date');inp.type='date';var now=new Date();inp.min=now.toISOString().slice(0,10);if(S.cfg.max_days_ahead){inp.max=new Date(now.getTime()+S.cfg.max_days_ahead*86400000).toISOString().slice(0,10);}inp.addEventListener('change',function(){S.date=inp.value;if(S.date)slots();});stage.appendChild(inp);}
+function slots(){clr();stage.appendChild(back(pickDate));stage.appendChild(el('p','bk-step','3. Choose a time'));var load=el('p','bk-msg','Finding open times…');stage.appendChild(load);getj(EP+'/slots?type='+encodeURIComponent(S.type.id)+'&date='+encodeURIComponent(S.date)).then(function(res){var sl=((res&&res.data)||{}).slots||[];if(load.parentNode)stage.removeChild(load);if(!sl.length){stage.appendChild(el('p','bk-msg','No open times that day — try another.'));return;}var grid=el('div','bk-slots');sl.forEach(function(s){var b=el('button','bk-slot',ftime(s.split('T')[1]));b.type='button';b.addEventListener('click',function(){S.slot=s;details();});grid.appendChild(b);});stage.appendChild(grid);}).catch(function(){if(load.parentNode)stage.removeChild(load);stage.appendChild(el('p','bk-msg','Couldn’t load times. Please try again.'));});}
+function field(lb,nm,ty,req){var w=el('label','bk-field');w.appendChild(el('span',null,lb+(req?' *':'')));var i=el(ty==='textarea'?'textarea':'input');if(ty!=='textarea')i.type=ty;i.name=nm;if(req)i.required=true;w.appendChild(i);return {w:w,i:i};}
+function details(){clr();stage.appendChild(back(slots));stage.appendChild(el('p','bk-step','4. Your details'));var f=el('form','bk-form');var nm=field('Your name','name','text',true),em=field('Email','email','email',false),ph=field('Phone','phone','tel',false),nt=field('Anything we should know?','note','textarea',false);f.appendChild(nm.w);f.appendChild(em.w);f.appendChild(ph.w);f.appendChild(nt.w);var hp=el('div','bk-hp');var hpi=el('input');hpi.name='_hp';hpi.tabIndex=-1;hpi.setAttribute('autocomplete','off');hp.appendChild(hpi);f.appendChild(hp);f.appendChild(el('p','bk-summary',S.type.name+' — '+fdate(S.date)+' at '+ftime(S.slot.split('T')[1])));var btn=el('button','bk-submit btn','Confirm booking');btn.type='submit';f.appendChild(btn);var err=el('p','bk-err');f.appendChild(err);f.addEventListener('submit',function(ev){ev.preventDefault();err.textContent='';if(!nm.i.value.trim()){err.textContent='Please add your name.';return;}if(!em.i.value.trim()&&!ph.i.value.trim()){err.textContent='Leave an email or phone so they can confirm.';return;}btn.disabled=true;btn.textContent='Booking…';fetch(EP,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type_id:S.type.id,slot_start:S.slot,name:nm.i.value,email:em.i.value,phone:ph.i.value,note:nt.i.value,_hp:hpi.value})}).then(function(r){return r.json().then(function(j){return {s:r.status,j:j};});}).then(function(o){if(o.s>=200&&o.s<300&&o.j&&o.j.data&&o.j.data.ok){done(o.j.data.message);}else{btn.disabled=false;btn.textContent='Confirm booking';err.textContent=(o.j&&o.j.message)||'That didn’t go through — please try again.';if(o.s===409){setTimeout(function(){S.slot='';slots();},1800);}}}).catch(function(){btn.disabled=false;btn.textContent='Confirm booking';err.textContent='Something went wrong — please try again.';});});stage.appendChild(f);}
+function done(m){clr();var d=el('div','bk-done');d.appendChild(el('p','bk-done-ic','✓'));d.appendChild(el('p','bk-done-msg',m||'Thanks — your booking request was received.'));stage.appendChild(d);}
+})();`;
+  return `<script>${js.replace(/<\//g, '<\\/')}</script>`;
 }
 
 /** Render validated blocks to deterministic HTML sections + optional JSON-LD.
@@ -710,6 +753,23 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       case 'form': {   // custom form builder — typed fields → accessible, XSS-safe form
         const inner = renderForm(b, { esc, attr, safeHref, formEndpoint: ctx.formEndpoint });
         html = `<section class="block wrap block-form">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
+        break;
+      }
+      case 'booking': {   // NATIVE booking widget — a calm, mobile-first, first-party
+        // stepper (service → day → open slot → details → confirm) driven by the site's
+        // OWN /book/:siteId endpoints. Zero external origins. Degrades gracefully: with
+        // no JS the visitor sees a clear note pointing them to the page's contact
+        // details; the server validates every step regardless. The enhancer builds all
+        // dynamic UI via createElement + textContent (owner data never interpolated
+        // into HTML). Without a bookEndpoint (unpublished/preview) it shows a placeholder.
+        const endpoint = ctx.bookEndpoint || '';
+        const intro = b.intro ? `<p class="bk-intro">${esc(b.intro)}</p>` : '';
+        const inner = endpoint
+          ? `<div class="booking-widget" data-book="${attr(endpoint)}">${intro}<div class="bk-stage" aria-live="polite"><p class="bk-msg">Loading available times…</p><noscript><p class="bk-msg">Online booking needs JavaScript turned on. Please enable it, or use the contact details on this page to book with us directly.</p></noscript></div></div>`
+          : `${intro}<p class="bk-msg">Your booking widget will appear here once your site is published.</p>`;
+        html = `<section class="block wrap block-booking">${h2(b.title, 'Book an appointment')}${inner}</section>`;
+        if (endpoint) html += bookingScript();
+        ld = { '@context': 'https://schema.org', '@type': 'ReserveAction', name: b.title || 'Book an appointment' };
         break;
       }
       case 'columns': {   // 2–3 equal columns; CSS grid stacks to one column < 620px
@@ -922,6 +982,35 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 .block-download .dl{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--accent);border-radius:12px;padding:12px 18px;text-decoration:none;color:var(--accent-dark,var(--accent));font-weight:700}
 .block-download .dl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .block-download .dl svg{flex:0 0 auto}
+/* ── Phase BK · native booking widget (first-party stepper) ── */
+.booking-widget{max-width:560px;margin-top:8px}
+.bk-intro{color:var(--soft);margin:0 0 12px}
+.bk-step{font-weight:700;margin:0 0 10px}
+.bk-msg{color:var(--soft)}
+.bk-services{display:grid;gap:10px}
+.bk-service{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card,#fff);color:inherit;padding:12px 16px;cursor:pointer}
+.bk-service:hover{border-color:var(--accent)}
+.bk-service:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bk-svc-name{font-weight:700}
+.bk-svc-meta{color:var(--soft);font-size:.9rem}
+.bk-svc-desc{color:var(--soft);font-size:.9rem;margin-top:2px}
+.bk-back{background:none;border:none;color:var(--accent-dark,var(--accent));font-weight:700;cursor:pointer;padding:0 0 10px}
+.bk-date{width:100%;max-width:240px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.bk-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.bk-slot{border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);color:inherit;padding:10px 8px;cursor:pointer;font-weight:600}
+.bk-slot:hover{border-color:var(--accent)}
+.bk-slot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bk-form{display:grid;gap:12px}
+.bk-field{display:flex;flex-direction:column;gap:4px;font-weight:600}
+.bk-field input,.bk-field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
+.bk-field textarea{min-height:80px}
+.bk-hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
+.bk-summary{background:var(--wash,#f5f5f5);border-radius:10px;padding:10px 14px;font-weight:600;margin:0}
+.bk-submit{justify-self:start}
+.bk-err{color:#b42318;margin:0;min-height:1em}
+.bk-done{text-align:center;padding:14px 0}
+.bk-done-ic{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;font-size:1.5rem;margin:0 auto 8px}
+.bk-done-msg{font-weight:600;margin:0}
 /* ── Phase T-STYLE · curated per-section style options (owner picks; never raw CSS) ── */
 /* background: 'tinted' = a brand-derived, contrast-safe wash; 'plain' = clears the
    auto-alternate band. .block.<class> ties the (0,2,0) specificity of .block.alt and
