@@ -45,7 +45,36 @@
   .toast.show{opacity:1}
   footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  /* ── UX upgrades: focus, bell/panel, chip-bar, skeletons, welcome ── */
+  a:focus-visible,button:focus-visible,[tabindex]:focus-visible,.card[role="button"]:focus-visible,.nitem:focus-visible,.chip:focus-visible{outline:3px solid var(--p);outline-offset:2px;border-radius:12px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .bell{position:relative;width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+  .bell .badge{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--p);color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
+  .bell .badge.on{display:flex}
+  .notifpanel{background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);margin:12px 0 4px;overflow:hidden}
+  .notifpanel[hidden]{display:none}
+  .ngroup{padding:11px 16px 3px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .nempty{padding:20px 16px;color:var(--soft);font-size:14px}
+  .nitem{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:transparent;padding:13px 16px;cursor:pointer;transition:background .12s}
+  .nitem:first-of-type{border-top:0}
+  .nitem:hover{background:var(--p-soft);color:var(--ink);border-color:var(--line)}
+  .nitem .nt{font-weight:600;font-size:14.5px;color:var(--ink);display:block}
+  .nitem.unread .nt::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--p);margin-right:8px;vertical-align:middle}
+  .nitem .nw{color:var(--soft);font-size:12.5px;margin-top:2px;display:block}
+  .chipbar{position:sticky;top:0;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:11px 20px;margin:8px -20px 4px;background:var(--bg);border-bottom:1px solid var(--line);scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .chipbar::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;font-size:13px;font-weight:600;padding:7px 15px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap}
+  .chip:hover{border-color:var(--p);color:var(--p)}
+  section[id^="sec-"],#sec-overview{scroll-margin-top:64px}
+  .welcome{border-left:3px solid var(--p);position:relative}
+  .welcome .x{position:absolute;top:12px;right:14px;width:30px;height:30px;padding:0;border-radius:999px;font-size:16px;line-height:1;color:var(--soft);border-color:transparent}
+  .welcome h3{padding-right:34px}
+  .skel{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px}
+  .skel .l{height:13px;border-radius:7px;background:var(--line);margin:9px 0;background-image:linear-gradient(90deg,var(--line) 0%,var(--p-soft) 50%,var(--line) 100%);background-size:200% 100%;animation:sh 1.3s ease-in-out infinite}
+  .skel .l.w60{width:60%}.skel .l.w40{width:40%}.skel .l.w80{width:80%}
+  @keyframes sh{to{background-position:-200% 0}}
+  @media (prefers-reduced-motion:reduce){.spin,.skel .l{animation:none}html{scroll-behavior:auto}}
+  html{scroll-behavior:smooth}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -74,6 +103,37 @@ async function api(path,method,body){const r=await fetch(FN+path,{method:method|
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // relative "when" — calm, human, no clock precision
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+let USER=null; // the signed-in session user (for name/email in the welcome + settings cards)
+
+// ── PURE UX helpers (mirrored 1:1 in tests/presence/portal_ux_test.mjs) ──
+// Which in-project section chips have content worth an anchor. Messages + Support
+// always exist (composer / open-a-request CTA); the rest are content-gated.
+function chipsFor(d){
+  d=d||{};const chips=[];
+  if(d.hasOverview)chips.push({id:'sec-overview',label:'Overview'});
+  if((d.approvals||[]).filter(a=>a&&a.status==='pending').length)chips.push({id:'sec-approvals',label:'Approvals'});
+  if((d.deliverables||[]).length)chips.push({id:'sec-files',label:'Files'});
+  if(d.hasMessages)chips.push({id:'sec-messages',label:'Messages'});
+  if(d.hasSupport)chips.push({id:'sec-support',label:'Support'});
+  return chips;
+}
+// Calm recency buckets for the What's-new panel.
+function notifBucket(iso,nowMs){const t=Date.parse(iso);if(!isFinite(t))return'Earlier';const days=Math.floor((nowMs-t)/86400000);if(days<=0)return'Today';if(days<7)return'This week';return'Earlier';}
+function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];const map={};for(const it of(items||[])){const b=notifBucket(it&&it.created_at,nowMs);(map[b]=map[b]||[]).push(it);}return order.filter(b=>map[b]&&map[b].length).map(b=>({bucket:b,items:map[b]}));}
+// Map a notification's anchor (#approvals, #task-…, #support-…) to a chip section id.
+function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
+// A friendly first name from the session user, or '' — never guessy.
+function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
+
+function scrollToSection(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:(matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'),block:'start'});}
+function skeleton(){return'<div class="skel"><div class="l w40"></div><div class="l w80"></div></div><div class="skel"><div class="l w60"></div><div class="l"></div><div class="l w80"></div></div><div class="skel"><div class="l w40"></div><div class="l w60"></div></div>';}
+// Route a notification's href to the right in-portal view (no full navigation).
+function navFromHref(href){
+  href=String(href||'');
+  const sup=href.match(/support=([0-9a-f-]{8,})/i);if(sup){openSupportThread(sup[1],null);return;}
+  const pm=href.match(/\/projects\/([0-9a-f-]{8,})(#[a-z0-9-]+)?/i);
+  if(pm){openProject(pm[1],pm[2]?sectionForAnchor(pm[2]):null);return;}
+}
 
 // ── the reviewer feed (pre-existing owner-shared updates) ──
 function renderFeed(ctx,feed){
@@ -94,12 +154,21 @@ function renderFeed(ctx,feed){
 async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Noted — your studio has been told. Nothing changed.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
 
 // ── the CLIENT App service-delivery view (Agency–Client Bridge) ──
-function renderProjects(projects,unread){
-  let html=`<div class="rolebadge">● Your projects</div><header><h1>Your projects</h1><p class="sub">${projects.length?'What your studio is working on with you.':'Your studio hasn’t started a project with you yet.'}${unread?` · <strong>${unread}</strong> new update${unread===1?'':'s'}`:''}</p></header><section>`;
+function renderProjects(projects,unread,notifs){
+  notifs=notifs||[];
+  const badge=unread?`<span class="badge on" aria-hidden="true">${unread>9?'9+':unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
+  let html=`<div class="topbar"><div class="rolebadge">● Your projects</div>`+
+    `<button id="bell" class="bell" aria-label="What’s new${unread?` — ${unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button></div>`+
+    `<div id="np" class="notifpanel" role="region" aria-label="What’s new" hidden></div>`+
+    `<header><h1>Your projects</h1><p class="sub">${projects.length?'What your studio is working on with you.':'Your studio hasn’t started a project with you yet.'}</p></header>`;
+  html+=welcomeCardHtml();
+  html+=`<section>`;
   if(!projects.length) html+=`<div class="card"><p class="muted">When your studio starts a project, it’ll appear here with your tasks, files, and approvals.</p></div>`;
   for(const p of projects){html+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   html+=`</section>`;
   $('main').innerHTML=html;
+  wireWelcome();
+  wireBell(notifs,unread);
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
   // Glanceable list: progress % and "N things need your OK" WITHOUT a click —
   // the report endpoint already computes both. Best-effort per card.
@@ -117,6 +186,70 @@ function renderProjects(projects,unread){
       el.innerHTML=bits.join(' · ');
     }catch(_){/* the card still opens */}
   });
+}
+// First-run welcome — calm, one-time, dismissible (no modal, no tour).
+const WELCOME_KEY='dds-portal-welcomed';
+function welcomed(){try{return localStorage.getItem(WELCOME_KEY)==='1';}catch(_){return false;}}
+function welcomeCardHtml(){
+  if(welcomed())return'';
+  const n=firstName(USER);
+  return `<div class="card welcome" id="welcome" role="note"><button class="x" id="welcomeX" aria-label="Dismiss welcome">×</button>`+
+    `<h3>Welcome${n?`, ${esc(n)}`:''}</h3>`+
+    `<p>This is your workspace. Here you’ll approve work, download the files your studio shares, and message them any time — all in one place.</p></div>`;
+}
+function wireWelcome(){
+  const x=$('welcomeX');if(!x)return;
+  x.addEventListener('click',()=>{try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}const w=$('welcome');if(w)w.remove();});
+}
+// What's-new bell/panel over the ALREADY-BUILT /client/notifications (with
+// read-state). Marks read via /client/notifications/read only when opened, so
+// the badge reflects genuinely-unseen activity.
+function notifPanelHtml(notifs){
+  if(!notifs.length)return'<p class="nempty">You’re all caught up — nothing new right now.</p>';
+  const groups=groupNotifs(notifs,Date.now());
+  let h='';
+  for(const g of groups){
+    h+=`<div class="ngroup">${esc(g.bucket)}</div>`;
+    for(const it of g.items){
+      h+=`<button class="nitem${it.read?'':' unread'}" data-nav="${esc(it.href||'')}"><span class="nt">${esc(it.label||'Activity')}</span><span class="nw">${esc(rel(it.created_at))}</span></button>`;
+    }
+  }
+  return h;
+}
+function wireBell(notifs,unread){
+  const bell=$('bell'),panel=$('np');if(!bell||!panel)return;
+  let built=false;
+  const close=()=>{panel.hidden=true;bell.setAttribute('aria-expanded','false');};
+  const open=()=>{
+    if(!built){panel.innerHTML=notifPanelHtml(notifs);built=true;
+      panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>navFromHref(b.getAttribute('data-nav'))));
+    }
+    panel.hidden=false;bell.setAttribute('aria-expanded','true');
+    if(unread){ // seen now — clear the badge and persist read-state
+      const b=bell.querySelector('.badge');if(b){b.classList.remove('on');b.textContent='';}
+      panel.querySelectorAll('.nitem.unread').forEach(el=>el.classList.remove('unread'));
+      unread=0;bell.setAttribute('aria-label','What’s new');
+      api('/client/notifications/read','POST',{}).catch(()=>{});
+    }
+  };
+  bell.addEventListener('click',()=>{panel.hidden?open():close();});
+  document.addEventListener('click',(e)=>{if(!panel.hidden&&!panel.contains(e.target)&&e.target!==bell&&!bell.contains(e.target))close();});
+  document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!panel.hidden){close();bell.focus();}});
+}
+// "You & notifications" — a light settings surface: who you're signed in as +
+// a clear way out. A notification on/off toggle is intentionally deferred (no
+// existing endpoint persists a preference — adding a backend route for it is out
+// of scope). Appended last, after billing.
+function appendYou(){
+  if(document.getElementById('sec-you'))return;
+  const email=(USER&&USER.email)?USER.email:'';
+  const sec=document.createElement('section');sec.id='sec-you';
+  sec.innerHTML=`<h2>You &amp; notifications</h2><div class="card">`+
+    (email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>')+
+    `<p class="muted" style="margin-top:6px">You’ll see a note in the bell above whenever your studio shares something or needs your OK.</p>`+
+    `<div class="row"><button id="signout2">Sign out</button></div></div>`;
+  $('main').appendChild(sec);
+  const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
 }
 // Service billing — the studio's invoices for project work, SEPARATE from the
 // Studio OS software subscription. Appended below the projects; hidden if none.
@@ -144,33 +277,40 @@ async function appendFaq(){
     $('main').appendChild(sec);
   }catch(_){/* the FAQ is additive; never block the view */}
 }
-async function openProject(id){
-  $('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+async function openProject(id,focusSection){
+  $('main').innerHTML=skeleton();
   const [d,rep,supRes]=await Promise.all([api('/client/projects/'+id),api('/client/projects/'+id+'/report').catch(()=>null),api('/client/support').catch(()=>null)]);
   if(!d.ok){toast('That project isn’t available.');return load();}
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
+  const hasOverview=!!(s&&s.progress&&s.milestones);
   let html=`<p><a class="link" href="/client.html">← Your projects</a></p><header><h1>${esc(p.name)}</h1><p class="sub">Status: ${esc((p.status||'').replace('_',' '))}</p></header>`;
-  if(s&&s.progress&&s.milestones) html+=`<div class="status"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${(s.open_client_actions||0)} action${s.open_client_actions===1?'':'s'} for you</div>`;
+  // slim sticky chip bar — anchors within this one screen (no new pages); only
+  // sections that actually have content get a chip.
+  const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true,hasSupport:true});
+  if(chips.length>1)html+=`<nav class="chipbar" aria-label="Jump to a section">${chips.map(c=>`<button class="chip" data-chip="${esc(c.id)}">${esc(c.label)}</button>`).join('')}</nav>`;
+  if(hasOverview) html+=`<div class="status" id="sec-overview"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${(s.open_client_actions||0)} action${s.open_client_actions===1?'':'s'} for you</div>`;
   // approvals that need the client
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
-  if(aps.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section id="sec-approvals"><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   // your tasks
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
-  if(acts.length){html+=`<section><h2>Your to-dos</h2>`;for(const t of acts){html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${t.derived&&t.derived.overdue?'Overdue · ':''}${esc(t.status.replace('_',' '))}</p></div>`;}html+=`</section>`;}
+  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${t.derived&&t.derived.overdue?'Overdue · ':''}${esc(t.status.replace('_',' '))}</p></div>`;}html+=`</section>`;}
   // files
-  if((data.deliverables||[]).length){html+=`<section><h2>Files</h2>`;for(const f of data.deliverables){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}html+=`</section>`;}
+  if((data.deliverables||[]).length){html+=`<section id="sec-files"><h2>Files</h2>`;for(const f of data.deliverables){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}html+=`</section>`;}
   // surveys
-  if((data.surveys||[]).length){html+=`<section><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
+  if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
   // milestones
-  if((data.milestones||[]).length){html+=`<section><h2>Milestones</h2>`;for(const m of data.milestones){html+=`<div class="card"><h3>${esc(m.title)}</h3><p>${m.status==='complete'?'✓ Complete':'In progress'}${m.due_date?` · due ${esc(m.due_date)}`:''}</p></div>`;}html+=`</section>`;}
+  if((data.milestones||[]).length){html+=`<section id="sec-milestones"><h2>Milestones</h2>`;for(const m of data.milestones){html+=`<div class="card"><h3>${esc(m.title)}</h3><p>${m.status==='complete'?'✓ Complete':'In progress'}${m.due_date?` · due ${esc(m.due_date)}`:''}</p></div>`;}html+=`</section>`;}
   // messages
-  html+=`<section><h2>Messages</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div id="thread"></div><div class="card"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
+  html+=`<section id="sec-messages"><h2>Messages</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div id="thread"></div><div class="card"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
   // support — the client can now SEE their requests + the studio's replies, not just fire one off
   const sup=((supRes&&supRes.body&&supRes.body.data)||[]).filter(r=>!r.project_id||r.project_id===id);
-  html+=`<section><h2>Support</h2>`;
+  html+=`<section id="sec-support"><h2>Support</h2>`;
   if(sup.length){for(const rq of sup){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}}
   html+=`<div class="card"><p class="muted">${sup.length?'Need something else?':'Have a question for your studio?'} Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
   $('main').innerHTML=html;
+  document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
+  if(focusSection)requestAnimationFrame(()=>scrollToSection(focusSection));
   const adec=async(aid,ah,decision,note,btn)=>{if(btn)btn.disabled=true;const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:ah,note:note||''});if(r.ok){toast(decision==='approved'?'Approved — thank you.':'Sent — your studio will take a look.');openProject(id);}else{toast('That didn’t go through.');if(btn)btn.disabled=false;}};
   document.querySelectorAll('[data-adec]').forEach(b=>b.addEventListener('click',()=>adec(b.getAttribute('data-adec'),b.getAttribute('data-ah'),'approved',null,b)));
   document.querySelectorAll('[data-areq]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-areq'));if(n){n.style.display='block';const t=$('nt-'+b.getAttribute('data-areq'));if(t)t.focus();}}));
@@ -246,7 +386,14 @@ async function load(){
   // Agency–Client Bridge: does this customer have linked delivery? If so, that IS their home.
   const proj=await api('/client/projects');
   const projects=(proj.ok&&proj.body.data)||[];
-  if(projects.length){const n=await api('/client/notifications').catch(()=>null);const nb=(n&&n.body)||{};const unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);renderProjects(projects,unread);appendBilling();api('/client/notifications/read','POST',{});return;}
+  if(projects.length){
+    const n=await api('/client/notifications').catch(()=>null);const nb=(n&&n.body)||{};
+    const items=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
+    const unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
+    renderProjects(projects,unread,items); // read-state is marked when the bell is OPENED, not on load
+    await appendBilling();appendYou();
+    return;
+  }
   if(c.sees_full_workspace){ownerNote();return;}     // owner with no linked delivery
   const feed=await api('/portal/feed');
   if(!feed.ok){trouble();return;}
@@ -254,9 +401,11 @@ async function load(){
 }
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
 // a client needs an obvious, in-view way out). Lands back on the client door.
-(function(){var s=$('signout');if(s)s.addEventListener('click',async(e)=>{e.preventDefault();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';});})();
+// Shared so both the footer link and the "You & notifications" card use it.
+async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
+(function(){var s=$('signout');if(s)s.addEventListener('click',doSignOut);})();
 (async function(){
-  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";USER=(data&&data.session&&data.session.user)||null;
     if(!TOKEN){signedOut();return;}await load();
   }catch(_){trouble();}
 })();
