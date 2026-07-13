@@ -126,12 +126,21 @@ export interface SiteBlockNewsletter { type: 'newsletter'; title?: string; text?
 export interface SiteBlockSocial { type: 'social'; title?: string; links: Array<{ network: string; url: string }> }
 export interface SiteBlockEvents { type: 'events'; title?: string; items: Array<{ name: string; date: string; time?: string; detail?: string; url?: string }> }
 export interface SiteBlockMap { type: 'map'; title?: string; image?: MediaRef | null; address?: string; directions_url?: string }
+// Text & layout staples (T-BLOCKS r3) — prose bodies render through renderMarkdown
+// (escape-first, output-allowlisted); media resolved to MediaRef; links via safeHref.
+export interface SiteBlockRichText { type: 'richtext'; title?: string; body: string }
+export interface SiteBlockImage { type: 'image'; title?: string; image?: MediaRef | null; caption?: string; alt?: string; link?: string }
+export interface SiteBlockImageText { type: 'image_text'; title?: string; image?: MediaRef | null; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
+export interface SiteBlockAccordion { type: 'accordion'; title?: string; items: Array<{ summary: string; body: string }> }
+export interface SiteBlockButtons { type: 'buttons'; title?: string; buttons: Array<{ label: string; url: string; style: 'primary' | 'outline' }> }
+export interface SiteBlockDivider { type: 'divider'; style: 'line' | 'space'; size: 'small' | 'medium' | 'large' }
 export type SiteBlock =
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
   | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment
-  | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap;
+  | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
+  | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider;
 export type SiteBlockType = SiteBlock['type'];
 
 /** A media reference resolved at snapshot time: deterministic output paths per variant. */

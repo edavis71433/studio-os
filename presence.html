@@ -3362,6 +3362,13 @@ const BLOCK_DEFS = [
     parse: (p) => ({ name: p[0] || "", date: p[1] || "", time: p[2] || "", detail: p[3] || "", url: p[4] || "" }),
     fmt: (o) => { const a = [o.name || "", o.date || "", o.time || "", o.detail || "", o.url || ""]; while (a.length > 2 && !a[a.length - 1]) a.pop(); return a.join(" | "); } },
   { type: "map", name: "Map & directions", mapSimple: true, hint: "" },
+  // Text & layout staples (r3) — the everyday building blocks.
+  { type: "richtext", name: "Text box", proseSimple: true, hint: "" },
+  { type: "image", name: "Image", imageSimple: true, hint: "" },
+  { type: "image_text", name: "Image + text", imageTextSimple: true, hint: "" },
+  { type: "accordion", name: "Accordion (expandable)", structured: "accordion", hint: "Add each expandable panel — a short label and the details inside." },
+  { type: "buttons", name: "Buttons", structured: "buttons", hint: "Up to three clear action links." },
+  { type: "divider", name: "Divider / space", dividerSimple: true, hint: "" },
 ];
 // ── FD-T-LIB: the "Add a section" library — purpose-grouped, with familiar-name
 //    aliases so owners recognize sections by the words they already know (carousel,
@@ -3369,11 +3376,13 @@ const BLOCK_DEFS = [
 //    renamed. Every addable def appears under exactly one header below. ──
 const SECTION_GROUPS = [
   { label: "Show your work", note: "Photos, video and the people behind the work.",
-    types: ["gallery", "before_after", "video", "team", "partners"] },
+    types: ["gallery", "before_after", "image", "image_text", "video", "team", "partners"] },
   { label: "Build trust", note: "Proof that turns visitors into customers.",
     types: ["features", "stats", "reviews", "certifications", "pricing", "process"] },
   { label: "Get customers to act", note: "Clear next steps — book, sign up, or find you.",
-    types: ["cta", "appointment", "newsletter", "map"] },
+    types: ["cta", "buttons", "appointment", "newsletter", "map"] },
+  { label: "Text & layout", note: "Your own words, expandable details, and spacing.",
+    types: ["richtext", "accordion", "divider"] },
   { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
     types: ["service_areas", "events", "social"] },
 ];
@@ -3386,6 +3395,8 @@ const SECTION_ALIAS = {
   certifications: "badges / accreditations", pricing: "plans / tiers", process: "steps / timeline",
   cta: "banner", appointment: "book / schedule", newsletter: "email sign-up", map: "location map",
   service_areas: "service area", events: "calendar", social: "social icons",
+  richtext: "text / paragraph", image: "photo", image_text: "image + words",
+  accordion: "expandable / toggle", buttons: "button / link", divider: "spacer / line",
 };
 // The CORE sections aren't blocks — they're edited in their own tabs. We surface
 // them read-only so an owner hunting for "hero / FAQ" sees they already have them.
@@ -3442,6 +3453,12 @@ function emptyBlock(def) {
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
   if (def.mediaKind === "video") { b.url = ""; return b; }
   if (def.mediaKind === "ba") { b.items = []; return b; }
+  if (def.proseSimple) { b.body = ""; return b; }
+  if (def.imageSimple) { return b; }   // image_id set by the picker
+  if (def.imageTextSimple) { b.body = ""; b.side = "left"; return b; }
+  if (def.dividerSimple) { b.style = "line"; b.size = "medium"; return b; }
+  if (def.structured === "accordion") { b.items = []; return b; }
+  if (def.structured === "buttons") { b.buttons = []; return b; }
   if (def.areasSimple) { b.areas = []; return b; }
   b[def.field] = []; return b;
 }
@@ -3539,11 +3556,69 @@ function renderBlocksCard() {
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_media_id = id || undefined; renderBlocksCard(); }); });
       picRow.appendChild(pick); sub.appendChild(picRow);
       sub.appendChild(el("div", "hint", "Privacy-safe by design: your own image plus a “Get directions” link — no third-party map embed, so no trackers on your site."));
+    } else if (def.proseSimple) {
+      const ta = el("textarea"); ta.value = blk.body || ""; ta.setAttribute("data-k", "body_md");   // hook: rich-text toolbar auto-attaches (MutationObserver)
+      ta.placeholder = "Write your text here…"; ta.rows = Math.max(4, (blk.body || "").split("\n").length + 1);
+      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
+      ta.addEventListener("change", () => { BLOCKS_WORK[idx] = { type: "richtext", title: ti.value.trim(), body: ta.value.trim() }; });
+      sub.appendChild(ta);
+      sub.appendChild(el("div", "hint", "Use the formatting buttons above — headings, bold, links and lists all work."));
+    } else if (def.imageSimple) {
+      const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
+      if (blk.image_id) picRow.appendChild(mediaThumb(blk.image_id));
+      const pick = el("button", null, blk.image_id ? "Change image" : "Choose an image"); pick.type = "button"; pick.style.cssText = miniBtn;
+      const cap = el("input"), alt = el("input"), lk = el("input");
+      cap.placeholder = "Caption (optional)"; cap.value = blk.caption || "";
+      alt.placeholder = "Describe the image for screen readers (alt text)"; alt.value = blk.alt || "";
+      lk.placeholder = "Link when the image is clicked (optional)"; lk.value = blk.link || "";
+      [cap, alt, lk].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "image", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, caption: cap.value.trim(), alt: alt.value.trim(), link: lk.value.trim() }; };
+      [cap, alt, lk].forEach((inp) => inp.addEventListener("change", commit));
+      pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, alt, lk);
+      sub.appendChild(el("div", "hint", "Alt text helps screen readers and search — describe what's in the photo."));
+    } else if (def.imageTextSimple) {
+      const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
+      if (blk.image_id) picRow.appendChild(mediaThumb(blk.image_id));
+      const pick = el("button", null, blk.image_id ? "Change image" : "Choose an image"); pick.type = "button"; pick.style.cssText = miniBtn;
+      const ta = el("textarea"); ta.value = blk.body || ""; ta.setAttribute("data-k", "body_md");   // hook: rich-text toolbar auto-attaches
+      ta.placeholder = "Write the text that sits beside the image…"; ta.rows = Math.max(4, (blk.body || "").split("\n").length + 1);
+      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box;margin-bottom:6px";
+      const sideWrap = el("label", "hint", "Image on the "); const side = el("select");
+      [["left", "left"], ["right", "right"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((blk.side || "left") === v) o.selected = true; side.appendChild(o); });
+      side.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; sideWrap.appendChild(side);
+      const bl = el("input"), bu = el("input");
+      bl.placeholder = "Button label (optional)"; bl.value = (blk.button && blk.button.label) || "";
+      bu.placeholder = "Button link (optional)"; bu.value = (blk.button && blk.button.url) || "";
+      [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = o; };
+      [ta, side, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
+      pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, sideWrap, bl, bu);
+      sub.appendChild(el("div", "hint", "On phones the image and text stack automatically."));
+    } else if (def.dividerSimple) {
+      const styWrap = el("label", "hint", "Style "); const sty = el("select");
+      [["line", "A line"], ["space", "Empty space"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((blk.style || "line") === v) o.selected = true; sty.appendChild(o); });
+      const szWrap = el("label", "hint", "Size "); const sz = el("select");
+      [["small", "Small"], ["medium", "Medium"], ["large", "Large"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((blk.size || "medium") === v) o.selected = true; sz.appendChild(o); });
+      [sty, sz].forEach((se) => { se.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; });
+      const commit = () => { BLOCKS_WORK[idx] = { type: "divider", style: sty.value === "space" ? "space" : "line", size: (["small", "large"].includes(sz.value) ? sz.value : "medium") }; };
+      [sty, sz].forEach((se) => se.addEventListener("change", commit));
+      styWrap.appendChild(sty); szWrap.appendChild(sz);
+      const row = el("div"); row.style.cssText = "display:flex;gap:16px;flex-wrap:wrap;align-items:center"; row.append(styWrap, szWrap);
+      sub.appendChild(row);
+      sub.appendChild(el("div", "hint", "Purely visual — a divider line or blank space between sections. (The heading above is ignored for dividers.)"));
     } else if (def.mediaKind) {
       renderMediaBlockBody(def, blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.structured === "team") {
       renderTeamBlockBody(blk, idx, sub, ti);
+      sub.appendChild(el("div", "hint", def.hint));
+    } else if (def.structured === "accordion") {
+      renderAccordionBlockBody(blk, idx, sub, ti);
+      sub.appendChild(el("div", "hint", def.hint));
+    } else if (def.structured === "buttons") {
+      renderButtonsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.field || def.areasSimple) {
       const ta = el("textarea"); ta.value = blockText(def, blk);
@@ -3759,6 +3834,57 @@ function renderTeamBlockBody(blk, idx, sub, ti) {
   const add = el("button", null, "+ Add person"); add.type = "button"; add.style.cssText = miniBtn;
   add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].members = BLOCKS_WORK[idx].members || []).push({ name: "" }); renderBlocksCard(); });
   sub.appendChild(add);
+}
+// r3 accordion editor — expandable panels (summary + markdown body; toolbar auto-attaches).
+function renderAccordionBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const items = Array.isArray(blk.items) ? blk.items : [];
+  items.forEach((it, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
+    const sm = el("input"); sm.type = "text"; sm.placeholder = "Label (what people click to expand)"; sm.value = it.summary || ""; sm.style.cssText = inputCss;
+    const bd = el("textarea"); bd.value = it.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "The details inside…";
+    bd.rows = Math.max(3, (it.body || "").split("\n").length + 1);
+    bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
+    const commit = () => { blk.items[k] = { summary: sm.value.trim(), body: bd.value.trim() }; };
+    sm.addEventListener("change", commit); bd.addEventListener("change", commit);
+    row.append(sm, bd);
+    const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
+    rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+    row.appendChild(rm); sub.appendChild(row);
+  });
+  if (items.length < 10) {
+    const add = el("button", null, "+ Add panel"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].items = BLOCKS_WORK[idx].items || []).push({ summary: "", body: "" }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
+}
+// r3 buttons editor — up to three real action links (label + url + look).
+function renderButtonsBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const buttons = Array.isArray(blk.buttons) ? blk.buttons : [];
+  buttons.forEach((bt, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
+    const lb = el("input"); lb.type = "text"; lb.placeholder = "Button label (e.g. Get a quote)"; lb.value = bt.label || ""; lb.style.cssText = inputCss;
+    const ur = el("input"); ur.type = "text"; ur.placeholder = "Where it goes (link)"; ur.value = bt.url || ""; ur.style.cssText = inputCss;
+    const stWrap = el("label", "hint", "Look "); const st = el("select");
+    [["primary", "Filled"], ["outline", "Outline"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((bt.style || "primary") === v) o.selected = true; st.appendChild(o); });
+    st.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; stWrap.appendChild(st);
+    const commit = () => { blk.buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
+    [lb, ur, st].forEach((inp) => inp.addEventListener("change", commit));
+    row.append(lb, ur, stWrap);
+    const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
+    rm.addEventListener("click", () => { commitTitle(); blk.buttons.splice(k, 1); renderBlocksCard(); });
+    row.appendChild(rm); sub.appendChild(row);
+  });
+  if (buttons.length < 3) {
+    const add = el("button", null, "+ Add button"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].buttons = BLOCKS_WORK[idx].buttons || []).push({ label: "", url: "", style: "primary" }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
 const HOME_SECTION_DEFS = [ ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];

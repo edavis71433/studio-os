@@ -4,7 +4,7 @@
 // coerces + dedupes; rendering is deterministic, escaped, JS-free, emits correct
 // schema.org + a11y; the engine only realizes blocks the catalog declares; and the
 // business-classic template surfaces them (and stays byte-stable with none).
-import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES, BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { COMPONENTS } from '../../supabase/functions/presence/lib/site_components.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 import { render as businessClassic } from '../../supabase/functions/presence/templates/business-classic/1.0.0/render.ts';
@@ -188,6 +188,68 @@ const ctx = { esc, attr, safeHref };
   ]), () => null), ctx);
   ok('hostile strings in all four blocks are escaped, never live markup', hostile.length === 4 && hostile.every((r) => !/<script>|<img\s|<b>/.test(r.html)) && hostile.filter((r) => r.html.includes('&lt;')).length === 4);
   ok('all four are catalog-declared + realized', ['newsletter', 'social', 'events', 'map'].every((t) => COMPONENTS.some((c) => c.key === t) && REALIZED_BLOCK_TYPES.includes(t)));
+}
+
+// ═══ 7. text & layout staples (r3) — richtext, image, image_text, accordion, buttons, divider ═══
+{
+  const IMG = '44444444-4444-4444-4444-444444444444';
+  const IREF = () => ({ alt: 'Our storefront', variants: { w400: '/img/s-400.webp', w800: '/img/s-800.webp', w1600: '/img/s-1600.webp' }, width: 1200, height: 800 });
+
+  // — richtext: markdown body, prose section, empty-skip, markdown safety —
+  ok('richtext requires a body (empty → skipped)', validateBlocks([{ type: 'richtext', body: '   ' }]).length === 0 && validateBlocks([{ type: 'richtext', body: 'Hello' }]).length === 1);
+  ok('richtext preserves newlines (not whitespace-collapsed like short fields)', validateBlocks([{ type: 'richtext', body: 'Line one\n\nLine two' }])[0].body === 'Line one\n\nLine two');
+  const rt = renderSiteBlocks(validateBlocks([{ type: 'richtext', title: 'Our story', body: '## We started small\n\nWith **grit** and a [plan](https://ex.com).\n\n- one\n- two' }]), ctx)[0];
+  ok('richtext renders a prose section with semantic markdown (h2/strong/list/link)', rt.html.includes('block-richtext') && rt.html.includes('<div class="prose">') && rt.html.includes('<h2>We started small</h2>') && rt.html.includes('<strong>grit</strong>') && rt.html.includes('<ul>') && rt.html.includes('href="https://ex.com"'));
+  ok('richtext emits no schema', !rt.ld);
+  const rtx = renderSiteBlocks(validateBlocks([{ type: 'richtext', body: '<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[x](javascript:alert(1))' }]), ctx)[0].html;
+  ok('richtext markdown is escape-first (no live script/img, javascript: link dropped)', !/<script>alert|<img\s+src=x/.test(rtx) && rtx.includes('&lt;script&gt;') && !/href="javascript:/i.test(rtx));
+
+  // — image: figure via blockImg, caption/alt, optional safe link; drops when media missing —
+  ok('image needs a resolvable media id (no image → dropped)', resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG }]), () => null).length === 0);
+  ok('image keeps a valid uuid; junk id dropped at validation', validateBlocks([{ type: 'image', image_id: IMG }])[0].image_id === IMG && validateBlocks([{ type: 'image', image_id: 'nope' }]).length === 0);
+  const im = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG, caption: 'Out front', alt: 'The shop', link: 'https://ex.com' }]), IREF), ctx)[0];
+  ok('image renders a <figure> with srcset image + <figcaption>, wrapped in a safe link', im.html.includes('block-image') && im.html.includes('<figure') && im.html.includes('srcset=') && im.html.includes('<figcaption>Out front</figcaption>') && im.html.includes('<a class="img-link" href="https://ex.com"'));
+  const imBad = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG, link: 'javascript:alert(1)' }]), IREF), ctx)[0].html;
+  ok('image with an unsafe link renders the figure but NO anchor', imBad.includes('<figure') && !imBad.includes('<a '));
+
+  // — image_text: image + markdown prose, responsive stacking, side, optional button —
+  ok('image_text keeps text even if the image is unresolvable; both empty → dropped', resolveBlockMedia(validateBlocks([{ type: 'image_text', body: 'Words', side: 'right' }]), () => null).length === 1 && validateBlocks([{ type: 'image_text', body: '', side: 'left' }]).length === 0);
+  ok('image_text side coerces to left|right (default left)', validateBlocks([{ type: 'image_text', body: 'x', side: 'sideways' }])[0].side === 'left' && validateBlocks([{ type: 'image_text', body: 'x', side: 'right' }])[0].side === 'right');
+  const itB = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image_text', image_id: IMG, body: 'Real **words** here', side: 'right', button: { label: 'Learn more', url: 'https://ex.com/x' } }]), IREF), ctx)[0];
+  ok('image_text renders a flex row (it-row) + markdown prose + a safe button', itB.html.includes('block-imgtext') && itB.html.includes('it-row it-right') && itB.html.includes('<div class="it-media">') && itB.html.includes('<strong>words</strong>') && itB.html.includes('<a class="btn" href="https://ex.com/x"'));
+  ok('image_text stacking is defined in BLOCK_CSS (@media min-width:620 → row; default column)', /\.it-row\{[^}]*flex-direction:column/.test(BLOCK_CSS) && /@media\(min-width:620px\)\{\.it-row\{flex-direction:row/.test(BLOCK_CSS));
+  ok('image_text drops the button when its url is unsafe', !renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image_text', body: 'x', side: 'left', button: { label: 'Go', url: 'javascript:alert(1)' } }]), () => null), ctx)[0].html.includes('<a class="btn"'));
+
+  // — accordion: native <details>, cap 10, markdown body, escaped summary, no JS —
+  ok('accordion caps items at 10 + requires a summary per item', (() => { const a = validateBlocks([{ type: 'accordion', items: Array.from({ length: 14 }, (_, i) => ({ summary: `S${i}`, body: 'b' })).concat([{ summary: '', body: 'x' }]) }])[0]; return a.items.length === 10 && a.items.every((it) => it.summary); })());
+  ok('accordion with no valid items is skipped', validateBlocks([{ type: 'accordion', items: [{ summary: '', body: 'x' }] }]).length === 0 && validateBlocks([{ type: 'accordion', items: [] }]).length === 0);
+  const ac = renderSiteBlocks(validateBlocks([{ type: 'accordion', items: [{ summary: 'Shipping', body: 'We ship **fast**.' }, { summary: '<b>Returns</b>', body: 'Within 30 days' }] }]), ctx)[0];
+  ok('accordion uses native <details>/<summary> (keyboard + a11y, zero JS)', ac.html.includes('<details class="acc-item">') && ac.html.includes('<summary>Shipping</summary>') && !/<script|onclick=/i.test(ac.html));
+  ok('accordion summary is escaped; body renders markdown', ac.html.includes('<summary>&lt;b&gt;Returns&lt;/b&gt;</summary>') && ac.html.includes('<strong>fast</strong>'));
+  ok('accordion emits no schema (distinct from FAQ)', !ac.ld);
+
+  // — buttons: real <a> via safeHref, cap 3, styles, empty-skip —
+  ok('buttons cap at 3 + require label AND url', (() => { const b = validateBlocks([{ type: 'buttons', buttons: Array.from({ length: 5 }, (_, i) => ({ label: `B${i}`, url: 'https://e.com' })).concat([{ label: 'NoUrl' }, { url: 'https://e.com' }]) }])[0]; return b.buttons.length === 3; })());
+  ok('buttons with no valid entries are skipped', validateBlocks([{ type: 'buttons', buttons: [{ label: 'x' }] }]).length === 0 && validateBlocks([{ type: 'buttons', buttons: [] }]).length === 0);
+  const bt = renderSiteBlocks(validateBlocks([{ type: 'buttons', buttons: [{ label: 'Call us', url: 'tel:+15551234567', style: 'primary' }, { label: 'Email', url: 'mailto:a@b.com', style: 'outline' }, { label: 'Bad', url: 'javascript:alert(1)', style: 'primary' }] }]), ctx)[0];
+  ok('buttons render real anchors via safeHref (tel/mailto ok), outline style, drop unsafe', bt.html.includes('<a class="btn" href="tel:+15551234567"') && bt.html.includes('<a class="btn btn-outline" href="mailto:a@b.com"') && !bt.html.includes('javascript:') && (bt.html.match(/<a /g) || []).length === 2);
+  ok('buttons label is escaped', renderSiteBlocks(validateBlocks([{ type: 'buttons', buttons: [{ label: '<script>x</script>', url: 'https://e.com' }] }]), ctx)[0].html.includes('&lt;script&gt;'));
+
+  // — divider: presentational, always valid, tokenized, no content —
+  ok('divider is always valid; style/size coerce to enums', (() => { const d = validateBlocks([{ type: 'divider', style: 'weird', size: 'huge' }])[0]; return d && d.style === 'line' && d.size === 'medium'; })());
+  const dvLine = renderSiteBlocks(validateBlocks([{ type: 'divider', style: 'line', size: 'large' }]), ctx)[0];
+  const dvSpace = renderSiteBlocks(validateBlocks([{ type: 'divider', style: 'space', size: 'small' }]), ctx)[0];
+  ok('divider line → <hr>; space → aria-hidden spacer; both sized', dvLine.html.includes('<hr>') && dvLine.html.includes('div-large') && dvSpace.html.includes('div-space') && dvSpace.html.includes('aria-hidden="true"') && dvSpace.html.includes('div-small'));
+  ok('divider emits no schema + no text/script', !dvLine.ld && !/<script|onclick=/i.test(dvLine.html) && !/<script|onclick=/i.test(dvSpace.html));
+
+  // — catalog agreement + zero external origins across all six —
+  ok('all six staples are catalog-declared AND realized', ['richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider'].every((t) => COMPONENTS.some((c) => c.key === t) && REALIZED_BLOCK_TYPES.includes(t)));
+  const hostile6 = renderSiteBlocks(resolveBlockMedia(validateBlocks([
+    { type: 'richtext', body: '<iframe src="https://evil.example"></iframe>' },
+    { type: 'accordion', items: [{ summary: '"><script>', body: '<img src=x onerror=alert(1)>' }] },
+    { type: 'buttons', buttons: [{ label: '"><script>', url: 'https://ok.example' }] },
+  ]), () => null), ctx);
+  ok('no staple ever loads an external origin (no live iframe/img/script/url())', hostile6.every((r) => !/<iframe|<img\b|<script|url\(/i.test(r.html)) && hostile6.every((r) => r.html.includes('&lt;')));
 }
 
 const passed = results.filter((r) => r.p).length;

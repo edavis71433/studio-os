@@ -17,7 +17,9 @@ import type {
   SiteBlockGallery, SiteBlockBeforeAfter, SiteBlockVideo, MediaRef,
   SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment,
   SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
+  SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
 } from './render_types.ts';
+import { renderMarkdown } from './markdown.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -25,14 +27,20 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'gallery', 'before_after', 'video',
   'partners', 'reviews', 'appointment',
   'newsletter', 'social', 'events', 'map',
+  'richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too
 // (one instance per type, so the cap = the realized-type count: every block can coexist).
-const MAX_BLOCKS = 18;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12 };
+const MAX_BLOCKS = 24;
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, buttons: 3 };
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+// Prose sanitizer: like s() but PRESERVES newlines (markdown structure) — collapses
+// only intra-line runs of spaces/tabs, caps blank runs, length-caps. renderMarkdown
+// still escapes-first and strips control chars, so this is a length/shape bound only.
+const ml = (x: unknown, max: number): string => String(x ?? '')
+  .replace(/\r\n?/g, '\n').replace(/[^\S\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
 const arr = (x: unknown): any[] => (Array.isArray(x) ? x : []);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uid = (x: unknown): string => { const v = String(x ?? '').trim(); return UUID_RE.test(v) ? v : ''; };
@@ -45,12 +53,17 @@ interface StoredBeforeAfter { type: 'before_after'; title?: string; items: Array
 interface StoredVideo { type: 'video'; title?: string; url: string; caption?: string; poster_id?: string }
 interface StoredPartners { type: 'partners'; title?: string; image_ids: string[] }
 interface StoredMap { type: 'map'; title?: string; image_media_id?: string; address?: string; directions_url?: string }
+// Text & layout staples: image/image_text carry media by ID (resolved by resolveBlockMedia);
+// richtext/accordion/buttons/divider carry no media (pass straight through).
+interface StoredImage { type: 'image'; title?: string; image_id?: string; caption?: string; alt?: string; link?: string }
+interface StoredImageText { type: 'image_text'; title?: string; image_id?: string; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
 export type StoredBlock =
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
   | StoredGallery | StoredBeforeAfter | StoredVideo
   | StoredPartners | SiteBlockReviews | SiteBlockAppointment
-  | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap;
+  | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
+  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
@@ -183,6 +196,55 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         if (address || image_media_id) block = { type: 'map', title, address, image_media_id, directions_url } as StoredMap;
         break;
       }
+      case 'richtext': {   // a readable prose section — markdown body (rendered safely at output)
+        const body = ml((b as any).body, 4000);
+        if (body) block = { type: 'richtext', title, body } as SiteBlockRichText;
+        break;
+      }
+      case 'image': {   // a single figure from the media library; optional caption/alt/link
+        const image_id = uid((b as any).image_id) || undefined;
+        if (image_id) block = {
+          type: 'image', title, image_id,
+          caption: s((b as any).caption, 200) || undefined,
+          alt: s((b as any).alt, 200) || undefined,
+          link: s((b as any).link, 300) || undefined,   // validated by safeHref at render
+        } as StoredImage;
+        break;
+      }
+      case 'image_text': {   // image beside prose; stacks on mobile. Optional single button.
+        const body = ml((b as any).body, 2000);
+        const image_id = uid((b as any).image_id) || undefined;
+        if (body || image_id) {
+          const side = (b as any).side === 'right' ? 'right' : 'left';
+          const st: StoredImageText = { type: 'image_text', title, image_id, body, side };
+          const bl = s((b as any).button?.label, 40);
+          const bu = s((b as any).button?.url, 300);
+          if (bl && bu) st.button = { label: bl, url: bu };   // url validated by safeHref at render
+          block = st;
+        }
+        break;
+      }
+      case 'accordion': {   // general expandable content (distinct from FAQ's Q&A + schema)
+        const items = arr((b as any).items).map((it) => ({ summary: s(it?.summary, 120), body: ml(it?.body, 1500) }))
+          .filter((it) => it.summary).slice(0, CAP.accordion);
+        if (items.length) block = { type: 'accordion', title, items } as SiteBlockAccordion;
+        break;
+      }
+      case 'buttons': {   // a small row of real links; each label required, url via safeHref at render
+        const buttons = arr((b as any).buttons).map((bt) => ({
+          label: s(bt?.label, 40), url: s(bt?.url, 300),
+          style: bt?.style === 'outline' ? 'outline' as const : 'primary' as const,
+        })).filter((bt) => bt.label && bt.url).slice(0, CAP.buttons);
+        if (buttons.length) block = { type: 'buttons', title, buttons } as SiteBlockButtons;
+        break;
+      }
+      case 'divider': {   // presentational spacer/rule — always valid (no content to be empty)
+        const style = (b as any).style === 'space' ? 'space' : 'line';
+        const sz = (b as any).size;
+        const size = sz === 'small' || sz === 'large' ? sz : 'medium';
+        block = { type: 'divider', style, size } as SiteBlockDivider;
+        break;
+      }
     }
     if (block) { out.push(block); seen.add(type); }
     if (out.length >= MAX_BLOCKS) break;
@@ -226,6 +288,16 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       case 'map': {   // an address keeps the block valuable even if the image can't resolve
         const image = b.image_media_id ? ref(b.image_media_id) : null;
         if (image || b.address) out.push({ type: 'map', title: b.title, image, address: b.address, directions_url: b.directions_url });
+        break;
+      }
+      case 'image': {   // an image with no resolvable media is nothing to show — drop it
+        const image = b.image_id ? ref(b.image_id) : null;
+        if (image) out.push({ type: 'image', title: b.title, image, caption: b.caption, alt: b.alt, link: b.link });
+        break;
+      }
+      case 'image_text': {   // prose keeps the block valuable even if the image can't resolve
+        const image = b.image_id ? ref(b.image_id) : null;
+        if (image || b.body) out.push({ type: 'image_text', title: b.title, image, body: b.body, side: b.side, button: b.button });
         break;
       }
       default:
@@ -417,6 +489,48 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         if (img || addr) html = `<section class="block wrap block-map">${h2(b.title, 'Find us')}${img}${addr}${dir}</section>`;
         break;
       }
+      case 'richtext': {   // readable prose, markdown → safe semantic HTML (escape-first)
+        const prose = renderMarkdown(b.body);
+        if (prose) html = `<section class="block wrap block-richtext">${b.title ? h2(b.title, '') : ''}<div class="prose">${prose}</div></section>`;
+        break;
+      }
+      case 'image': {   // a figure; wrapped in a safe link only when the link is safe
+        if (b.image) {
+          const fig = `<figure class="img-fig">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px')}${b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ''}</figure>`;
+          const href = b.link ? safeHref(b.link) : null;
+          const inner = href ? `<a class="img-link" href="${attr(href)}" rel="noopener">${fig}</a>` : fig;
+          html = `<section class="block wrap block-image">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
+        }
+        break;
+      }
+      case 'image_text': {   // image beside prose; flex row STACKS < 620px (see BLOCK_CSS)
+        const prose = b.body ? renderMarkdown(b.body) : '';
+        const img = b.image ? `<div class="it-media">${blockImg(b.image, esc, attr, '(max-width:620px) 100vw, 460px')}</div>` : '';
+        const href = b.button ? safeHref(b.button.url) : null;
+        const btn = href ? `<p class="it-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button!.label)}</a></p>` : '';
+        const text = `<div class="it-text">${prose}${btn}</div>`;
+        if (img || prose) html = `<section class="block wrap block-imgtext">${b.title ? h2(b.title, '') : ''}<div class="it-row it-${b.side === 'right' ? 'right' : 'left'}">${img}${text}</div></section>`;
+        break;
+      }
+      case 'accordion': {   // native <details>/<summary> — keyboard + a11y for free, zero JS
+        const rows = b.items.map((it) => `<details class="acc-item"><summary>${esc(it.summary)}</summary>${it.body ? `<div class="prose">${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
+        html = `<section class="block wrap block-accordion">${h2(b.title, 'More information')}<div class="accordion">${rows}</div></section>`;
+        break;
+      }
+      case 'buttons': {   // a small centered row of real links; drop any without a safe href
+        const btns = b.buttons.map((bt) => {
+          const href = safeHref(bt.url); if (!href) return '';
+          return `<a class="btn${bt.style === 'outline' ? ' btn-outline' : ''}" href="${attr(href)}" rel="noopener">${esc(bt.label)}</a>`;
+        }).filter(Boolean);
+        if (btns.length) html = `<section class="block wrap block-buttons">${b.title ? h2(b.title, '') : ''}<div class="btn-row">${btns.join('')}</div></section>`;
+        break;
+      }
+      case 'divider': {   // presentational only — a hairline rule or plain vertical space
+        html = b.style === 'space'
+          ? `<div class="block-divider div-space div-${b.size}" aria-hidden="true"></div>`
+          : `<div class="block wrap block-divider div-line div-${b.size}"><hr></div>`;
+        break;
+      }
     }
     if (b.type === 'partners') {
       html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
@@ -491,4 +605,34 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .block-map .map-img img{width:100%;border-radius:12px;display:block}
 .map-addr{margin:10px 0 0;font-size:1.05rem}
 .map-dir{margin-top:6px}
-.map-dir a{font-weight:700;color:var(--accent-dark,var(--accent))}`;
+.map-dir a{font-weight:700;color:var(--accent-dark,var(--accent))}
+.block-richtext .prose,.block-imgtext .it-text .prose{max-width:68ch}
+.prose>*:first-child{margin-top:0}.prose>*:last-child{margin-bottom:0}
+.prose h2,.prose h3{margin:1.1em 0 .4em}.prose p{margin:0 0 .8em}
+.prose ul,.prose ol{margin:0 0 .8em;padding-left:1.3em}.prose li{margin:.2em 0}
+.prose blockquote{margin:0 0 .8em;padding-left:14px;border-left:3px solid var(--accent);color:var(--soft)}
+.prose a{color:var(--accent-dark,var(--accent))}
+.block-image .img-fig{margin:0}
+.block-image .img-fig img{width:100%;border-radius:12px;display:block}
+.block-image figcaption{font-size:.9rem;color:var(--soft);margin-top:6px}
+.block-image .img-link{display:block;text-decoration:none;color:inherit}
+.it-row{display:flex;flex-direction:column;gap:20px;margin-top:6px}
+.it-row .it-media img{width:100%;border-radius:12px;display:block}
+.it-text{align-self:center}
+.it-cta{margin:14px 0 0}
+@media(min-width:620px){.it-row{flex-direction:row;align-items:center;gap:32px}.it-row .it-media,.it-row .it-text{flex:1 1 0;min-width:0}.it-row.it-right{flex-direction:row-reverse}}
+.accordion{margin-top:8px}
+.acc-item{border-bottom:1px solid var(--line);padding:0}
+.acc-item summary{cursor:pointer;font-weight:700;padding:14px 0;list-style:none;position:relative;padding-right:28px}
+.acc-item summary::-webkit-details-marker{display:none}
+.acc-item summary::after{content:"+";position:absolute;right:4px;top:50%;transform:translateY(-50%);font-weight:400;font-size:1.3rem;color:var(--accent)}
+.acc-item[open] summary::after{content:"–"}
+.acc-item .prose{padding:0 0 14px}
+.acc-item summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:8px}
+.btn-outline{background:transparent;color:var(--accent-dark,var(--accent));border:2px solid var(--accent)}
+.block-divider{padding-top:0;padding-bottom:0}
+.block-divider hr{border:none;border-top:1px solid var(--line);margin:0}
+.div-small{--div-gap:16px}.div-medium{--div-gap:36px}.div-large{--div-gap:64px}
+.block-divider.div-line{margin:var(--div-gap,36px) 0}
+.div-space{height:var(--div-gap,36px)}`;
