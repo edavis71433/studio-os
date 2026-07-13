@@ -65,6 +65,8 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// styled toast via the shared shell (replaces native alert()); bad→error styling
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 let TOKEN="",ME=null,CLIENTS=[],ACTING=null;
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
@@ -121,16 +123,16 @@ async function loadKits(){
     document.querySelectorAll('[data-delkit]').forEach(b=>b.addEventListener('click',async()=>{if(!b.dataset.armed){b.dataset.armed='1';b.textContent='?';setTimeout(()=>{delete b.dataset.armed;b.textContent='✕';},2500);return;}await apiSend('DELETE','/agency/kits/'+b.getAttribute('data-delkit'));loadKits();}));
     const save=$('kitSave'); if(save)save.addEventListener('click',async()=>{
       const sid=$('kitFromSite').value,nm=$('kitName').value.trim();
-      if(!sid||!nm){alert('Pick a client and name the kit.');return;}
+      if(!sid||!nm){toast('Pick a client and name the kit.',true);return;}
       const r2=await apiSend('POST','/agency/kits',{site_id:sid,name:nm});
-      if(r2.ok){$('kitName').value='';loadKits();}else alert((r2.body&&r2.body.message)||'That didn’t save.');
+      if(r2.ok){$('kitName').value='';toast('Kit saved.');loadKits();}else toast((r2.body&&r2.body.message)||'That didn’t save.',true);
     });
     const ap=$('kitApply'); if(ap)ap.addEventListener('click',async()=>{
       const kid=$('kitPick').value,sid=$('kitToSite').value;
-      if(!kid||!sid){alert('Pick a kit and a client.');return;}
+      if(!kid||!sid){toast('Pick a kit and a client.',true);return;}
       const r3=await apiSend('POST','/agency/kits/'+kid+'/apply',{site_id:sid});
-      if(r3.ok){const a=(r3.body.data&&r3.body.data.applied)||{};const sk=(r3.body.data&&r3.body.data.skipped)||[];alert('Applied: '+(a.offerings||0)+' services, '+(a.faqs||0)+' FAQs'+(a.voice?', voice':'')+(a.colors?', colors':'')+(a.industry?', industry':'')+(sk.length?'\nSkipped (already set): '+sk.join('; '):''));}
-      else alert((r3.body&&r3.body.message)||'That didn’t apply.');
+      if(r3.ok){const a=(r3.body.data&&r3.body.data.applied)||{};const sk=(r3.body.data&&r3.body.data.skipped)||[];toast('Applied: '+(a.offerings||0)+' services, '+(a.faqs||0)+' FAQs'+(a.voice?', voice':'')+(a.colors?', colors':'')+(a.industry?', industry':'')+(sk.length?' · skipped '+sk.length+' already set':''));loadKits();}
+      else toast((r3.body&&r3.body.message)||'That didn’t apply.',true);
     });
   }catch(_){host.textContent='Kits wouldn’t load just now.';}
 }

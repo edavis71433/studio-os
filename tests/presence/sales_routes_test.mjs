@@ -96,8 +96,9 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   // as a pre-auth public route.
   ok('add-customer: gated to the relationship edition (same /sales gate)', /case 'sales':[\s\S]{0,80}return 'relationship'/.test(feat));
   ok('add-customer: dispatched in the authed block (after checkEntitlement gate)', idx.indexOf("route === '/sales/customers'") > idx.indexOf('checkEntitlement(principal'));
-  // reuses the frozen bridge + one-primary-agency (ensureBridge), never a parallel bridge
-  ok('add-customer: reuses ensureBridge (one primary agency per customer)', /ensureBridge\(site\.id, project\.id, clientId/.test(sales) && /import \{ ensureProjectForDeal, ensureBridge, linksForCustomer \}/.test(sales));
+  // reuses the frozen bridge + one-primary-agency (ensureBridge), never a parallel
+  // bridge — the bridge is now formed in the ONE shared bridgeCustomerToStudio helper.
+  ok('add-customer: reuses ensureBridge via the shared bridgeCustomerToStudio (one primary agency)', /ensureBridge\(agencySiteId, project\.id, clientId/.test(sales) && /import \{ ensureProjectForDeal, ensureBridge, linksForCustomer \}/.test(sales) && /export async function bridgeCustomerToStudio/.test(sales));
   // SERVICE customer: entitlement without a Stripe subscription (active access, no checkout)
   ok('add-customer: SERVICE billing boundary — provisions active access, no Stripe subscription created', !/createServicePaymentLink|createCheckout|stripe/i.test(sales.slice(sales.indexOf('handleSalesAddCustomer'))));
   // IDEMPOTENT existing-email: returns a friendly already_exists (with a link), never a duplicate
@@ -105,7 +106,61 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   // the invite only fires for a genuinely new setup (after the already-exists early return)
   ok('add-customer: sends the sign-in invite only for a new setup', (() => { const h = sales.indexOf('handleSalesAddCustomer'); const already = sales.indexOf('if (acct.alreadyExisted)', h); const invite = sales.indexOf('sendCustomerInvite(email, acct.isNewLogin)', h); return already > 0 && invite > already; })());
   // reuses an existing bridge instead of minting a duplicate empty project on retry
-  ok('add-customer: idempotent bridge — reuses an existing link (no duplicate project)', /linksForCustomer\(clientId\)/.test(sales) && /links\.find\(\(l\) => l\.agency_site_id === site\.id\)/.test(sales));
+  ok('add-customer: idempotent bridge — reuses an existing link (no duplicate project)', /linksForCustomer\(clientId\)/.test(sales) && /links\.find\(\(l\) => l\.agency_site_id === agencySiteId\)/.test(sales));
+  // the shared bridge helper is the SINGLE non-deal bridge path (no parallel bridge):
+  // ensureBridge + linksForCustomer + the project insert appear ONCE, inside it.
+  ok('add-customer: bridgeCustomerToStudio is the one non-deal bridge path (ensureBridge called once, inside the helper)', (() => {
+    // The deal handoff bridges via ensureProjectForDeal; the non-deal paths (add,
+    // connect, signup-hook) bridge via bridgeCustomerToStudio. So a DIRECT ensureBridge
+    // call appears exactly once in sales.ts — inside the shared helper — and never
+    // inside handleSalesAddCustomer (which only CALLS the helper, twice).
+    const ensureCalls = (sales.match(/ensureBridge\(/g) || []).length;
+    const addBody = sales.slice(sales.indexOf('export async function handleSalesAddCustomer'));
+    return ensureCalls === 1 && /export async function bridgeCustomerToStudio[\s\S]*?ensureBridge\(agencySiteId/.test(sales) && !/ensureBridge\(/.test(addBody) && (addBody.match(/bridgeCustomerToStudio\(\{ agencySiteId/g) || []).length >= 2;
+  })());
+}
+
+// ── ADD A CUSTOMER · CONNECT-BY-EMAIL (mode='connect') — provisions NOTHING ────
+// The owner's second option: "they'll sign up themselves — connect by email".
+{
+  const addAt = sales.indexOf('export async function handleSalesAddCustomer');
+  const add = sales.slice(addAt);
+  // mode is accepted, default 'provision' (today's behavior unchanged)
+  ok('connect: handleSalesAddCustomer accepts mode (provision|connect, default provision)', /const mode = b\.mode === 'connect' \? 'connect' : 'provision'/.test(add));
+  // CONNECT provisions NOTHING: no provisionCustomerAccount, no auth user, no invite,
+  // inside the connect branch (which returns before the provision path).
+  ok('connect: the connect branch provisions nothing (no provisionCustomerAccount / createAuthUser / sendCustomerInvite before its returns)', (() => {
+    const start = add.indexOf("if (mode === 'connect')");
+    const end = add.indexOf('// ── A) SET THEM UP NOW');
+    const branch = add.slice(start, end);
+    return start > 0 && end > start && !/provisionCustomerAccount\(/.test(branch) && !/createAuthUser\(/.test(branch) && !/sendCustomerInvite\(/.test(branch) && !/provisionForSignup\(/.test(branch);
+  })());
+  // EXISTING account → bridge NOW (reuse the shared helper) and report connected:true
+  ok('connect: existing account → findClientByEmail then bridge now, connected:true', /if \(mode === 'connect'\)[\s\S]*?findClientByEmail\(email\)[\s\S]*?bridgeCustomerToStudio\(\{ agencySiteId: site\.id[\s\S]*?connected: true/.test(add));
+  // NO account → record a CONTACT under this site (the pending record) + pending:true;
+  // NEVER duplicates a table — reuses presence_contacts via ensureConnectContact.
+  ok('connect: no account → records the pending contact (ensureConnectContact, tagged) + pending:true', /ensureConnectContact\(site\.id, email, name, true\)[\s\S]*?pending: true/.test(add) && /async function ensureConnectContact/.test(sales));
+  // the pending record is a presence_contacts row (site-scoped = the studio), tagged
+  // with the shared marker — NO new table.
+  ok('connect: pending record reuses presence_contacts (site-scoped) + the shared CONNECT_INTENT_TAG (no new table)', /export const CONNECT_INTENT_TAG =/.test(sales) && /svc\('presence_contacts', \{ method: 'POST'/.test(sales) && /notes: mark \? CONNECT_INTENT_TAG/.test(sales));
+  // connect self-guard: never bridge the studio to itself
+  ok('connect: self-guard — does not bridge the studio to itself', /if \(clientId !== site\.client_id\)/.test(add));
+}
+
+// ── SIGNUP AUTO-CONNECT HOOK (commerce/handleSignup) ──────────────────────────
+// When a pre-listed email self-serve signs up, they auto-connect to that studio —
+// reusing the SAME bridge (bridgeCustomerToStudio → ensureBridge), best-effort.
+{
+  const commerce = read('supabase/functions/presence/routes/commerce.ts');
+  ok('signup-hook: commerce imports the SHARED bridge + tag from sales (no parallel bridge)', /import \{ bridgeCustomerToStudio, CONNECT_INTENT_TAG \} from '\.\/sales\.ts'/.test(commerce));
+  // finds the tagged pending contact by email, resolves its site_id (= the studio)
+  ok('signup-hook: resolves the pre-listing studio via the tagged presence_contacts (site_id)', /presence_contacts\?email=eq\.\$\{encodeURIComponent\(email\)\}&notes=ilike\.\*\$\{needle\}\*/.test(commerce) && /CONNECT_INTENT_TAG\.replace\(/.test(commerce));
+  // calls the shared bridge — never a second bridge implementation in commerce
+  ok('signup-hook: bridges via the shared bridgeCustomerToStudio (single bridge path)', /bridgeCustomerToStudio\(\{ agencySiteId, clientId, customerSiteId/.test(commerce) && !/ensureBridge\(/.test(commerce) && !/presence_service_links/.test(commerce));
+  // wired into handleSignup for BOTH the trial and the paid path, best-effort
+  ok('signup-hook: called from handleSignup (trial + paid), best-effort (never blocks signup)', (commerce.match(/autoConnectPreListedStudio\(chain\.clientId/g) || []).length >= 2 && /async function autoConnectPreListedStudio[\s\S]*?try \{[\s\S]*?\} catch/.test(commerce));
+  // masked logging (no raw email in logs)
+  ok('signup-hook: logs are email-masked', /maskEmail\(email\)/.test(commerce));
 }
 
 // ── UI: contacts.html "Add a customer" (service language; success + already-exists states) ──
@@ -113,9 +168,40 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   const contacts = read('contacts.html');
   ok('ui: a prominent "+ Add a customer" action + dialog', /id="addCust"/.test(contacts) && /openAddCustomer/.test(contacts) && /id="custDlg"/.test(contacts));
   ok('ui: posts to /sales/customers with name/business_name/email/edition', /api\('\/sales\/customers','POST'/.test(contacts) && /business_name/.test(contacts) && /edition:\$\('cu-edition'\)\.value/.test(contacts));
-  ok('ui: SERVICE language (never SaaS plan words) + "never pay for software"', /never pay for software/.test(contacts) && /What they get/.test(contacts) && !/subscription|SaaS|per month|\/mo/i.test(contacts.slice(contacts.indexOf('custDlg'), contacts.indexOf('custDlg') + 1400)));
+  ok('ui: SERVICE language (never SaaS plan words) + "never pay for software"', /never pay for software/.test(contacts) && /What kind of work is this\?/.test(contacts) && !/subscription|SaaS|per month|\/mo/i.test(contacts.slice(contacts.indexOf('custDlg'), contacts.indexOf('custDlg') + 1400)));
   ok('ui: success state shows "Invitation sent to {email}" + the already-exists case', /Invitation sent to/.test(contacts) && /already_exists/.test(contacts) && /already have a workspace/.test(contacts));
   ok('ui: labels wired to inputs (for/id) + focus managed', /for="cu-email"/.test(contacts) && /id="cu-email"/.test(contacts) && /\$\('cu-name'\)\.focus\(\)/.test(contacts));
+  // TWO-OPTION chooser (owner's words): "set them up now" vs "connect by email".
+  ok('ui: a two-option chooser (radiogroup) precedes the work-type field', /role="radiogroup"/.test(contacts) && /name="cumode" value="provision"/.test(contacts) && /name="cumode" value="connect"/.test(contacts) && contacts.indexOf('name="cumode"') < contacts.indexOf('id="cu-edition"'));
+  ok('ui: option copy — set-up-now (default) + sign-up-themselves', /I’ll set them up now/.test(contacts) && /They’ll sign up themselves — connect by email/.test(contacts) && /value="provision" checked/.test(contacts));
+  ok('ui: connect copy explains existing-vs-later auto-connect', /If they already have an account, they connect to you now\. If not, they’ll connect automatically the moment they sign up/.test(contacts));
+  ok('ui: mode drives the POST body (provision vs connect) to /sales/customers', /mode:'connect',name:name\|\|undefined,email/.test(contacts) && /mode:'provision'/.test(contacts) && /const mode=cuMode\(\)/.test(contacts));
+  ok('ui: distinct success states — connected / saved-for-later / invitation-sent', /When '\+esc\(email\)\+' signs up, they’ll connect to you automatically/.test(contacts) && /Connected to their workspace/.test(contacts));
+  ok('ui: connect mode hides provision-only fields (no workspace set-up)', /id="cu-provision-only"/.test(contacts) && /po\.style\.display=connect\?'none':''/.test(contacts));
+}
+
+// ── STUDIO SERVICES CATALOG (/sales/services) — manageable catalog + proposal dropdown ──
+{
+  const pipe = read('pipeline.html');
+  // route exists (GET+PUT), exported + dispatched
+  ok('services: handleSalesServices exported + dispatched at GET/PUT /sales/services', /export async function handleSalesServices/.test(sales) && /route === '\/sales\/services' && \(method === 'GET' \|\| method === 'PUT'\)/.test(idx));
+  // studio-gated exactly like the rest of /sales/* (relationship feature) + dispatched
+  // in the AUTHED block after the entitlement gate (never a pre-auth public route).
+  ok('services: gated to the relationship edition (same /sales gate)', /case 'sales':[\s\S]{0,80}return 'relationship'/.test(feat));
+  ok('services: dispatched in the authed block (after checkEntitlement gate)', idx.indexOf("route === '/sales/services'") > idx.indexOf('checkEntitlement(principal'));
+  // NO new migration: catalog stored in the EXISTING sales-templates store via a reserved sentinel row
+  ok('services: stored in the existing sales-templates store via a reserved sentinel (no new migration)', /SERVICES_CATALOG_NAME = '__services_catalog__'/.test(sales) && /kind=eq\.proposal&name=eq\.\$\{encodeURIComponent\(SERVICES_CATALOG_NAME\)\}/.test(sales));
+  // site-scoped read + write (tenant isolation)
+  ok('services: catalog read/write is site_id-scoped', /presence_sales_templates\?site_id=eq\.\$\{siteId\}&kind=eq\.proposal&name=eq\.\$\{encodeURIComponent\(SERVICES_CATALOG_NAME\)\}/.test(sales) && /presence_sales_templates\?site_id=eq\.\$\{site\.id\}&kind=eq\.proposal&name=eq\.\$\{encodeURIComponent\(SERVICES_CATALOG_NAME\)\}/.test(sales));
+  // the sentinel row is hidden from the reusable-templates list
+  ok('services: the sentinel row is excluded from the templates list', /name=neq\.\$\{encodeURIComponent\(SERVICES_CATALOG_NAME\)\}/.test(sales));
+  // PUT validates: name ≤120 (clean), price bounded 0–$1,000,000, catalog capped ~40
+  ok('services: PUT validates name (≤120) + bounds price + caps the catalog (40)', /b\.services\.length > 40/.test(sales) && /clean\(s\?\.name, 120\)/.test(sales) && /Math\.min\(1_000_000_00, Math\.max\(0, Math\.trunc\(Number\(\(s as any\)\?\.price_cents\)\)/.test(sales));
+  // ── pipeline.html UI: dropdown + Custom + empty-catalog fallback + manage editor ──
+  ok('ui: proposal line item is a <select> of services with a Custom… option', /class="pl-pick"/.test(pipe) && /Pick a service…<\/option>/.test(pipe) && /__custom__">Custom…<\/option>/.test(pipe));
+  ok('ui: picking a service auto-fills the line name + price (still editable)', /const s=SERVICES\[\+v\]; if\(s\)\{ lab\.value=s\.name; pr\.value=\(s\.price_cents\/100\)/.test(pipe));
+  ok('ui: empty catalog falls back to free-text with a manage hint/link', /const hasCat=SERVICES\.length>0/.test(pipe) && /id="plManageHint"/.test(pipe) && /Add your services/.test(pipe));
+  ok('ui: a Manage services editor (name+price rows, add/remove) saves via PUT /sales/services', /id="svcDlg"/.test(pipe) && /openManageServices/.test(pipe) && /api\('\/sales\/services','PUT',\{services\}\)/.test(pipe));
 }
 
 // ── dispatch wired (authed + public) ──

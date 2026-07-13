@@ -85,6 +85,16 @@
 
 <dialog id="detail" aria-label="Deal detail"><div id="detailInner"></div></dialog>
 
+<dialog id="svcDlg" aria-label="Manage your services">
+  <div class="dbody" style="max-height:70vh">
+    <div style="font-family:var(--serif);font-size:20px;margin-bottom:4px">Your services and prices</div>
+    <div class="mut" style="margin-bottom:12px">Used to fill proposals fast. Change these any time.</div>
+    <div id="svcRows"></div>
+    <div class="row2" style="margin-top:10px"><button type="button" class="btn ghost" id="svcAdd">＋ Add a service</button></div>
+    <div class="row2" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn ghost" id="svcCancel">Cancel</button><button type="button" class="btn" id="svcSave">Save</button></div>
+  </div>
+</dialog>
+
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -119,6 +129,10 @@ let TOKEN="",FILTER="",DEALS=[];
 // "not-emailed" doc always shows a persistent "copy the signing link" — never a
 // silently-unsent agreement again. Keyed by proposal/contract id.
 const LINKS={};
+// The studio's services catalog (name + price_cents), loaded per deal-open so the
+// proposal line-item dropdown can offer them + auto-fill the price. CURRENT_DEAL
+// lets "Manage services" refresh the open deal after a save.
+let SERVICES=[],CURRENT_DEAL=null;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
@@ -275,12 +289,36 @@ function miniForm(host, fields, onSubmit, opts){
   setTimeout(()=>{const first=f.querySelector('input,textarea'); if(first)first.focus();},20);
 }
 
+// ── Manage services: the studio's own catalog of sellable services + prices.
+// A calm editor (rows of name + price, add/remove, Save) writing the whole list
+// to /sales/services. Reused by the proposal dropdown to auto-fill line items. ──
+const svcRowHtml=(s)=>{s=s||{name:'',price:''};return `<div class="row2 svc-row" style="margin-top:6px"><input type="text" class="svc-name" maxlength="120" placeholder="Service name, e.g. Website design" value="${esc(s.name)}" style="flex:1;min-width:150px" aria-label="Service name"><input type="number" step="0.01" min="0" class="svc-price" placeholder="Price (USD)" value="${esc(s.price)}" style="max-width:140px" aria-label="Price in dollars"><button type="button" class="btn ghost svc-del" title="Remove this service" aria-label="Remove this service" style="padding:8px 11px">✕</button></div>`;};
+async function openManageServices(){
+  const host=$('svcRows'); host.innerHTML='<div class="mut">Loading…</div>'; $('svcDlg').showModal();
+  let list=[];
+  try{const r=await api('/sales/services');list=(r.data||[]).map(s=>({name:s.name,price:(s.price_cents/100)}));}catch(e){toast(nice(e),true);}
+  if(!list.length)list=[{name:'',price:''}]; // an empty starter row to type into
+  host.innerHTML=list.map(svcRowHtml).join('');
+  setTimeout(()=>{const f=host.querySelector('.svc-name');if(f)f.focus();},20);
+}
+$('svcRows').addEventListener('click',(e)=>{const del=e.target.closest('.svc-del');if(!del)return;del.closest('.svc-row').remove();if(!$('svcRows').querySelector('.svc-row'))$('svcRows').insertAdjacentHTML('beforeend',svcRowHtml());});
+$('svcAdd').onclick=()=>{$('svcRows').insertAdjacentHTML('beforeend',svcRowHtml());const names=$('svcRows').querySelectorAll('.svc-name');names[names.length-1].focus();};
+$('svcCancel').onclick=()=>$('svcDlg').close();
+$('svcSave').onclick=async()=>{
+  const services=[...$('svcRows').querySelectorAll('.svc-row')].map(r=>({name:r.querySelector('.svc-name').value.trim(),price_cents:Math.round(parseFloat(r.querySelector('.svc-price').value||'0')*100)})).filter(s=>s.name);
+  $('svcSave').disabled=true;
+  try{const r=await api('/sales/services','PUT',{services});SERVICES=(r.data||[]);toast('Services saved');$('svcDlg').close();if(CURRENT_DEAL)openDeal(CURRENT_DEAL);}
+  catch(e){toast(nice(e),true);}finally{$('svcSave').disabled=false;}
+};
+
 async function openDeal(id){
+  CURRENT_DEAL=id;
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
   const dlg=$('detail'); $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; dlg.showModal();
   bizName(); // warm the studio-name cache so the agreement starter fills instantly
   try{
-    const [{data},tplRes]=await Promise.all([api('/sales/deals/'+id),api('/sales/templates').catch(()=>({data:[]}))]);
+    const [{data},tplRes,svcRes]=await Promise.all([api('/sales/deals/'+id),api('/sales/templates').catch(()=>({data:[]})),api('/sales/services').catch(()=>({data:[]}))]);
+    SERVICES=(svcRes&&svcRes.data)||[];
     const d=data.deal, c=data.contact;
     const TPLS=(tplRes&&tplRes.data)||[]; const propTpls=TPLS.filter(t=>t.kind==='proposal'); const conTpls=TPLS.filter(t=>t.kind==='contract');
     // only VALID next stages (mirrors lib/sales_lifecycle.ts); 'won' is convert-only
@@ -322,9 +360,9 @@ async function openDeal(id){
     // Self-serve platform signups pick a plan at signup.html; never here.
     const whoName=esc(((c&&c.name)||d.title||'this client'));
     const convExplain=(c&&c.email
-      ? `This adds ${whoName} as your customer — it creates their account + workspace and emails ${esc(c.email)} a sign-in invitation. Nothing else needed.`
-      : `This adds ${whoName} as your customer — it creates their account + workspace. There’s no client email on this deal, so no sign-in invitation goes out; you can share access with them later.`)
-      +' It’s part of your service: you bill them as usual — they never subscribe to anything or pay for software.';
+      ? `This adds ${whoName} as your customer — it creates their client workspace and emails ${esc(c.email)} a link to set their password and sign in. Nothing else needed.`
+      : `This adds ${whoName} as your customer — it creates their client workspace. There’s no client email on this deal, so no sign-in invitation goes out; you can share access with them later.`)
+      +' It’s part of your service: you bill them for your work the usual way — they never subscribe to anything or pay for software.';
     $('detailInner').innerHTML=`
       <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(d.title||'Deal')}</div>
         <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}</div></div>
@@ -342,7 +380,7 @@ async function openDeal(id){
           <textarea id="ed-notes-${d.id}" data-dds-draft="1" rows="3" placeholder="Anything worth remembering about this deal…" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">${esc(d.notes||'')}</textarea>
           <div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ed-save">Save details</button></div>
         </div>
-        <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}</div><div id="propForm"></div></div>
+        <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
           ${(data.invoices||[]).map(v=>`<div class="row2"><span class="mut">${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))} — ${money(v.amount_cents)}</span><span>${v.status==='paid'?`<span style="color:var(--good,#33664b);font-weight:700">✓ Paid${v.paid_at?' '+new Date(v.paid_at).toLocaleDateString():''}</span>`:v.status==='void'?`<span class="mut">Voided</span>`:`<span style="color:var(--warn,#775d31);font-weight:600">Awaiting payment</span>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''}`}</span></div>`).join('')}
@@ -384,13 +422,39 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
+    const mng=$('mngServices'); if(mng) mng.onclick=openManageServices;
     // Multi-line proposal form — real projects have design + build + care, not one line.
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{
       const host=$('propForm');
+      // Each line starts as a DROPDOWN of the studio's services (auto-fills the
+      // price) plus a "Custom…" option that reveals the free name+price fields —
+      // today's behaviour. With no catalog yet, we fall back to the free fields
+      // and gently point to "Manage services".
+      const hasCat=SERVICES.length>0;
+      const optsHtml=SERVICES.map((s,i)=>`<option value="${i}">${esc(s.name)} — ${esc(money(s.price_cents)||'$0')}</option>`).join('');
       let ln=0; // per-deal, per-line draft keys — typed line items survive an accidental Esc
-      const rowHtml=()=>{ln++;return `<div class="row2 prop-line" style="margin-top:6px"><input type="text" class="pl-label" data-dds-draft="prop-${id}-label-${ln}" placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price" data-dds-draft="prop-${id}-price-${ln}" placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div>`;};
-      host.innerHTML=`<div style="margin-top:8px">${rowHtml()}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">Save draft</button><button type="button" class="btn" id="plSaveSend">Save & send →</button></div></div>`;
+      const rowHtml=()=>{ln++;
+        const pick=hasCat?`<select class="pl-pick" aria-label="Choose a service"><option value="">Pick a service…</option>${optsHtml}<option value="__custom__">Custom…</option></select>`:'';
+        const hide=hasCat?' style="display:none"':'';
+        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label" data-dds-draft="prop-${id}-label-${ln}" placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price" data-dds-draft="prop-${id}-price-${ln}" placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div></div>`;};
+      const hint=hasCat?'':`<div class="mut" style="margin-top:8px"><a href="#" id="plManageHint">Add your services</a> to pick them from a list here.</div>`;
+      host.innerHTML=`<div style="margin-top:8px">${hint}${rowHtml()}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">Save draft</button><button type="button" class="btn" id="plSaveSend">Save & send →</button></div></div>`;
+      const hintLink=$('plManageHint'); if(hintLink) hintLink.onclick=(e)=>{e.preventDefault();openManageServices();};
+      // A service pick fills that line's name+price (still editable); "Custom…"
+      // reveals the empty free fields; the placeholder option hides them again.
+      const wirePick=(sel)=>{ if(!sel) return; const row=sel.closest('.prop-line'); const box=row.querySelector('.pl-custom'); const lab=row.querySelector('.pl-label'); const pr=row.querySelector('.pl-price');
+        sel.onchange=()=>{ const v=sel.value;
+          if(v===''){ box.style.display='none'; lab.value=''; pr.value=''; }
+          else if(v==='__custom__'){ box.style.display=''; lab.value=''; pr.value=''; lab.focus(); }
+          else { const s=SERVICES[+v]; if(s){ lab.value=s.name; pr.value=(s.price_cents/100); box.style.display=''; } }
+        };
+      };
+      const wireRow=(row)=>wirePick(row&&row.querySelector('.pl-pick'));
       const restoreDrafts=()=>{if(window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
+      // A restored draft (or a seeded first line) means real text lives in a hidden
+      // field — reveal it and mark its dropdown "Custom…" so it isn't lost.
+      const revealFilled=()=>host.querySelectorAll('.prop-line').forEach(row=>{const lab=row.querySelector('.pl-label');const box=row.querySelector('.pl-custom');const sel=row.querySelector('.pl-pick');if(lab&&lab.value&&box){box.style.display='';if(sel)sel.value='__custom__';}});
+      host.querySelectorAll('.prop-line').forEach(wireRow);
       restoreDrafts();
       // Same idea as the agreement starter: a first proposal shouldn't open
       // blank. Only when the restored draft left the first line EMPTY — seed it
@@ -398,7 +462,8 @@ async function openDeal(id){
       // and the price field's own placeholder stands in for [price].
       const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price');
       if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100); }
-      $('plMore').onclick=()=>{$('plSave').closest('div').insertAdjacentHTML('beforebegin',rowHtml());restoreDrafts();};
+      revealFilled();
+      $('plMore').onclick=()=>{$('plSave').closest('div').insertAdjacentHTML('beforebegin',rowHtml());const rowsEls=host.querySelectorAll('.prop-line');wireRow(rowsEls[rowsEls.length-1]);restoreDrafts();};
       const clearPropDrafts=()=>{if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
       const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
       // Save draft ONLY writes the record; Save & send writes then immediately
@@ -472,13 +537,18 @@ async function openDeal(id){
     const sendDep=$('sendDeposit'); if(sendDep) sendDep.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Deposit amount (USD)',type:'number',step:'0.01',placeholder:'500'}],async(v)=>{if(!v.amount){toast('Enter a deposit amount.',true);return;}await sendMoney({purpose:'deposit',amount_cents:Math.round(parseFloat(v.amount)*100),title:'Deposit'});});
     const conv=$('convert'); if(conv) conv.onclick=()=>{
       // two-step confirm (no confirm() dialog). Service language, not SaaS: the
-      // labels say WHAT THEY GET; the values stay the same edition keys the
-      // convert route expects (CONVERT_PLANS in routes/sales.ts).
-      const wrap=$('convWrap'); wrap.innerHTML=`
-        <label for="convPlan">What they get</label>
-        <select id="convPlan"><option value="presence" selected>Full website + business tools (most projects)</option><option value="cms_only">Website only</option><option value="business_os_only">Business tools only (no website with you)</option><option value="presence_monitor">Monitoring only (a site you didn’t build)</option></select>
-        <div class="mut" style="margin-top:6px">You can change this later.</div>
+      // labels say WHAT KIND OF WORK this is; the values stay the same edition
+      // keys the convert route expects (CONVERT_PLANS in routes/sales.ts). Paying
+      // for software is SELF-SERVE at signup — never picked here.
+      const wrap=$('convWrap'); const signupLink=location.origin+'/pricing.html'; wrap.innerHTML=`
+        <label for="convPlan">What kind of work is this?</label>
+        <select id="convPlan"><option value="presence" selected>Their site will live on my platform (Studio OS)</option><option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option><option value="business_os_only">Just their client workspace / business tools — no site work</option><option value="presence_monitor">Just monitoring a site they already have</option></select>
+        <div class="mut" style="margin-top:6px">Adding them creates their client workspace and emails them a link to set their password and sign in. You bill them for your work the usual way — they never pay for software here. You can change this later.</div>
+        <div id="convSignup" class="mut" style="margin-top:10px;padding:10px;border:1px solid var(--line,#ddd);border-radius:8px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="convSignupLink" readonly value="${esc(signupLink)}" style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="convSignupCopy">Copy</button></div></div>
         <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, add them as my customer</button></div>`;
+      const syncSignup=()=>{const s=$('convSignup');if(s)s.style.display=($('convPlan').value==='presence')?'':'none';};
+      $('convPlan').onchange=syncSignup; syncSignup();
+      $('convSignupCopy').onclick=()=>{const el=$('convSignupLink');if(el&&el.value){copyToClip(el.value);toast('Sign-up link copied');}};
       $('convNo').onclick=()=>openDeal(id);
       $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
     };

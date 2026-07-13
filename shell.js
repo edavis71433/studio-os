@@ -57,7 +57,7 @@
     });
     return best ? best.key : null;
   }
-  function flatten(nav) { var o = []; (nav || []).forEach(function (s) { (s.items || []).forEach(function (i) { o.push({ label: i.label, href: i.href, section: s.label }); }); }); return o; }
+  function flatten(nav) { var o = []; (nav || []).forEach(function (s) { (s.items || []).forEach(function (i) { o.push({ label: i.label, href: i.href, section: s.label, desc: i.desc || "" }); }); }); return o; }
 
   // ── supabase (reuse the portal session) ──
   function ensureSupabase() {
@@ -243,7 +243,7 @@
   var fileSearchTok = 0;
   function paintResults(q) {
     var qq = String(q || '').trim().toLowerCase();
-    var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0; }) : DESTS;
+    var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0 || (d.desc && d.desc.toLowerCase().indexOf(qq) >= 0); }) : DESTS;
     var box = pal.querySelector('.results');
     var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" id="dds-res-' + i + '" role="option" aria-selected="' + (i === 0 ? 'true' : 'false') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
     box.innerHTML = navHtml || (qq ? '' : '');
@@ -329,7 +329,7 @@
     // Multi-item groups get a quiet header so a long menu stays scannable.
     UTILS.forEach(function (sec) {
       if (sec.items.length > 1) rows += '<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
-      sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + '</a>'; });
+      sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + (i.desc ? '<span class="sub">' + esc(i.desc) + '</span>' : '') + '</a>'; });
     });
     // Notifications toggle (Web Push) — reviewers don't get it (their world is
     // one calm page). Label reflects current permission/subscription state.

@@ -322,10 +322,10 @@ h5.rune .whisper.ok{color:var(--sage)}
 .designwrap{display:flex;gap:30px;align-items:flex-start}
 #designHost{flex:1;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:0 28px;align-items:start}
 #designHost .field{min-width:0;max-width:none;margin-bottom:26px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
-/* the whole-site restylers (Complete looks + the studio's fine controls) lead, full-width;
-   the template switcher and brand kit follow; content blocks span the row at the end */
+/* "Templates & style" (the template switcher) leads full-width, then the Design
+   studio (Complete looks + fine controls) and brand kit; sections span at the end */
+#designHost #lookCard{grid-column:1/-1;order:-4}
 #designHost #designCard{grid-column:1/-1;order:-3}
-#designHost #lookCard{order:-2}
 #designHost #brandKitCard{order:-1}
 #designHost #blocksCard{grid-column:1/-1}
 #designPreviewWrap{flex:0 0 400px;min-width:280px;position:sticky;top:14px}
@@ -3269,6 +3269,38 @@ const BLOCK_DEFS = [
     fmt: (o) => { const a = [o.name || "", o.date || "", o.time || "", o.detail || "", o.url || ""]; while (a.length > 2 && !a[a.length - 1]) a.pop(); return a.join(" | "); } },
   { type: "map", name: "Map & directions", mapSimple: true, hint: "" },
 ];
+// ── FD-T-LIB: the "Add a section" library — purpose-grouped, with familiar-name
+//    aliases so owners recognize sections by the words they already know (carousel,
+//    accordion, icon grid…). These reference BLOCK_DEFS *types* only — no type is
+//    renamed. Every addable def appears under exactly one header below. ──
+const SECTION_GROUPS = [
+  { label: "Show your work", note: "Photos, video and the people behind the work.",
+    types: ["gallery", "before_after", "video", "team", "partners"] },
+  { label: "Build trust", note: "Proof that turns visitors into customers.",
+    types: ["features", "stats", "reviews", "certifications", "pricing", "process"] },
+  { label: "Get customers to act", note: "Clear next steps — book, sign up, or find you.",
+    types: ["cta", "appointment", "newsletter", "map"] },
+  { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
+    types: ["service_areas", "events", "social"] },
+];
+// A muted secondary label shown only where the common word differs from ours —
+// display-only; the stored block.type never changes.
+const SECTION_ALIAS = {
+  gallery: "carousel / grid", before_after: "before/after slider", video: "embed",
+  team: "staff / about us", partners: "logo cloud / clients",
+  features: "highlights / icon grid", stats: "counters / metrics", reviews: "star rating",
+  certifications: "badges / accreditations", pricing: "plans / tiers", process: "steps / timeline",
+  cta: "banner", appointment: "book / schedule", newsletter: "email sign-up", map: "location map",
+  service_areas: "service area", events: "calendar", social: "social icons",
+};
+// The CORE sections aren't blocks — they're edited in their own tabs. We surface
+// them read-only so an owner hunting for "hero / FAQ" sees they already have them.
+// Each chip routes via go() to the view that edits it.
+const CORE_SECTIONS = [
+  ["Hero", "business"], ["About", "business"], ["Services / Menu", "offerings"],
+  ["Testimonials", "testimonials"], ["FAQ", "faqs"], ["Updates", "updates"],
+  ["Hours", "business"], ["Location", "business"], ["Contact", "business"],
+];
 function mediaThumb(id) {
   const m = (S.media || []).find((x) => x.id === id);
   const wrap = el("span"); wrap.style.cssText = "display:inline-block;width:52px;height:52px;border-radius:8px;overflow:hidden;background:var(--wash,#eee);vertical-align:middle";
@@ -3276,6 +3308,7 @@ function mediaThumb(id) {
   return wrap;
 }
 let BLOCKS_WORK = null;
+let BLOCK_FOCUS = null;      // FD-T-LIB: index of a just-added block to scroll to + focus
 let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
 let CL_ITEMS = null;        // CL-1: saved content-library items (null = not loaded)
 let CL_SHOW = false;
@@ -3324,7 +3357,7 @@ async function saveBlocks() {
     S.settings = r.data || { ...S.settings, blocks: BLOCKS_WORK };
     BLOCKS_WORK = currentBlocks();
     renderBlocksCard();
-    toast("Content blocks saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
+    toast("Sections saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(nice(err), true); }
 }
 function mountBlocksCard() {
@@ -3338,13 +3371,14 @@ function mountBlocksCard() {
 }
 function renderBlocksCard() {
   const card = $("blocksCard"); if (!card) return; card.textContent = "";
+  const focusIdx = BLOCK_FOCUS; BLOCK_FOCUS = null;   // FD-T-LIB: consume the one-shot focus target
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const miniBtn = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  card.appendChild(el("label", null, "Content blocks"));
-  card.appendChild(el("div", "hint", "Add ready-made sections to your home page and fill them in — no design needed. Reorder or hide them under “Your home page”. Publish to apply."));
+  card.appendChild(el("label", null, "Your sections"));
+  card.appendChild(el("div", "hint", "Ready-made sections for your home page — add one, fill it in, done. No design needed. Reorder or hide them under “Your home page”. Publish to apply."));
   BLOCKS_WORK.forEach((blk, idx) => {
     const def = BLOCK_DEFS.find((d) => d.type === blk.type); if (!def) return;
-    const sub = el("div"); sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
+    const sub = el("div"); sub.id = "blkSub-" + idx; sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
     const nm = el("div", null, def.name + (blk.mediaNote ? "  ·  " + blk.mediaNote : "")); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
     const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
@@ -3426,65 +3460,125 @@ function renderBlocksCard() {
       sub.appendChild(el("div", "hint", def.hint));
     }
     card.appendChild(sub);
+    // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
+    // never "added but invisible" below the fold.
+    if (idx === focusIdx) setTimeout(() => { try { sub.scrollIntoView({ behavior: "smooth", block: "center" }); ti.focus(); } catch (_) {} }, 40);
   });
   const present = new Set(BLOCKS_WORK.map((b) => b.type));
   const addable = BLOCK_DEFS.filter((d) => !present.has(d.type));
-  if (addable.length) {
-    const addWrap = el("div"); addWrap.style.cssText = "margin-top:12px;display:flex;gap:7px;flex-wrap:wrap;align-items:center";
-    addWrap.appendChild(Object.assign(el("span", null, "Add a block:"), { style: "font-size:12px;font-weight:600" }));
-    addable.forEach((d) => {
-      const b = el("button", null, "+ " + d.name); b.type = "button";
-      b.style.cssText = "font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;border:2px solid var(--line,#ddd);background:transparent;cursor:pointer";
-      b.addEventListener("click", () => { BLOCKS_WORK.push(emptyBlock(d)); renderBlocksCard(); });
-      addWrap.appendChild(b);
-    });
-    card.appendChild(addWrap);
-  }
-  if (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.blocks)) {
-    const here = new Set(BLOCKS_WORK.map((b) => b.type));
-    const missing = BLOCK_SUGGEST.blocks.filter((t) => !here.has(t) && BLOCK_DEFS.some((d) => d.type === t));
-    if (missing.length) {
-      const sug = el("div"); sug.style.cssText = "margin-top:12px;padding:10px 12px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:10px";
-      const hd = el("div", null, "✨ Suggested for your business"); hd.style.cssText = "font-weight:600;font-size:12.5px"; sug.appendChild(hd);
-      if (BLOCK_SUGGEST.note) { const nt = el("div", "hint", BLOCK_SUGGEST.note); nt.style.margin = "2px 0 8px"; sug.appendChild(nt); }
-      sug.appendChild(el("div", "hint", missing.map((t) => (BLOCK_DEFS.find((d) => d.type === t) || {}).name).filter(Boolean).join(", ")));
-      const addb = el("button", null, "Add these sections"); addb.type = "button";
-      addb.style.cssText = "font:inherit;font-size:12px;margin-top:8px;padding:6px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
-      addb.addEventListener("click", () => { missing.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) BLOCKS_WORK.push(emptyBlock(d)); }); renderBlocksCard(); });
-      sug.appendChild(addb);
-      card.appendChild(sug);
-    }
-  }
-  // CL-1: reuse saved sections from the content library (same block model + editor)
+  // ── FD-T-LIB: "Already on your site" — your CORE sections live in their own tabs.
+  //    Chips route there so an owner isn't hunting for a "hero / FAQ" to add when
+  //    they already have one. Read-only; reuses go().
   {
-    const libRow = el("div"); libRow.style.cssText = "margin-top:12px";
-    const libBtn = el("button", null, CL_SHOW ? "Hide content library" : "Insert from content library"); libBtn.type = "button";
-    libBtn.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-    libBtn.addEventListener("click", async () => { CL_SHOW = !CL_SHOW; if (CL_SHOW && CL_ITEMS === null) { try { CL_ITEMS = (await api("GET", "/content-library")).data || []; } catch (_) { CL_ITEMS = []; } } renderBlocksCard(); });
-    libRow.appendChild(libBtn);
-    if (CL_SHOW) {
-      const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
-      if (!(CL_ITEMS && CL_ITEMS.length)) list.appendChild(el("div", "hint", "Your content library is empty. Use “Save” on any section to reuse it later — here, in a launch, or after a rebuild."));
-      else CL_ITEMS.forEach((it) => {
-        const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
-        row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;font-size:12.5px" }));
-        row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
-        const ins = el("button", null, "Insert"); ins.type = "button"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
-        ins.addEventListener("click", () => clInsert(it.block));
-        const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-        del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); } });
-        row.append(ins, del); list.appendChild(row);
-      });
-      libRow.appendChild(list);
+    const core = el("div"); core.style.cssText = "margin-top:18px;padding:12px 14px;border:1px solid var(--line,#e5e5e5);border-radius:12px;background:var(--wash,#faf9fb)";
+    core.appendChild(Object.assign(el("div", null, "Already on your site"), { style: "font-weight:600;font-size:12.5px" }));
+    core.appendChild(el("div", "hint", "These main sections are edited in their own tabs — tap one to jump there. That's why they aren't in the “Add a section” list below."));
+    const chips = el("div"); chips.style.cssText = "margin-top:8px;display:flex;gap:7px;flex-wrap:wrap";
+    CORE_SECTIONS.forEach(([label, view]) => {
+      const c = el("button", null, label); c.type = "button"; c.title = "Edit your " + label + " section";
+      c.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:inherit;cursor:pointer";
+      c.addEventListener("click", () => go(view));
+      chips.appendChild(c);
+    });
+    core.appendChild(chips);
+    card.appendChild(core);
+  }
+  // ── FD-T-LIB: one prominent, purpose-grouped "Add a section" library. Reuses
+  //    BLOCK_DEFS + emptyBlock; each addable def appears once, under a familiar
+  //    header, with a muted alias for recognition. The server suggestion folds in
+  //    as a highlighted first "Recommended for you" group. Added → scroll + focus.
+  if (addable.length) {
+    const lib = el("div"); lib.style.cssText = "margin-top:18px";
+    lib.appendChild(el("label", null, "Add a section"));
+    lib.appendChild(el("div", "hint", "Pick a ready-made section for your home page, then fill it in — no design needed. Familiar names are shown underneath."));
+    const groupGrid = () => { const g = el("div"); g.style.cssText = "margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px"; return g; };
+    const addBtn = (d) => {
+      const b = el("button"); b.type = "button";
+      b.style.cssText = "text-align:left;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0";
+      b.appendChild(Object.assign(el("div", null, "+ " + d.name), { style: "font-weight:600;font-size:12.5px" }));
+      if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:11px;color:var(--soft,#888)" }));
+      b.addEventListener("click", () => { BLOCKS_WORK.push(emptyBlock(d)); BLOCK_FOCUS = BLOCKS_WORK.length - 1; renderBlocksCard(); });
+      return b;
+    };
+    // Recommended for you — the server suggestion, folded in as the lead group.
+    let recTypes = [];
+    if (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.blocks)) {
+      recTypes = BLOCK_SUGGEST.blocks.filter((t) => !present.has(t) && BLOCK_DEFS.some((d) => d.type === t));
+    }
+    const recSet = new Set(recTypes);
+    if (recTypes.length) {
+      const wrap = el("div"); wrap.style.cssText = "margin-top:12px;padding:12px 14px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:12px";
+      wrap.appendChild(Object.assign(el("div", null, "✨ Recommended for you"), { style: "font-weight:600;font-size:12.5px;color:#3a2470" }));
+      wrap.appendChild(el("div", "hint", BLOCK_SUGGEST.note || "A good fit for your kind of business."));
+      const grid = groupGrid();
+      recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) grid.appendChild(addBtn(d)); });
+      wrap.appendChild(grid);
+      if (recTypes.length > 1) {
+        const all = el("button", null, "Add all recommended"); all.type = "button";
+        all.style.cssText = "font:inherit;font-size:12px;margin-top:10px;padding:6px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
+        all.addEventListener("click", () => { let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) BLOCK_FOCUS = firstAt; renderBlocksCard(); });
+        wrap.appendChild(all);
+      }
+      lib.appendChild(wrap);
+    }
+    // Purpose groups — every remaining addable def under exactly one familiar header.
+    SECTION_GROUPS.forEach((grp) => {
+      const defs = grp.types.map((t) => addable.find((d) => d.type === t)).filter((d) => d && !recSet.has(d.type));
+      if (!defs.length) return;
+      const wrap = el("div"); wrap.style.cssText = "margin-top:14px";
+      wrap.appendChild(Object.assign(el("div", null, grp.label), { style: "font-weight:600;font-size:12.5px" }));
+      wrap.appendChild(el("div", "hint", grp.note));
+      const grid = groupGrid();
+      defs.forEach((d) => grid.appendChild(addBtn(d)));
+      wrap.appendChild(grid);
+      lib.appendChild(wrap);
+    });
+    card.appendChild(lib);
+  }
+  // ── CL-1: Saved sections — reuse a section you crafted, later. Same block model
+  //    + editor (save/insert/delete unchanged). Empty = a quiet secondary note, not
+  //    an open panel that reads as broken.
+  {
+    const libRow = el("div"); libRow.style.cssText = "margin-top:18px;padding-top:14px;border-top:1px solid var(--line,#eee)";
+    if (CL_ITEMS === null) {
+      const link = el("button", null, "Saved sections — reuse later"); link.type = "button";
+      link.style.cssText = "font:inherit;font-size:12.5px;font-weight:600;padding:0;border:none;background:none;color:inherit;cursor:pointer";
+      const hint = el("span", "hint", "  — show"); hint.style.fontWeight = "400"; link.appendChild(hint);
+      link.addEventListener("click", async () => { CL_SHOW = true; try { CL_ITEMS = (await api("GET", "/content-library")).data || []; } catch (_) { CL_ITEMS = []; } renderBlocksCard(); });
+      libRow.appendChild(link);
+    } else if (!CL_ITEMS.length) {
+      libRow.appendChild(Object.assign(el("div", null, "Saved sections — reuse later"), { style: "font-weight:600;font-size:12.5px" }));
+      libRow.appendChild(el("div", "hint", "No saved sections yet. Use “Save” on any section above to keep a copy you can reuse here — in a launch, or after a rebuild."));
+    } else {
+      const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px";
+      head.appendChild(Object.assign(el("div", null, "Saved sections — reuse later"), { style: "flex:1;font-weight:600;font-size:12.5px" }));
+      const tog = el("button", null, CL_SHOW ? "Hide" : "Show (" + CL_ITEMS.length + ")"); tog.type = "button";
+      tog.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+      tog.addEventListener("click", () => { CL_SHOW = !CL_SHOW; renderBlocksCard(); });
+      head.append(tog); libRow.appendChild(head);
+      if (CL_SHOW) {
+        const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
+        CL_ITEMS.forEach((it) => {
+          const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
+          row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;font-size:12.5px" }));
+          row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
+          const ins = el("button", null, "Insert"); ins.type = "button"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+          ins.addEventListener("click", () => clInsert(it.block));
+          const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+          del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); } });
+          row.append(ins, del); list.appendChild(row);
+        });
+        libRow.appendChild(list);
+      }
     }
     card.appendChild(libRow);
   }
   const saveRow = el("div"); saveRow.style.cssText = "margin-top:14px;display:flex;gap:10px;align-items:center";
-  const save = el("button", null, "Save content blocks"); save.type = "button";
+  const save = el("button", null, "Save sections"); save.type = "button";
   save.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
   save.addEventListener("click", saveBlocks);
   saveRow.appendChild(save);
-  saveRow.appendChild(el("span", "hint", "Empty blocks won’t appear on your site."));
+  saveRow.appendChild(el("span", "hint", "Empty sections won’t appear on your site."));
   card.appendChild(saveRow);
 }
 // FD-T17 media block editors — pick photos from your library (openPicker → media id).
@@ -3615,10 +3709,10 @@ async function mountLookCard() {
   try { looks = (await api("GET", "/site/templates")).data; } catch (_) { return; }
   if (!looks || (looks.templates || []).length < 2) return;
   const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Your site's look"));
+  card.appendChild(el("label", null, "Templates & style"));
   const cur = looks.templates.find((t) => t.slug === looks.current.slug);
-  card.appendChild(el("div", "hint", "You're dressed as “" + ((cur && cur.name) || looks.current.slug) + "”. Try another look safely — preview it with your real content before deciding."));
-  const b = el("button", null, "Try another look in the proof →");
+  card.appendChild(el("div", "hint", "Your template sets your whole layout; complete looks, colors and type are in the Design studio just below. You're on the “" + ((cur && cur.name) || looks.current.slug) + "” template — try another safely and preview it with your real content before deciding."));
+  const b = el("button", null, "Try another template in the proof →");
   b.type = "button";
   b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   b.addEventListener("click", () => openPreview("draft"));

@@ -27,6 +27,7 @@ import type { PlanKey, Term } from '../commerce/catalog.ts';
 import { supportFor } from '../commerce/support.ts';
 import { validEmail, passwordProblem, findClientByEmail, createAuthUser, deleteAuthUser, createContactAndClient, sendEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
+import { bridgeCustomerToStudio, CONNECT_INTENT_TAG } from './sales.ts';
 import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
 import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPortal } from '../commerce/stripe.ts';
@@ -63,6 +64,30 @@ function handlePlans(cors: Record<string, string>) {
   // training/maintenance) so software and service packages can never drift apart.
   const plans = planPayload(grantFounder()).map((p: any) => ({ ...p, support: supportFor(p.key) }));
   return json({ data: { founders_open: FOUNDERS_OPEN, trial_days: TRIAL_DAYS, plans } }, 200, cors);
+}
+
+// ── Auto-connect: a studio pre-listed this email to connect on signup ────────
+// When a studio records an email via contacts.html → "they'll sign up themselves"
+// (mode='connect'), it leaves a tagged, site-scoped presence_contacts row. The
+// site IS the studio, and presence_contacts.site_id is exactly the agency_site_id
+// the frozen bridge keys on. On a successful self-serve signup we look that record
+// up and bridge the brand-new customer to that studio — reusing the SAME
+// bridgeCustomerToStudio → ensureBridge path convert/add-customer use (never a
+// parallel bridge). Idempotent + best-effort: it must NEVER block or fail signup.
+// Only the explicit connect-intent tag triggers it (a coincidental CRM lead won't).
+// Logs are email-masked.
+async function autoConnectPreListedStudio(clientId: string, customerSiteId: string | null, email: string, businessName: string): Promise<void> {
+  try {
+    const needle = CONNECT_INTENT_TAG.replace(/[^a-z-]/gi, '');   // 'connect-on-signup' — the searchable inner tag (single source of truth)
+    const pending = (await svc(`presence_contacts?email=eq.${encodeURIComponent(email)}&notes=ilike.*${needle}*&deleted_at=is.null&select=site_id&order=updated_at.desc&limit=1`)).json?.[0];
+    const agencySiteId = pending?.site_id ? String(pending.site_id) : '';
+    if (!agencySiteId) return;   // no studio pre-listed this email → nothing to connect
+    const r = await bridgeCustomerToStudio({ agencySiteId, clientId, customerSiteId, label: businessName });
+    const { maskEmail } = await import('./email_infra.ts');
+    console.log(`[signup] auto-connect ${maskEmail(email)} → studio site=${agencySiteId}: ${r.bridged ? 'bridged' : (r.ownedElsewhere ? 'skipped(owned-elsewhere)' : 'noop')}`);
+  } catch (e) {
+    try { const { maskEmail } = await import('./email_infra.ts'); console.warn(`[signup] auto-connect skipped for ${maskEmail(email)}: ${String((e as Error)?.message || e)}`); } catch { /* logging is best-effort too */ }
+  }
 }
 
 // ── PUBLIC: signup ──────────────────────────────────────────────────────────
@@ -148,6 +173,8 @@ async function handleSignup(req: Request, cors: Record<string, string>) {
       return json({ error: 'provision_incomplete', message: msg, account_created: true }, 502, cors);
     }
     if (signupId) await svc(`presence_signups?id=eq.${signupId}`, { method: 'PATCH', body: JSON.stringify({ status: 'provisioned', site_id: prov.siteId }) });
+    // If a studio pre-listed this email (connect-by-email), connect them now.
+    await autoConnectPreListedStudio(chain.clientId, prov.siteId || null, email, businessName);
     return json({ data: { mode: 'trial', message: 'Your workspace is ready.', redirect: `${siteUrl()}/presence.html`, site_id: prov.siteId, trial_days: TRIAL_DAYS } }, 201, cors);
   }
 
@@ -164,6 +191,9 @@ async function handleSignup(req: Request, cors: Record<string, string>) {
       email, clientId: chain.clientId, plan: plan.key, term, founder, signupId: signupId || 'nosignup',
     });
     if (signupId) await svc(`presence_signups?id=eq.${signupId}`, { method: 'PATCH', body: JSON.stringify({ status: 'checkout_pending', stripe_session_id: co.id }) });
+    // If a studio pre-listed this email (connect-by-email), form the connection now
+    // (the customer's workspace provisions on the webhook; the bridge is idempotent).
+    await autoConnectPreListedStudio(chain.clientId, null, email, businessName);
     return json({ data: { mode: 'checkout', url: co.url } }, 200, cors);
   } catch (e) {
     return json({ error: 'checkout_failed', message: 'We couldn’t start checkout. Please try again.', detail: String((e as Error).message || e) }, 502, cors);

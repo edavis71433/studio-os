@@ -169,6 +169,30 @@ let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+// Small styled confirm — replaces native confirm(), matching the app's surfaces
+// (same pattern as connections.html / visual-studio.html). Resolves true/false.
+function askConfirm(title, body, okLabel){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div'); box.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
+      b.style.cssText=primary
+        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
+        :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b; };
+    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
+    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    cancel.addEventListener('click',()=>finish(false));
+    ok.addEventListener('click',()=>finish(true));
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
+    dlg.showModal(); setTimeout(()=>ok.focus(),20);
+  });
+}
 function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
 
 async function loadContext(){
@@ -386,17 +410,17 @@ async function setAssetStatus(id,action){
 }
 async function duplicate(id){const r=await api('POST','/assets/'+id+'/duplicate');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
 async function download(id){const r=await api('GET','/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('Could not prepare download');}
-async function rollback(id){if(!confirm('Restore the previous version? This puts the earlier file back everywhere it was used.'))return;const r=await api('POST','/assets/'+id+'/rollback');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
+async function rollback(id){if(!(await askConfirm('Restore the previous version?','This puts the earlier file back everywhere it was used.','Restore')))return;const r=await api('POST','/assets/'+id+'/rollback');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 async function decideFile(id,action){
-  if(action==='reject'&&!confirm('Ask for changes? This keeps the current version live and sets the proposed replacement aside.'))return;
+  if(action==='reject'&&!(await askConfirm('Ask for changes?','This keeps the current version live and sets the proposed replacement aside.','Ask for changes')))return;
   const r=await api('POST','/assets/'+id+'/status',{action});
   if(r.ok){toast(action==='approve'?('Approved'+(r.body.data&&r.body.data.requires_publish?' — publish to go live':'')):'Sent back for changes');closeDetail();load();}
   else toast((r.body&&r.body.message)||'Could not do that');
 }
 async function del(id,inUse){
   if(inUse){toast('This file is in use — remove it from the page or archive it first.');return;}
-  if(!confirm('Delete this file permanently? This cannot be undone.'))return;
+  if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
   const r=await api('DELETE','/assets/'+id);
   if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');
 }
@@ -426,7 +450,8 @@ $('picker').onchange=(e)=>{const f=[...e.target.files];e.target.value='';if(f.le
 $('replacer').onchange=async(e)=>{
   const file=e.target.files[0];e.target.value='';if(!file||!S.current)return;
   const old=S.current.asset;
-  if(!confirm(`Replace “${old.name}” with ${file.name}?`+((S.current.usage&&S.current.usage.length)?` This updates it in ${S.current.usage.length} place(s) on your site.`:'')))return;
+  const _extra=(S.current.usage&&S.current.usage.length)?` This updates it in ${S.current.usage.length} place(s) on your site.`:'';
+  if(!(await askConfirm('Replace this file?',`Replace “${old.name}” with ${file.name}.`+_extra,'Replace')))return;
   const isDoc=file.type==='application/pdf';const dims=await dimsOf(file);
   const alt=isDoc?old.name:(old.alt_text||old.name);
   const up=await api('POST','/media/upload-url',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height});

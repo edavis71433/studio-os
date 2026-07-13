@@ -30,6 +30,16 @@ const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'pres
 const pickPlan = (p: unknown): PlanKey => (typeof p === 'string' && CONVERT_PLANS.has(p) ? p : 'presence') as PlanKey;
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
 const nowIso = () => new Date().toISOString();
+// The studio's services catalog lives as ONE reserved template row (kind=proposal,
+// this sentinel name) so it reuses the existing site-scoped, deny-all, function-
+// mediated sales-templates store with NO new migration. Hidden from the template list.
+const SERVICES_CATALOG_NAME = '__services_catalog__';
+// A machine marker on a presence_contacts row (site-scoped) that says "this studio
+// wants THIS email as a customer — auto-connect them the moment they self-serve
+// sign up". The studio IS its presence site, and presence_contacts.site_id is
+// exactly the agency_site_id the frozen bridge (ensureBridge) keys on — so this
+// needs NO new table. commerce/handleSignup reads this same tag on signup.
+export const CONNECT_INTENT_TAG = '[[connect-on-signup]]';
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const actorOf = (p: Principal) => ({ actor: p.email || p.userId || 'system', actor_kind: p.kind });
 const siteUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
@@ -235,7 +245,8 @@ async function loadTemplate(siteId: string, id: string, kind: 'proposal' | 'cont
 }
 export async function handleSalesTemplates(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
-    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
+    // the reserved services-catalog row is NOT a reusable template — keep it out of the list
+    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
     return r.ok ? json({ data: rows(r) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
   }
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -266,6 +277,46 @@ export async function handleSalesTemplateDelete(site: SiteRow, id: string, cors:
   const up = await svc(`presence_sales_templates?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
   return rows(up)[0] ? json({ data: { ok: true } }, 200, cors) : json({ error: 'not_found' }, 404, cors);
 }
+// ═══ STUDIO SERVICES CATALOG ═════════════════════════════════════════════════
+// The studio's own sellable services (name + price) — the palette a proposal line
+// item is picked from. Stored as ONE reserved template row (kind=proposal, the
+// SERVICES_CATALOG_NAME sentinel) so it reuses the existing site-scoped, deny-all,
+// function-mediated sales-templates store — NO new migration. Services are kept in
+// the same LineItem shape the store already holds ({ label, qty, unit_cents });
+// the API speaks { name, price_cents } to the UI. Site-scoped like every /sales/*.
+async function loadServicesCatalog(siteId: string): Promise<Array<{ name: string; price_cents: number }>> {
+  const row = rows(await svc(`presence_sales_templates?site_id=eq.${siteId}&kind=eq.proposal&name=eq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&deleted_at=is.null&select=id,line_items&limit=1`))[0];
+  const items = row && Array.isArray(row.line_items) ? row.line_items : [];
+  return items
+    .map((i: any) => ({ name: String(i?.label || ''), price_cents: Math.max(0, Math.trunc(Number(i?.unit_cents)) || 0) }))
+    .filter((s: any) => s.name);
+}
+export async function handleSalesServices(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method === 'GET') return json({ data: await loadServicesCatalog(site.id) }, 200, cors);
+  if (req.method === 'PUT') {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    if (!Array.isArray(b.services)) return json({ error: 'validation', message: 'Send your services as a list.' }, 422, cors);
+    if (b.services.length > 40) return json({ error: 'validation', message: 'You can keep up to 40 services here.' }, 422, cors);
+    // clean + bound each; drop blank-name rows (an empty row left behind in the editor)
+    const items: Array<{ label: string; qty: number; unit_cents: number }> = [];
+    for (const s of b.services) {
+      const name = clean(s?.name, 120);                                            // ≤120, control-char stripped (same as line items)
+      if (!name) continue;
+      const price = Math.min(1_000_000_00, Math.max(0, Math.trunc(Number((s as any)?.price_cents)) || 0)); // 0–$1,000,000
+      items.push({ label: name, qty: 1, unit_cents: price });
+    }
+    // upsert the ONE reserved row (find-or-create). A single studio operator edits
+    // their own catalog — no concurrent-writer race to design around.
+    const existing = rows(await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.proposal&name=eq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&deleted_at=is.null&select=id&limit=1`))[0];
+    const wrote = existing
+      ? rows(await svc(`presence_sales_templates?id=eq.${existing.id}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ line_items: items, updated_at: nowIso() }) }))[0]
+      : rows(await svc('presence_sales_templates', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, kind: 'proposal', name: SERVICES_CATALOG_NAME, title: '', line_items: items, created_by: principal.email || principal.userId || 'system' }) }))[0];
+    if (!wrote) return json({ error: 'write_failed', message: 'Your services didn’t save — please try again.' }, 502, cors);
+    return json({ data: items.map((i) => ({ name: i.label, price_cents: i.unit_cents })) }, 200, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
 /** Fill {{client_name}} / {{deal_title}} from the deal. */
 async function fillPlaceholders(siteId: string, deal: any, text: string): Promise<string> {
   let clientName = '';
@@ -792,7 +843,7 @@ async function sendCustomerInvite(email: string, isNewLogin: boolean): Promise<b
   if (isNewLogin) {
     const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html?next=/get-started.html`);
     sendEmail(email, 'Welcome to Studio OS — set up your login',
-      `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password</a> to sign in — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
+      `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password and sign in</a> — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
     undefined, { critical: true }).catch(() => {});   // login access = transactional
     return !!link;
   }
@@ -802,13 +853,62 @@ async function sendCustomerInvite(email: string, isNewLogin: boolean): Promise<b
   return true;
 }
 
+/** Form the Agency–Client Bridge for a customer that has NO originating deal (a
+ *  direct add, a connect-by-email, or a self-serve signup a studio pre-listed).
+ *  Reuses the ONE frozen bridge path (ensureBridge + presence_customer_agency =
+ *  one primary agency per customer) — never a parallel bridge. Idempotent: reuses
+ *  an existing link for this customer under this studio instead of minting a second
+ *  empty project. Returns which happened (bridged / already owned elsewhere). */
+export async function bridgeCustomerToStudio(opts: {
+  agencySiteId: string; clientId: string; customerSiteId: string | null; label: string;
+}): Promise<{ bridged: boolean; projectId: string | null; ownedElsewhere: boolean }> {
+  const { agencySiteId, clientId, customerSiteId, label } = opts;
+  const links = await linksForCustomer(clientId);
+  const mine = links.find((l) => l.agency_site_id === agencySiteId);
+  if (mine) return { bridged: true, projectId: mine.project_id, ownedElsewhere: false };   // reuse — no duplicate project
+  if (links.length) return { bridged: false, projectId: null, ownedElsewhere: true };       // linked to a DIFFERENT agency already
+  const ins = await svc('presence_projects', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: agencySiteId, client_id: clientId, name: String(label || 'New project').slice(0, 200), description: '', status: 'active', client_visible: true }) });
+  const project = rows(ins)[0];
+  if (!project) return { bridged: false, projectId: null, ownedElsewhere: false };
+  const bridged = await ensureBridge(agencySiteId, project.id, clientId, customerSiteId, null);
+  if (!bridged) { await svc(`presence_projects?id=eq.${project.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {}); return { bridged: false, projectId: null, ownedElsewhere: true }; } // customer belongs to another agency — drop our orphan
+  return { bridged: true, projectId: project.id, ownedElsewhere: false };
+}
+
+/** Find-or-create the site-scoped CRM contact for (site, email) — the record that
+ *  lets a later self-serve signup find THIS studio. `mark` stamps the connect-intent
+ *  tag (so signup only auto-connects emails the studio explicitly pre-listed, never
+ *  a coincidental CRM lead); it's appended, never clobbering the operator's notes.
+ *  Reuses the presence_contacts store's (site,email) uniqueness — no new table. */
+async function ensureConnectContact(siteId: string, email: string, name: string, mark: boolean) {
+  const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
+  if (existing) {
+    if (mark && !String(existing.notes || '').includes(CONNECT_INTENT_TAG)) {
+      const notes = (String(existing.notes || '').trim() ? existing.notes.trim() + ' ' : '') + CONNECT_INTENT_TAG;
+      await svc(`presence_contacts?id=eq.${existing.id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ notes: clean(notes, 2000) }) }).catch(() => {});
+    }
+    return existing;
+  }
+  const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: siteId, name: name || '', email, notes: mark ? CONNECT_INTENT_TAG : '' }) });
+  return rows(ins)[0] || null;
+}
+
 // ═══ ADD A CUSTOMER (direct — no sales ceremony) ═════════════════════════════
-// The owner already has customers (people he's served for years). This sets one
-// up + invites them WITHOUT the deal→sign→convert theater: reuse the SAME
-// provisioning internals (account + workspace + service-role entitlement + agency
-// bridge + invite). A SERVICE customer — active access, no Stripe subscription
-// (billing stays the studio's own invoicing, P2-E). Idempotent: an email that
-// already has a workspace returns a friendly "already set up", never a duplicate.
+// The owner already has customers (people he's served for years). TWO paths, his
+// choice (owner's words: "there should be two options"):
+//   A) mode='provision' (default) — set them up NOW: reuse the SAME provisioning
+//      internals (account + workspace + service-role entitlement + agency bridge +
+//      set-password invite). Idempotent: an email that already has a workspace
+//      returns a friendly "already set up", never a duplicate.
+//   B) mode='connect' — they'll sign up themselves; the owner just RECORDS the
+//      email. If an account already exists → bridge it to this studio NOW. If not →
+//      record the intent on a site-scoped contact so commerce/handleSignup
+//      auto-connects them the moment that email self-serve-signs-up. NEVER
+//      provisions a workspace, mints a login, or sends a set-password email.
+// A SERVICE customer either way — active access, no Stripe subscription (billing
+// stays the studio's own invoicing, P2-E).
 export async function handleSalesAddCustomer(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -817,6 +917,33 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   const businessNameIn = clean(b.business_name, 120);
   if (!email || !validEmail(email)) return json({ error: 'validation', message: 'Enter the customer’s email — that’s where their sign-in invitation goes.' }, 422, cors);
   const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
+  const mode = b.mode === 'connect' ? 'connect' : 'provision';
+  const portalUrl = `${siteUrl()}/portal.html`;
+
+  // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────
+  if (mode === 'connect') {
+    const existing = await findClientByEmail(email);
+    if (existing) {
+      // They already have an account → connect (bridge) it to this studio now.
+      const clientId = existing.id;
+      const customerSite = rows(await svc(`presence_sites?client_id=eq.${clientId}&select=id&limit=1`))[0];
+      const managed = await linkAgencyPortfolio(principal, customerSite?.id, email);
+      await ensureConnectContact(site.id, email, name, false);   // record them in the CRM (no marker — already connected)
+      let projectId: string | null = null, bridged = false, ownedElsewhere = false;
+      if (clientId !== site.client_id) {   // self-guard: never bridge the studio to itself
+        const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
+        projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
+      }
+      await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'connect', summary: `Connected ${businessName} to your workspace`, principal, provenance: 'human' }).catch(() => {});
+      return json({ data: { mode: 'connect', connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
+    }
+    // No account yet → record the intent (tagged contact) so signup auto-connects.
+    const contact = await ensureConnectContact(site.id, email, name, true);
+    await writeChangeEvent({ siteId: site.id, entityType: 'contact', entityId: contact?.id || email, action: 'connect_pending', summary: `Saved ${email} to connect when they sign up`, principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { mode: 'connect', pending: true, connected: false, email, contact_id: contact?.id || null, portal_url: portalUrl, message: `Saved. When ${email} signs up, they’ll connect to you automatically.` } }, 200, cors);
+  }
+
+  // ── A) SET THEM UP NOW (existing behavior) ──────────────────────────────────
   const plan = pickPlan(b.edition);   // "what they get" (default presence); reuse the convert whitelist
 
   const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email });
@@ -826,30 +953,15 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   // managed portfolio (Seam 1) + agency bridge (one primary agency per customer).
   const managed = await linkAgencyPortfolio(principal, acct.siteId, email);
 
-  // Agency–Client Bridge: ONE authoritative delivery project on THIS agency site,
-  // linked to the customer's own workspace (ensureBridge claims presence_customer_agency
-  // = one primary agency per customer). Idempotent — reuse an existing link for this
-  // customer instead of minting a second empty project. Self-guard: never bridge the
-  // studio to itself. A customer already owned by ANOTHER agency is refused by ensureBridge.
+  // Agency–Client Bridge via the shared helper (ensureBridge — one primary agency
+  // per customer; idempotent; reuses an existing link; refuses a customer owned by
+  // another agency). Self-guard: never bridge the studio to itself.
   let projectId: string | null = null, bridged = false, ownedElsewhere = false;
   if (clientId !== site.client_id) {
-    const links = await linksForCustomer(clientId);
-    const mine = links.find((l) => l.agency_site_id === site.id);
-    if (mine) { projectId = mine.project_id; bridged = true; }
-    else if (links.length) { ownedElsewhere = true; }   // linked to a DIFFERENT agency already
-    else {
-      const ins = await svc('presence_projects', { method: 'POST', headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ site_id: site.id, client_id: clientId, name: String(businessName).slice(0, 200), description: '', status: 'active', client_visible: true }) });
-      const project = rows(ins)[0];
-      if (project) {
-        bridged = await ensureBridge(site.id, project.id, clientId, acct.siteId || null, null);
-        if (bridged) projectId = project.id;
-        else { ownedElsewhere = true; await svc(`presence_projects?id=eq.${project.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {}); } // customer belongs to another agency — drop our orphan
-      }
-    }
+    const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: acct.siteId || null, label: businessName });
+    projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
   }
 
-  const portalUrl = `${siteUrl()}/portal.html`;
   // Already had a workspace → friendly "they're already set up" (with a link), no
   // duplicate, no fresh invite (they already have access).
   if (acct.alreadyExisted) {

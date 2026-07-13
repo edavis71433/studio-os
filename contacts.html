@@ -48,6 +48,12 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:12px 0 0;line-height:1.5}
+  #cu-mode{display:flex;flex-direction:column;gap:8px;margin:2px 0 4px}
+  .modeopt{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:14px;color:var(--ink)}
+  .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
+  .modeopt input{width:auto;margin-top:3px;accent-color:var(--p)}
+  .modeopt strong{display:block;font-weight:600;font-size:13.5px}
+  .modehint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
   .dbody .done{text-align:center;padding:8px 0 4px}
   .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px}
   .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
@@ -84,20 +90,30 @@
   <form id="custForm" class="dbody">
     <div id="cust-fields">
       <h3>Add a customer</h3>
+      <div id="cu-mode" role="radiogroup" aria-label="How would you like to add them?">
+        <label class="modeopt"><input type="radio" name="cumode" value="provision" checked>
+          <span><strong>I’ll set them up now</strong><span class="modehint">Create their workspace and email them a link to set their password.</span></span></label>
+        <label class="modeopt"><input type="radio" name="cumode" value="connect">
+          <span><strong>They’ll sign up themselves — connect by email</strong><span class="modehint">Just record their email. You don’t set anything up.</span></span></label>
+      </div>
       <label for="cu-name">Their name</label>
       <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
-      <label for="cu-biz">Business name</label>
-      <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
       <label for="cu-email">Email</label>
       <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <label for="cu-edition">What they get</label>
-      <select id="cu-edition">
-        <option value="presence" selected>Full website + business tools</option>
-        <option value="cms_only">Website only</option>
-        <option value="business_os_only">Business tools only</option>
-        <option value="presence_monitor">Monitoring only</option>
-      </select>
-      <p class="note">This creates their account + workspace and emails them a sign-in invitation. You bill them as usual — they never pay for software.</p>
+      <div id="cu-provision-only">
+        <label for="cu-biz">Business name</label>
+        <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
+        <label for="cu-edition">What kind of work is this?</label>
+        <select id="cu-edition">
+          <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
+          <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
+          <option value="business_os_only">Just their client workspace / business tools — no site work</option>
+          <option value="presence_monitor">Just monitoring a site they already have</option>
+        </select>
+        <p class="note">Adding them creates their client workspace and emails them a link to set their password and sign in. You bill them for your work the usual way — they never pay for software here.</p>
+        <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
+      </div>
+      <p class="note" id="cu-connect-only" style="display:none">Enter their email. If they already have an account, they connect to you now. If not, they’ll connect automatically the moment they sign up with that email.</p>
       <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
     </div>
     <div id="cust-done" style="display:none"></div>
@@ -170,38 +186,71 @@ $('newForm').onsubmit=async(e)=>{
 // ── ADD A CUSTOMER: set up an existing customer with their own workspace +
 // a sign-in invitation — no deal/sign/convert ceremony. Reuses the shared
 // provisioning path server-side; here we just collect + show the outcome. ──
+// The signup note + copyable link only apply when their site will live with us
+// (self-serve plan). Hidden otherwise. Paying for software is never picked here.
+function syncCuSignup(){const s=$('cu-signup');if(s)s.style.display=($('cu-edition').value==='presence')?'':'none';}
+// TWO options (owner's words): "set them up now" (provision) vs "they'll sign up
+// themselves — connect by email" (connect). The mode governs which fields show and
+// what the server does; connect provisions nothing.
+function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
+function syncCuMode(){
+  const connect=cuMode()==='connect';
+  const po=$('cu-provision-only');if(po)po.style.display=connect?'none':'';
+  const co=$('cu-connect-only');if(co)co.style.display=connect?'':'none';
+  const sb2=$('cu-submit');if(sb2)sb2.textContent=connect?'Save':'Set up + invite';
+  if(!connect)syncCuSignup();
+}
 function openAddCustomer(){
   $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
+  const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
+  const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
   const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
   $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
 }
 $('cu-cancel').onclick=()=>$('custDlg').close();
+$('cu-edition').onchange=syncCuSignup;
+document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
+$('cu-signup-copy').onclick=()=>{const el=$('cu-signup-link');if(el&&el.value&&navigator.clipboard){navigator.clipboard.writeText(el.value).then(()=>toast('Sign-up link copied')).catch(()=>{});}};
 $('custForm').onsubmit=async(e)=>{
   e.preventDefault();
+  const mode=cuMode();
   const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
-  if(!email){toast('Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
-  const btn=$('cu-submit');btn.disabled=true;btn.textContent='Setting up…';
+  if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
+  const label=mode==='connect'?'Save':'Set up + invite';
+  const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
+  const body=mode==='connect'
+    ?{mode:'connect',name:name||undefined,email}
+    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value};
   try{
-    const r=await api('/sales/customers','POST',{name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value});
+    const r=await api('/sales/customers','POST',body);
     if(!r.ok){
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'We couldn’t set them up just now.');
-      toast(m);btn.disabled=false;btn.textContent='Set up + invite';return;
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
+      toast(m);btn.disabled=false;btn.textContent=label;return;
     }
     const d=(r.body&&r.body.data)||{};
-    const already=!!d.already_exists;
-    const heading=already?'They already have a workspace':'Invitation sent';
-    const line=already
-      ?'Nothing was duplicated — they’re already set up. Send them their sign-in link if they need it.'
-      :('Invitation sent to '+esc(email)+'. They’ll set a password and land in their guided setup.');
-    const link=d.portal_url?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
+    const who=esc(business_name||name||email);
+    let heading,line;
+    if(mode==='connect'){
+      if(d.connected){heading='Connected to their workspace';line=who+' already had an account — they’re connected to you now.';}
+      else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
+    }else if(d.already_exists){
+      heading='They already have a workspace';
+      line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
+    }else{
+      heading='Invitation sent';
+      line='Invitation sent to '+esc(email)+'. They’ll set their password and land in their guided setup.';
+    }
+    // A portal link only makes sense once they actually have a workspace.
+    const showLink=d.portal_url&&(mode!=='connect'||d.connected);
+    const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
     $('cust-fields').style.display='none';
     const done=$('cust-done');
-    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">'+(already?'✓':'✓')+'</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
+    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
     done.style.display='';
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
     await load();
-  }catch(_){toast('We couldn’t set them up just now.');btn.disabled=false;btn.textContent='Set up + invite';}
+  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;}
 };
 // ── CSV IMPORT: bring an existing contact list in one go. Pure frontend — the
 // server already dedupes per email and validates every row, so this simply

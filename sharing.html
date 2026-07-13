@@ -94,8 +94,8 @@ function render(members){
     html+=`<div class="rowitem${s.internal?' locked':''}"><span class="grow"><span class="t">${esc(s.t)}${s.internal?' <span class="pill">private by default</span>':''}</span><br><span class="d">${esc(s.d)}</span></span>
       <button class="sw" role="switch" aria-label="Share ${esc(s.t)} with clients" aria-checked="${on}" data-surface="${esc(s.k)}"></button></div>`;}
   html+=`</div>`;
-  // developer mode entry point (locked — A8 prep, not the feature)
-  html+=`<h2>Advanced</h2><div class="card"><div class="rowitem locked"><span class="grow"><span class="t">Developer Mode <span class="pill">coming soon</span></span><br><span class="d">Edit templates and code alongside the no-code workspace. Off by default; you're never forced into code.</span></span><button disabled>Not yet</button></div></div>`;
+  // (Developer Mode is fully built and appears under Settings when the account has
+  //  that capability — no "coming soon" placeholder belongs here.)
   $('main').innerHTML=html;wire();
 }
 function wire(){

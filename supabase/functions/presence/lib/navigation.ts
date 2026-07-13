@@ -7,7 +7,11 @@
 import type { SiteRole, SiteCapability } from './site_roles.ts';
 import { editionFlags, type EditionKey, type EditionFlags } from '../commerce/editions.ts';
 
-export interface NavItem { key: string; label: string; href: string; }
+// `desc` is a one-line, plain-language note on what the destination is FOR. It
+// disambiguates near-synonym surfaces (e.g. the Inbox vs its focused cuts) for a
+// non-technical owner. Optional; surfaces that render it (overflow menu / ⌘K)
+// show it as a subtitle, but nothing depends on it.
+export interface NavItem { key: string; label: string; href: string; desc?: string; }
 // `utility: true` sections are the account/overflow items (Settings, Connections,
 // Help). They are composed the same way (Edition × Role) but the shell renders
 // them in the profile/overflow menu, keeping the PRIMARY bar to outcomes only
@@ -52,8 +56,8 @@ export function buildNav(c: NavContext): NavSection[] {
   // section renders as a top-level button; multi-item sections render as a group.
   const f = flagsOf(c);
   const sections: NavSection[] = [];
-  const single = (key: string, label: string, href: string) => sections.push({ key, label, items: [{ key, label, href }] });
-  const utility = (key: string, label: string, href: string) => sections.push({ key, label, items: [{ key, label, href }], utility: true });
+  const single = (key: string, label: string, href: string, desc?: string) => sections.push({ key, label, items: [{ key, label, href, desc }] });
+  const utility = (key: string, label: string, href: string, desc?: string) => sections.push({ key, label, items: [{ key, label, href, desc }], utility: true });
 
   // Today — the calm home
   if (f.hasBusinessOS) single('today', 'Today', '/today.html');
@@ -95,31 +99,38 @@ export function buildNav(c: NavContext): NavSection[] {
   //  (internally: Analytics/reporting). Reserved home; the later phase enriches it.
   if (f.hasReports) single('analytics', 'Analytics', '/analytics.html');
 
-  // Inbox — ONE place for what needs you: messages, approvals, notifications, leads
-  single('inbox', 'Inbox', '/inbox.html');
+  // Inbox — THE ONE place for what needs you: messages, approvals, notices, leads.
+  // Everything below in "Focused views" is just a narrower cut of this same data —
+  // the label + desc make Inbox read as the primary, the rest as optional lenses.
+  single('inbox', 'Inbox', '/inbox.html', 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.');
 
   // Studio — the agency scope (agency roles only); open a client to re-scope
   if (f.hasAgency && c.isAgency) single('studio', 'Studio', '/agency.html');
 
-  // ── Utilities — rendered in the profile/overflow menu, not the primary bar ──
-  // More views — the deeper read-only lenses (Attention, Approvals, Timeline…).
-  // They were reachable only from Today's "all clear" card — i.e. they vanished
-  // exactly when something needed attention. Here they're always one ⌘K away.
+  // ── Deeper views (profile/overflow menu + ⌘K, never the primary bar) ─────────
+  // Every capability stays reachable — nothing is retired. The old single long
+  // "More views" list was the confusion, so it's split into two clearly-named,
+  // purpose-labelled groups. Nothing here competes with the Inbox: the first group
+  // is explicitly focused CUTS of the Inbox, the second is calm read-outs you look
+  // at on purpose (history / what's ahead / understanding), never a to-do.
   if (has(c, 'view_all')) {
-    const views: NavItem[] = [];
+    // Group 1 — focused cuts of the Inbox (the same "needs you" data, one lens).
+    const focus: NavItem[] = [];
     if (f.hasBusinessOS || f.hasWebsite) {
-      views.push({ key: 'attention', label: 'Attention Center', href: '/attention.html' });
-      views.push({ key: 'approval_center', label: 'Approval Center', href: '/approval-center.html' });
-      views.push({ key: 'view_timeline', label: 'Timeline', href: '/timeline.html' });
-      views.push({ key: 'view_upcoming', label: 'Upcoming', href: '/upcoming.html' });
+      focus.push({ key: 'attention', label: 'Website attention', href: '/attention.html', desc: 'Just your website’s to-dos — the website-only slice of your Inbox.' });
+      focus.push({ key: 'approval_center', label: 'Approvals', href: '/approval-center.html', desc: 'Only the things waiting for your go-ahead before they go live.' });
     }
-    if (f.hasBusinessOS) views.push({ key: 'view_insights', label: 'Business insights', href: '/business-insights.html' });
-    if (f.hasWebsite) {
-      views.push({ key: 'view_content_tree', label: 'Content tree', href: '/content-tree.html' });
-      views.push({ key: 'view_site_health', label: 'Website health', href: '/website-health.html' });
-      views.push({ key: 'view_snapshots', label: 'Snapshot history', href: '/snapshot-history.html' });
-    }
-    if (views.length) sections.push({ key: 'views', label: 'More views', items: views, utility: true });
+    if (focus.length) sections.push({ key: 'focus_views', label: 'Focused views', items: focus, utility: true });
+
+    // Group 2 — calm read-outs: understand the business, look back, look ahead.
+    const lenses: NavItem[] = [];
+    if (f.hasWebsite) lenses.push({ key: 'view_content_tree', label: 'Website map', href: '/content-tree.html', desc: 'Every page and section of your site, laid out as one simple tree.' });
+    if (f.hasWebsite) lenses.push({ key: 'view_site_health', label: 'Website health', href: '/website-health.html', desc: 'A plain-English check-up of your live site.' });
+    if (f.hasWebsite) lenses.push({ key: 'view_timeline', label: 'Website story', href: '/timeline.html', desc: 'A plain-English history of everything that’s happened to your site.' });
+    if (f.hasWebsite) lenses.push({ key: 'view_snapshots', label: 'Version history', href: '/snapshot-history.html', desc: 'Past saved versions of your site you can look back on or restore.' });
+    if (f.hasWebsite) lenses.push({ key: 'view_upcoming', label: 'What’s coming next', href: '/upcoming.html', desc: 'Scheduled and expected changes — a calm look ahead, nothing guessed.' });
+    if (f.hasBusinessOS) lenses.push({ key: 'view_insights', label: 'Business insights', href: '/business-insights.html', desc: 'Plain observations about how your business is doing — only what we can measure.' });
+    if (lenses.length) sections.push({ key: 'views', label: 'Understand your site', items: lenses, utility: true });
   }
 
   // Connections — integrations (the connected services)

@@ -54,6 +54,16 @@
   .features .lead{font-size:13px;color:var(--soft);margin:0 0 12px}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+  /* "More about your business" — secondary context, collapsed by default so Today
+     opens on what needs the owner. Native <details> keeps it keyboard-accessible. */
+  details.more{margin-top:40px;border-top:1px solid var(--line);padding-top:6px}
+  details.more>summary{list-style:none;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--soft);padding:12px 2px;display:flex;align-items:center;gap:9px}
+  details.more>summary::-webkit-details-marker{display:none}
+  details.more>summary::before{content:"›";display:inline-block;transition:transform .15s;color:var(--faint);font-size:16px}
+  details.more[open]>summary::before{transform:rotate(90deg)}
+  details.more>summary:hover{color:var(--accent)}
+  details.more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+  @media (prefers-reduced-motion:reduce){details.more>summary::before{transition:none}}
   .ask{margin-top:44px;padding-top:28px;border-top:1px solid var(--line)}
   .ask h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 4px}
   .ask p{margin:0 0 14px;color:var(--soft);font-size:14px}
@@ -151,7 +161,7 @@ function render(moments, features, feed, ctx){
     const _lnk = (href, label) => { let h = href; if(_sc && href.charAt(0)==='/'){ const p = href.split('#'); h = p[0] + (p[0].indexOf('?')>=0?'&':'?') + 'client=' + encodeURIComponent(_sc) + (p[1]?'#'+p[1]:''); } return `<a class="link" href="${h}">${label}</a>`; };
     const _sep = ' <span style="color:var(--soft)">·</span> ';
     const clearLinks = (hasWebsite
-      ? [['/attention.html','What needs you'],['/approval-center.html','Approvals'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/timeline.html','Website story'],['/upcoming.html','What’s next'],['/business-insights.html','Insights'],['/snapshot-history.html','Versions'],['/leads.html','Website enquiries']]
+      ? [['/inbox.html','What needs you'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/snapshot-history.html','History'],['/schedule.html','What’s next'],['/analytics.html','Insights'],['/leads.html','Website enquiries']]
       : [['/crm.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
     html += `<div class="moment calm"><span class="tag">All clear</span>
@@ -178,20 +188,41 @@ function render(moments, features, feed, ctx){
       </article>`;
     }
   }
-  // "what comes with your business" — the Industry Pack, made invisible
-  const feats = (features && features.features) || [];
-  if(feats.length){
-    html += `<div class="features"><p class="lead">${esc((features && features.note) || 'These come with your kind of business — nothing to set up.')}</p>
-      <div class="chips">${feats.map(f=>`<span class="chip">${esc(f)}</span>`).join('')}</div></div>`;
-  }
-  // the Concierge — a knowledgeable partner, not a chatbot
+  // the Concierge — a knowledgeable partner, not a chatbot. Stays in the focused
+  // area (right under what needs you) — asking a question is a primary action.
   html += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
   // (Navigation to Connections and Visual Studio now lives in the persistent top nav.)
   $('main').innerHTML = '<div class="stack">' + html + '</div>';   // .stack gives the cards their breathing room
+  // "what comes with your business" — the Industry Pack, made invisible. Secondary
+  // context, so it opens inside the collapsible "More about your business" below.
+  const feats = (features && features.features) || [];
+  if(feats.length){
+    const box = document.createElement('div'); box.className = 'features';
+    box.style.cssText = 'margin-top:0;padding-top:0;border-top:none';
+    box.innerHTML = `<p class="lead">${esc((features && features.note) || 'These come with your kind of business — nothing to set up.')}</p><div class="chips">${feats.map(f=>`<span class="chip">${esc(f)}</span>`).join('')}</div>`;
+    moreHost().appendChild(box);
+  }
   wire();
+}
+
+// ── The collapsible "More about your business" — the secondary context (what
+// comes with the plan, the health line, the journey strip, the plan card) lives
+// here so Today opens focused on what actually needs the owner. Nothing is
+// deleted — just de-emphasized. Created lazily, only when something fills it, so
+// an otherwise-quiet Today never shows an empty disclosure. ──
+function moreHost(){
+  let body = document.getElementById('more-body');
+  if(body) return body;
+  const main = document.getElementById('main') || document.body;
+  const d = document.createElement('details'); d.className = 'more'; d.id = 'more-details';
+  const sum = document.createElement('summary'); sum.textContent = 'More about your business';
+  body = document.createElement('div'); body.id = 'more-body';
+  d.appendChild(sum); d.appendChild(body);
+  main.appendChild(d);   // always the last block on the page, below the focused area
+  return body;
 }
 
 function wire(){
@@ -334,16 +365,16 @@ async function healthLine(){
   try { r = (await apiGet('/coach/health')).data; } catch(_) { return; }
   if (!r) return;
   const attn = r.status === 'attention' || r.status === 'quiet';
-  const host = document.getElementById('main') || document.body;
+  const host = moreHost();   // secondary context — lives in the collapsible, not atop the needs-you stack
   const line = document.createElement('div');
-  line.style.cssText = 'max-width:860px;margin:10px auto 0;padding:12px 20px;border-radius:12px;font-size:14px;border:1px solid var(--line);background:' + (attn ? 'var(--warn-soft)' : 'var(--good-soft)') + ';color:var(--ink)';
+  line.style.cssText = 'max-width:860px;margin:0 auto 12px;padding:12px 20px;border-radius:12px;font-size:14px;border:1px solid var(--line);background:' + (attn ? 'var(--warn-soft)' : 'var(--good-soft)') + ';color:var(--ink)';
   const sugg = (r.suggestions || [])[0];
   if (!sugg) {
     line.textContent = '✓ ' + (r.headline || 'Everything looks healthy.');
   } else {
     line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(sugg.href) + '" style="color:var(--accent);font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:var(--muted)">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
   }
-  host.insertBefore(line, host.firstChild);   // the health line leads the page — never splits the needs-you stack
+  host.appendChild(line);
 }
 
 // ── PT-2C: the Customer Journey (PT-7) — celebrate milestones, never a score ──
@@ -351,9 +382,9 @@ async function journeyStrip(){
   let j = null;
   try { j = (await apiGet('/coach/journey')).data; } catch(_) { return; }
   if (!j || !Array.isArray(j.milestones)) return;
-  const host = document.getElementById('main') || document.body;
+  const host = moreHost();
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'max-width:860px;margin:28px auto 0;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--card)';
+  wrap.style.cssText = 'max-width:860px;margin:16px auto 0;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--card)';
   let html = '<div style="font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:14px">Your journey</div>';
   if (j.latestCelebration && j.latestCelebration.note) html += '<div style="font-family:var(--serif);font-size:19px;margin-bottom:16px;color:var(--ink)">' + esc(j.latestCelebration.note) + '</div>';
   html += '<div style="display:flex;flex-direction:column;gap:9px">';
@@ -370,9 +401,9 @@ async function journeyStrip(){
 
 function planCard(c){
   if(!c || !c.edition_name) return;
-  const host = document.getElementById('main') || document.body;
+  const host = moreHost();
   const card = document.createElement('div');
-  card.style.cssText = 'max-width:860px;margin:26px auto 40px;padding:16px 20px;border:1px solid var(--accent-soft);border-radius:14px;background:var(--card);font-size:14px;color:var(--soft)';
+  card.style.cssText = 'max-width:860px;margin:16px auto 0;padding:16px 20px;border:1px solid var(--accent-soft);border-radius:14px;background:var(--card);font-size:14px;color:var(--soft)';
   const own = document.createElement('div');
   own.innerHTML = '<strong>Your plan: ' + esc(c.edition_name) + '.</strong> Everything you see here is included.';
   card.appendChild(own);
