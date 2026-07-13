@@ -182,6 +182,7 @@ const NOTICE_HREF: Record<string, string> = {
   missing_required: '/content-tree.html',  // FIX 4: a section blocking publish → the website map
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
+  support_aging: '/projects.html', // service edge #3: an aging support request needs a reply (support lives in the project view)
   invoice_paid: '/pipeline.html',  // money landed → the deal it landed on
   publish_failed: '/presence.html#publish',
   site_down: '/presence.html#foundations',   // a confirmed outage → the foundations desk (domain/hosting/health)

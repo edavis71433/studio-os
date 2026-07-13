@@ -8,7 +8,8 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { signDownload } from '../lib/media.ts';
-import { linksForCustomer, linkForCustomerProject, linkForCustomerVia } from '../lib/service_bridge.ts';
+import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient } from '../lib/service_bridge.ts';
+import { csatRatingsForProject } from '../lib/csat.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority } from '../lib/intake.ts';
@@ -113,7 +114,8 @@ export async function handleClientReport(_req: Request, site: SiteRow, _principa
     svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=status`),
     svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${s}&client_visible=is.true&select=created_at&order=created_at.desc&limit=1`),
   ]);
-  const summary = reportSummary({ tasks: rows(ts), milestones: rows(ms), deliverables: rows(dl), approvals: rows(ap), lastActivityAt: rows(ev)[0]?.created_at || null }, nowIso());
+  const csatRatings = await csatRatingsForProject(s, id);   // service edge #1: computed CSAT average
+  const summary = reportSummary({ tasks: rows(ts), milestones: rows(ms), deliverables: rows(dl), approvals: rows(ap), lastActivityAt: rows(ev)[0]?.created_at || null, csatRatings }, nowIso());
   return json({ data: { project: ctx.project, summary, generated_at: nowIso() } }, 200, cors);
 }
 
@@ -273,6 +275,10 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
     body: JSON.stringify({ site_id: s, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (projectId) await clientEvent(s, projectId, 'support_opened', principal, { request_id: rows(ins)[0].id, subject });
+  // service edge #2: auto-acknowledge the customer — a submitted ticket used to
+  // email no one. Best-effort, transactional, on the agency's brand.
+  await emailCustomerByClient(s, me, 'We’ve got your request',
+    `<p>Thanks — we’ve got your request and it’s in our queue. Nothing more is needed right now; we’ll follow up here, and you can add details or reply any time from your workspace.</p>`).catch(() => {});
   return json({ data: rows(ins)[0] }, 201, cors);
 }
 

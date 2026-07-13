@@ -207,7 +207,7 @@ async function openProject(id){
         <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div>
         <button class="btn ghost sm" id="closeDetail">Close</button></div>
       <div class="dbody">
-        ${rp?`<div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div></div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div>`:''}
+        ${rp?`<div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div>${rp.csat?`<div><b>${rp.csat.average}★</b><span>CSAT · ${rp.csat.count}</span></div>`:''}</div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div>`:''}
         ${STUDIO&&statusBtns?`<div class="sec"><h3>Status</h3><div class="steps">${statusBtns}</div></div>`:''}
         <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
         <div class="sec"><h3>Tasks ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
@@ -287,14 +287,19 @@ async function loadSupport(id,focusRid){
 // backend was always there; only the UI (mark-resolved only) was missing.
 async function openStudioSupport(rid,pid){
   try{
-    const r=await api('/support/'+rid); const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
+    const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]); const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
     const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
-    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body-${rid}">Reply to the client</label><textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
+    // Saved replies (service edge #4): the bodies live in a JS map keyed by id so
+    // nothing goes into an attribute; the <select> only carries escaped titles.
+    const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
+    const pickerHtml=replies.length?`<select id="sr-canned-${rid}" aria-label="Insert a saved reply" style="margin-bottom:6px"><option value="">Insert a saved reply…</option>${replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select>`:'';
+    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
     $('sup-back').onclick=()=>loadSupport(pid,rid);
     const sta=$('sr-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta); // a half-written reply survives an accidental close/refresh
+    const cn=$('sr-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
     const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid);}catch(err){toast(nice(err),true);}};
     const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid,rid);}catch(e){toast(nice(e),true);}};
   }catch(e){ toast('Couldn’t open that request.',true); }

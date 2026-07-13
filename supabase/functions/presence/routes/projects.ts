@@ -8,6 +8,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { ensureProjectForDeal, ensureBridge } from '../lib/service_bridge.ts';
+import { offerCsat, csatRatingsForProject } from '../lib/csat.ts';
 import { templateByKey, type ProjectTemplate } from '../lib/project_templates.ts';
 import {
   isProjectStatus, canProjectTransition, isTaskStatus, canTaskTransition, isTaskPriority,
@@ -235,7 +236,8 @@ export async function handleProjectReport(req: Request, jwt: string, site: SiteR
   const deliverables = (studio ? rows(dl) : rows(dl).filter((d) => d.client_visible === true));
   const approvals = forViewer(rows(ap), studio);
   const lastEv = (studio ? rows(ev) : rows(ev).filter((e) => e.client_visible === true))[0];
-  const summary = reportSummary({ tasks, milestones, deliverables, approvals, lastActivityAt: lastEv?.created_at || null }, nowIso());
+  const csatRatings = await csatRatingsForProject(site.id, id);   // service edge #1: computed CSAT average
+  const summary = reportSummary({ tasks, milestones, deliverables, approvals, lastActivityAt: lastEv?.created_at || null, csatRatings }, nowIso());
   return json({ data: { project: { id: project.id, name: project.name, status: project.status, start_date: project.start_date, target_date: project.target_date }, summary, generated_at: nowIso(), is_studio_view: studio } }, 200, cors);
 }
 
@@ -253,6 +255,9 @@ export async function handleProjectStatus(req: Request, jwt: string, site: SiteR
   const up = await svc(`presence_projects?id=eq.${id}&site_id=eq.${site.id}&status=eq.${project.status}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That project just changed — refresh and try again.' }, 409, cors); // optimistic: prior-status guard in WHERE
   await projectEvent(site.id, id, 'status_change', principal, project.client_visible, { from: project.status, to });
+  // service edge #1: a completed project offers the client a one-question CSAT
+  // (reuses the survey spine; idempotent per project; emails the bridged customer).
+  if (to === 'complete') await offerCsat({ agencySiteId: site.id, projectId: id, source: 'project', sourceId: id });
   return json({ data: rows(up)[0] }, 200, cors);
 }
 

@@ -14,6 +14,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
+import { supportAgingDue, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
@@ -430,6 +431,51 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
           sendEmail(String(owner), `Follow up on ${title}`, `<p>${safeBody}</p><p class="cta"><a href="${base}/pipeline.html?deal=${deal.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the deal →</a></p>`, brand).catch(() => {});
         }
       } catch { /* the notice already carries it */ }
+    }
+  }
+  return { nudged };
+}
+
+// ── SUPPORT AGING: nudge the OWNER about a request that has waited (service edge #3) ─
+// A submitted support request that sits open/in_progress with no movement for a
+// few days would otherwise wait until someone happens to look. Mirroring the
+// lead/deal follow-up pattern exactly: same 15-min sweep, same notices rail,
+// send-once per request (period = the request id). The nudge goes to the OWNER
+// ONLY — the customer already got the calm auto-ack on submit; we never auto-
+// message them again here. Best-effort + graceful: pre-0095 the 'support_aging'
+// notice fails the kind check and raiseNotice returns false (no email, no throw).
+export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
+  const nowIso = new Date().toISOString();
+  const from = new Date(Date.now() - 30 * 86400_000).toISOString();                 // not ancient (<30d)
+  const to = new Date(Date.now() - SUPPORT_AGING_DAYS * 86400_000).toISOString();   // quiet at least N days
+  const q = await svc(`presence_support_requests?deleted_at=is.null&status=in.(open,in_progress)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,subject,status,priority,updated_at&order=updated_at.asc&limit=${limit}`);
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  let nudged = 0;
+  for (const r of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; subject?: string; status: string; priority?: string; updated_at: string }>) {
+    if (!supportAgingDue(r, nowIso)) continue;                    // pure guard (defends the SQL window)
+    const siteQ = await svc(`presence_sites?id=eq.${r.site_id}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+    const subject = r.subject || 'a support request';
+    const urgent = r.priority === 'high' || r.priority === 'urgent';
+    const body = urgent
+      ? `A ${r.priority}-priority support request has been waiting a few days without a reply — worth a look soon.`
+      : 'A support request has been open a few days without a reply — a quick response keeps the customer confident.';
+    const fresh = await raiseNotice({ siteId: r.site_id, clientId, kind: 'support_aging', period: `support:${r.id}`, headline: `Waiting on you — ${subject}`, body });
+    if (fresh) {
+      nudged++;
+      // Parity with lead/deal nudges: the owner also gets the email once (send-once
+      // gated on the notice insert above), on their own brand.
+      try {
+        const ident = await svc(`presence_identity?site_id=eq.${r.site_id}&select=email&limit=1`);
+        const owner = ident.json?.[0]?.email;
+        if (owner) {
+          const brand = await loadEmailBrand(r.site_id);
+          sendEmail(String(owner), `A support request is waiting — ${subject}`,
+            `<p>${esc(body)}</p><p class="cta"><a href="${base}/projects.html?support=${r.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the request →</a></p>`, brand).catch(() => {});
+        }
+      } catch { /* the owner notice already carries it */ }
     }
   }
   return { nudged };

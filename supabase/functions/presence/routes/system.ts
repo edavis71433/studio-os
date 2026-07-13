@@ -13,7 +13,7 @@ import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
-import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture, runSupportAging } from '../commerce/lifecycle.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
@@ -299,6 +299,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['deletion', () => runDeletionSweep(25)],
             ['leads', () => runLeadFollowups(20)],
             ['deal_nudges', () => runDealFollowups(20)],
+            ['support_aging', () => runSupportAging(20)],
             ['renewals', () => runRenewalReminders(50)],
             ['invoice_nudges', () => runInvoiceReminders(20)],
             ['doc_reminders', () => runSalesDocReminders(20)],
@@ -362,6 +363,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const domains = await step('domains', () => runDomainWatch(10));             // INF: RDAP expiry+registrar, 24h dedupe
       const leads = await step('leads', () => runLeadFollowups(20));               // CRM: nudge un-replied leads, once per lead
       const dealNudges = await step('deal_nudges', () => runDealFollowups(20));    // CRM: nudge stale deals
+      const supportAging = await step('support_aging', () => runSupportAging(20)); // service edge #3: nudge owner on aging support requests
       const renewals = await step('renewals', () => runRenewalReminders(50));      // PP-2: annual renewal heads-up
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
@@ -376,7 +378,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // result.progress, which nobody reads until something else breaks.
       const issues = sweepIssues(progress);
       if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
+      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

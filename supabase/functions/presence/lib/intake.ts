@@ -62,3 +62,18 @@ export type SupportPriority = 'low' | 'normal' | 'high' | 'urgent';
 export function isSupportPriority(p: unknown): p is SupportPriority {
   return p === 'low' || p === 'normal' || p === 'high' || p === 'urgent';
 }
+
+// ── support aging (service edge #3 — nudge the OWNER, never the customer) ──────
+export const SUPPORT_AGING_DAYS = 2;         // quiet at least this long → one owner nudge
+export const SUPPORT_AGING_MAX_DAYS = 30;    // …but a truly ancient ticket isn't nagged
+/** Is an open/in_progress request "aging" — untouched at least N days but younger
+ *  than the max window? Pure over an ISO `now` + the request's updated_at, so the
+ *  threshold is deterministic in tests and guards the sweep's SQL window. */
+export function supportAgingDue(req: { status?: string; updated_at?: string | null }, nowIso: string, days = SUPPORT_AGING_DAYS): boolean {
+  if (req.status !== 'open' && req.status !== 'in_progress') return false;
+  const upd = req.updated_at ? Date.parse(String(req.updated_at)) : NaN;
+  const now = Date.parse(nowIso);
+  if (!Number.isFinite(upd) || !Number.isFinite(now)) return false;
+  const ageDays = (now - upd) / 86400_000;
+  return ageDays >= days && ageDays < SUPPORT_AGING_MAX_DAYS;
+}

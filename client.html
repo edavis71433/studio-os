@@ -131,6 +131,19 @@ async function appendBilling(){
     $('main').appendChild(sec);
   }catch(_){/* billing is additive; never block the projects view */}
 }
+// Customer FAQ (service edge #5) — the studio's mini knowledge base, deflecting
+// repeat questions. The HTML arrives already sanitized (server-side renderFaq via
+// the markdown pipeline), so injecting it is safe. Best-effort + additive.
+async function appendFaq(){
+  try{
+    const r=await api('/client/faq'); if(!r.ok) return;
+    const html=(r.body&&r.body.data&&r.body.data.html)||'';
+    if(!html) return;
+    const sec=document.createElement('section');
+    sec.innerHTML=`<h2>Common questions<\/h2><p class="muted" style="margin:-4px 0 10px">Quick answers from your studio — you may find what you need here.<\/p>${html}`;
+    $('main').appendChild(sec);
+  }catch(_){/* the FAQ is additive; never block the view */}
+}
 async function openProject(id){
   $('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   const [d,rep,supRes]=await Promise.all([api('/client/projects/'+id),api('/client/projects/'+id+'/report').catch(()=>null),api('/client/support').catch(()=>null)]);
@@ -167,6 +180,7 @@ async function openProject(id){
   document.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',async()=>{const r=await api('/client/deliverables/'+b.getAttribute('data-dl')+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('That file isn’t available.');}));
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
   $('newSupport').addEventListener('click',()=>openSupport(id));
+  appendFaq();
   loadThread(id);
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
 }

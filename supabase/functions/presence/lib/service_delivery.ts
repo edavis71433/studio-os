@@ -117,6 +117,7 @@ export interface ReportInputs {
   deliverables: Array<{ status?: string | null }>;
   approvals: Array<{ status?: string | null }>;
   lastActivityAt?: string | null;
+  csatRatings?: number[];               // service edge #1: raw CSAT ratings → a COMPUTED average, never a stored metric
 }
 /** A calm, explainable client summary composed from authoritative rows. Every
  *  number is a direct count of real data — no vanity metrics, no separate store. */
@@ -128,6 +129,7 @@ export function reportSummary(inp: ReportInputs, nowIso: string): {
   pending_approvals: number;
   shared_files: number;
   last_activity_at: string | null;
+  csat: { count: number; average: number } | null;
 } {
   const progress = progressOf(inp.tasks);
   const milestones = { total: inp.milestones.length, complete: inp.milestones.filter((m) => m.status === 'complete').length };
@@ -135,5 +137,8 @@ export function reportSummary(inp: ReportInputs, nowIso: string): {
   const overdue_tasks = inp.tasks.filter((t) => deriveTaskState(t, nowIso).overdue).length;
   const pending_approvals = inp.approvals.filter((a) => a.status === 'pending').length;
   const shared_files = inp.deliverables.filter((d) => d.status === 'shared').length;
-  return { progress, milestones, open_client_actions, overdue_tasks, pending_approvals, shared_files, last_activity_at: inp.lastActivityAt ?? null };
+  // CSAT: a computed average over collected ratings (no separate store). Null = none yet.
+  const ratings = (inp.csatRatings || []).filter((n) => Number.isFinite(n) && n >= 1);
+  const csat = ratings.length ? { count: ratings.length, average: Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 } : null;
+  return { progress, milestones, open_client_actions, overdue_tasks, pending_approvals, shared_files, last_activity_at: inp.lastActivityAt ?? null, csat };
 }

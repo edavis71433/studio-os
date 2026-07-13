@@ -118,3 +118,21 @@ export async function emailBridgedCustomer(agencySiteId: string, projectId: stri
     return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true });
   } catch { return false; }
 }
+
+/** Email a customer DIRECTLY by their clients.id — the transactional channel for
+ *  a support request that has no project to resolve a recipient through (the
+ *  auto-acknowledgement of a new ticket). Same agency brand + "open your project"
+ *  button as emailBridgedCustomer. Best-effort: never throws. */
+export async function emailCustomerByClient(agencySiteId: string, customerClientId: string | null, subject: string, bodyHtml: string): Promise<boolean> {
+  try {
+    if (!customerClientId) return false;
+    const client = rows(await svc(`clients?id=eq.${customerClientId}&select=email&limit=1`))[0];
+    const email = client?.email ? String(client.email) : '';
+    if (!email) return false;
+    const { sendEmail } = await import('../commerce/account.ts');
+    const { loadEmailBrand } = await import('./email_brand.ts');
+    const brand = await loadEmailBrand(agencySiteId);
+    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
+    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true });
+  } catch { return false; }
+}

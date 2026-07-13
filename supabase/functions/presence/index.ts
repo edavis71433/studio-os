@@ -32,6 +32,7 @@ import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling } from './routes/client_delivery.ts';
+import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
@@ -612,6 +613,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     m = route.match(/^\/support\/([0-9a-f-]{36})\/messages$/);
     if (m && method === 'POST') return handleSupportMessage(req, jwt, site, principal, m[1], cors);
   }
+  // Service-loop edges (#4 saved replies, #5 FAQ): owner-managed JSON settings
+  if (route === '/service/saved-replies' && (method === 'GET' || method === 'PUT')) return handleSavedReplies(req, jwt, site, principal, cors);
+  if (route === '/service/faq' && (method === 'GET' || method === 'PUT')) return handleFaqAdmin(req, jwt, site, principal, cors);
   // P2-D-3: notifications (derived from the activity log + a per-reader last-seen)
   if (route === '/notifications' && method === 'GET') return handleNotifications(req, jwt, site, principal, cors);
   if (route === '/notifications/read' && method === 'POST') return handleNotificationsRead(req, jwt, site, principal, cors);
@@ -623,6 +627,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/notifications' && method === 'GET') return handleClientNotifications(req, site, principal, cors);
   if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
+  if (route === '/client/faq' && method === 'GET') return handleClientFaq(req, site, principal, cors);   // service edge #5: the studio's FAQ in the portal
   {
     let m = route.match(/^\/client\/projects\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleClientProject(req, site, principal, m[1], cors);

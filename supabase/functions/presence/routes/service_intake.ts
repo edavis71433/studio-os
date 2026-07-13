@@ -12,6 +12,23 @@ import {
   normalizeQuestions, normalizeAnswers,
   isSupportStatus, canSupportTransition, isSupportPriority,
 } from '../lib/intake.ts';
+import { offerCsat } from '../lib/csat.ts';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** The calm "we've got it" auto-acknowledgement of a NEW support request — today
+ *  a submitted ticket emails no one (a real trust gap). Best-effort, transactional
+ *  (survives a marketing opt-out), on the site's own email brand. Never throws. */
+async function ackSupportRequester(siteId: string, toEmail: string, subject: string): Promise<void> {
+  try {
+    if (!EMAIL_RE.test(String(toEmail))) return;
+    const { sendEmail } = await import('../commerce/account.ts');
+    const { loadEmailBrand } = await import('../lib/email_brand.ts');
+    const brand = await loadEmailBrand(siteId);
+    await sendEmail(toEmail, subject,
+      `<p>Thanks — we've got your request and it's in our queue. Nothing more is needed from you right now; we'll follow up here. You can add details or reply any time from your workspace.</p>`,
+      brand, { critical: true });
+  } catch { /* best-effort — an ack must never block the submission */ }
+}
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -113,6 +130,10 @@ export async function handleSupport(req: Request, jwt: string, site: SiteRow, pr
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
     const req0 = rows(ins)[0];
     if (projectId) await projectEvent(site.id, projectId, 'support_opened', principal, true, { request_id: req0.id, subject });
+    // auto-acknowledge the requester (best-effort). The agency-side submitter is
+    // reached at their own login email; a bridged customer's ack is handled on
+    // the /client/support path (client_delivery.ts) where their email resolves.
+    await ackSupportRequester(site.id, String(principal.email || ''), 'We’ve got your request');
     return json({ data: req0 }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -155,7 +176,12 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
     const guard = (b.status !== undefined && patch.status !== reqRow.status) ? `&status=eq.${reqRow.status}` : '';
     const up = await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}${guard}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That request just changed — refresh and try again.' }, 409, cors);
-    if (resolvedNow && reqRow.project_id) await projectEvent(site.id, reqRow.project_id, 'support_resolved', principal, true, { request_id: id });
+    if (resolvedNow && reqRow.project_id) {
+      await projectEvent(site.id, reqRow.project_id, 'support_resolved', principal, true, { request_id: id });
+      // service edge #1: on resolve, offer the client a one-question CSAT (reuses
+      // the survey spine; idempotent per ticket; emails the bridged customer).
+      await offerCsat({ agencySiteId: site.id, projectId: reqRow.project_id, source: 'support', sourceId: id });
+    }
     return json({ data: rows(up)[0] }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
