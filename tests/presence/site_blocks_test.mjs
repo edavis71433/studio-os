@@ -293,6 +293,11 @@ const ctx = { esc, attr, safeHref };
   const dl = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'download', file_id: G, label: '2026 Menu' }]), DLREF), ctx)[0];
   ok('download renders a first-party "Download <name>" link with a download attr + zero external origins', dl.html.includes('block-download') && dl.html.includes('href="/img/menu-1600.webp"') && dl.html.includes(' download ') && dl.html.includes('Download 2026 Menu') && !/https?:\/\//.test(dl.html));
   ok('download label is escaped (hostile → inert)', renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'download', file_id: G, label: '<script>alert(1)</script>' }]), DLREF), ctx)[0].html.includes('&lt;script&gt;'));
+  // DL-FILES: a DOCUMENT (PDF) has no image variants — it links its deployed ORIGINAL
+  // (/files/<hash>.pdf), which is the file that actually serves on the published site.
+  const DOCREF = () => ({ alt: 'Spring menu', variants: {}, original: '/files/abc123.pdf' });
+  const dlDoc = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'download', file_id: G, label: 'Spring menu (PDF)' }]), DOCREF), ctx)[0];
+  ok('download of a document links its served ORIGINAL file, not an image variant', dlDoc.html.includes('href="/files/abc123.pdf"') && !dlDoc.html.includes('/img/') && dlDoc.html.includes(' download ') && dlDoc.html.includes('Download Spring menu (PDF)') && !/https?:\/\//.test(dlDoc.html));
 
   // — anchors + toc: stable ids on every section; a nav jump-list linking them —
   const tocBlocks = validateBlocks([

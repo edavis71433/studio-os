@@ -218,6 +218,11 @@ export interface MediaRef {
   width?: number; height?: number;
   /** Phase CP-2: focal point (0-100 %) for cropped presentations. */
   focal?: { x: number; y: number };
+  /** DL-FILES: a NON-image file (e.g. a PDF) has no image variants — instead it
+   *  carries the site-relative path to its ORIGINAL, deployed as-is (no transform).
+   *  Set only for documents; the Download block links this so a PDF menu/price list
+   *  actually serves on the published site. Absent for images (they use `variants`). */
+  original?: string;
 }
 
 /** Phase B1: the Developer-Mode presentation layer, a SIBLING of content in the

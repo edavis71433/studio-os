@@ -7,6 +7,7 @@
 // consumes, computes the media manifest (deterministic output paths per
 // variant), and stamps contract/template versions + timestamp.
 import { svc } from './db.ts';
+import { isImageMime } from './media.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
 import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
@@ -16,7 +17,7 @@ import { normalizeTags } from './search_index.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
-interface MediaRow { id: string; storage_path: string; alt_text: string; width: number | null; height: number | null; focal_x?: number | null; focal_y?: number | null }
+interface MediaRow { id: string; storage_path: string; alt_text: string; mime?: string | null; width: number | null; height: number | null; focal_x?: number | null; focal_y?: number | null }
 
 // deterministic variant output path: /img/<fnv(storage_path)>-<width>.<format>
 function fnv(s: string): string {
@@ -26,10 +27,23 @@ function fnv(s: string): string {
 }
 /** The image formats we publish, in ascending preference (browser picks the first
  *  it supports, WebP is the universal fallback). AVIF sits alongside WebP at the
- *  SAME widths — self-hosted variants only, so the render can offer both. */
-export type VariantFormat = 'webp' | 'avif';
+ *  SAME widths — self-hosted variants only, so the render can offer both. The
+ *  `original` pseudo-format means "deploy the raw object unchanged" — used for
+ *  NON-image files (a PDF download), which have no image transform. */
+export type VariantFormat = 'webp' | 'avif' | 'original';
 export function variantPath(storagePath: string, width: number, format: VariantFormat = 'webp'): string {
   return `/img/${fnv(storagePath)}-${width}.${format}`;
+}
+// DL-FILES: the deterministic served path for a NON-image original (e.g. a PDF the
+// owner offers via a Download block). Same fnv(storage_path) keying as variantPath,
+// so the render, the manifest, and the deploy all agree on ONE stable path. Served
+// verbatim from the deploy — Netlify sets the content-type from the extension.
+const ORIGINAL_EXT: Record<string, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+export function originalPath(storagePath: string, mime: string): string {
+  const dot = storagePath.lastIndexOf('.');
+  const tail = dot >= 0 ? storagePath.slice(dot + 1) : '';
+  const ext = ORIGINAL_EXT[mime] || (tail && !tail.includes('/') ? tail : 'bin');
+  return `/files/${fnv(storagePath)}.${ext}`;
 }
 
 export interface MediaManifestEntry {
@@ -40,10 +54,17 @@ export interface MediaManifestEntry {
 
 function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | null {
   if (!m) return null;
+  // DL-FILES: a NON-image file (a PDF document) has no image transform — it carries
+  // no `variants` and instead points at its ORIGINAL, deployed verbatim. Images are
+  // byte-identical to before (variants only, no `original`). This is what lets a
+  // Download block's PDF actually serve, and stops the publish from trying to
+  // image-transform a document (which fails the whole deploy).
+  const isImg = isImageMime(String(m.mime ?? ''));
   const variants: Record<string, string> = {};
-  for (const [name, v] of Object.entries(manifest.image_variants)) variants[name] = variantPath(m.storage_path, v.width);
+  if (isImg) for (const [name, v] of Object.entries(manifest.image_variants)) variants[name] = variantPath(m.storage_path, v.width);
   return {
     alt: m.alt_text, variants, width: m.width ?? undefined, height: m.height ?? undefined,
+    ...(isImg ? {} : { original: originalPath(m.storage_path, String(m.mime ?? '')) }),
     // Phase CP-2: focal point (0-100 %) — consumed wherever a template crops
     ...(Number.isFinite(Number(m.focal_x)) && Number.isFinite(Number(m.focal_y)) ? { focal: { x: Math.min(100, Math.max(0, Number(m.focal_x))), y: Math.min(100, Math.max(0, Number(m.focal_y))) } } : {}),
   };
@@ -69,7 +90,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     q(`presence_testimonials?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
     q(`presence_posts?site_id=eq.${siteId}&deleted_at=is.null&status=eq.published&order=published_at.desc`),
-    q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,width,height,focal_x,focal_y`),
+    q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y`),
     q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
     q(`presence_settings?site_id=eq.${siteId}&limit=1`),
     q(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`),
@@ -168,6 +189,15 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
 
   const mediaManifest: MediaManifestEntry[] = [...usedMedia].sort().map((id) => {
     const m = mediaById.get(id)!;
+    // DL-FILES: a NON-image file (a PDF Download) is deployed as its ORIGINAL, byte
+    // for byte — NEVER image-transformed (that would fail the deploy). Images keep
+    // the exact same variant manifest as before, so their output is byte-identical.
+    if (!isImageMime(String(m.mime ?? ''))) {
+      return {
+        media_id: m.id, storage_path: m.storage_path,
+        variants: [{ name: 'original', width: 0, format: 'original' as VariantFormat, output_path: originalPath(m.storage_path, String(m.mime ?? '')) }],
+      };
+    }
     return {
       media_id: m.id, storage_path: m.storage_path,
       // Emit BOTH formats at every width: WebP (universal) + AVIF (smaller, modern).

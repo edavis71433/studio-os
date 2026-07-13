@@ -156,12 +156,18 @@ export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ f
   const failed: string[] = [];
   await Promise.all(manifest.flatMap((m) => m.variants.map(async (v) => {
     const objectPath = m.storage_path.replace(`${BUCKET}/`, '');
-    const url = `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&format=${v.format}&quality=80`;
+    // DL-FILES: a NON-image original (e.g. a PDF Download) is fetched VERBATIM from
+    // storage — never through the image transform (which can't process a document
+    // and would fail the whole publish). Images use the transform path as before.
+    const url = v.format === 'original'
+      ? `${SB_URL}/storage/v1/object/authenticated/${BUCKET}/${objectPath}`
+      : `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&format=${v.format}&quality=80`;
+    const label = v.format === 'original' ? `${m.storage_path} (original)` : `${m.storage_path} @${v.width}.${v.format}`;
     try {
       const r = await fetch(url, { headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE } });
-      if (!r.ok) { failed.push(`${m.storage_path} @${v.width}.${v.format}`); return; }
+      if (!r.ok) { failed.push(label); return; }
       files[v.output_path.replace(/^\//, '')] = new Uint8Array(await r.arrayBuffer());
-    } catch { failed.push(`${m.storage_path} @${v.width}.${v.format}`); }
+    } catch { failed.push(label); }
   })));
   return { files, failed };
 }
@@ -242,9 +248,13 @@ export async function previewUrlMap(manifest: MediaManifestEntry[]): Promise<Rec
   const map: Record<string, string> = {};
   await Promise.all(manifest.flatMap((m) => m.variants.map(async (v) => {
     const objectPath = m.storage_path.replace(`${BUCKET}/`, '');
+    // DL-FILES: a NON-image original (a PDF Download) is signed WITHOUT a transform,
+    // so the preview's Download link resolves to the real file — matching how it will
+    // serve once published. Images are signed with their width/format transform as before.
+    const body = v.format === 'original' ? {} : { transform: { width: v.width, format: v.format, quality: 80 } };
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=600`, {
       method: 'POST', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transform: { width: v.width, format: v.format, quality: 80 } }),
+      body: JSON.stringify(body),
     });
     const j = await r.json().catch(() => null);
     if (j?.signedURL) map[v.output_path] = `${SB_URL}/storage/v1${j.signedURL}`;

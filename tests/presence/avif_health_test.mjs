@@ -5,7 +5,7 @@
 // preserved). (2) the "always online" reassurance line. (3) SSL-expiry surfacing
 // that formats a date and degrades cleanly when absent.
 import { renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
-import { variantPath } from '../../supabase/functions/presence/lib/serializer.ts';
+import { variantPath, originalPath } from '../../supabase/functions/presence/lib/serializer.ts';
 import { buildWebsiteHealth } from '../../supabase/functions/presence/lib/website_health.ts';
 
 let pass = 0, fail = 0;
@@ -30,6 +30,17 @@ const SITE = { baseUrl: 'https://vermilionandvine.example' };
   // widths produce distinct paths (no collision across sizes)
   const avifSet = new Set(widths.map((w) => variantPath(sp, w, 'avif')));
   ok('1 three distinct avif widths', avifSet.size === 3);
+}
+
+// ═══ 1b. originalPath: a NON-image file (PDF Download) served verbatim under /files ═══
+{
+  const pdf = 'siteid/menu-2026.pdf';
+  const op = originalPath(pdf, 'application/pdf');
+  ok('1b pdf original path is a stable /files/<hash>.pdf', /^\/files\/[0-9a-f]{8}\.pdf$/.test(op));
+  ok('1b original path is deterministic (same storage_path → same path)', originalPath(pdf, 'application/pdf') === op);
+  ok('1b original path is NOT an image variant path (distinct namespace)', !op.startsWith('/img/') && op !== variantPath(pdf, 1600));
+  // ext derives from the mime, with a sane fallback for anything unmapped
+  ok('1b ext follows the mime', originalPath('x/y.pdf', 'application/pdf').endsWith('.pdf') && originalPath('x/y', 'application/octet-stream').endsWith('.bin'));
 }
 
 // ═══ 2. published render → <picture> with avif + webp + <img> fallback ═══
