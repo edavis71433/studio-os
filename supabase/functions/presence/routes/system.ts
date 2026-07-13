@@ -14,6 +14,7 @@ import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture, runSupportAging, runAgreementRenewalReminders } from '../commerce/lifecycle.ts';
+import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
@@ -305,6 +306,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['invoice_nudges', () => runInvoiceReminders(20)],
             ['doc_reminders', () => runSalesDocReminders(20)],
             ['nurture', () => runProspectNurture(10)],
+            ['broadcasts', () => runScheduledBroadcasts(25)],   // owner-approved scheduled sends, dispatched at due time
           ],
           hygiene: [
             ['stale_runs', () => reapStaleRuns()],   // FIRST: converts the previous run's stuck rows into countable failures
@@ -370,6 +372,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
       await step('nurture', () => runProspectNurture(10));                        // CRO: day-7 free-review follow-up (owner-gated NURTURE_DRIP=1)
+      await step('broadcasts', () => runScheduledBroadcasts(25));                 // BROADCASTS: dispatch owner-approved scheduled sends at their due time
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots

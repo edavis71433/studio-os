@@ -54,6 +54,7 @@ import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, h
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
+import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
@@ -506,6 +507,23 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
   }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
+  // ── Broadcasts: owner-approved email to a saved segment (compose → preview →
+  //    EXPLICITLY send/schedule). Site-scoped + studio-gated by the reviewer
+  //    boundary above; dispatch reuses the ONE send path (suppression + one-click
+  //    unsubscribe inherited). Nothing auto-sends. Literal paths before the :id route.
+  if (route === '/broadcasts' && method === 'GET') return handleBroadcastsList(site, cors);
+  if (route === '/broadcasts' && method === 'POST') return handleBroadcastCreate(req, site, principal, cors);
+  if (route === '/broadcasts/segments' && method === 'GET') return handleBroadcastSegments(site, cors);
+  if (route === '/broadcasts/draft-assist' && method === 'POST') return handleBroadcastDraftAssist(req, site, cors);
+  {
+    let m = route.match(/^\/broadcasts\/([0-9a-f-]{36})$/);
+    if (m && method === 'GET') return handleBroadcastGet(site, m[1], cors);
+    if (m && method === 'PATCH') return handleBroadcastUpdate(req, site, m[1], cors);
+    m = route.match(/^\/broadcasts\/([0-9a-f-]{36})\/send$/);
+    if (m && method === 'POST') return handleBroadcastSend(req, site, principal, m[1], cors);
+    m = route.match(/^\/broadcasts\/([0-9a-f-]{36})\/cancel$/);
+    if (m && method === 'POST') return handleBroadcastCancel(site, m[1], cors);
+  }
   // ── P2-C: Sales & Customer Lifecycle (authed, site-scoped). One coherent
   //    /sales/* resource surface. Public token actions are handled pre-auth above. ──
   if (route === '/sales/contacts') return handleSalesContacts(req, site, principal, cors);

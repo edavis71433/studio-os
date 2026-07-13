@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Send an update — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Write one update and send it to your contacts or website enquiries — you preview and press send.">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
+  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
+  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
+  header .sub{color:var(--soft);font-size:15px;margin:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);margin-top:16px}
+  .card h2{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 4px}
+  .card .hint{color:var(--soft);font-size:13px;margin:0 0 12px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 5px}
+  input[type=text],textarea,select{width:100%;font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  textarea{min-height:150px;resize:vertical;line-height:1.5}
+  input[type=datetime-local]{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .segs{display:flex;flex-wrap:wrap;gap:8px}
+  .seg{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;padding:7px 13px;cursor:pointer;text-align:left}
+  .seg.on{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
+  .seg .n{opacity:.75;font-weight:500}
+  .tokens{font-size:12.5px;color:var(--faint);margin-top:6px}
+  .tokens code{background:var(--p-soft);color:var(--p);border-radius:5px;padding:1px 6px;font-size:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+  button.primary{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:10px 20px;cursor:pointer}
+  button.ghost{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:8px 15px;cursor:pointer}
+  button.ghost:hover{border-color:var(--p);color:var(--p)}
+  button:disabled{opacity:.5;cursor:default}
+  .count{font-size:14px;color:var(--ink);font-weight:600}
+  .count .sub{color:var(--soft);font-weight:400;font-size:13px}
+  .preview{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:12px;background:#f4f2ef}
+  .preview iframe{width:100%;height:420px;border:0;background:#f4f2ef}
+  .preview .subj{padding:10px 14px;font-size:13.5px;color:var(--soft);border-bottom:1px solid var(--line);background:var(--card)}
+  .preview .subj b{color:var(--ink)}
+  .bc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px}
+  .bc .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .bc .subj{font-weight:600;font-size:15px}
+  .bc .st{font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;border-radius:999px;padding:2px 9px}
+  .st.draft{color:var(--warn);background:var(--warn-soft)}
+  .st.scheduled{color:var(--p);background:var(--p-soft)}
+  .st.sent{color:var(--good);background:var(--good-soft)}
+  .st.sending{color:var(--p);background:var(--p-soft)}
+  .st.canceled{color:var(--faint);background:var(--line)}
+  .bc .meta{font-size:13px;color:var(--soft);margin-top:4px}
+  .bc .acts{display:flex;gap:8px;margin-top:12px}
+  .muted{color:var(--soft);font-size:14.5px}
+  .center{text-align:center;padding:50px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20}
+  .toast.show{opacity:1}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Studio OS · You always preview and press send — nothing goes out on its own. Everyone can unsubscribe with one tap.</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="",SEGMENTS=[],BROADCASTS=[],SEL='contacts',DRAFT=null,BUSY=false;
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function scParam(){const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';}
+function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';return Math.floor(d/7)+' weeks ago';}
+function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
+
+function render(){
+  let h=`<div class="rolebadge">● Send an update</div>
+    <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">Write one message and send it to your people. You preview it and press send — nothing ever goes out on its own.</p></header>
+    <div class="card">
+      <h2>Who it goes to</h2>
+      <p class="hint">Pick a list. Anyone who has unsubscribed is left out automatically.</p>
+      <div class="segs" id="segs">${SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" data-seg="${esc(s.key)}"><span>${esc(s.label)}</span> <span class="n">· ${s.count}</span></button>`).join('')||'<span class="muted">Loading lists…</span>'}</div>
+    </div>
+    <div class="card">
+      <h2>Your message</h2>
+      <p class="hint">A subject line and your note. You can use simple formatting.</p>
+      <label for="subj">Subject</label>
+      <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
+      <label for="bodytx">Message</label>
+      <textarea id="bodytx" placeholder="Hi {{first_name}},&#10;&#10;Write your update here…">${esc(DRAFT&&DRAFT.body||'')}</textarea>
+      <p class="tokens">Personalize with <code>{{first_name}}</code> and <code>{{business_name}}</code> — they fill in for each person.</p>
+      <div class="row">
+        <button class="ghost" id="assist" type="button" title="Ask for a first draft you can edit">✨ Help me write it</button>
+        <button class="ghost" id="preview" type="button">Preview →</button>
+      </div>
+    </div>
+    <div id="stage"></div>
+    <div class="card">
+      <h2>Recent broadcasts</h2>
+      ${BROADCASTS.length?BROADCASTS.map(bcCard).join(''):'<p class="muted">Nothing sent yet.</p>'}
+    </div>`;
+  $('main').innerHTML=h;wire();
+}
+function bcCard(b){
+  const cnt=b.status==='sent'?`${b.sent_count} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}`
+    :b.status==='scheduled'?`Scheduled for ${b.scheduled_at?new Date(b.scheduled_at).toLocaleString():'soon'}`
+    :b.status==='draft'?'Draft':b.status;
+  return `<div class="bc">
+    <div class="top"><span class="subj">${esc(b.subject||'(no subject)')}</span><span class="st ${esc(b.status)}">${esc(b.status)}</span></div>
+    <div class="meta">${esc(cnt)} · ${esc(when(b.sent_at||b.created_at))}</div>
+    ${(b.status==='draft'||b.status==='scheduled')?`<div class="acts">${b.status==='scheduled'?`<button class="ghost" data-cancel="${esc(b.id)}">Cancel</button>`:''}</div>`:''}
+  </div>`;
+}
+function wire(){
+  document.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{SEL=b.getAttribute('data-seg');syncDraftFromForm();render();}));
+  const a=$('assist');if(a)a.addEventListener('click',assist);
+  const p=$('preview');if(p)p.addEventListener('click',doPreview);
+  document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelBc(b.getAttribute('data-cancel'))));
+  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;});
+}
+function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAFT||{};DRAFT.subject=s.value;DRAFT.body=t.value;}}
+
+async function assist(){
+  const goal=prompt("What's this update about? (a sentence is enough)");
+  if(!goal)return;
+  toast('Writing a draft…');
+  const r=await api('/broadcasts/draft-assist','POST',{goal});
+  if(!r.ok){toast(r.body&&r.body.message||'Couldn’t draft that.');return;}
+  DRAFT=DRAFT||{};if(r.body.data.subject)DRAFT.subject=r.body.data.subject;if(r.body.data.body)DRAFT.body=r.body.data.body;
+  render();toast('Here’s a starting point — edit anything.');
+}
+
+// Save the current compose form as a draft on the server, return its id.
+async function ensureDraft(){
+  syncDraftFromForm();
+  const subject=($('subj')&&$('subj').value||'').trim();
+  const body=($('bodytx')&&$('bodytx').value||'').trim();
+  if(!subject){toast('Add a subject line first.');return null;}
+  if(!body){toast('Write your message first.');return null;}
+  if(DRAFT&&DRAFT.id){await api('/broadcasts/'+DRAFT.id,'PATCH',{subject,body,audience:SEL});return DRAFT.id;}
+  const r=await api('/broadcasts','POST',{subject,body,audience:SEL});
+  if(!r.ok||!r.body.data||!r.body.data.id){toast('Couldn’t save the draft.');return null;}
+  DRAFT=r.body.data;return DRAFT.id;
+}
+
+async function doPreview(){
+  if(BUSY)return;BUSY=true;
+  const id=await ensureDraft();BUSY=false;if(!id)return;
+  const r=await api('/broadcasts/'+id);
+  if(!r.ok){toast('Couldn’t build the preview.');return;}
+  const d=r.body.data;const cnt=d.recipient_count||0;
+  const skip=d.suppressed_count?` <span class="sub">· ${d.suppressed_count} unsubscribed and left out</span>`:'';
+  $('stage').innerHTML=`<div class="card">
+    <h2>Preview & send</h2>
+    <p class="hint">This is exactly what lands in their inbox.</p>
+    <div class="count">${cnt} ${cnt===1?'person':'people'} will get this${skip}</div>
+    <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||'')}</b></div><iframe id="pvframe" title="Email preview" sandbox=""></iframe></div>
+    <label for="when">When</label>
+    <div class="row" style="margin-top:4px">
+      <label style="display:inline-flex;align-items:center;gap:7px;font-weight:500;color:var(--ink);margin:0"><input type="radio" name="whenmode" value="now" checked> Send now</label>
+      <label style="display:inline-flex;align-items:center;gap:7px;font-weight:500;color:var(--ink);margin:0"><input type="radio" name="whenmode" value="later"> Schedule</label>
+      <input type="datetime-local" id="when" style="display:none">
+    </div>
+    <div class="row">
+      <button class="primary" id="send" ${cnt?'':'disabled'}>${cnt?'Send now':'No one to send to'}</button>
+      <button class="ghost" id="reedit">Keep editing</button>
+    </div>
+  </div>`;
+  // sandboxed preview via srcdoc (isolated, no scripts run)
+  const f=$('pvframe');if(f)f.srcdoc=d.preview_html||'';
+  $('stage').scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelectorAll('[name=whenmode]').forEach(r=>r.addEventListener('change',()=>{const later=document.querySelector('[name=whenmode]:checked').value==='later';$('when').style.display=later?'inline-block':'none';$('send').textContent=later?'Schedule':'Send now';}));
+  $('send').addEventListener('click',()=>doSend(id));
+  $('reedit').addEventListener('click',()=>{$('stage').innerHTML='';$('subj').focus();});
+}
+
+async function doSend(id){
+  if(BUSY)return;
+  const later=document.querySelector('[name=whenmode]:checked').value==='later';
+  let scheduled_at=null;
+  if(later){const v=$('when').value;if(!v){toast('Pick a date and time.');return;}scheduled_at=new Date(v).toISOString();if(Date.parse(scheduled_at)<=Date.now()){toast('Pick a time in the future — or choose Send now.');return;}}
+  if(!later&&!confirm('Send this to your list now?'))return;
+  BUSY=true;$('send').disabled=true;$('send').textContent=later?'Scheduling…':'Sending…';
+  const r=await api('/broadcasts/'+id+'/send','POST',scheduled_at?{scheduled_at}:{});
+  BUSY=false;
+  if(!r.ok){toast(r.body&&r.body.message||'That didn’t send.');$('send').disabled=false;return;}
+  const d=r.body.data||{};
+  if(d.status==='scheduled')toast('Scheduled. It’ll go out then — you can cancel any time before.');
+  else if(d.status==='queued')toast('Sending now — it goes out over the next few minutes.');
+  else toast(`Sent to ${d.sent_count||0} ${(d.sent_count===1)?'person':'people'}.`+(d.failed_count?` (${d.failed_count} couldn’t be reached.)`:''));
+  DRAFT=null;$('stage').innerHTML='';
+  await load();
+}
+
+async function cancelBc(id){
+  if(!confirm('Cancel this scheduled broadcast?'))return;
+  const r=await api('/broadcasts/'+id+'/cancel','POST',{});
+  if(!r.ok){toast(r.body&&r.body.message||'Couldn’t cancel.');return;}
+  toast('Canceled.');await load();
+}
+
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to send an update.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button class="primary" onclick="location.reload()" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;}
+
+async function load(){
+  const seg=await api('/broadcasts/segments');
+  if(seg.status===403){$('main').innerHTML=`<div class="center"><h2>Broadcasts live in your studio workspace.</h2></div>`;return;}
+  if(seg.ok&&seg.body.data)SEGMENTS=seg.body.data.segments||[];
+  const list=await api('/broadcasts');
+  if(list.ok&&list.body.data)BROADCASTS=list.body.data.broadcasts||[];
+  render();
+}
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>
