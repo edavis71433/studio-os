@@ -21,6 +21,7 @@ import { signDocToken, verifyDocToken, renderDocument, type DocKind } from '../l
 import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
+  buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
 } from '../lib/sales_lifecycle.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -192,7 +193,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
       svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version&order=created_at.desc`),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=50`),
-      svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,paid_at,created_at&order=created_at.desc`),
+      svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`),
     ]);
     return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: rows(events), invoices: rows(invoices) } }, 200, cors);
   }
@@ -466,6 +467,111 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   // recorded — the retry that completes it must write the history line.
   if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, amount_cents: Number(inv.amount_cents) }, reused ? 200 : 201, cors);
+}
+
+/** PAYMENT SCHEDULE — turn a deal total into an ordered set of STAGED invoices
+ *  (deposit + balance, or N milestone installments). Pure composition over the
+ *  existing invoice model: each stage is an ordinary presence_invoices row (its
+ *  own Stripe link + reminder sweep + independent webhook settlement), grouped by
+ *  deal_id and ordered by due_date — NO new table/column/migration. The stage math
+ *  (sum == total, remainder-on-last, non-decreasing dates, ≤12 stages) is the pure
+ *  buildPaymentSchedule; this handler just mints the rows and links/emails the
+ *  first (due-now) stage. Later stages are sent on demand (see handleSalesInvoiceSend).
+ *  Guarded: refuses if the deal already carries live invoices, so a plan is never
+ *  a second, double-billing money source. */
+export async function handleSalesSchedule(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before setting up a payment plan.' }, 503, cors);
+  const deal = await loadDeal(site.id, dealId);
+  if (!deal) return json({ error: 'not_found' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+
+  // Total to schedule: explicit > accepted proposal subtotal > the deal's own value.
+  let total: number | null = Number.isFinite(Number(b.total_cents)) ? Math.trunc(Number(b.total_cents)) : null;
+  if (total === null) {
+    const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=subtotal_cents&order=decided_at.desc&limit=1`))[0];
+    total = prop ? Number(prop.subtotal_cents) : (Number(deal.expected_value_cents) || null);
+  }
+  if (!total || total < 50) return json({ error: 'validation', message: 'Set the total to schedule — accept a proposal, set the deal value, or enter an amount.' }, 422, cors);
+
+  // Compose the stage list from the friendly spec (or a raw stages array the
+  // preview already computed). The pure builder is authoritative either way.
+  let stages: StageInput[];
+  if (Array.isArray(b.stages)) stages = b.stages as StageInput[];
+  else if (b.mode === 'installments') stages = equalInstallmentStages({ total_cents: total, count: Number(b.count), first_due_date: b.first_due_date ?? null, interval_days: Number(b.interval_days) });
+  else stages = depositBalanceStages({ deposit_type: b.deposit_type === 'amount' ? 'amount' : 'percent', deposit_value: Number(b.deposit_value), deposit_due_date: b.deposit_due_date ?? null, balance_due_date: b.balance_due_date ?? null });
+
+  const built = buildPaymentSchedule(total, stages);
+  if (!built.ok) return json({ error: 'validation', message: built.error }, 422, cors);
+
+  // A plan is the single money source for the deal — refuse if live invoices
+  // already exist (never double-bill). Voided ones don't count.
+  const existing = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=in.(open,paid)&deleted_at=is.null&select=id&limit=1`))[0];
+  if (existing) return json({ error: 'schedule_exists', message: 'This deal already has invoices — settle or remove them before setting up a payment plan.' }, 409, cors);
+
+  // Mint every stage in ONE bulk insert (atomic: all rows or none).
+  const insBody = built.stages.map((s) => ({
+    site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null,
+    title: s.label, description: `${s.label} — ${deal.title || 'project'}`, amount_cents: s.amount_cents, currency: 'usd',
+    purpose: s.purpose, status: 'open', due_date: s.due_date, created_by: principal.email || principal.userId || 'system',
+  }));
+  const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(insBody) });
+  const created = rows(ins);
+  if (created.length !== built.stages.length) return json({ error: 'write_failed', message: 'The payment plan didn’t save — please try again.' }, 502, cors);
+
+  // Link the FIRST (due-now) stage now and email it — the deposit is payable
+  // immediately, exactly like today's single deposit. Later stages get their link
+  // ON DEMAND when the operator sends them (handleSalesInvoiceSend); the reminder
+  // sweep then nudges any sent-but-unpaid stage as its due date arrives.
+  const sendFirst = b.send_first !== false;
+  const first = created[0];
+  let emailed = false, linked = false;
+  if (sendFirst && first) {
+    try {
+      const link = await createServicePaymentLink({ amountCents: Number(first.amount_cents), currency: 'usd', description: String(first.description || first.title), invoiceId: first.id });
+      await svc(`presence_invoices?id=eq.${first.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+      first.stripe_url = link.url; linked = true;
+      emailed = await emailInvoice(site.id, dealId, String(first.title), link.url, Number(first.amount_cents), first.id);
+      await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: first.id, amount_cents: Number(first.amount_cents), purpose: first.purpose, schedule: true } });
+    } catch { /* the plan is saved; the first stage's link can be generated later via Send */ }
+  }
+  const view = created.map((c) => ({ id: c.id, label: c.title, amount_cents: Number(c.amount_cents), due_date: c.due_date || null, purpose: c.purpose, status: c.status, stripe_url: c.stripe_url || null }));
+  return json({ data: { stages: view, total_cents: built.total_cents, count: view.length, linked, emailed } }, 201, cors);
+}
+
+/** Send (or resend) ONE existing invoice — the per-stage action a payment plan
+ *  needs (e.g. "bill the balance now that the milestone is reached"). Reuses the
+ *  exact single-invoice primitives: generate the Stripe link on demand if missing,
+ *  email the client on the studio's brand, record the history line. Idempotent and
+ *  double-tap-throttled like handleSalesInvoice. Works for ANY open invoice, so a
+ *  plan stage and a one-off invoice share one send path (no parallel system). */
+export async function handleSalesInvoiceSend(req: Request, site: SiteRow, principal: Principal, invoiceId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(invoiceId)) return json({ error: 'bad_request' }, 400, cors);
+  if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before sending invoices.' }, 503, cors);
+  const inv = rows(await svc(`presence_invoices?id=eq.${invoiceId}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
+  if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
+  if (inv.status !== 'open') return json({ error: 'bad_state', message: inv.status === 'paid' ? 'That stage is already paid.' : 'That invoice isn’t open.' }, 409, cors);
+  const hadLink = !!inv.stripe_url;
+  let payUrl: string | null = inv.stripe_url || null;
+  let repaired = false;
+  if (!payUrl) {
+    try {
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id });
+      payUrl = link.url; repaired = true;
+      await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+    } catch {
+      return json({ data: { ...inv, stripe_url: null }, warning: 'link_failed', message: 'The payment link didn’t generate — tap Send again (it finishes this same stage).' }, 200, cors);
+    }
+  }
+  // A resend within 2 minutes of the last touch is a double-tap, not a deliberate
+  // resend — don't send the client two identical emails.
+  const lastTouch = Date.parse(String(inv.updated_at || inv.created_at || '')) || 0;
+  const doubleTap = hadLink && !repaired && (Date.now() - lastTouch) < 120000;
+  const emailed = doubleTap ? false : await emailInvoice(site.id, inv.deal_id, String(inv.title || 'Invoice'), payUrl!, Number(inv.amount_cents), inv.id);
+  if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
+  if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired }, 200, cors);
 }
 
 /** W1: a client just accepted a proposal / signed a contract via the token link.
