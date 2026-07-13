@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesSummary, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
@@ -613,6 +613,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesContractCreate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/convert$/);
     if (m && method === 'POST') return handleSalesConvert(req, site, principal, m[1], cors);
+    // Re-send the welcome / set-password email to a converted customer (never got it / it expired).
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/resend-invite$/);
+    if (m && method === 'POST') return handleSalesResendInvite(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/invoice$/);
     if (m && method === 'POST') return handleSalesInvoice(req, site, principal, m[1], cors);
     // Payment schedule (deposit + balance / staged installments) — mints the deal's

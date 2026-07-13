@@ -1316,6 +1316,27 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }
 
+/** Re-send the welcome / set-password email to an already-converted customer —
+ *  the "they never got it / it expired" recovery. Reuses the ONE invite helper
+ *  (sendCustomerInvite → a fresh signed set-password link), so a resend is byte-
+ *  identical to the original. Only for a converted deal with an email on file;
+ *  logged as an email activity on the deal timeline. Idempotent to re-tap. */
+export async function handleSalesResendInvite(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  const deal = await loadDeal(site.id, dealId);
+  if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
+  if (!deal.converted_client_id) return json({ error: 'not_converted', message: 'Convert this deal to a customer first — then you can send the welcome email.' }, 409, cors);
+  // Email lives on the deal's contact (same source convert used to provision).
+  const contact = deal.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=email&limit=1`))[0] : null;
+  const email = clean(contact?.email, 160).toLowerCase();
+  if (!email || !validEmail(email)) return json({ error: 'no_email', message: 'This customer has no email on file, so there’s nothing to send. Add an email to their contact first.' }, 409, cors);
+  const sent = await sendCustomerInvite(email, false);
+  if (!sent) return json({ error: 'send_failed', message: 'We couldn’t send the welcome email just now — please try again in a moment.' }, 502, cors);
+  await dealEvent(site.id, dealId, 'note', principal, { detail: buildActivityDetail('email', `Welcome email re-sent to ${email}`, nowIso()) });
+  return json({ data: { sent: true, email } }, 200, cors);
+}
+
 // ═══ SHARED PROVISIONING INTERNALS ═══════════════════════════════════════════
 // The account + workspace provisioning that BOTH the deal→convert ceremony and
 // the direct "Add a customer" path run — extracted so there is exactly ONE
