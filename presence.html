@@ -598,6 +598,8 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
         <h1 class="doc" role="heading" aria-level="2">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
         <div id="previewBox"></div>
+        <div id="checkpointBox"></div>
+        <div id="versionToolsBox"></div>
         <div id="launchBox"></div>
         <div id="pubList"></div>
       </section>
@@ -2912,7 +2914,7 @@ async function renderLaunches() {
   });
   card.appendChild(stage);
   const act = async (path, okmsg, body) => { try { await api("POST", path, body || {}); toast(okmsg); renderLaunches(); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } };
-  launches.filter((l) => l.status !== "canceled" && l.status !== "rolled_back").forEach((l) => {
+  launches.filter((l) => l.status !== "canceled" && l.status !== "rolled_back" && l.status !== "checkpoint").forEach((l) => {
     const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
     const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
     top.appendChild(Object.assign(el("strong", null, l.name), { style: "font-size:13.5px" }));
@@ -2981,14 +2983,142 @@ async function renderPreviewPanel() {
   card.appendChild(acts);
   box.appendChild(card);
 }
+// ── Checkpoints — name + save the current draft as a safety point ────────────
+// Reuses the named-snapshot substrate (checkpoints are stored like launches);
+// preview reuses the launch-preview door, "bring into draft" reuses the shared
+// restore-to-draft engine. The live site is never touched.
+async function renderCheckpoints() {
+  const box = $("checkpointBox"); if (!box) return;
+  let cps = [];
+  try { cps = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { box.innerHTML = ""; return; }
+  box.innerHTML = "";
+  const card = el("div", "field"); card.style.marginBottom = "18px";
+  card.appendChild(el("label", null, "Checkpoints"));
+  card.appendChild(el("div", "hint", "Before a big edit or a publish, save a named checkpoint of your current draft — a safety point you can look at or return to anytime. Your live site is never affected."));
+  const save = el("button", null, "Save a checkpoint"); save.type = "button";
+  save.style.cssText = "font:inherit;font-size:12.5px;margin:8px 0;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  save.addEventListener("click", async () => {
+    const name = await askText("Name this checkpoint", { placeholder: "e.g. Before spring redesign", ok: "Save" });
+    if (name === null) return;
+    try { await api("POST", "/publishes/checkpoints", { name }); toast("Checkpoint saved"); renderCheckpoints(); }
+    catch (err) { toast(nice(err), true); }
+  });
+  card.appendChild(save);
+  cps.forEach((c) => {
+    const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
+    const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+    top.appendChild(Object.assign(el("strong", null, c.name), { style: "font-size:13.5px" }));
+    const d = new Date(c.at);
+    top.appendChild(Object.assign(el("span", null, "saved " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")), { style: "font-size:12px;color:var(--soft,#666)" }));
+    row.appendChild(top);
+    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
+    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
+    mk("Look", () => openLaunchPreview(c.id));
+    mk("Bring into draft", async () => {
+      if (!confirm("Bring checkpoint “" + c.name + "” into your draft? Today’s draft is set aside as a safety copy.")) return;
+      try { const r = await api("POST", `/publishes/checkpoints/${c.id}/restore`, {}); toast(r.data.message); await refreshAll(); go("today"); }
+      catch (err) { toast(nice(err), true); }
+    }, true);
+    mk("Remove", async () => {
+      if (!confirm("Remove checkpoint “" + c.name + "”? This can’t be undone.")) return;
+      try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
+      catch (err) { toast(nice(err), true); }
+    });
+    row.appendChild(acts);
+    card.appendChild(row);
+  });
+  box.appendChild(card);
+}
+// ── Compare any two versions + Timewarp ──────────────────────────────────────
+// Compare feeds two kept versions to the SAME plain-language change engine the
+// publish sheet uses; Timewarp resolves a date to the version that was live then
+// and opens it in the existing read-only preview. Depends on S.publishes (set by
+// loadHistory before this runs).
+function versionOptionLabel(p) {
+  const d = new Date(p.at);
+  const when = d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "");
+  return (p.label ? "“" + p.label + "” · " : "") + when + (p.kind === "restore" ? " · restored" : "");
+}
+function fromToWord(side) {
+  if (side.ref === "draft") return "your working draft";
+  if (side.label) return "“" + side.label + "”";
+  if (side.at) return new Date(side.at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return "that version";
+}
+function renderVersionTools() {
+  const box = $("versionToolsBox"); if (!box) return;
+  box.innerHTML = "";
+  const versions = (S.publishes || []).filter((p) => p.status === "live" && p.restorable);
+  const card = el("div", "field"); card.style.marginBottom = "18px";
+  card.appendChild(el("label", null, "Compare & look back"));
+  card.appendChild(el("div", "hint", "See what changed between any two versions in plain language, or travel back to see your site as it looked on a chosen date."));
+
+  // Compare
+  const cmp = el("div"); cmp.style.cssText = "margin-top:10px";
+  if (versions.length < 1) {
+    cmp.appendChild(el("div", "hint", "Once you’ve published a version, you can compare it with your working draft here."));
+  } else {
+    const opts = [{ v: "draft", t: "Your working draft" }].concat(versions.map((p) => ({ v: p.id, t: versionOptionLabel(p) })));
+    const mkSel = (aria, def) => {
+      const s = el("select"); s.setAttribute("aria-label", aria);
+      s.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line,#ddd);border-radius:8px;max-width:100%";
+      opts.forEach((o) => { const op = el("option", null, o.t); op.value = o.v; s.appendChild(op); });
+      s.value = def; return s;
+    };
+    const from = mkSel("Compare from version", versions[0] ? versions[0].id : "draft");
+    const to = mkSel("Compare to version", "draft");
+    const rowc = el("div"); rowc.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+    rowc.appendChild(Object.assign(el("span", null, "From"), { style: "font-size:12.5px" })); rowc.appendChild(from);
+    rowc.appendChild(Object.assign(el("span", null, "to"), { style: "font-size:12.5px" })); rowc.appendChild(to);
+    const go = el("button", null, "Compare"); go.type = "button";
+    go.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470";
+    rowc.appendChild(go); cmp.appendChild(rowc);
+    const out = el("div"); out.style.cssText = "margin-top:10px"; cmp.appendChild(out);
+    go.addEventListener("click", async () => {
+      if (from.value === to.value) { out.innerHTML = `<div class="hint">Those are the same version — pick two different ones.</div>`; return; }
+      out.innerHTML = `<div class="shimmer"></div>`;
+      try {
+        const d = (await api("GET", `/publishes/compare?a=${encodeURIComponent(from.value)}&b=${encodeURIComponent(to.value)}`)).data;
+        if (d.identical) { out.innerHTML = `<div class="hint">These two versions are identical — nothing changed between them.</div>`; return; }
+        out.innerHTML = "";
+        out.appendChild(el("div", "hint", `${d.count} change${d.count === 1 ? "" : "s"} from ${fromToWord(d.from)} to ${fromToWord(d.to)}:`));
+        const j = el("div", "journal");
+        d.changes.forEach((ch) => { const jr = el("div", "jrow"); jr.appendChild(el("span", "jsec", sectionWord(ch.section))); jr.appendChild(el("span", null, ch.sentence)); j.appendChild(jr); });
+        out.appendChild(j);
+      } catch (err) { out.innerHTML = `<div class="hint">${esc(nice(err))}</div>`; }
+    });
+  }
+  card.appendChild(cmp);
+
+  // Timewarp
+  const tw = el("div"); tw.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#eee)";
+  tw.appendChild(el("div", "hint", "See your site as it looked on a chosen date:"));
+  const roww = el("div"); roww.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px";
+  const dt = el("input"); dt.type = "date"; dt.setAttribute("aria-label", "Date to travel back to");
+  dt.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line,#ddd);border-radius:8px";
+  const today = new Date(); const pad = (n) => String(n).padStart(2, "0");
+  dt.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const twGo = el("button", null, "Travel there"); twGo.type = "button";
+  twGo.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
+  roww.appendChild(dt); roww.appendChild(twGo); tw.appendChild(roww);
+  twGo.addEventListener("click", async () => {
+    if (!dt.value) { toast("Pick a date first.", true); return; }
+    try { const d = (await api("GET", `/publishes/timewarp?date=${encodeURIComponent(dt.value)}`)).data; toast(d.message); openPublishPreview(d.publish_id); }
+    catch (err) { toast(nice(err), true); }
+  });
+  card.appendChild(tw);
+  box.appendChild(card);
+}
 async function loadHistory() {
   renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
+  renderCheckpoints();    // named draft safety points
   renderLaunches();   // FD-T7: staged launches sit above the version journal
   const list = $("pubList");
   list.innerHTML = `<div class="loadline"><div class="lq">Opening the journal…</div><div class="shimmer"></div></div>`;
   try {
     const pubs = (await api("GET", "/publishes")).data;
     S.publishes = pubs;
+    renderVersionTools();   // compare any two versions + Timewarp (needs S.publishes)
     list.innerHTML = "";
     if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">The journal is empty — for now.</div><div class="eh">When you publish, every version of your site is kept here, forever restorable.</div></div>`; return; }
     pubs.forEach((p) => {

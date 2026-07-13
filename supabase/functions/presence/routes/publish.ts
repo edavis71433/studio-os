@@ -20,8 +20,15 @@ import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '..
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
+import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
+import { captureDraftSnapshot } from '../lib/staging.ts';
+import { applySnapshotToDraft } from '../lib/draft_writer.ts';
+import { snapshotContentUsable } from '../lib/render_types.ts';
+import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
 
@@ -326,4 +333,147 @@ export async function handleVersionLabel(req: Request, site: SiteRow, principal:
   if (!r.ok || !Array.isArray(r.json) || !r.json.length) return json({ error: 'not_found', message: 'That version isn’t in your journal.' }, 404, cors);
   await writeChangeEvent({ siteId: site.id, entityType: 'publish', entityId: publishId, action: 'update', summary: label ? `Named a kept version “${label}”` : 'Removed a version’s name', principal, provenance: 'human', fields: ['version_label'] });
   return json({ data: { id: publishId, label } }, 200, cors);
+}
+
+// ── Version tools (Compare · Timewarp · Checkpoint) ──────────────────────────
+// All three are WIRING over engines that already exist:
+//   • Compare  → the change-sentence engine (lib/diff.ts describeChanges), which
+//     until now only ever saw draft-vs-live; here it is fed ANY two snapshots.
+//   • Timewarp → the preview renderer (routes/preview.ts, publish_id door): we
+//     resolve which retained version was live on a date, then hand its publish_id
+//     to the SAME read-only preview the "Look" button uses.
+//   • Checkpoint → captureDraftSnapshot (lib/staging.ts) + the presence_launches
+//     named-snapshot substrate (status='checkpoint'); restore reuses the shared
+//     draft-writer, preview reuses the existing /preview?launch_id= door. No new
+//     store, no migration — GC already retains presence_launches.snapshot_id.
+
+/** Resolve one side of a comparison to its snapshot CONTENT. Accepts a kept
+ *  version's publish id, or the tokens 'live' / 'draft'. Site-scoped throughout. */
+async function loadVersionContent(site: SiteRow, ref: string):
+  Promise<{ content: SnapshotContent; label: string; at: string | null } | { error: string; message: string; status: number }> {
+  if (ref === 'draft') {
+    const t = getTemplate(site.template_slug, site.template_version);
+    if (!t) return { error: 'template_missing', message: 'This site’s template isn’t available.', status: 500 };
+    const { snapshot } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
+    return { content: snapshot.content as SnapshotContent, label: 'Your working draft', at: null };
+  }
+  let snapId: string | null = null, at: string | null = null, label = '';
+  if (ref === 'live') {
+    const p = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id,created_at,completed_at,version_label&order=created_at.desc&limit=1`);
+    const row = p.json?.[0];
+    if (!row?.snapshot_id) return { error: 'not_found', message: 'Nothing is live yet — publish first, then you can compare.', status: 404 };
+    snapId = row.snapshot_id; at = row.completed_at || row.created_at; label = row.version_label || '';
+  } else if (UUID_RE.test(ref)) {
+    const p = await svc(`presence_publishes?id=eq.${ref}&site_id=eq.${site.id}&select=snapshot_id,created_at,completed_at,version_label&limit=1`);
+    const row = p.json?.[0];
+    if (!row) return { error: 'not_found', message: 'We couldn’t find that version.', status: 404 };
+    if (!row.snapshot_id) return { error: 'not_comparable', message: 'That version is no longer kept, so it can’t be compared.', status: 410 };
+    snapId = row.snapshot_id; at = row.completed_at || row.created_at; label = row.version_label || '';
+  } else {
+    return { error: 'bad_request', message: 'Pick two versions to compare.', status: 400 };
+  }
+  const s = await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content&limit=1`);
+  const content = s.json?.[0]?.content;
+  if (!content || !snapshotContentUsable(content)) return { error: 'not_comparable', message: 'That version predates the current site format, so it can’t be compared.', status: 410 };
+  return { content: content as SnapshotContent, label, at };
+}
+
+/** GET /publishes/compare?a=<id|live|draft>&b=<id|live|draft> — plain-language
+ *  differences going FROM version a TO version b, in the ONE change-sentence
+ *  vocabulary the publish sheet uses. */
+export async function handleCompareVersions(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const url = new URL(req.url);
+  const a = (url.searchParams.get('a') || '').trim();
+  const b = (url.searchParams.get('b') || '').trim();
+  if (!a || !b) return json({ error: 'bad_request', message: 'Pick two versions to compare.' }, 400, cors);
+  const A = await loadVersionContent(site, a);
+  if ('error' in A) return json({ error: A.error, message: A.message }, A.status, cors);
+  const B = await loadVersionContent(site, b);
+  if ('error' in B) return json({ error: B.error, message: B.message }, B.status, cors);
+  const cs = describeVersionDiff(A.content, B.content);
+  return json({
+    data: {
+      from: { ref: a, label: A.label, at: A.at },
+      to: { ref: b, label: B.label, at: B.at },
+      count: cs.count, identical: cs.count === 0, changes: cs.changes,
+    },
+  }, 200, cors);
+}
+
+/** GET /publishes/timewarp?date=<YYYY-MM-DD | ISO> — resolve the retained version
+ *  that was live on that date. The client then opens it in the read-only preview
+ *  (publish_id door). Honest when the date predates retention. */
+export async function handleTimewarp(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const url = new URL(req.url);
+  const date = url.searchParams.get('date') || '';
+  const r = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&snapshot_id=not.is.null&select=id,created_at,completed_at,version_label&order=created_at.desc&limit=60`);
+  const rows: any[] = Array.isArray(r.json) ? r.json : [];
+  const versions: TimewarpVersion[] = rows.map((p) => ({ publish_id: p.id, effective_at: p.completed_at || p.created_at, label: p.version_label || '' }));
+  const res = resolveTimewarpTarget(versions, normalizeTimewarpDate(date));
+  const friendly = (iso?: string) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+  if (!res.ok) {
+    const msg = res.reason === 'bad_date' ? 'Pick a date to travel back to.'
+      : res.reason === 'no_versions' ? 'Your website has no saved versions yet — publish first, then you can look back in time.'
+      : `We don’t keep a version from that far back. The earliest one we still have is from ${friendly(res.earliest_at)}.`;
+    return json({ error: res.reason, message: msg, ...(res.earliest_at ? { earliest_at: res.earliest_at } : {}) }, res.reason === 'bad_date' ? 400 : 404, cors);
+  }
+  return json({
+    data: {
+      publish_id: res.publish_id, effective_at: res.effective_at, label: res.label, is_current: res.is_current,
+      message: res.is_current ? 'That’s how your website looks right now.' : `Here’s your website as it looked on ${friendly(res.effective_at)}.`,
+    },
+  }, 200, cors);
+}
+
+const CHECKPOINT_STATUS = 'checkpoint';   // an off-workflow status on the shared named-snapshot table; never enters the launch state machine
+
+/** GET /publishes/checkpoints — the site's saved draft checkpoints. */
+export async function handleCheckpointList(site: SiteRow, cors: Record<string, string>) {
+  const r = await svc(`presence_launches?site_id=eq.${site.id}&status=eq.${CHECKPOINT_STATUS}&snapshot_id=not.is.null&select=id,name,created_at&order=created_at.desc&limit=30`);
+  const rows: any[] = Array.isArray(r.json) ? r.json : [];
+  return json({ data: rows.map((l) => ({ id: l.id, name: l.name, at: l.created_at })) }, 200, cors);
+}
+
+/** POST /publishes/checkpoints { name } — snapshot the current draft as a named
+ *  safety point. Reuses captureDraftSnapshot (the one draft-capture path). */
+export async function handleCheckpointSave(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: 'This site can’t save a checkpoint right now.' }, 409, cors);
+  let body: any = null; try { body = await req.json(); } catch { /* */ }
+  const name = cleanCheckpointName(body?.name);
+  const cap = await captureDraftSnapshot(site, principal);
+  if ('error' in cap) return json({ error: cap.error, message: cap.message }, cap.status, cors);
+  const ins = await svc('presence_launches', {
+    method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, name, status: CHECKPOINT_STATUS, snapshot_id: cap.snapshotId, created_by: principal.userId }),
+  });
+  if (!ins.ok || !ins.json?.[0]?.id) return json({ error: 'checkpoint_failed', message: 'We couldn’t save that checkpoint — please try again.' }, 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'launch', entityId: ins.json[0].id, action: 'create', summary: `Saved a checkpoint “${name}”`, principal, provenance: 'human' });
+  return json({ data: { id: ins.json[0].id, name, at: ins.json[0].created_at, blockers: cap.blockers, warnings: cap.warnings, message: 'Checkpoint saved — you can look at it or return to it anytime.' } }, 201, cors);
+}
+
+/** POST /publishes/checkpoints/:id/restore — bring a checkpoint back into the
+ *  draft (a safety point). Reuses the shared draft-writer; the live site is
+ *  untouched until the owner publishes. */
+export async function handleCheckpointRestore(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'bad_request', message: 'Which checkpoint should we bring back?' }, 400, cors);
+  const l = await svc(`presence_launches?id=eq.${id}&site_id=eq.${site.id}&status=eq.${CHECKPOINT_STATUS}&select=name,snapshot_id&limit=1`);
+  const row = l.json?.[0];
+  if (!row) return json({ error: 'not_found', message: 'That checkpoint isn’t here.' }, 404, cors);
+  if (!row.snapshot_id) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
+  const s = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,dev_customization&limit=1`);
+  const snap = s.json?.[0];
+  if (!snap) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
+  const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`);
+  if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' }, 502, cors);
+  return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft. Your previous draft was set aside as a safety copy — nothing was lost.` } }, 200, cors);
+}
+
+/** DELETE /publishes/checkpoints/:id — remove a saved checkpoint (its snapshot is
+ *  reclaimed later by the normal GC once unreferenced). */
+export async function handleCheckpointDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'bad_request', message: 'Which checkpoint?' }, 400, cors);
+  const r = await svc(`presence_launches?id=eq.${id}&site_id=eq.${site.id}&status=eq.${CHECKPOINT_STATUS}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+  if (!r.ok || !Array.isArray(r.json) || !r.json.length) return json({ error: 'not_found', message: 'That checkpoint is already gone.' }, 404, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'launch', entityId: id, action: 'update', summary: 'Removed a checkpoint', principal, provenance: 'human' });
+  return json({ data: { ok: true } }, 200, cors);
 }

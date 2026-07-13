@@ -33,7 +33,7 @@ import { handleMessages, handleNotifications, handleNotificationsRead } from './
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
-import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate } from './routes/assets.ts';
@@ -413,6 +413,19 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/publish' && method === 'POST') return handlePublish(req, site, principal, cors);
   if (route === '/restore' && method === 'POST') return handleRestore(req, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
+  // ── Version tools: compare any two versions · Timewarp · draft checkpoints ──
+  // (all under /publishes/* so featureForRoute maps them to the 'website' area).
+  if (route === '/publishes/compare' && method === 'GET') return handleCompareVersions(req, site, cors);
+  if (route === '/publishes/timewarp' && method === 'GET') return handleTimewarp(req, site, cors);
+  if (route === '/publishes/checkpoints' && method === 'GET') return handleCheckpointList(site, cors);
+  if (route === '/publishes/checkpoints' && method === 'POST') return handleCheckpointSave(req, site, principal, cors);
+  {
+    const m = route.match(/^\/publishes\/checkpoints\/([0-9a-f-]{36})(\/restore)?$/);
+    if (m) {
+      if (m[2] === '/restore' && method === 'POST') return handleCheckpointRestore(site, principal, m[1], cors);
+      if (!m[2] && method === 'DELETE') return handleCheckpointDelete(site, principal, m[1], cors);
+    }
+  }
   // ── FD-T7: Launches — named staged releases through the ONE pipeline ──
   if (route === '/launches' && method === 'GET') return handleLaunchList(site, cors);
   if (route === '/launches' && method === 'POST') return handleLaunchCreate(req, site, principal, cors);
