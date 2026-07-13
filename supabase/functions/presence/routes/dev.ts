@@ -65,6 +65,11 @@ export async function handleDevCustomizationGet(jwt: string, site: SiteRow, prin
     custom_css: row?.custom_css ?? '',
     custom_html: row?.custom_html ?? '',
     allowed_tokens: ALLOWED_TOKENS,
+    // Whether THIS caller may author custom CSS/HTML (full Developer Mode) vs. only
+    // read it (an owner sees the palette but not the advanced CSS editor). The UI
+    // gates the "Custom CSS (advanced)" area on this so non-technical owners never
+    // trip over it.
+    can_edit_css: devModeAllowed(role, principal.kind),
     updated_at: row?.updated_at ?? null,
     updated_by: row?.updated_by ?? null,
   } }, 200, cors);

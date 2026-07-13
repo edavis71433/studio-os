@@ -8,6 +8,7 @@
 // not code. Render-LOGIC (the TypeScript templates/components) stays a build-time
 // SDK activity — there is no in-app runtime code editor, by design (determinism +
 // no-foreign-code are Product Laws). Pure.
+import { sanitizeCustomCss } from './custom_css.ts';
 
 export interface DevCustomization {
   theme_tokens: Record<string, string>;   // e.g. { accent:'#5b3fa0', ink:'#1b1525' }
@@ -87,15 +88,15 @@ export const DEV_HTML_ALLOW: ReadonlySet<string> = new Set([
   'col', 'colgroup', 'dl', 'dt', 'dd', 'time', 'mark', 'abbr',
 ]);
 
-/** Custom CSS is inert (no execution), but strip the few CSS constructs that can
- *  fetch/execute: url(javascript:…), expression(), @import, and behavior:. */
+/** Custom CSS is inert (no execution). Sanitizing is delegated to the single
+ *  hardened boundary in lib/custom_css.ts (the "Developer" story, layer 1): length
+ *  cap, `</style>` breakout prevention, @import stripped, expression()/behavior:/
+ *  -moz-binding: neutralized, and url() gated to relative/data:/platform-asset
+ *  origins only (external url() is a privacy/CSS-exfil channel). Kept as a thin
+ *  re-export so every existing caller (render re-sanitize, serializer, /dev save)
+ *  gets the hardening without a second CSS sanitizer. */
 export function sanitizeDevCss(css: string): string {
-  let s = String(css || '');
-  s = s.replace(/@import[^;]+;?/gi, '');
-  s = s.replace(/expression\s*\([^)]*\)/gi, '');
-  s = s.replace(/url\s*\(\s*["']?\s*(javascript|vbscript|data):[^)]*\)/gi, 'none');
-  s = s.replace(/behavior\s*:[^;}]+/gi, '');
-  return s.slice(0, 100_000); // hard size cap
+  return sanitizeCustomCss(css);
 }
 
 /** Build the safe, validated customization from raw input. */

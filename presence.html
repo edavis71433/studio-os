@@ -3326,6 +3326,51 @@ async function mountDesignCard() {
   host.appendChild(card);
   mountSectionsCard();
   mountBlocksCard();
+  mountDevCssCard();   // "Developer" story, layer 1 — advanced Custom CSS, off the no-code path
+}
+// ── Custom CSS (advanced) — the first layer of the safe "Developer" story ─────
+// Deliberately OFF the main no-code path: a collapsed disclosure that appears ONLY
+// for a user who can author custom CSS (can_edit_css from /dev/customization — the
+// developer capability). Styling only: the server sanitizes to inert CSS (no
+// scripts, no <style> breakout, no third-party url()) at save AND at render, and it
+// applies to this owner's own published site, versioned with the snapshot. Saves
+// through the SAME /dev/customization path as Design Studio (one machinery).
+async function mountDevCssCard() {
+  const host = $("designHost") || $("view-business"); if (!host || $("devCssCard")) return;
+  let data;
+  try { data = (await api("GET", "/dev/customization")).data; }
+  catch (_) { return; }
+  if (!data || !data.can_edit_css) return;   // owners see the palette, not the advanced editor
+
+  const wrap = el("details", "field"); wrap.id = "devCssCard"; wrap.style.marginTop = "18px";
+  const sum = el("summary", null, "Custom CSS (advanced)");
+  sum.style.cssText = "cursor:pointer;font-weight:600;font-size:13px;color:#3a2470;list-style:none;padding:2px 0";
+  wrap.appendChild(sum);
+  wrap.appendChild(el("div", "hint", "Advanced: add your own CSS to fine-tune the look. Styling only — scripts aren’t allowed, so your site stays safe and fast. Changes apply next time you publish."));
+
+  const ta = el("textarea"); ta.value = data.custom_css || "";
+  ta.spellcheck = false; ta.setAttribute("aria-label", "Custom CSS");
+  ta.style.cssText = "width:100%;min-height:200px;margin-top:10px;padding:11px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--card,#fff);color:var(--ink,#1b1525);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;resize:vertical;tab-size:2";
+  ta.placeholder = ".hero h1 { letter-spacing: -.02em; }";
+  wrap.appendChild(ta);
+
+  const note = el("div", "hint", ""); note.style.marginTop = "8px";
+  const save = el("button", null, "Save custom CSS"); save.type = "button";
+  save.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:12px;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    try {
+      const r = await api("PUT", "/dev/customization", { theme_tokens: DESIGN_TOKENS, custom_css: ta.value });
+      const saved = (r.data && r.data.saved && r.data.saved.custom_css) || "";
+      ta.value = saved;   // reflect exactly what was stored (post-sanitize)
+      const adjusted = r.data && r.data.sanitized && r.data.sanitized.css;
+      note.textContent = adjusted ? "Saved. Some CSS wasn’t allowed and was adjusted for safety." : "";
+      toast("Custom CSS saved — publish to take it live"); scheduleChangesRefresh(); refreshDesignPreview();
+    } catch (err) { toast(nice(err), true); }
+    finally { save.disabled = false; }
+  });
+  wrap.appendChild(save); wrap.appendChild(note);
+  host.appendChild(wrap);
 }
 // ── Phase T-BLOCKS (FD-T15): content blocks — structured sections you turn on + fill.
 //    Writes the SAME /settings blocks array the server validates + the template renders
