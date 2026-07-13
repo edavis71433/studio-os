@@ -24,10 +24,12 @@
   .eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:10px}
   h1{font-family:var(--serif);font-size:30px;font-weight:400;line-height:1.1;margin-bottom:8px;letter-spacing:-.4px}
   .sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+  .sub .em{color:var(--ink);font-weight:600}
   label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 5px}
   input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--cream);color:var(--ink);
     border-radius:10px;padding:11px 13px;outline:none}
   input:focus{border-color:var(--p)}
+  input.code{letter-spacing:8px;font-size:22px;text-align:center;font-weight:600}
   button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);
     background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;width:100%;margin-top:20px}
   button:disabled{opacity:.55;cursor:default}
@@ -36,9 +38,12 @@
   @media (prefers-color-scheme:dark){button{color:#171320}}
   .err{background:#fbeaea;color:#8a2f2f;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
   @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
+  .ok{background:#eef4ef;color:#2e6a44;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px}
+  @media (prefers-color-scheme:dark){.ok{background:#1f2a24;color:#8bbf9f}}
   .muted{color:var(--muted);font-size:13px;margin-top:16px;text-align:center}
   .muted button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13px}
   .muted button.linky:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
+  .muted button.linky:disabled{color:var(--muted);cursor:default}
   .panel{display:none}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:8px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -49,20 +54,54 @@
 <div class="card">
   <a class="brand" href="/">Davis<span class="d">Digital</span> Studio</a>
 
-  <!-- SIGN IN -->
-  <div id="loginPanel">
+  <!-- SIGN IN · PASSWORDLESS (primary) -->
+  <div id="emailPanel">
     <div class="eyebrow">Client portal</div>
     <h1>Welcome</h1>
-    <p class="sub">Sign in to see your project, files, and what's next.</p>
-    <form id="f" novalidate>
+    <p class="sub">Sign in to see your project, files, and what's next. No password needed — we'll email you a code.</p>
+    <form id="fEmail" novalidate>
       <label for="em">Email</label>
-      <input id="em" type="email" autocomplete="email" placeholder="you@business.com" required>
+      <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required>
+      <button id="sendGo" type="submit">Email me a sign-in code</button>
+    </form>
+    <div class="err" id="errEmail" role="alert"></div>
+    <p class="muted"><button class="linky" id="toPw" type="button">Prefer a password? Sign in with a password instead</button></p>
+    <p class="muted">First time here? Use the link in your invitation email to set things up.</p>
+  </div>
+
+  <!-- CODE ENTRY (after a code is sent) -->
+  <div id="codePanel" class="panel">
+    <div class="eyebrow">Check your email</div>
+    <h1>Enter your code</h1>
+    <p class="sub" id="codeSub">If that email has an account, your 6-digit code is on the way. Enter it below — or just tap the sign-in link in the email.</p>
+    <form id="fCode" novalidate>
+      <label for="code">6-digit code</label>
+      <input id="code" class="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" pattern="[0-9]*" placeholder="······"
+             autocorrect="off" autocapitalize="off" spellcheck="false"
+             name="dds-signin-code" data-lpignore="true" data-1p-ignore="true"
+             oninput="this.value=this.value.replace(/[^0-9]/g,'')" required>
+      <button id="codeGo" type="submit">Sign in →</button>
+    </form>
+    <div class="err" id="errCode" role="alert"></div>
+    <p class="muted" aria-live="polite" id="resendLine"><button class="linky" id="resend" type="button">Didn't get it? Send again</button></p>
+    <p class="muted"><button class="linky" id="toEmail" type="button">Use a different email</button></p>
+  </div>
+
+  <!-- SIGN IN · PASSWORD (preserved fallback) -->
+  <div id="pwPanel" class="panel">
+    <div class="eyebrow">Client portal</div>
+    <h1>Welcome</h1>
+    <p class="sub">Sign in with your email and password.</p>
+    <form id="f" novalidate>
+      <label for="empw">Email</label>
+      <input id="empw" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required>
       <label for="pw">Password</label>
       <input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required>
       <button id="go" type="submit">Sign in →</button>
     </form>
     <div class="err" id="err" role="alert"></div>
-    <p class="muted">First time here? Use the link in your invitation email to set a password.</p>
+    <p class="muted"><button class="linky" id="toCode" type="button">Email me a code instead</button></p>
     <p class="muted"><button class="linky" id="forgot" type="button">Forgot your password?</button></p>
   </div>
 
@@ -96,20 +135,31 @@
 // The legacy in-page portal app is retired — clients now live in the modern
 // experience (client.html for delivery, or their own workspace pages). Team
 // and owner accounts that knock here are routed to the Studio OS door.
+//
+// PASSWORDLESS-FIRST (consumer-auth benchmark): the primary way in is an emailed
+// 6-digit code / magic link via GoTrue's signInWithOtp — lowest friction, best
+// mobile UX, no shared secret to phish. Password is kept as a quiet fallback so
+// nothing existing breaks. A verified OTP creates a NORMAL Supabase session in
+// the same 'dds-portal-auth' storage, so the role-routing below and every app
+// page (client.html, workspace) keep working unchanged.
 var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 var FN = SUPABASE_URL + "/functions/v1";
 var $ = function(id){ return document.getElementById(id); };
-function show(id){ ['loginPanel','routing','noAccess','resetSent'].forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); }
-function err(m){ var e=$('err'); e.textContent=m; e.style.display='block'; }
+var PANELS = ['emailPanel','codePanel','pwPanel','routing','noAccess','resetSent'];
+function show(id){ PANELS.forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); }
+function errIn(boxId, m){ var e=$(boxId); e.textContent=m; e.style.display='block'; }
+function clearErr(boxId){ var e=$(boxId); if(e){ e.style.display='none'; } }
 function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
 
 var sb = null;
 if (typeof supabase !== "undefined") {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 } else {
-  err("Connection problem — check your internet and refresh this page.");
+  errIn('errEmail', "Connection problem — check your internet and refresh this page.");
 }
+
+var pendingEmail = "";   // the email a code was last sent to (for verify + resend)
 
 var NA_DEFAULT = null;   // the panel's honest default copy (captured once, restored on every retry)
 function noAccess(msg){
@@ -119,6 +169,7 @@ function noAccess(msg){
   show('noAccess');
 }
 
+// ── the ONE post-sign-in role-router (used by password, OTP, and link arrivals) ──
 async function route(token){
   show('routing');
   var sawNetworkTrouble = false;
@@ -147,42 +198,141 @@ async function route(token){
   noAccess(null);
 }
 
+// ── rate-limit-friendly cooldown for code sends ──
+var cooldownTimer = null;
+function startResendCooldown(secs){
+  var b = $('resend'); if (!b) return;
+  var left = secs;
+  b.disabled = true;
+  if (cooldownTimer) clearInterval(cooldownTimer);
+  var tick = function(){
+    if (left <= 0) { clearInterval(cooldownTimer); cooldownTimer = null; b.disabled = false; b.textContent = "Didn't get it? Send again"; return; }
+    b.textContent = "You can send another code in " + left + "s";
+    left--;
+  };
+  tick();
+  cooldownTimer = setInterval(tick, 1000);
+}
+
+// ── PRIMARY: send the sign-in code (non-enumerating, never creates an account) ──
+async function sendCode(email){
+  if (!sb) { errIn('errEmail', "Connection problem — check your internet and refresh this page."); return false; }
+  try {
+    // shouldCreateUser:false → signing in never silently makes a new account.
+    // emailRedirectTo → the magic LINK in the same email lands back here and
+    // role-routes via the bootstrap below. We ignore the result shape on purpose
+    // so we never reveal whether an account exists.
+    await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + '/portal.html' } });
+  } catch (e) { /* stay non-enumerating — same calm outcome either way */ }
+  return true;
+}
+
+$('fEmail').addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  clearErr('errEmail');
+  var em = $('em').value.trim();
+  if (!em || em.indexOf('@') < 1) { errIn('errEmail', 'Please enter your email address.'); $('em').focus(); return; }
+  var b = $('sendGo'); b.disabled = true; b.textContent = 'Sending…';
+  await sendCode(em);
+  pendingEmail = em;
+  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account, your 6-digit code is on the way. Enter it below — or just tap the sign-in link in the email.";
+  $('codeSub').querySelector('.em').textContent = em;
+  b.disabled = false; b.textContent = 'Email me a sign-in code';
+  clearErr('errCode');
+  $('code').value = '';
+  show('codePanel');
+  startResendCooldown(30);
+  $('code').focus();
+});
+
+$('fCode').addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  clearErr('errCode');
+  if (!sb) { errIn('errCode', "Connection problem — check your internet and refresh this page."); return; }
+  var token = ($('code').value || '').replace(/[^0-9]/g, '');
+  if (token.length < 6) { errIn('errCode', 'Enter the 6-digit code from your email.'); return; }
+  var b = $('codeGo'); b.disabled = true; b.textContent = 'Signing in…';
+  try {
+    var r = await sb.auth.verifyOtp({ email: pendingEmail, token: token, type: 'email' });
+    if (r.error || !r.data || !r.data.session) {
+      $('code').value = '';                       // clear the field on failure
+      errIn('errCode', 'That code didn’t work — it may have expired. Check the latest email, or send a new code.');
+      b.disabled = false; b.textContent = 'Sign in →'; $('code').focus(); return;
+    }
+    route(r.data.session.access_token);
+  } catch (e) {
+    $('code').value = '';
+    errIn('errCode', 'Something went wrong — give it another try, or send a new code.');
+    b.disabled = false; b.textContent = 'Sign in →';
+  }
+});
+
+$('resend').addEventListener('click', async function(){
+  if (this.disabled || !pendingEmail) return;
+  clearErr('errCode');
+  await sendCode(pendingEmail);
+  $('code').value = '';
+  startResendCooldown(30);
+  $('code').focus();
+});
+
+// ── FALLBACK: email + password (unchanged behavior) ──
 $('f').addEventListener('submit', async function(ev){
   ev.preventDefault();
-  if (!sb) { err("Connection problem — check your internet and refresh this page."); return; }
-  var em = $('em').value.trim(), pw = $('pw').value;
-  if (!em || !pw) { err('Please enter your email and password.'); return; }
-  var b = $('go'); b.disabled = true; b.textContent = 'Signing in…'; $('err').style.display='none';
+  if (!sb) { errIn('err', "Connection problem — check your internet and refresh this page."); return; }
+  var em = $('empw').value.trim(), pw = $('pw').value;
+  if (!em || !pw) { errIn('err', 'Please enter your email and password.'); return; }
+  var b = $('go'); b.disabled = true; b.textContent = 'Signing in…'; clearErr('err');
   try {
     var r = await sb.auth.signInWithPassword({ email: em, password: pw });
-    if (r.error || !r.data || !r.data.session) { err('That email or password isn’t right. Check your welcome email, or use “Forgot your password?” below.'); b.disabled=false; b.textContent='Sign in →'; return; }
+    if (r.error || !r.data || !r.data.session) { errIn('err', 'That email or password isn’t right. Check your welcome email, or use “Forgot your password?” below.'); b.disabled=false; b.textContent='Sign in →'; return; }
     route(r.data.session.access_token);
-  } catch (e) { err('Something went wrong signing in. Give it another try.'); b.disabled=false; b.textContent='Sign in →'; }
+  } catch (e) { errIn('err', 'Something went wrong signing in. Give it another try.'); b.disabled=false; b.textContent='Sign in →'; }
 });
 
 $('forgot').addEventListener('click', async function(){
   if (!sb) return;
-  var em = $('em').value.trim();
-  if (!em) { err('Type your email above first, then tap “Forgot your password?” again.'); $('em').focus(); return; }
+  var em = $('empw').value.trim();
+  if (!em) { errIn('err', 'Type your email above first, then tap “Forgot your password?” again.'); $('empw').focus(); return; }
   try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html' }); } catch(e){}
   show('resetSent');
 });
-$('backToLogin').addEventListener('click', function(){ show('loginPanel'); });
+
+// ── panel toggles (calm, keyboard-friendly) ──
+$('toPw').addEventListener('click', function(){ clearErr('err'); if ($('em').value.trim() && !$('empw').value) $('empw').value = $('em').value.trim(); show('pwPanel'); $('empw').focus(); });
+$('toCode').addEventListener('click', function(){ clearErr('errEmail'); if ($('empw').value.trim() && !$('em').value) $('em').value = $('empw').value.trim(); show('emailPanel'); $('em').focus(); });
+$('toEmail').addEventListener('click', function(){ clearErr('errEmail'); show('emailPanel'); $('em').focus(); });
+$('backToLogin').addEventListener('click', function(){ show('emailPanel'); });
 $('retry').addEventListener('click', async function(){
   if (!sb) return;
   var s = await sb.auth.getSession(); var t = s && s.data && s.data.session && s.data.session.access_token;
-  if (t) route(t); else show('loginPanel');
+  if (t) route(t); else show('emailPanel');
 });
-$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } show('loginPanel'); });
+$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } show('emailPanel'); });
 
-// Already signed in? This page is a door, not a stop.
+// Already signed in — or arriving from a magic LINK? This page is a door, not a
+// stop. A clicked magic link lands here with the session tokens in the URL hash;
+// detectSessionInUrl (default on) consumes them asynchronously, so give it a beat.
 (async function(){
   if (!sb) return;
+  var hash = location.hash || "";
+  // An expired/used magic link comes back as #error=...otp_expired — say so
+  // honestly on the email panel instead of leaving them staring at a dead form.
+  if (/error=/.test(hash)) {
+    errIn('errEmail', "That sign-in link expired or was already used. Enter your email below and we’ll send a fresh code.");
+    try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+    return;
+  }
+  var hasTokens = /access_token|refresh_token|[?&]code=/.test(hash) || /[?&]code=/.test(location.search);
   try {
-    var s = await sb.auth.getSession();
-    var t = s && s.data && s.data.session && s.data.session.access_token;
-    if (t) route(t);
-  } catch (e) { /* stay on the login form */ }
+    for (var i = 0; i < (hasTokens ? 20 : 1); i++) {
+      var s = await sb.auth.getSession();
+      var t = s && s.data && s.data.session && s.data.session.access_token;
+      if (t) { route(t); return; }
+      if (!hasTokens) break;
+      await new Promise(function(res){ setTimeout(res, 150); });
+    }
+  } catch (e) { /* stay on the sign-in form */ }
 })();
 </script>
 </body>

@@ -52,7 +52,7 @@
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · by Davis Digital Studio — you see only what your studio shares with you.</footer>
+  <footer>Studio OS · by Davis Digital Studio — you see only what your studio shares with you.<br><a class="link" href="#" id="signout" style="font-size:12.5px">Sign out</a></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -252,6 +252,9 @@ async function load(){
   if(!feed.ok){trouble();return;}
   renderFeed(c,feed.body.data||{});
 }
+// Always-available client sign-out (the shell's profile menu is owner-shaped;
+// a client needs an obvious, in-view way out). Lands back on the client door.
+(function(){var s=$('signout');if(s)s.addEventListener('click',async(e)=>{e.preventDefault();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';});})();
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}await load();
