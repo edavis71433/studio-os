@@ -23,6 +23,7 @@ import {
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline,
+  splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -231,7 +232,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   if (req.method === 'GET') {
     const [contact, proposals, contracts, events, invoices] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
-      svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
+      svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
       svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version&order=created_at.desc`),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`),
@@ -346,7 +347,10 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
   if (UUID_RE.test(b.from_proposal_id || '')) {   // save an existing proposal as the template
     const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items&limit=1`))[0];
     if (!p) return json({ error: 'not_found', message: 'That proposal isn’t here.' }, 404, cors);
-    title = title || p.title; line_items = Array.isArray(p.line_items) ? p.line_items : [];
+    // Keep the items + any discount/tax, but DROP the revise trail (revised_from/
+    // superseded_by) — a reusable template isn't a version of anything.
+    const sp = splitLineItems(p.line_items);
+    title = title || p.title; line_items = packLineItems(sp.items, { discount: sp.meta.discount ?? null, tax_pct: sp.meta.tax_pct ?? null });
   } else if (UUID_RE.test(b.from_contract_id || '')) {   // save an existing contract as the template
     const c = rows(await svc(`presence_contracts?id=eq.${b.from_contract_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,body&limit=1`))[0];
     if (!c) return json({ error: 'not_found', message: 'That agreement isn’t here.' }, 404, cors);
@@ -425,12 +429,64 @@ export async function handleSalesProposalCreate(req: Request, site: SiteRow, pri
   }
   const norm = normalizeLineItems(b.line_items);
   if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
+  // Discount + tax: the owner's fields win; otherwise carry any pricing a template
+  // brought in via its line_items (never the revise trail on a plain create).
+  const bodyMeta = normalizeProposalMeta(b);
+  const tplMeta = splitLineItems(b.line_items).meta;
+  const meta: ProposalMeta = { discount: bodyMeta.discount ?? tplMeta.discount ?? null, tax_pct: bodyMeta.tax_pct ?? tplMeta.tax_pct ?? null };
   const ins = await svc('presence_proposals', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: site.id, deal_id: dealId, title: clean(b.title, 200) || 'Proposal',
-      line_items: norm.items, subtotal_cents: norm.subtotal_cents, currency: clean(b.currency, 8) || 'usd',
+      line_items: packLineItems(norm.items, meta), subtotal_cents: norm.subtotal_cents, currency: clean(b.currency, 8) || 'usd',
       terms: clean(b.terms, 5000), status: 'draft' }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   return json({ data: rows(ins)[0] }, 201, cors);
+}
+
+// ═══ REVISE (versioning) — clone a sent/declined proposal as vN+1 ═════════════
+// Renegotiation is universal, but a sent/declined proposal was a dead end. Revise
+// creates a NEW draft proposal on the SAME deal at version = prior.version + 1,
+// carrying the prior's line items, discount/tax, terms and title (the editor may
+// have edited any of them), records the trail (new.revised_from → prior), and
+// stamps the prior as superseded (prior.superseded_by → new). Supersession lives
+// in the reserved line_items meta — no status-enum migration on a live table — and
+// is enforced at decide time so the prior's public link can never be accepted once
+// it's been replaced. Studio-gated & site-scoped like every authed /sales/* route.
+export async function handleSalesProposalRevise(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const prior = rows(await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
+  if (!prior) return json({ error: 'not_found', message: 'That proposal isn’t here.' }, 404, cors);
+  if (prior.status !== 'sent' && prior.status !== 'declined') return json({ error: 'bad_state', message: 'Only a proposal you’ve sent (or one the client declined) can be revised.' }, 409, cors);
+  const priorSplit = splitLineItems(prior.line_items);
+  if (priorSplit.meta.superseded_by) return json({ error: 'already_revised', message: 'This proposal was already revised — edit the newest version instead.' }, 409, cors);
+  let b: any = {}; try { b = await req.json(); } catch { /* body optional — a blank body clones the prior as-is */ }
+  // Edited data from the drawer editor, else clone the prior's exactly.
+  const rawItems = (b.line_items !== undefined) ? b.line_items : priorSplit.items;
+  const norm = normalizeLineItems(rawItems);
+  if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
+  const bodyMeta = normalizeProposalMeta(b);
+  const meta: ProposalMeta = {
+    discount: (b.discount !== undefined) ? (bodyMeta.discount ?? null) : (priorSplit.meta.discount ?? null),
+    tax_pct: (b.tax_pct !== undefined) ? (bodyMeta.tax_pct ?? null) : (priorSplit.meta.tax_pct ?? null),
+    revised_from: id,
+  };
+  const newVersion = (Math.trunc(Number(prior.version)) || 1) + 1;
+  const title = clean(b.title, 200) || prior.title || 'Proposal';
+  const terms = (b.terms !== undefined) ? clean(b.terms, 5000) : String(prior.terms || '');
+  const ins = await svc('presence_proposals', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, deal_id: prior.deal_id, title,
+      line_items: packLineItems(norm.items, meta), subtotal_cents: norm.subtotal_cents,
+      currency: prior.currency || 'usd', terms, status: 'draft', version: newVersion }) });
+  const created = rows(ins)[0];
+  if (!created) return json({ error: 'write_failed', message: 'The revision didn’t save — please try again.' }, 502, cors);
+  // Stamp the prior superseded (merge into ITS meta — keeps its own items+pricing).
+  // Best-effort: the new draft is authoritative; the decide guard also protects the
+  // prior via the new proposal's trail, so a missed stamp can't be accepted twice.
+  const priorPacked = packLineItems(priorSplit.items, { ...priorSplit.meta, superseded_by: created.id });
+  await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ line_items: priorPacked }) }).catch(() => {});
+  // No dedicated deal event: the version trail (prior shown Superseded → the new
+  // vN+1 draft) is the visible record, and presence_deal_events has no 'revised'
+  // kind (its CHECK constraint would reject one, and a generic 'note' reads wrong).
+  return json({ data: created, revised_from: id, version: newVersion }, 201, cors);
 }
 
 /** Auto-email a signed proposal/contract link to the deal's contact, so "Send"
@@ -485,9 +541,9 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { /* body optional */ }
   let amountCents: number | null = Number.isFinite(Number(b.amount_cents)) ? Math.trunc(Number(b.amount_cents)) : null;
-  if (amountCents === null) {   // default to the accepted proposal's total
-    const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=subtotal_cents&order=decided_at.desc&limit=1`))[0];
-    amountCents = prop ? Number(prop.subtotal_cents) : null;
+  if (amountCents === null) {   // default to the accepted proposal's FINAL total (post discount + tax)
+    const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=line_items,subtotal_cents&order=decided_at.desc&limit=1`))[0];
+    amountCents = prop ? proposalTotals(prop.line_items).total_cents : null;
   }
   if (!amountCents || amountCents < 50) return json({ error: 'validation', message: 'Enter an amount to invoice (or accept a proposal first).' }, 422, cors);
   if (amountCents > 100000000) return json({ error: 'validation', message: 'That amount is over $1,000,000 — double-check it and try again.' }, 422, cors);
@@ -563,8 +619,8 @@ export async function handleSalesSchedule(req: Request, site: SiteRow, principal
   // Total to schedule: explicit > accepted proposal subtotal > the deal's own value.
   let total: number | null = Number.isFinite(Number(b.total_cents)) ? Math.trunc(Number(b.total_cents)) : null;
   if (total === null) {
-    const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=subtotal_cents&order=decided_at.desc&limit=1`))[0];
-    total = prop ? Number(prop.subtotal_cents) : (Number(deal.expected_value_cents) || null);
+    const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=line_items,subtotal_cents&order=decided_at.desc&limit=1`))[0];
+    total = prop ? proposalTotals(prop.line_items).total_cents : (Number(deal.expected_value_cents) || null);
   }
   if (!total || total < 50) return json({ error: 'validation', message: 'Set the total to schedule — accept a proposal, set the deal value, or enter an amount.' }, 422, cors);
 
@@ -705,6 +761,9 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   const r = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&select=*&limit=1`);
   const p = rows(r)[0];
   if (!p) return json({ error: 'not_found' }, 404, cors);
+  // A revised (superseded) proposal's old link can NEVER be accepted — the studio
+  // replaced it with a newer version (the enforcement point for revise/supersede).
+  if (splitLineItems(p.line_items).meta.superseded_by) return json({ error: 'superseded', message: 'This proposal was replaced by a newer version — ask your studio for the latest.' }, 409, cors);
   if (p.status === decision) return json({ data: { status: p.status }, already: true }, 200, cors); // idempotent
   if (!canDecideProposal(p.status, decision)) return json({ error: 'bad_state', message: 'This proposal can’t be updated.' }, 409, cors);
   const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=deal_id,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: nowIso(), decided_note: clean(b.note, 500) }) });

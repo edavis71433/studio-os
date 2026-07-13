@@ -132,6 +132,14 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
+const money0=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{minimumFractionDigits:0});
+// A proposal's optional discount/tax + revise trail ride ONE reserved element in
+// its line_items (see lib/sales_lifecycle.ts). Split it out and mirror the pure
+// computeProposalTotals so the drawer's total/breakdown match the document + the
+// client's public view exactly (subtotal − discount + tax, never negative).
+const PROP_META='__meta__';
+const splitPropLI=(raw)=>{const a=Array.isArray(raw)?raw:[];const items=a.filter(el=>!(el&&typeof el==='object'&&PROP_META in el));const me=a.find(el=>el&&typeof el==='object'&&PROP_META in el);return{items,meta:(me&&me[PROP_META])||{}};};
+const propTotals=(raw)=>{const {items,meta}=splitPropLI(raw);const sub=items.reduce((n,i)=>n+Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};};
 const STAGES=['lead','qualified','proposal','contract','won','lost'];
 // calm, human stage labels (the raw enum never reaches the owner's eyes)
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
@@ -192,7 +200,7 @@ function starterAgreement(d,c,accepted,biz){
   const work=accepted
     ? `${d.title||'The project'} — the work set out in the proposal you accepted${accepted.title&&accepted.title!=='Proposal'?' (“'+accepted.title+'”)':''}. The specific deliverables, pages, and features are those described in that accepted proposal, which forms part of this agreement.`
     : '[Describe the work — the specific website, pages, features, and services included. Anything not listed here is a separate project.]';
-  const total=accepted?money(accepted.subtotal_cents):'[total price]';
+  const total=accepted?money0(propTotals(accepted.line_items).total):'[total price]';
   const invest=accepted
     ? `The total investment for this project is ${total}, matching the proposal you accepted.`
     : `The total investment for this project is ${total}.`;
@@ -395,9 +403,16 @@ async function openDeal(id){
     const forWhom=(c&&c.name)?(' to '+esc(c.name)):'';
     const linkNote=(kind,docId,label)=>LINKS[docId]?`<div class="mut" style="flex-basis:100%;margin-top:4px">Prepared — <a href="${esc(LINKS[docId])}" target="_blank" rel="noopener">open the ${label}</a>, or use “Copy ${label}”. It wasn’t emailed, so share it yourself.</div>`:'';
     const props=(data.proposals||[]).map(p=>{
-      const chip=p.status==='accepted'?`<span class="stage won">Accepted ✓</span>`:p.status==='declined'?`<span class="stage lost">Declined</span>`:p.status==='sent'?`<span class="stage">Sent — awaiting decision</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
-      const act=p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
-      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')} — ${money(p.subtotal_cents)} ${chip}</span><span>${act}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${p.status==='sent'?linkNote('proposal',p.id,'link'):''}</div>`;
+      const T=propTotals(p.line_items);
+      const superseded=!!(T.meta&&T.meta.superseded_by);
+      const ver=(p.version&&p.version>1)?` <span class="mut">v${p.version}</span>`:'';
+      const chip=superseded?`<span class="stage lost">Superseded</span>`:p.status==='accepted'?`<span class="stage won">Accepted ✓</span>`:p.status==='declined'?`<span class="stage lost">Declined</span>`:p.status==='sent'?`<span class="stage">Sent — awaiting decision</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      // A sent/declined proposal that hasn't already been replaced can be revised
+      // into a fresh vN+1 (renegotiation), which supersedes this one.
+      const canRevise=!superseded&&(p.status==='sent'||p.status==='declined');
+      const act=superseded?'':p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
+      const revise=canRevise?`<button class="btn ghost" data-revise-prop="${p.id}" title="Create a new version to renegotiate — this one is kept and marked superseded">Revise →</button>`:'';
+      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const cons=(data.contracts||[]).map(k=>{
@@ -511,58 +526,86 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-doc-con]').forEach(b=>b.onclick=()=>openDoc('contracts',b.dataset.docCon,b));
     $('detailInner').querySelectorAll('[data-doc-inv]').forEach(b=>b.onclick=()=>openDoc('invoices',b.dataset.docInv,b));
     const mng=$('mngServices'); if(mng) mng.onclick=openManageServices;
-    // Multi-line proposal form — real projects have design + build + care, not one line.
-    const addProp=$('addProp'); if(addProp) addProp.onclick=()=>{
+    // Multi-line proposal form — real projects have design + build + care, not one
+    // line. ONE builder serves both "+ Proposal" and "Revise" (opts.reviseOf set):
+    // revise pre-fills the prior's items + discount/tax and submits to /revise as
+    // vN+1; a fresh proposal submits to /proposals. Draft persistence is skipped in
+    // revise mode (the prior IS the saved state).
+    const openPropEditor=(opts)=>{
+      opts=opts||{};
+      const rev=opts.reviseOf||null, pf=opts.prefill||null;
       const host=$('propForm');
       // Each line starts as a DROPDOWN of the studio's services (auto-fills the
-      // price) plus a "Custom…" option that reveals the free name+price fields —
-      // today's behaviour. With no catalog yet, we fall back to the free fields
-      // and gently point to "Manage services".
+      // price) plus a "Custom…" option that reveals the free name+price fields.
       const hasCat=SERVICES.length>0;
       const optsHtml=SERVICES.map((s,i)=>`<option value="${i}">${esc(s.name)} — ${esc(money(s.price_cents)||'$0')}</option>`).join('');
       let ln=0; // per-deal, per-line draft keys — typed line items survive an accidental Esc
+      const draftAttr=(kind,n)=>rev?'':` data-dds-draft="prop-${id}-${kind}-${n}"`;   // no drafts while revising
       const rowHtml=()=>{ln++;
         const pick=hasCat?`<select class="pl-pick" aria-label="Choose a service"><option value="">Pick a service…</option>${optsHtml}<option value="__custom__">Custom…</option></select>`:'';
         const hide=hasCat?' style="display:none"':'';
-        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label" data-dds-draft="prop-${id}-label-${ln}" placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price" data-dds-draft="prop-${id}-price-${ln}" placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div></div>`;};
+        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label"${draftAttr('label',ln)} placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price"${draftAttr('price',ln)} placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div></div>`;};
       const hint=hasCat?'':`<div class="mut" style="margin-top:8px"><a href="#" id="plManageHint">Add your services</a> to pick them from a list here.</div>`;
-      host.innerHTML=`<div style="margin-top:8px">${hint}${rowHtml()}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">Save draft</button><button type="button" class="btn" id="plSaveSend">Save & send →</button></div></div>`;
+      // Seed one row per prefilled item (revise/clone), else a single blank row.
+      const seedRows=(pf&&pf.items&&pf.items.length)?pf.items.map(()=>rowHtml()).join(''):rowHtml();
+      const headNote=rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked superseded.</div>`:'';
+      // Discount + tax: optional, plainly labelled, with a live breakdown so the
+      // owner always sees subtotal → discount → tax → total before sending.
+      const pricingHtml=`<div style="margin-top:12px;border-top:1px solid var(--line,#e9e4dc);padding-top:10px">
+        <div class="row2"><label class="mut" style="min-width:120px">Discount</label>
+          <select id="plDiscMode" aria-label="Discount type"><option value="">No discount</option><option value="percent">Percent (%)</option><option value="fixed">Amount ($)</option></select>
+          <input type="number" step="0.01" id="plDiscVal" placeholder="0" aria-label="Discount amount" style="max-width:120px;display:none"></div>
+        <div class="row2" style="margin-top:6px"><label class="mut" style="min-width:120px">Tax %</label>
+          <input type="number" step="0.01" id="plTaxPct" placeholder="0" aria-label="Tax percent" style="max-width:120px"></div>
+        <div id="plBreak" class="mut" style="margin-top:8px"></div></div>`;
+      host.innerHTML=`<div style="margin-top:8px">${headNote}${hint}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev?'Save & send →':'Save & send →'}</button></div></div>`;
       const hintLink=$('plManageHint'); if(hintLink) hintLink.onclick=(e)=>{e.preventDefault();openManageServices();};
-      // A service pick fills that line's name+price (still editable); "Custom…"
-      // reveals the empty free fields; the placeholder option hides them again.
       const wirePick=(sel)=>{ if(!sel) return; const row=sel.closest('.prop-line'); const box=row.querySelector('.pl-custom'); const lab=row.querySelector('.pl-label'); const pr=row.querySelector('.pl-price');
         sel.onchange=()=>{ const v=sel.value;
           if(v===''){ box.style.display='none'; lab.value=''; pr.value=''; }
           else if(v==='__custom__'){ box.style.display=''; lab.value=''; pr.value=''; lab.focus(); }
           else { const s=SERVICES[+v]; if(s){ lab.value=s.name; pr.value=(s.price_cents/100); box.style.display=''; } }
+          recalc();
         };
       };
-      const wireRow=(row)=>wirePick(row&&row.querySelector('.pl-pick'));
-      const restoreDrafts=()=>{if(window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
-      // A restored draft (or a seeded first line) means real text lives in a hidden
-      // field — reveal it and mark its dropdown "Custom…" so it isn't lost.
+      const wireRow=(row)=>{wirePick(row&&row.querySelector('.pl-pick'));if(row){row.querySelectorAll('.pl-label,.pl-price').forEach(el=>el.addEventListener('input',recalc));}};
+      const restoreDrafts=()=>{if(!rev&&window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
       const revealFilled=()=>host.querySelectorAll('.prop-line').forEach(row=>{const lab=row.querySelector('.pl-label');const box=row.querySelector('.pl-custom');const sel=row.querySelector('.pl-pick');if(lab&&lab.value&&box){box.style.display='';if(sel)sel.value='__custom__';}});
+      // Live breakdown — mirrors the server's computeProposalTotals exactly.
+      const collectPricing=()=>{const mode=$('plDiscMode').value;const dv=parseFloat($('plDiscVal').value||'0');let discount=null;if(mode==='percent'&&dv>0)discount={mode:'percent',value:dv};else if(mode==='fixed'&&dv>0)discount={mode:'fixed',value:Math.round(dv*100)};const tv=parseFloat($('plTaxPct').value||'0');const tax_pct=(tv>0)?tv:null;return{discount,tax_pct};};
+      const recalc=()=>{const items=collectItems();const pr=collectPricing();const meta={};if(pr.discount)meta.discount=pr.discount;if(pr.tax_pct!=null)meta.tax_pct=pr.tax_pct;const T=propTotals([...items,{__meta__:meta}]);const showB=T.discount>0||T.tax>0;$('plBreak').innerHTML=showB?`Subtotal ${money0(T.subtotal)} · Discount −${money0(T.discount)} · Tax +${money0(T.tax)} · <strong>Total ${money0(T.total)}</strong>`:`Total ${money0(T.total)}`;};
       host.querySelectorAll('.prop-line').forEach(wireRow);
       restoreDrafts();
-      // Same idea as the agreement starter: a first proposal shouldn't open
-      // blank. Only when the restored draft left the first line EMPTY — seed it
-      // from the deal itself (title + expected value if set); fully editable,
-      // and the price field's own placeholder stands in for [price].
-      const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price');
-      if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100); }
+      // Prefill (revise/clone): fill each row from the prior's items, and the
+      // discount/tax controls from its meta. Else seed the FIRST row from the deal.
+      if(pf&&pf.items&&pf.items.length){const rowsEls=host.querySelectorAll('.prop-line');pf.items.forEach((it,i)=>{const r=rowsEls[i];if(!r)return;r.querySelector('.pl-label').value=it.label||'';r.querySelector('.pl-price').value=((it.unit_cents||0)/100);});
+        if(pf.discount){$('plDiscMode').value=pf.discount.mode;$('plDiscVal').style.display='';$('plDiscVal').value=pf.discount.mode==='percent'?pf.discount.value:((pf.discount.value||0)/100);}
+        if(pf.tax_pct!=null)$('plTaxPct').value=pf.tax_pct;
+      } else { const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price'); if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100); } }
       revealFilled();
-      $('plMore').onclick=()=>{$('plSave').closest('div').insertAdjacentHTML('beforebegin',rowHtml());const rowsEls=host.querySelectorAll('.prop-line');wireRow(rowsEls[rowsEls.length-1]);restoreDrafts();};
-      const clearPropDrafts=()=>{if(window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
+      $('plDiscMode').onchange=()=>{$('plDiscVal').style.display=$('plDiscMode').value?'':'none';recalc();};
+      $('plDiscVal').addEventListener('input',recalc); $('plTaxPct').addEventListener('input',recalc);
+      $('plMore').onclick=()=>{host.querySelector('#plMore').closest('.row2').insertAdjacentHTML('beforebegin',rowHtml());const rowsEls=host.querySelectorAll('.prop-line');wireRow(rowsEls[rowsEls.length-1]);restoreDrafts();recalc();};
+      const clearPropDrafts=()=>{if(!rev&&window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
       const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
-      // Save draft ONLY writes the record; Save & send writes then immediately
-      // emails the review link — so the common path is one click and a proposal
-      // is never left silently unsent.
-      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const r=await api('/sales/deals/'+id+'/proposals','POST',{line_items:items});clearPropDrafts();return r.data&&r.data.id;};
+      // Save writes the record (revise → vN+1 that supersedes the prior); Save &
+      // send then immediately emails the review link.
+      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};const path=rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
       const busyProp=(x)=>{$('plSave').disabled=x;$('plSaveSend').disabled=x;};
-      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast('Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
+      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
       $('plSaveSend').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}await sendProposalById(pid);}catch(e){toast(nice(e),true);busyProp(false);}};
-      host.querySelector('.pl-label').focus();
+      recalc();
+      const f=host.querySelector('.pl-label'); if(f) f.focus();
     };
+    const addProp=$('addProp'); if(addProp) addProp.onclick=()=>openPropEditor({});
+    // Revise → pre-fill the editor from the prior proposal (items + discount/tax),
+    // submit to /revise as vN+1. The prior is superseded server-side.
+    $('detailInner').querySelectorAll('[data-revise-prop]').forEach(b=>b.onclick=()=>{
+      const p=(data.proposals||[]).find(x=>x.id===b.dataset.reviseProp); if(!p){toast('That proposal isn’t here.',true);return;}
+      const S=splitPropLI(p.line_items);
+      openPropEditor({reviseOf:p.id,versionLabel:'v'+(((+p.version)||1)+1),prefill:{items:S.items,discount:S.meta.discount||null,tax_pct:(S.meta.tax_pct!=null?S.meta.tax_pct:null),title:p.title}});
+      const pf=$('propForm'); if(pf&&pf.scrollIntoView)pf.scrollIntoView({behavior:'smooth',block:'nearest'});
+    });
     const addCon=$('addCon'); if(addCon) addCon.onclick=()=>{
       // Write the draft record; return its id so "Save & send" can email it next.
       const saveCon=async(v)=>{if(!v.body)throw new Error('Add the agreement text.');const r=await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});return r.data&&r.data.id;};
@@ -633,7 +676,7 @@ async function openDeal(id){
     const setupPlanBtn=$('setupPlan'); if(setupPlanBtn) setupPlanBtn.onclick=()=>{
       const host=$('invForm');
       const acceptedProp=(data.proposals||[]).find(p=>p.status==='accepted');
-      const totalCents=(acceptedProp&&acceptedProp.subtotal_cents)||d.expected_value_cents||0;
+      const totalCents=(acceptedProp&&propTotals(acceptedProp.line_items).total)||d.expected_value_cents||0;
       if(!totalCents){host.innerHTML='<div class="mut" style="margin-top:8px">Set the deal value (in Details) or accept a proposal first — a plan needs a total to split.</div>';return;}
       const addDays=(iso,days)=>{const p=iso.split('-').map(Number);const t=Date.UTC(p[0],p[1]-1,p[2])+days*86400000;const x=new Date(t);const z=n=>String(n).padStart(2,'0');return x.getUTCFullYear()+'-'+z(x.getUTCMonth()+1)+'-'+z(x.getUTCDate());};
       const computeStages=(spec)=>{

@@ -16,7 +16,7 @@
 // line-item math reuses lib/sales_lifecycle.ts so the document can never disagree
 // with the proposal it renders. Escaping reuses lib/markdown.ts `esc`.
 import { esc } from './markdown.ts';
-import { subtotalOf, type LineItem } from './sales_lifecycle.ts';
+import { splitLineItems, computeProposalTotals, type LineItem } from './sales_lifecycle.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 
 // ── the studio's identity on the page (structurally the EmailBrand shape) ─────
@@ -144,19 +144,28 @@ function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: s
 // ── PROPOSAL ─────────────────────────────────────────────────────────────────
 export function renderProposalDocument(p: any, brandIn?: Partial<DocBrand> | null): string {
   const brand = brandOf(brandIn);
-  const items: LineItem[] = Array.isArray(p?.line_items)
-    ? p.line_items.map((i: any) => ({ label: String(i?.label ?? ''), qty: Math.trunc(Number(i?.qty)) || 0, unit_cents: Math.trunc(Number(i?.unit_cents)) || 0 }))
-    : [];
+  // Unpack the real line items from the reserved discount/tax meta, then recompute
+  // the whole breakdown — the document can never disagree with the stored math.
+  const { items, meta } = splitLineItems(p?.line_items);
   const currency = String(p?.currency || 'usd');
-  const total = subtotalOf(items);   // recompute — the document can never disagree with the math
+  const t = computeProposalTotals(items, meta);
   const rows = items.length
     ? items.map((i) => `<tr><td>${esc(i.label)}${i.qty > 1 ? ` <span style="color:var(--soft)">× ${i.qty}</span>` : ''}</td><td>${esc(money(i.unit_cents * Math.max(1, i.qty), currency))}</td></tr>`).join('')
     : `<tr><td colspan="2" style="color:var(--soft)">No line items.</td></tr>`;
+  // Show the breakdown ONLY when a discount or tax applies; otherwise the total
+  // is the subtotal and one clean Total line is all that's honest to print.
+  const hasBreakdown = t.discount_cents > 0 || t.tax_cents > 0;
+  const discLabel = meta.discount?.mode === 'percent' ? `Discount (${Number(meta.discount.value)}%)` : 'Discount';
+  const taxLabel = (meta.tax_pct != null) ? `Tax (${Number(meta.tax_pct)}%)` : 'Tax';
+  const breakdown = hasBreakdown ? `
+      <tr class="sub"><td style="color:var(--soft)">Subtotal</td><td style="color:var(--soft)">${esc(money(t.subtotal_cents, currency))}</td></tr>
+      ${t.discount_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(discLabel)}</td><td style="color:var(--soft)">−${esc(money(t.discount_cents, currency))}</td></tr>` : ''}
+      ${t.tax_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(taxLabel)}</td><td style="color:var(--soft)">+${esc(money(t.tax_cents, currency))}</td></tr>` : ''}` : '';
   const statusNote = p?.status === 'accepted' ? 'Accepted — thank you.'
     : p?.status === 'declined' ? 'This proposal was declined.'
     : 'This is a proposal — nothing is final until you accept.';
   const body = `
-    <table><tbody>${rows}<tr class="total"><td>Total</td><td>${esc(money(total, currency))}</td></tr></tbody></table>
+    <table><tbody>${rows}${breakdown}<tr class="total"><td>Total</td><td>${esc(money(t.total_cents, currency))}</td></tr></tbody></table>
     ${p?.terms ? `<div class="hr"></div><p class="terms">${esc(p.terms)}</p>` : ''}
     <p class="note">${esc(statusNote)}</p>`;
   return shell({ title: `${p?.title || 'Proposal'} — ${brand.name}`, brand, docLabel: 'Proposal', heading: String(p?.title || 'Proposal'), sub: undefined, bodyHtml: body });

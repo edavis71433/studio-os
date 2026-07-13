@@ -101,11 +101,24 @@ async function load(){
   if(d.kind==='proposal')renderProposal(d);else renderContract(d);
 }
 function preparedBy(){return window.__brandName?`<p class="muted" style="margin-top:2px">Prepared by ${esc(window.__brandName)}</p>`:'';}
+// The proposal's discount/tax + trail ride ONE reserved element in line_items
+// (see lib/sales_lifecycle.ts). Split it out, then mirror computeProposalTotals so
+// the client sees the exact same honest breakdown the studio and the document do.
+function splitProposalLI(raw){const a=Array.isArray(raw)?raw:[];const M='__meta__';const items=a.filter(el=>!(el&&typeof el==='object'&&M in el));const me=a.find(el=>el&&typeof el==='object'&&M in el);return{items,meta:(me&&me[M])||{}};}
+function proposalTotals(raw){const {items,meta}=splitProposalLI(raw);const sub=items.reduce((n,i)=>n+Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};}
 function renderProposal(p){
-  const items=(p.line_items||[]).map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+  const T=proposalTotals(p.line_items);
+  const items=T.items.map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+  const hasB=T.discount>0||T.tax>0;
+  const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
+  const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
+  const bd=hasB?`<tr class="muted"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="muted"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="muted"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
   let h=`<h1>${esc(p.title||'Your proposal')}</h1>${preparedBy()}<p class="sub">Take your time — nothing is final until you accept.</p>
-  <div class="card"><table>${items}<tr class="total"><td>Total</td><td>${money(p.subtotal_cents)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}</div>`;
-  if(p.status==='accepted'){h+=`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`;}
+  <div class="card"><table>${items}${bd}<tr class="total"><td>Total</td><td>${money(T.total)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}</div>`;
+  // A revised proposal's old link can't be accepted (the studio replaced it) —
+  // say so plainly instead of offering an Accept button that would just error.
+  if(T.meta&&T.meta.superseded_by){h+=`<p class="muted">Your studio sent an updated version of this proposal — please use the latest link they gave you.</p>`;}
+  else if(p.status==='accepted'){h+=`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`;}
   else if(p.status==='declined'){h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;}
   else h+=`<div class="row"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Decline this proposal</button></div>`;
   $('main').innerHTML=h;
