@@ -3715,6 +3715,24 @@ async function saveBlocks() {
     toast("Sections saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(nice(err), true); }
 }
+// ── T-STARTER: apply a pre-arranged, pre-filled starter layout. Replaces the
+//    working sections with a ready-made set the owner then EDITS (never a blank
+//    canvas). Reuses the existing block-save (PUT /settings), so the server
+//    re-validates every starter block through the same validator. Never silently
+//    overwrites — confirms first when the owner already has sections.
+function applyStarterLayout(starter) {
+  if (!starter || !Array.isArray(starter.blocks) || !starter.blocks.length) return;
+  const hasContent = Array.isArray(BLOCKS_WORK) && BLOCKS_WORK.length > 0;
+  if (hasContent && !confirm("Start from the “" + starter.name + "” layout? This replaces your current sections with a ready-made set you can then edit. Your existing sections will be removed.")) return;
+  // Deep copy so the shared suggestion payload is never mutated, and MULTI-INSTANCE
+  // ids (columns/cards) stay unique against anything already in the working set.
+  BLOCKS_WORK = JSON.parse(JSON.stringify(starter.blocks)).map((b) => {
+    if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id);
+    return b;
+  });
+  BLOCK_FOCUS = 0;
+  saveBlocks();   // reuse the existing save → server validateBlocks() proves every block
+}
 function mountBlocksCard() {
   const host = $("designHost"); if (!host || $("blocksCard")) return;
   BLOCKS_WORK = currentBlocks();
@@ -3770,6 +3788,34 @@ function renderBlocksCard() {
   const miniBtn = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   card.appendChild(el("label", null, "Your sections"));
   card.appendChild(el("div", "hint", "Ready-made sections for your home page — add one, fill it in, done. No design needed. Reorder or hide them under “Your home page”. Publish to apply."));
+  // ── T-STARTER: "Start from a layout" — one click lays out a full, PRE-FILLED set
+  //    of sections (guiding placeholder copy the owner edits), tuned to the business
+  //    type. Especially inviting when the page is empty (no cold-start blank canvas).
+  if (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.starters) && BLOCK_SUGGEST.starters.length) {
+    const recKey = BLOCK_SUGGEST.recommendedStarter;
+    const empty = !BLOCKS_WORK.length;
+    const panel = el("div"); panel.style.cssText = "margin-top:12px;padding:14px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:12px";
+    panel.appendChild(Object.assign(el("div", null, "Start from a layout"), { style: "font-weight:600;font-size:13px;color:#3a2470" }));
+    panel.appendChild(el("div", "hint", empty
+      ? "New here? Pick a ready-made layout — a full set of sections, already filled with guiding text you just edit. Nothing blank to stare at."
+      : "Pick a ready-made layout to replace your sections with a filled-in starting point you can edit. We’ll ask before replacing anything."));
+    // Recommended layout first; the rest keep their listed order (stable sort).
+    const ordered = BLOCK_SUGGEST.starters.slice().sort((a, b) => (b.key === recKey ? 1 : 0) - (a.key === recKey ? 1 : 0));
+    const grid = el("div"); grid.style.cssText = "margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px";
+    ordered.forEach((st) => {
+      const isRec = st.key === recKey;
+      const b = el("button"); b.type = "button";
+      b.style.cssText = "text-align:left;font:inherit;padding:10px 12px;border-radius:10px;border:" + (isRec ? "2px solid #5b3fa0" : "1px solid var(--line,#ddd)") + ";background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0";
+      b.appendChild(Object.assign(el("div", null, (isRec ? "✨ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:#3a2470" : "") }));
+      b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:11px;color:var(--soft,#888);line-height:1.4" }));
+      const n = Array.isArray(st.blocks) ? st.blocks.length : 0;
+      b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:10.5px;color:var(--soft,#a99);margin-top:2px" }));
+      b.addEventListener("click", () => applyStarterLayout(st));
+      grid.appendChild(b);
+    });
+    panel.appendChild(grid);
+    card.appendChild(panel);
+  }
   BLOCKS_WORK.forEach((blk, idx) => {
     const def = BLOCK_DEFS.find((d) => d.type === blk.type); if (!def) return;
     const sub = el("div"); sub.id = "blkSub-" + idx; sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
@@ -4002,9 +4048,16 @@ function renderBlocksCard() {
       }
       lib.appendChild(wrap);
     }
+    // Recommended-first WITHIN each purpose group: the server `order` (built from
+    // site_components' industries[] model + vertical presets) floats the blocks that
+    // suit this business to the top of their group. Stable — everything else keeps
+    // its listed order, and NOTHING is hidden (the whole group still shows).
+    const ORDER = (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.order)) ? BLOCK_SUGGEST.order : [];
+    const rank = (t) => { const i = ORDER.indexOf(t); return i === -1 ? 999 : i; };
     // Purpose groups — every remaining addable def under exactly one familiar header.
     SECTION_GROUPS.forEach((grp) => {
       const defs = grp.types.map((t) => addable.find((d) => d.type === t)).filter((d) => d && !recSet.has(d.type));
+      defs.sort((a, b) => rank(a.type) - rank(b.type));
       if (!defs.length) return;
       const wrap = el("div"); wrap.style.cssText = "margin-top:14px";
       wrap.appendChild(Object.assign(el("div", null, grp.label), { style: "font-weight:600;font-size:12.5px" }));

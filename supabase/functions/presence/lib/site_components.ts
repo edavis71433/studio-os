@@ -1,8 +1,9 @@
-// ⚠️ SPEC MODULE — NOT WIRED INTO PRODUCTION (verified Jul 12 2026: zero production
-// imports; exercised only by its test). It documents a frozen-architecture contract
-// awaiting its phase — do NOT assume it guards anything at runtime. Wire it or
-// delete it (with an ADR note) when its phase arrives.
 // ── Structured component library (Phase T) — blocks, not a page builder ──────
+// PARTIALLY WIRED (Phase T-STARTER, Jul 13 2026): the `industries[]` model on each
+// component is now read in production by routes/content.ts (handleBlockSuggestions →
+// componentsForIndustry) to order the "Add a section" library recommended-first.
+// The rest of this catalog (fields/schema/a11y contracts) remains the frozen-
+// architecture spec its render engine + SDK read; do not assume those guard runtime.
 // The "structured site builder" is a catalog of REUSABLE BLOCKS defined as DATA:
 // each declares its fields, validation, the schema.org it emits, its a11y
 // contract, and whether AI can assist. Templates realize a selection of these;

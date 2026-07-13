@@ -16,19 +16,42 @@ import { asUser, svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import { suggestedBlocksFor, suggestionNoteFor } from '../lib/vertical_presets.ts';
+import { REALIZED_BLOCK_TYPES } from '../lib/site_blocks.ts';
+import { componentsForIndustry } from '../lib/site_components.ts';
+import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
-/** FD-T4: the content blocks recommended for this site's industry (read-only
- *  guidance; the owner still adds + fills + approves). Reuses vertical_presets +
- *  the stored industry_key — no duplicated mapping on the client. */
+/** FD-T4 / T-STARTER: everything the block library needs to lead with the RIGHT
+ *  choices for this site's industry, plus one-click pre-arranged starter layouts —
+ *  all read-only guidance (the owner still adds + fills + approves + publishes).
+ *  Reuses three existing pure layers, so nothing is duplicated on the client:
+ *    · vertical_presets  → the recommended BLOCKS (the "Recommended for you" group)
+ *    · site_components    → the industries[] model → an ORDER so recommended blocks
+ *                           surface first inside every purpose group (hides nothing)
+ *    · starter_layouts    → pre-filled layouts applied through the same /settings save */
 export async function handleBlockSuggestions(site: SiteRow, cors: Record<string, string>) {
   let industry = 'generic';
   try {
     const r = await svc(`presence_settings?site_id=eq.${site.id}&select=industry_key&limit=1`);
     if (r.ok && Array.isArray(r.json) && r.json[0]?.industry_key) industry = String(r.json[0].industry_key);
   } catch { /* fall back to generic */ }
-  return json({ data: { blocks: suggestedBlocksFor(industry), note: suggestionNoteFor(industry) } }, 200, cors);
+  const realized = new Set<string>(REALIZED_BLOCK_TYPES);
+  // Recommended-first ordering: vertical_presets suggestions lead, then any other
+  // block the site_components industries[] model marks relevant to this industry —
+  // realized types only, deduped. The client sorts each group by this; nothing is
+  // dropped, so the full library stays reachable below the recommended ones.
+  const order: string[] = [];
+  const push = (t: string) => { if (realized.has(t) && !order.includes(t)) order.push(t); };
+  suggestedBlocksFor(industry).forEach(push);
+  componentsForIndustry(industry).forEach((c) => push(c.key));
+  return json({ data: {
+    blocks: suggestedBlocksFor(industry),
+    note: suggestionNoteFor(industry),
+    order,
+    starters: listStarterLayouts(),
+    recommendedStarter: starterKeyFor(industry),
+  } }, 200, cors);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
