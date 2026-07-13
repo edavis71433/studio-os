@@ -173,7 +173,7 @@
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">🔔' + (att > 0 ? '<span class="dot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</button>' +
-        '<a class="dds-ic" href="/help.html" aria-label="Help">?</a>' +
+        '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">?</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">◐</button>' +
       '</div>';
 
@@ -227,6 +227,10 @@
     // bell + profile
     document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(); });
     document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(); });
+    // in-app help (HELP-1): the "?" opens a grounded "how do I…?" panel; the href
+    // stays a real fallback to the full Help page if JS is off.
+    var helpTrig = document.getElementById('dds-help');
+    if (helpTrig) helpTrig.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); toggleHelp(); });
     // burger
     document.getElementById('dds-burger').addEventListener('click', function (e) { e.stopPropagation(); toggleDrawer(nav); });
   }
@@ -336,6 +340,64 @@
   }
   function closeNotifications() { if (notif) notif.classList.remove('open'); setExpanded('dds-bell', false); }
 
+  // ── in-app "how do I…?" helper (HELP-1) ─────────────────────────────────────
+  // A grounded product-help panel: type a question, the server (/help/ask) matches
+  // it to a curated answer with a deep link straight to the right screen. Deterministic
+  // and honest — no invented features; the full Help page is always one tap away.
+  // Distinct from the site-aware Concierge; this is help ABOUT the product.
+  var help, helpTok = 0;
+  var HELP_IN = 'width:100%;box-sizing:border-box;margin:8px 0;padding:8px 10px;border:1px solid var(--dds-line,#e5e5e5);border-radius:9px;font:inherit;font-size:14px;background:var(--dds-card,#fff);color:inherit';
+  var HELP_CHIP = 'font:inherit;font-size:12.5px;margin:3px 4px 0 0;padding:4px 11px;border-radius:999px;border:1px solid var(--dds-line,#ddd);background:transparent;color:inherit;cursor:pointer';
+  var HELP_LINK = 'display:inline-block;margin:6px 8px 0 0;font-weight:600;font-size:13px;color:var(--dds-accent,#5b3fa0);text-decoration:none';
+  function toggleHelp() {
+    closeNotifications(); closeProfile();
+    if (help && help.classList.contains('open')) { closeHelp(); return; }
+    if (!help) {
+      help = el('<div class="dds-pop" role="region" aria-label="Help — how do I…?"><h4>How do I…?</h4>' +
+        '<input id="dds-help-q" type="text" placeholder="Ask a question — e.g. change my hours" aria-label="Ask a how-to question" autocomplete="off" style="' + HELP_IN + '">' +
+        '<div class="body" id="dds-help-body"></div>' +
+        '<a class="row" href="/help.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">Open full Help →</a></div>');
+      document.body.appendChild(help);
+      help.addEventListener('click', function (e) { e.stopPropagation(); });
+      var inp = help.querySelector('#dds-help-q'); var deb;
+      inp.addEventListener('input', function () { clearTimeout(deb); var v = inp.value; deb = setTimeout(function () { askHelp(v); }, 250); });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(deb); askHelp(inp.value); } else if (e.key === 'Escape') { closeHelp(); var t = document.getElementById('dds-help'); if (t) t.focus(); } });
+    }
+    help.classList.add('open'); setExpanded('dds-help', true);
+    helpSuggest();
+    setTimeout(function () { var i = help.querySelector('#dds-help-q'); if (i) i.focus(); }, 20);
+  }
+  function closeHelp() { if (help) help.classList.remove('open'); setExpanded('dds-help', false); }
+  function helpSuggest() {
+    var body = help.querySelector('#dds-help-body');
+    var qs = ['Change my hours', 'Publish my changes', 'Set up booking', 'Send a broadcast', 'Connect a service'];
+    body.innerHTML = '<div class="muted" style="font-size:12px;margin-bottom:2px">Popular questions</div>' +
+      qs.map(function (q) { return '<button type="button" class="dds-help-chip" style="' + HELP_CHIP + '">' + esc(q) + '</button>'; }).join('');
+    Array.prototype.forEach.call(body.querySelectorAll('.dds-help-chip'), function (b) {
+      b.addEventListener('click', function () { var i = help.querySelector('#dds-help-q'); i.value = b.textContent; askHelp(b.textContent); });
+    });
+  }
+  function askHelp(q) {
+    q = String(q || '').trim();
+    var body = help.querySelector('#dds-help-body');
+    if (q.length < 2) { helpSuggest(); return; }
+    var tok = ++helpTok;
+    body.innerHTML = '<div class="muted" style="font-size:12px">Looking…</div>';
+    window.ddsApi('/help/ask', { method: 'POST', body: { question: q } }).then(function (r) {
+      if (tok !== helpTok) return;
+      var d = (r && r.body && r.body.data) || {};
+      var links = (d.links || []).map(function (l) {
+        var href = String(l.href || '');
+        return '<a style="' + HELP_LINK + '" href="' + esc(href.charAt(0) === '/' ? withScope(href) : href) + '">' + esc(l.label) + ' →</a>';
+      }).join('');
+      body.innerHTML = '<div style="font-size:13.5px;line-height:1.55">' + esc(d.answer || 'Open the full Help below for more.') + '</div>' +
+        (links ? '<div style="margin-top:4px">' + links + '</div>' : '');
+    }).catch(function () {
+      if (tok !== helpTok) return;
+      body.innerHTML = '<div style="font-size:13.5px;line-height:1.55">Couldn’t reach help just now — open the full Help below.</div>';
+    });
+  }
+
   // ── profile / context menu (role, edition, agency, sign out) ──
   var prof;
   function toggleProfile() {
@@ -381,13 +443,14 @@
     if (so) so.addEventListener('click', function (e) { e.preventDefault(); if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door; });
   }
   function closeProfile() { if (prof) prof.classList.remove('open'); setExpanded('dds-profile', false); }
-  document.addEventListener('click', function () { closeNotifications(); closeProfile(); });
+  document.addEventListener('click', function () { closeNotifications(); closeProfile(); closeHelp(); });
   // Escape closes whatever shell popover is open (WCAG 1.4.13) and returns
   // focus to its trigger so a keyboard user isn't stranded.
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
     if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
+    if (help && help.classList.contains('open')) { closeHelp(); var b3 = document.getElementById('dds-help'); if (b3) b3.focus(); }
   });
 
   // ── Web Push opt-in (notifications when the app is closed) ──────────────────

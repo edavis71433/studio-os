@@ -10,6 +10,7 @@ import { svc } from './db.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
 import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
+import { linkedRefIds, resolveLinkedBlocks } from './linked_sections.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
 
@@ -97,6 +98,19 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
   const ident = identArr[0] || {};
   const settings = settingsArr[0] || {};
 
+  // CL-LINK: resolve any "linked" sections to the CURRENT content of their library
+  // item (single source, update-once). The impure read lives HERE; the pure engine
+  // (validateBlocks → resolveBlockMedia) is unchanged, so a copy-inserted block and
+  // a linked one render identically. No links → no query, byte-identical to before.
+  const rawBlocks: unknown[] = Array.isArray(settings.blocks) ? settings.blocks : [];
+  const refIds = linkedRefIds(rawBlocks);
+  const libMap = new Map<string, unknown>();
+  if (refIds.length) {
+    const libRows = await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`);
+    for (const r of libRows as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
+  }
+  const resolvedBlocks = resolveLinkedBlocks(rawBlocks, (id) => libMap.get(id) ?? null);
+
   const content: SnapshotContent = {
     identity: {
       business_name: ident.business_name || '', description: ident.description || '',
@@ -126,7 +140,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       // Phase T-BLOCKS: validated + capped structured blocks (authoritative boundary);
       // FD-T17 resolves any block media IDs → MediaRefs via the SAME ref() (so block
       // photos land in the media manifest and get variants — one media pipeline).
-      blocks: resolveBlockMedia(validateBlocks(settings.blocks), ref, reviewsWall ? { reviewsWall } : undefined),
+      blocks: resolveBlockMedia(validateBlocks(resolvedBlocks), ref, reviewsWall ? { reviewsWall } : undefined),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],

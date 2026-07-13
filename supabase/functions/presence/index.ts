@@ -52,7 +52,7 @@ import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
-import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryDelete } from './routes/content_library.ts';
+import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
@@ -60,6 +60,7 @@ import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBook
 import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } from './routes/reviews.ts';
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
+import { handleHelpAsk } from './routes/help.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
@@ -310,6 +311,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    resolved from the JWT (portfolio rollup) BEFORE caller-site resolution.
   if (route === '/analytics/portfolio' && method === 'GET') return handleAnalyticsPortfolio(jwt, cors);
 
+  // ── HELP-1: in-app "how do I…?" helper — product help grounded in our OWN help
+  //    copy. Site-agnostic (every signed-in user gets it, even one who owns no
+  //    site), so it sits BEFORE the caller-site gate. Distinct from the site-aware
+  //    Concierge; deterministic-first, honest fallback, no invented features.
+  if (route === '/help/ask' && method === 'POST') return handleHelpAsk(req, cors);
+
   // 3. resolve the caller's site. Un-scoped: RLS confines to the caller's OWN
   //    site. Scoped (SC-1): an agency operator drilled into a client — the
   //    x-dds-scope-site header is a REQUEST, re-validated here against agency
@@ -486,6 +493,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/content-library' && method === 'POST') return handleContentLibrarySave(req, site, principal, cors);
   {
     const m = route.match(/^\/content-library\/([0-9a-f-]{36})$/);
+    if (m && method === 'PUT') return handleContentLibraryUpdate(req, site, principal, m[1], cors);   // CL-LINK: edit the single source
     if (m && method === 'DELETE') return handleContentLibraryDelete(site, principal, m[1], cors);
   }
 

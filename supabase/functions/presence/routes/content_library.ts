@@ -35,6 +35,34 @@ export async function handleContentLibrarySave(req: Request, site: SiteRow, prin
   return json({ data: { id: ins.json[0].id, name, kind: 'block', block } }, 201, cors);
 }
 
+// CL-LINK: edit a saved section in place — this is the "single source" for every
+// LINKED placement, so an update here flows to every linked spot at next publish
+// (copies are untouched). Reuses the ONE name cleaner + block validator; no new
+// content model, no migration (payload is the existing jsonb column).
+export async function handleContentLibraryUpdate(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'bad_request', message: 'Invalid reference.' }, 400, cors);
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const patch: Record<string, unknown> = {};
+  if (body?.name !== undefined) {
+    const name = cleanLibraryName(body.name);
+    if (!name) return json({ error: 'bad_name', message: 'Give this saved section a name.' }, 422, cors);
+    patch.name = name;
+  }
+  if (body?.block !== undefined) {
+    const block = validateLibraryBlock(body.block);
+    if (!block) return json({ error: 'bad_block', message: 'That isn’t a saveable content block yet — fill it in first.' }, 422, cors);
+    patch.payload = block;
+  }
+  if (!Object.keys(patch).length) return json({ error: 'nothing_to_update', message: 'Nothing to change.' }, 422, cors);
+  const r = await svc(`presence_content_library?id=eq.${id}&site_id=eq.${site.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch),
+  });
+  if (!r.ok || !Array.isArray(r.json) || !r.json.length) return json({ error: 'not_found', message: 'That item isn’t in your library.' }, 404, cors);
+  const row = r.json[0];
+  await writeChangeEvent({ siteId: site.id, entityType: 'content_library', entityId: id, action: 'update', summary: `Updated “${row.name}” — every linked placement will show this`, principal, provenance: 'human' });
+  return json({ data: { id: row.id, name: row.name, kind: row.kind, block: row.payload } }, 200, cors);
+}
+
 export async function handleContentLibraryDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
   if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'bad_request', message: 'Invalid reference.' }, 400, cors);
   const r = await svc(`presence_content_library?id=eq.${id}&site_id=eq.${site.id}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });

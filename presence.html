@@ -4252,6 +4252,7 @@ let BLOCK_FOCUS = null;      // FD-T-LIB: index of a just-added block to scroll 
 let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
 let CL_ITEMS = null;        // CL-1: saved content-library items (null = not loaded)
 let CL_SHOW = false;
+let CL_LOADING = false;     // CL-LINK: one-shot guard for the lazy saved-items load
 async function clSave(idx) {   // CL-1: save a crafted section to the reusable library
   const blk = BLOCKS_WORK[idx]; const def = BLOCK_DEFS.find((d) => d.type === blk.type);
   const name = await askText("Name this saved section", { value: blk.title || (def && def.name) || "Saved section", ok: "Save" });
@@ -4270,7 +4271,62 @@ function clInsert(block) {   // CL-1: insert a saved block into the SAME editor 
     if (at >= 0) { if (!confirm("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?")) return; BLOCKS_WORK[at] = copy; }
     else BLOCKS_WORK.push(copy);
   }
-  CL_SHOW = false; renderBlocksCard(); toast("Inserted — Save content blocks to keep it");
+  CL_SHOW = false; renderBlocksCard(); toast("Inserted a copy — Save sections to keep it");
+}
+// CL-LINK: insert a saved section as a LINK — the page stores only a reference to
+// the saved item; at publish, it resolves to the saved section's CURRENT content,
+// so editing the saved section updates every linked placement. Opt-in, alongside
+// the copy option above. (The server resolves the ref at serialize time.)
+function clInsertLink(item) {
+  if (!item || !item.id) return;
+  BLOCKS_WORK.push({ type: "linked", ref: item.id });
+  CL_SHOW = false; renderBlocksCard(); toast("Linked — edits to the saved section update everywhere");
+}
+function clItemById(ref) { return (CL_ITEMS || []).find((x) => x.id === ref) || null; }
+// CL-LINK: push the edited saved-section content back to the ONE library item — this
+// updates every linked placement (at next publish). Then revert this slot to a link.
+async function clUpdateSource(idx) {
+  const blk = BLOCKS_WORK[idx]; const ref = blk && blk._clEdit; if (!ref) return;
+  const clean = { ...blk }; delete clean._clEdit;   // strip the transient edit marker
+  try {
+    const r = await api("PUT", "/content-library/" + ref, { block: clean });
+    if (CL_ITEMS && r && r.data) { const it = CL_ITEMS.find((x) => x.id === ref); if (it) { it.block = r.data.block; it.name = r.data.name; } }
+    BLOCKS_WORK[idx] = { type: "linked", ref };
+    renderBlocksCard();
+    toast("Updated — every linked spot shows this after you publish");
+  } catch (err) { toast(nice(err), true); }
+}
+// CL-LINK: a linked placement — a labeled, read-only chip (its content is the saved
+// section). Opt-in labeling makes the difference from a copy unmistakable, and a
+// missing/deleted saved section degrades gracefully (the spot just won't appear).
+function renderLinkedChip(blk, idx, card) {
+  const miniBtn = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const item = clItemById(blk.ref);
+  const sub = el("div"); sub.id = "blkSub-" + idx; sub.style.cssText = "border:1px solid #d9cef0;border-radius:12px;padding:12px 14px;margin-top:10px;background:#faf7ff";
+  const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+  const nm = el("div", null, "🔗 Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:#3a2470";
+  const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
+  [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
+  up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
+  if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
+  up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; renderBlocksCard(); });
+  rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
+  head.append(nm, up, dn, rm); sub.appendChild(head);
+  if (!item && CL_ITEMS !== null) {
+    sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
+    card.appendChild(sub); return;
+  }
+  const typeName = item ? ((BLOCK_DEFS.find((d) => d.type === (item.block && item.block.type)) || {}).name || "") : "";
+  sub.appendChild(el("div", "hint", "Linked" + (typeName ? " " + typeName.toLowerCase() : "") + " — edits to the saved section update everywhere it’s linked. Edit the saved section to change it in every spot, or make it independent to edit just this one."));
+  const row = el("div"); row.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
+  const edit = el("button", null, "Edit the saved section"); edit.type = "button"; edit.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
+  edit.disabled = !item;
+  edit.addEventListener("click", () => { const it = clItemById(blk.ref); if (!it || !it.block) { toast("Loading the saved section…"); return; } BLOCKS_WORK[idx] = Object.assign(JSON.parse(JSON.stringify(it.block)), { _clEdit: blk.ref }); renderBlocksCard(); });
+  const indep = el("button", null, "Make independent"); indep.type = "button"; indep.style.cssText = miniBtn;
+  indep.addEventListener("click", () => { const it = clItemById(blk.ref); if (!it || !it.block) { toast("Loading the saved section…"); return; } const copy = JSON.parse(JSON.stringify(it.block)); const d = BLOCK_DEFS.find((x) => x.type === copy.type); if (d && d.multi) copy.id = uniqueBlockId(copy.type); BLOCKS_WORK[idx] = copy; renderBlocksCard(); toast("Now independent — edits here won’t affect other places"); });
+  row.append(edit, indep); sub.appendChild(row);
+  card.appendChild(sub);
 }
 function currentBlocks() { return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : []; }
 function blockText(def, blk) {
@@ -4318,7 +4374,12 @@ function emptyBlock(def) {
 }
 async function saveBlocks() {
   try {
-    const r = await api("PUT", "/settings", { blocks: BLOCKS_WORK });
+    // CL-LINK: a saved-section edit-in-progress (_clEdit) is NOT page content — it
+    // belongs to the library. If the owner saves the page mid-edit, keep the linked
+    // placement (revert the temp editable block to its link) and discard the uncommitted
+    // source edit, so a linked spot is never lost or accidentally flattened to a copy.
+    const blocksToSave = BLOCKS_WORK.map((b) => (b && b._clEdit ? { type: "linked", ref: b._clEdit } : b));
+    const r = await api("PUT", "/settings", { blocks: blocksToSave });
     S.settings = r.data || { ...S.settings, blocks: BLOCKS_WORK };
     BLOCKS_WORK = currentBlocks();
     renderBlocksCard();
@@ -4355,7 +4416,7 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
 // no CSS. Lives INSIDE the block you're already editing (no separate panel). The
 // options are enumerated; the server re-validates and only known values are stored.
@@ -4439,6 +4500,12 @@ function blockWindowRow(idx, blk, sub) {
 function renderBlocksCard() {
   const card = $("blocksCard"); if (!card) return; card.textContent = "";
   const focusIdx = BLOCK_FOCUS; BLOCK_FOCUS = null;   // FD-T-LIB: consume the one-shot focus target
+  // CL-LINK: a linked section needs the saved-items list to show its name + let it be
+  // edited. Lazy-load it once when any placement is a link (or being edited from one).
+  if (CL_ITEMS === null && !CL_LOADING && BLOCKS_WORK.some((b) => b && (b.type === "linked" || b._clEdit))) {
+    CL_LOADING = true;
+    api("GET", "/content-library").then((r) => { CL_ITEMS = (r && r.data) || []; }).catch(() => { CL_ITEMS = []; }).then(() => { CL_LOADING = false; renderBlocksCard(); });
+  }
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const miniBtn = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   card.appendChild(el("label", null, "Your sections"));
@@ -4472,6 +4539,9 @@ function renderBlocksCard() {
     card.appendChild(panel);
   }
   BLOCKS_WORK.forEach((blk, idx) => {
+    // CL-LINK: a link renders as a read-only chip (a block being edited FROM a link
+    // carries a real type + _clEdit, so it falls through to its normal editor below).
+    if (blk && blk.type === "linked") { renderLinkedChip(blk, idx, card); return; }
     const def = BLOCK_DEFS.find((d) => d.type === blk.type); if (!def) return;
     const sub = el("div"); sub.id = "blkSub-" + idx; sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
@@ -4486,6 +4556,21 @@ function renderBlocksCard() {
     const sv = el("button", null, "Save"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); sub.appendChild(head);
+    // CL-LINK: editing the SINGLE SOURCE (reached via a linked chip) — swap the
+    // toolbar for a clear "update everywhere" flow so it can't be mistaken for a
+    // normal, page-only edit.
+    if (blk._clEdit) {
+      sub.style.borderColor = "#d9cef0"; sub.style.background = "#faf7ff";
+      head.textContent = "";
+      const it = clItemById(blk._clEdit);
+      const lbl = el("div", null, "Editing saved section" + (it ? " · " + it.name : "")); lbl.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:#3a2470";
+      const upd = el("button", null, "Update everywhere"); upd.type = "button"; upd.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+      const cxl = el("button", null, "Cancel"); cxl.type = "button"; cxl.style.cssText = miniBtn;
+      upd.addEventListener("click", () => clUpdateSource(idx));
+      cxl.addEventListener("click", () => { BLOCKS_WORK[idx] = { type: "linked", ref: blk._clEdit }; renderBlocksCard(); });
+      head.append(lbl, upd, cxl);
+      sub.appendChild(Object.assign(el("div", "hint", "This is your saved section. Changes here update every place it’s linked — after you Update and publish. “Cancel” keeps it as it was."), { style: "margin:0 0 8px;font-size:12px;color:#6b4fa0" }));
+    }
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Section heading (optional)"; ti.value = blk.title || ""; ti.style.cssText = inputCss;
     ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; });
     sub.appendChild(ti);
@@ -4767,16 +4852,22 @@ function renderBlocksCard() {
       tog.addEventListener("click", () => { CL_SHOW = !CL_SHOW; renderBlocksCard(); });
       head.append(tog); libRow.appendChild(head);
       if (CL_SHOW) {
+        // CL-LINK: two ways to reuse a saved section — a Copy (independent) or a Link
+        // (edits to the saved section update everywhere it’s linked). Spelled out so
+        // the choice is never a guess.
+        libRow.appendChild(Object.assign(el("div", "hint", "Insert a copy = an independent section you edit on its own. Link = it stays tied to this saved section, so editing the saved section updates every linked spot."), { style: "margin-top:6px;font-size:11.5px" }));
         const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
         CL_ITEMS.forEach((it) => {
-          const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
-          row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;font-size:12.5px" }));
+          const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
+          row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;min-width:120px;font-size:12.5px" }));
           row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
-          const ins = el("button", null, "Insert"); ins.type = "button"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+          const ins = el("button", null, "Insert a copy"); ins.type = "button"; ins.title = "An independent copy you edit on its own"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid #5b3fa0;background:transparent;color:#3a2470;cursor:pointer";
           ins.addEventListener("click", () => clInsert(it.block));
+          const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+          lnk.addEventListener("click", () => clInsertLink(it));
           const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
           del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); } });
-          row.append(ins, del); list.appendChild(row);
+          row.append(ins, lnk, del); list.appendChild(row);
         });
         libRow.appendChild(list);
       }
