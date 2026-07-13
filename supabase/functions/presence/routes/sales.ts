@@ -1398,17 +1398,22 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
 /** The one-tap sign-in invite. A brand-new login gets a signed set-password link
  *  (they never chose a password) that lands them straight in the EXISTING guided
  *  first-run (via ?next=); an existing login gets a welcome. Best-effort. */
-async function sendCustomerInvite(email: string, isNewLogin: boolean): Promise<boolean> {
+async function sendCustomerInvite(email: string, _isNewLogin: boolean): Promise<boolean> {
   if (!email) return false;
-  if (isNewLogin) {
-    const link = await generateSetPasswordLink(email, `${siteUrl()}/set-password.html?next=/get-started.html`);
-    sendEmail(email, 'Welcome to Studio OS — set up your login',
-      `<p>Welcome! Your workspace is set up and ready.</p><p><a href="${link || `${siteUrl()}/portal.html`}">Set your password and sign in</a> — you’ll land straight in your guided setup. You can always sign in at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
-    undefined, { critical: true }).catch(() => {});   // login access = transactional
-    return !!link;
-  }
+  // App links must point where the APP is served — portal/set-password/get-started are
+  // NOT on the public marketing domain (they're excluded from the public allowlist), so
+  // siteUrl()'s davisdigitalstudio.com default 404s them. Use SITE_URL, defaulting to
+  // the presence app base like the booking/form links already do.
+  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  // Every provisioned customer needs to CREATE their password. Always send a signed
+  // set-password link that lands them in the guided first-run; if it can't be generated
+  // they can still get in passwordlessly (one-time email code) at the portal.
+  const link = await generateSetPasswordLink(email, `${base}/set-password.html?next=/get-started.html`);
+  const cta = link
+    ? `<a href="${link}">Create your password &amp; sign in →</a> — you’ll land straight in your guided setup.`
+    : `<a href="${base}/portal.html">Sign in at your portal →</a> — we’ll email you a one-time code, no password needed.`;
   sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
-    `<p>Welcome! Your workspace is set up and ready.</p><p>Sign in at <a href="${siteUrl()}/portal.html">your portal</a>, then open <a href="${siteUrl()}/get-started.html">your guided setup</a>.</p>`,
+    `<p>Welcome! Your workspace is set up and ready.</p><p>${cta}</p><p style="font-size:13px;color:#6b6478">You can always sign in any time at <a href="${base}/portal.html">your portal</a>.</p>`,
   undefined, { critical: true }).catch(() => {});   // login access = transactional
   return true;
 }
