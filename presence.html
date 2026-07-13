@@ -2324,6 +2324,24 @@ function renderMediaGrid(grid, manage, onPick) {
         cell.appendChild(inp); inp.focus(); inp.select();
       });
       row.appendChild(ed);
+      // AI-proposed description + tags + caption — one tap, propose-then-approve.
+      // Nothing saves until the owner accepts; the manual "Edit description" above
+      // always works, so this is calm and obviously optional.
+      const ai = el("button", null, "✦ Suggest with AI");
+      ai.type = "button";
+      ai.title = "Let AI propose a description, a few tags, and a caption — you approve or edit before anything saves";
+      ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid #cfc2ee;background:rgba(91,63,160,.06);color:#5b3fa0;cursor:pointer";
+      ai.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (cell.querySelector(".aisuggest")) return;
+        const label = ai.textContent; ai.disabled = true; ai.textContent = "Looking at the photo…";
+        try {
+          const r = await api("POST", `/assets/${m.id}/suggest`, {});
+          showSuggest(cell, m, grid, (r.data || {}).proposal || {});
+        } catch (err) { toast(nice(err), true); }
+        finally { ai.disabled = false; ai.textContent = label; }
+      });
+      row.appendChild(ai);
       // Phase CP-2 (DS-5): focus point — 3×3 chooser; used wherever the site crops
       const fp = el("button", null, "Set focus");
       fp.type = "button";
@@ -2358,6 +2376,49 @@ function renderMediaGrid(grid, manage, onPick) {
     }
     grid.appendChild(cell);
   });
+}
+// The AI proposal panel: fills editable description / tags / caption fields for the
+// owner to accept or edit. It NEVER auto-saves — accepting writes alt via /media and
+// tags+caption via /assets; dismissing throws the suggestion away.
+function showSuggest(cell, m, grid, p) {
+  const prev = cell.querySelector(".aisuggest"); if (prev) prev.remove();
+  const panel = el("div", "aisuggest");
+  panel.style.cssText = "margin-top:8px;padding:11px 12px;border:1px solid #d8cef0;background:rgba(91,63,160,.05);border-radius:10px;font-size:12px";
+  const note = el("div", null, "A suggestion — edit anything. Nothing saves until you accept.");
+  note.style.cssText = "color:var(--ink-2);margin-bottom:9px;font-family:var(--serif);font-style:italic";
+  panel.appendChild(note);
+  const mkField = (labelText, value, max) => {
+    const l = el("label", null, labelText); l.style.cssText = "display:block;font-size:11px;color:var(--ink-2);margin-bottom:2px";
+    const i = el("input"); i.type = "text"; i.value = value || ""; i.maxLength = max;
+    i.style.cssText = "width:100%;margin-bottom:8px;padding:6px 8px;font:inherit;font-size:12px;border:1px solid var(--line,#ddd);border-radius:8px";
+    panel.appendChild(l); panel.appendChild(i); return i;
+  };
+  const altI = mkField("Description (alt text)", p.alt, 200);
+  const tagsI = mkField("Tags", (p.tags || []).join(", "), 240);
+  const capI = mkField("Caption", p.caption, 200);
+  const btns = el("div"); btns.style.cssText = "display:flex;gap:16px;align-items:baseline";
+  const accept = el("button", "pillbtn inked", "Accept");
+  accept.type = "button";
+  accept.addEventListener("click", async () => {
+    const alt = altI.value.trim();
+    if (alt.length < 3) { toast("A few words about the photograph first — it matters.", true); return; }
+    accept.disabled = true;
+    try {
+      await api("PUT", `/media/${m.id}`, { alt_text: alt });
+      m.alt_text = alt;
+      const tags = tagsI.value.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 40);
+      try { await api("PATCH", `/assets/${m.id}`, { tags, caption: capI.value.trim() }); } catch (_) { /* alt is the essential save; tags/caption best-effort */ }
+      panel.remove(); renderMediaGrid(grid, true);
+      toast("Saved — publish to apply"); scheduleChangesRefresh();
+    } catch (err) { accept.disabled = false; toast(nice(err), true); }
+  });
+  const dismiss = el("button", "quietact", "Dismiss");
+  dismiss.type = "button";
+  dismiss.addEventListener("click", () => panel.remove());
+  btns.appendChild(accept); btns.appendChild(dismiss);
+  panel.appendChild(btns);
+  cell.appendChild(panel);
+  altI.focus(); altI.select();
 }
 $("btnUpload").addEventListener("click", () => $("fileInput").click());
 $("fileInput").addEventListener("change", () => {

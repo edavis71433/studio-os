@@ -22,10 +22,13 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { deleteMedia, signThumb, signDownload, copyObject } from '../lib/media.ts';
+import { deleteMedia, signThumb, signDownload, copyObject, isImageMime } from '../lib/media.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { editionFromPlan, editionFromSite } from '../commerce/editions.ts';
+import { anthropicVisionModel } from '../writer/vision.ts';
+import { suggestFromImage } from '../lib/media_suggest.ts';
+import { checkAiCeiling, ceilingDenial, recordUsage } from '../commerce/metering.ts';
 import {
   searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
@@ -176,6 +179,56 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
     download_url: download,
     policy: await policyFor(site),
   } }, 200, cors);
+}
+
+// ── AI suggestion: PROPOSE alt text + tags + caption for a photo (never applied) ──
+// Turns the required-alt chore into one tap: the vision model looks at the image
+// and proposes alt + a few tags + a caption; the owner accepts or edits before
+// anything saves. This handler NEVER writes to the media row — it returns a
+// proposal only; the UI applies it (PATCH /assets/:id, PUT /media/:id) on accept.
+// Gated on ANTHROPIC_KEY (honest 503 without it), cost-ceiling enforced BEFORE the
+// call, and metered afterward. We send a bounded, EXIF-stripped thumbnail (not the
+// full original) so latency + token cost stay small and predictable.
+const SUGGEST_THUMB_WIDTH = 512;          // enough detail to describe; cheap tokens
+const SUGGEST_MAX_BYTES = 2 * 1024 * 1024; // defensive cap on the image we forward
+
+async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const buf = new Uint8Array(await r.arrayBuffer());
+    return buf.byteLength > 0 && buf.byteLength <= SUGGEST_MAX_BYTES ? buf : null;
+  } catch { return null; }
+}
+
+export async function handleAssetSuggest(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const asset = await loadAsset(site.id, id);
+  if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  if (!isImageMime(asset.mime || '')) {
+    return json({ error: 'not_an_image', message: 'AI descriptions are for photos — this file isn’t an image.' }, 400, cors);
+  }
+  // Gate: no key → the feature is honestly dark; the manual description always works.
+  const vision = anthropicVisionModel();
+  if (!vision) {
+    return json({ error: 'suggest_unavailable', message: 'AI descriptions aren’t switched on right now — you can still write the description yourself, which always works.' }, 503, cors);
+  }
+  // HARD cost ceiling — enforced BEFORE the provider call (a dismissed notice can't bypass it).
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
+  // Send a small, EXIF-stripped webp thumbnail (bounded cost/latency), not the original.
+  const thumb = await signThumb(asset.storage_path, asset.mime || '', SUGGEST_THUMB_WIDTH);
+  const bytes = thumb ? await fetchImageBytes(thumb) : null;
+  if (!bytes) return json({ error: 'image_unreadable', message: 'We couldn’t open that photo to describe it — try again in a moment.' }, 502, cors);
+
+  const res = await suggestFromImage(vision, bytes, 'image/webp');
+  // Meter the successful generative op (fire-and-forget; never blocks the reply).
+  if (res.usage) recordUsage({ siteId: site.id, clientId: site.client_id, agent: 'media_suggest' }, res.usage.model, res.usage.input_tokens ?? null, res.usage.output_tokens ?? null).catch(() => {});
+  void principal; // media RLS + site scope enforce ownership; the router already authed
+  if (!res.ok || !res.suggestion) {
+    return json({ error: 'suggest_failed', message: 'The description didn’t come through — nothing was changed. Try again, or write it yourself.' }, 502, cors);
+  }
+  // A PROPOSAL only — the owner accepts or edits before anything is saved.
+  return json({ data: { proposal: res.suggestion, note: 'A suggestion — look it over, edit anything, and it only saves when you accept.' } }, 200, cors);
 }
 
 export async function handleAssetDownload(site: SiteRow, id: string, cors: Record<string, string>) {
