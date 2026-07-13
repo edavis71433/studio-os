@@ -119,6 +119,17 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('label', 'text', { required: true, repeatable: true, max: 40 }), t('url', 'url', { required: true }), t('style', 'enum')], schema: null, a11y: 'real focusable links, visible focus', seo: 'internal linking', industries: ['*'] },
   { key: 'divider', label: 'Divider / space', category: 'content', purpose: 'A hairline rule or a bit of breathing room between sections.',
     fields: [t('style', 'enum'), t('size', 'enum')], schema: null, a11y: 'presentational only, hidden from assistive tech', seo: 'none (layout)', industries: ['*'] },
+  // ── Layout & utility (T-BLOCKS r4). Columns + Cards are multi-instance. ──
+  { key: 'columns', label: 'Columns', category: 'content', purpose: 'Two or three side-by-side columns — each with text, an optional image and a button. Stacks on mobile.',
+    fields: [t('columns', 'list', { required: true, repeatable: true, max: 3 }), t('body', 'richtext', { aiAssist: true }), t('image', 'image'), t('button', 'text')],
+    schema: null, a11y: 'reading order stays sound when columns stack; each image has alt', seo: 'supporting copy in a scannable layout', industries: ['*'] },
+  { key: 'cards', label: 'Feature cards', category: 'content', purpose: 'A grid of teaser cards — image, title, a line of text and an optional link.',
+    fields: [t('cards', 'list', { required: true, repeatable: true, max: 8 }), t('heading', 'text', { required: true, aiAssist: true }), t('text', 'text', { aiAssist: true }), t('image', 'image'), t('link', 'url')],
+    schema: null, a11y: 'each card is one focusable link when linked; image alt describes it; grid stacks on mobile', seo: 'internal linking + scannable content', industries: ['*'] },
+  { key: 'download', label: 'Download', category: 'media', purpose: 'Offer a file from your library (e.g. a PDF or price list) as an accessible Download link.',
+    fields: [t('file', 'image', { required: true }), t('label', 'text', { max: 80 })], schema: null, a11y: 'a real labelled download link, visible focus', seo: 'resource discoverability', industries: ['*'] },
+  { key: 'toc', label: 'Table of contents', category: 'content', purpose: 'An auto-built "On this page" jump list from your section headings.',
+    fields: [t('title', 'text', { max: 80 })], schema: null, a11y: 'a labelled nav landmark of in-page jump links to real anchors', seo: 'internal anchors improve navigability', industries: ['*'] },
   // Phase FB: the custom form builder — a whitelisted, typed form (contact/quote/
   // application/booking). Full field schema + validation live in lib/forms.ts; the
   // catalog just declares the block so the engine may realize it. Multi-instance.

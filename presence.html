@@ -3416,6 +3416,11 @@ const BLOCK_DEFS = [
   { type: "accordion", name: "Accordion (expandable)", structured: "accordion", hint: "Add each expandable panel — a short label and the details inside." },
   { type: "buttons", name: "Buttons", structured: "buttons", hint: "Up to three clear action links." },
   { type: "divider", name: "Divider / space", dividerSimple: true, hint: "" },
+  // Layout & utility (r4). Columns + Cards are MULTI-INSTANCE (like forms) — add several.
+  { type: "columns", name: "Columns", structured: "columns", multi: true, hint: "Two or three side-by-side columns — each with text, an optional image and a button. They stack on phones." },
+  { type: "cards", name: "Feature cards", structured: "cards", multi: true, hint: "A grid of cards — image, title, a line of text and an optional link." },
+  { type: "download", name: "Download", downloadSimple: true, hint: "Offer a file from your library (e.g. a PDF or price list) as a clear Download link." },
+  { type: "toc", name: "Table of contents", tocSimple: true, hint: "Auto-built “On this page” jump list from your section headings — nothing to fill in." },
 ];
 // ── FD-T-LIB: the "Add a section" library — purpose-grouped, with familiar-name
 //    aliases so owners recognize sections by the words they already know (carousel,
@@ -3425,11 +3430,11 @@ const SECTION_GROUPS = [
   { label: "Show your work", note: "Photos, video and the people behind the work.",
     types: ["gallery", "before_after", "image", "image_text", "video", "team", "partners"] },
   { label: "Build trust", note: "Proof that turns visitors into customers.",
-    types: ["features", "stats", "reviews", "certifications", "pricing", "process"] },
-  { label: "Get customers to act", note: "Clear next steps — book, sign up, or find you.",
-    types: ["cta", "buttons", "appointment", "newsletter", "map"] },
-  { label: "Text & layout", note: "Your own words, expandable details, and spacing.",
-    types: ["richtext", "accordion", "divider"] },
+    types: ["features", "stats", "cards", "reviews", "certifications", "pricing", "process"] },
+  { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
+    types: ["cta", "buttons", "appointment", "newsletter", "download", "map"] },
+  { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
+    types: ["richtext", "columns", "accordion", "divider", "toc"] },
   { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
     types: ["service_areas", "events", "social"] },
 ];
@@ -3444,6 +3449,7 @@ const SECTION_ALIAS = {
   service_areas: "service area", events: "calendar", social: "social icons",
   richtext: "text / paragraph", image: "photo", image_text: "image + words",
   accordion: "expandable / toggle", buttons: "button / link", divider: "spacer / line",
+  columns: "columns / grid", cards: "feature cards / tiles", download: "file / PDF", toc: "on this page / jump links",
 };
 // The CORE sections aren't blocks — they're edited in their own tabs. We surface
 // them read-only so an owner hunting for "hero / FAQ" sees they already have them.
@@ -3474,9 +3480,14 @@ function clInsert(block) {   // CL-1: insert a saved block into the SAME editor 
   if (!block || !block.type) return;
   const def = BLOCK_DEFS.find((d) => d.type === block.type);
   const copy = JSON.parse(JSON.stringify(block));
-  const at = BLOCKS_WORK.findIndex((b) => b.type === block.type);
-  if (at >= 0) { if (!confirm("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?")) return; BLOCKS_WORK[at] = copy; }
-  else BLOCKS_WORK.push(copy);
+  // MULTI-INSTANCE (columns/cards): always add a fresh copy with a new id — never
+  // offer to replace, since a site can hold several.
+  if (def && def.multi) { copy.id = uniqueBlockId(block.type); BLOCKS_WORK.push(copy); }
+  else {
+    const at = BLOCKS_WORK.findIndex((b) => b.type === block.type);
+    if (at >= 0) { if (!confirm("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?")) return; BLOCKS_WORK[at] = copy; }
+    else BLOCKS_WORK.push(copy);
+  }
   CL_SHOW = false; renderBlocksCard(); toast("Inserted — Save content blocks to keep it");
 }
 function currentBlocks() { return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : []; }
@@ -3490,8 +3501,20 @@ function textToBlock(def, title, text) {
   b[def.field] = text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => def.parse(l.split("|").map((s) => s.trim())));
   return b;
 }
+// A stable, unique id for a MULTI-INSTANCE block (columns/cards), unique among
+// the current working blocks so its render key (block_<type>_<id>) never collides.
+function uniqueBlockId(prefix) {
+  const taken = new Set((BLOCKS_WORK || []).map((b) => b && b.id).filter(Boolean));
+  let id = prefix, n = 1;
+  while (taken.has(id)) id = prefix + "_" + (++n);
+  return id;
+}
 function emptyBlock(def) {
   const b = { type: def.type };
+  if (def.structured === "columns") { b.id = uniqueBlockId("columns"); b.columns = [{ body: "" }, { body: "" }]; return b; }
+  if (def.structured === "cards") { b.id = uniqueBlockId("cards"); b.cards = [{ heading: "" }]; return b; }
+  if (def.downloadSimple) { return b; }   // file_id set by the picker
+  if (def.tocSimple) { return b; }         // nothing to fill — auto-built at render
   if (def.ctaSimple) { b.text = ""; return b; }
   if (def.reviewsSimple) { b.rating = 5; b.count = 0; return b; }
   if (def.apptSimple) { b.url = ""; return b; }
@@ -3619,11 +3642,18 @@ function renderBlocksCard() {
       alt.placeholder = "Describe the image for screen readers (alt text)"; alt.value = blk.alt || "";
       lk.placeholder = "Link when the image is clicked (optional)"; lk.value = blk.link || "";
       [cap, alt, lk].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = { type: "image", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, caption: cap.value.trim(), alt: alt.value.trim(), link: lk.value.trim() }; };
+      // A11y: mark a purely decorative image so it's hidden from screen readers
+      // (alt="" + role="presentation") rather than forcing meaningless alt text.
+      const decWrap = el("label"); decWrap.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;margin:2px 0 6px";
+      const dec = el("input"); dec.type = "checkbox"; dec.checked = !!blk.decorative; dec.style.cssText = "width:auto;margin:0";
+      decWrap.append(dec, document.createTextNode("This image is decorative (screen readers skip it — no alt text needed)"));
+      const commit = () => { BLOCKS_WORK[idx] = { type: "image", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, caption: cap.value.trim(), alt: alt.value.trim(), link: lk.value.trim(), decorative: dec.checked || undefined }; alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1"; };
       [cap, alt, lk].forEach((inp) => inp.addEventListener("change", commit));
+      dec.addEventListener("change", commit);
+      alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1";
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, alt, lk);
-      sub.appendChild(el("div", "hint", "Alt text helps screen readers and search — describe what's in the photo."));
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, alt, decWrap, lk);
+      sub.appendChild(el("div", "hint", "Alt text helps screen readers and search — describe what's in the photo. Tick “decorative” only for backgrounds/flourishes that add no information."));
     } else if (def.imageTextSimple) {
       const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
       if (blk.image_id) picRow.appendChild(mediaThumb(blk.image_id));
@@ -3655,6 +3685,24 @@ function renderBlocksCard() {
       const row = el("div"); row.style.cssText = "display:flex;gap:16px;flex-wrap:wrap;align-items:center"; row.append(styWrap, szWrap);
       sub.appendChild(row);
       sub.appendChild(el("div", "hint", "Purely visual — a divider line or blank space between sections. (The heading above is ignored for dividers.)"));
+    } else if (def.downloadSimple) {
+      const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
+      if (blk.file_id) picRow.appendChild(mediaThumb(blk.file_id));
+      const pick = el("button", null, blk.file_id ? "Change file" : "Choose a file"); pick.type = "button"; pick.style.cssText = miniBtn;
+      const lb = el("input"); lb.type = "text"; lb.placeholder = "Download label (optional — e.g. 2026 Menu)"; lb.value = blk.label || ""; lb.style.cssText = inputCss;
+      const commit = () => { BLOCKS_WORK[idx] = { type: "download", title: ti.value.trim(), file_id: BLOCKS_WORK[idx].file_id || undefined, label: lb.value.trim() || undefined }; };
+      lb.addEventListener("change", commit);
+      pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].file_id = id || undefined; renderBlocksCard(); }); });
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.appendChild(lb);
+      sub.appendChild(el("div", "hint", "Visitors get a clear “Download …” link. The file is served from your own site — nothing external loads."));
+    } else if (def.tocSimple) {
+      sub.appendChild(el("div", "hint", "Nothing to fill in — this builds an “On this page” jump list automatically from your section headings. Give the sections above headings and place this near the top."));
+    } else if (def.structured === "columns") {
+      renderColumnsBlockBody(blk, idx, sub, ti);
+      sub.appendChild(el("div", "hint", def.hint));
+    } else if (def.structured === "cards") {
+      renderCardsBlockBody(blk, idx, sub, ti);
+      sub.appendChild(el("div", "hint", def.hint));
     } else if (def.mediaKind) {
       renderMediaBlockBody(def, blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
@@ -3681,7 +3729,8 @@ function renderBlocksCard() {
     if (idx === focusIdx) setTimeout(() => { try { sub.scrollIntoView({ behavior: "smooth", block: "center" }); ti.focus(); } catch (_) {} }, 40);
   });
   const present = new Set(BLOCKS_WORK.map((b) => b.type));
-  const addable = BLOCK_DEFS.filter((d) => !present.has(d.type));
+  // MULTI-INSTANCE defs (columns/cards) stay addable even when already present.
+  const addable = BLOCK_DEFS.filter((d) => d.multi || !present.has(d.type));
   // ── FD-T-LIB: "Already on your site" — your CORE sections live in their own tabs.
   //    Chips route there so an owner isn't hunting for a "hero / FAQ" to add when
   //    they already have one. Read-only; reuses go().
@@ -3930,6 +3979,75 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
   if (buttons.length < 3) {
     const add = el("button", null, "+ Add button"); add.type = "button"; add.style.cssText = miniBtn;
     add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].buttons = BLOCKS_WORK[idx].buttons || []).push({ label: "", url: "", style: "primary" }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
+}
+// r4 columns editor — 2–3 columns, each: text (markdown) + optional image + button.
+function renderColumnsBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cols = Array.isArray(blk.columns) ? blk.columns : [];
+  cols.forEach((c, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
+    row.appendChild(Object.assign(el("div", "hint", "Column " + (k + 1)), { style: "font-weight:600;margin-bottom:4px" }));
+    const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+    if (c.image_id) photo.appendChild(mediaThumb(c.image_id));
+    const pb = el("button", null, c.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.columns[k].image_id = id || undefined; renderBlocksCard(); }); });
+    photo.appendChild(pb); row.appendChild(photo);
+    const bd = el("textarea"); bd.value = c.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "This column’s text…";
+    bd.rows = Math.max(3, (c.body || "").split("\n").length + 1);
+    bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box;margin-bottom:6px";
+    const bl = el("input"), bu = el("input");
+    bl.placeholder = "Button label (optional)"; bl.value = (c.button && c.button.label) || "";
+    bu.placeholder = "Button link (optional)"; bu.value = (c.button && c.button.url) || "";
+    [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+    const commit = () => { const o = { body: bd.value.trim(), image_id: blk.columns[k].image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; blk.columns[k] = o; };
+    [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
+    row.append(bd, bl, bu);
+    if (cols.length > 2) {
+      const rm = el("button", null, "Remove column"); rm.type = "button"; rm.style.cssText = miniBtn;
+      rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); renderBlocksCard(); });
+      row.appendChild(rm);
+    }
+    sub.appendChild(row);
+  });
+  if (cols.length < 3) {
+    const add = el("button", null, "+ Add column"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].columns = BLOCKS_WORK[idx].columns || []).push({ body: "" }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
+  sub.appendChild(el("div", "hint", "Two or three columns; they stack on phones. Keep at least two."));
+}
+// r4 feature-cards editor — a grid of cards (image + title + text + optional link).
+function renderCardsBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cards = Array.isArray(blk.cards) ? blk.cards : [];
+  cards.forEach((c, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
+    const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+    if (c.image_id) photo.appendChild(mediaThumb(c.image_id));
+    const pb = el("button", null, c.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.cards[k].image_id = id || undefined; renderBlocksCard(); }); });
+    photo.appendChild(pb); row.appendChild(photo);
+    const hd = el("input"), tx = el("input"), lk = el("input");
+    hd.placeholder = "Card title"; hd.value = c.heading || "";
+    tx.placeholder = "A line of text (optional)"; tx.value = c.text || "";
+    lk.placeholder = "Link (optional)"; lk.value = c.link || "";
+    [hd, tx, lk].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+    const commit = () => { blk.cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: blk.cards[k].image_id || undefined, link: lk.value.trim() || undefined }; };
+    [hd, tx, lk].forEach((inp) => inp.addEventListener("change", commit));
+    row.append(hd, tx, lk);
+    const rm = el("button", null, "Remove card"); rm.type = "button"; rm.style.cssText = miniBtn;
+    rm.addEventListener("click", () => { commitTitle(); blk.cards.splice(k, 1); renderBlocksCard(); });
+    row.appendChild(rm); sub.appendChild(row);
+  });
+  if (cards.length < 8) {
+    const add = el("button", null, "+ Add card"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].cards = BLOCKS_WORK[idx].cards || []).push({ heading: "" }); renderBlocksCard(); });
     sub.appendChild(add);
   }
 }

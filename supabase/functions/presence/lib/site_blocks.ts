@@ -18,6 +18,7 @@ import type {
   SiteBlockPartners, SiteBlockReviews, SiteBlockAppointment,
   SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
+  SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
 } from './render_types.ts';
 import { renderMarkdown } from './markdown.ts';
 import { normalizeFormDefinition, renderForm, type FormDefinition } from './forms.ts';
@@ -30,12 +31,16 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'newsletter', 'social', 'events', 'map',
   'richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider',
   'form',
+  'columns', 'cards', 'download', 'toc',
 ];
 
-// Per-block item caps — bounded content, never unbounded. Total blocks capped too
-// (one instance per type, so the cap = the realized-type count: every block can coexist).
-const MAX_BLOCKS = 24;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, buttons: 3 };
+// Per-block item caps — bounded content, never unbounded. Total blocks capped too.
+// Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
+// so the total cap is generous headroom rather than the realized-type count.
+const MAX_BLOCKS = 32;
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, buttons: 3, columns: 3, cards: 8 };
+// The block types a site may hold more than one of (each de-collided to a unique id).
+const MULTI = new Set<string>(['form', 'columns', 'cards']);
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 // Prose sanitizer: like s() but PRESERVES newlines (markdown structure) — collapses
@@ -46,6 +51,9 @@ const ml = (x: unknown, max: number): string => String(x ?? '')
 const arr = (x: unknown): any[] => (Array.isArray(x) ? x : []);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uid = (x: unknown): string => { const v = String(x ?? '').trim(); return UUID_RE.test(v) ? v : ''; };
+// A human-ish, storage-safe id for the multi-instance blocks (form/columns/cards) —
+// mirrors lib/forms.ts slug(): lowercase, non-alphanumerics → '_', trimmed, capped.
+const slugId = (x: unknown): string => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
 
 // ── Stored (pre-resolution) shapes for media blocks — carry media by ID; the
 //    serializer's resolveBlockMedia() turns IDs into MediaRefs (reusing ref()). ──
@@ -57,8 +65,14 @@ interface StoredPartners { type: 'partners'; title?: string; image_ids: string[]
 interface StoredMap { type: 'map'; title?: string; image_media_id?: string; address?: string; directions_url?: string }
 // Text & layout staples: image/image_text carry media by ID (resolved by resolveBlockMedia);
 // richtext/accordion/buttons/divider carry no media (pass straight through).
-interface StoredImage { type: 'image'; title?: string; image_id?: string; caption?: string; alt?: string; link?: string }
+interface StoredImage { type: 'image'; title?: string; image_id?: string; caption?: string; alt?: string; link?: string; decorative?: boolean }
 interface StoredImageText { type: 'image_text'; title?: string; image_id?: string; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
+// Layout & utility staples (T-BLOCKS r4). Columns/cards carry media by ID (resolved
+// by resolveBlockMedia) + a stable id (multi-instance). Download carries one file id.
+// Toc carries no media/id — its list is derived at render from sibling headings.
+interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string } }> }
+interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
+interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 export type StoredBlock =
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
@@ -66,6 +80,7 @@ export type StoredBlock =
   | StoredPartners | SiteBlockReviews | SiteBlockAppointment
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
   | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
+  | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
   | FormDefinition;
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
@@ -78,12 +93,20 @@ export type StoredBlock =
 export function validateBlocks(raw: unknown): StoredBlock[] {
   const out: StoredBlock[] = [];
   const seen = new Set<string>();
-  const formIds = new Set<string>();
+  // Per-type id registries for the MULTI blocks — each instance gets a unique id so
+  // its render key (block_<type>_<id>) + storage never collide with a sibling.
+  const idsByType: Record<string, Set<string>> = { form: new Set(), columns: new Set(), cards: new Set() };
+  const uniqueId = (t: string, rawId: unknown, fallback: string): string => {
+    let id = slugId(rawId) || fallback;
+    const set = idsByType[t];
+    while (set.has(id)) id = `${id}_${out.length}`;
+    set.add(id); return id;
+  };
   for (const b of arr(raw)) {
     if (!b || typeof b !== 'object') continue;
     const type = String((b as any).type || '');
-    // `form` is exempt from the one-per-type rule (multiple forms per site).
-    if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || (type !== 'form' && seen.has(type))) continue;
+    // MULTI blocks (form/columns/cards) are exempt from the one-per-type rule.
+    if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || (!MULTI.has(type) && seen.has(type))) continue;
     const title = s((b as any).title, 80) || undefined;
     let block: StoredBlock | null = null;
     switch (type as SiteBlockType) {
@@ -216,6 +239,7 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
           caption: s((b as any).caption, 200) || undefined,
           alt: s((b as any).alt, 200) || undefined,
           link: s((b as any).link, 300) || undefined,   // validated by safeHref at render
+          ...((b as any).decorative ? { decorative: true } : {}),   // a11y: alt="" + role="presentation"
         } as StoredImage;
         break;
       }
@@ -255,16 +279,42 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
       }
       case 'form': {   // custom form builder — full validation delegated to lib/forms.ts
         const r = normalizeFormDefinition(b);
-        if (r.ok) {
-          let id = r.form.id;
-          while (formIds.has(id)) id = `${id}_${out.length}`;   // unique id → unique render key + storage
-          formIds.add(id);
-          block = { ...r.form, id };
-        }
+        if (r.ok) block = { ...r.form, id: uniqueId('form', r.form.id, 'form') };   // unique id → unique render key + storage
+        break;
+      }
+      case 'columns': {   // MULTI: 2–3 equal columns, each a small stack (prose + optional image + button)
+        const cols = arr((b as any).columns).map((c) => {
+          const col: StoredColumns['columns'][number] = { body: ml(c?.body, 1200) };
+          const image_id = uid(c?.image_id); if (image_id) col.image_id = image_id;
+          const bl = s(c?.button?.label, 40), bu = s(c?.button?.url, 300);
+          if (bl && bu) col.button = { label: bl, url: bu };   // url validated by safeHref at render
+          return col;
+        }).filter((c) => c.body || c.image_id || c.button).slice(0, CAP.columns);
+        if (cols.length >= 2) block = { type: 'columns', id: uniqueId('columns', (b as any).id, 'columns'), title, columns: cols };
+        break;
+      }
+      case 'cards': {   // MULTI: a repeatable teaser grid (image + heading + short text + optional link)
+        const cards = arr((b as any).cards).map((c) => {
+          const card: StoredCards['cards'][number] = { heading: s(c?.heading ?? c?.title, 80) };
+          const text = s(c?.text, 240); if (text) card.text = text;
+          const image_id = uid(c?.image_id); if (image_id) card.image_id = image_id;
+          const link = s(c?.link, 300); if (link) card.link = link;   // validated by safeHref at render
+          return card;
+        }).filter((c) => c.heading || c.text || c.image_id).slice(0, CAP.cards);
+        if (cards.length) block = { type: 'cards', id: uniqueId('cards', (b as any).id, 'cards'), title, cards };
+        break;
+      }
+      case 'download': {   // an accessible download link to one media-library file
+        const file_id = uid((b as any).file_id) || undefined;
+        if (file_id) block = { type: 'download', title, file_id, label: s((b as any).label, 80) || undefined } as StoredDownload;
+        break;
+      }
+      case 'toc': {   // always valid; the render skips it when the page has no headings to list
+        block = { type: 'toc', title } as SiteBlockToc;
         break;
       }
     }
-    if (block) { out.push(block); if (type !== 'form') seen.add(type); }
+    if (block) { out.push(block); if (!MULTI.has(type)) seen.add(type); }
     if (out.length >= MAX_BLOCKS) break;
   }
   return out;
@@ -310,7 +360,18 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       }
       case 'image': {   // an image with no resolvable media is nothing to show — drop it
         const image = b.image_id ? ref(b.image_id) : null;
-        if (image) out.push({ type: 'image', title: b.title, image, caption: b.caption, alt: b.alt, link: b.link });
+        if (image) out.push({ type: 'image', title: b.title, image, caption: b.caption, alt: b.alt, link: b.link, decorative: b.decorative });
+        break;
+      }
+      case 'columns':   // prose/button ride through; each column's image resolves (or drops to null)
+        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button })) });
+        break;
+      case 'cards':
+        out.push({ type: 'cards', id: b.id, title: b.title, cards: b.cards.map((c) => ({ heading: c.heading, text: c.text, image: c.image_id ? ref(c.image_id) : null, link: c.link })) });
+        break;
+      case 'download': {   // a download with no resolvable file is nothing to offer — drop it
+        const file = b.file_id ? ref(b.file_id) : null;
+        if (file) out.push({ type: 'download', title: b.title, file, label: b.label });
         break;
       }
       case 'image_text': {   // prose keeps the block valuable even if the image can't resolve
@@ -327,13 +388,16 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
 
 /** Deterministic <img> from a resolved MediaRef — mirrors each template's img():
  *  responsive srcset, lazy, alt, focal crop. Zero external origins. */
-function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => string, sizes: string): string {
+function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => string, sizes: string, opts?: { decorative?: boolean }): string {
   const v = m.variants || {};
   const srcset = ['w400', 'w800', 'w1600'].filter((k) => v[k]).map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
   const src = v.w800 || v.w400 || Object.values(v)[0]; if (!src) return '';
   const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
   const focal = m.focal ? ` style="object-position:${m.focal.x}% ${m.focal.y}%"` : '';
-  return `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt || '')}"${dims} loading="lazy" decoding="async"${focal}>`;
+  // Decorative → empty alt + role="presentation" (announced by nothing). Otherwise
+  // the media's alt describes the image for AT + search.
+  const a11y = opts?.decorative ? ` alt="" role="presentation"` : ` alt="${attr(m.alt || '')}"`;
+  return `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''}${a11y}${dims} loading="lazy" decoding="async"${focal}>`;
 }
 
 // ── Render context: the escapers + safe-href a template already has, injected so
@@ -390,13 +454,41 @@ const socialIcon = (network: string): string => {
   return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SOCIAL_ICONS[key] || SOCIAL_ICONS.link}</svg>`;
 };
 
+// ── Anchors + Table of contents ──────────────────────────────────────────────
+// Blocks whose section ALWAYS shows an <h2> (title or this fallback). The fallback
+// text MUST match the render's h2() fallback so the anchor slug matches the shown
+// heading. Title-optional blocks (richtext/image/image_text/buttons/columns/cards/
+// download/form) get a heading only when the owner set a title; cta/divider/toc none.
+const MANDATORY_H2: Record<string, string> = {
+  features: 'Why choose us', stats: 'By the numbers', team: 'Meet the team', process: 'How it works',
+  pricing: 'Pricing', certifications: 'Credentials & certifications', service_areas: 'Areas we serve',
+  gallery: 'Gallery', before_after: 'Before & after', video: 'Video', newsletter: 'Get updates from us',
+  social: 'Find us online', events: 'Upcoming events', map: 'Find us', accordion: 'More information',
+  partners: 'Trusted by', reviews: 'What customers say', appointment: 'Book an appointment',
+};
+/** The effective (displayed) heading of a block, or null when it shows none. */
+function effHeading(b: SiteBlock): string | null {
+  if (Object.prototype.hasOwnProperty.call(MANDATORY_H2, b.type)) return (b as { title?: string }).title || MANDATORY_H2[b.type];
+  if (b.type === 'cta' || b.type === 'divider' || b.type === 'toc') return null;
+  return (b as { title?: string }).title || null;   // title-optional blocks
+}
+/** A stable, human-ish anchor slug (deterministic — same text → same id). */
+function slugifyAnchor(t: string): string {
+  return t.toLowerCase().replace(/&[a-z]+;/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'section';
+}
+
 /** Render validated blocks to deterministic HTML sections + optional JSON-LD.
- *  One section each, stable `block_<type>` key (for section order/visibility),
- *  reusing the template's existing classes (.block/.wrap/.cards/.card/.svc-grid).
- *  Each block meets the site_components a11y contract (lists, headings, text-first). */
+ *  One section each, stable `block_<type>` key (for section order/visibility;
+ *  MULTI blocks add their id: `block_<type>_<id>`), reusing the template's existing
+ *  classes (.block/.wrap/.cards/.card/.svc-grid). Every rendered <section> gets a
+ *  stable, deterministic anchor id (slug of its heading, de-duped) so a Table of
+ *  contents block + in-page links resolve. Each block meets the site_components
+ *  a11y contract (lists, headings, text-first). */
 export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRenderCtx): RenderedBlock[] {
   const { esc, attr, safeHref } = ctx;
-  const out: RenderedBlock[] = [];
+  // First pass: build each block's HTML/LD (the `toc` block is deferred — it needs
+  // every OTHER section's heading + anchor, known only after this pass).
+  const built: Array<{ b: SiteBlock; html: string; ld?: object }> = [];
   const h2 = (t: string | undefined, fallback: string) => `<h2>${esc(t || fallback)}</h2>`;
 
   for (const b of blocks || []) {
@@ -516,7 +608,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       }
       case 'image': {   // a figure; wrapped in a safe link only when the link is safe
         if (b.image) {
-          const fig = `<figure class="img-fig">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px')}${b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ''}</figure>`;
+          const fig = `<figure class="img-fig">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px', b.decorative ? { decorative: true } : undefined)}${b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ''}</figure>`;
           const href = b.link ? safeHref(b.link) : null;
           const inner = href ? `<a class="img-link" href="${attr(href)}" rel="noopener">${fig}</a>` : fig;
           html = `<section class="block wrap block-image">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
@@ -556,6 +648,47 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         html = `<section class="block wrap block-form">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
         break;
       }
+      case 'columns': {   // 2–3 equal columns; CSS grid stacks to one column < 620px
+        const cols = b.columns.map((c) => {
+          const prose = c.body ? renderMarkdown(c.body) : '';
+          const img = c.image ? `<div class="col-media">${blockImg(c.image, esc, attr, '(max-width:620px) 100vw, 320px')}</div>` : '';
+          const href = c.button ? safeHref(c.button.url) : null;
+          const btn = href ? `<p class="col-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(c.button!.label)}</a></p>` : '';
+          return `<div class="col">${img}${prose ? `<div class="prose">${prose}</div>` : ''}${btn}</div>`;
+        }).join('');
+        const n = Math.min(3, Math.max(2, b.columns.length));
+        html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '') : ''}<div class="cols" data-cols="${n}">${cols}</div></section>`;
+        break;
+      }
+      case 'cards': {   // a teaser grid; each card is one link when a safe href is set
+        const cards = b.cards.map((c) => {
+          const media = c.image ? `<div class="tc-media">${blockImg(c.image, esc, attr, '(max-width:620px) 100vw, 300px')}</div>` : '';
+          const head = c.heading ? `<p class="tc-title">${esc(c.heading)}</p>` : '';
+          const text = c.text ? `<p class="tc-text">${esc(c.text)}</p>` : '';
+          const href = c.link ? safeHref(c.link) : null;
+          const body = `<div class="tc-body">${head}${text}${href ? `<span class="tc-link" aria-hidden="true">Learn more →</span>` : ''}</div>`;
+          return href
+            ? `<a class="teaser-card" href="${attr(href)}" rel="noopener">${media}${body}</a>`
+            : `<div class="teaser-card">${media}${body}</div>`;
+        }).join('');
+        html = `<section class="block wrap block-cards">${b.title ? h2(b.title, '') : ''}<div class="card-grid">${cards}</div></section>`;
+        break;
+      }
+      case 'download': {   // an accessible download link to a first-party file (zero external origins)
+        if (b.file) {
+          const v = b.file.variants || {};
+          const href = v.w1600 || v.w800 || v.w400 || Object.values(v)[0];
+          if (href) {
+            const name = b.label || b.file.alt || 'file';
+            const icon = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+            html = `<section class="block wrap block-download">${b.title ? h2(b.title, '') : ''}<p class="dl-row"><a class="dl" href="${attr(href)}" download rel="noopener" aria-label="${attr('Download ' + name)}">${icon}<span>Download ${esc(name)}</span></a></p></section>`;
+          }
+        }
+        break;
+      }
+      case 'toc':   // deferred — rendered after anchors are assigned (needs sibling headings)
+        html = '';
+        break;
     }
     if (b.type === 'partners') {
       html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
@@ -569,12 +702,44 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       const href = safeHref(b.url);
       html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment')}${b.text ? `<p class="appt-text">${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    if (html) {
-      // `form` is the one multi-instance block type → a per-instance key so the
-      // section-order/visibility machinery never collides two forms.
-      const key = b.type === 'form' ? `block_form_${(b as FormDefinition).id}` : `block_${b.type}`;
-      out.push({ key, type: b.type, html, ...(ld ? { ld } : {}) });
-    }
+    built.push({ b, html, ld });
+  }
+
+  // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
+  // and collect the heading list a Table-of-contents block links to.
+  const usedIds = new Set<string>();
+  const tocEntries: Array<{ id: string; text: string }> = [];
+  for (const e of built) {
+    if (!e.html || e.b.type === 'toc' || !e.html.includes('<section')) continue;   // divider = <div>, toc = deferred
+    const heading = effHeading(e.b);
+    const base = slugifyAnchor(heading || e.b.type);
+    let id = base, n = 2;
+    while (usedIds.has(id)) id = `${base}-${n++}`;
+    usedIds.add(id);
+    e.html = e.html.replace('<section ', `<section id="${attr(id)}" `);   // first section only
+    if (heading) tocEntries.push({ id, text: heading });
+  }
+
+  // Third pass: render each toc block now that anchors exist (skipped when the page
+  // has no headings to list). A labelled <nav> landmark of real in-page jump links.
+  for (const e of built) {
+    if (e.b.type !== 'toc') continue;
+    if (!tocEntries.length) { e.html = ''; continue; }
+    const title = (e.b as SiteBlockToc).title || 'On this page';
+    e.html = `<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2>${esc(title)}</h2><ol class="toc">${
+      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`;
+  }
+
+  const out: RenderedBlock[] = [];
+  for (const e of built) {
+    if (!e.html) continue;
+    const b = e.b;
+    // MULTI blocks (form/columns/cards) add their id → a per-instance key so the
+    // section-order/visibility machinery never collides two of the same type.
+    const key = (b.type === 'form' || b.type === 'columns' || b.type === 'cards')
+      ? `block_${b.type}_${(b as { id: string }).id}`
+      : `block_${b.type}`;
+    out.push({ key, type: b.type, html: e.html, ...(e.ld ? { ld: e.ld } : {}) });
   }
   return out;
 }
@@ -665,4 +830,25 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .block-divider hr{border:none;border-top:1px solid var(--line);margin:0}
 .div-small{--div-gap:16px}.div-medium{--div-gap:36px}.div-large{--div-gap:64px}
 .block-divider.div-line{margin:var(--div-gap,36px) 0}
-.div-space{height:var(--div-gap,36px)}`;
+.div-space{height:var(--div-gap,36px)}
+.block-columns .cols{display:grid;gap:24px;grid-template-columns:1fr;margin-top:6px}
+.block-columns .col-media img{width:100%;border-radius:10px;display:block;margin-bottom:10px}
+.block-columns .col .prose{max-width:none}
+.block-columns .col-cta{margin:12px 0 0}
+@media(min-width:620px){.block-columns .cols[data-cols="2"]{grid-template-columns:1fr 1fr}.block-columns .cols[data-cols="3"]{grid-template-columns:repeat(3,1fr)}}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
+.teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
+a.teaser-card{text-decoration:none;color:inherit}
+.teaser-card .tc-media img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
+.teaser-card .tc-body{padding:14px 16px}
+.teaser-card .tc-title{font-weight:700;margin:0 0 4px}
+.teaser-card .tc-text{color:var(--soft);font-size:.95rem;margin:0}
+.teaser-card .tc-link{display:inline-block;margin-top:10px;font-weight:700;color:var(--accent-dark,var(--accent))}
+a.teaser-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+ol.toc{margin:8px 0 0;padding-left:1.2em}
+ol.toc li{margin:.25em 0}
+ol.toc a{color:var(--accent-dark,var(--accent))}
+.block-download .dl-row{margin:8px 0 0}
+.block-download .dl{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--accent);border-radius:12px;padding:12px 18px;text-decoration:none;color:var(--accent-dark,var(--accent));font-weight:700}
+.block-download .dl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.block-download .dl svg{flex:0 0 auto}`;

@@ -252,6 +252,77 @@ const ctx = { esc, attr, safeHref };
   ok('no staple ever loads an external origin (no live iframe/img/script/url())', hostile6.every((r) => !/<iframe|<img\b|<script|url\(/i.test(r.html)) && hostile6.every((r) => r.html.includes('&lt;')));
 }
 
+// ═══ 8. layout & utility blocks (r4) — columns, cards, download, toc, anchors, decorative ═══
+{
+  const G = '11111111-1111-1111-1111-111111111111', H = '22222222-2222-2222-2222-222222222222';
+  const REF = () => ({ alt: 'A photo', variants: { w800: '/img/a-800.webp', w1600: '/img/a-1600.webp' }, width: 800, height: 600 });
+
+  // — columns: MULTI-INSTANCE, 2–3 columns, markdown + safe image + safe button, stacks —
+  const twoCols = validateBlocks([
+    { type: 'columns', columns: [{ body: 'A' }, { body: 'B' }] },
+    { type: 'columns', columns: [{ body: 'C' }, { body: 'D' }] },
+  ]);
+  ok('columns is multi-instance (two kept, unique ids)', twoCols.length === 2 && twoCols[0].id !== twoCols[1].id);
+  const colKeys = renderSiteBlocks(resolveBlockMedia(twoCols, () => null), ctx).map((b) => b.key);
+  ok('columns render keys are per-instance (block_columns_<id>, no collision)', colKeys.length === 2 && colKeys[0] !== colKeys[1] && colKeys.every((k) => k.startsWith('block_columns_')));
+  ok('columns cap 3; a single column is not a columns section (min 2)',
+    validateBlocks([{ type: 'columns', columns: [{ body: 'a' }, { body: 'b' }, { body: 'c' }, { body: 'd' }] }])[0].columns.length === 3
+    && validateBlocks([{ type: 'columns', columns: [{ body: 'only' }] }]).length === 0);
+  const colR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', title: 'Our pillars', columns: [
+    { body: 'Fast **service**', image_id: G, button: { label: 'Book', url: 'https://ex.com/b' } },
+    { body: '<script>alert(1)</script>', button: { label: 'Bad', url: 'javascript:alert(1)' } },
+  ] }]), REF), ctx)[0];
+  ok('columns render a responsive grid (data-cols) + prose + safe image + safe button', colR.html.includes('block-columns') && colR.html.includes('data-cols="2"') && colR.html.includes('<strong>service</strong>') && colR.html.includes('/img/a-800.webp') && colR.html.includes('<a class="btn" href="https://ex.com/b"'));
+  ok('columns escape hostile markdown + drop an unsafe (javascript:) button', !/<script>alert|href="javascript:/i.test(colR.html) && colR.html.includes('&lt;script&gt;'));
+  ok('columns stacking is defined in BLOCK_CSS (1fr default → 2/3 cols ≥620px)', /\.block-columns \.cols\{[^}]*grid-template-columns:1fr/.test(BLOCK_CSS) && /@media\(min-width:620px\)\{\.block-columns \.cols\[data-cols="2"\]/.test(BLOCK_CSS));
+
+  // — cards: MULTI-INSTANCE teaser grid, cap 8, whole-card safe link, escaped —
+  ok('cards is multi-instance + caps at 8', (() => { const c = validateBlocks([{ type: 'cards', cards: Array.from({ length: 12 }, (_, i) => ({ heading: `C${i}` })) }, { type: 'cards', cards: [{ heading: 'x' }] }]); return c.length === 2 && c[0].cards.length === 8; })());
+  const cardR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'cards', title: 'Services', cards: [
+    { heading: 'Roofing', text: 'We fix leaks', image_id: G, link: 'https://ex.com/roof' },
+    { heading: '<script>alert(1)</script>', link: 'javascript:alert(1)' },
+  ] }]), REF), ctx)[0];
+  ok('cards render a grid; a linked card is ONE safe anchor; an unsafe link → plain card', cardR.html.includes('card-grid') && cardR.html.includes('<a class="teaser-card" href="https://ex.com/roof"') && (cardR.html.match(/teaser-card/g) || []).length >= 2 && !cardR.html.includes('javascript:'));
+  ok('cards escape a hostile heading; the grid stacks (auto-fill minmax)', cardR.html.includes('&lt;script&gt;') && !/<script>alert/.test(cardR.html) && /\.card-grid\{[^}]*repeat\(auto-fill/.test(BLOCK_CSS));
+
+  // — download: media-plumbing reuse → an accessible first-party download link —
+  const DLREF = () => ({ alt: 'Menu 2026', variants: { w1600: '/img/menu-1600.webp', w800: '/img/menu-800.webp' }, width: 1600, height: 2000 });
+  ok('download needs a resolvable file (unresolvable → dropped) + a valid uuid', resolveBlockMedia(validateBlocks([{ type: 'download', file_id: G }]), () => null).length === 0 && validateBlocks([{ type: 'download', file_id: 'nope' }]).length === 0);
+  const dl = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'download', file_id: G, label: '2026 Menu' }]), DLREF), ctx)[0];
+  ok('download renders a first-party "Download <name>" link with a download attr + zero external origins', dl.html.includes('block-download') && dl.html.includes('href="/img/menu-1600.webp"') && dl.html.includes(' download ') && dl.html.includes('Download 2026 Menu') && !/https?:\/\//.test(dl.html));
+  ok('download label is escaped (hostile → inert)', renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'download', file_id: G, label: '<script>alert(1)</script>' }]), DLREF), ctx)[0].html.includes('&lt;script&gt;'));
+
+  // — anchors + toc: stable ids on every section; a nav jump-list linking them —
+  const tocBlocks = validateBlocks([
+    { type: 'toc' },
+    { type: 'features', title: 'Why us', items: [{ title: 'Fast' }] },
+    { type: 'process', steps: [{ step: 'Call' }] },   // fallback heading "How it works"
+    { type: 'divider' },
+  ]);
+  const tocR = renderSiteBlocks(resolveBlockMedia(tocBlocks, () => null), ctx);
+  const toc = tocR.find((b) => b.type === 'toc'), feat = tocR.find((b) => b.type === 'features'), proc = tocR.find((b) => b.type === 'process');
+  ok('every rendered section carries a stable, human-ish anchor id (slug of its heading)', feat.html.includes('<section id="why-us"') && proc.html.includes('<section id="how-it-works"'));
+  ok('toc builds a labelled <nav> jump-list whose links match the section anchor ids', toc.html.includes('<nav') && toc.html.includes('block-toc') && toc.html.includes('aria-label=') && toc.html.includes('href="#why-us"') && toc.html.includes('href="#how-it-works"') && toc.html.includes('>Why us</a>') && toc.html.includes('>How it works</a>'));
+  ok('toc lists neither itself nor headingless sections (divider, cta)', !toc.html.includes('href="#on-this-page"') && !toc.html.includes('href="#divider"'));
+  ok('toc renders nothing when the page has no headings to list', renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'toc' }, { type: 'divider' }]), () => null), ctx).every((b) => b.type !== 'toc'));
+  ok('anchor ids de-dupe deterministically when two sections share a heading', (() => {
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', title: 'More', columns: [{ body: 'a' }, { body: 'b' }] }, { type: 'cards', title: 'More', cards: [{ heading: 'x' }] }]), () => null), ctx);
+    return r[0].html.includes('<section id="more"') && r[1].html.includes('<section id="more-2"');
+  })());
+  ok('block anchors + toc are deterministic (same input → identical output)', JSON.stringify(renderSiteBlocks(resolveBlockMedia(tocBlocks, () => null), ctx)) === JSON.stringify(tocR));
+
+  // — decorative-image toggle (a11y): alt="" + role="presentation" —
+  const decOn = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image', image_id: G, decorative: true }]), REF), ctx)[0].html;
+  const decOff = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image', image_id: G }]), REF), ctx)[0].html;
+  ok('decorative image → empty alt + role="presentation" (announced by nothing)', decOn.includes('alt=""') && decOn.includes('role="presentation"') && !decOn.includes('alt="A photo"'));
+  ok('a non-decorative image keeps its descriptive alt (no presentation role)', decOff.includes('alt="A photo"') && !decOff.includes('role="presentation"'));
+  ok('decorative flag validates to boolean true, and is absent when unset', validateBlocks([{ type: 'image', image_id: G, decorative: true }])[0].decorative === true && !('decorative' in validateBlocks([{ type: 'image', image_id: G }])[0]));
+
+  // — dedupe posture: MULTI for columns/cards; single-instance for download/toc —
+  ok('download + toc stay single-instance (first kept, one-per-type)', validateBlocks([{ type: 'download', file_id: G }, { type: 'download', file_id: H }]).length === 1 && validateBlocks([{ type: 'toc' }, { type: 'toc' }]).length === 1);
+  ok('all four r4 blocks are catalog-declared AND realized', ['columns', 'cards', 'download', 'toc'].every((t) => COMPONENTS.some((c) => c.key === t) && REALIZED_BLOCK_TYPES.includes(t)));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SITE BLOCKS: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

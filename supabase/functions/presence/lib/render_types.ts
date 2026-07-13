@@ -129,11 +129,23 @@ export interface SiteBlockMap { type: 'map'; title?: string; image?: MediaRef | 
 // Text & layout staples (T-BLOCKS r3) — prose bodies render through renderMarkdown
 // (escape-first, output-allowlisted); media resolved to MediaRef; links via safeHref.
 export interface SiteBlockRichText { type: 'richtext'; title?: string; body: string }
-export interface SiteBlockImage { type: 'image'; title?: string; image?: MediaRef | null; caption?: string; alt?: string; link?: string }
+// `decorative`: an explicit a11y choice — a purely decorative image renders alt=""
+// + role="presentation" (announced by nothing), instead of carrying its media alt.
+export interface SiteBlockImage { type: 'image'; title?: string; image?: MediaRef | null; caption?: string; alt?: string; link?: string; decorative?: boolean }
 export interface SiteBlockImageText { type: 'image_text'; title?: string; image?: MediaRef | null; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
 export interface SiteBlockAccordion { type: 'accordion'; title?: string; items: Array<{ summary: string; body: string }> }
 export interface SiteBlockButtons { type: 'buttons'; title?: string; buttons: Array<{ label: string; url: string; style: 'primary' | 'outline' }> }
 export interface SiteBlockDivider { type: 'divider'; style: 'line' | 'space'; size: 'small' | 'medium' | 'large' }
+// Layout & utility blocks (T-BLOCKS r4). Columns + Cards are MULTI-INSTANCE (like
+// `form`): each carries its own stable `id` so a site may hold several, keyed by id.
+// Columns: 2–3 equal columns, each a small stack (markdown + optional image + button);
+// stacks to one column on mobile. Cards: a repeatable teaser grid (image + heading +
+// text + optional link). Download: an accessible link to a media-library file. Toc:
+// an auto-built "On this page" jump list, computed at render from section headings.
+export interface SiteBlockColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image?: MediaRef | null; button?: { label: string; url: string } }> }
+export interface SiteBlockCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image?: MediaRef | null; link?: string }> }
+export interface SiteBlockDownload { type: 'download'; title?: string; file?: MediaRef | null; label?: string }
+export interface SiteBlockToc { type: 'toc'; title?: string }
 // Custom form builder (Phase FB): a typed, structured, whitelisted form (never a
 // code box). The full shape + validation live in lib/forms.ts; a form block is a
 // stored FormDefinition. Multiple forms per site are allowed (unlike other block
@@ -147,6 +159,7 @@ export type SiteBlock =
   | SiteBlockPartners | SiteBlockReviews | SiteBlockAppointment
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
   | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
+  | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc
   | FormDefinition;
 export type SiteBlockType = SiteBlock['type'];
 
