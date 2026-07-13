@@ -11,6 +11,7 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
 import { deployFileMap, netlifyConfigured } from '../lib/netlify.ts';
+import { mergeSecurityHeaders } from '../lib/security_headers.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
@@ -148,6 +149,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
   Object.assign(fileMap, images);
   at('images');
+
+  // ── Response-level security headers (parity with the marketing site) ────────
+  // The tenant HTML already carries a <meta> CSP (defense-in-depth, kept). Ship a
+  // Netlify `_headers` file too, so every published page ALSO returns HSTS,
+  // clickjacking (X-Frame-Options DENY + CSP frame-ancestors 'none'), MIME-sniff,
+  // referrer, permissions, and a real CSP header. Merged into (never clobbering)
+  // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
+  fileMap['_headers'] = mergeSecurityHeaders(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined);
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });

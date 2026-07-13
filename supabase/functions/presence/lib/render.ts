@@ -162,7 +162,11 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
 // styles, and storage-hosted images. Tightening script-src (to actually block
 // injected inline JS) requires hashing/externalising the per-site analytics
 // script AND a browser smoke on a real published page — QUEUED, not shipped here.
-const PUBLISHED_CSP = "default-src 'self' https: data: 'unsafe-inline'; object-src 'none'; base-uri 'self'";
+// Exported as the ONE source of truth for the published-site CSP policy string.
+// The <meta> tag below (defense-in-depth) and the response-header CSP that
+// routes/publish.ts ships via lib/security_headers.ts both derive from THIS
+// constant, so the two can never drift apart.
+export const PUBLISHED_CSP = "default-src 'self' https: data: 'unsafe-inline'; object-src 'none'; base-uri 'self'";
 export function injectCsp(fileMap: FileMap): FileMap {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${PUBLISHED_CSP}">`;
   const out: FileMap = {};
