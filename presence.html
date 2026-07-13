@@ -4355,7 +4355,7 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; return o; }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
 // no CSS. Lives INSIDE the block you're already editing (no separate panel). The
 // options are enumerated; the server re-validates and only known values are stored.
@@ -4389,6 +4389,51 @@ function blockLookRow(idx, blk, sub) {
   Object.values(selects).forEach((se) => se.addEventListener("change", commit));
   det.appendChild(row);
   det.appendChild(el("div", "hint", "Optional — give this section a soft background, make it full-width, or change its spacing. It stays readable and accessible on every screen."));
+  sub.appendChild(det);
+}
+// Phase EXP: auto-expiring content — an optional "Show this from / until" window on
+// any section. A holiday-hours notice, a limited-time special, a seasonal banner, an
+// event post: the owner sets the dates once and it appears and retires by itself.
+// Dates only (plain, intuitive); blank = always show. The server normalizes + the
+// render omits the section outside its window, and the platform auto-republishes the
+// live site at the boundary — so nobody has to remember to take it down.
+function blockWindowRow(idx, blk, sub) {
+  const from = (blk && blk.show_from ? String(blk.show_from) : "").slice(0, 10);
+  const until = (blk && blk.show_until ? String(blk.show_until) : "").slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const set = !!(from || until);
+  const det = el("details"); det.style.cssText = "margin-top:8px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
+  if (set) det.open = true;
+  // A small state chip so the owner sees at a glance what's scheduled or expired.
+  let chip = "", chipCss = "";
+  if (from && from > today) { chip = "Scheduled — starts " + from; chipCss = "background:#fff4e0;color:#8a5a00"; }
+  else if (until && until < today) { chip = "Expired — ended " + until; chipCss = "background:#efeef2;color:#6b6478"; }
+  else if (until) { chip = "Showing until " + until; chipCss = "background:#eaf7ee;color:#1c6b34"; }
+  else if (from) { chip = "Showing since " + from; chipCss = "background:#eaf7ee;color:#1c6b34"; }
+  const sum = el("summary");
+  sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478);display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+  sum.appendChild(document.createTextNode("Show this only for a while" + (set ? "" : "  ·  optional")));
+  if (chip) { const c = el("span", null, chip); c.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + chipCss; sum.appendChild(c); }
+  det.appendChild(sum);
+  const row = el("div"); row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px";
+  const mk = (label, val) => {
+    const w = el("label"); w.style.cssText = "font-size:12px;color:var(--soft,#6b6478);display:flex;align-items:center;gap:6px";
+    w.appendChild(document.createTextNode(label));
+    const inp = el("input"); inp.type = "date"; inp.value = val;
+    inp.style.cssText = "font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px";
+    w.appendChild(inp); row.appendChild(w); return inp;
+  };
+  const fi = mk("Show from", from), ui = mk("Until", until);
+  const commit = () => {
+    const b = { ...BLOCKS_WORK[idx] };
+    if (fi.value) b.show_from = fi.value; else delete b.show_from;
+    if (ui.value) b.show_until = ui.value; else delete b.show_until;
+    BLOCKS_WORK[idx] = b;
+    renderBlocksCard();   // redraw so the state chip updates immediately
+  };
+  [fi, ui].forEach((inp) => inp.addEventListener("change", commit));
+  det.appendChild(row);
+  det.appendChild(el("div", "hint", "Optional — this section appears on the “Show from” date and comes down by itself after “Until”. Leave both blank to always show. The change goes live on its own at the right time (publish once to set it)."));
   sub.appendChild(det);
 }
 function renderBlocksCard() {
@@ -4613,6 +4658,9 @@ function renderBlocksCard() {
     // Phase T-STYLE: the shared "Look of this section" options — every content
     // section, but not the presentational divider or the auto-built table of contents.
     if (!def.dividerSimple && !def.tocSimple) blockLookRow(idx, blk, sub);
+    // Phase EXP: the shared "Show this only for a while" window — same set of sections
+    // (a spacer/auto TOC has nothing to schedule).
+    if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, sub);
     card.appendChild(sub);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.

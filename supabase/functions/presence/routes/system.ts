@@ -7,7 +7,7 @@
 //   GET  /system/health  ?secret=…   (or x-system-secret header)
 import { json } from '../../_shared/http.ts';
 import { svc, svcAll, svcCount } from '../lib/db.ts';
-import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns } from '../ops/scheduler.ts';
+import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns, runWindowExpiries } from '../ops/scheduler.ts';
 import { runUptimeHeartbeat } from '../monitor/heartbeat.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
@@ -257,6 +257,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
     try {
       if (task === 'retry') return json({ data: await retryFailedRuns(limit) }, 200, cors);
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);
+      if (task === 'window_expiry') return json({ data: await runWindowExpiries(limit) }, 200, cors);   // Phase EXP: enqueue rewindow re-emits for crossed show-from/until boundaries
       if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
       if (task === 'reconcile') return json({ data: await runReconcileStuckPublishes(limit) }, 200, cors); // M5: finalize stuck publishes
       if (task === 'heartbeat') return json({ data: await runUptimeHeartbeat(limit ?? 25) }, 200, cors); // uptime: probe live hosted sites
@@ -290,6 +291,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
         const GROUPS: Record<string, Array<[string, () => Promise<unknown>]>> = {
           observe: [
             ['cycle', () => runOperationsCycle({ limit })],
+            ['window_expiry', () => runWindowExpiries(limit ?? 40)],   // Phase EXP: enqueue rewindow re-emits BEFORE the due-publish fire, so a crossed boundary flips this same tick
             ['scheduled_publishes', () => runDuePublishes(limit)],
             ['reconcile', () => runReconcileStuckPublishes(50)],
             ['heartbeat', () => runUptimeHeartbeat(limit ?? 25)],   // uptime: probe live hosted sites, alert on confirmed outage
@@ -357,6 +359,9 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // be skipped by exactly the mid-chain death it exists to surface.
       await step('stale_runs', () => reapStaleRuns());
       const cycle = await step('cycle', () => runOperationsCycle({ limit }));
+      // Phase EXP: enqueue rewindow re-emits for any live site whose windowed section
+      // just crossed a boundary — BEFORE the due-publish fire, so it flips this tick.
+      const windowExpiry = await step('window_expiry', () => runWindowExpiries(40));
       const scheduled = await step('scheduled_publishes', () => runDuePublishes(limit));
       const reconcile = await step('reconcile', () => runReconcileStuckPublishes(50));   // M5: finalize stuck publishes every tick
       const heartbeat = await step('heartbeat', () => runUptimeHeartbeat(25));   // uptime: probe live hosted sites, alert on confirmed outage (2 fails)
@@ -391,7 +396,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // result.progress, which nobody reads until something else breaks.
       const issues = sweepIssues(progress);
       if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
-      return json({ data: { ...cycle, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, emailAuth, apexDrift, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, bookingReminders, bookingFollowups, retention } }, 200, cors);
+      return json({ data: { ...cycle, window_expiry: { enqueued: windowExpiry.enqueued, scanned: windowExpiry.scanned }, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, emailAuth, apexDrift, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, bookingReminders, bookingFollowups, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

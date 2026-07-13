@@ -486,10 +486,10 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
     files[file] = html;
   };
 
-  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint });   // Phase T-BLOCKS (+ FB form blocks + BK booking)
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
   // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
   // only) onto the ONE business node — home only, where the reviews_wall is visible.
-  const rSchema = reviewsSchema(c.settings?.blocks);
+  const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
   const ldHomeBiz = rSchema ? { ...ldRestaurant(c, site), ...rSchema } : ldRestaurant(c, site);
   page('/', { title: siteTitle, description: siteDesc, ld: [ldHomeBiz, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, blocks) });
   page('/menu/', { ...seoOv('offerings', `Menu — ${i.business_name}`, `The menu at ${i.business_name}.`), ld: [ldMenu(c, site)], ogImage: ogImg, active: 'menu', body: menuBody(c) });

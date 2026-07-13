@@ -193,8 +193,11 @@ export interface BlockLook {
   align?: 'center';
 }
 /** Distributive conditional: adds an optional `look` to EVERY union member while
- *  preserving the `type` discriminant (so `switch (b.type)` narrowing keeps working). */
-type WithLook<T> = T extends unknown ? T & { look?: BlockLook } : never;
+ *  preserving the `type` discriminant (so `switch (b.type)` narrowing keeps working).
+ *  Also carries the optional auto-expiring window (Phase EXP: show_from / show_until,
+ *  canonical ISO instants) — the render omits a section outside its window at
+ *  snapshot.created_at; a section with no window renders exactly as before. */
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string } : never;
 export type SiteBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner

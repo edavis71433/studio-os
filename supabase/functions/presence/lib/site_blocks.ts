@@ -24,6 +24,7 @@ import type {
 import { renderMarkdown } from './markdown.ts';
 import { normalizeFormDefinition, renderForm, type FormDefinition } from './forms.ts';
 import { brandTint } from './palettes.ts';
+import { parseWindow, isVisibleNow } from './content_window.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -96,8 +97,9 @@ interface StoredColumns { type: 'columns'; id: string; title?: string; columns: 
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 // Same distributive WithLook as render_types: the owner-chosen per-section style
-// (Phase T-STYLE) rides on the stored block, orthogonal to its content.
-type WithLook<T> = T extends unknown ? T & { look?: BlockLook } : never;
+// (Phase T-STYLE) rides on the stored block, orthogonal to its content. Phase EXP:
+// it ALSO carries the optional auto-expiring window (show_from / show_until).
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string } : never;
 export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
@@ -355,6 +357,10 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
     if (block) {
       const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
       if (look) (block as any).look = look;
+      // Phase EXP: attach the normalized auto-expiring window (or nothing). Parsing
+      // is clockless — WHEN it shows is decided at render against snapshot.created_at.
+      const win = parseWindow(b);
+      if (win) { if (win.show_from) (block as any).show_from = win.show_from; if (win.show_until) (block as any).show_until = win.show_until; }
       out.push(block); if (!MULTI.has(type)) seen.add(type);
     }
     if (out.length >= MAX_BLOCKS) break;
@@ -378,7 +384,13 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
   const out: SiteBlock[] = [];
   // Phase T-STYLE: the media-bearing branches rebuild their block object, so carry
   // the owner-chosen per-section style across the rebuild (default `out.push(b)` keeps it).
-  const lk = (b: StoredBlock) => (b.look ? { look: b.look } : {});
+  // Phase EXP: the auto-expiring window rides along the same way, so a rebuilt
+  // media block (team/gallery/image/columns/cards/…) keeps its show_from/show_until.
+  const lk = (b: StoredBlock) => ({
+    ...(b.look ? { look: b.look } : {}),
+    ...((b as any).show_from ? { show_from: (b as any).show_from } : {}),
+    ...((b as any).show_until ? { show_until: (b as any).show_until } : {}),
+  });
   for (const b of blocks) {
     switch (b.type) {
       case 'team':
@@ -482,8 +494,10 @@ function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => 
 //    real business — the correct rich-results shape. Counts only approved rows (the
 //    resolved block already carries approved-only data). Returns null when there is
 //    nothing approved to show, so a template with no reviews_wall is byte-identical. ──
-export function reviewsSchema(blocks: SiteBlock[] | undefined): { aggregateRating: object; review: object[] } | null {
-  const rw = (blocks || []).find((b) => b.type === 'reviews_wall') as SiteBlockReviewsWall | undefined;
+export function reviewsSchema(blocks: SiteBlock[] | undefined, now?: string): { aggregateRating: object; review: object[] } | null {
+  const rw = (blocks || []).find((b) => b.type === 'reviews_wall'
+    // Phase EXP: a reviews wall outside its window isn't shown, so it emits no schema either.
+    && (!now || isVisibleNow(b as { show_from?: string; show_until?: string }, now))) as SiteBlockReviewsWall | undefined;
   if (!rw || !rw.aggregate || rw.aggregate.count < 1 || !rw.reviews.length) return null;
   return {
     aggregateRating: { '@type': 'AggregateRating', ratingValue: rw.aggregate.average, reviewCount: rw.aggregate.count, bestRating: 5, worstRating: 1 },
@@ -506,6 +520,11 @@ export interface BlockRenderCtx {
   /** Phase BK: the public native-booking API base (site.bookEndpoint = …/book/:siteId).
    *  The booking block's first-party enhancer calls /types, /slots, and POSTs here. */
   bookEndpoint?: string;
+  /** Phase EXP: the deterministic publish clock (snapshot.created_at). When set,
+   *  a section outside its show_from/show_until window is omitted from the output.
+   *  When absent (e.g. a direct unit call), every section renders — so no-window
+   *  output is byte-identical to before this feature. */
+  now?: string;
 }
 
 export interface RenderedBlock { key: string; type: SiteBlockType; html: string; ld?: object }
@@ -649,6 +668,10 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   const h2 = (t: string | undefined, fallback: string) => `<h2>${esc(t || fallback)}</h2>`;
 
   for (const b of blocks || []) {
+    // Phase EXP: auto-expiring content — a section outside its window at the publish
+    // clock is omitted entirely (no HTML, no schema, no anchor, absent from the TOC).
+    // No window (the default) → always visible → byte-identical to before.
+    if (ctx.now && !isVisibleNow(b as { show_from?: string; show_until?: string }, ctx.now)) continue;
     let html = '', ld: object | undefined;
     switch (b.type) {
       case 'features':

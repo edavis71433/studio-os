@@ -500,11 +500,11 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     files[file] = html;
   };
 
-  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint });   // Phase T-BLOCKS (+ FB form blocks + BK booking)
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
   // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
   // only) onto the ONE business node — home only, where the reviews_wall is visible.
-  const rSchema = reviewsSchema(c.settings?.blocks);
+  const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
   const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
   page('/', { title: siteTitle, description: siteDesc, ld: [ldBizHome, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
   page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });

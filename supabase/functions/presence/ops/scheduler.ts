@@ -12,6 +12,7 @@
 import { svc } from '../lib/db.ts';
 import { runPipeline } from '../routes/publish.ts';
 import { reconcileOnePublish, RECONCILE_STALE_MS, type InflightPublish } from '../lib/deploy_reconcile.ts';
+import { blocksNeedRewindow } from '../lib/content_window.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
@@ -100,7 +101,7 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   await svc(`presence_scheduled_publishes?status=eq.pending&fired_at=not.is.null&fired_at=lt.${encodeURIComponent(hourAgo)}`, {
     method: 'PATCH', body: JSON.stringify({ status: 'failed', last_error: 'interrupted: claimed but never finalized (invocation died mid-publish)' }),
   }).catch(() => {});
-  const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary&order=scheduled_for.asc&limit=${limit}`);
+  const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary,created_by&order=scheduled_for.asc&limit=${limit}`);
   const rows = (q.ok && Array.isArray(q.json)) ? q.json : [];
   const results: SiteRunResult[] = [];
   const sysPrincipal: Principal = { kind: 'system', userId: 'scheduler', tenantId: null, role: null, email: null, jwt: null, requestId: 'scheduled-publish' };
@@ -116,7 +117,12 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
       const snap = (await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization&limit=1`)).json?.[0];
       if (!site || !snap) { err = 'site or snapshot gone'; }
       else {
-        const snapshot = { content: snap.content, content_contract_version: snap.content_contract_version, template_slug: snap.template_slug, template_version: snap.template_version, created_at: snap.created_at, dev_customization: snap.dev_customization ?? null };
+        // Phase EXP: a boundary-republish row (created_by sentinel) re-emits the CURRENT
+        // live snapshot but with its render clock set to the FIRE time, so the pure
+        // window filter re-evaluates and ONLY the time-gated sections flip — every other
+        // byte is frozen in that snapshot (no unrelated draft edit can ride along).
+        const isRewindow = String(row.created_by || '').startsWith('scheduler:rewindow');
+        const snapshot = { content: snap.content, content_contract_version: snap.content_contract_version, template_slug: snap.template_slug, template_version: snap.template_version, created_at: isRewindow ? nowIso : snap.created_at, dev_customization: snap.dev_customization ?? null };
         const res = await runPipeline(site as SiteRow, sysPrincipal, row.kind === 'revert' ? 'restore' : 'publish', { snapshot, snapshotId: row.snapshot_id, mediaManifest: snap.media_manifest || [] }, row.summary || 'Scheduled change', {});
         ok = res.status === 200;
         if (!ok) { try { err = (await res.clone().json())?.error || `status ${res.status}`; } catch { err = `status ${res.status}`; } }
@@ -128,6 +134,53 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const failures = results.filter((r) => !r.ok).length;
   if (failures > 0) await alertFailures('scheduled-publish', failures, results.length, results.filter((r) => !r.ok));
   return { ok: failures === 0, run_type: 'scheduled-publish', considered: rows.length, ran: results.length, failures, results };
+}
+
+// ── Phase EXP: auto-expiring content — the boundary-republish sweep ───────────
+// A live site whose content carries a section with a show_from/show_until window
+// goes stale on its own the instant a boundary passes: the live bytes were rendered
+// at the last publish's clock, so a special that just expired (or a banner that just
+// went live) wouldn't come down / go up until the next manual publish. This sweep
+// detects that and enqueues a re-emit of the CURRENT LIVE snapshot through the SAME
+// publish machinery (presence_scheduled_publishes + runDuePublishes). The row's
+// created_by sentinel marks it a rewindow, so runDuePublishes re-renders that frozen
+// snapshot at the FIRE time — ONLY the time-gated sections flip; every other byte is
+// frozen in the snapshot, so no unrelated draft edit can ride along. Idempotent
+// (skips a site already publishing or already enqueued) and best-effort (one site's
+// failure never stops another). Reuses the ONE pipeline — no second publish path.
+export async function runWindowExpiries(limit = 40): Promise<{ ok: true; run_type: 'window_expiry'; scanned: number; enqueued: number; site_ids: string[] }> {
+  const nowIso = new Date().toISOString();
+  // Live sites only — a window can only be stale on a site that's actually published.
+  const cap = Math.max(1, Math.min(200, limit));
+  const sr = await svc(`presence_sites?status=eq.live&select=id&order=last_published_at.asc.nullsfirst&limit=${cap}`);
+  const sites = (sr.ok && Array.isArray(sr.json)) ? sr.json as Array<{ id: string }> : [];
+  let enqueued = 0; const siteIds: string[] = [];
+  for (const s of sites) {
+    try {
+      // the current live publish → its snapshot content + the clock the live bytes
+      // were rendered at (the publish record's completed/created time IS that clock —
+      // for a normal publish ≈ snapshot.created_at, for a prior rewindow = its fire time,
+      // so an already-flipped section never re-fires).
+      const pub = (await svc(`presence_publishes?site_id=eq.${s.id}&status=eq.live&snapshot_id=not.is.null&select=snapshot_id,created_at,completed_at&order=created_at.desc&limit=1`)).json?.[0];
+      if (!pub?.snapshot_id) continue;
+      const liveIso = String(pub.completed_at || pub.created_at || '');
+      if (!liveIso) continue;
+      const snap = (await svc(`presence_snapshots?id=eq.${pub.snapshot_id}&select=content&limit=1`)).json?.[0];
+      if (!blocksNeedRewindow(snap?.content?.settings?.blocks, liveIso, nowIso)) continue;
+      // idempotent: don't stack a rewindow while a publish is in flight or one is
+      // already queued for this site (that publish will carry the flip anyway).
+      const inflight = (await svc(`presence_publishes?site_id=eq.${s.id}&status=in.(queued,deploying)&select=id&limit=1`)).json;
+      if (Array.isArray(inflight) && inflight.length) continue;
+      const pendingSched = (await svc(`presence_scheduled_publishes?site_id=eq.${s.id}&status=eq.pending&select=id&limit=1`)).json;
+      if (Array.isArray(pendingSched) && pendingSched.length) continue;
+      const ins = await svc('presence_scheduled_publishes', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ site_id: s.id, snapshot_id: pub.snapshot_id, kind: 'publish', scheduled_for: nowIso, status: 'pending', summary: 'A timed section went live or came down', created_by: 'scheduler:rewindow' }),
+      });
+      if (ins.ok && ins.json?.[0]?.id) { enqueued++; siteIds.push(s.id); }
+    } catch { /* best-effort — the next tick retries this site */ }
+  }
+  return { ok: true, run_type: 'window_expiry', scanned: sites.length, enqueued, site_ids: siteIds };
 }
 
 // ── M5: reconcile STUCK publishes — the recovery process for publishes left
