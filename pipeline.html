@@ -574,8 +574,8 @@ async function openDeal(id){
     // Self-serve platform signups pick a plan at signup.html; never here.
     const whoName=esc(((c&&c.name)||d.title||'this client'));
     const convExplain=(c&&c.email
-      ? `This adds ${whoName} as your customer — it creates their client workspace and emails ${esc(c.email)} a link to set their password and sign in. Nothing else needed.`
-      : `This adds ${whoName} as your customer — it creates their client workspace. There’s no client email on this deal, so no sign-in invitation goes out; you can share access with them later.`)
+      ? `This adds ${whoName} as your customer — it creates their client portal and emails ${esc(c.email)} a link to set their password and sign in. Nothing else needed.`
+      : `This adds ${whoName} as your customer — it creates their client portal. There’s no client email on this deal, so no sign-in invitation goes out; you can share access with them later.`)
       +' It’s part of your service: you bill them for your work the usual way — they never subscribe to anything or pay for software.';
     // Activity: the quick-log (call/email/meeting/dated note) + the ONE merged
     // timeline (manual activities interleaved with system events, newest first).
@@ -857,15 +857,11 @@ async function openDeal(id){
       // labels say WHAT KIND OF WORK this is; the values stay the same edition
       // keys the convert route expects (CONVERT_PLANS in routes/sales.ts). Paying
       // for software is SELF-SERVE at signup — never picked here.
-      const wrap=$('convWrap'); const signupLink=location.origin+'/pricing.html'; wrap.innerHTML=`
+      const wrap=$('convWrap'); wrap.innerHTML=`
         <label for="convPlan">What kind of work is this?</label>
-        <select id="convPlan"><option value="presence" selected>Their site will live on my platform (Studio OS)</option><option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option><option value="business_os_only">Just their client workspace / business tools — no site work</option><option value="presence_monitor">Just monitoring a site they already have</option></select>
-        <div class="mut" style="margin-top:6px">Adding them creates their client workspace and emails them a link to set their password and sign in. You bill them for your work the usual way — they never pay for software here. You can change this later.</div>
-        <div id="convSignup" class="mut" style="margin-top:10px;padding:10px;border:1px solid var(--line,#ddd);border-radius:8px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="convSignupLink" readonly value="${esc(signupLink)}" style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="convSignupCopy">Copy</button></div></div>
+        <select id="convPlan"><option value="presence" selected>I’m building them a new site — hosted with me</option><option value="business_os_only">They keep their site on their own platform — I do the rest</option><option value="presence_monitor">Just monitoring a site they already have</option></select>
+        <div class="mut" style="margin-top:6px">Adding them creates their <strong>client portal</strong> and emails them a link to set their password and sign in — that’s where they work with you: files, approvals, messages, invoices. You bill them for your work the usual way — they never pay for software here. You can change this later.</div>
         <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, add them as my customer</button></div>`;
-      const syncSignup=()=>{const s=$('convSignup');if(s)s.style.display=($('convPlan').value==='presence')?'':'none';};
-      $('convPlan').onchange=syncSignup; syncSignup();
-      $('convSignupCopy').onclick=()=>{const el=$('convSignupLink');if(el&&el.value){copyToClip(el.value);toast('Sign-up link copied');}};
       $('convNo').onclick=()=>openDeal(id);
       $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
     };

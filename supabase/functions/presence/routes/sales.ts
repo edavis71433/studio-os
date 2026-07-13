@@ -1432,9 +1432,13 @@ async function sendCustomerInvite(email: string, _isNewLogin: boolean): Promise<
   // Every provisioned customer needs to CREATE their password. Always send a signed
   // set-password link that lands them in the guided first-run; if it can't be generated
   // they can still get in passwordlessly (one-time email code) at the portal.
-  const link = await generateSetPasswordLink(email, `${base}/set-password.html?next=/get-started.html`);
+  // Converted customers are CLIENTS — they land in their client portal (client.html),
+  // where they work WITH the studio (files, approvals, messages, invoices), NOT the
+  // Studio OS operator surfaces. (/client.html is whitelisted in set-password.html's
+  // NEXT_OK.) Self-running workspaces are a different persona (self-serve signup).
+  const link = await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
   const cta = link
-    ? `<a href="${link}">Create your password &amp; sign in →</a> — you’ll land straight in your guided setup.`
+    ? `<a href="${link}">Create your password &amp; sign in →</a> — you’ll land in your client portal.`
     : `<a href="${base}/portal.html">Sign in at your portal →</a> — we’ll email you a one-time code, no password needed.`;
   sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
     `<p>Welcome! Your workspace is set up and ready.</p><p>${cta}</p><p style="font-size:13px;color:#6b6478">You can always sign in any time at <a href="${base}/portal.html">your portal</a>.</p>`,
