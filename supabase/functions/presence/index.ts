@@ -56,7 +56,7 @@ import { handleContentLibraryList, handleContentLibrarySave, handleContentLibrar
 import { handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNotePin, handleCrmNoteDelete } from './routes/crm.ts';
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
-import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel } from './routes/booking.ts';
+import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -784,10 +784,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
   if (route === '/bookings/appointments' && method === 'GET') return handleBookingAppointments(req, site, cors);
   {
-    const m = route.match(/^\/bookings\/appointments\/([0-9a-f-]{36})\/(confirm|cancel)$/);
-    if (m && method === 'POST') return m[2] === 'confirm'
-      ? handleBookingConfirm(site, m[1], principal, cors)
-      : handleBookingCancel(req, site, m[1], principal, cors);
+    const m = route.match(/^\/bookings\/appointments\/([0-9a-f-]{36})\/(confirm|cancel|complete|no_show)$/);
+    if (m && method === 'POST') {
+      if (m[2] === 'confirm') return handleBookingConfirm(site, m[1], principal, cors);
+      if (m[2] === 'cancel') return handleBookingCancel(req, site, m[1], principal, cors);
+      return handleBookingMark(site, m[1], m[2] as 'complete' | 'no_show', principal, cors);
+    }
   }
 
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
