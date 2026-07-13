@@ -127,6 +127,49 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
   return { url: String(link.url), id: String(link.id) };
 }
 
+/** A recurring SERVICE-RETAINER authorization link (a Payment Link, NOT a 24h
+ *  Checkout session, so it never expires — the client authorizes whenever). It is
+ *  a SEPARATE service-purpose subscription, DISTINCT from the SaaS subscription
+ *  primitive above (createSubscriptionCheckout): it carries NO plan/term/founder,
+ *  and metadata.purpose='service_retainer' on BOTH the link and the subscription
+ *  so the ONE webhook routes every later customer.subscription.* / invoice.* by
+ *  purpose to the service rail and NEVER to SaaS entitlement. Inline recurring
+ *  price_data → no pre-created Price. Idempotent per (deal, amount, interval): a
+ *  re-request returns the same price + link; a changed amount mints a fresh one. */
+export async function createServiceRetainerLink(p: { productName: string; amountCents: number; interval: 'month' | 'year'; dealId: string; siteId: string; successUrl?: string }): Promise<{ url: string; id: string; priceId: string }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const key = `${p.dealId}-${Math.max(1, Math.round(p.amountCents))}-${p.interval}`;
+  const price = await stripeReq('prices', {
+    'unit_amount': String(Math.max(1, Math.round(p.amountCents))),
+    'currency': 'usd',
+    'recurring[interval]': p.interval,
+    'product_data[name]': (p.productName || 'Retainer').slice(0, 250),
+  }, `retainer-price-${key}`);
+  const link = await stripeReq('payment_links', {
+    'line_items[0][price]': String(price.id),
+    'line_items[0][quantity]': '1',
+    'metadata[purpose]': 'service_retainer',
+    'metadata[kind]': 'service_retainer',
+    'metadata[deal_id]': p.dealId,
+    'metadata[site_id]': p.siteId,
+    // Threaded onto the SUBSCRIPTION so every later lifecycle event carries the purpose.
+    'subscription_data[metadata][purpose]': 'service_retainer',
+    'subscription_data[metadata][kind]': 'service_retainer',
+    'subscription_data[metadata][deal_id]': p.dealId,
+    'subscription_data[metadata][site_id]': p.siteId,
+    'after_completion[type]': 'redirect',
+    'after_completion[redirect][url]': `${p.successUrl || `${SITE_URL}/payment-success.html`}`,
+  }, `retainer-plink-${key}`);
+  return { url: String(link.url), id: String(link.id), priceId: String(price.id) };
+}
+
+/** Deactivate a Payment Link so it can no longer be used (e.g. a pending retainer
+ *  the studio canceled before the client ever authorized). Best-effort; never throws. */
+export async function deactivatePaymentLink(linkId: string): Promise<void> {
+  if (!STRIPE_SECRET || !linkId) return;
+  try { await stripeReq(`payment_links/${encodeURIComponent(linkId)}`, { active: 'false' }); } catch { /* best-effort */ }
+}
+
 // A Billing Portal session — the customer manages payment method, cancels,
 // or changes plan through Stripe's own hosted surface. Requires a customer id.
 export async function createBillingPortal(customerId: string, returnUrl?: string): Promise<{ url: string }> {

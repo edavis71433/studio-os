@@ -34,6 +34,7 @@ import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPor
 import { requestDeletion, cancelDeletion, coolingOffDays } from '../commerce/deletion.ts';
 import { recordAcceptance } from '../commerce/terms.ts';
 import { applyEntitlementPatch } from '../commerce/entitlement_sync.ts';
+import { isServiceRetainerMeta, applyRetainerSync } from '../commerce/retainers.ts';
 import { checkAiCeiling } from '../commerce/metering.ts';
 
 const TRIAL_DAYS = 14;
@@ -372,6 +373,17 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
   const obj = body?.object || {};
 
   try {
+    // ── SERVICE RETAINER rail (frozen boundary) ──────────────────────────────
+    // Routed by PURPOSE METADATA, BEFORE any SaaS branch, so a service retainer's
+    // recurring lifecycle NEVER reaches applyEntitlementPatch / provisioning
+    // (both scoped product=eq.presence). invoice.* events (recurring-charge
+    // settlement) also route here — they resolve a retainer by subscription id and
+    // no-op otherwise, so a SaaS renewal invoice can never touch entitlement.
+    if (isServiceRetainerMeta(obj.metadata) || type.startsWith('invoice.')) {
+      const r = await applyRetainerSync(type, obj);
+      return json({ data: { rail: 'service_retainer', ...r } }, 200, cors);
+    }
+
     // First payment landed → provision the workspace.
     if (type === 'checkout.session.completed' && String(obj.mode || '') === 'subscription') {
       const md = obj.metadata || {};

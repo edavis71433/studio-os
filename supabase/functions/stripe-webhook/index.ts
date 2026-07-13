@@ -388,6 +388,28 @@ Deno.serve(async (req: Request) => {
         return new Response('ok', { status: 200 });
       }
 
+      // SERVICE RETAINER settlement (recurring service charges). SaaS entitlement
+      // rides subscription.* + checkout — it never uses invoice.*, so this branch
+      // is purely additive and cannot touch SaaS. Forward ONLY when the object is
+      // tagged with the service-retainer PURPOSE (on the invoice or its subscription
+      // details); billing-sync then updates the retainer and records the settlement.
+      // (Register invoice.payment_succeeded / invoice.payment_failed in the Stripe
+      // endpoint to enable the per-charge echo; retainer STATUS also stays correct
+      // via the always-registered customer.subscription.* events below.)
+      if (type === 'invoice.payment_succeeded' || type === 'invoice.payment_failed') {
+        const imd = obj.metadata || {};
+        const smd = obj.subscription_details?.metadata || {};
+        const isRetainer = imd.purpose === 'service_retainer' || imd.kind === 'service_retainer' || smd.purpose === 'service_retainer' || smd.kind === 'service_retainer';
+        if (isRetainer) {
+          const ok = await forwardBillingSync(type, obj);
+          if (!ok) { console.error(`[stripe-webhook] ${type} retainer sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+          console.log(`[stripe-webhook] ${type} → service retainer settled (sub ${(typeof obj.subscription === 'string' ? obj.subscription : obj.subscription?.id) || '?'})`);
+        } else {
+          console.log(`[stripe-webhook] ${type} (not a service retainer) — acknowledged, entitlement unaffected`);
+        }
+        return new Response('ok', { status: 200 });
+      }
+
       // L1: subscription lifecycle → entitlement sync (renewal, past-due grace,
       // voluntary pause, cancellation). Delegated to billing-sync; a failed sync
       // returns 500 so Stripe retries the (idempotent) event.

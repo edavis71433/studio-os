@@ -20,6 +20,7 @@ import { sendEmail } from './account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
+import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -563,6 +564,44 @@ export async function runRenewalReminders(limit = 50): Promise<{ reminded: numbe
       const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=email&limit=1`);
       const owner = ident.json?.[0]?.email;
       if (owner) sendEmail(String(owner), copy.subject, `<p>${copy.body}</p><p><a href="${base}/portal.html">Review or manage your plan →</a></p>`).catch(() => {});
+    }
+  }
+  return { reminded };
+}
+
+// ── AGREEMENT RENEWAL: nudge the OWNER before a signed agreement's term ends ──
+// DISTINCT from the SaaS renewal_reminder (that watches presence_entitlements'
+// annual plan). This watches the studio's OWN signed service agreements: a
+// term-end date set on a signed contract (terms_snapshot.term_end, 0096) gets ONE
+// calm owner nudge ~30 and again ~7 days out — never an auto-renew or auto-charge.
+// Same notices rail + send-once (period = term_end:window) + owner email. Pre-0096
+// nothing has a term_end, so the jsonb filter matches nothing → a clean no-op.
+export async function runAgreementRenewalReminders(limit = 50): Promise<{ reminded: number }> {
+  const nowIso = new Date().toISOString();
+  const today = nowIso.slice(0, 10);
+  const within = new Date(Date.now() + 31 * 86400_000).toISOString().slice(0, 10);
+  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  // ISO date strings compare correctly as text, so the jsonb ->> filter windows by date.
+  const q = await svc(`presence_contracts?status=eq.signed&deleted_at=is.null&terms_snapshot->>term_end=gte.${today}&terms_snapshot->>term_end=lte.${within}&select=id,site_id,deal_id,title,terms_snapshot&order=created_at.asc&limit=${limit}`);
+  if (!q.ok) return { reminded: 0 };   // pre-0096 / older data → clean no-op
+  let reminded = 0;
+  for (const c of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; terms_snapshot?: { term_end?: string } }>) {
+    const termEnd = c.terms_snapshot?.term_end;
+    const win = agreementRenewalWindow(termEnd, nowIso);
+    if (!win) continue;
+    const siteQ = await svc(`presence_sites?id=eq.${c.site_id}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+    const copy = agreementRenewalCopy(c.title || '', String(termEnd), win);
+    const fresh = await raiseNotice({ siteId: c.site_id, clientId, kind: 'agreement_renewal', period: agreementRenewalPeriod(String(termEnd), win), headline: copy.headline, body: copy.body });
+    if (fresh) {
+      reminded++;
+      const ident = await svc(`presence_identity?site_id=eq.${c.site_id}&select=email&limit=1`);
+      const owner = ident.json?.[0]?.email;
+      if (owner) {
+        const link = c.deal_id ? `${base}/pipeline.html?deal=${c.deal_id}` : `${base}/pipeline.html`;
+        sendEmail(String(owner), copy.subject, `<p>${copy.body}</p><p><a href="${link}">Open the deal →</a></p>`).catch(() => {});
+      }
     }
   }
   return { reminded };

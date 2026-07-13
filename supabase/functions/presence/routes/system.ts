@@ -13,7 +13,7 @@ import { runGscSync } from '../ops/gsc_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
-import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture, runSupportAging } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runProspectNurture, runSupportAging, runAgreementRenewalReminders } from '../commerce/lifecycle.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
@@ -301,6 +301,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['deal_nudges', () => runDealFollowups(20)],
             ['support_aging', () => runSupportAging(20)],
             ['renewals', () => runRenewalReminders(50)],
+            ['agreement_renewals', () => runAgreementRenewalReminders(50)],
             ['invoice_nudges', () => runInvoiceReminders(20)],
             ['doc_reminders', () => runSalesDocReminders(20)],
             ['nurture', () => runProspectNurture(10)],
@@ -365,6 +366,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const dealNudges = await step('deal_nudges', () => runDealFollowups(20));    // CRM: nudge stale deals
       const supportAging = await step('support_aging', () => runSupportAging(20)); // service edge #3: nudge owner on aging support requests
       const renewals = await step('renewals', () => runRenewalReminders(50));      // PP-2: annual renewal heads-up
+      const agreementRenewals = await step('agreement_renewals', () => runAgreementRenewalReminders(50)); // signed-agreement term-end heads-up (owner-only)
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
       await step('nurture', () => runProspectNurture(10));                        // CRO: day-7 free-review follow-up (owner-gated NURTURE_DRIP=1)

@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesSummary, handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesContacts, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
@@ -545,6 +545,17 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // "bill this now" action; generates the Stripe link on demand like the deposit path.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesInvoiceSend(req, site, principal, m[1], cors);
+    // Retainer (recurring SERVICE billing) — set up / cancel a "$X every month/
+    // year" on a deal. A separate service-purpose Stripe subscription, distinct
+    // from the SaaS subscription (frozen billing boundary). Studio-gated & site-scoped.
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/retainer$/);
+    if (m && method === 'POST') return handleSalesRetainer(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/retainer\/cancel$/);
+    if (m && method === 'POST') return handleSalesRetainerCancel(req, site, principal, m[1], cors);
+    // Renewal/expiry date on a SIGNED agreement → the 'agreement_renewal' owner
+    // reminder before it lapses (never an auto-renew). Site-scoped like every /sales/*.
+    m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/term$/);
+    if (m && method === 'POST') return handleSalesContractTerm(req, site, principal, m[1], cors);
     if (route === '/sales/templates' && (method === 'GET' || method === 'POST')) return handleSalesTemplates(req, site, principal, cors);
     m = route.match(/^\/sales\/templates\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleSalesTemplateDelete(site, m[1], cors);

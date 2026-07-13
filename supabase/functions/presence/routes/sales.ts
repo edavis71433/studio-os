@@ -14,7 +14,8 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice } from '../lib/notice.ts';
-import { stripeConfigured, createServicePaymentLink } from '../commerce/stripe.ts';
+import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
+import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { signDocToken, verifyDocToken, renderDocument, type DocKind } from '../lib/documents.ts';
@@ -233,7 +234,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     const [contact, proposals, contracts, events, invoices] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
-      svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version&order=created_at.desc`),
+      svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`),
     ]);
@@ -702,6 +703,116 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
   if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired }, 200, cors);
+}
+
+/** Email the client their non-expiring retainer authorization link, on the
+ *  studio's brand. Best-effort — it never blocks setup; the link is still returned. */
+async function emailRetainerLink(siteId: string, dealId: string, url: string, amountCents: number, interval: 'month' | 'year'): Promise<boolean> {
+  try {
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
+    const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
+    if (!email) return false;
+    const brand = await loadEmailBrand(siteId);
+    const amount = '$' + (amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const per = interval === 'year' ? 'year' : 'month';
+    const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Set up your ${amount}/${per} retainer →</a>`;
+    return await sendEmail(String(email), `Your retainer — ${amount} every ${per}`,
+      `<p>Your studio has set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
+      brand, { critical: true });   // a payment authorization the client is expecting = transactional
+  } catch { return false; }
+}
+
+/** RETAINER — set up recurring SERVICE billing on a deal: "$X every month/year".
+ *  Starts a Stripe recurring subscription tagged with a SERVICE purpose (metadata),
+ *  DISTINCT from the customer's SaaS subscription. The client authorizes via Stripe
+ *  (their consent) exactly like existing service payments — nothing is auto-charged.
+ *  State lives on the deal (presence_deals.retainer jsonb, 0096) so no SaaS
+ *  lifecycle can ever touch it. ONE calm toggle — never a plan-builder. */
+export async function handleSalesRetainer(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before setting up a retainer.' }, 503, cors);
+  const deal = await loadDeal(site.id, dealId);
+  if (!deal) return json({ error: 'not_found' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const v = validateRetainerInput(b.amount_cents, b.interval);
+  if (!v.ok) return json({ error: 'validation', message: v.error }, 422, cors);
+  const prior: Partial<RetainerState> | null = (deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
+  // One retainer at a time — a live one must be canceled before starting another
+  // (never two recurring charges on one deal).
+  if (prior && (prior.status === 'active' || prior.status === 'past_due')) {
+    return json({ error: 'retainer_exists', retainer: prior, message: 'This deal already has an active retainer. Cancel it before starting a new one.' }, 409, cors);
+  }
+  // A still-PENDING retainer at the same amount+interval → return the existing link
+  // (idempotent re-tap), never mint a second Stripe link.
+  if (prior && prior.status === 'pending' && Number(prior.amount_cents) === v.value.amount_cents && prior.interval === v.value.interval && prior.checkout_url) {
+    return json({ data: { retainer: prior, url: prior.checkout_url, reused: true } }, 200, cors);
+  }
+  const now = nowIso();
+  // Seed a PENDING marker FIRST — this write gates on the 0096 column, so BEFORE
+  // any Stripe object is created it fails fast on a pre-migration environment
+  // (never an orphan subscription). Idempotent shape via mergeRetainerState.
+  const pending = mergeRetainerState((prior && prior.status === 'canceled') ? null : prior, {
+    status: 'pending', amount_cents: v.value.amount_cents, interval: v.value.interval,
+    stripe_subscription_id: null, stripe_customer_id: null, stripe_payment_link_id: null,
+    checkout_url: null, current_period_end: null, canceled_at: null, created_at: now,
+  }, now);
+  const seed = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ retainer: pending }) });
+  if (!seed.ok || !rows(seed)[0]) return json({ error: 'unavailable', message: 'Retainers need a one-time database update before they can be set up.' }, 503, cors);
+  // Create the non-expiring recurring authorization link (client authorizes via Stripe).
+  let link: { url: string; id: string; priceId: string };
+  try {
+    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id });
+  } catch (e) {
+    // Roll the pending marker back so the deal never shows a broken retainer.
+    await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ retainer: prior && prior.status !== 'canceled' ? prior : null }) }).catch(() => {});
+    return json({ error: 'link_failed', message: 'We couldn’t set up the retainer link — please try again.', detail: String((e as Error).message || e) }, 502, cors);
+  }
+  const withLink = mergeRetainerState(pending, { stripe_payment_link_id: link.id, checkout_url: link.url }, now);
+  await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ retainer: withLink }) });
+  const emailed = await emailRetainerLink(site.id, dealId, link.url, v.value.amount_cents, v.value.interval);
+  return json({ data: { retainer: withLink, url: link.url, emailed } }, 201, cors);
+}
+
+/** Cancel a deal's retainer: stop future Stripe billing (cancel the subscription,
+ *  or deactivate the pending authorization link) and mark it canceled. Never
+ *  refunds or touches past charges. Idempotent. */
+export async function handleSalesRetainerCancel(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  const deal = await loadDeal(site.id, dealId);
+  if (!deal) return json({ error: 'not_found' }, 404, cors);
+  const prior: Partial<RetainerState> | null = (deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
+  if (!prior || prior.status === 'canceled') return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
+  const now = nowIso();
+  if (prior.stripe_subscription_id) {
+    const r = await cancelSubscription(String(prior.stripe_subscription_id));
+    if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+  } else if (prior.stripe_payment_link_id) {
+    await deactivatePaymentLink(String(prior.stripe_payment_link_id));   // pending: kill the link so no one authorizes it
+  }
+  const next = mergeRetainerState(prior, { status: 'canceled', canceled_at: now }, now);
+  const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ retainer: next }) });
+  if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+  return json({ data: { retainer: next, canceled: true } }, 200, cors);
+}
+
+/** Set (or clear) the renewal / expiry date on a SIGNED agreement. Stored in the
+ *  contract's existing terms_snapshot jsonb (no new column). A distinct
+ *  'agreement_renewal' owner reminder (commerce/lifecycle.ts) then nudges before it
+ *  lapses — never an auto-renew. Signed-only, so the immutable content_hash is
+ *  untouched (terms_snapshot is a side annotation, not part of the signed bytes). */
+export async function handleSalesContractTerm(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const c = rows(await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,terms_snapshot,status&limit=1`))[0];
+  if (!c) return json({ error: 'not_found', message: 'That agreement isn’t here.' }, 404, cors);
+  if (c.status !== 'signed') return json({ error: 'not_signed', message: 'Add a renewal date once the agreement is signed.' }, 409, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const raw = typeof b.term_end === 'string' ? b.term_end.trim() : '';
+  if (raw && !DATE_RE.test(raw)) return json({ error: 'validation', message: 'The renewal date must be a date (YYYY-MM-DD).' }, 422, cors);
+  const terms = (c.terms_snapshot && typeof c.terms_snapshot === 'object') ? { ...c.terms_snapshot } : {};
+  if (raw) terms.term_end = raw; else delete terms.term_end;
+  const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&select=id,terms_snapshot`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ terms_snapshot: terms }) });
+  if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+  return json({ data: { term_end: raw || null } }, 200, cors);
 }
 
 /** W1: a client just accepted a proposal / signed a contract via the token link.
