@@ -277,6 +277,44 @@ async function appendFaq(){
     $('main').appendChild(sec);
   }catch(_){/* the FAQ is additive; never block the view */}
 }
+// A MANAGED CLIENT (an agency's customer signed into their OWN site) whose studio
+// hasn't opened a delivery project yet must still reach the whole client app — never
+// the owner dead-end. Onto the calm "no project yet" home this appends every surface
+// they can still reach: things to approve + recent updates (from the shared feed),
+// and a "talk to your studio / request more work" channel (support). Billing (their
+// invoices) is appended separately by appendBilling. All values are escaped.
+async function appendManagedExtras(feed){
+  feed=feed||{};
+  const pending=(feed.pending_approvals||[]);
+  if(pending.length){
+    const sec=document.createElement('section');
+    let h=`<h2>Waiting for your OK</h2>`;
+    for(const p of pending){h+=`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span><h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p><div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`;}
+    sec.innerHTML=h;$('main').appendChild(sec);
+    sec.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
+    sec.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
+  }
+  const moments=(feed.moments||[]);
+  if(moments.length){
+    const sec=document.createElement('section');
+    let h=`<h2>Recent updates</h2>`;
+    for(const m of moments){h+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;}
+    sec.innerHTML=h;$('main').appendChild(sec);
+  }
+  // Talk to your studio — the general channel while there's no project yet: the
+  // client's own open requests (view & reply) + a way to ask for more work.
+  try{
+    const r=await api('/client/support');
+    const list=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id);
+    const sec=document.createElement('section');sec.id='sec-support';
+    let h=`<h2>Talk to your studio</h2><p class="muted" style="margin:-4px 0 10px">Ask a question, request more work, or follow up — your studio usually replies within a day.</p>`;
+    for(const rq of list){const resolved=rq.status==='resolved'||rq.status==='closed';h+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
+    h+=`<div class="card"><p class="muted">${list.length?'Need something else?':'Have a question, or want to start something new?'}</p><div class="row"><button id="newSupport">Message your studio</button></div></div>`;
+    sec.innerHTML=h;$('main').appendChild(sec);
+    sec.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
+    const ns=$('newSupport');if(ns)ns.addEventListener('click',()=>openSupport(null));
+  }catch(_){/* the support channel is additive; never block the home */}
+}
 async function openProject(id,focusSection){
   $('main').innerHTML=skeleton();
   const [d,rep,supRes]=await Promise.all([api('/client/projects/'+id),api('/client/projects/'+id+'/report').catch(()=>null),api('/client/support').catch(()=>null)]);
@@ -367,10 +405,13 @@ async function openSurvey(sid,pid){
   $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
 }
 async function openSupport(pid){
-  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>Open a support request</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
+  let html=`<p><a class="link" href="#" id="back">${pid?'← Back to project':'← Back'}</a></p><header><h1>${pid?'Open a support request':'Message your studio'}</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
   $('main').innerHTML=html;
-  $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
-  $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid});if(r.ok){toast('Sent — your studio will get back to you.');openProject(pid);}else{toast('That didn’t send.');b.disabled=false;}});
+  // No project yet? Back and success return to the client home (load), not a
+  // missing project — so a managed client with zero projects never hits a dead end.
+  const backTo=()=>{pid?openProject(pid):load();};
+  $('back').addEventListener('click',(e)=>{e.preventDefault();backTo();});
+  $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid});if(r.ok){toast('Sent — your studio will get back to you.');backTo();}else{toast('That didn’t send.');b.disabled=false;}});
 }
 
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
@@ -394,7 +435,20 @@ async function load(){
     await appendBilling();appendYou();
     return;
   }
-  if(c.sees_full_workspace){ownerNote();return;}     // owner with no linked delivery
+  // No delivery project yet. A MANAGED CLIENT (an agency's customer on their OWN
+  // site) must still get the client app — NEVER the owner dead-end. Show the calm
+  // "no project yet" home, then wire the surfaces they can still reach: things to
+  // approve + recent updates (shared feed), talk-to-your-studio / request more work
+  // (support), and their invoices (appendBilling).
+  if(c.is_managed_client){
+    const mfeed=await api('/portal/feed');
+    renderProjects([],0,[]);                        // friendly empty state + welcome + bell
+    await appendManagedExtras(mfeed.ok?(mfeed.body.data||{}):{});
+    await appendBilling();
+    appendYou();
+    return;
+  }
+  if(c.sees_full_workspace){ownerNote();return;}     // a plain owner (not a managed client) — the full workspace lives elsewhere
   const feed=await api('/portal/feed');
   if(!feed.ok){trouble();return;}
   renderFeed(c,feed.body.data||{});

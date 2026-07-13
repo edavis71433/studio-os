@@ -25,6 +25,7 @@ export interface NavContext {
   isAgency: boolean;            // the caller is also an agency member
   isOperator: boolean;          // staff/system (operator)
   editionKey?: EditionKey;      // Phase D: the FEATURE edition; when absent, all features (today's behavior)
+  isManagedClient?: boolean;    // the caller is an agency's CLIENT signed into their OWN (bridged) site — client experience, not operator tools
 }
 
 const has = (c: NavContext, cap: SiteCapability) => c.capabilities.includes(cap);
@@ -47,6 +48,11 @@ function reviewerNav(): NavSection[] {
  *  every edition/role feels intentionally designed. */
 export function buildNav(c: NavContext): NavSection[] {
   if (c.role === 'client_reviewer') return reviewerNav();
+  // A converted/bridged customer owns their own site (role = business_owner) but is
+  // the studio's CLIENT — they get the calm client surface, never the operator
+  // workspace (no "Customers"/CRM, no "build your site" prompts). Same one surface
+  // as the reviewer; presentation only (entitlements/billing/bridge unchanged).
+  if (c.isManagedClient) return reviewerNav();
 
   // ── Architecture v1.0 (frozen): the PRIMARY bar is OUTCOMES ONLY —
   // Today · Website · Customers · Files · Analytics · Inbox · (Studio). Utilities
@@ -151,7 +157,7 @@ export function buildNav(c: NavContext): NavSection[] {
 /** The caller's landing surface, by role + edition. A CMS-Only account lands on
  *  its website; everyone with Business OS lands on Today; agency on the portfolio. */
 export function landingFor(c: NavContext): string {
-  if (c.role === 'client_reviewer') return '/client.html';
+  if (c.role === 'client_reviewer' || c.isManagedClient) return '/client.html';
   if (c.isAgency) return '/agency.html';
   const f = flagsOf(c);
   if (!f.hasBusinessOS && f.hasWebsite) return '/presence.html';
