@@ -11,6 +11,7 @@ import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDev
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
 import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
+import { normalizeTags } from './search_index.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -145,7 +146,9 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     offerings: offerings.map((o: any) => ({ id: o.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media: ref(o.media_id), sort_order: o.sort_order })),
     testimonials: testimonials.map((t: any) => ({ id: t.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || undefined, sort_order: t.sort_order })),
     faqs: faqs.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer, sort_order: f.sort_order })),
-    posts: posts.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at, noindex: p.noindex === true })),
+    // Phase SEARCH: flat tags on updates. normalizeTags is the ONE gate; deploy-order
+    // tolerant — pre-0102 the `tags` column is absent → p.tags is undefined → [].
+    posts: posts.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at, noindex: p.noindex === true, tags: normalizeTags(p.tags) })),
     redirects: redirects.map((r: any) => ({ from_path: r.from_path, to_path: r.to_path })),
   };
 

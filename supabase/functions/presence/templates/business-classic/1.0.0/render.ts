@@ -11,6 +11,7 @@ import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
+import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
 const loc0 = (c: SnapshotContent): LocationContent | null => c.locations?.[0] ?? null;
@@ -152,7 +153,8 @@ footer.site h2{font-size:1.1rem}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 @media (max-width:640px){.hero{padding:52px 0 36px}.block{padding:40px 0}}
-${BLOCK_CSS}`;
+${BLOCK_CSS}
+${SEARCH_CSS}`;
 
 const CRITICAL = `:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--accent:#23635a;--line:#e2e4e1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.15;letter-spacing:-.015em}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1000px;margin:0 auto;padding:0 22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:#5b6572;font-weight:600}.hero{padding:72px 0 48px}`;
 
@@ -290,6 +292,7 @@ ${closedNotice}
   <a class="brand" href="/">${logo?.variants?.w400 ? `<img src="${attr(logo.variants.w400)}" alt="" class="brandlogo">` : ''}${esc(i.business_name)}</a>
   <nav class="primary" aria-label="Main"><ul>${x.nav.map(([p, label, key]) =>
     `<li><a href="${attr(p)}"${o.active === key ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')}</ul></nav>
+  ${searchBoxHtml()}
 </div></header>
 <main id="main">
 ${o.body}
@@ -426,11 +429,11 @@ function postDate(iso: string): string {
 
 function postIndexBody(c: SnapshotContent): string {
   const posts = [...c.posts].sort((a, b) => b.published_at.localeCompare(a.published_at));
-  return `<section class="block wrap"><h1>Updates</h1><div class="post-list">${posts.map((p) => `
-<article${prE('post', p.id)}><h2><a href="/updates/${attr(p.slug)}/">${esc(p.title)}</a></h2>
+  return `<section class="block wrap"><h1>Updates</h1>${tagFilterBar(posts, esc, attr)}<div class="post-list">${posts.map((p) => { const tags = normalizeTags(p.tags); return `
+<article${prE('post', p.id)}${postTagsAttr(tags, attr)}><h2><a href="/updates/${attr(p.slug)}/">${esc(p.title)}</a></h2>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.excerpt ? `<p>${esc(p.excerpt)}</p>` : ''}</article>`).join('')}
-${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''}</div></section>`;
+${p.excerpt ? `<p>${esc(p.excerpt)}</p>` : ''}${postTagsHtml(tags, esc)}</article>`; }).join('')}
+${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''}</div>${tagFilterScript(posts)}</section>`;
 }
 
 function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): string {
@@ -439,7 +442,7 @@ function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): stri
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
 ${p.hero ? `<div style="margin:20px 0;border-radius:14px;overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
 ${renderMarkdown(p.body_md)}
-</article>
+${postTagsHtml(normalizeTags(p.tags), esc)}</article>
 <p style="margin-top:28px"><a href="/updates/">← All updates</a></p></section>`;
 }
 
@@ -520,6 +523,14 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
   }
 
+  // Phase SEARCH: static, privacy-safe on-site search — the site's own content
+  // index (zero external origins, zero trackers) + a calm results page whose
+  // first-party inline script filters it client-side. Kept out of the sitemap +
+  // noindexed (a thin utility page).
+  files['search-index.json'] = searchIndexJson(c, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel });
+  page('/search/', { title: `Search — ${i.business_name}`, description: `Search ${i.business_name}.`, ld: [], active: '', body: searchPageBody(esc, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel }) + searchClientScript() });
+  markNoindex('search/index.html');
+
   files['404.html'] = shell(c, site, cssPath, {
     path: '/404.html', title: `Page not found — ${i.business_name}`, description: siteDesc, ld: [], active: '',
     body: `<section class="hero wrap"><h1>That page isn’t here</h1><p class="tagline">The page you’re after may have moved.</p><div class="cta-row"><a class="btn" href="/">Back to ${esc(i.business_name)}</a><a class="btn ghost" href="${attr(v.offeringPath)}">See our ${esc(v.offeringLabel.toLowerCase())}</a></div></section>`,
@@ -539,7 +550,8 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
       const link = esc(site.baseUrl + `/updates/${p.slug}/`);
       const pub = p.published_at ? `<pubDate>${new Date(p.published_at).toUTCString()}</pubDate>` : '';
       const desc = p.excerpt ? `<description>${esc(p.excerpt)}</description>` : '';
-      return `<item><title>${esc(p.title || 'Update')}</title><link>${link}</link><guid>${link}</guid>${pub}${desc}</item>`;
+      const cats = normalizeTags(p.tags).map((t) => `<category>${esc(t)}</category>`).join('');
+      return `<item><title>${esc(p.title || 'Update')}</title><link>${link}</link><guid>${link}</guid>${pub}${cats}${desc}</item>`;
     }).join('');
     files['feed.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>${esc(i.business_name)} — Updates</title><link>${esc(site.baseUrl + '/updates/')}</link><description>${esc('Latest updates from ' + i.business_name)}</description>${feedItems}</channel></rss>\n`;
   }

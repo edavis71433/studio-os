@@ -55,6 +55,17 @@ html.dds-has-shell .rail .wordmark{display:none}
 .main{flex:1;min-width:0}
 .topbar{display:flex;align-items:center;gap:16px;padding:26px 56px 0;max-width:860px}
 .topbar .whisper{margin-left:auto;font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2);transition:opacity var(--dur) var(--ease)}
+.findwrap{position:relative;width:230px}
+.findwrap input{width:100%;font:inherit;font-size:13px;padding:7px 14px;border:1px solid var(--hair-2);border-radius:100px;background:var(--sheet);color:var(--ink)}
+.findwrap input:focus{outline:none;border-color:var(--plum)}
+.findresults{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--paper);border:1px solid var(--hair-2);border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.14);max-height:60vh;overflow:auto;z-index:60;padding:6px}
+.findhit{display:block;width:100%;text-align:left;padding:9px 11px;border-radius:9px;background:none;border:0;cursor:pointer}
+.findhit:hover{background:var(--sheet)}
+.findhit .fk{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--plum);font-weight:600;margin-right:7px}
+.findhit .ft{font-weight:600;color:var(--ink);font-size:13.5px}
+.findhit .fs{display:block;color:var(--ink-2);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.findempty{padding:12px;color:var(--ink-2);font-size:13px}
+@media (max-width:720px){.findwrap{display:none}}
 .topbar .whisper.ok{color:var(--sage)}
 .pillbtn{font-size:13px;font-weight:600;padding:8px 18px;border-radius:100px;border:1px solid var(--hair-2);background:var(--sheet);white-space:nowrap;transition:background var(--dur) var(--ease)}
 .pillbtn:hover{background:var(--plum-soft)}
@@ -419,6 +430,10 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
 
   <div class="main">
     <header class="topbar">
+      <div class="findwrap">
+        <input id="findInput" type="search" placeholder="Find anything…" aria-label="Find anything in your content" autocomplete="off" maxlength="120">
+        <div id="findResults" class="findresults" role="listbox" aria-label="Search results" hidden></div>
+      </div>
       <span class="whisper" id="topWhisper" aria-live="polite">everything saved</span>
       <button class="pillbtn" id="btnPreview">See your site</button>
       <button class="pillbtn inked" id="btnPublish">Publish</button>
@@ -771,6 +786,20 @@ function askText(title, opts) {
   });
 }
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Phase SEARCH: client-side tag parse — mirrors lib/search_index.ts normalizeTags
+// (lowercase · charset-limited · de-duped · ≤12 tags · ≤30 chars). The server
+// re-normalizes on save, so this is just a friendly local preview of the result.
+function splitTags(raw) {
+  const parts = Array.isArray(raw) ? raw.map(String) : String(raw ?? "").split(/[,\n]/);
+  const out = [], seen = new Set();
+  for (const p of parts) {
+    const t = p.toLowerCase().replace(/[^a-z0-9 &+-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 30);
+    if (!t || seen.has(t)) continue;
+    seen.add(t); out.push(t);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
 const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 function toast(msg, bad) {
@@ -1410,6 +1439,7 @@ function postEditor(p) {
   ed.innerHTML = `
     <div class="field"><label>Title</label><input type="text" data-k="title" value="${esc(p.title)}" maxlength="160"></div>
     <div class="field"><label>The update</label><textarea data-k="body_md" maxlength="20000" style="min-height:130px">${esc(p.body_md || "")}</textarea></div>
+    <div class="field"><label>Tags</label><input type="text" data-k="tags" value="${esc((p.tags || []).join(", "))}" maxlength="200" placeholder="events, seasonal, news"><div class="hint">Separate with commas. Tags let visitors filter your Updates page and help on-site search.</div></div>
     <div class="field" style="max-width:220px"><label>Photograph</label><button class="textact" data-act="photo" style="background:none">${p.hero_media_id ? "Change photograph" : "Choose one"}</button></div>
     <div class="eacts">
       <button class="pillbtn inked" data-act="save">Save</button>
@@ -1427,7 +1457,7 @@ function postEditor(p) {
     ed.querySelector(".eacts").insertBefore(improve, ed.querySelector(".spacer"));
   }
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => {
-    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.value);
+    const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => body[i.dataset.k] = i.dataset.k === "tags" ? splitTags(i.value) : i.value);
     try { const r = await api("PATCH", `/posts/${p.id}`, body); Object.assign(p, r.data); renderPosts(); toast("Saved"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   });
@@ -2048,12 +2078,73 @@ $("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
     catch (err) { toast(nice(err), true); }
   }, "Keep this kind word"));
 $("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
-  [["title","Title","text",160,"Summer patio is open"],["body_md","The update","textarea",20000,""]],
+  [["title","Title","text",160,"Summer patio is open"],["body_md","The update","textarea",20000,""],["tags","Tags (comma-separated)","text",200,"events, seasonal"]],
   async (b, done) => {
     if (!b.title) { toast("An update needs a title.", true); return; }
-    try { const r = await api("POST", "/posts", { ...b, status: "draft" }); S.posts.unshift(r.data); done(); renderPosts(); toast("Saved as a draft — show it when it’s ready"); scheduleChangesRefresh(); }
+    const body = { ...b, tags: splitTags(b.tags || ""), status: "draft" };
+    try { const r = await api("POST", "/posts", body); S.posts.unshift(r.data); done(); renderPosts(); toast("Saved as a draft — show it when it’s ready"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   }, "Save as a draft"));
+
+/* ── Author "find anything" — search across the owner's OWN loaded content and
+   jump to the right editor. Pure client-side over already-loaded state (no new
+   route, no extra reads); same tokenized, title-weighted ranking as the published
+   on-site search (lib/search_index.ts matchDocs). Answers "where's that FAQ I
+   wrote?" without hunting through tabs. ── */
+function findLabel() { try { return (VOCAB && VOCAB.label) || "Menu"; } catch (_) { return "Menu"; } }
+function findDataset() {
+  const ds = [];
+  [["business", "Business & settings"], ["offerings", findLabel()], ["faqs", "Questions"],
+   ["testimonials", "Kind words"], ["updates", "Updates"], ["media", "Photos"],
+   ["bookings", "Bookings"], ["reviews", "Reviews"], ["design", "Design"], ["history", "History"]]
+    .forEach(([v, label]) => ds.push({ view: v, kind: "Section", title: label, text: "" }));
+  (S.offerings || []).forEach((o) => ds.push({ view: "offerings", kind: findLabel(), title: o.name || "", text: [o.category, o.description, o.price_text].filter(Boolean).join(" ") }));
+  (S.faqs || []).forEach((f) => ds.push({ view: "faqs", kind: "Question", title: f.question || "", text: f.answer || "" }));
+  (S.testimonials || []).forEach((t) => ds.push({ view: "testimonials", kind: "Kind words", title: t.author || t.quote || "", text: t.quote || "" }));
+  (S.posts || []).forEach((p) => ds.push({ view: "updates", kind: "Update", title: p.title || "", text: [p.excerpt, p.body_md, (p.tags || []).join(" ")].filter(Boolean).join(" ") }));
+  return ds;
+}
+function findMatch(query) {
+  const q = String(query || "").toLowerCase().trim();
+  if (!q) return [];
+  const toks = q.split(/\s+/).filter(Boolean);
+  return findDataset().map((d, i) => {
+    const title = (d.title || "").toLowerCase();
+    const hay = (title + " " + (d.text || "")).toLowerCase();
+    let score = 0, ok = true;
+    toks.forEach((tk) => { if (title.indexOf(tk) >= 0) score += 3; else if (hay.indexOf(tk) >= 0) score += 1; });
+    toks.forEach((tk) => { if (hay.indexOf(tk) < 0) ok = false; });
+    if (!ok || score === 0) return null;
+    if (title.indexOf(q) === 0) score += 4; else if (hay.indexOf(q) >= 0) score += 2;
+    return { d: d, score: score, i: i };
+  }).filter(Boolean).sort((a, b) => b.score - a.score || a.i - b.i).slice(0, 20).map((x) => x.d);
+}
+function renderFind() {
+  const box = $("findResults"), q = $("findInput").value;
+  box.innerHTML = "";
+  if (!q.trim()) { box.hidden = true; return; }
+  const res = findMatch(q);
+  box.hidden = false;
+  if (!res.length) { box.appendChild(el("div", "findempty", "No matches. Try another word.")); return; }
+  res.forEach((d) => {
+    const b = el("button", "findhit"); b.type = "button"; b.setAttribute("role", "option");
+    b.appendChild(el("span", "fk", d.kind));
+    b.appendChild(el("span", "ft", d.title || "(untitled)"));
+    if (d.text) b.appendChild(el("span", "fs", d.text.slice(0, 90)));
+    b.addEventListener("click", () => { box.hidden = true; $("findInput").value = ""; go(d.view); });
+    box.appendChild(b);
+  });
+}
+$("findInput").addEventListener("input", renderFind);
+$("findInput").addEventListener("focus", renderFind);
+$("findInput").addEventListener("keydown", (e) => { if (e.key === "Escape") { $("findInput").value = ""; $("findResults").hidden = true; $("findInput").blur(); } });
+document.addEventListener("click", (e) => { if (!e.target.closest(".findwrap")) $("findResults").hidden = true; });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "/") return;
+  const t = e.target || {}; const tag = t.tagName || "";
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || t.isContentEditable) return;
+  e.preventDefault(); $("findInput").focus();
+});
 
 /* ── photographs (identical media API) ── */
 async function loadMedia() {

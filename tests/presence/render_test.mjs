@@ -87,7 +87,7 @@ const h = renderSnapshot(hostile, SITE);
     const stripped = s
       .replace(/<style>[\s\S]*?<\/style>/g, '')
       .replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>/, '')
-      .replace(/<script>\(function\(\)\{[\s\S]*?<\/script>/, '')
+      .replace(/<script>\(function\(\)\{[\s\S]*?<\/script>/g, '')
       .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '');
     if (/<script[\s>]/i.test(stripped)) bad.push(`${k}: <script survived`);
     // a real event handler = on\w+= INSIDE an actual element tag (escaped text can't be)
@@ -121,7 +121,7 @@ const h = renderSnapshot(hostile, SITE);
     if (!/<main id="main">/.test(s)) bad.push(`${k}: no main landmark`);
     if (!/<nav class="primary" aria-label="Main">/.test(s)) bad.push(`${k}: no labeled nav`);
     if (!/<html lang="en">/.test(s)) bad.push(`${k}: no lang`);
-    if (!/aria-current="page"/.test(s) && !k.startsWith('404') && !k.startsWith('updates/') && !k.startsWith('privacy/') && !k.startsWith('accessibility/')) bad.push(`${k}: no aria-current`);   // footer utility pages aren't nav destinations
+    if (!/aria-current="page"/.test(s) && !k.startsWith('404') && !k.startsWith('updates/') && !k.startsWith('privacy/') && !k.startsWith('accessibility/') && !k.startsWith('search/')) bad.push(`${k}: no aria-current`);   // footer utility pages aren't nav destinations
     // every <img has non-empty alt
     for (const m of s.matchAll(/<img\b[^>]*>/g)) {
       const alt = m[0].match(/alt="([^"]*)"/);

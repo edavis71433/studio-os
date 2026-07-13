@@ -65,7 +65,9 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
   ok('accessibility: lang, skip link, exactly one <h1> on the home page', /<html lang="/.test(home) && home.includes('class="skip"') && (home.match(/<h1[ >]/g) || []).length === 1);
   ok('every <img> carries an alt attribute', [...home.matchAll(/<img\b[^>]*>/g)].every((m) => /\balt=/.test(m[0])));
   ok('contact form: honeypot + thanks page is noindexed', f['contact/index.html'].includes('name="_hp"') && f['thanks/index.html'].includes('name="robots" content="noindex"'));
-  ok('editorial keeps ZERO client JavaScript', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && /<script(?![^>]*application\/ld\+json)/.test(v)));
+  // Content pages carry ZERO client JS. The sole first-party inline scripts are the
+  // on-site search (/search/) + the updates tag-filter — same-origin, zero external origins.
+  ok('editorial keeps ZERO client JavaScript (except first-party search + tag-filter)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(v)));
   ok('provenance markers preserved (data-pr on the hero identity)', home.includes('data-pr="identity.business_name"'));
 }
 

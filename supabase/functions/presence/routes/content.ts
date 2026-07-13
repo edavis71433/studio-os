@@ -19,6 +19,7 @@ import { suggestedBlocksFor, suggestionNoteFor } from '../lib/vertical_presets.t
 import { REALIZED_BLOCK_TYPES } from '../lib/site_blocks.ts';
 import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
+import { normalizeTags } from '../lib/search_index.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -64,7 +65,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' };
+type FieldRule = { max?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' };
 interface EntitySpec {
   table: string;
   entityType: string;           // provenance entity_type
@@ -113,8 +114,9 @@ export const SPECS: Record<string, EntitySpec> = {
       body_md: { max: 20000 }, excerpt: { max: 300 },
       hero_media_id: { kind: 'uuid' }, status: { max: 12 }, published_at: { kind: 'date' },
       noindex: { kind: 'bool' },   // Phase SD: 'Show this update on Google?'
+      tags: { kind: 'tags' },      // Phase SEARCH: flat, normalized update tags
     },
-    select: 'id,title,slug,body_md,excerpt,hero_media_id,status,published_at,noindex,updated_at',
+    select: 'id,title,slug,body_md,excerpt,hero_media_id,status,published_at,noindex,tags,updated_at',
     order: 'updated_at.desc', softDelete: true,
   },
 };
@@ -157,6 +159,7 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'int') { const n = Number(v); if (!Number.isFinite(n)) { errors.push({ field: key, message: `${key} must be a number.` }); continue; } cleanBody[key] = Math.trunc(n); fields.push(key); continue; }
     if (rule.kind === 'uuid') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } if (!UUID_RE.test(String(v))) { errors.push({ field: key, message: `${key} isn’t a valid reference.` }); continue; } cleanBody[key] = v; fields.push(key); continue; }
     if (rule.kind === 'json') { cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue; }
+    if (rule.kind === 'tags') { cleanBody[key] = normalizeTags(v); fields.push(key); continue; }   // Phase SEARCH: the ONE tag gate — normalized to a clean text[]
     if (rule.kind === 'date') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } cleanBody[key] = String(v); fields.push(key); continue; }
     if (rule.kind === 'slug') { const s = clean(String(v ?? '')).toLowerCase(); if (s && !SLUG_RE.test(s)) { errors.push({ field: key, message: 'Links use lowercase letters, numbers, and dashes.' }); continue; } cleanBody[key] = s; fields.push(key); continue; }
     const s = clean(String(v ?? ''));
