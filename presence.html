@@ -411,6 +411,11 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
 .dp-stage{display:flex;justify-content:center}
 .dp-frame{position:relative;width:100%;height:640px;min-height:340px;max-height:82vh;resize:vertical;overflow:hidden;border:1px solid var(--hair-2);border-radius:12px;background:#fff;box-shadow:0 6px 24px rgba(60,45,20,.08);transition:width var(--dur,.3s) var(--ease,ease)}
 .dp-frame iframe{width:100%;height:100%;border:none;border-radius:12px;display:block;pointer-events:none}
+/* AEM-style live canvas: once editing chrome is injected the preview becomes the
+   editor itself — interactive. The bottom padding leaves the vertical-resize grip
+   grabbable below the now-interactive iframe. Structured/list-order edits only. */
+.dp-frame.dc-live{padding-bottom:16px}
+.dp-frame.dc-live iframe{pointer-events:auto}
 .dp-stage.dev-tablet .dp-frame{width:768px;max-width:100%}
 .dp-stage.dev-phone .dp-frame{width:390px;max-width:100%}
 #designPreviewEmpty{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:26px 30px;background:var(--sheet)}
@@ -5753,8 +5758,8 @@ function trayItem(d) {
   if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
   b.appendChild(txt);
   b.addEventListener("click", () => addBlockAt(d, BLOCKS_WORK.length));   // append (matches existing add path)
-  b.addEventListener("dragstart", (e) => { DND = { kind: "new", type: d.type }; b.classList.add("dragging"); try { e.dataTransfer.setData("text/plain", "new:" + d.type); e.dataTransfer.effectAllowed = "copy"; } catch (_) {} });
-  b.addEventListener("dragend", () => { b.classList.remove("dragging"); clearDropLines(); DND = null; });
+  b.addEventListener("dragstart", (e) => { DND = { kind: "new", type: d.type }; b.classList.add("dragging"); dcSetDragging(true); try { e.dataTransfer.setData("text/plain", "new:" + d.type); e.dataTransfer.effectAllowed = "copy"; } catch (_) {} });
+  b.addEventListener("dragend", () => { b.classList.remove("dragging"); clearDropLines(); dcSetDragging(false); DND = null; });
   return b;
 }
 
@@ -5892,6 +5897,179 @@ function refreshDesignPreview() {
     }
   }, 350);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AEM-STYLE LIVE CANVAS — the design preview IS the editor
+// ─────────────────────────────────────────────────────────────────────────────
+// #designPreview is a SAME-ORIGIN srcdoc of the real render engine (draft). We
+// reach into its document and layer editing chrome ON the live page, so building
+// is WYSIWYG: drag a section from the tray onto the page (drop-lines appear
+// between sections), grab a section to reorder it in place, and edit / duplicate /
+// hide / delete right where it lives. Columns get a 2↔3 responsive-grid switch.
+//
+// THE MOAT: every action mutates the SAME BLOCKS_WORK list + saveBlocks() the
+// side rail uses — a single list index or a column count, NEVER an x/y coordinate,
+// z-index, or overlap. The served render (site_blocks.ts) is untouched: columns
+// still stack to one column below 620px, order is still the list order. Structured
+// blocks, always auto-responsive, always accessible. Nothing here changes output.
+let DC_SCROLL = null;   // preserve the canvas scroll position across the save→reload cycle
+function dcFrameDoc() { const f = $("designPreview"); try { return f && f.contentDocument; } catch (_) { return null; } }
+function dcSetDragging(on) { const d = dcFrameDoc(); if (d && d.body) d.body.classList.toggle("dc-drag", !!on); }
+function dcClearZones(doc) { (doc || dcFrameDoc() || document).querySelectorAll(".dc-drop.over").forEach((z) => z.classList.remove("over")); }
+function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.defaultView) ? d.defaultView.scrollY : null; }
+
+// ── canvas block ops — all REUSE the existing list model, then persist + redraw ──
+// saveBlocks() PUTs /settings then refreshDesignPreview(), which reloads the iframe;
+// the load handler re-injects the chrome and restores scroll. Same auto-save the
+// modal proof's eeMoveBlock already uses — nothing goes live until Publish.
+function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type); if (!def) return; dcCaptureScroll(); addBlockAt(def, gap); saveBlocks(); }
+function dcMove(from, gap) { dcCaptureScroll(); moveBlockTo(from, gap); saveBlocks(); }
+function dcDuplicate(bi) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const def = BLOCK_DEFS.find((x) => x.type === b.type);
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
+  dcCaptureScroll(); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; renderBlocksCard(); saveBlocks();
+}
+function dcDelete(bi) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const def = BLOCK_DEFS.find((x) => x.type === b.type);
+  if (!confirm("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.")) return;
+  dcCaptureScroll(); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+}
+// ── column controls (responsive grid) — PURE helpers, extracted + unit-tested ──
+// The Columns block is the render engine's responsive Layout Container: 2 or 3
+// equal columns that STACK to one column below 620px (site_blocks.ts data-cols).
+// These set the column COUNT within the model's supported range; each column's
+// text/image/button is edited in the side rail. (See report: dropping ARBITRARY
+// blocks INTO a column, or a 1-column layout, would need a render/serializer change.)
+function dcClampColumns(n) { n = Math.round(Number(n) || 0); return n < 2 ? 2 : (n > 3 ? 3 : n); }
+function dcResizeColumns(cols, n) { n = dcClampColumns(n); const out = Array.isArray(cols) ? cols.slice(0, n) : []; while (out.length < n) out.push({ body: "" }); return out; }
+function dcSetColumns(bi, n) {
+  const b = BLOCKS_WORK[bi]; if (!b || b.type !== "columns") return;
+  n = dcClampColumns(n); const cur = Array.isArray(b.columns) ? b.columns : [];
+  if (n < cur.length && cur.slice(n).some((c) => c && (c.body || c.image_id || c.button)) &&
+    !confirm("Show " + n + " columns? The extra column’s content will be removed.")) return;
+  b.columns = dcResizeColumns(cur, n);
+  dcCaptureScroll(); renderBlocksCard(); saveBlocks();
+}
+
+// ── the drop-zone between two sections on the live page ──────────────────────
+// A gap at index `gap` means "insert before block `gap`" (a trailing gap = append)
+// — EXACTLY the side rail's blkGap model, so new/move both reuse addBlockAt /
+// moveBlockTo (+ the tested dndDropIndex reindex). List order only; no XY.
+function dcMakeZone(doc, gap) {
+  const z = doc.createElement("div"); z.className = "dc-drop"; z.dataset.gap = String(gap); z.setAttribute("aria-hidden", "true");
+  const over = (e) => { if (!DND) return; e.preventDefault(); try { e.dataTransfer.dropEffect = DND.kind === "new" ? "copy" : "move"; } catch (_) {} dcClearZones(doc); z.classList.add("over"); };
+  z.addEventListener("dragenter", over);
+  z.addEventListener("dragover", over);
+  z.addEventListener("dragleave", () => z.classList.remove("over"));
+  z.addEventListener("drop", (e) => {
+    e.preventDefault(); z.classList.remove("over");
+    const d = DND; DND = null; dcSetDragging(false);
+    if (!d) return;
+    if (d.kind === "new") dcAddAt(d.type, gap);
+    else if (d.kind === "move") dcMove(d.from, gap);
+  });
+  return z;
+}
+
+// ── inject the editing chrome into the rendered preview document ─────────────
+function dcInjectCanvas(doc, main) {
+  const win = doc.defaultView;
+  if (!doc.getElementById("dds-dc-style")) {
+    const st = doc.createElement("style"); st.id = "dds-dc-style";
+    st.textContent =
+      ".dc-drop{height:0;margin:0;position:relative;transition:height .12s ease}" +
+      "body.dc-drag .dc-drop{height:24px;margin:6px 0}" +
+      "body.dc-drag .dc-drop::before{content:'';position:absolute;left:16px;right:16px;top:50%;height:3px;transform:translateY(-50%);background:rgba(91,63,160,.35);border-radius:2px}" +
+      ".dc-drop.over{height:36px;margin:10px 0}" +
+      ".dc-drop.over::before{background:#5b3fa0;height:4px;box-shadow:0 0 0 3px rgba(91,63,160,.16)}" +
+      ".dc-hot{outline:2px solid #5b3fa0!important;outline-offset:-2px}" +
+      "#dds-dc-bar{position:absolute;z-index:2147483000;display:none;gap:4px;flex-wrap:wrap;max-width:calc(100vw - 24px);background:#5b3fa0;border-radius:9px;padding:4px;box-shadow:0 6px 22px rgba(0,0,0,.34);font-family:system-ui,-apple-system,sans-serif}" +
+      "#dds-dc-bar.on{display:flex}" +
+      "#dds-dc-bar .dc-b{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 9px;cursor:pointer;white-space:nowrap}" +
+      "#dds-dc-bar .dc-b:hover{background:rgba(255,255,255,.34)}" +
+      "#dds-dc-bar .dc-grip{cursor:grab}#dds-dc-bar .dc-grip:active{cursor:grabbing}" +
+      "#dds-dc-bar .dc-on{background:#fff;color:#3a2470;font-weight:700}" +
+      "#dds-dc-bar .dc-danger:hover{background:#c0392b;border-color:#c0392b}" +
+      "#dds-dc-bar .dc-b:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
+      "[data-dc]:focus-visible{outline:2px solid #5b3fa0;outline-offset:-2px}";
+    (doc.head || doc.documentElement).appendChild(st);
+  }
+  let bar = doc.getElementById("dds-dc-bar");
+  if (!bar) { bar = doc.createElement("div"); bar.id = "dds-dc-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
+  let current = null, hideT = null;
+  const place = (el2) => { const r = el2.getBoundingClientRect(); bar.style.top = Math.max(2, r.top + win.scrollY + 6) + "px"; bar.style.left = Math.max(2, r.left + win.scrollX + 6) + "px"; };
+  const hideBar = () => { bar.classList.remove("on"); if (current) { current.classList.remove("dc-hot"); current = null; } };
+  const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 170); };
+  bar.addEventListener("mouseenter", () => clearTimeout(hideT));
+  bar.addEventListener("mouseleave", scheduleHide);
+  const mkBtn = (label, aria, fn, opts) => {
+    const b = doc.createElement("button"); b.type = "button"; b.className = "dc-b" + ((opts && opts.cls) ? " " + opts.cls : "");
+    b.textContent = label; b.setAttribute("aria-label", aria); b.title = aria;
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (fn) fn(); });
+    return b;
+  };
+  const showBar = (el2) => {
+    clearTimeout(hideT);
+    if (current && current !== el2) current.classList.remove("dc-hot");
+    current = el2; el2.classList.add("dc-hot");
+    const c = eeClassify(el2); bar.textContent = "";
+    if (c.kind === "block") {
+      const bi = c.bi, b = BLOCKS_WORK[bi] || {};
+      const grip = mkBtn("⠿ Move", "Drag to move this section", null, { cls: "dc-grip" });
+      grip.draggable = true;
+      grip.addEventListener("dragstart", (e) => { DND = { kind: "move", from: bi }; dcSetDragging(true); try { e.dataTransfer.setData("text/plain", "move:" + bi); e.dataTransfer.effectAllowed = "move"; } catch (_) {} });
+      grip.addEventListener("dragend", () => { dcSetDragging(false); dcClearZones(doc); DND = null; });
+      bar.appendChild(grip);
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi)));
+      if (b.type === "columns") {   // responsive-grid column controls (2 or 3; stacks on mobile)
+        const nc = Array.isArray(b.columns) ? b.columns.length : 2;
+        bar.appendChild(mkBtn("2 cols", "Show two columns", () => dcSetColumns(bi, 2), { cls: nc <= 2 ? "dc-on" : "" }));
+        bar.appendChild(mkBtn("3 cols", "Show three columns", () => dcSetColumns(bi, 3), { cls: nc >= 3 ? "dc-on" : "" }));
+      }
+      bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi)));
+      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[bi]))));
+      bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger" }));
+    } else {
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
+      if (c.key) bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(c.key)));
+    }
+    bar.classList.add("on"); place(el2);
+  };
+  // Build the id→block map for THIS render, then wire every top-level section and
+  // drop a zone before each library block (+ one trailing zone to append).
+  EE_IDMAP = eeBuildIdMap(Array.prototype.map.call(main.querySelectorAll("section[id]"), (s) => s.id));
+  const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
+  Array.prototype.forEach.call(targets, (el2) => {
+    if (!el2.hasAttribute("data-dc")) {
+      el2.setAttribute("data-dc", "1");
+      el2.addEventListener("mouseenter", () => showBar(el2));
+      el2.addEventListener("mouseleave", scheduleHide);
+    }
+    const c = eeClassify(el2);
+    if (c.kind === "block") { el2.parentNode.insertBefore(dcMakeZone(doc, c.bi), el2); }
+  });
+  main.appendChild(dcMakeZone(doc, (BLOCKS_WORK || []).length));   // trailing = append (also the first-drop target when empty)
+}
+
+// Install once: every time the canvas srcdoc (re)loads, inject the chrome and
+// restore the scroll we captured before the save→reload. Guarded + best-effort:
+// a chrome failure never breaks the proof.
+(function installDesignCanvas() {
+  const frame = $("designPreview"); if (!frame) return;
+  frame.addEventListener("load", () => {
+    let doc; try { doc = frame.contentDocument; } catch (_) { return; }
+    if (!doc || !doc.body) return;
+    const main = doc.getElementById("main"); if (!main) return;
+    if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
+    const wrap = frame.closest(".dp-frame"); if (wrap) wrap.classList.add("dc-live");
+    frame.removeAttribute("aria-hidden");   // the canvas is now interactive, not decorative
+    try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
+    if (DC_SCROLL != null && doc.defaultView) { try { doc.defaultView.scrollTo(0, DC_SCROLL); } catch (_) {} DC_SCROLL = null; }
+  });
+})();
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
 [["f-gsv", "google_site_verification"], ["f-bsv", "bing_site_verification"]].forEach(([id, key]) => {
   $(id).addEventListener("change", async () => {
