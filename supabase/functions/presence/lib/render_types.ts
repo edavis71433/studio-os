@@ -188,6 +188,14 @@ export interface SiteBlockColumns { type: 'columns'; id: string; title?: string;
 export interface SiteBlockCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image?: MediaRef | null; link?: string }> }
 export interface SiteBlockDownload { type: 'download'; title?: string; file?: MediaRef | null; label?: string }
 export interface SiteBlockToc { type: 'toc'; title?: string }
+// AEM-parity staples (r5, text-first — no media, always auto-responsive/accessible):
+// Title = a standalone heading + optional subtitle; Link list = a titled list of safe
+// links; Table = a simple data table (header row + body rows, scrolls on small screens);
+// Spotlight = a prominent highlight band (eyebrow + heading + prose + optional button).
+export interface SiteBlockTitle { type: 'title'; title: string; subtitle?: string }
+export interface SiteBlockLinkList { type: 'link_list'; title?: string; links: Array<{ label: string; url: string }> }
+export interface SiteBlockTable { type: 'table'; title?: string; headers: string[]; rows: string[][] }
+export interface SiteBlockSpotlight { type: 'spotlight'; title: string; eyebrow?: string; body?: string; button?: { label: string; url: string } }
 // Custom form builder (Phase FB): a typed, structured, whitelisted form (never a
 // code box). The full shape + validation live in lib/forms.ts; a form block is a
 // stored FormDefinition. Multiple forms per site are allowed (unlike other block
@@ -229,6 +237,7 @@ export type SiteBlock = WithLook<
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
   | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockTabs | SiteBlockCarousel | SiteBlockProgress | SiteBlockButtons | SiteBlockDivider
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc
+  | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
   | FormDefinition
 >;
 export type SiteBlockType = SiteBlock['type'];

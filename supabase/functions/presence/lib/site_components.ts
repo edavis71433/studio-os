@@ -141,6 +141,15 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('file', 'image', { required: true }), t('label', 'text', { max: 80 })], schema: null, a11y: 'a real labelled download link, visible focus', seo: 'resource discoverability', industries: ['*'] },
   { key: 'toc', label: 'Table of contents', category: 'content', purpose: 'An auto-built "On this page" jump list from your section headings.',
     fields: [t('title', 'text', { max: 80 })], schema: null, a11y: 'a labelled nav landmark of in-page jump links to real anchors', seo: 'internal anchors improve navigability', industries: ['*'] },
+  // ── AEM-parity staples (r5): standalone heading, link list, data table, spotlight. ──
+  { key: 'title', label: 'Title / heading', category: 'header', purpose: 'A standalone heading, with an optional line of subtitle beneath it.',
+    fields: [t('title', 'text', { required: true, aiAssist: true, max: 120 }), t('subtitle', 'text', { max: 200 })], schema: null, a11y: 'a real section heading in reading order', seo: 'section headings structure the page', industries: ['*'] },
+  { key: 'link_list', label: 'Link list', category: 'content', purpose: 'A tidy list of links — resources, related pages, or quick jumps.',
+    fields: [t('label', 'text', { required: true, repeatable: true, max: 80 }), t('url', 'url', { required: true })], schema: null, a11y: 'a real list of focusable links, visible focus', seo: 'internal + outbound linking', industries: ['*'] },
+  { key: 'table', label: 'Table', category: 'content', purpose: 'A simple data table — headers and rows. Scrolls sideways on phones.',
+    fields: [t('headers', 'list', { repeatable: true, max: 6 }), t('rows', 'list', { required: true, repeatable: true, max: 24 })], schema: null, a11y: 'header cells are <th scope=col>; table scrolls within its own container', seo: 'structured comparison content', industries: ['*'] },
+  { key: 'spotlight', label: 'Spotlight', category: 'content', purpose: 'A prominent highlight band — a short eyebrow, a heading, a line or two, and an optional button.',
+    fields: [t('eyebrow', 'text', { max: 60 }), t('title', 'text', { required: true, aiAssist: true, max: 120 }), t('body', 'richtext', { aiAssist: true, max: 800 }), t('button', 'text')], schema: null, a11y: 'a real heading + focusable button, centered band', seo: 'a featured message with a clear call to action', industries: ['*'] },
   // Phase FB: the custom form builder — a whitelisted, typed form (contact/quote/
   // application/booking). Full field schema + validation live in lib/forms.ts; the
   // catalog just declares the block so the engine may realize it. Multi-instance.

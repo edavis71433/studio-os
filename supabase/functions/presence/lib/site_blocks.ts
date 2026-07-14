@@ -20,6 +20,7 @@ import type {
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
   SiteBlockProgress,
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
+  SiteBlockTitle, SiteBlockLinkList, SiteBlockTable, SiteBlockSpotlight,
   BlockLook,
 } from './render_types.ts';
 import { renderMarkdown } from './markdown.ts';
@@ -36,13 +37,14 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'richtext', 'image', 'image_text', 'accordion', 'tabs', 'carousel', 'progress', 'buttons', 'divider',
   'form',
   'columns', 'cards', 'download', 'toc',
+  'title', 'link_list', 'table', 'spotlight',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too.
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24 };
 // Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
 // snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
 const clampSpan = (v: unknown): number | undefined => {
@@ -128,6 +130,7 @@ export type StoredBlock = WithLook<
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
   | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | StoredTabs | StoredCarousel | SiteBlockProgress | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
+  | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
   | FormDefinition
 >;
 
@@ -400,6 +403,37 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
       }
       case 'toc': {   // always valid; the render skips it when the page has no headings to list
         block = { type: 'toc', title } as SiteBlockToc;
+        break;
+      }
+      case 'title': {   // a standalone heading + optional subtitle (no media)
+        const heading = s((b as any).title, 120);
+        if (heading) block = { type: 'title', title: heading, subtitle: s((b as any).subtitle, 200) || undefined } as SiteBlockTitle;
+        break;
+      }
+      case 'link_list': {   // a titled list of links — each label required, url via safeHref at render
+        const links = arr((b as any).links).map((lk) => ({ label: s(lk?.label, 80), url: s(lk?.url, 300) }))
+          .filter((lk) => lk.label && lk.url).slice(0, CAP.linkList);
+        if (links.length) block = { type: 'link_list', title, links } as SiteBlockLinkList;
+        break;
+      }
+      case 'table': {   // a simple data table — capped header row + body rows of plain text
+        const headers = arr((b as any).headers).map((h) => s(h, 80)).slice(0, CAP.tableCols);
+        const cols = headers.length || Math.min(CAP.tableCols, Math.max(1, arr((b as any).rows)[0] ? arr(arr((b as any).rows)[0]).length : 0));
+        const rows = arr((b as any).rows).map((r) => { const cells = arr(r).map((c) => s(c, 200)).slice(0, cols); while (cells.length < cols) cells.push(''); return cells; })
+          .filter((r) => r.some((c) => c)).slice(0, CAP.tableRows);
+        if (rows.length && cols > 0) block = { type: 'table', title, headers: headers.length ? headers : [], rows } as SiteBlockTable;
+        break;
+      }
+      case 'spotlight': {   // a prominent highlight band — eyebrow + heading + prose + optional button
+        const heading = s((b as any).title, 120);
+        if (heading) {
+          const sp: SiteBlockSpotlight = { type: 'spotlight', title: heading };
+          const eyebrow = s((b as any).eyebrow, 60); if (eyebrow) sp.eyebrow = eyebrow;
+          const body = ml((b as any).body, 800); if (body) sp.body = body;
+          const bl = s((b as any).button?.label, 40), bu = s((b as any).button?.url, 300);
+          if (bl && bu) sp.button = { label: bl, url: bu };
+          block = sp;
+        }
         break;
       }
     }
@@ -1019,6 +1053,29 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         }
         break;
       }
+      case 'title': {   // a standalone heading + optional subtitle
+        html = `<section class="block wrap block-titleonly"><h2>${esc(b.title)}</h2>${b.subtitle ? `<p class="title-sub">${esc(b.subtitle)}</p>` : ''}</section>`;
+        break;
+      }
+      case 'link_list': {   // a titled list of safe links (safeHref drops anything unsafe)
+        const items = b.links.map((lk) => { const href = safeHref(lk.url); return href ? `<li><a href="${attr(href)}" rel="noopener">${esc(lk.label)}</a></li>` : ''; }).filter(Boolean).join('');
+        if (items) html = `<section class="block wrap block-linklist">${b.title ? h2(b.title, '') : ''}<ul class="linklist">${items}</ul></section>`;
+        break;
+      }
+      case 'table': {   // a simple data table; the wrapper scrolls it horizontally on phones
+        const head = b.headers.length ? `<thead><tr>${b.headers.map((hd) => `<th scope="col">${esc(hd)}</th>`).join('')}</tr></thead>` : '';
+        const body = `<tbody>${b.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+        html = `<section class="block wrap block-table">${b.title ? h2(b.title, '') : ''}<div class="table-wrap"><table class="site-table">${head}${body}</table></div></section>`;
+        break;
+      }
+      case 'spotlight': {   // a prominent highlight band — eyebrow + heading + prose + optional button
+        const href = b.button ? safeHref(b.button.url) : null;
+        const btn = href ? `<p class="sp-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button!.label)}</a></p>` : '';
+        const eyebrow = b.eyebrow ? `<p class="sp-eyebrow">${esc(b.eyebrow)}</p>` : '';
+        const body = b.body ? `<div class="prose sp-body">${renderMarkdown(b.body)}</div>` : '';
+        html = `<section class="block wrap block-spotlight"><div class="sp-inner">${eyebrow}<h2>${esc(b.title)}</h2>${body}${btn}</div></section>`;
+        break;
+      }
       case 'toc':   // deferred — rendered after anchors are assigned (needs sibling headings)
         html = '';
         break;
@@ -1310,4 +1367,19 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
    lists, tables, prose bodies) stays left-aligned so it never turns ragged. */
 .block--align-center{text-align:center}
 .block--align-center .svc-grid,.block--align-center .cards,.block--align-center .card-grid,.block--align-center .cols,.block--align-center .accordion,.block--align-center .prose,.block--align-center ul,.block--align-center ol,.block--align-center table,.block--align-center .it-row{text-align:left}
-.block--align-center .btn-row,.block--align-center .cta-inner{justify-content:center}`;
+.block--align-center .btn-row,.block--align-center .cta-inner{justify-content:center}
+.block-titleonly .title-sub{color:var(--soft);font-size:1.05rem;margin-top:6px;max-width:60ch}
+.block-linklist ul.linklist{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.block-linklist ul.linklist li{margin:0}
+.block-linklist ul.linklist a{display:inline-block;padding:8px 0;color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+.block-linklist ul.linklist a:hover{border-bottom-color:var(--accent)}
+.block-table .table-wrap{overflow-x:auto;margin-top:12px;-webkit-overflow-scrolling:touch}
+table.site-table{border-collapse:collapse;width:100%;min-width:min(100%,480px);font-size:.97rem}
+table.site-table th,table.site-table td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+table.site-table thead th{font-weight:700;color:var(--ink);border-bottom:2px solid var(--line)}
+table.site-table tbody tr:last-child td{border-bottom:none}
+.block-spotlight .sp-inner{padding:28px 26px;border-radius:16px;background:var(--wash,rgba(0,0,0,.04));border:1px solid var(--line);text-align:center;max-width:760px;margin:0 auto}
+.block-spotlight .sp-eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.78rem;font-weight:700;color:var(--accent);margin:0 0 8px}
+.block-spotlight h2{margin:0}
+.block-spotlight .sp-body{margin-top:10px;color:var(--soft)}
+.block-spotlight .sp-cta{margin-top:18px}`;
