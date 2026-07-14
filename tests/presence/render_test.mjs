@@ -220,7 +220,7 @@ const h = renderSnapshot(hostile, SITE);
 // escaped (never executable markup). This extends the SAME golden + hostile
 // mechanism to business-classic and editorial — no second harness, no second
 // renderer. Adding a template = add it to this list + commit its golden baseline.
-const OTHER_TEMPLATES = ['business-classic', 'editorial'];
+const OTHER_TEMPLATES = ['business-classic', 'editorial', 'aurora'];
 const HOSTILE_PAYLOADS = [
   '<script>alert(1)</script>',
   '" onmouseover="alert(1)" x="',

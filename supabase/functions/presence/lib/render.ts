@@ -9,6 +9,8 @@ import { render as businessClassic_1_0_0 } from '../templates/business-classic/1
 import manifest_bc_1_0_0 from '../templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
 import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.ts';
 import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
+import { render as aurora_1_0_0 } from '../templates/aurora/1.0.0/render.ts';
+import manifest_au_1_0_0 from '../templates/aurora/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 
@@ -26,6 +28,7 @@ const LOADERS: Record<string, Record<string, () => TemplateEntry>> = {
   'restaurant-classic': { '1.0.0': () => ({ render: restaurantClassic_1_0_0, manifest: manifest_rc_1_0_0 as unknown as TemplateManifest }) },
   'business-classic': { '1.0.0': () => ({ render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest }) },  // Phase T3 production default
   'editorial': { '1.0.0': () => ({ render: editorial_1_0_0, manifest: manifest_ed_1_0_0 as unknown as TemplateManifest }) },               // Phase PT premium family
+  'aurora': { '1.0.0': () => ({ render: aurora_1_0_0, manifest: manifest_au_1_0_0 as unknown as TemplateManifest }) },                     // #183 modern family
 };
 const _entryCache = new Map<string, TemplateEntry>();
 

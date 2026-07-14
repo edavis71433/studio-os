@@ -10,12 +10,12 @@ const ok = (n, p) => { results.push({ n, p }); if (!p) console.log(`FAIL  ${n}`)
 
 const integrity = registryIntegrity();
 ok('registry integrity holds (every manifest matches its keys)', integrity.ok, integrity.problems?.join('; '));
-ok('the index lists the three shipped families', (() => { const s = templateIndex().map((e) => e.slug).sort(); return s.length === 3 && s.includes('restaurant-classic') && s.includes('business-classic') && s.includes('editorial'); })());
+ok('the index lists the shipped families', (() => { const s = templateIndex().map((e) => e.slug).sort(); return s.length === 4 && s.includes('restaurant-classic') && s.includes('business-classic') && s.includes('editorial') && s.includes('aurora'); })());
 ok('every index entry has latest + a numeric contract version', templateIndex().every((e) => e.latest && e.versions.includes(e.latest) && typeof e.content_contract_version === 'number'));
 ok('getTemplate returns render + manifest; unknown → null', (() => { const t = getTemplate('business-classic', '1.0.0'); return t && typeof t.render === 'function' && t.manifest.slug === 'business-classic' && getTemplate('nope', '1.0.0') === null && getTemplate('business-classic', '9.9.9') === null; })());
 ok('getTemplate memoizes (same object on repeat)', getTemplate('editorial', '1.0.0') === getTemplate('editorial', '1.0.0'));
 ok('latestTemplateVersion resolves via the index', latestTemplateVersion('restaurant-classic') === '1.0.0' && latestTemplateVersion('nope') === null);
-ok('listTemplates returns {slug,name,version} for each family', (() => { const l = listTemplates(); return l.length === 3 && l.every((x) => x.slug && x.name && x.version) && l.some((x) => x.slug === 'business-classic'); })());
+ok('listTemplates returns {slug,name,version} for each family', (() => { const l = listTemplates(); return l.length === 4 && l.every((x) => x.slug && x.name && x.version) && l.some((x) => x.slug === 'business-classic') && l.some((x) => x.slug === 'aurora'); })());
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ TEMPLATE REGISTRY: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
