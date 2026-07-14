@@ -113,6 +113,14 @@ ok(/BLOCKS_WORK = arr/.test(applyHist) && /saveBlocks\(\)/.test(applyHist), 'und
 ok(/JSON\.parse\(snapJson\)/.test(applyHist), 'history entries are serialized block lists (structured), not rendered HTML or x/y');
 ok(/DC_HIST_SILENT/.test(html), 'undo/redo suppress their own history recording (no infinite loop)');
 
+// ── Copy / Cut / Paste — a structured section clipboard; paste re-keys MULTI blocks
+// and re-persists through saveBlocks. Never raw HTML; a single list index insert. ──
+const pasteFn = extractFn(html, 'dcPasteAt');
+ok(/uniqueBlockId\(blk\.type/.test(pasteFn), 'paste gives a MULTI-instance block a fresh unique id (no render-key collision)');
+ok(/BLOCKS_WORK\.splice\(at, 0, blk\)/.test(pasteFn) && /saveBlocks\(\)/.test(pasteFn), 'paste inserts at ONE list index and re-persists through the validating save');
+ok(/JSON\.parse\(JSON\.stringify\(clip\)\)/.test(pasteFn), 'paste deep-copies the clipboard (structured block), never shares references or raw HTML');
+ok(/function dcCopyBlock\(/.test(html) && /function dcCutBlock\(/.test(html), 'copy + cut both exist');
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);

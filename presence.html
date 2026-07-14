@@ -6258,6 +6258,17 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   closeInsertMenu();
   const menu = el("div", "blk-insertmenu"); INSERT_MENU = menu;
   menu.appendChild(el("div", "tray-h", "Add a section here"));
+  // If a section was copied/cut, offer to paste it right here (before the palette).
+  const clip = dcClipGet();
+  if (clip) {
+    const cdef = BLOCK_DEFS.find((x) => x.type === clip.type);
+    const pasteBtn = el("button", "tray-item"); pasteBtn.type = "button"; pasteBtn.style.cssText = "border:1px solid var(--plum,#5b3fa0);margin-bottom:8px";
+    pasteBtn.appendChild(Object.assign(el("span", "ti-ico"), { textContent: "📋" }));
+    const pt = el("span", "ti-txt"); pt.appendChild(el("span", "ti-name", "Paste copied section"));
+    pt.appendChild(el("span", "ti-alias", (cdef && cdef.name) || clip.type)); pasteBtn.appendChild(pt);
+    pasteBtn.addEventListener("click", () => { closeInsertMenu(); dcPasteAt(atIndex); });
+    menu.appendChild(pasteBtn);
+  }
   const search = el("input", "tray-search"); search.type = "search"; search.placeholder = "Search sections…"; search.setAttribute("aria-label", "Search sections to add here");
   menu.appendChild(search);
   const list = el("div"); menu.appendChild(list);
@@ -6372,6 +6383,34 @@ function dcDelete(bi) {
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   if (!confirm("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.")) return;
   dcCaptureScroll(); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+}
+// ── Copy / Cut / Paste a section (AEM parity) — a section clipboard ─────────────
+// The clipboard holds ONE section (deep copy), persisted to sessionStorage so it
+// survives navigation within the studio. Pasting deep-copies again and gives any
+// MULTI-instance block (columns/cards/form/tabs id-keyed) a fresh unique id so its
+// render key never collides. Structured blocks only — never raw HTML.
+const DC_CLIP_KEY = "dds-section-clip";
+function dcClipGet() { try { return JSON.parse(sessionStorage.getItem(DC_CLIP_KEY) || "null"); } catch (_) { return null; } }
+function dcClipSet(b) { try { sessionStorage.setItem(DC_CLIP_KEY, JSON.stringify(b)); } catch (_) {} }
+function dcCopyBlock(bi) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  dcClipSet(copy);
+  const def = BLOCK_DEFS.find((x) => x.type === b.type);
+  toast("Copied “" + ((def && def.name) || "section") + "” — use the ＋ points to paste it");
+}
+function dcCutBlock(bi) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  dcCopyBlock(bi);
+  dcCaptureScroll(); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+  toast("Cut — paste it anywhere with the ＋ points");
+}
+function dcPasteAt(gap) {
+  const clip = dcClipGet(); if (!clip) { toast("Nothing copied yet"); return; }
+  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit;
+  if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
+  const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
+  dcCaptureScroll(); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; renderBlocksCard(); saveBlocks();
 }
 // ── column controls (responsive grid) — PURE helpers, extracted + unit-tested ──
 // The Columns block is the render engine's LAYOUT CONTAINER (Adobe Layout Mode):
@@ -6556,6 +6595,8 @@ function dcInjectCanvas(doc, main) {
         bar.appendChild(mkBtn("＋", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "" }));
       }
       bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi)));
+      bar.appendChild(mkBtn("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi)));
+      bar.appendChild(mkBtn("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi)));
       bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[bi]))));
       bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger" }));
     } else {
