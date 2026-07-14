@@ -41,7 +41,12 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, buttons: 3, columns: 3, cards: 8 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, buttons: 3, columns: 6, cards: 8 };
+// Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
+// snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
+const clampSpan = (v: unknown): number | undefined => {
+  const n = Math.round(Number(v)); return Number.isFinite(n) && n >= 1 && n <= 12 ? n : undefined;
+};
 // The block types a site may hold more than one of (each de-collided to a unique id).
 const MULTI = new Set<string>(['form', 'columns', 'cards']);
 
@@ -93,7 +98,7 @@ interface StoredImageText { type: 'image_text'; title?: string; image_id?: strin
 // Layout & utility staples (T-BLOCKS r4). Columns/cards carry media by ID (resolved
 // by resolveBlockMedia) + a stable id (multi-instance). Download carries one file id.
 // Toc carries no media/id — its list is derived at render from sibling headings.
-interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string } }> }
+interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string }; span?: number }> }
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 // Same distributive WithLook as render_types: the owner-chosen per-section style
@@ -328,9 +333,12 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
           const image_id = uid(c?.image_id); if (image_id) col.image_id = image_id;
           const bl = s(c?.button?.label, 40), bu = s(c?.button?.url, 300);
           if (bl && bu) col.button = { label: bl, url: bu };   // url validated by safeHref at render
+          const span = clampSpan(c?.span); if (span !== undefined) col.span = span;   // 12-grid width (optional)
           return col;
         }).filter((c) => c.body || c.image_id || c.button).slice(0, CAP.columns);
-        if (cols.length >= 2) block = { type: 'columns', id: uniqueId('columns', (b as any).id, 'columns'), title, columns: cols };
+        // A single-column layout container is valid (Adobe allows 1..N). Only spans
+        // are additive: columns with no span keep the original equal-width behavior.
+        if (cols.length >= 1) block = { type: 'columns', id: uniqueId('columns', (b as any).id, 'columns'), title, columns: cols };
         break;
       }
       case 'cards': {   // MULTI: a repeatable teaser grid (image + heading + short text + optional link)
@@ -437,7 +445,7 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
         break;
       }
       case 'columns':   // prose/button ride through; each column's image resolves (or drops to null)
-        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button })), ...lk(b) });
+        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button, span: c.span })), ...lk(b) });
         break;
       case 'cards':
         out.push({ type: 'cards', id: b.id, title: b.title, cards: b.cards.map((c) => ({ heading: c.heading, text: c.text, image: c.image_id ? ref(c.image_id) : null, link: c.link })), ...lk(b) });
@@ -868,16 +876,32 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         html = `<section class="block alt block-reviews-wall"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-grid">${cards}</div></div></section>`;
         break;
       }
-      case 'columns': {   // 2–3 equal columns; CSS grid stacks to one column < 620px
-        const cols = b.columns.map((c) => {
+      case 'columns': {   // Layout Container — a responsive grid that stacks < 620px
+        const cells = b.columns.map((c) => {
           const prose = c.body ? renderMarkdown(c.body) : '';
           const img = c.image ? `<div class="col-media">${blockImg(c.image, esc, attr, '(max-width:620px) 100vw, 320px')}</div>` : '';
           const href = c.button ? safeHref(c.button.url) : null;
           const btn = href ? `<p class="col-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(c.button!.label)}</a></p>` : '';
-          return `<div class="col">${img}${prose ? `<div class="prose">${prose}</div>` : ''}${btn}</div>`;
-        }).join('');
-        const n = Math.min(3, Math.max(2, b.columns.length));
-        html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '') : ''}<div class="cols" data-cols="${n}">${cols}</div></section>`;
+          return { inner: `${img}${prose ? `<div class="prose">${prose}</div>` : ''}${btn}`, span: c.span };
+        });
+        const cnt = b.columns.length;
+        const hasSpan = cells.some((c) => c.span !== undefined);
+        if (!hasSpan && cnt >= 2 && cnt <= 3) {
+          // ORIGINAL equal-width path — kept byte-identical so existing sites (and the
+          // render goldens) are unchanged. Spans + 1/4+ columns take the grid path below.
+          const cols = cells.map((c) => `<div class="col">${c.inner}</div>`).join('');
+          html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '') : ''}<div class="cols" data-cols="${cnt}">${cols}</div></section>`;
+        } else {
+          // 12-unit responsive grid (Adobe's Layout Container). Each cell spans its
+          // width; a cell with no span takes an equal share. Everything stacks to one
+          // column below 620px, so it stays readable on phones automatically.
+          const equal = Math.max(1, Math.min(12, Math.round(12 / Math.max(1, cnt))));
+          const cols = cells.map((c) => {
+            const sp = c.span !== undefined ? Math.max(1, Math.min(12, c.span)) : equal;
+            return `<div class="col" data-span="${sp}">${c.inner}</div>`;
+          }).join('');
+          html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '') : ''}<div class="cols cols-grid">${cols}</div></section>`;
+        }
         break;
       }
       case 'cards': {   // a teaser grid; each card is one link when a safe href is set
@@ -1081,6 +1105,10 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .block-columns .col .prose{max-width:none}
 .block-columns .col-cta{margin:12px 0 0}
 @media(min-width:620px){.block-columns .cols[data-cols="2"]{grid-template-columns:1fr 1fr}.block-columns .cols[data-cols="3"]{grid-template-columns:repeat(3,1fr)}}
+/* Layout Container: a 12-unit responsive grid. Each cell spans data-span units on
+   desktop and the full width on phones (auto-responsive). Cells wrap to new rows
+   when their spans exceed 12 — Adobe's "float to new line". */
+@media(min-width:620px){.block-columns .cols-grid{grid-template-columns:repeat(12,1fr)}.block-columns .cols-grid>.col[data-span="1"]{grid-column:span 1}.block-columns .cols-grid>.col[data-span="2"]{grid-column:span 2}.block-columns .cols-grid>.col[data-span="3"]{grid-column:span 3}.block-columns .cols-grid>.col[data-span="4"]{grid-column:span 4}.block-columns .cols-grid>.col[data-span="5"]{grid-column:span 5}.block-columns .cols-grid>.col[data-span="6"]{grid-column:span 6}.block-columns .cols-grid>.col[data-span="7"]{grid-column:span 7}.block-columns .cols-grid>.col[data-span="8"]{grid-column:span 8}.block-columns .cols-grid>.col[data-span="9"]{grid-column:span 9}.block-columns .cols-grid>.col[data-span="10"]{grid-column:span 10}.block-columns .cols-grid>.col[data-span="11"]{grid-column:span 11}.block-columns .cols-grid>.col[data-span="12"]{grid-column:span 12}}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
 .teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
 a.teaser-card{text-decoration:none;color:inherit}

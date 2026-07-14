@@ -165,7 +165,7 @@ export interface SiteBlockDivider { type: 'divider'; style: 'line' | 'space'; si
 // stacks to one column on mobile. Cards: a repeatable teaser grid (image + heading +
 // text + optional link). Download: an accessible link to a media-library file. Toc:
 // an auto-built "On this page" jump list, computed at render from section headings.
-export interface SiteBlockColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image?: MediaRef | null; button?: { label: string; url: string } }> }
+export interface SiteBlockColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image?: MediaRef | null; button?: { label: string; url: string }; span?: number }> }
 export interface SiteBlockCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image?: MediaRef | null; link?: string }> }
 export interface SiteBlockDownload { type: 'download'; title?: string; file?: MediaRef | null; label?: string }
 export interface SiteBlockToc { type: 'toc'; title?: string }

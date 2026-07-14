@@ -267,9 +267,18 @@ const ctx = { esc, attr, safeHref };
   ok('columns is multi-instance (two kept, unique ids)', twoCols.length === 2 && twoCols[0].id !== twoCols[1].id);
   const colKeys = renderSiteBlocks(resolveBlockMedia(twoCols, () => null), ctx).map((b) => b.key);
   ok('columns render keys are per-instance (block_columns_<id>, no collision)', colKeys.length === 2 && colKeys[0] !== colKeys[1] && colKeys.every((k) => k.startsWith('block_columns_')));
-  ok('columns cap 3; a single column is not a columns section (min 2)',
-    validateBlocks([{ type: 'columns', columns: [{ body: 'a' }, { body: 'b' }, { body: 'c' }, { body: 'd' }] }])[0].columns.length === 3
-    && validateBlocks([{ type: 'columns', columns: [{ body: 'only' }] }]).length === 0);
+  ok('columns cap 6; a single column IS a valid layout container now (min 1)',
+    validateBlocks([{ type: 'columns', columns: Array.from({ length: 8 }, (_, i) => ({ body: 'c' + i })) }])[0].columns.length === 6
+    && validateBlocks([{ type: 'columns', columns: [{ body: 'only' }] }])[0].columns.length === 1);
+  // spans → the 12-unit grid layout container (equal 2/3-col blocks keep data-cols)
+  const spanR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', columns: [
+    { body: 'wide', span: 8 }, { body: 'narrow', span: 4 },
+  ] }]), REF), ctx)[0];
+  ok('columns WITH spans render the 12-grid layout container (cols-grid + data-span)',
+    spanR.html.includes('cols-grid') && spanR.html.includes('data-span="8"') && spanR.html.includes('data-span="4"') && !spanR.html.includes('data-cols'));
+  ok('12-grid span widths are defined in BLOCK_CSS', /\.block-columns \.cols-grid>\.col\[data-span="8"\]\{grid-column:span 8\}/.test(BLOCK_CSS));
+  const oneColR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', columns: [{ body: 'solo' }] }]), REF), ctx)[0];
+  ok('a 1-column container renders as a grid (not the equal data-cols path)', oneColR.html.includes('cols-grid') && !oneColR.html.includes('data-cols'));
   const colR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', title: 'Our pillars', columns: [
     { body: 'Fast **service**', image_id: G, button: { label: 'Book', url: 'https://ex.com/b' } },
     { body: '<script>alert(1)</script>', button: { label: 'Bad', url: 'javascript:alert(1)' } },

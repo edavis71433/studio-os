@@ -25,14 +25,28 @@ function extractFn(src, name) {
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.log('  FAIL → ' + msg); } };
 
-// dcClampColumns(n): the Columns block is 2–3 columns (render drops <2, caps at 3).
+// dcClampColumns(n): the Layout Container is 1–6 columns (Adobe allows 1..N; we cap
+// at 6 for a small-business site). render + serializer now support the full range.
 const dcClampColumns = new Function('return (' + extractFn(html, 'dcClampColumns') + ')')();
-ok(dcClampColumns(1) === 2, '1 clamps up to 2 (a 1-col layout would need a render change)');
+ok(dcClampColumns(1) === 1, '1 column is allowed now (single-column layout container)');
 ok(dcClampColumns(2) === 2, '2 stays 2');
 ok(dcClampColumns(3) === 3, '3 stays 3');
-ok(dcClampColumns(4) === 3, '4 clamps down to 3 (max)');
-ok(dcClampColumns(0) === 2, '0/garbage clamps to the minimum of 2');
+ok(dcClampColumns(6) === 6, '6 stays 6 (max)');
+ok(dcClampColumns(7) === 6, '7 clamps down to 6 (max)');
+ok(dcClampColumns(0) === 1, '0/garbage clamps to the minimum of 1');
 ok(dcClampColumns('3') === 3, 'coerces a numeric string');
+
+// dcEqualSpans(n): distribute 12 grid units across n columns; leftmost get remainder.
+// Always integers summing to exactly 12 — the moat (span = integer grid unit, no x/y).
+const dcEqualSpans = new Function(
+  extractFn(html, 'dcClampColumns') + '\n' + extractFn(html, 'dcEqualSpans') + '\n return dcEqualSpans;'
+)();
+const sums = (a) => a.reduce((x, y) => x + y, 0);
+ok(JSON.stringify(dcEqualSpans(2)) === JSON.stringify([6, 6]), '2 columns → 6|6');
+ok(JSON.stringify(dcEqualSpans(3)) === JSON.stringify([4, 4, 4]), '3 columns → 4|4|4');
+ok(JSON.stringify(dcEqualSpans(1)) === JSON.stringify([12]), '1 column → full 12');
+ok(sums(dcEqualSpans(5)) === 12 && dcEqualSpans(5).every((s) => Number.isInteger(s) && s >= 1), '5 columns still sum to 12 with integer units');
+ok(dcEqualSpans(4).every((s) => s === 3), '4 columns → 3|3|3|3');
 
 // dcResizeColumns(cols, n): grow pads with an empty column, shrink truncates —
 // existing columns (and their content) are preserved in order. Never returns XY.
@@ -46,7 +60,7 @@ ok(dcResizeColumns(two, 3)[2].body === '', 'grow pads with an empty column');
 const three = [{ body: 'A' }, { body: 'B' }, { body: 'C' }];
 ok(dcResizeColumns(three, 2).length === 2, 'shrink 3→2 yields two columns');
 ok(dcResizeColumns(three, 2)[0].body === 'A' && dcResizeColumns(three, 2)[1].body === 'B', 'shrink keeps the first columns');
-ok(dcResizeColumns(three, 1).length === 2, 'a 1-col request is clamped to the min of 2');
+ok(dcResizeColumns(three, 1).length === 1, 'a 1-column layout container is now allowed');
 ok(dcResizeColumns(null, 2).length === 2, 'missing columns builds two empty ones');
 ok(dcResizeColumns([], 3).every((c) => c && c.body === ''), 'from empty, all columns are empty objects');
 // Every column is a plain content object — no coordinate, z-index, or position.

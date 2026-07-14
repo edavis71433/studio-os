@@ -448,6 +448,9 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-tree-empty{font-size:12px;color:var(--ink-2);padding:12px 6px;line-height:1.6}
 .dc-tree-row{display:flex;align-items:center;gap:2px;border-radius:9px;padding:1px}
 .dc-tree-row:hover,.dc-tree-row.sel{background:var(--wash,#f4f0fb)}
+.dc-tree-row.child{margin-left:15px;border-left:2px solid var(--hair,#e7e0f2)}
+.dc-tree-row.child .dc-tree-ico{width:20px;height:20px;font-size:12px;background:transparent}
+.dc-tree-row.child .dc-tree-name{font-weight:500;font-size:12.5px}
 .dc-tree-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;font:inherit;text-align:left;background:none;border:none;color:inherit;cursor:pointer;padding:7px 8px;border-radius:8px}
 .dc-tree-ico{flex:0 0 auto;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--wash,#f2eefb);border-radius:7px}
 .dc-tree-row.core .dc-tree-ico{background:#eee7de}
@@ -4485,7 +4488,7 @@ const BLOCK_DEFS = [
   { type: "buttons", name: "Buttons", structured: "buttons", hint: "Up to three clear action links." },
   { type: "divider", name: "Divider / space", dividerSimple: true, hint: "" },
   // Layout & utility (r4). Columns + Cards are MULTI-INSTANCE (like forms) — add several.
-  { type: "columns", name: "Columns", structured: "columns", multi: true, hint: "Two or three side-by-side columns — each with text, an optional image and a button. They stack on phones." },
+  { type: "columns", name: "Columns", structured: "columns", multi: true, hint: "Side-by-side columns on a responsive grid — choose 1–6, set each one’s width (or drag the dividers on the page), each with text, an optional image and a button. They stack on phones." },
   { type: "cards", name: "Feature cards", structured: "cards", multi: true, hint: "A grid of cards — image, title, a line of text and an optional link." },
   { type: "download", name: "Download", downloadSimple: true, hint: "Offer a file from your library (e.g. a PDF or price list) as a clear Download link." },
   { type: "toc", name: "Table of contents", tocSimple: true, hint: "Auto-built “On this page” jump list from your section headings — nothing to fill in." },
@@ -5414,22 +5417,30 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     bl.placeholder = "Button label (optional)"; bl.value = (c.button && c.button.label) || "";
     bu.placeholder = "Button link (optional)"; bu.value = (c.button && c.button.url) || "";
     [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-    const commit = () => { const o = { body: bd.value.trim(), image_id: blk.columns[k].image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; blk.columns[k] = o; };
+    // per-column WIDTH on the 12-unit grid (Adobe Layout Mode). "Auto" = equal share.
+    const wrap = el("div"); wrap.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+    wrap.appendChild(Object.assign(el("span", "hint", "Width"), { style: "font-weight:600" }));
+    const wsel = el("select"); wsel.style.cssText = "padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
+    const WIDTHS = [[0, "Auto (equal)"], [3, "¼ — narrow"], [4, "⅓"], [6, "½ — half"], [8, "⅔"], [9, "¾ — wide"], [12, "Full row"]];
+    WIDTHS.forEach(([v, lab]) => { const o = el("option", null, lab); o.value = String(v); if ((c.span || 0) === v) o.selected = true; wsel.appendChild(o); });
+    wrap.appendChild(wsel);
+    const commit = () => { const o = { body: bd.value.trim(), image_id: blk.columns[k].image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; const sp = parseInt(wsel.value, 10) || 0; if (sp) o.span = sp; blk.columns[k] = o; };
     [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
-    row.append(bd, aiField(bd, {}), bl, bu);
-    if (cols.length > 2) {
+    wsel.addEventListener("change", () => { commit(); renderBlocksCard(); });
+    row.append(bd, aiField(bd, {}), bl, bu, wrap);
+    if (cols.length > 1) {
       const rm = el("button", null, "Remove column"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
   });
-  if (cols.length < 3) {
+  if (cols.length < 6) {
     const add = el("button", null, "+ Add column"); add.type = "button"; add.style.cssText = miniBtn;
-    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].columns = BLOCKS_WORK[idx].columns || []).push({ body: "" }); renderBlocksCard(); });
+    add.addEventListener("click", () => { commitTitle(); const b = (BLOCKS_WORK[idx].columns = BLOCKS_WORK[idx].columns || []); b.push({ body: "" }); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
     sub.appendChild(add);
   }
-  sub.appendChild(el("div", "hint", "Two or three columns; they stack on phones. Keep at least two."));
+  sub.appendChild(el("div", "hint", "1–6 columns on a responsive grid — set each column’s width, or drag the dividers right on the page. Everything stacks to one column on phones automatically."));
 }
 // r4 feature-cards editor — a grid of cards (image + title + text + optional link).
 function renderCardsBlockBody(blk, idx, sub, ti) {
@@ -6273,20 +6284,102 @@ function dcDelete(bi) {
   dcCaptureScroll(); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
 }
 // ── column controls (responsive grid) — PURE helpers, extracted + unit-tested ──
-// The Columns block is the render engine's responsive Layout Container: 2 or 3
-// equal columns that STACK to one column below 620px (site_blocks.ts data-cols).
-// These set the column COUNT within the model's supported range; each column's
-// text/image/button is edited in the side rail. (See report: dropping ARBITRARY
-// blocks INTO a column, or a 1-column layout, would need a render/serializer change.)
-function dcClampColumns(n) { n = Math.round(Number(n) || 0); return n < 2 ? 2 : (n > 3 ? 3 : n); }
+// The Columns block is the render engine's LAYOUT CONTAINER (Adobe Layout Mode):
+// 1–6 columns on a 12-unit responsive grid, each column spanning part of the grid,
+// all stacking to one column below 620px (site_blocks.ts cols-grid). Two knobs only,
+// both integers on a grid — never x/y: the column COUNT and each column's WIDTH
+// (span 1–12). Widths are resized right on the canvas by dragging the divider
+// between two columns (snaps to the grid) — see dcInjectColControls / dcColResize.
+function dcClampColumns(n) { n = Math.round(Number(n) || 0); return n < 1 ? 1 : (n > 6 ? 6 : n); }
 function dcResizeColumns(cols, n) { n = dcClampColumns(n); const out = Array.isArray(cols) ? cols.slice(0, n) : []; while (out.length < n) out.push({ body: "" }); return out; }
+// Distribute the 12 grid units as evenly as possible across n columns; the leftmost
+// columns get any remainder. Always integers that sum to exactly 12.
+function dcEqualSpans(n) { n = dcClampColumns(n); const base = Math.floor(12 / n), rem = 12 - base * n; return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0)); }
+function dcRebalanceSpans(b) { if (!b || !Array.isArray(b.columns)) return; const s = dcEqualSpans(b.columns.length); b.columns.forEach((c, i) => { if (c) c.span = s[i]; }); }
+// The spans to paint on the live canvas: the column's own span, or an equal share.
+function dcLiveSpans(b, n) {
+  const cols = Array.isArray(b.columns) ? b.columns : []; const eq = dcEqualSpans(n);
+  return eq.map((e, i) => { const c = cols[i]; return (c && c.span >= 1 && c.span <= 12) ? c.span : e; });
+}
 function dcSetColumns(bi, n) {
   const b = BLOCKS_WORK[bi]; if (!b || b.type !== "columns") return;
   n = dcClampColumns(n); const cur = Array.isArray(b.columns) ? b.columns : [];
   if (n < cur.length && cur.slice(n).some((c) => c && (c.body || c.image_id || c.button)) &&
-    !confirm("Show " + n + " columns? The extra column’s content will be removed.")) return;
+    !confirm("Show " + n + " column" + (n === 1 ? "" : "s") + "? The extra column’s content will be removed.")) return;
   b.columns = dcResizeColumns(cur, n);
+  dcRebalanceSpans(b);   // reset to even widths for the new count
   dcCaptureScroll(); renderBlocksCard(); saveBlocks();
+}
+function dcSetSpan(bi, k, span) {
+  const b = BLOCKS_WORK[bi]; if (!b || b.type !== "columns" || !Array.isArray(b.columns) || !b.columns[k]) return;
+  b.columns[k].span = Math.max(1, Math.min(12, Math.round(Number(span) || 1)));
+  dcCaptureScroll(); renderBlocksCard(); saveBlocks();
+}
+// ── on-canvas column resize (drag the divider; snaps to the 12-grid) ──
+// Injected per columns block. Dragging the handle between column i and i+1 shifts
+// grid units between just those two (their total stays fixed), snapping to whole
+// units and showing the grid guide — Adobe's blue-dot column resize. Persists on
+// release. Reuses pointer-capture, so it never loses the drag over the iframe.
+let DC_COLR = null;
+function dcColResizeStart(e, g, i) {
+  e.preventDefault(); e.stopPropagation();
+  const rect = g.grid.getBoundingClientRect(); const unit = rect.width / 12;
+  const spans = g.cols.map((c) => parseInt(c.getAttribute("data-span") || "0", 10) || 1);
+  DC_COLR = { g: g, i: i, unit: unit, startX: e.clientX, spans: spans, handle: e.currentTarget };
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+  e.currentTarget.addEventListener("pointermove", dcColResizeMove);
+  e.currentTarget.addEventListener("pointerup", dcColResizeEnd);
+  e.currentTarget.addEventListener("pointercancel", dcColResizeEnd);
+  g.grid.classList.add("dc-grid-show");
+}
+function dcColResizeMove(e) {
+  if (!DC_COLR) return;
+  const { g, i, unit, startX, spans } = DC_COLR;
+  const total = spans[i] + spans[i + 1];
+  let a = spans[i] + Math.round((e.clientX - startX) / (unit || 1));
+  a = Math.max(1, Math.min(total - 1, a));
+  g.cols[i].setAttribute("data-span", String(a));
+  g.cols[i + 1].setAttribute("data-span", String(total - a));
+}
+function dcColResizeEnd(e) {
+  const st = DC_COLR; DC_COLR = null; if (!st) return;
+  try { st.handle.releasePointerCapture(e.pointerId); } catch (_) {}
+  st.handle.removeEventListener("pointermove", dcColResizeMove);
+  st.handle.removeEventListener("pointerup", dcColResizeEnd);
+  st.handle.removeEventListener("pointercancel", dcColResizeEnd);
+  st.g.grid.classList.remove("dc-grid-show");
+  const b = BLOCKS_WORK[st.g.bi]; if (!b || !Array.isArray(b.columns)) return;
+  st.g.cols.forEach((c, k) => { if (b.columns[k]) b.columns[k].span = parseInt(c.getAttribute("data-span") || "0", 10) || undefined; });
+  dcCaptureScroll(); renderBlocksCard(); saveBlocks();
+}
+// Find every columns block on the canvas + its grid + column elements.
+function dcColGrids(main) {
+  const out = [];
+  Array.prototype.forEach.call(main.querySelectorAll(":scope > section.block-columns"), (sec) => {
+    const c = eeClassify(sec); if (!c || c.kind !== "block") return;
+    const b = BLOCKS_WORK[c.bi]; if (!b || b.type !== "columns") return;
+    const grid = sec.querySelector(".cols"); if (!grid) return;
+    const cols = Array.prototype.slice.call(grid.querySelectorAll(":scope > .col"));
+    if (cols.length) out.push({ sec: sec, grid: grid, bi: c.bi, cols: cols, b: b });
+  });
+  return out;
+}
+// Put the canvas into live grid mode for each columns block and inject a resize
+// handle between adjacent columns (the last column has none).
+function dcInjectColControls(doc, main) {
+  dcColGrids(main).forEach((g) => {
+    g.grid.classList.add("cols-grid");
+    const spans = dcLiveSpans(g.b, g.cols.length);
+    g.cols.forEach((col, i) => {
+      col.setAttribute("data-span", String(spans[i]));
+      const old = col.querySelector(":scope > .dc-colh"); if (old) old.remove();
+      if (i < g.cols.length - 1) {
+        const h = doc.createElement("div"); h.className = "dc-colh"; h.title = "Drag to resize these two columns";
+        h.addEventListener("pointerdown", (ev) => dcColResizeStart(ev, g, i));
+        col.appendChild(h);
+      }
+    });
+  });
 }
 
 // NOTE: adding/reordering by drag no longer injects native drop-zones INTO the
@@ -6316,7 +6409,7 @@ function dcInjectCanvas(doc, main) {
       // Clicking one opens the section picker AT that spot; it's also the drop
       // target the drag ghost snaps to. Purely an editing overlay — never served.
       ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:system-ui,-apple-system,sans-serif}" +
-      ".dc-ins::before{content:'';position:absolute;left:18px;right:18px;top:50%;height:0;border-top:2px dashed transparent;transform:translateY(-50%);transition:border-color .12s}" +
+      ".dc-ins::before{content:'';position:absolute;left:18px;right:18px;top:50%;height:0;border-top:2px dashed rgba(91,63,160,.28);transform:translateY(-50%);transition:border-color .12s}" +
       ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:#5b3fa0}" +
       ".dc-ins .dc-ins-pill{opacity:0;transition:opacity .12s;position:relative;z-index:1;font:700 12px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border:none;border-radius:999px;padding:5px 13px;cursor:pointer;box-shadow:0 3px 10px rgba(91,63,160,.42);white-space:nowrap}" +
       ".dc-ins:hover .dc-ins-pill,.dc-ins:focus-within .dc-ins-pill{opacity:1}" +
@@ -6327,7 +6420,15 @@ function dcInjectCanvas(doc, main) {
       ".dc-emptyzone:hover,.dc-emptyzone.dc-drop-active{border-color:#5b3fa0;background:rgba(91,63,160,.09)}" +
       ".dc-emptyzone .dc-ez-t{font:700 18px system-ui,-apple-system,sans-serif;color:#3a2470;margin:0 0 6px}" +
       ".dc-emptyzone .dc-ez-s{font:400 13px system-ui,-apple-system,sans-serif;color:#6b6478;max-width:34ch;margin:0 auto}" +
-      ".dc-emptyzone .dc-ez-btn{margin-top:16px;display:inline-block;font:700 13.5px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border-radius:999px;padding:11px 22px;box-shadow:0 6px 18px rgba(91,63,160,.4)}";
+      ".dc-emptyzone .dc-ez-btn{margin-top:16px;display:inline-block;font:700 13.5px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border-radius:999px;padding:11px 22px;box-shadow:0 6px 18px rgba(91,63,160,.4)}" +
+      // Layout Mode: the drag-to-resize divider between two columns (Adobe's blue
+      // dots) + the 12-unit grid guide shown while resizing.
+      ".block-columns .col{position:relative}" +
+      ".dc-colh{position:absolute;top:0;bottom:0;right:-13px;width:20px;cursor:col-resize;z-index:6;display:flex;align-items:center;justify-content:center;touch-action:none}" +
+      ".dc-colh::before{content:'';width:5px;height:46px;max-height:60%;background:#5b3fa0;border-radius:4px;box-shadow:0 0 0 3px rgba(91,63,160,.18);opacity:.5;transition:opacity .12s}" +
+      ".dc-colh:hover::before,.dc-colh:active::before{opacity:1}" +
+      ".block-columns .cols.dc-grid-show{background-image:repeating-linear-gradient(90deg,rgba(91,63,160,.09) 0,rgba(91,63,160,.09) 1px,transparent 1px,transparent 8.3333%);background-position:0 0}" +
+      "#dds-dc-bar .dc-off{opacity:.4;pointer-events:none}";
     (doc.head || doc.documentElement).appendChild(st);
   }
   let bar = doc.getElementById("dds-dc-bar");
@@ -6358,10 +6459,11 @@ function dcInjectCanvas(doc, main) {
       grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
       bar.appendChild(grip);
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi)));
-      if (b.type === "columns") {   // responsive-grid column controls (2 or 3; stacks on mobile)
+      if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
         const nc = Array.isArray(b.columns) ? b.columns.length : 2;
-        bar.appendChild(mkBtn("2 cols", "Show two columns", () => dcSetColumns(bi, 2), { cls: nc <= 2 ? "dc-on" : "" }));
-        bar.appendChild(mkBtn("3 cols", "Show three columns", () => dcSetColumns(bi, 3), { cls: nc >= 3 ? "dc-on" : "" }));
+        bar.appendChild(mkBtn("－", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "" }));
+        bar.appendChild(mkBtn(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi)));
+        bar.appendChild(mkBtn("＋", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "" }));
       }
       bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi)));
       bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[bi]))));
@@ -6387,6 +6489,7 @@ function dcInjectCanvas(doc, main) {
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
   dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
+  try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
   dcBuildTree(main);           // left-rail Content Tree of every component on the page
 }
 
@@ -6456,7 +6559,43 @@ function dcBuildTree(main) {
   const secs = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   if (!secs.length) { dcTreeEmpty("Nothing on your page yet. Open “＋ Add section” to place your first one — or click the box on the canvas."); return; }
   host.appendChild(el("div", "dc-tree-hd", "Top → bottom on your page"));
-  Array.prototype.forEach.call(secs, (el2) => { const c = eeClassify(el2); host.appendChild(dcTreeRow(el2, c)); });
+  Array.prototype.forEach.call(secs, (el2) => {
+    const c = eeClassify(el2);
+    host.appendChild(dcTreeRow(el2, c));
+    // Hierarchical tree (AEM): a Columns container expands to reveal its columns,
+    // each selectable + with its own settings ("meta").
+    if (c && c.kind === "block" && el2.classList.contains("block-columns")) {
+      const b = BLOCKS_WORK[c.bi];
+      const colEls = el2.querySelectorAll(".cols > .col");
+      if (b && b.type === "columns" && colEls.length) {
+        const spans = dcLiveSpans(b, colEls.length);
+        Array.prototype.forEach.call(colEls, (colEl, k) => host.appendChild(dcTreeChildRow(colEl, c.bi, k, spans[k])));
+      }
+    }
+  });
+}
+// a child row under a container: one column, selectable, with its own settings
+function dcTreeChildRow(colEl, bi, k, span) {
+  const row = el("div", "dc-tree-row child");
+  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this column on the page";
+  mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: "▯" }));
+  const txt = el("span", "dc-tree-txt");
+  txt.appendChild(el("span", "dc-tree-name", "Column " + (k + 1)));
+  txt.appendChild(el("span", "dc-tree-meta", "width " + (span || "?") + "/12"));
+  mainBtn.appendChild(txt);
+  mainBtn.addEventListener("click", () => {
+    try { colEl.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {}
+    colEl.classList.add("dc-hot"); setTimeout(() => { try { colEl.classList.remove("dc-hot"); } catch (_) {} }, 1300);
+    const host = $("designTreeList"); if (host) Array.prototype.forEach.call(host.querySelectorAll(".dc-tree-row.sel"), (n) => n.classList.remove("sel"));
+    row.classList.add("sel");
+  });
+  row.appendChild(mainBtn);
+  const acts = el("span", "dc-tree-acts");
+  const set = el("button", null, "⚙"); set.type = "button"; set.title = "Edit this column"; set.setAttribute("aria-label", "Edit column " + (k + 1));
+  set.addEventListener("click", (e) => { e.stopPropagation(); eeEditBlock(bi); });
+  acts.appendChild(set);
+  row.appendChild(acts);
+  return row;
 }
 function dcTreeRow(el2, c) {
   const isBlock = c && c.kind === "block";
