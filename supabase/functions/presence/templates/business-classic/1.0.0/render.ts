@@ -10,6 +10,7 @@ import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
+import { renderNavList, NAV_DROPDOWN_CSS } from '../../../lib/site_nav.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
@@ -290,8 +291,11 @@ ${x.announce}
 ${closedNotice}
 <header class="site"><div class="wrap nav${c.settings?.nav_style === 'centered' ? ' centered' : ''}">
   <a class="brand" href="/">${logo?.variants?.w400 ? `<img src="${attr(logo.variants.w400)}" alt="" class="brandlogo">` : ''}${esc(i.business_name)}</a>
-  <nav class="primary" aria-label="Main"><ul>${x.nav.map(([p, label, key]) =>
-    `<li><a href="${attr(p)}"${o.active === key ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')}</ul></nav>
+  <nav class="primary" aria-label="Main"><ul>${
+    c.settings?.nav?.length
+      ? renderNavList(c.settings.nav, o.path, esc, attr)
+      : x.nav.map(([p, label, key]) => `<li><a href="${attr(p)}"${o.active === key ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')
+  }</ul></nav>
   ${searchBoxHtml()}
 </div></header>
 <main id="main">
@@ -454,8 +458,11 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const v = vocabFor(c.settings?.industry);   // THE industry realization
   const files: FileMap = {};
 
-  const cssPath = `/assets/site-${fnv(CSS)}.css`;
-  files[`assets/site-${fnv(CSS)}.css`] = CSS;
+  // Append the dropdown-nav CSS only when the owner set a custom nav → sites without
+  // one keep the exact same stylesheet + hash (byte-identical).
+  const effCss = CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
+  const cssPath = `/assets/site-${fnv(effCss)}.css`;
+  files[`assets/site-${fnv(effCss)}.css`] = effCss;
 
   const siteTitle = i.seo_title || i.business_name;
   const siteDesc = i.seo_description || i.description;

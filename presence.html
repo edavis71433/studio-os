@@ -824,6 +824,7 @@ body.pd-dragging *{cursor:grabbing !important}
                 <button type="button" class="dc-actbtn" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button>
                 <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Page contents</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
+                <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">☰ Menu</button>
                 <button type="button" class="dc-actbtn" id="btnSettingsOpen" aria-haspopup="dialog" aria-controls="settingsPanel">Design settings</button>
               </div>
             </div>
@@ -4782,6 +4783,102 @@ async function dcChoosePageLayout(title) {
     setTimeout(() => { try { box.querySelector(".dc-layout-card").focus(); } catch (_) {} }, 30);
   });
 }
+// ── Editable GLOBAL top menu (header + footer are global — ONE edit changes every
+//    page). A small structured editor: order items, rename them, point each at one of
+//    your pages or an external link, and give any item a dropdown of child links.
+//    Saved to settings.nav; the server validates (safe links only) and every template
+//    renders it. Empty / "Reset to automatic" → the site builds the menu from pages. ──
+let NAV_WORK = null;
+function dcNavPages() {   // Home + each custom page → the "links to" picker options
+  return dcPageList().map((p) => ({ href: p.slug ? "/" + p.slug + "/" : "/", title: p.title || (p.slug || "Home") }));
+}
+function dcNavSeed() {
+  const cur = (S.settings && Array.isArray(S.settings.nav)) ? S.settings.nav : [];
+  if (cur.length) return JSON.parse(JSON.stringify(cur));
+  return dcNavPages().map((p) => ({ label: p.title, href: p.href }));   // seed from real pages, never blank
+}
+const NAV_INP = "flex:1;min-width:120px;padding:8px 9px;border:1px solid var(--line,#dcdce3);border-radius:8px;font:inherit;background:var(--bg,#fff);color:inherit";
+const NAV_MINI = "padding:6px 9px;border:1px solid var(--line,#dcdce3);border-radius:7px;background:var(--bg,#fff);color:inherit;cursor:pointer;font:inherit";
+function dcEditNav() {
+  NAV_WORK = dcNavSeed();
+  const scrim = el("div", "dc-modal-scrim");
+  const box = el("div", "dc-modal");
+  box.style.cssText = "max-height:88vh;display:flex;flex-direction:column";
+  box.appendChild(el("h3", "dc-modal-h", "Edit your menu"));
+  box.appendChild(el("p", "dc-modal-sub", "This top menu appears on every page. Drag the arrows to reorder, rename any item, point each at one of your pages or a link, and add a dropdown under any item."));
+  const list = el("div"); list.style.cssText = "flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:2px";
+  box.appendChild(list);
+  const addRow = el("button", null, "＋ Add menu item"); addRow.type = "button";
+  addRow.style.cssText = NAV_MINI + ";margin-top:8px;padding:9px 14px;font-weight:600";
+  addRow.addEventListener("click", () => { NAV_WORK.push({ label: "New item", href: "/" }); renderRows(); });
+  box.appendChild(addRow);
+  const foot = el("div"); foot.style.cssText = "display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#eee)";
+  const reset = el("button", "dc-modal-cancel", "Reset to automatic"); reset.type = "button";
+  reset.title = "Remove your custom menu and let the site build it from your pages";
+  reset.addEventListener("click", async () => { if (confirm("Remove your custom menu and let the site build it automatically from your pages?")) { await dcSaveNav(null); cleanup(); } });
+  const right = el("div"); right.style.cssText = "display:flex;gap:8px";
+  const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", cleanup);
+  const save = el("button", null, "Save menu"); save.type = "button";
+  save.style.cssText = "padding:9px 18px;border:none;border-radius:8px;background:#5b3fa0;color:#fff;font-weight:700;cursor:pointer;font:inherit";
+  save.addEventListener("click", async () => { await dcSaveNav(NAV_WORK); cleanup(); });
+  right.append(cancel, save); foot.append(reset, right); box.appendChild(foot);
+  scrim.appendChild(box); document.body.appendChild(scrim);
+  function cleanup() { scrim.remove(); document.removeEventListener("keydown", onKey, true); NAV_WORK = null; }
+  function onKey(e) { if (e.key === "Escape") cleanup(); }
+  document.addEventListener("keydown", onKey, true);
+  scrim.addEventListener("click", (e) => { if (e.target === scrim) cleanup(); });
+
+  function renderRows() { list.textContent = ""; NAV_WORK.forEach((it, i) => list.appendChild(row(it, i, false, -1))); }
+  function row(it, i, isChild, parentIdx) {
+    const wrap = el("div");
+    wrap.style.cssText = "border:1px solid var(--line,#e4e4ea);border-radius:10px;padding:9px;margin:0 0 8px " + (isChild ? "24px" : "0") + ";background:var(--sheet," + (isChild ? "rgba(91,63,160,.04)" : "#fff") + ")";
+    const main = el("div"); main.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;align-items:center";
+    const lab = el("input"); lab.type = "text"; lab.value = it.label || ""; lab.maxLength = 40; lab.placeholder = "Label"; lab.style.cssText = NAV_INP;
+    lab.addEventListener("input", () => { it.label = lab.value; });
+    const sel = el("select"); sel.style.cssText = NAV_INP + ";flex:0 0 auto;min-width:0";
+    const pages = dcNavPages();
+    pages.forEach((p) => { const o = el("option", null, "→ " + p.title); o.value = p.href; sel.appendChild(o); });
+    const eo = el("option", null, "External link…"); eo.value = "__ext"; sel.appendChild(eo);
+    const onPage = pages.some((p) => p.href === it.href);
+    sel.value = onPage ? it.href : "__ext";
+    const ext = el("input"); ext.type = "text"; ext.placeholder = "https://…  ·  mailto:…  ·  tel:…"; ext.value = onPage ? "" : (it.href || ""); ext.style.cssText = NAV_INP; ext.hidden = onPage;
+    sel.addEventListener("change", () => { if (sel.value === "__ext") { ext.hidden = false; it.href = ext.value || ""; ext.focus(); } else { ext.hidden = true; it.href = sel.value; } });
+    ext.addEventListener("input", () => { it.href = ext.value; });
+    const ctl = el("div"); ctl.style.cssText = "display:flex;gap:4px";
+    const arr = isChild ? NAV_WORK[parentIdx].children : NAV_WORK;
+    const up = el("button", null, "↑"); up.type = "button"; up.title = "Move up"; up.style.cssText = NAV_MINI;
+    const dn = el("button", null, "↓"); dn.type = "button"; dn.title = "Move down"; dn.style.cssText = NAV_MINI;
+    const del = el("button", null, "✕"); del.type = "button"; del.title = "Remove"; del.style.cssText = NAV_MINI + ";color:#c0392b";
+    up.addEventListener("click", () => { if (i > 0) { const t = arr[i - 1]; arr[i - 1] = arr[i]; arr[i] = t; renderRows(); } });
+    dn.addEventListener("click", () => { if (i < arr.length - 1) { const t = arr[i + 1]; arr[i + 1] = arr[i]; arr[i] = t; renderRows(); } });
+    del.addEventListener("click", () => { arr.splice(i, 1); renderRows(); });
+    ctl.append(up, dn, del);
+    main.append(lab, sel, ext, ctl);
+    wrap.appendChild(main);
+    if (!isChild) {
+      if ((it.children || []).length) { const kids = el("div"); kids.style.cssText = "margin-top:8px"; it.children.forEach((k, ki) => kids.appendChild(row(k, ki, true, i))); wrap.appendChild(kids); }
+      const addKid = el("button", null, "＋ Add dropdown item"); addKid.type = "button"; addKid.style.cssText = NAV_MINI + ";margin-top:6px;font-size:.9em";
+      addKid.addEventListener("click", () => { it.children = it.children || []; it.children.push({ label: "New link", href: "/" }); renderRows(); });
+      wrap.appendChild(addKid);
+    }
+    return wrap;
+  }
+  renderRows();
+}
+async function dcSaveNav(nav) {
+  try {
+    const clean = Array.isArray(nav) ? nav.map((it) => {
+      const o = { label: String(it.label || "").trim().slice(0, 40), href: String(it.href || "").trim() };
+      const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href);
+      if (kids.length) o.children = kids;
+      return o;
+    }).filter((it) => it.label && it.href).slice(0, 12) : [];
+    const r = await api("PUT", "/settings", { nav: clean });
+    S.settings = r.data || { ...S.settings, nav: clean };
+    refreshDesignPreview();
+    toast(clean.length ? "Menu saved — publish to update your live site" : "Menu reset to automatic");
+  } catch (err) { toast(nice(err), true); }
+}
 function dcPageMenu(slug, anchor) {
   const isHome = !slug;
   const p = isHome ? null : dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
@@ -6183,6 +6280,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); if (PANEL
   on("btnTrayOpen", () => toggleTray("add")); on("btnAddFab", () => openTrayPanel("add")); on("btnTrayClose", closeDesignPanels);
   on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add"));
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
+  on("btnNavEdit", dcEditNav);
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
@@ -6942,6 +7040,16 @@ function dcInjectCanvas(doc, main) {
   });
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
+  // Click the header menu on the canvas → open the menu editor (edit labels, links,
+  // dropdowns). The header/footer are global, so this edits the menu on every page.
+  try {
+    const navEl = doc.querySelector("header nav.primary");
+    if (navEl && !navEl.hasAttribute("data-navedit")) {
+      navEl.setAttribute("data-navedit", "1");
+      navEl.style.cursor = "pointer"; navEl.title = "Click to edit your menu (shown on every page)";
+      navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); dcEditNav(); }, true);
+    }
+  } catch (_) {}
   dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
   try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
   dcBuildTree(main);           // left-rail Content Tree of every component on the page

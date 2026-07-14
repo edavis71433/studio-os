@@ -154,6 +154,30 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     return p?.hideNav === true ? { slug, title, blocks, hideNav: true } : { slug, title, blocks };
   }).filter((p): p is { slug: string; title: string; blocks: ReturnType<typeof resolveBlockMedia> } => !!p);
 
+  // Editable GLOBAL nav (the header/footer are global — one edit changes every page).
+  // Each item: a trimmed/capped label + a SAFE href — an internal path ("/", "/x/") or
+  // an https/mailto/tel URL only (never javascript:/data:/raw markup). A single level
+  // of dropdown children is allowed. Empty/all-invalid → absent (template default nav).
+  const navHref = (raw: unknown): string | null => {
+    const v = String(raw ?? '').trim();
+    if (!v) return null;
+    if (v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v)) return v;              // home or a single-segment internal page
+    if (/^https:\/\/[^\s<>"']+$/i.test(v)) return v.slice(0, 300);              // external https
+    if (/^mailto:[^\s<>"']+$/i.test(v) || /^tel:[+0-9()\-.\s]+$/i.test(v)) return v.slice(0, 300);
+    return null;
+  };
+  const navItem = (it: any): { label: string; href: string } | null => {
+    const label = String(it?.label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const href = navHref(it?.href);
+    return label && href ? { label, href } : null;
+  };
+  const rawNav: any[] = Array.isArray(settings.nav) ? settings.nav : [];
+  const customNav = rawNav.slice(0, 12).map((it: any) => {
+    const top = navItem(it); if (!top) return null;
+    const kids = (Array.isArray(it?.children) ? it.children : []).slice(0, 8).map(navItem).filter(Boolean) as Array<{ label: string; href: string }>;
+    return kids.length ? { ...top, children: kids } : top;
+  }).filter(Boolean) as Array<{ label: string; href: string; children?: Array<{ label: string; href: string }> }>;
+
   const content: SnapshotContent = {
     identity: {
       business_name: ident.business_name || '', description: ident.description || '',
@@ -186,6 +210,8 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       blocks: resolveBlockMedia(validateBlocks(resolvedBlocks), ref, reviewsWall ? { reviewsWall } : undefined),
       // Multi-page: only present when the owner has custom pages (absent = byte-identical).
       ...(customPages.length ? { pages: customPages } : {}),
+      // Editable global nav — only present when the owner set one (absent = default nav).
+      ...(customNav.length ? { nav: customNav } : {}),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],

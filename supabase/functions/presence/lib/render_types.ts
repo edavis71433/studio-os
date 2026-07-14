@@ -21,6 +21,11 @@ export interface SiteConfig {
   siteId?: string;
 }
 
+/** One editable navigation entry. `href` is an internal path ("/", "/about/", a
+ *  "/{slug}/" page) or a safe external URL; `children` (optional) is a single-level
+ *  dropdown. Labels/hrefs are validated + capped by the serializer. */
+export interface NavItem { label: string; href: string; children?: Array<{ label: string; href: string }> }
+
 export interface HoursInterval { open: string; close: string }
 export interface HoursDay { day: string; closed: boolean; intervals: HoursInterval[] }
 export interface HolidayException { date: string; label: string; closed: boolean; intervals?: HoursInterval[] }
@@ -75,6 +80,12 @@ export interface SnapshotContent {
      *  or empty = single-page (byte-identical to before). Slugs are safe + unique and
      *  never collide with a template's built-in pages. */
     pages?: Array<{ slug: string; title: string; blocks: SiteBlock[]; hideNav?: boolean }>;
+    /** Editable GLOBAL top navigation. When present + non-empty the template renders
+     *  THIS header nav on every page (the header/footer are global — one edit changes
+     *  all pages) instead of its built-in default. Each item links to an internal path
+     *  or a safe external URL; `children` form a single-level dropdown menu. Absent or
+     *  empty = the template's default nav (byte-identical to before). */
+    nav?: Array<NavItem>;
   };
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
