@@ -3688,11 +3688,16 @@ async function refreshAll() {
   // The website-content reads are TOLERANT: a plan without the website feature
   // (e.g. a Customers-only plan opening #settings) must still get this page —
   // a locked area renders empty, it never takes Settings down with it.
-  const soft = (p) => p.catch((e) => (e && e.status === 403 ? { data: [] } : Promise.reject(e)));
+  // Tolerate a LOCKED area (403) AND a transient/one-off server error (5xx) on the
+  // non-critical content reads — one flaky endpoint must never blank the whole
+  // editor. Only /site is truly required. `tagged` prefixes an error with which
+  // call failed so a real failure is diagnosable, not a generic "couldn't load".
+  const soft = (p) => p.catch((e) => (e && (e.status === 403 || e.status >= 500) ? { data: [] } : Promise.reject(e)));
+  const tagged = (name, p) => p.catch((e) => { if (e && typeof e.message === "string") e.message = "[" + name + "] " + e.message; throw e; });
   const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
-    api("GET", "/site"),
+    tagged("site", api("GET", "/site")),
     soft(api("GET", "/offerings")), soft(api("GET", "/faqs")), soft(api("GET", "/testimonials")), soft(api("GET", "/posts")),
-    soft(api("GET", "/media")), api("GET", "/settings"),
+    soft(api("GET", "/media")), soft(api("GET", "/settings")),
     api("GET", "/portal/context").catch(() => null),
   ]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
