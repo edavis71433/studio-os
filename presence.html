@@ -4742,15 +4742,24 @@ async function dcAddPage() {
     toast("Page “" + title + "” created — edit any section, then publish");
   } catch (err) { toast(nice(err), true); }
 }
-// The new-page layout wizard: a ready-made layout (starter blocks) or a blank page.
+// Apply a chosen template/layout to the CURRENT (empty) page — the empty-canvas
+// "Choose a template" entry point. Blank = leave it empty.
+async function dcPickAndApplyLayout() {
+  const chosen = await dcChoosePageLayout(dcPageTitle(DC_PAGE) || "this page");
+  if (!chosen || !chosen.length) return;
+  BLOCKS_WORK = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
+  BLOCK_FOCUS = 0; dcCaptureScroll(); renderBlocksCard(); saveBlocks();
+}
+// The template/layout picker — ALL ready-made layouts (generic + industry) or blank.
+// Scrollable; used by ＋ Page and the empty-canvas "Choose a template".
 async function dcChoosePageLayout(title) {
   if (BLOCK_SUGGEST === null || BLOCK_SUGGEST === undefined) { try { BLOCK_SUGGEST = (await api("GET", "/blocks/suggested")).data || false; } catch (_) { BLOCK_SUGGEST = false; } }
   const starters = (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.starters)) ? BLOCK_SUGGEST.starters : [];
   return new Promise((resolve) => {
     const scrim = el("div", "dc-modal-scrim");
     const box = el("div", "dc-modal");
-    box.appendChild(el("h3", "dc-modal-h", "Choose a layout for “" + title + "”"));
-    box.appendChild(el("p", "dc-modal-sub", "Start with a ready-made layout of editable sections — or a blank page. You can change everything afterwards."));
+    box.appendChild(el("h3", "dc-modal-h", "Choose a template for “" + title + "”"));
+    box.appendChild(el("p", "dc-modal-sub", "Every ready-made layout (generic and industry) — pick one and it drops in as editable sections. Or start blank. You can change everything afterwards."));
     const grid = el("div", "dc-layout-grid");
     const opt = (t, d, blocks) => { const c = el("button", "dc-layout-card"); c.type = "button"; c.appendChild(el("div", "dl-t", t)); c.appendChild(el("div", "dl-d", d)); c.addEventListener("click", () => { cleanup(); resolve(blocks); }); grid.appendChild(c); };
     opt("Blank page", "Start empty and add your own sections.", []);
@@ -6942,11 +6951,11 @@ function dcBuildInserts(doc, main) {
     const t = doc.createElement("div"); t.className = "dc-ez-t"; t.textContent = "Start building your page";
     const s = doc.createElement("div"); s.className = "dc-ez-s"; s.textContent = "The fastest start: drop in a ready-made layout of real sections you then edit. Or add one section at a time.";
     const acts = doc.createElement("div"); acts.className = "dc-ez-acts";
-    const seed = doc.createElement("button"); seed.type = "button"; seed.className = "dc-ez-btn"; seed.textContent = "✨ Use a ready-made layout";
+    const seed = doc.createElement("button"); seed.type = "button"; seed.className = "dc-ez-btn"; seed.textContent = "✨ Choose a template";
     const b = doc.createElement("button"); b.type = "button"; b.className = "dc-ez-btn2"; b.textContent = "＋ Add one section";
     acts.appendChild(seed); acts.appendChild(b);
     z.appendChild(t); z.appendChild(s); z.appendChild(acts);
-    seed.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); seedStarterIfEmpty().then((ok) => { if (!ok) toast("Pick a template first, then a layout drops in"); }); });
+    seed.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); dcPickAndApplyLayout(); });
     const open = (e) => { e.preventDefault(); e.stopPropagation(); dcOpenInsertFromCanvas(0, z); };
     b.addEventListener("click", open);
     z.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
