@@ -64,3 +64,69 @@
 /retail-web-design          /retail-web-design.html          200
 /home-services-web-design   /home-services-web-design.html   200
 /health-wellness-web-design /health-wellness-web-design.html 200
+
+# ── Clean URLs for the studio operator app (extensionless) ──────────────────────
+# Each app page: .html 301s to the clean path (so the address bar never shows .html)
+# and the clean path serves the file. Auth/payment/OAuth/email-linked pages
+# (set-password, connections-callback, payment-*, approve, project-survey, portal,
+# client) are intentionally LEFT as .html so their externally-shared URLs never change.
+/today.html                   /today               301!
+/today                       /today.html           200
+/presence.html                /presence            301!
+/presence                    /presence.html        200
+/customers.html               /customers           301!
+/customers                   /customers.html       200
+/projects.html                /projects            301!
+/projects                    /projects.html        200
+/files.html                   /files               301!
+/files                       /files.html           200
+/analytics.html               /analytics           301!
+/analytics                   /analytics.html       200
+/inbox.html                   /inbox               301!
+/inbox                       /inbox.html           200
+/crm.html                     /crm                 301!
+/crm                         /crm.html             200
+/leads.html                   /leads               301!
+/leads                       /leads.html           200
+/pipeline.html                /pipeline            301!
+/pipeline                    /pipeline.html        200
+/contacts.html                /contacts            301!
+/contacts                    /contacts.html        200
+/connections.html             /connections         301!
+/connections                 /connections.html     200
+/developer.html               /developer           301!
+/developer                   /developer.html       200
+/visual-studio.html           /visual-studio       301!
+/visual-studio               /visual-studio.html   200
+/agency.html                  /agency              301!
+/agency                      /agency.html          200
+/snapshot-history.html        /snapshot-history    301!
+/snapshot-history            /snapshot-history.html200
+/timeline.html                /timeline            301!
+/timeline                    /timeline.html        200
+/upcoming.html                /upcoming            301!
+/upcoming                    /upcoming.html        200
+/attention.html               /attention           301!
+/attention                   /attention.html       200
+/broadcasts.html              /broadcasts          301!
+/broadcasts                  /broadcasts.html      200
+/business-insights.html       /business-insights   301!
+/business-insights           /business-insights.html 200
+/website-health.html          /website-health      301!
+/website-health              /website-health.html  200
+/content-tree.html            /content-tree        301!
+/content-tree                /content-tree.html    200
+/schedule.html                /schedule            301!
+/schedule                    /schedule.html        200
+/sharing.html                 /sharing             301!
+/sharing                     /sharing.html         200
+/approval-center.html         /approval-center     301!
+/approval-center             /approval-center.html 200
+/admin-health.html            /admin-health        301!
+/admin-health                /admin-health.html    200
+/admin-growth.html            /admin-growth        301!
+/admin-growth                /admin-growth.html    200
+/get-started.html             /get-started         301!
+/get-started                 /get-started.html     200
+/studio.html                  /studio              301!
+/studio                      /studio.html          200
