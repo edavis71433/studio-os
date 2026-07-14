@@ -37,7 +37,7 @@ a{color:var(--plum);text-decoration:none}
 .wordmark{font-family:var(--serif);font-weight:500;font-size:20px;margin-bottom:34px}
 .wordmark small{display:block;font-family:var(--sans);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);font-weight:550;margin-top:4px}
 nav.rooms{display:flex;flex-direction:column}
-.navitem{position:relative;text-align:left;padding:6px 0;font-size:13.5px;color:var(--ink-2);transition:color var(--dur) var(--ease)}
+.navitem{position:relative;display:block;width:100%;text-align:left;padding:6px 0;font-size:13.5px;color:var(--ink-2);text-decoration:none;transition:color var(--dur) var(--ease)}
 .navitem:hover{color:var(--ink)}
 .navitem.on{color:var(--ink);font-weight:600}
 .navitem.on::before{content:"";position:absolute;left:-20px;top:50%;width:9px;height:2px;background:var(--plum)}
@@ -618,6 +618,7 @@ body.pd-dragging *{cursor:grabbing !important}
            is your media library; Bookings & Reviews are their own tools. -->
       <button class="navitem" data-view="design">Design</button>
       <button class="navitem" data-view="media">Photos</button>
+      <a class="navitem" href="/visual-studio.html">Visual Studio</a>
       <button class="navitem" data-view="bookings">Bookings</button>
       <button class="navitem" data-view="reviews">Reviews</button>
       <div class="railsep"></div>
@@ -1280,7 +1281,7 @@ function routeHash() {
   if (v && $("view-" + v)) go(v);
 }
 window.addEventListener("hashchange", routeHash);
-$("nav").addEventListener("click", (e) => { const b = e.target.closest(".navitem"); if (b) go(b.dataset.view); });
+$("nav").addEventListener("click", (e) => { const b = e.target.closest(".navitem"); if (b && b.dataset.view) go(b.dataset.view); });   /* link navitems (Visual Studio) navigate via their href */
 $("dock").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.tab === "today") go("today");
