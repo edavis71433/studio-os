@@ -205,17 +205,17 @@ function mapsHref(c: SnapshotContent): string | null {
 // ═════════ JSON-LD (industry-correct — the whole point of this template) ═════════
 
 function ldBusiness(c: SnapshotContent, site: SiteConfig, schemaType: string, offeringPath: string, isMenu: boolean): object {
-  const l = loc0(c)!;
-  const spec = (l.hours || []).filter((d) => !d.closed && d.intervals?.length).flatMap((d) =>
+  const l = loc0(c);   // may be null on a brand-new/empty draft — must not crash the render
+  const spec = (l?.hours || []).filter((d) => !d.closed && d.intervals?.length).flatMap((d) =>
     d.intervals.map((i) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: DAY_LABEL[d.day], opens: i.open, closes: i.close })));
-  const special = (l.holiday_exceptions || []).map((e) => e.closed
+  const special = (l?.holiday_exceptions || []).map((e) => e.closed
     ? { '@type': 'OpeningHoursSpecification', validFrom: e.date, validThrough: e.date, opens: '00:00', closes: '00:00' }
     : { '@type': 'OpeningHoursSpecification', validFrom: e.date, validThrough: e.date, opens: e.intervals?.[0]?.open, closes: e.intervals?.[0]?.close });
   return {
     '@context': 'https://schema.org', '@type': schemaType,
     name: c.identity.business_name, description: c.identity.description, url: site.baseUrl,
-    telephone: l.phone || c.identity.phone || undefined, email: c.identity.email || undefined,
-    address: { '@type': 'PostalAddress', streetAddress: [l.address_line1, l.address_line2].filter(Boolean).join(', '), addressLocality: l.city, addressRegion: l.region, postalCode: l.postal_code, addressCountry: l.country },
+    telephone: l?.phone || c.identity.phone || undefined, email: c.identity.email || undefined,
+    address: l ? { '@type': 'PostalAddress', streetAddress: [l.address_line1, l.address_line2].filter(Boolean).join(', '), addressLocality: l.city, addressRegion: l.region, postalCode: l.postal_code, addressCountry: l.country } : undefined,
     openingHoursSpecification: spec, specialOpeningHoursSpecification: special.length ? special : undefined,
     areaServed: c.identity.service_area || undefined,
     menu: isMenu ? `${site.baseUrl}${offeringPath}` : undefined,
