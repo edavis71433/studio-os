@@ -15,6 +15,11 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 - 🔑 **Visual Studio (AI-generated images)** — set edge secret `VISUAL_MODEL_KEY`
   (separate from the Anthropic *text* key that already exists). This is why Visual
   Studio shows "not switched on."
+- 🔑 **Apply migration `0106_security_rls_hardening.sql`** on **staging AND prod**
+  (SQL editor, like 0105). Closes the 5 Security Advisor errors (4 tables missing
+  RLS + 1 SECURITY DEFINER view). Safe: those tables are service-role-only, so
+  deny-all RLS blocks anon without touching the app. (44 warnings + 84 suggestions
+  from the linter remain — lower priority, mostly function search_path / advisory.)
 - 🚀 **`git push`** — every builder + studio fix this stretch is frontend
   (`presence.html`, `studio.html`) and only goes live on Eric's push.
 - ❓ **Messages** — Eric says he specified what he wants; it did not survive compaction.
