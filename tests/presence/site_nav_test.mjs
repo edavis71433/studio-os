@@ -53,6 +53,18 @@ const ok = (n, c) => { if (c) pass++; else { fail++; console.log('  FAIL → ' +
   ok('NAV_DROPDOWN_CSS is zero-JS (no <script>, no url())', !/script|javascript:|url\(/i.test(NAV_DROPDOWN_CSS));
 }
 
+// ═══ 3. removable built-in sections — hero can be hidden from the canvas ═══
+{
+  const withHero = businessClassic(structuredClone(fixture), manifest, { baseUrl: 'https://x.test' })['index.html'];
+  ok('the hero renders by default', withHero.includes('class="hero wrap"'));
+  const noHeroFx = structuredClone(fixture);
+  noHeroFx.content.settings = noHeroFx.content.settings || {};
+  noHeroFx.content.settings.sections = { hidden: ['hero'], order: [] };
+  const noHero = businessClassic(noHeroFx, manifest, { baseUrl: 'https://x.test' })['index.html'];
+  ok('hiding "hero" removes the hero section from the home page', !noHero.includes('class="hero wrap"'));
+  ok('hiding the hero leaves the rest of the page intact (strip + about still there)', noHero.includes('class="strip"') && noHero.includes('About'));
+}
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  site-nav — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ SITE NAV GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);

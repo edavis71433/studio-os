@@ -342,7 +342,8 @@ function homeBody(c: SnapshotContent, site: SiteConfig, blocks: RenderedBlock[] 
   const maps = mapsHref(c);
   const book = safeHref(i.booking_url || '');
   const order = safeHref(i.ordering_url || '');
-  return `
+  const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
+  return `${heroOff ? '' : `
 <section class="hero wrap">
   <h1${pr('identity.business_name')}>${esc(i.business_name)}</h1>
   ${i.tagline ? `<p class="tagline"${pr('identity.tagline')}>${esc(i.tagline)}</p>` : ''}
@@ -352,7 +353,7 @@ function homeBody(c: SnapshotContent, site: SiteConfig, blocks: RenderedBlock[] 
     ${!book && !order ? `<a class="btn" href="/menu/">See the menu</a>` : ''}
   </div>
   ${hero ? `<div class="hero-img">${img(hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
-</section>
+</section>`}
 <div class="strip"><div class="wrap">
   <span id="open-now" class="open-now" aria-live="polite"></span>
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}

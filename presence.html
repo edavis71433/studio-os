@@ -3462,7 +3462,7 @@ function eeHideKey(key) {                        // reuse the sections-visibilit
 function eeClassify(el) {
   const id = el.getAttribute("id");
   if (id && EE_IDMAP[id] != null) return { kind: "block", bi: EE_IDMAP[id] };
-  if (el.classList.contains("hero")) return { kind: "core", view: "business", key: null };
+  if (el.classList.contains("hero")) return { kind: "core", view: "business", key: "hero" };
   if (el.querySelector(".svc-grid, .svc")) return { kind: "core", view: "offerings", key: "offerings" };
   if (el.querySelector("dl.faq")) return { kind: "core", view: "faqs", key: "faqs" };
   if (el.querySelector("blockquote")) return { kind: "core", view: "testimonials", key: "testimonials" };
@@ -3523,7 +3523,7 @@ function eeInjectChrome(doc, main) {
       bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[c.bi]))));
     } else {
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
-      if (c.key) bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(c.key)));
+      if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Design settings → Your home page)", () => eeHideKey(c.key)));
     }
     bar.classList.add("on");
     place(el);
@@ -6138,7 +6138,7 @@ function renderFormsCard() {
   card.appendChild(save);
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
-const HOME_SECTION_DEFS = [ ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];
+const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];
 async function saveSections(order, hidden) {
   try {
     const r = await api("PUT", "/settings", { sections_order: order, sections_hidden: hidden });
@@ -7022,7 +7022,7 @@ function dcInjectCanvas(doc, main) {
       bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger" }));
     } else {
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
-      if (c.key) bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(c.key)));
+      if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Design settings → Your home page)", () => eeHideKey(c.key), { cls: "dc-danger" }));
     }
     bar.classList.add("on"); place(el2);
   };
