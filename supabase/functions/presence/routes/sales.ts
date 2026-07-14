@@ -13,7 +13,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
-import { raiseNotice } from '../lib/notice.ts';
+import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -1229,6 +1229,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   if (outcome === 'already_converted') { // idempotent: return the existing customer/workspace (+ ensure the project handoff)
     const { actor, actor_kind } = actorOf(principal);
     const ph = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId: deal.converted_client_id, customerSiteId: deal.converted_site_id, actor, actorKind: actor_kind });
+    if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); } // already a customer → drop any lingering "ready to convert" notice
     return json({ data: { converted: true, client_id: deal.converted_client_id, site_id: deal.converted_site_id, project_id: ph.project?.id || deal.created_project_id || null, onboarding: '/get-started.html', idempotent: true } }, 200, cors);
   }
   if (outcome === 'blocked_lost') return json({ error: 'lost', message: 'A lost deal can’t be converted.' }, 409, cors);
@@ -1285,6 +1286,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     return json({ error: 'convert_conflict', message: 'That customer is already linked to another deal.' }, 409, cors);
   }
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
+  if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); } // the deal is a customer now — clear the "ready to convert" notice
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
   // Seam 1: if the converting operator runs an AGENCY, add the new customer to
