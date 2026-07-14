@@ -240,6 +240,12 @@ h5.rune .whisper.ok{color:var(--sage)}
 .mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 8px;font-size:11px;color:var(--paper);background:linear-gradient(transparent,rgba(33,29,25,.75))}
 .mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
 .uploadprep{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:20px 24px;margin-top:18px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+/* in-picker source switch: Your photos / Stock photos (FD-T10 in-builder stock) */
+.pickerTabs{display:flex;gap:6px;margin:14px 0 4px;border-bottom:1px solid var(--hair)}
+.pickerTab{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink-2);background:transparent;border:0;border-bottom:2px solid transparent;padding:8px 4px;margin-bottom:-1px;cursor:pointer;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.pickerTab.on{color:var(--ink);border-bottom-color:var(--plum)}
+.pickerStockBar{display:flex;gap:8px;align-items:center;margin:16px 0 10px}
+.pickerStockBar input{flex:1;padding:8px 12px;font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:8px;background:var(--sheet);color:var(--ink)}
 
 /* ── history journal ── */
 .hentry{display:flex;gap:22px;padding:18px 0;border-bottom:1px solid var(--hair)}
@@ -749,7 +755,21 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
 <div class="scrim" id="pickerScrim">
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
     <h2 id="pickTitle">Choose a photograph</h2>
-    <div class="body"><div class="mediagrid" id="pickerGrid" style="margin-top:0"></div></div>
+    <div class="pickerTabs" role="tablist" aria-label="Where to choose a photo from">
+      <button class="pickerTab on" id="pickTabMine" type="button" role="tab" aria-selected="true">Your photos</button>
+      <button class="pickerTab" id="pickTabStock" type="button" role="tab" aria-selected="false">Stock photos</button>
+    </div>
+    <div class="body">
+      <div id="pickerMinePane" role="tabpanel"><div class="mediagrid" id="pickerGrid" style="margin-top:0"></div></div>
+      <div id="pickerStockPane" role="tabpanel" hidden>
+        <div class="pickerStockBar">
+          <input id="pickStockQ" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" autocomplete="off">
+          <button class="pillbtn inked" id="pickStockGo" type="button">Search</button>
+        </div>
+        <p id="pickStockNote" style="margin:0 0 8px;font-size:12px;color:var(--ink-2)"></p>
+        <div class="mediagrid" id="pickStockGrid" style="margin-top:0"></div>
+      </div>
+    </div>
     <div class="foot">
       <button class="quietact" id="btnPickNone">No photograph</button>
       <button class="quietact" data-close>Never mind</button>
@@ -2732,9 +2752,82 @@ let pickerCb = null;
 function openPicker(onPick) {
   pickerCb = onPick;
   renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); });
+  pickerShowTab("mine");   // "Your photos" is always the default when the picker opens
   openSheet("pickerScrim");
 }
 $("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if (pickerCb) pickerCb(null); });
+
+/* ── FD-T10 in-builder Stock Library: search Pexels + import into Files without
+ *    leaving the builder. Reuses the SAME endpoints as files.html's Stock Library
+ *    (GET /stock/search, POST /stock/import). Selecting a result imports it to the
+ *    user's own site (presence_media) and sets it as this block's media in one tap.
+ *    Nothing auto-publishes — the imported photo enters the library + the block
+ *    draft, applied via the normal publish flow. state: null|loading|ok|off ── */
+const PICK_STOCK = { state: null, q: "", results: [], provider: "", license: "" };
+function pickerShowTab(which) {
+  const mine = which !== "stock";
+  $("pickTabMine").classList.toggle("on", mine); $("pickTabMine").setAttribute("aria-selected", String(mine));
+  $("pickTabStock").classList.toggle("on", !mine); $("pickTabStock").setAttribute("aria-selected", String(!mine));
+  $("pickerMinePane").hidden = !mine; $("pickerStockPane").hidden = mine;
+  if (!mine) { renderPickerStock(); const q = $("pickStockQ"); if (q) q.focus(); }
+}
+$("pickTabMine").addEventListener("click", () => pickerShowTab("mine"));
+$("pickTabStock").addEventListener("click", () => pickerShowTab("stock"));
+$("pickStockGo").addEventListener("click", () => { PICK_STOCK.q = $("pickStockQ").value.trim(); loadPickerStock(); });
+$("pickStockQ").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); PICK_STOCK.q = $("pickStockQ").value.trim(); loadPickerStock(); } });
+async function loadPickerStock() {
+  PICK_STOCK.state = "loading"; renderPickerStock();
+  try {
+    const r = await api("GET", "/stock/search?q=" + encodeURIComponent(PICK_STOCK.q || "") + "&page=1");
+    const d = (r && r.data) || {};
+    PICK_STOCK.results = d.images || [];
+    PICK_STOCK.provider = d.provider || "";
+    PICK_STOCK.license = (d.license && d.license.name) || "";
+    PICK_STOCK.state = "ok";
+  } catch (err) {
+    if (err && err.status === 503) { PICK_STOCK.state = "off"; }
+    else { PICK_STOCK.results = []; PICK_STOCK.state = "ok"; toast(nice(err), true); }
+  }
+  renderPickerStock();
+}
+function renderPickerStock() {
+  const grid = $("pickStockGrid"), note = $("pickStockNote"), st = PICK_STOCK.state;
+  note.textContent = (st === "off" || st == null) ? ""
+    : (PICK_STOCK.license
+      ? "Royalty-free from " + PICK_STOCK.provider + " · " + PICK_STOCK.license + " · added to your Files and hosted on your own site."
+      : "Professional royalty-free photos, added straight to your Files.");
+  if (st === "off") { grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:24px 8px"><div class="eq">Stock photos aren’t turned on yet.</div><div class="eh">Add a Pexels key to search professional royalty-free photos and drop them straight into this block — hosted on your own site.</div></div>`; return; }
+  if (st === "loading") { grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">Searching…</p>`; return; }
+  if (st == null) { grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:24px 8px"><div class="eq">Search for a photo above.</div><div class="eh">Try “office”, “coffee”, “construction”, “salon”…</div></div>`; return; }
+  if (!PICK_STOCK.results.length) { grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:24px 8px"><div class="eq">No matches — try another word.</div><div class="eh">Try “office”, “coffee”, “construction”, “salon”…</div></div>`; return; }
+  grid.innerHTML = "";
+  PICK_STOCK.results.forEach((im) => {
+    const cell = el("button", "mcell"); cell.type = "button";
+    cell.setAttribute("aria-label", "Use this stock photo" + (im.credit ? " by " + im.credit : ""));
+    const img = el("img"); img.src = im.thumb; img.alt = im.alt || ""; img.loading = "lazy"; cell.appendChild(img);
+    if (im.credit) cell.appendChild(el("span", "alt", im.credit));
+    cell.addEventListener("click", () => importStockToBlock(im, cell));
+    grid.appendChild(cell);
+  });
+}
+// Select → import to Files (Add to my files) → set as this block's media → close.
+async function importStockToBlock(im, cell) {
+  if (cell.dataset.busy) return; cell.dataset.busy = "1"; cell.style.opacity = ".5";
+  const badge = el("span", "badge", "Adding…"); cell.appendChild(badge);
+  try {
+    const r = await api("POST", "/stock/import", { stock_id: im.id, alt_text: im.alt, credit: im.credit || "" });
+    const mid = r && r.data && r.data.media_id;
+    if (!mid) throw new Error("That photo couldn’t be added — please try another.");
+    await loadMedia();   // refresh S.media so the block preview thumbnail resolves for the new id
+    toast("Added to your Files");
+    closeSheet("pickerScrim");
+    if (pickerCb) pickerCb(mid);
+  } catch (err) {
+    cell.style.opacity = ""; badge.remove(); delete cell.dataset.busy;
+    if (err && err.status === 503) { PICK_STOCK.state = "off"; renderPickerStock(); }
+    else toast(nice(err), true);
+  }
+}
 
 /* ── Phase SKU: feature-edition gate. null features = all on (studio_os default,
    preserves today's behavior). A standalone CMS lacks the Business-OS brains
