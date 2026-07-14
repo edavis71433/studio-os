@@ -5547,7 +5547,7 @@ async function renderFirstRun() {
   } catch (err) {
     if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or write to support@davisdigitalstudio.com.", true);
     else if (err.status === 403) showGate("Paused for now", err.message, true);
-    else if (err.message !== "no-session") showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Refresh to try again, or write to support@davisdigitalstudio.com.", true);
+    else if (err.message !== "no-session") { try { console.error("[presence boot]", err.status, err.message, err.body); } catch (_) {} showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Refresh to try again, or write to support@davisdigitalstudio.com.  (Details: " + (err.status || "network error") + (err.message ? " — " + err.message : "") + ")", true); }
   }
 })();
 </script>
