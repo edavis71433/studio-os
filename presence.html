@@ -454,7 +454,8 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-close:hover{border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)}
 .dc-close:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 #designTray{flex:1;min-height:0;overflow:auto;padding:14px 16px 20px}
-#designHost{flex:1;min-height:0;overflow:auto;padding:16px 16px 24px}
+.dc-panel-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
+#designHost{padding:16px 16px 24px}
 #designHost .field{min-width:0;max-width:none;margin-bottom:18px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
 #designHost #brandKitCard{order:-1}
 /* the settings panel gets a dimming scrim (editing focus); the tray does NOT, so the
@@ -862,10 +863,13 @@ body.pd-dragging *{cursor:grabbing !important}
                into #designHost, id preserved -->
           <aside id="settingsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="true" aria-label="Design settings" aria-hidden="true">
             <div class="dc-panel-head"><span class="dc-panel-t">Design settings</span><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
-            <!-- The site's overall look (theme) lives here now — off the Design page,
-                 since starting a page/layout happens through "＋ Page". -->
-            <div id="designGallery" hidden></div>
-            <div id="designHost"></div>
+            <!-- one scroll container for the whole panel (theme gallery + design cards) -->
+            <div class="dc-panel-scroll">
+              <!-- The site's overall look (theme) lives here now — off the Design page,
+                   since starting a page/layout happens through "＋ Page". -->
+              <div id="designGallery" hidden></div>
+              <div id="designHost"></div>
+            </div>
           </aside>
           <div class="dc-scrim" id="dcScrim" hidden></div>
         </div>
