@@ -4485,6 +4485,7 @@ const BLOCK_DEFS = [
   { type: "image", name: "Image", imageSimple: true, hint: "" },
   { type: "image_text", name: "Image + text", imageTextSimple: true, hint: "" },
   { type: "accordion", name: "Accordion (expandable)", structured: "accordion", hint: "Add each expandable panel — a short label and the details inside." },
+  { type: "tabs", name: "Tabs", structured: "tabs", hint: "Tabbed sections — a row of tabs, each revealing its own text and optional image. Great for services, plans, or FAQs by category. Keyboard-friendly and stacks on phones." },
   { type: "buttons", name: "Buttons", structured: "buttons", hint: "Up to three clear action links." },
   { type: "divider", name: "Divider / space", dividerSimple: true, hint: "" },
   // Layout & utility (r4). Columns + Cards are MULTI-INSTANCE (like forms) — add several.
@@ -4505,7 +4506,7 @@ const SECTION_GROUPS = [
   { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
     types: ["cta", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
   { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
-    types: ["richtext", "columns", "accordion", "divider", "toc"] },
+    types: ["richtext", "columns", "tabs", "accordion", "divider", "toc"] },
   { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
     types: ["service_areas", "events", "social"] },
 ];
@@ -4519,7 +4520,7 @@ const SECTION_ALIAS = {
   cta: "banner", appointment: "book / schedule (link out)", booking: "appointments / scheduler", newsletter: "email sign-up", map: "location map",
   service_areas: "service area", events: "calendar", social: "social icons",
   richtext: "text / paragraph", image: "photo", image_text: "image + words",
-  accordion: "expandable / toggle", buttons: "button / link", divider: "spacer / line",
+  accordion: "expandable / toggle", tabs: "tabbed sections", buttons: "button / link", divider: "spacer / line",
   columns: "columns / grid", cards: "feature cards / tiles", download: "file / PDF", toc: "on this page / jump links",
 };
 // The CORE sections aren't blocks — they're edited in their own tabs. We surface
@@ -4657,6 +4658,7 @@ function emptyBlock(def) {
   if (def.imageTextSimple) { b.body = ""; b.side = "left"; return b; }
   if (def.dividerSimple) { b.style = "line"; b.size = "medium"; return b; }
   if (def.structured === "accordion") { b.items = []; return b; }
+  if (def.structured === "tabs") { b.tabs = [{ label: "Tab one", body: "" }, { label: "Tab two", body: "" }]; return b; }
   if (def.structured === "buttons") { b.buttons = []; return b; }
   if (def.areasSimple) { b.areas = []; return b; }
   b[def.field] = []; return b;
@@ -5023,6 +5025,8 @@ function renderBlocksCard() {
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.structured === "accordion") {
       renderAccordionBlockBody(blk, idx, sub, ti);
+    } else if (def.structured === "tabs") {
+      renderTabsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.structured === "buttons") {
       renderButtonsBlockBody(blk, idx, sub, ti);
@@ -5369,6 +5373,41 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
     add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].items = BLOCKS_WORK[idx].items || []).push({ summary: "", body: "" }); renderBlocksCard(); });
     sub.appendChild(add);
   }
+}
+// r3 tabs editor — a row of tabs, each: a label + markdown body + optional image.
+function renderTabsBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const tabs = Array.isArray(blk.tabs) ? blk.tabs : [];
+  tabs.forEach((t, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
+    row.appendChild(Object.assign(el("div", "hint", "Tab " + (k + 1)), { style: "font-weight:600;margin-bottom:4px" }));
+    const lb = el("input"); lb.type = "text"; lb.placeholder = "Tab label (what people click)"; lb.value = t.label || ""; lb.style.cssText = inputCss;
+    const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin:6px 0";
+    if (t.image_id) photo.appendChild(mediaThumb(t.image_id));
+    const pb = el("button", null, t.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.tabs[k].image_id = id || undefined; renderBlocksCard(); }); });
+    photo.appendChild(pb);
+    const bd = el("textarea"); bd.value = t.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "What’s inside this tab…";
+    bd.rows = Math.max(3, (t.body || "").split("\n").length + 1);
+    bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
+    const commit = () => { blk.tabs[k] = { label: lb.value.trim(), body: bd.value.trim(), image_id: blk.tabs[k].image_id || undefined }; };
+    [lb, bd].forEach((inp) => inp.addEventListener("change", commit));
+    row.append(lb, photo, bd, aiField(bd, {}));
+    if (tabs.length > 1) {
+      const rm = el("button", null, "Remove tab"); rm.type = "button"; rm.style.cssText = miniBtn;
+      rm.addEventListener("click", () => { commitTitle(); blk.tabs.splice(k, 1); renderBlocksCard(); });
+      row.appendChild(rm);
+    }
+    sub.appendChild(row);
+  });
+  if (tabs.length < 6) {
+    const add = el("button", null, "+ Add tab"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].tabs = BLOCKS_WORK[idx].tabs || []).push({ label: "New tab", body: "" }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
+  sub.appendChild(el("div", "hint", "Up to 6 tabs. Keyboard-friendly, and they stack neatly on phones — no code, works everywhere."));
 }
 // r3 buttons editor — up to three real action links (label + url + look).
 function renderButtonsBlockBody(blk, idx, sub, ti) {
@@ -5933,7 +5972,7 @@ const TRAY_TYPE_ICON = {
   gallery: "🖼", before_after: "🔀", image: "🖼", image_text: "🖽", video: "▶", team: "👥", partners: "🏷",
   features: "✦", stats: "№", cards: "▤", reviews_wall: "★", reviews: "★", certifications: "✔", pricing: "＄", process: "⇢",
   cta: "❗", buttons: "🔘", booking: "🗓", appointment: "🗓", newsletter: "✉", download: "⭳", map: "📍",
-  richtext: "¶", columns: "▥", accordion: "▾", divider: "―", toc: "☰", service_areas: "📍", events: "📅", social: "◎",
+  richtext: "¶", columns: "▥", accordion: "▾", tabs: "🗂", divider: "―", toc: "☰", service_areas: "📍", events: "📅", social: "◎",
 };
 // PURE + self-contained (no globals) so it can be unit-tested by extraction: does a
 // section (its name / familiar-alias / type) match a plain-text search query?

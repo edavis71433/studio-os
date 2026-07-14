@@ -120,6 +120,8 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('image', 'image'), t('body', 'richtext', { aiAssist: true, max: 2000 }), t('side', 'enum'), t('button', 'text')], schema: null, a11y: 'reading order sound when stacked; image has alt', seo: 'supporting copy + imagery', industries: ['*'] },
   { key: 'accordion', label: 'Accordion (expandable)', category: 'content', purpose: 'Expandable panels for longer details, one at a time.',
     fields: [t('summary', 'text', { required: true, repeatable: true, max: 120 }), t('body', 'richtext', { aiAssist: true, max: 1500 })], schema: null, a11y: 'native details/summary — keyboard + screen-reader ready, no JS', seo: 'scannable content', industries: ['*'] },
+  { key: 'tabs', label: 'Tabs', category: 'content', purpose: 'Tabbed panels — related content grouped behind a row of tabs.',
+    fields: [t('label', 'text', { required: true, repeatable: true, max: 40 }), t('body', 'richtext', { aiAssist: true, max: 1500 }), t('image', 'image')], schema: null, a11y: 'zero-JS CSS radio tabs — keyboard-operable (arrow keys), stacks on phones', seo: 'grouped scannable content', industries: ['*'] },
   { key: 'buttons', label: 'Buttons', category: 'header', purpose: 'A small row of clear action links.',
     fields: [t('label', 'text', { required: true, repeatable: true, max: 40 }), t('url', 'url', { required: true }), t('style', 'enum')], schema: null, a11y: 'real focusable links, visible focus', seo: 'internal linking', industries: ['*'] },
   { key: 'divider', label: 'Divider / space', category: 'content', purpose: 'A hairline rule or a bit of breathing room between sections.',

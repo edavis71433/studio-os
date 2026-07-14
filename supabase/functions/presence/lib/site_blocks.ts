@@ -32,7 +32,7 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'gallery', 'before_after', 'video',
   'partners', 'reviews', 'reviews_wall', 'appointment', 'booking',
   'newsletter', 'social', 'events', 'map',
-  'richtext', 'image', 'image_text', 'accordion', 'buttons', 'divider',
+  'richtext', 'image', 'image_text', 'accordion', 'tabs', 'buttons', 'divider',
   'form',
   'columns', 'cards', 'download', 'toc',
 ];
@@ -41,7 +41,7 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, buttons: 3, columns: 6, cards: 8 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, buttons: 3, columns: 6, cards: 8 };
 // Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
 // snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
 const clampSpan = (v: unknown): number | undefined => {
@@ -100,6 +100,7 @@ interface StoredImageText { type: 'image_text'; title?: string; image_id?: strin
 // Toc carries no media/id — its list is derived at render from sibling headings.
 interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string }; span?: number }> }
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
+interface StoredTabs { type: 'tabs'; title?: string; tabs: Array<{ label: string; body: string; image_id?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 // Same distributive WithLook as render_types: the owner-chosen per-section style
 // (Phase T-STYLE) rides on the stored block, orthogonal to its content. Phase EXP:
@@ -111,7 +112,7 @@ export type StoredBlock = WithLook<
   | StoredGallery | StoredBeforeAfter | StoredVideo
   | StoredPartners | SiteBlockReviews | StoredReviewsWall | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
-  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | SiteBlockButtons | SiteBlockDivider
+  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | StoredTabs | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
   | FormDefinition
 >;
@@ -307,6 +308,15 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         if (items.length) block = { type: 'accordion', title, items } as SiteBlockAccordion;
         break;
       }
+      case 'tabs': {   // tabbed panels — each tab: a label + rich body + optional image
+        const tabs = arr((b as any).tabs).map((t) => {
+          const tab: StoredTabs['tabs'][number] = { label: s(t?.label, 40), body: ml(t?.body, 1500) };
+          const image_id = uid(t?.image_id); if (image_id) tab.image_id = image_id;
+          return tab;
+        }).filter((t) => t.label && (t.body || t.image_id)).slice(0, CAP.tabs);
+        if (tabs.length) block = { type: 'tabs', title, tabs } as StoredTabs;
+        break;
+      }
       case 'buttons': {   // a small row of real links; each label required, url via safeHref at render
         const buttons = arr((b as any).buttons).map((bt) => ({
           label: s(bt?.label, 40), url: s(bt?.url, 300),
@@ -446,6 +456,9 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       }
       case 'columns':   // prose/button ride through; each column's image resolves (or drops to null)
         out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button, span: c.span })), ...lk(b) });
+        break;
+      case 'tabs':   // each tab's body/label ride through; optional image resolves (or null)
+        out.push({ type: 'tabs', title: b.title, tabs: b.tabs.map((t) => ({ label: t.label, body: t.body, image: t.image_id ? ref(t.image_id) : null })), ...lk(b) });
         break;
       case 'cards':
         out.push({ type: 'cards', id: b.id, title: b.title, cards: b.cards.map((c) => ({ heading: c.heading, text: c.text, image: c.image_id ? ref(c.image_id) : null, link: c.link })), ...lk(b) });
@@ -817,6 +830,19 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         html = `<section class="block wrap block-accordion">${h2(b.title, 'More information')}<div class="accordion">${rows}</div></section>`;
         break;
       }
+      case 'tabs': {   // tabbed panels — ZERO JS (CSS radio pattern): keyboard-operable,
+        // stacks on phones, no external anything. One tabs section per page (nm fixed).
+        const nm = 'site-tabs';
+        const radios = b.tabs.map((_t, i) => `<input type="radio" name="${nm}" id="${nm}-${i}" class="tab-radio"${i === 0 ? ' checked' : ''}>`).join('');
+        const strip = b.tabs.map((t, i) => `<label class="tab-label" for="${nm}-${i}">${esc(t.label)}</label>`).join('');
+        const panels = b.tabs.map((t) => {
+          const img = t.image ? `<div class="col-media">${blockImg(t.image, esc, attr, '(max-width:620px) 100vw, 640px')}</div>` : '';
+          const prose = t.body ? `<div class="prose">${renderMarkdown(t.body)}</div>` : '';
+          return `<div class="tab-panel">${img}${prose}</div>`;
+        }).join('');
+        html = `<section class="block wrap block-tabs">${b.title ? h2(b.title, '') : ''}<div class="tabs">${radios}<div class="tab-strip" role="tablist">${strip}</div><div class="tab-panels">${panels}</div></div></section>`;
+        break;
+      }
       case 'buttons': {   // a small centered row of real links; drop any without a safe href
         const btns = b.buttons.map((bt) => {
           const href = safeHref(bt.url); if (!href) return '';
@@ -1109,6 +1135,20 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
    desktop and the full width on phones (auto-responsive). Cells wrap to new rows
    when their spans exceed 12 — Adobe's "float to new line". */
 @media(min-width:620px){.block-columns .cols-grid{grid-template-columns:repeat(12,1fr)}.block-columns .cols-grid>.col[data-span="1"]{grid-column:span 1}.block-columns .cols-grid>.col[data-span="2"]{grid-column:span 2}.block-columns .cols-grid>.col[data-span="3"]{grid-column:span 3}.block-columns .cols-grid>.col[data-span="4"]{grid-column:span 4}.block-columns .cols-grid>.col[data-span="5"]{grid-column:span 5}.block-columns .cols-grid>.col[data-span="6"]{grid-column:span 6}.block-columns .cols-grid>.col[data-span="7"]{grid-column:span 7}.block-columns .cols-grid>.col[data-span="8"]{grid-column:span 8}.block-columns .cols-grid>.col[data-span="9"]{grid-column:span 9}.block-columns .cols-grid>.col[data-span="10"]{grid-column:span 10}.block-columns .cols-grid>.col[data-span="11"]{grid-column:span 11}.block-columns .cols-grid>.col[data-span="12"]{grid-column:span 12}}
+/* Tabs — ZERO-JS tabbed panels via the CSS radio pattern. The radios are visually
+   hidden but keyboard-focusable (arrow keys switch tabs); the checked radio reveals
+   its panel + marks its label. Stacks fine on phones (the strip wraps). */
+.block-tabs .tabs{margin-top:6px}
+.block-tabs .tab-radio{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.block-tabs .tab-strip{display:flex;flex-wrap:wrap;gap:2px;border-bottom:2px solid var(--line);margin-bottom:2px}
+.block-tabs .tab-label{padding:10px 16px;cursor:pointer;font-weight:600;color:var(--soft);border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0}
+.block-tabs .tab-label:hover{color:var(--ink,inherit)}
+.block-tabs .tab-panel{display:none;padding:18px 2px}
+.block-tabs .tab-panel .col-media img{border-radius:10px;display:block;max-width:100%;margin-bottom:12px}
+.block-tabs .tab-panel .prose{max-width:none}
+.block-tabs .tab-radio:nth-of-type(1):checked~.tab-strip .tab-label:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):checked~.tab-strip .tab-label:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):checked~.tab-strip .tab-label:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):checked~.tab-strip .tab-label:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):checked~.tab-strip .tab-label:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):checked~.tab-strip .tab-label:nth-of-type(6){color:var(--accent);border-bottom-color:var(--accent)}
+.block-tabs .tab-radio:nth-of-type(1):checked~.tab-panels .tab-panel:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):checked~.tab-panels .tab-panel:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):checked~.tab-panels .tab-panel:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):checked~.tab-panels .tab-panel:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):checked~.tab-panels .tab-panel:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):checked~.tab-panels .tab-panel:nth-of-type(6){display:block}
+.block-tabs .tab-radio:nth-of-type(1):focus-visible~.tab-strip .tab-label:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):focus-visible~.tab-strip .tab-label:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):focus-visible~.tab-strip .tab-label:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):focus-visible~.tab-strip .tab-label:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):focus-visible~.tab-strip .tab-label:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):focus-visible~.tab-strip .tab-label:nth-of-type(6){outline:2px solid var(--accent);outline-offset:2px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
 .teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
 a.teaser-card{text-decoration:none;color:inherit}

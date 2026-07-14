@@ -279,6 +279,16 @@ const ctx = { esc, attr, safeHref };
   ok('12-grid span widths are defined in BLOCK_CSS', /\.block-columns \.cols-grid>\.col\[data-span="8"\]\{grid-column:span 8\}/.test(BLOCK_CSS));
   const oneColR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', columns: [{ body: 'solo' }] }]), REF), ctx)[0];
   ok('a 1-column container renders as a grid (not the equal data-cols path)', oneColR.html.includes('cols-grid') && !oneColR.html.includes('data-cols'));
+
+  // — tabs: zero-JS tabbed panels (CSS radio pattern), keyboard-operable, no script —
+  const tabR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'tabs', title: 'Plans', tabs: [
+    { label: 'Basic', body: 'Cheap **plan**' }, { label: 'Pro', body: 'Better' },
+    { label: '<script>x</script>', body: 'safe' },
+  ] }]), REF), ctx)[0];
+  ok('tabs render the zero-JS radio pattern (radios + labels + panels) with a tablist', tabR.html.includes('block-tabs') && tabR.html.includes('type="radio"') && (tabR.html.match(/class="tab-panel"/g) || []).length === 3 && tabR.html.includes('role="tablist"') && tabR.html.includes('<strong>plan</strong>'));
+  ok('tabs are zero-JS (no <script>) and exactly the first tab is pre-selected', !/<script/i.test(tabR.html) && tabR.html.includes('id="site-tabs-0" class="tab-radio" checked') && (tabR.html.match(/checked/g) || []).length === 1);
+  ok('tabs escape a hostile label (no executable markup survives)', tabR.html.includes('&lt;script&gt;x&lt;/script&gt;') && !tabR.html.includes('<script>x'));
+  ok('tabs CSS (hidden radios + hidden panels + checked-reveal) is defined in BLOCK_CSS', /\.block-tabs \.tab-panel\{display:none/.test(BLOCK_CSS) && /\.tab-radio:nth-of-type\(1\):checked~\.tab-panels \.tab-panel:nth-of-type\(1\)/.test(BLOCK_CSS) && /display:block\}/.test(BLOCK_CSS));
   const colR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', title: 'Our pillars', columns: [
     { body: 'Fast **service**', image_id: G, button: { label: 'Book', url: 'https://ex.com/b' } },
     { body: '<script>alert(1)</script>', button: { label: 'Bad', url: 'javascript:alert(1)' } },
