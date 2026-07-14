@@ -350,20 +350,65 @@ async function renderInvoices(){
   html+=appendBilling(inv);
   $('main').innerHTML=html;
 }
-// ── REQUESTS — Release-1 stand-in for the service catalog: your requests + ask for more ──
+// ── REQUESTS (R2) — the studio's service catalog + your open requests ─────────
+// Pick a service → a structured brief → a PENDING request the studio reviews.
+// Nothing is ever charged or ordered automatically (the moat). A reviewer with
+// no service-link just sees the calm empty state, never an error.
 async function renderRequests(){
   $('main').innerHTML=spinnerHtml();
   const canMessage=PORTAL.persona==='client';
-  let list=[];try{const r=await api('/client/support');list=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id);}catch(_){}
-  let html=portalHeader('Requests','Ask your studio for more work, or follow up on something.');
-  html+=`<section><div class="card"><h3>Need something new?</h3><p class="muted">Tell your studio what you’d like — a new page, an update, a fresh project. They’ll reply with next steps; nothing is charged automatically.</p><p class="muted" style="margin-top:6px">A menu of ready-to-pick services is coming soon.</p>${canMessage?`<div class="row"><button class="approve" id="newReq">Request more work</button></div>`:''}</div></section>`;
+  let list=[],services=[];
+  try{const[sr,svr]=await Promise.all([api('/client/support'),api('/client/services')]);
+    list=(((sr&&sr.body&&sr.body.data)||[])).filter(x=>x&&x.id);
+    services=(((svr&&svr.body&&svr.body.data)||[])).filter(x=>x&&x.id);
+  }catch(_){}
+  let html=portalHeader('Requests','Browse what your studio offers and ask for what you need. Nothing is charged automatically — every request is reviewed first.');
+  // ── service catalog ──
+  html+=`<section><h2>Request a service</h2>`;
+  if(!services.length)html+=emptyCard('Your studio hasn’t listed services here yet — you can still message them for anything you need using the button below.');
+  else{
+    for(const svc of services){
+      html+=`<div class="card"><h3>${esc(svc.name)}</h3>`+
+        `${svc.category?`<p class="muted" style="margin:-2px 0 6px;font-size:12.5px">${esc(svc.category)}</p>`:''}`+
+        `${svc.description?`<p>${esc(svc.description)}</p>`:''}`+
+        `${svc.price?`<p class="muted" style="margin-top:6px">${esc(svc.price)}</p>`:''}`+
+        `${canMessage?`<div class="row"><button class="approve" data-svc="${esc(svc.id)}">Request this</button></div>`:''}</div>`;
+    }
+  }
+  html+=`</section>`;
+  // ── generic "something else" ──
+  if(canMessage)html+=`<section><div class="card"><h3>Something else?</h3><p class="muted">Not sure which service fits, or need something custom? Tell your studio what you have in mind — they’ll reply with next steps. Nothing is charged automatically.</p><div class="row"><button id="newReq">Message your studio</button></div></div></section>`;
+  // ── your open requests ──
   html+=`<section><h2>Your requests</h2>`;
   if(!list.length)html+=emptyCard('You haven’t made any requests yet. When you ask your studio for something, you’ll be able to track it here.');
   else for(const rq of list){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
   html+=`</section>`;
   $('main').innerHTML=html;
   const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null));
+  document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-svc');const svc=services.find(x=>x.id===id);if(svc)openServiceRequest(svc);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
+}
+// A short, standard brief for a picked service → POST as a PENDING support
+// request (service ref + structured fields). Per-service custom fields are out
+// of R2 scope. Crystal-clear that NOTHING is charged or ordered automatically.
+async function openServiceRequest(svc){
+  const box='style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
+  let html=`<p><a class="link" href="#" id="back">← Back to requests</a></p><header><h1>Request: ${esc(svc.name)}</h1><p class="sub">Tell your studio a little about what you need. They’ll review and reply with next steps — nothing is charged and nothing is ordered automatically.</p></header><section><div class="card">`+
+    `<label for="sr-need" style="display:block;font-weight:600;margin-bottom:6px">What do you need?</label><textarea id="sr-need" rows="3" ${box} placeholder="A short description of what you’re looking for…"></textarea>`+
+    `<label for="sr-time" style="display:block;font-weight:600;margin:12px 0 6px">Ideal timeline <span class="muted" style="font-weight:400">(optional)</span></label><input id="sr-time" type="text" ${box} placeholder="e.g. in the next month, no rush…">`+
+    `<label for="sr-budget" style="display:block;font-weight:600;margin:12px 0 6px">Budget range <span class="muted" style="font-weight:400">(optional)</span></label><input id="sr-budget" type="text" ${box} placeholder="e.g. around \$500, not sure yet…">`+
+    `<p class="muted" style="margin-top:12px;font-size:12.5px">This sends a request only. Your studio will review it and get back to you with next steps and pricing — nothing is charged now.</p>`+
+    `<div class="row"><button class="approve" id="sr-send">Send request</button></div></div></section>`;
+  $('main').innerHTML=html;
+  $('back').addEventListener('click',(e)=>{e.preventDefault();renderRequests();});
+  $('sr-send').addEventListener('click',async()=>{
+    const btn=$('sr-send');const need=$('sr-need').value.trim();
+    if(!need){toast('Tell your studio what you need first.');return;}
+    btn.disabled=true;
+    const r=await api('/client/support','POST',{subject:'Service request: '+svc.name,service:svc.id,brief:{need,timeline:$('sr-time').value.trim(),budget:$('sr-budget').value.trim()}});
+    if(r.ok&&r.body&&r.body.data&&r.body.data.id){toast('Sent — your studio will review and get back to you with next steps. Nothing’s charged.');renderRequests();}
+    else{toast('That didn’t send — please try again.');btn.disabled=false;}
+  });
 }
 // ── HELP — the studio's FAQ (searchable/expandable) + a way to reach a human ──
 async function renderHelp(){

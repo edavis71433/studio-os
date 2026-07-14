@@ -3,6 +3,7 @@
 import {
   isSurveyStatus, normalizeQuestions, normalizeAnswers,
   isSupportStatus, canSupportTransition, isSupportPriority,
+  composeServiceBrief,
 } from '../../supabase/functions/presence/lib/intake.ts';
 
 const results = [];
@@ -29,6 +30,28 @@ ok('support: closed→open (reopen) allowed', canSupportTransition('closed', 'op
 ok('support: closed→resolved refused (must reopen first)', !canSupportTransition('closed', 'resolved'));
 ok('support: same→same refused', !canSupportTransition('open', 'open'));
 ok('isSupportPriority guards the enum', isSupportPriority('urgent') && isSupportPriority('low') && !isSupportPriority('critical'));
+
+// service requests (R2) — composeServiceBrief folds a picked offering + brief into plain text
+ok('brief: names the service + labels each field', (() => {
+  const b = composeServiceBrief('Logo Refresh', { need: 'A cleaner mark', timeline: 'next month', budget: '$500' });
+  return b.includes('Service requested: Logo Refresh') && b.includes('What they need: A cleaner mark') && b.includes('Ideal timeline: next month') && b.includes('Budget range: $500');
+})());
+ok('brief: optional fields omitted when blank (need-only)', (() => {
+  const b = composeServiceBrief('Website Audit', { need: 'Just the audit' });
+  return b === 'Service requested: Website Audit\nWhat they need: Just the audit';
+})());
+ok('brief: no service name → no "Service requested" line (degrades cleanly)',
+  composeServiceBrief(null, { need: 'help' }) === 'What they need: help');
+ok('brief: extra note appended as "More detail"',
+  composeServiceBrief('X', { need: 'a' }, 'and one more thing').includes('More detail: and one more thing'));
+ok('brief: newlines/tabs in a field are collapsed to single spaces (single-line, plain text)',
+  composeServiceBrief(null, { need: 'line one\nline two\t\tend' }) === 'What they need: line one line two end');
+ok('brief: everything empty → empty string (no stray labels)',
+  composeServiceBrief(null, {}) === '' && composeServiceBrief('', null) === '');
+ok('brief: each field is length-capped', (() => {
+  const b = composeServiceBrief('n', { need: 'x'.repeat(5000) });
+  return b.length <= 5000 && b.startsWith('Service requested: n\nWhat they need: ') && b.length > 2000;
+})());
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ INTAKE (P2-D-4 pure): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

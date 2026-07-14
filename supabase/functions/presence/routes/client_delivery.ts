@@ -12,7 +12,7 @@ import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCust
 import { csatRatingsForProject } from '../lib/csat.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
-import { normalizeAnswers, isSupportPriority } from '../lib/intake.ts';
+import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -253,6 +253,26 @@ export async function handleClientNotificationsRead(_req: Request, site: SiteRow
   return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
 }
 
+// ═══ SERVICES (the studio's visible offerings — the catalog a client requests FROM) ═══
+// Read-only projection of the agency's presence_offerings, scoped to the caller's
+// linked agency site (SAME resolution as handleClientSupport). Only VISIBLE, non-
+// deleted offerings. Empty array when the studio has listed none (or the caller has
+// no active service-link, e.g. a reviewer) → the portal shows a calm empty state.
+export async function handleClientServices(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const me = customerOf(site);
+  if (!me) return json({ data: [] }, 200, cors);
+  const links = await linksForCustomer(me);
+  if (!links.length) return json({ data: [] }, 200, cors);
+  const s = links[0].agency_site_id;                 // a customer's delivery lives on their converting agency's site
+  const r = await svc(`presence_offerings?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&select=id,name,category,description,price_text&order=sort_order.asc,created_at.asc&limit=200`);
+  if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
+  const list = rows(r).map((o) => ({
+    id: o.id, name: clean(o.name, 120), category: clean(o.category, 60),
+    description: clean(o.description, 500), price: clean(o.price_text, 40),
+  }));
+  return json({ data: list }, 200, cors);
+}
+
 // ═══ SUPPORT (client submits/replies; the studio triages via /support on the agency site) ═══
 export async function handleClientSupport(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const me = customerOf(site);
@@ -271,8 +291,23 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   let projectId: string | null = UUID_RE.test(b.project_id || '') ? b.project_id : null;
   if (projectId && !(await linkForCustomerProject(me, projectId))) projectId = null; // only a linked project
   const priority = isSupportPriority(b.priority) ? b.priority : 'normal';
+  // R2 service request: an optional reference to one of THIS studio's visible
+  // offerings + a structured brief. The offering is verified to live on THIS
+  // agency site (tenant-safe) before its name is used; the brief is folded into
+  // the request body as clean, plain, escaped text (there is no jsonb column).
+  // It is still just a PENDING support request the studio confirms + quotes by
+  // hand — NOTHING is charged and no paid order is created (the moat).
+  let serviceName: string | null = null;
+  if (UUID_RE.test(b.service || '')) {
+    const off = rows(await svc(`presence_offerings?id=eq.${b.service}&site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&select=name&limit=1`))[0];
+    serviceName = off ? (clean(off.name, 120) || null) : null;
+  }
+  const hasBrief = b.brief && typeof b.brief === 'object';
+  const body = (serviceName || hasBrief)
+    ? composeServiceBrief(serviceName, hasBrief ? b.brief : null, b.body)
+    : clean(b.body, 5000);
   const ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: s, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind }) });
+    body: JSON.stringify({ site_id: s, project_id: projectId, subject, body, status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (projectId) await clientEvent(s, projectId, 'support_opened', principal, { request_id: rows(ins)[0].id, subject });
   // service edge #2: auto-acknowledge the customer — a submitted ticket used to

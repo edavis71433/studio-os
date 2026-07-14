@@ -63,6 +63,35 @@ export function isSupportPriority(p: unknown): p is SupportPriority {
   return p === 'low' || p === 'normal' || p === 'high' || p === 'urgent';
 }
 
+// ── service requests (R2) — a client picks one of the studio's OFFERINGS and
+// submits a structured brief. There is NO auto-charge and NO paid order: this
+// composes a clean, plain-text summary that is folded into the ONE support-
+// request spine (presence_support_requests has no jsonb column), which the
+// studio confirms + quotes by hand. Pure so the caps + formatting are
+// deterministic and unit-testable. No HTML, no markup — labelled plain lines. ──
+export interface ServiceBrief { need?: unknown; timeline?: unknown; budget?: unknown; }
+const briefLine = (s: unknown, max: number) =>
+  String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+/** Build the plain-text body for a service request. `serviceName` (optional)
+ *  names the picked offering; the brief fields are the standard R2 questions
+ *  ("What do you need?" / "Ideal timeline" / "Budget range"). `note` is any extra
+ *  free text. Returns a labelled, plain-text block (max 5000 chars). Pure. */
+export function composeServiceBrief(serviceName: unknown, brief: ServiceBrief | null | undefined, note?: unknown): string {
+  const b = brief || {};
+  const name = briefLine(serviceName, 120);
+  const need = briefLine(b.need, 2000);
+  const timeline = briefLine(b.timeline, 200);
+  const budget = briefLine(b.budget, 200);
+  const extra = briefLine(note, 2000);
+  const lines: string[] = [];
+  if (name) lines.push(`Service requested: ${name}`);
+  if (need) lines.push(`What they need: ${need}`);
+  if (timeline) lines.push(`Ideal timeline: ${timeline}`);
+  if (budget) lines.push(`Budget range: ${budget}`);
+  if (extra) lines.push(`More detail: ${extra}`);
+  return lines.join('\n').slice(0, 5000);
+}
+
 // ── support aging (service edge #3 — nudge the OWNER, never the customer) ──────
 export const SUPPORT_AGING_DAYS = 2;         // quiet at least this long → one owner nudge
 export const SUPPORT_AGING_MAX_DAYS = 30;    // …but a truly ancient ticket isn't nagged
