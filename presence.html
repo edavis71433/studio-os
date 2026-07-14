@@ -5458,7 +5458,7 @@ function renderBlocksCard() {
       b.style.cssText = "text-align:left;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0";
       b.appendChild(Object.assign(el("div", null, "+ " + d.name), { style: "font-weight:600;font-size:12.5px" }));
       if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:11px;color:var(--soft,#888)" }));
-      b.addEventListener("click", () => { BLOCKS_WORK.push(emptyBlock(d)); BLOCK_FOCUS = BLOCKS_WORK.length - 1; renderBlocksCard(); });
+      b.addEventListener("click", () => { dcCaptureScroll(); BLOCKS_WORK.push(emptyBlock(d)); BLOCK_FOCUS = BLOCKS_WORK.length - 1; DC_FOCUS_BI = BLOCKS_WORK.length - 1; saveBlocks(); });
       return b;
     };
     // Recommended for you — the server suggestion, folded in as the lead group.
@@ -5477,7 +5477,7 @@ function renderBlocksCard() {
       if (recTypes.length > 1) {
         const all = el("button", null, "Add all recommended"); all.type = "button";
         all.style.cssText = "font:inherit;font-size:12px;margin-top:10px;padding:6px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
-        all.addEventListener("click", () => { let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) BLOCK_FOCUS = firstAt; renderBlocksCard(); });
+        all.addEventListener("click", () => { dcCaptureScroll(); let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) { BLOCK_FOCUS = firstAt; DC_FOCUS_BI = firstAt; } saveBlocks(); });
         wrap.appendChild(all);
       }
       lib.appendChild(wrap);
@@ -6700,7 +6700,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
         const txt = el("span", "ti-txt"); txt.appendChild(el("span", "ti-name", d.name));
         if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
         b.appendChild(txt);
-        b.addEventListener("click", () => { closeInsertMenu(); addBlockAt(d, atIndex); });
+        b.addEventListener("click", () => { closeInsertMenu(); dcCaptureScroll(); addBlockAt(d, atIndex); saveBlocks(); });
         wrap.appendChild(b); shown++;
       });
       list.appendChild(wrap);
@@ -6714,7 +6714,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   // Clamped to the viewport; it's a fixed layer, not XY page content.
   const r = rectOverride || (anchor && anchor.getBoundingClientRect()) || { bottom: 80, left: 80 };
   menu.style.position = "fixed";
-  menu.style.top = Math.min(r.bottom + 6, window.innerHeight - 20 - menu.offsetHeight) + "px";
+  menu.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - 20 - menu.offsetHeight)) + "px";
   menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + "px";
   document.addEventListener("keydown", insertMenuKey, true);
   setTimeout(() => { try { search.focus(); } catch (_) {} }, 20);
