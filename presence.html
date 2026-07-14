@@ -613,15 +613,13 @@ body.pd-dragging *{cursor:grabbing !important}
     <nav class="rooms" id="nav">
       <button class="navitem on" data-view="today" aria-current="page">Today</button>
       <div class="railsep"></div>
-      <button class="navitem" data-view="business">Business</button>
-      <button class="navitem" data-view="offerings">Menu</button>
-      <button class="navitem" data-view="faqs">Questions</button>
-      <button class="navitem" data-view="testimonials">Kind words</button>
-      <button class="navitem" data-view="updates">Updates</button>
+      <!-- Consolidated: your business info, menu, questions, kind words and updates
+           are all edited ON the page in Design (click a section to edit it). Photos
+           is your media library; Bookings & Reviews are their own tools. -->
+      <button class="navitem" data-view="design">Design</button>
       <button class="navitem" data-view="media">Photos</button>
       <button class="navitem" data-view="bookings">Bookings</button>
       <button class="navitem" data-view="reviews">Reviews</button>
-      <button class="navitem" data-view="design">Design</button>
       <div class="railsep"></div>
       <button class="navitem" data-view="history">History</button>
     </nav>
@@ -4711,7 +4709,7 @@ function renderPagesBar() {
     const pill = el("button", "page-pill" + (on ? " on" : "") + (hidden ? " hidden-nav" : "")); pill.type = "button"; pill.setAttribute("role", "tab"); pill.setAttribute("aria-selected", String(on));
     pill.appendChild(el("span", "pp-name", pg.title + (hidden ? " (hidden)" : "")));
     pill.addEventListener("click", () => dcSwitchPage(pg.slug));
-    if (pg.slug) { const mn = el("span", "pp-menu", "⋯"); mn.title = "Rename or delete this page"; mn.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, mn); }); pill.appendChild(mn); }
+    const mn = el("span", "pp-menu", "⋯"); mn.title = pg.slug ? "Rename, clear or delete this page" : "Clear this page"; mn.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, mn); }); pill.appendChild(mn);
     host.appendChild(pill);
   });
   const add = el("button", "page-add", "＋ Page"); add.type = "button"; add.title = "Add a new page to your website";
@@ -4780,14 +4778,21 @@ async function dcChoosePageLayout(title) {
   });
 }
 function dcPageMenu(slug, anchor) {
-  const p = dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
+  const isHome = !slug;
+  const p = isHome ? null : dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
   const m = el("div", "pp-pop");
-  const rn = el("button", "pp-pop-item", "Rename"); rn.type = "button"; rn.addEventListener("click", () => { m.remove(); dcRenamePage(slug); });
-  const nv = el("button", "pp-pop-item", (p && p.hideNav) ? "Show in menu" : "Hide from menu"); nv.type = "button"; nv.addEventListener("click", () => { m.remove(); dcTogglePageNav(slug); });
-  const ml = el("button", "pp-pop-item", "Move left"); ml.type = "button"; if (idx <= 0) ml.disabled = true; else ml.addEventListener("click", () => { m.remove(); dcMovePage(slug, -1); });
-  const mr = el("button", "pp-pop-item", "Move right"); mr.type = "button"; if (idx >= last) mr.disabled = true; else mr.addEventListener("click", () => { m.remove(); dcMovePage(slug, 1); });
-  const dl = el("button", "pp-pop-item danger", "Delete page"); dl.type = "button"; dl.addEventListener("click", () => { m.remove(); dcDeletePage(slug); });
-  m.append(rn, nv, ml, mr, dl); document.body.appendChild(m);
+  if (!isHome) {
+    const rn = el("button", "pp-pop-item", "Rename"); rn.type = "button"; rn.addEventListener("click", () => { m.remove(); dcRenamePage(slug); });
+    const nv = el("button", "pp-pop-item", (p && p.hideNav) ? "Show in menu" : "Hide from menu"); nv.type = "button"; nv.addEventListener("click", () => { m.remove(); dcTogglePageNav(slug); });
+    const ml = el("button", "pp-pop-item", "Move left"); ml.type = "button"; if (idx <= 0) ml.disabled = true; else ml.addEventListener("click", () => { m.remove(); dcMovePage(slug, -1); });
+    const mr = el("button", "pp-pop-item", "Move right"); mr.type = "button"; if (idx >= last) mr.disabled = true; else mr.addEventListener("click", () => { m.remove(); dcMovePage(slug, 1); });
+    m.append(rn, nv, ml, mr);
+  }
+  // Clear the template/sections off the canvas → a blank page (works on Home too)
+  const cl = el("button", "pp-pop-item", "Clear page (start blank)"); cl.type = "button"; cl.addEventListener("click", () => { m.remove(); dcClearPage(slug); });
+  m.appendChild(cl);
+  if (!isHome) { const dl = el("button", "pp-pop-item danger", "Delete page"); dl.type = "button"; dl.addEventListener("click", () => { m.remove(); dcDeletePage(slug); }); m.appendChild(dl); }
+  document.body.appendChild(m);
   const r = anchor.getBoundingClientRect();
   m.style.cssText = "position:fixed;z-index:300;top:" + (r.bottom + 4) + "px;left:" + Math.max(8, r.left - 70) + "px;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px";
   const off = (e) => { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("mousedown", off, true); } };
@@ -4819,6 +4824,15 @@ async function dcDeletePage(slug) {
     if (DC_PAGE === slug) { DC_PAGE = ""; dcResetHistory(); BLOCKS_WORK = currentBlocks(); }
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview(); toast("Page deleted — publish to update your live site");
   } catch (err) { toast(nice(err), true); }
+}
+// Clear a page's sections back to a blank canvas (removes the applied template).
+// Works on Home and custom pages; undoable; live site unchanged until publish.
+function dcClearPage(slug) {
+  slug = slug || "";
+  if (slug !== DC_PAGE) dcSwitchPage(slug);   // clear the page you picked
+  if (!Array.isArray(BLOCKS_WORK) || !BLOCKS_WORK.length) { toast("This page is already blank"); return; }
+  if (!confirm("Clear all sections from “" + dcPageTitle(slug) + "” and start from a blank canvas? You can Undo this, and your live site is unchanged until you publish.")) return;
+  dcCaptureScroll(); BLOCKS_WORK = []; BLOCK_FOCUS = null; renderBlocksCard(); saveBlocks();
 }
 function blockText(def, blk) {
   if (def.areasSimple) return (blk.areas || []).join("\n");
@@ -7014,12 +7028,10 @@ function dcPageTreeRow(pg, cur) {
   mn.appendChild(txt);
   mn.addEventListener("click", () => dcSwitchPage(pg.slug));
   row.appendChild(mn);
-  if (pg.slug) {
-    const acts = el("span", "dc-tree-acts");
-    const m = el("button", null, "⋯"); m.type = "button"; m.title = "Rename, hide or delete this page";
-    m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
-    acts.appendChild(m); row.appendChild(acts);
-  }
+  const acts = el("span", "dc-tree-acts");
+  const m = el("button", null, "⋯"); m.type = "button"; m.title = pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page";
+  m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
+  acts.appendChild(m); row.appendChild(acts);
   return row;
 }
 // The sections of the currently-open page, nested (indented) under its page row.

@@ -251,6 +251,102 @@ export const STARTER_LAYOUTS: StarterLayout[] = [
       cta('Ready to book? Add your booking link or phone number so clients can reserve a time.'),
     ],
   },
+  {
+    key: 'nonprofit',
+    name: 'Nonprofit / cause',
+    description: 'For nonprofits and causes: your mission, what you do, the impact you’ve made, and how people can help.',
+    blocks: [
+      { type: 'richtext', title: 'Our mission', body: 'Say what you stand for in a few clear, heartfelt sentences — who you help and the change you’re working toward.' },
+      { type: 'cards', id: 'starter_programs', title: 'What we do', cards: [
+        { heading: 'A program', text: 'Describe one thing you do and who it helps.' },
+        { heading: 'Another program', text: 'Add a second area of your work.' },
+        { heading: 'One more', text: 'A third — keep each short and clear.' },
+      ] },
+      { type: 'stats', title: 'Our impact', items: [
+        { value: '1,000+', label: 'People helped' },
+        { value: '10 yrs', label: 'Serving the community' },
+        { value: '100%', label: 'Mission-driven' },
+      ] },
+      { type: 'features', title: 'How you can help', items: [
+        { title: 'Donate', text: 'Explain how a gift makes a difference.', icon: '💛' },
+        { title: 'Volunteer', text: 'Invite people to give their time.', icon: '🙌' },
+        { title: 'Spread the word', text: 'Ask supporters to share your mission.', icon: '📣' },
+      ] },
+      cta('Want to help? Add your donation link, volunteer form or the best way to get involved.'),
+    ],
+  },
+  {
+    key: 'education',
+    name: 'Courses & classes',
+    description: 'For tutors, coaches, studios and schools: a welcome, your programs, why choose you, common questions, and an enrol prompt.',
+    blocks: [
+      { type: 'richtext', title: 'Welcome', body: 'Introduce what you teach and who it’s for in a few encouraging sentences.' },
+      { type: 'cards', id: 'starter_courses', title: 'Programs & classes', cards: [
+        { heading: 'A course', text: 'Name a class and who it’s for in one line.' },
+        { heading: 'Another course', text: 'Add a second program here.' },
+        { heading: 'One more', text: 'A third — add levels, ages or schedules below.' },
+      ] },
+      { type: 'features', title: 'Why learn with us', items: [
+        { title: 'Experienced teachers', text: 'What makes your instruction stand out.', icon: '🎓' },
+        { title: 'Real results', text: 'What students achieve with you.', icon: '📈' },
+        { title: 'A supportive space', text: 'The environment learners can expect.', icon: '🤝' },
+      ] },
+      { type: 'accordion', title: 'Common questions', items: [
+        { summary: 'Who is this for?', body: 'Ages, levels or prerequisites.' },
+        { summary: 'How do I sign up?', body: 'Explain enrolment in a sentence.' },
+        { summary: 'Pricing & schedule', body: 'Give a sense of cost and timing.' },
+      ] },
+      cta('Ready to enrol? Add your sign-up link or the best way to get started.'),
+    ],
+  },
+  {
+    key: 'events',
+    name: 'Events & venue',
+    description: 'For venues, entertainers and event hosts: a welcome, what makes you special, what’s on, good-to-know details, and a booking prompt.',
+    blocks: [
+      { type: 'richtext', title: 'Welcome', body: 'Set the scene — what you host, the atmosphere, and why people love coming.' },
+      { type: 'features', title: 'What makes us special', items: [
+        { title: 'The experience', text: 'What guests remember most.', icon: '✨' },
+        { title: 'The space', text: 'Describe your venue or setup.', icon: '📍' },
+        { title: 'Made easy', text: 'How you take care of the details.', icon: '✅' },
+      ] },
+      { type: 'cards', id: 'starter_events', title: 'What’s on', cards: [
+        { heading: 'An event or package', text: 'Name it and tempt people in one line.' },
+        { heading: 'Another', text: 'Add a second offering here.' },
+        { heading: 'One more', text: 'A third — add dates and details below.' },
+      ] },
+      { type: 'accordion', title: 'Good to know', items: [
+        { summary: 'Booking & availability', body: 'How far ahead to book.' },
+        { summary: 'Capacity & options', body: 'Group sizes, packages, add-ons.' },
+        { summary: 'Getting here', body: 'Location and parking.' },
+      ] },
+      cta('Ready to plan something? Add a booking link or the best way to get in touch.'),
+    ],
+  },
+  {
+    key: 'medical',
+    name: 'Clinic & practice',
+    description: 'For clinics and practices: a reassuring welcome, your services, why choose you, good-to-know answers, and a booking prompt.',
+    blocks: [
+      { type: 'richtext', title: 'Welcome', body: 'Introduce your practice in a few calm, reassuring sentences — the care you provide and who it’s for.' },
+      { type: 'cards', id: 'starter_services', title: 'Our services', cards: [
+        { heading: 'A service', text: 'Name a service and describe it in one clear line.' },
+        { heading: 'Another service', text: 'Add a second here.' },
+        { heading: 'One more', text: 'A third to start with.' },
+      ] },
+      { type: 'features', title: 'Why choose us', items: [
+        { title: 'Experienced team', text: 'The expertise patients can trust.', icon: '🩺' },
+        { title: 'Gentle, personal care', text: 'How you put people at ease.', icon: '💙' },
+        { title: 'Easy to reach', text: 'Booking, hours and location.', icon: '📅' },
+      ] },
+      { type: 'accordion', title: 'Good to know', items: [
+        { summary: 'Insurance & payment', body: 'What you accept.' },
+        { summary: 'New patients', body: 'How to get started.' },
+        { summary: 'Hours & location', body: 'Where and when to find you.' },
+      ] },
+      cta('Ready to book? Add your booking link or phone number so patients can make an appointment.'),
+    ],
+  },
 ];
 
 // ── Which starter suits an industry. Mirrors the vertical_presets FAMILY grouping
@@ -262,26 +358,33 @@ const STARTER_FOR: Record<string, string> = {
   electrician: 'services_business', contractor: 'services_business', roofing: 'services_business',
   landscaping: 'services_business', cleaning: 'services_business', pest_control: 'services_business',
   moving: 'services_business', auto_repair: 'services_business', auto_detailing: 'services_business',
-  // professional & creative → services business
+  // professional → services business
   professional: 'services_business', law: 'services_business', accounting: 'services_business',
   insurance: 'services_business', consulting: 'services_business', marketing: 'services_business',
-  real_estate: 'services_business', childcare: 'services_business', tutoring: 'services_business',
+  real_estate: 'services_business',
+  // teaching & learning → courses & classes
+  tutoring: 'education', childcare: 'education', music_lessons: 'education',
+  driving_school: 'education', coaching: 'education', training: 'education',
   // creative & makers → creative portfolio
   photography: 'creative', videography: 'creative', interior_design: 'creative',
-  event_planning: 'creative', graphic_design: 'creative', web_design: 'creative', artist: 'creative',
-  // community → services business (about → what we do → get involved)
-  nonprofit: 'services_business', church: 'services_business',
-  // beauty, fitness & medical → wellness / appointments
+  graphic_design: 'creative', web_design: 'creative', artist: 'creative',
+  // events & venues → events
+  event_planning: 'events', venue: 'events', dj: 'events', entertainment: 'events',
+  // community & causes → nonprofit
+  nonprofit: 'nonprofit', church: 'nonprofit', charity: 'nonprofit',
+  // beauty & fitness → wellness / appointments
   salon: 'wellness', barber: 'wellness', spa: 'wellness', nail_salon: 'wellness', massage: 'wellness',
   pet_grooming: 'wellness', fitness: 'wellness', gym: 'wellness', yoga: 'wellness',
-  medical: 'wellness', dental: 'wellness', veterinary: 'wellness',
+  // clinics & practices → medical
+  medical: 'medical', dental: 'medical', veterinary: 'medical', chiropractor: 'medical', optometry: 'medical',
   // retail / product → shop
   retail: 'retail', florist: 'retail', jewelry: 'retail', boutique: 'retail', bookstore: 'retail', furniture: 'retail',
   // food → restaurant
   restaurant: 'restaurant', coffee_shop: 'restaurant', cafe: 'restaurant', bar: 'restaurant',
   food_truck: 'restaurant', bakery: 'restaurant', catering: 'restaurant', brewery: 'restaurant', winery: 'restaurant',
-  // explicit generics
+  // explicit generics + new-layout self-keys
   generic: 'generic', business: 'generic',
+  nonprofit_generic: 'nonprofit', education: 'education', events: 'events', medical_generic: 'medical',
 };
 
 /** The starter layout KEY recommended for an industry (never null; generic is the

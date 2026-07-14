@@ -93,7 +93,7 @@ function stringFieldsOf(b) {   // → [{ v, cap }] every human-authored string i
   // The families are actually USED — each starter is the recommendation for some industry.
   const used = new Set(allIndustryKeys().map((k) => starterKeyFor(k)));
   ok('services_business is recommended for trades + pros', starterKeyFor('plumber') === 'services_business' && starterKeyFor('law') === 'services_business');
-  ok('restaurant → food, retail → shops, wellness → salon/clinic/gym', starterKeyFor('restaurant') === 'restaurant' && starterKeyFor('boutique') === 'retail' && starterKeyFor('salon') === 'wellness' && starterKeyFor('dental') === 'wellness' && starterKeyFor('gym') === 'wellness');
+  ok('restaurant → food, retail → shops, wellness → salon/gym, clinics → medical, causes → nonprofit, teaching → education, venues → events', starterKeyFor('restaurant') === 'restaurant' && starterKeyFor('boutique') === 'retail' && starterKeyFor('salon') === 'wellness' && starterKeyFor('gym') === 'wellness' && starterKeyFor('dental') === 'medical' && starterKeyFor('veterinary') === 'medical' && starterKeyFor('nonprofit') === 'nonprofit' && starterKeyFor('tutoring') === 'education' && starterKeyFor('event_planning') === 'events');
   ok('at least four distinct families are actually recommended in practice', used.size >= 4);
 }
 
