@@ -29,30 +29,26 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 
 ## Code — for me to do (Eric will batch-review)
 
-- ⏳ **Analytics / Google Search Console connection** (raised on analytics.html):
-  - The "1 of 1 client hasn't connected Google Search Console" card is worded as if the
-    *client* connects it. Eric: "I should be doing this, not the customer."
-  - Reality: `connections.html` is an **operator** page and already supports connecting
-    for a specific client via `?client=<siteId>` (→ `x-dds-scope-site`). So the operator
-    CAN do it — it's just not framed or surfaced that way.
-  - FIX: reword the GSC + Google Analytics "not connected" cards to operator framing;
-    add a discoverable **"Connect their Search Console"** entry point in the client's
-    profile (today only `crm.html` has a small "Connected services →" link). Scope the
-    analytics card's link to the specific client.
-- ⏳ **#184 Layout containers / columns** — Eric's repeated ask: "column controls on the
-  templates," "each layout container you should also be able to choose a component,"
-  "drop arbitrary blocks INTO each column." Columns block exists (1–6 cols, resize) but
-  you can't yet drop *arbitrary components* into a cell. Needs render + serializer change.
-- ⏳ **AEM component parity check** — Eric wants the full out-of-the-box set (carousel ✅,
-  image ✅, text ✅, accordion ✅, buttons ✅, columns ✅, table?, Title, Link List,
-  Spotlight). Verify Table/Link-List/Title/Spotlight are actually present (some were
-  reverted mid-build) and add any missing.
+- ✅ **Analytics / Google Search Console connection** — DONE. Reworded the agency card to
+  operator framing ("connect it for them — it's your setup, not theirs") and made it a
+  working action: links straight to that client's scoped connections
+  (`/connections.html?client=<siteId>`) when one client needs it. Deployed.
+- ✅ **AEM component parity — Table, Title, Link List, Spotlight** — DONE. All four built
+  (backend + builder editor) and deployed; drop them from "Add section". (Existing set
+  already had carousel/image/text/accordion/buttons/columns/etc.)
+- ✅ **Convert flow** — VERIFIED, no bug. All 3 convert options already land the customer
+  in the client portal (`client.html`); the CRM only keeps *your* operator view.
+- ✅ **"Add a section shows nothing"** — root-caused + fixed: added blocks are now seeded
+  with editable placeholder content so a content section renders the instant you add it;
+  media blocks open their editor to pick a file. Deployed + in presence.html (push).
+- ⏳ **#184 Layout containers / columns** — STILL OPEN. Eric's ask: "each layout container
+  you should also be able to choose a component," "drop arbitrary blocks INTO each
+  column." Columns exist (1–6 cols, resize, text/image/button per cell) but you can't yet
+  drop *arbitrary component types* into a cell. Needs a recursive render + serializer +
+  editor change — the biggest remaining builder item.
 - ⏳ **More visual templates/themes** (#183) — only 3 template *designs* exist
-  (business-classic, editorial, restaurant-classic). Starter *layouts* were expanded to
-  13, but Eric also wants more full theme designs.
-- ⏳ **Convert flow** — "I selected 'building their site on their own platform' … it took
-  me to the CRM … this should go to the client portal." Verify converted customers land
-  in the client portal, not CRM.
+  (business-classic, editorial, restaurant-classic). Starter *layouts* are at 13, but
+  Eric also wants more full theme designs.
 
 ## Done this stretch (verify after push)
 
