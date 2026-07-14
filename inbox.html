@@ -26,6 +26,14 @@
   .item .when{margin-left:auto;font-size:12.5px;color:var(--faint)}
   .item .body{margin-top:8px;font-size:14.5px;color:var(--soft)}
   .item .go{margin-top:12px;color:var(--p);font-weight:600;font-size:13.5px}
+  .item.convo{padding:14px 18px}
+  .convo-row{display:flex;align-items:center;gap:13px}
+  .convo .avatar{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--p,#5b3fa0);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;letter-spacing:.02em}
+  .convo-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .convo-main .top{display:flex;align-items:center;gap:10px}
+  .convo-main .body{margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cmbadge{flex:0 0 auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--p,#5b3fa0);color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  h2 .cmcount{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;padding:0 7px;margin-left:8px;border-radius:999px;background:var(--p,#5b3fa0);color:#fff;font-size:13px;font-weight:700;vertical-align:middle}
   .cmbar{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--soft)}
   .cmbar select{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:13.5px}
   .cmhead{font-family:var(--serif);font-weight:500;font-size:16px;color:var(--ink);margin:16px 0 8px;text-transform:none;letter-spacing:0}
@@ -107,33 +115,39 @@ function render(feed,leads,notifs){
   const clientMsgs=(feed.client_messages||[]);
   // Keep recently-read activity VISIBLE (dimmed) — glancing at the Inbox must
   // never make unhandled items vanish; they just stop counting as new.
-  const activity=(notifs||[]).slice(0,12);
+  // Client messages/support now live in their own "Messages" conversations section
+  // above — keep them OUT of the dim "Project activity" list so they're not shown twice.
+  const activity=(notifs||[]).filter(n=>!/^(new message|support:)/i.test(String(n.label||''))).slice(0,12);
   const unreadCount=activity.filter(n=>!n.read).length;
   const total=approvals.length+clientMsgs.length+notices.length+moments.length+newLeads.length+unreadCount;
   let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;
   if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div><p style="text-align:center;margin-top:14px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p>`;h+=toolkit();$('main').innerHTML=h;return;}
   if(!total&&activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing new — recent activity is below.</div>`;}
 
-  // Messages from your clients — grouped BY CLIENT (not a flat list) with a
-  // dropdown to switch which client you're viewing. Each message still links to
-  // where you reply (the customer's delivery view / the support thread).
-  if(clientMsgs.length){h+=`<h2>Messages from your clients</h2>`;
-    const groups=new Map(); // client_id → {name, items}
+  // Messages from your clients — ONE conversation per client (not a flat list of
+  // every message). Each row shows who's waiting + their most recent message + how
+  // many, and opens THAT client's thread where you reply. This is the "who has
+  // messages" summary Eric asked for; the thread itself lives in their profile.
+  if(clientMsgs.length){
+    const groups=new Map(); // client_id → {name, items, href}
     for(const c of clientMsgs){const key=c.client_id||'';const nm=c.client||'Other clients';
-      if(!groups.has(key))groups.set(key,{name:nm,items:[]});groups.get(key).items.push(c);}
+      if(!groups.has(key))groups.set(key,{name:nm,items:[],href:''});const g=groups.get(key);g.items.push(c);if(c.href&&!g.href)g.href=c.href;}
     const glist=[...groups.entries()];
-    if(glist.length>1){
-      h+=`<div class="cmbar"><label for="cmSel">Show</label> <select id="cmSel" onchange="filterClientMsgs(this.value)"><option value="">All clients (${clientMsgs.length})</option>${glist.map(([k,g])=>`<option value="${esc(k||'__none')}">${esc(g.name)} (${g.items.length})</option>`).join('')}</select></div>`;}
+    // most-recently-active client first
+    const lastAt=(g)=>g.items.reduce((m,c)=>String(c.created_at||'')>m?String(c.created_at||''):m,'');
+    glist.sort((a,b)=>lastAt(b[1]).localeCompare(lastAt(a[1])));
+    h+=`<h2>Messages <span class="cmcount">${glist.length}</span></h2>`;
+    h+=`<p class="mut" style="margin:-6px 0 12px">${glist.length===1?'1 client is waiting to hear back from you.':glist.length+' clients are waiting to hear back from you.'}</p>`;
     for(const [k,g] of glist){
-      h+=`<div class="cmgroup" data-cm="${esc(k||'__none')}">`;
-      if(glist.length>1){h+=`<h3 class="cmhead">${esc(g.name)}</h3>`;}
-      for(const c of g.items){const isSup=c.type==='support';
-        const title=isSup?esc(c.subject||'Support request'):'A client sent you a message';
-        const bits=[]; if(c.client)bits.push(esc(c.client)); if(c.project)bits.push('Project: '+esc(c.project)); else if(isSup)bits.push('General request');
-        const ctx=bits.join(' · ');
-        h+=`<a class="item approve" href="${esc(scoped(c.href||'/projects.html'))}"><div class="top"><span class="tag">${isSup?'Support':'Message'}</span>${c.created_at?`<span class="when">${esc(when(c.created_at))}</span>`:''}</div><div class="who" style="margin-top:8px">${title}</div>${ctx?`<div class="body">${ctx}</div>`:''}<div class="go">View &amp; reply →</div></a>`;}
-      h+=`</div>`;}
-    h+=`<div id="cmEmpty" class="mut" style="display:none">No messages from this client right now.</div>`;}
+      const latest=g.items.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||{};
+      const isSup=latest.type==='support';
+      const preview=isSup?('Support: '+esc(latest.subject||'a request')):'Sent you a message';
+      const n=g.items.length;
+      const href=scoped(g.href||'/projects.html');
+      const initials=esc((g.name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
+      h+=`<a class="item convo" href="${esc(href)}"><div class="convo-row"><span class="avatar" aria-hidden="true">${initials}</span><span class="convo-main"><span class="top"><span class="who">${esc(g.name)}</span>${latest.created_at?`<span class="when">${esc(when(latest.created_at))}</span>`:''}</span><span class="body">${preview}</span></span>${n>1?`<span class="cmbadge">${n}</span>`:''}</div><div class="go">Open conversation →</div></a>`;
+    }
+  }
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
     for(const p of approvals){const href=scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations');
