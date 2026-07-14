@@ -5956,6 +5956,17 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
     wsel.addEventListener("change", () => { commit(); renderBlocksCard(); });
     row.append(bd, aiField(bd, {}), bl, bu, wrap);
+    // #184: OR drop a component into this column (a video, a feature list, stats, a
+    // table…). Picking one shows its own mini-editor; a column renders its component
+    // when set, otherwise the text/image/button above.
+    const compRow = el("div"); compRow.style.cssText = "margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#eee)";
+    const cLab = el("label", "hint", "Or drop a component here: "); cLab.style.fontWeight = "600";
+    const cSel = el("select"); cSel.style.cssText = "padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-left:6px";
+    [["", "— none (use the text above) —"], ["video", "Video"], ["features", "Feature list"], ["stats", "Stats / numbers"], ["pricing", "Pricing"], ["table", "Table"], ["title", "Heading"], ["richtext", "Rich text"], ["link_list", "Link list"], ["accordion", "Accordion"]].forEach(([v, lab]) => { const o = el("option", null, lab); o.value = v; if (((c.block && c.block.type) || "") === v) o.selected = true; cSel.appendChild(o); });
+    cSel.addEventListener("change", () => { commit(); const t = cSel.value; if (!t) { delete blk.columns[k].block; } else { const d = BLOCK_DEFS.find((x) => x.type === t); blk.columns[k].block = d ? emptyBlock(d) : { type: t }; } renderBlocksCard(); });
+    cLab.appendChild(cSel); compRow.appendChild(cLab);
+    if (c.block && c.block.type) { const host = el("div"); host.style.cssText = "margin-top:8px"; renderCellBlockEditor(c.block, (nb) => { blk.columns[k].block = nb; }, host); compRow.appendChild(host); }
+    row.appendChild(compRow);
     if (cols.length > 1) {
       const rm = el("button", null, "Remove column"); rm.type = "button"; rm.style.cssText = miniBtn;
       rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
@@ -5969,6 +5980,63 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     sub.appendChild(add);
   }
   sub.appendChild(el("div", "hint", "1–6 columns on a responsive grid — set each column’s width, or drag the dividers right on the page. Everything stacks to one column on phones automatically."));
+}
+// #184: the mini-editor for a component dropped INTO a column cell. Bounded to a
+// curated, simple set (video + the line-based grids + heading/rich-text/table); each
+// writes a valid nested block via save(). The server re-validates it like any block.
+function renderCellBlockEditor(cb, save, host) {
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const taCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box;margin-bottom:6px";
+  const t = cb.type;
+  if (t === "video") {
+    const u = el("input"); u.type = "text"; u.placeholder = "Video link (YouTube, Vimeo, or an .mp4)"; u.value = cb.url || ""; u.style.cssText = inputCss;
+    const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = cb.caption || ""; cap.style.cssText = inputCss;
+    const commit = () => save({ type: "video", url: u.value.trim(), caption: cap.value.trim() || undefined });
+    [u, cap].forEach((i) => i.addEventListener("change", commit));
+    host.append(u, cap, el("div", "hint", "A poster + link — nothing external loads on your live page."));
+    return;
+  }
+  if (t === "title") {
+    const h = el("input"); h.type = "text"; h.placeholder = "Heading"; h.value = cb.title || ""; h.style.cssText = inputCss;
+    const st = el("input"); st.type = "text"; st.placeholder = "Subtitle (optional)"; st.value = cb.subtitle || ""; st.style.cssText = inputCss;
+    const commit = () => save({ type: "title", title: h.value.trim(), subtitle: st.value.trim() || undefined });
+    [h, st].forEach((i) => i.addEventListener("change", commit));
+    host.append(h, st);
+    return;
+  }
+  if (t === "richtext") {
+    const ta = el("textarea"); ta.value = cb.body || ""; ta.setAttribute("data-k", "body_md"); ta.rows = 4; ta.placeholder = "Write your text…"; ta.style.cssText = taCss;
+    ta.addEventListener("change", () => save({ type: "richtext", body: ta.value.trim() }));
+    host.append(ta, aiField(ta, {}));
+    return;
+  }
+  if (t === "table") {
+    const ta = el("textarea");
+    const lines = []; if ((cb.headers || []).length) lines.push(cb.headers.join(" | ")); (cb.rows || []).forEach((r) => lines.push((r || []).join(" | ")));
+    ta.value = lines.join("\n"); ta.placeholder = "Name | Price\nBasic | $10\nPro | $25"; ta.rows = 4; ta.style.cssText = taCss + ";font-family:ui-monospace,monospace";
+    ta.addEventListener("change", () => { const ls = ta.value.split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim()); const cells = (l) => l.split("|").map((x) => x.trim()); save({ type: "table", headers: ls.length ? cells(ls[0]) : [], rows: ls.slice(1).map(cells) }); });
+    host.append(ta, el("div", "hint", "One row per line, columns split by “ | ”. First line = headers."));
+    return;
+  }
+  if (t === "accordion") {
+    const ta = el("textarea");
+    ta.value = (cb.items || []).map((it) => [it.summary || "", it.body || ""].join(" | ")).join("\n");
+    ta.placeholder = "A question | the answer\nAnother | its answer"; ta.rows = 4; ta.style.cssText = taCss;
+    ta.addEventListener("change", () => { const items = ta.value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const p = l.split("|").map((x) => x.trim()); return { summary: p[0] || "", body: p[1] || "" }; }).filter((it) => it.summary); save({ type: "accordion", items }); });
+    host.append(ta, el("div", "hint", "One row per line:  summary | details"));
+    return;
+  }
+  const def = BLOCK_DEFS.find((d) => d.type === t);
+  if (def && def.field && def.parse && def.fmt) {
+    const ta = el("textarea");
+    ta.value = (cb[def.field] || []).map(def.fmt).join("\n");
+    ta.placeholder = def.hint || ""; ta.rows = 4; ta.style.cssText = taCss;
+    ta.addEventListener("change", () => { const arrv = ta.value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => def.parse(l.split("|").map((x) => x.trim()))); const o = { type: t }; o[def.field] = arrv; save(o); });
+    host.appendChild(ta);
+    if (def.hint) host.appendChild(el("div", "hint", def.hint));
+    return;
+  }
+  host.appendChild(el("div", "hint", "Edit this component from the main section list."));
 }
 // r4 feature-cards editor — a grid of cards (image + title + text + optional link).
 function renderCardsBlockBody(blk, idx, sub, ti) {
