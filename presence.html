@@ -341,75 +341,126 @@ h5.rune .whisper.ok{color:var(--sage)}
 .gate h1{font-family:var(--serif);font-weight:500;font-size:25px;line-height:1.25;margin-bottom:12px}
 .gate p{color:var(--ink-2);margin-bottom:26px;font-size:14px}
 
-/* ── the design studio: template-first gallery + roomy 3-zone workspace ──
-   #1 large gallery on top · #2 tray (left) + big canvas (center) + slim rail (right)
-   Structured-blocks only: every zone edits the SAME block/settings model — nothing
-   here positions by pixel, so the served site stays auto-responsive & accessible. */
-.content:has(#view-design.on){max-width:1400px}
+/* ── the design studio: template-first gallery + a CANVAS-DOMINANT workspace ──
+   The live canvas takes the majority of the screen. The add-block tray and the
+   design settings are NOT permanent flanking rails — they open ON DEMAND as
+   slide-over panels and close again. Structured-blocks only: every surface edits
+   the SAME block/settings model — nothing here positions by pixel, so the served
+   site stays auto-responsive & accessible. */
+.content:has(#view-design.on){max-width:1320px}
 
-/* #1 — template-first, big-preview gallery */
-#designGallery{margin:4px 0 26px}
-.tg-head{margin-bottom:12px}
-.tg-head .tg-h{font-weight:600;font-size:15px}
+/* #1 — template-first, BIG realistic-preview gallery */
+#designGallery{margin:4px 0 30px}
+.tg-head{margin-bottom:14px}
+.tg-head .tg-h{font-weight:600;font-size:16px}
 .tg-head .hint{margin-top:2px}
-.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
-.tg-card{border:2px solid var(--hair,rgba(0,0,0,.12));border-radius:14px;overflow:hidden;background:var(--sheet,#fff);box-shadow:0 2px 10px rgba(60,45,20,.06);display:flex;flex-direction:column}
-.tg-card.on{border-color:var(--plum,#5b3fa0);box-shadow:0 8px 26px rgba(91,63,160,.18)}
-.tg-shot{position:relative;height:206px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
-.tg-shot iframe{position:absolute;top:0;left:0;width:250%;height:250%;transform:scale(.4);transform-origin:0 0;border:none;pointer-events:none;display:block}
-.tg-shot .tg-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-style:italic;color:var(--ink-2);font-size:14px;padding:20px;text-align:center}
-.tg-shot .tg-badge{position:absolute;top:10px;left:10px;z-index:2;background:var(--plum,#5b3fa0);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px}
-.tg-body{padding:13px 15px 15px;display:flex;flex-direction:column;gap:3px;flex:1}
-.tg-name{font-weight:600;font-size:15px}
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:22px}
+.tg-card{border:2px solid var(--hair,rgba(0,0,0,.12));border-radius:16px;overflow:hidden;background:var(--sheet,#fff);box-shadow:0 4px 16px rgba(60,45,20,.08);display:flex;flex-direction:column}
+.tg-card.on{border-color:var(--plum,#5b3fa0);box-shadow:0 10px 32px rgba(91,63,160,.20)}
+.tg-shot{position:relative;height:430px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
+.tg-shot iframe{position:absolute;top:0;left:0;width:294%;height:294%;transform:scale(.34);transform-origin:0 0;border:none;pointer-events:none;display:block}
+.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:#fff;font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+/* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
+   nothing real to render), so the card always shows a designed page, never a name
+   on white. A representative sample only; switching template keeps your real words. */
+.tg-demo{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column}
+.tg-demo .tgd-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;font-size:15px;font-weight:700}
+.tg-demo .tgd-nav .tgd-links{display:flex;gap:12px;font-size:11px;font-weight:500;opacity:.7}
+.tg-demo .tgd-hero{padding:40px 26px 44px;display:flex;flex-direction:column;gap:12px}
+.tg-demo .tgd-h1{font-size:30px;font-weight:700;line-height:1.1;max-width:16ch}
+.tg-demo .tgd-line{height:8px;border-radius:5px;opacity:.28;background:currentColor}
+.tg-demo .tgd-btn{align-self:flex-start;margin-top:8px;padding:10px 20px;border-radius:999px;font-size:12px;font-weight:700;color:#fff}
+.tg-demo .tgd-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:6px 26px 26px}
+.tg-demo .tgd-card{border-radius:12px;padding:16px;min-height:96px;background:rgba(0,0,0,.05);display:flex;flex-direction:column;gap:8px}
+.tg-demo .tgd-dot{width:26px;height:26px;border-radius:8px}
+.tg-demo .tgd-split{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 26px 30px;align-items:center}
+.tg-demo .tgd-img{border-radius:12px;min-height:120px;background:rgba(0,0,0,.08)}
+.tg-demo .tgd-txt{display:flex;flex-direction:column;gap:9px}
+.tg-demo .tgd-foot{margin-top:auto;padding:18px 26px;font-size:11px;opacity:.6}
+.tg-body{padding:15px 17px 17px;display:flex;flex-direction:column;gap:3px;flex:1}
+.tg-name{font-weight:600;font-size:16px}
 .tg-tag{font-size:12px;color:var(--ink-2,#8a8172)}
-.tg-act{margin-top:11px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.tg-start{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;cursor:pointer}
+.tg-act{margin-top:13px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.tg-start{font:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;cursor:pointer}
 .tg-start.current{background:transparent;color:var(--plum,#5b3fa0);cursor:default}
 .tg-second{font:inherit;font-size:12.5px;padding:6px 2px;background:none;border:none;color:var(--plum,#5b3fa0);cursor:pointer;text-decoration:underline}
 
-/* #2 — three-zone workspace: tray · canvas · settings rail */
-.designstudio{display:grid;grid-template-columns:236px minmax(0,1fr) 360px;gap:22px;align-items:start}
-#designTray{position:sticky;top:14px;align-self:start;max-height:calc(100vh - 40px);overflow:auto;border:1px solid var(--hair);border-radius:12px;background:var(--sheet);padding:14px 14px 18px}
-html.dds-has-shell #designTray{top:calc(var(--dds-shell-h,52px) + 14px)}
+/* #2 — CANVAS-DOMINANT workspace: the canvas is full width; tray + settings are
+   on-demand slide-over panels, not permanent rails. */
+.designstudio{position:relative;display:block}
+#designCanvas{min-width:0}
+/* the canvas toolbar: device toggle on the left, on-demand panel launchers right */
+.dc-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.dc-bar-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dc-actbtn{font:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink,#1b1525);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.dc-actbtn:hover{border-color:var(--plum,#5b3fa0)}
+.dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+.dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff}
+/* the prominent floating "add section" affordance over the canvas */
+.dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:14px;font-weight:700;padding:13px 22px;border-radius:999px;border:none;background:var(--plum,#5b3fa0);color:#fff;cursor:pointer;box-shadow:0 10px 30px rgba(91,63,160,.42);display:inline-flex;align-items:center;gap:8px}
+.dc-fab:hover{filter:brightness(1.06)}
+.dc-fab:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px rgba(91,63,160,.4)}
+
+/* on-demand slide-over panels (tray = left, settings = right). Kept in the DOM but
+   parked off-screen when closed (visibility:hidden removes them from the tab order). */
+.dc-slideover{position:fixed;top:0;bottom:0;z-index:82;width:360px;max-width:88vw;background:var(--sheet,#fff);display:flex;flex-direction:column;visibility:hidden;box-shadow:0 0 44px rgba(33,29,25,.30);transition:transform var(--dur,.28s) var(--ease,ease),visibility 0s linear var(--dur,.28s)}
+.dc-slideover.on{visibility:visible;transition:transform var(--dur,.28s) var(--ease,ease),visibility 0s}
+.dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
+.dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
+.dc-slideover.on{transform:translateX(0)}
+.dc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 16px;border-bottom:1px solid var(--hair);flex:0 0 auto}
+.dc-panel-head .dc-panel-t{font-weight:600;font-size:14px}
+.dc-close{font:inherit;font-size:18px;line-height:1;width:34px;height:34px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
+.dc-close:hover{border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)}
+.dc-close:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+#designTray{flex:1;min-height:0;overflow:auto;padding:14px 16px 20px}
+#designHost{flex:1;min-height:0;overflow:auto;padding:16px 16px 24px}
+#designHost .field{min-width:0;max-width:none;margin-bottom:18px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+#designHost #brandKitCard{order:-1}
+/* the settings panel gets a dimming scrim (editing focus); the tray does NOT, so the
+   canvas stays visible as the drop target while dragging a section onto it. */
+.dc-scrim{position:fixed;inset:0;z-index:78;background:rgba(20,16,28,.34);opacity:0;pointer-events:none;transition:opacity var(--dur,.28s) var(--ease,ease)}
+.dc-scrim.on{opacity:1;pointer-events:auto}
+
 .tray-h{font-weight:600;font-size:13.5px;margin-bottom:4px}
 .tray-search{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:9px;font:inherit;font-size:13px;margin:8px 0 4px}
 .tray-grp{margin-top:12px}
 .tray-grp-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);margin:0 0 5px}
-.tray-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;font-size:12.5px;padding:7px 9px;border-radius:9px;border:1px solid transparent;background:transparent;color:inherit;cursor:grab;margin-bottom:2px}
+.tray-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;font-size:12.5px;padding:9px 10px;border-radius:9px;border:1px solid transparent;background:transparent;color:inherit;cursor:grab;margin-bottom:2px;touch-action:pan-y}
 .tray-item:hover{background:var(--wash,#faf9fb);border-color:var(--hair,#eee)}
 .tray-item:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:1px}
 .tray-item .ti-ico{flex:0 0 auto;font-size:15px;width:20px;text-align:center}
 .tray-item .ti-txt{min-width:0}
 .tray-item .ti-name{font-weight:600;line-height:1.2}
 .tray-item .ti-alias{font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
-.tray-item.dragging{opacity:.5}
+.tray-item.pd-source{opacity:.5}
 .tray-empty{font-size:12px;color:var(--ink-2);padding:8px 2px}
-#designCanvas{min-width:0}
-#designHost{min-width:0}
-#designHost .field{min-width:0;max-width:none;margin-bottom:18px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
-#designHost #brandKitCard{order:-1}
 
-/* #4 — drop-lines + Notion-style "+" insert points (list-order only, never XY) */
+/* the floating drag "ghost" + the drop-line indicator — BOTH drawn in the PARENT
+   document over the iframe (never inside it), so the drop never depends on native
+   cross-frame drag-and-drop. List-order only; the line marks a single gap index. */
+.pd-ghost{position:fixed;z-index:2147483600;pointer-events:none;display:flex;align-items:center;gap:7px;font:inherit;font-size:12.5px;font-weight:600;color:#fff;background:var(--plum,#5b3fa0);border-radius:9px;padding:8px 12px;box-shadow:0 10px 30px rgba(33,29,25,.42);transform:translate(10px,10px);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-ghost .pd-ico{font-size:14px}
+.pd-dropline{position:fixed;z-index:2147483500;pointer-events:none;height:0;border-top:4px solid var(--plum,#5b3fa0);border-radius:2px;box-shadow:0 0 0 3px rgba(91,63,160,.18)}
+.pd-dropline::before{content:"";position:absolute;left:-5px;top:-7px;width:10px;height:10px;border-radius:50%;background:var(--plum,#5b3fa0)}
+body.pd-dragging{cursor:grabbing !important}
+body.pd-dragging *{cursor:grabbing !important}
+
+/* #4 — Notion-style "+" insert points in the section editor list (list-order only) */
 .blk-gap{position:relative;height:12px;margin:2px 0;display:flex;align-items:center;justify-content:center}
 .blk-gap .blk-plus{opacity:0;transition:opacity .12s;font:inherit;font-size:12px;line-height:1;width:22px;height:22px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .blk-gap:hover .blk-plus,.blk-gap:focus-within .blk-plus{opacity:1}
-.blk-gap.drop::before{content:"";position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);background:var(--plum,#5b3fa0);border-radius:2px}
-.blk-gap.drop .blk-plus{opacity:0}
-.blk-handle{cursor:grab;font-size:14px;line-height:1;color:var(--ink-2,#8a8172);padding:0 2px;background:none;border:none;user-select:none;touch-action:none}
-.blk-handle:active{cursor:grabbing}
-.blk-sub.dragging{opacity:.5}
 .blk-insertmenu{position:absolute;z-index:200;width:300px;max-width:92vw;max-height:60vh;overflow:auto;background:var(--sheet,#fff);border:1px solid var(--hair,#ddd);border-radius:12px;box-shadow:0 18px 50px rgba(33,29,25,.28);padding:12px}
 
-/* #5 — larger device toggle + big responsive canvas */
+/* #5 — big device toggle + a CANVAS that dominates the screen */
 .dp-title{font-size:12px;font-weight:600;margin-bottom:8px}
-.dpdevseg{display:inline-flex;gap:2px;background:var(--wash,#efece7);border-radius:999px;padding:4px;margin-bottom:12px}
+.dpdevseg{display:inline-flex;gap:2px;background:var(--wash,#efece7);border-radius:999px;padding:4px}
 .dpdevseg button{font:inherit;font-size:13px;font-weight:600;padding:8px 18px;border-radius:999px;border:none;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
 .dpdevseg button.on{background:var(--sheet,#fff);color:var(--ink,#1b1525);box-shadow:0 1px 4px rgba(0,0,0,.12)}
 .dpdevseg button:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
-#designPreviewWrap{position:sticky;top:14px}
-html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
+#designPreviewWrap{position:relative}
 .dp-stage{display:flex;justify-content:center}
-.dp-frame{position:relative;width:100%;height:640px;min-height:340px;max-height:82vh;resize:vertical;overflow:hidden;border:1px solid var(--hair-2);border-radius:12px;background:#fff;box-shadow:0 6px 24px rgba(60,45,20,.08);transition:width var(--dur,.3s) var(--ease,ease)}
+.dp-frame{position:relative;width:100%;height:calc(100vh - 210px);min-height:460px;max-height:88vh;resize:vertical;overflow:hidden;border:1px solid var(--hair-2);border-radius:12px;background:#fff;box-shadow:0 6px 24px rgba(60,45,20,.08);transition:width var(--dur,.3s) var(--ease,ease)}
 .dp-frame iframe{width:100%;height:100%;border:none;border-radius:12px;display:block;pointer-events:none}
 /* AEM-style live canvas: once editing chrome is injected the preview becomes the
    editor itself — interactive. The bottom padding leaves the vertical-resize grip
@@ -422,12 +473,15 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
 #designPreviewEmpty .eq{font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.5;max-width:26ch}
 #designPreviewEmpty .eh{font-size:13px;color:var(--ink-2);margin-top:10px;line-height:1.7;max-width:40ch}
 #designPreviewEmpty .ea{margin-top:16px;display:flex;gap:20px;flex-wrap:wrap}
-/* stack to a single column — no horizontal scroll — on narrow screens */
+/* narrow screens: gallery to one column, panels become bottom sheets (no h-scroll) */
 @media(max-width:1180px){
-  .designstudio{grid-template-columns:1fr}
-  #designTray{position:static;max-height:none;order:2}
-  #designCanvas{order:1}
-  #designHost{order:3}
+  .tg-grid{grid-template-columns:1fr}
+  .dp-frame{height:calc(100vh - 240px)}
+}
+@media(max-width:760px){
+  .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:16px 16px 0 0;border:none;box-shadow:0 -8px 44px rgba(33,29,25,.30);transform:translateY(103%)}
+  .dc-slideover.on{transform:translateY(0)}
+  .dc-fab{right:14px;bottom:14px;padding:11px 18px;font-size:13px}
 }
 
 /* ── mobile: the dock ── */
@@ -674,18 +728,25 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
       <section class="view" id="view-design">
         <h1 class="doc" role="heading" aria-level="2">Design</h1>
         <p class="docsub">How your website looks — colors, type, layout, and what appears on your home page. Every choice is designed to stay readable; nothing applies until you publish, and every previous look stays restorable.</p>
-        <!-- #1 template-first, big-preview gallery (mountTemplateGallery) -->
+        <!-- #1 template-first, BIG realistic-preview gallery (mountTemplateGallery) -->
         <div id="designGallery" hidden></div>
+        <!-- #2 CANVAS-DOMINANT workspace: the live canvas fills the screen; the add
+             tray and the design settings open ON DEMAND (slide-over panels below). -->
         <div class="designstudio">
-          <!-- #3 add-block tray (left) — searchable, categorized, drag or click -->
-          <aside id="designTray" aria-label="Add a section"></aside>
-          <!-- #2/#5 large live canvas (center) with a big device toggle -->
           <div id="designCanvas">
-            <div class="dp-title">Your home page, as it would publish</div>
-            <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
-              <button type="button" data-dpdev="desktop" class="on" aria-pressed="true">Desktop</button>
-              <button type="button" data-dpdev="tablet" aria-pressed="false">Tablet</button>
-              <button type="button" data-dpdev="phone" aria-pressed="false">Phone</button>
+            <div class="dc-bar">
+              <div>
+                <div class="dp-title">Your home page, as it would publish</div>
+                <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
+                  <button type="button" data-dpdev="desktop" class="on" aria-pressed="true">Desktop</button>
+                  <button type="button" data-dpdev="tablet" aria-pressed="false">Tablet</button>
+                  <button type="button" data-dpdev="phone" aria-pressed="false">Phone</button>
+                </div>
+              </div>
+              <div class="dc-bar-acts">
+                <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
+                <button type="button" class="dc-actbtn" id="btnSettingsOpen" aria-haspopup="dialog" aria-controls="settingsPanel">Design settings</button>
+              </div>
             </div>
             <div id="designPreviewWrap">
               <div class="dp-stage" id="dpStage">
@@ -699,13 +760,26 @@ html.dds-has-shell #designPreviewWrap{top:calc(var(--dds-shell-h,52px) + 14px)}
                       <button class="textact" type="button" onclick="go('offerings')">Add what you offer →</button>
                     </div>
                   </div>
+                  <!-- prominent, always-there way to add a section without a permanent rail -->
+                  <button type="button" class="dc-fab" id="btnAddFab" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
                 </div>
               </div>
               <div class="hint" style="margin-top:8px">✓ Your website adapts to phones automatically — every section stays readable and in the right order on any screen. A live proof of your draft; drag the frame’s bottom-right corner to make it taller.</div>
             </div>
           </div>
-          <!-- settings rail (right) — cards mount into #designHost, id preserved -->
-          <div id="designHost"></div>
+          <!-- on-demand ADD-BLOCK tray (left slide-over, no scrim so the canvas stays a
+               drop target); #designTray keeps its id so the engine mounts into it -->
+          <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Add a section" aria-hidden="true">
+            <div class="dc-panel-head"><span class="dc-panel-t">Add a section</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Close">✕</button></div>
+            <div id="designTray"></div>
+          </aside>
+          <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
+               into #designHost, id preserved -->
+          <aside id="settingsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="true" aria-label="Design settings" aria-hidden="true">
+            <div class="dc-panel-head"><span class="dc-panel-t">Design settings</span><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
+            <div id="designHost"></div>
+          </aside>
+          <div class="dc-scrim" id="dcScrim" hidden></div>
         </div>
       </section>
       <!-- HISTORY -->
@@ -3268,9 +3342,13 @@ function eeBuildIdMap(reportedIds) {
 function eeEditBlock(bi) {                       // open the block's editor panel
   closePreview(); go("design");
   if (!$("blocksCard")) mountBlocksCard();
+  if (typeof openSettingsPanel === "function") openSettingsPanel();   // the editor lives in the on-demand settings panel
   BLOCK_FOCUS = bi; renderBlocksCard();          // consumes BLOCK_FOCUS → scroll + focus
 }
-function eeEditCore(view) { closePreview(); go(view || "design"); }   // open the core-section tab
+function eeEditCore(view) {                      // open the core-section tab
+  closePreview(); go(view || "design");
+  if ((view || "design") === "design" && typeof openSettingsPanel === "function") openSettingsPanel();
+}
 function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder swap + save
   const o = BLOCKS_WORK; const ni = bi + dir; if (ni < 0 || ni >= o.length) return;
   [o[ni], o[bi]] = [o[bi], o[ni]];
@@ -4482,7 +4560,6 @@ function renderLinkedChip(blk, idx, card) {
   const item = clItemById(blk.ref);
   const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid #d9cef0;border-radius:12px;padding:12px 14px;margin-top:10px;background:#faf7ff";
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-  const hnd = blkHandle(sub, idx);   // #4 — drag to reorder (list order only)
   const nm = el("div", null, "🔗 Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:#3a2470";
   const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
@@ -4491,7 +4568,7 @@ function renderLinkedChip(blk, idx, card) {
   up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; renderBlocksCard(); });
   dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; renderBlocksCard(); });
   rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
-  head.append(hnd, nm, up, dn, rm); sub.appendChild(head);
+  head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
     card.appendChild(sub); return;
@@ -4562,6 +4639,7 @@ async function saveBlocks() {
     S.settings = r.data || { ...S.settings, blocks: BLOCKS_WORK };
     BLOCKS_WORK = currentBlocks();
     renderBlocksCard();
+    if (typeof renderBlockTray === "function" && $("designTray") && $("designTray").childElementCount) renderBlockTray();   // reflect which types are now on the page
     toast("Sections saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(nice(err), true); }
 }
@@ -4725,7 +4803,6 @@ function renderBlocksCard() {
     const def = BLOCK_DEFS.find((d) => d.type === blk.type); if (!def) return;
     const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
-    const hnd = blkHandle(sub, idx);   // #4 — drag to reorder (list order only); ↑/↓ below remain the fallback
     const nm = el("div", null, def.name + (blk.mediaNote ? "  ·  " + blk.mediaNote : "")); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
     const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
@@ -4736,7 +4813,7 @@ function renderBlocksCard() {
     rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
     const sv = el("button", null, "Save"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
-    head.append(hnd, nm, sv, up, dn, rm); sub.appendChild(head);
+    head.append(nm, sv, up, dn, rm); sub.appendChild(head);
     // CL-LINK: editing the SINGLE SOURCE (reached via a linked chip) — swap the
     // toolbar for a clear "update everywhere" flow so it can't be mistaken for a
     // normal, page-only edit.
@@ -5629,6 +5706,49 @@ async function mountLookCard() {
   });
 })();
 
+// ── #2 — on-demand panels (canvas-dominant layout) ──────────────────────────
+// The tray and the design settings are NOT permanent rails. Each opens as a
+// slide-over and closes again, so the live canvas keeps the majority of the
+// screen. The tray has NO scrim (the canvas stays a visible drop target while
+// dragging a section onto it); the settings panel dims behind a scrim.
+let PANEL_LASTFOCUS = null;
+function closeTrayPanel() {
+  const p = $("trayPanel"); if (!p) return;
+  p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+}
+function openTrayPanel() {
+  const p = $("trayPanel"); if (!p) return;
+  closeSettingsPanel();
+  PANEL_LASTFOCUS = document.activeElement;
+  p.classList.add("on"); p.setAttribute("aria-hidden", "false");
+  const s = p.querySelector(".tray-search"); setTimeout(() => { try { (s || $("btnTrayClose")).focus(); } catch (_) {} }, 40);
+}
+function closeSettingsPanel() {
+  const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
+  p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  if (sc) { sc.classList.remove("on"); sc.hidden = true; }
+}
+function openSettingsPanel() {
+  const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
+  closeTrayPanel();
+  PANEL_LASTFOCUS = document.activeElement;
+  if (sc) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add("on")); }
+  p.classList.add("on"); p.setAttribute("aria-hidden", "false");
+  setTimeout(() => { try { $("btnSettingsClose").focus(); } catch (_) {} }, 40);
+}
+function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+(function initDesignPanels() {
+  const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
+  on("btnTrayOpen", openTrayPanel); on("btnAddFab", openTrayPanel); on("btnTrayClose", closeDesignPanels);
+  on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
+  const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const t = $("trayPanel"), s = $("settingsPanel");
+    if ((t && t.classList.contains("on")) || (s && s.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
+  }, true);
+})();
+
 // ── #1 — template-first, big-preview gallery ────────────────────────────────
 // Full-width row of LARGE, realistic previews (the real /preview render, scaled).
 // One clear action per card: "Start with this" → the EXISTING PUT /site/template
@@ -5650,23 +5770,33 @@ function renderTemplateGallery() {
   host.appendChild(head);
   const grid = el("div", "tg-grid");
   const curSlug = (LOOKS.current && LOOKS.current.slug) || "";
+  // A cold-start draft has nothing real to render; render the DEMO silhouette so
+  // every card shows a designed page. Once there IS real content, we render it in
+  // the actual /preview pipeline (the most faithful possible preview of the look).
+  const empty = draftLooksEmpty();
   LOOKS.templates.forEach((t) => {
     const sw = lookSwatch(t.slug);
     const active = t.slug === curSlug;
     const card = el("div", "tg-card" + (active ? " on" : "")); card.dataset.look = t.slug;
-    // realistic preview: the real render for THIS template, scaled down (read-only)
+    // BIG, realistic preview of THIS template's design (read-only)
     const shot = el("div", "tg-shot");
     if (active) { const badge = el("span", "tg-badge", "Your current template"); shot.appendChild(badge); }
-    const fb = el("div", "tg-fallback", t.name); shot.appendChild(fb);
-    const frame = el("iframe"); frame.setAttribute("title", t.name + " preview"); frame.setAttribute("aria-hidden", "true"); frame.setAttribute("tabindex", "-1"); frame.setAttribute("scrolling", "no");
-    apiHtml("/preview?version=draft&template=" + encodeURIComponent(t.slug) + "&page=%2F")
-      .then((html) => { frame.srcdoc = html; fb.style.display = "none"; })
-      .catch(() => { /* keep the name fallback if the proof can't draw */ });
-    shot.appendChild(frame);
+    // on-brand demo silhouette — always present as the realistic-looking base; it is
+    // replaced by the real render the moment the live /preview draws real content.
+    const demo = tgDemoNode(sw, t.name); shot.appendChild(demo);
+    if (!empty) {
+      const frame = el("iframe"); frame.setAttribute("title", t.name + " preview"); frame.setAttribute("aria-hidden", "true"); frame.setAttribute("tabindex", "-1"); frame.setAttribute("scrolling", "no");
+      frame.style.visibility = "hidden";   // show the on-brand demo underneath until the real render paints (no white flash)
+      frame.addEventListener("load", () => { if (frame.srcdoc) { frame.style.visibility = "visible"; demo.style.display = "none"; } });
+      apiHtml("/preview?version=draft&template=" + encodeURIComponent(t.slug) + "&page=%2F")
+        .then((html) => { frame.srcdoc = html; })
+        .catch(() => { /* keep the on-brand demo silhouette if the proof can't draw */ });
+      shot.appendChild(frame);
+    }
     card.appendChild(shot);
     const body = el("div", "tg-body");
     body.appendChild(el("div", "tg-name", t.name));
-    body.appendChild(el("div", "tg-tag", sw.tag));
+    body.appendChild(el("div", "tg-tag", sw.tag + (empty ? " · sample layout" : "")));
     const act = el("div", "tg-act");
     const start = el("button", "tg-start" + (active ? " current" : ""), active ? "✓ In use" : "Start with this");
     start.type = "button";
@@ -5674,14 +5804,43 @@ function renderTemplateGallery() {
     else start.addEventListener("click", () => applyTemplateFromGallery(t));
     act.appendChild(start);
     const second = el("button", "tg-second", "Change the look"); second.type = "button";
-    second.title = "Fine-tune colours, type and corners in the Design studio";
-    second.addEventListener("click", () => { const c = $("designCard"); if (c) c.scrollIntoView({ behavior: "smooth", block: "start" }); else openPreview("draft"); });
+    second.title = "Fine-tune colours, type and corners in the Design settings";
+    second.addEventListener("click", () => openSettingsPanel());
     act.appendChild(second);
     body.appendChild(act);
     card.appendChild(body);
     grid.appendChild(card);
   });
   host.appendChild(grid);
+}
+// The demo silhouette: a small, on-brand canned page (nav · hero · cards · split ·
+// footer) painted in the template family's colour + type. Representative sample
+// only — never claims to be the owner's content; switching keeps their real words.
+function tgDemoNode(sw, name) {
+  const wrap = el("div", "tg-demo");
+  wrap.style.cssText = "background:" + sw.bg + ";color:" + sw.ink + ";font-family:" + sw.font;
+  const line = (w) => { const l = el("div", "tgd-line"); l.style.width = w; return l; };
+  const nav = el("div", "tgd-nav");
+  nav.appendChild(el("span", null, name));
+  const links = el("span", "tgd-links"); ["Home", "About", "Services", "Contact"].forEach((x) => links.appendChild(el("span", null, x)));
+  nav.appendChild(links); wrap.appendChild(nav);
+  const hero = el("div", "tgd-hero");
+  hero.appendChild(el("div", "tgd-h1", "Your business, beautifully online"));
+  hero.appendChild(line("92%")); hero.appendChild(line("74%"));
+  const btn = el("div", "tgd-btn", "Get in touch"); btn.style.background = sw.accent; hero.appendChild(btn);
+  wrap.appendChild(hero);
+  const cards = el("div", "tgd-cards");
+  ["What we do", "How it works", "Why us"].forEach(() => {
+    const c = el("div", "tgd-card"); const dot = el("div", "tgd-dot"); dot.style.background = sw.accent; c.appendChild(dot);
+    c.appendChild(line("80%")); c.appendChild(line("60%")); cards.appendChild(c);
+  });
+  wrap.appendChild(cards);
+  const split = el("div", "tgd-split");
+  split.appendChild(el("div", "tgd-img"));
+  const txt = el("div", "tgd-txt"); ["70%", "88%", "62%", "80%"].forEach((w) => txt.appendChild(line(w))); split.appendChild(txt);
+  wrap.appendChild(split);
+  wrap.appendChild(el("div", "tgd-foot", "A representative sample of the " + name + " design."));
+  return wrap;
 }
 async function applyTemplateFromGallery(t) {
   // Non-destructive: switching template keeps content — it re-lays-out + re-styles.
@@ -5729,8 +5888,7 @@ function mountBlockTray() {
 function renderBlockTray() {
   const host = $("designTray"); if (!host) return;
   host.textContent = "";
-  host.appendChild(el("div", "tray-h", "Add a section"));
-  host.appendChild(el("div", "hint", "Click to add it to the bottom — or drag it up into place. Everything stays readable on phones automatically."));
+  host.appendChild(el("div", "hint", "Click to add it to the bottom of your page — or drag it onto the canvas and drop it exactly where you want. Everything stays readable on phones automatically."));
   const search = el("input", "tray-search"); search.type = "search"; search.placeholder = "Search sections…"; search.value = TRAY_QUERY; search.setAttribute("aria-label", "Search sections to add");
   search.addEventListener("input", () => { TRAY_QUERY = search.value; renderBlockTray(); const s2 = $("designTray") && $("designTray").querySelector(".tray-search"); if (s2) { s2.focus(); s2.setSelectionRange(TRAY_QUERY.length, TRAY_QUERY.length); } });
   host.appendChild(search);
@@ -5750,29 +5908,26 @@ function renderBlockTray() {
   if (!shown) host.appendChild(el("div", "tray-empty", TRAY_QUERY ? "No sections match “" + TRAY_QUERY + "”." : "Every section type is already on your page. Reorder or edit them in the middle."));
 }
 function trayItem(d) {
-  const b = el("button", "tray-item"); b.type = "button"; b.draggable = true;
-  b.title = "Add “" + d.name + "” — click to append, or drag into place";
+  const b = el("button", "tray-item"); b.type = "button";
+  b.title = "Add “" + d.name + "” — click to append, or drag onto the canvas to place it";
   b.appendChild(Object.assign(el("span", "ti-ico"), { textContent: TRAY_TYPE_ICON[d.type] || "▧" }));
   const txt = el("span", "ti-txt");
   txt.appendChild(el("span", "ti-name", d.name));
   if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
   b.appendChild(txt);
-  b.addEventListener("click", () => addBlockAt(d, BLOCKS_WORK.length));   // append (matches existing add path)
-  b.addEventListener("dragstart", (e) => { DND = { kind: "new", type: d.type }; b.classList.add("dragging"); dcSetDragging(true); try { e.dataTransfer.setData("text/plain", "new:" + d.type); e.dataTransfer.effectAllowed = "copy"; } catch (_) {} });
-  b.addEventListener("dragend", () => { b.classList.remove("dragging"); clearDropLines(); dcSetDragging(false); DND = null; });
+  // click = append (keyboard-accessible fallback); pointer-drag = drop into place
+  b.addEventListener("click", () => { if (pdConsumeClick()) return; addBlockAt(d, BLOCKS_WORK.length); });
+  b.addEventListener("pointerdown", (e) => pdStart(e, { kind: "new", type: d.type, label: d.name, icon: TRAY_TYPE_ICON[d.type] || "▧" }, b));
   return b;
 }
 
-// ── #4 — drag-to-reorder (structured, list-order only) + Notion "+" insert gaps ─
-// The gaps between sections are the drop targets AND the "+" click affordances.
-// A gap at index i means "insert before block i" (a trailing gap = append). Drop:
+// ── #4 — the block list model (list-order only) + Notion "+" insert gaps ────────
+// A gap at index i means "insert before block i" (a trailing gap = append):
 //   new  → splice emptyBlock(def) at i   (same object the click path builds)
 //   move → remove from f, insert at (i>f ? i-1 : i)   — a pure list reindex.
-// This is EXACTLY the arrows' model (adjacent swap) generalised to any target; the
-// ↑/↓ buttons remain as the keyboard-accessible fallback. No x/y, no overlap ever.
-let DND = null;   // { kind:'new', type } | { kind:'move', from }
+// This is the arrows' model (adjacent swap) generalised to any target; the ↑/↓
+// buttons remain as the keyboard-accessible fallback. No x/y, no overlap ever.
 function dndDropIndex(from, gap) { return gap > from ? gap - 1 : gap; }   // PURE — tested by extraction
-function clearDropLines() { document.querySelectorAll(".blk-gap.drop").forEach((g) => g.classList.remove("drop")); }
 function addBlockAt(d, at) {
   const blk = emptyBlock(d);   // REUSE the exact block factory the click path uses
   const i = Math.max(0, Math.min(at, BLOCKS_WORK.length));
@@ -5788,31 +5943,137 @@ function moveBlockTo(from, gap) {
   BLOCKS_WORK.splice(to, 0, b);
   renderBlocksCard();
 }
-function blkHandle(sub, idx) {
-  const h = el("button", "blk-handle"); h.type = "button"; h.textContent = "⠿"; h.draggable = true;
-  h.setAttribute("aria-label", "Drag to reorder this section (or use the up and down arrows)");
-  h.title = "Drag to reorder";
-  h.addEventListener("dragstart", (e) => { DND = { kind: "move", from: idx }; sub.classList.add("dragging"); try { e.dataTransfer.setData("text/plain", "move:" + idx); e.dataTransfer.effectAllowed = "move"; } catch (_) {} });
-  h.addEventListener("dragend", () => { sub.classList.remove("dragging"); clearDropLines(); DND = null; });
-  return h;
-}
 function blkGap(i) {
   const g = el("div", "blk-gap"); g.dataset.gap = String(i);
   const plus = el("button", "blk-plus"); plus.type = "button"; plus.textContent = "+";
   plus.setAttribute("aria-label", "Add a section here"); plus.title = "Add a section here";
   plus.addEventListener("click", (e) => { e.stopPropagation(); openInsertMenu(i, plus); });
   g.appendChild(plus);
-  g.addEventListener("dragover", (e) => { if (!DND) return; e.preventDefault(); try { e.dataTransfer.dropEffect = DND.kind === "new" ? "copy" : "move"; } catch (_) {} if (!g.classList.contains("drop")) { clearDropLines(); g.classList.add("drop"); } });
-  g.addEventListener("dragleave", () => g.classList.remove("drop"));
-  g.addEventListener("drop", (e) => {
-    e.preventDefault(); g.classList.remove("drop");
-    const d = DND; DND = null;
-    if (!d) return;
-    if (d.kind === "new") { const def = BLOCK_DEFS.find((x) => x.type === d.type); if (def) addBlockAt(def, i); }
-    else if (d.kind === "move") moveBlockTo(d.from, i);
-  });
   return g;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POINTER-BASED DRAG — the reliable replacement for native cross-frame DnD
+// ═══════════════════════════════════════════════════════════════════════════════
+// The OLD code used native HTML5 drag-and-drop to drop a tray item INTO the same-
+// origin preview iframe. Browsers deliver drag events across a frame boundary
+// unreliably, so the drop frequently never fired ("drag to the page doesn't drop").
+//
+// This engine never relies on native DnD. On pointerdown we setPointerCapture on the
+// SOURCE element, so every pointermove/pointerup for that pointer is delivered to
+// the source — even while the cursor is over the iframe. We read the iframe's
+// rendered section rects (same-origin → getBoundingClientRect works) and draw a
+// floating ghost + a drop-line in the PARENT document, positioned over the iframe.
+// On pointerup we resolve a SINGLE list-index gap and call addBlockAt / moveBlockTo
+// (never an x/y). Because capture bypasses hit-testing, the drop ALWAYS resolves.
+//
+//   PDRAG = { kind:'new'|'move', type?, from?, label, icon, sourceEl, pointerId,
+//             iframeLocal, startX, startY, begun, lastGap, ghost }
+let PDRAG = null;
+let PD_JUST_DRAGGED = false;   // guards the click that follows a real drag (append)
+function pdConsumeClick() { if (PD_JUST_DRAGGED) { PD_JUST_DRAGGED = false; return true; } return false; }
+function pdReducedMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) { return false; } }
+// PURE + self-contained (unit-tested by extraction): given candidate gaps
+// [{gap,y}] and a cursor Y, return the nearest gap — always ONE list index, never
+// an x/y coordinate. Ties resolve to the first (topmost) candidate.
+function pdPickGap(gaps, cy) {
+  let best = gaps.length ? gaps[0].gap : 0, bestD = Infinity;
+  for (const g of gaps) { const d = Math.abs(g.y - cy); if (d < bestD) { bestD = d; best = g.gap; } }
+  return best;
+}
+function pdStart(e, spec, sourceEl) {
+  if (PDRAG) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;   // primary button / touch / pen only
+  PDRAG = Object.assign({ sourceEl: sourceEl, pointerId: e.pointerId, iframeLocal: !!spec.iframeLocal,
+    startX: e.clientX, startY: e.clientY, begun: false, lastGap: null, ghost: null }, spec);
+  try { sourceEl.setPointerCapture(e.pointerId); } catch (_) {}
+  sourceEl.addEventListener("pointermove", pdMove);
+  sourceEl.addEventListener("pointerup", pdEnd);
+  sourceEl.addEventListener("pointercancel", pdCancel);
+}
+// translate the pointer to PARENT-document viewport coords (a move grip lives INSIDE
+// the iframe, so its clientX/Y are iframe-local and need the frame offset added).
+function pdParentXY(e) {
+  if (!PDRAG || !PDRAG.iframeLocal) return { x: e.clientX, y: e.clientY };
+  const f = $("designPreview"); const fr = f ? f.getBoundingClientRect() : { left: 0, top: 0 };
+  return { x: fr.left + e.clientX, y: fr.top + e.clientY };
+}
+function pdBegin() {
+  PDRAG.begun = true;
+  document.body.classList.add("pd-dragging");
+  const g = el("div", "pd-ghost");
+  g.appendChild(Object.assign(el("span", "pd-ico"), { textContent: PDRAG.icon || "▧" }));
+  g.appendChild(el("span", null, (PDRAG.kind === "move" ? "Move: " : "") + (PDRAG.label || "Section")));
+  if (pdReducedMotion()) g.style.transition = "none";
+  document.body.appendChild(g); PDRAG.ghost = g;
+  let line = document.getElementById("pdDropLine");
+  if (!line) { line = el("div", "pd-dropline"); line.id = "pdDropLine"; document.body.appendChild(line); }
+  line.style.display = "none";
+}
+// candidate gaps from the rendered preview: one "before block bi" per top-level
+// block section, plus a trailing "append" gap. Y values are PARENT viewport coords.
+function pdGaps() {
+  const frame = $("designPreview"); if (!frame) return null;
+  const fr = frame.getBoundingClientRect();
+  let doc; try { doc = frame.contentDocument; } catch (_) { return null; }
+  const main = doc && doc.getElementById("main"); if (!main) return null;
+  const secs = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
+  const gaps = []; let lastBottom = null;
+  Array.prototype.forEach.call(secs, (elx) => {
+    const c = eeClassify(elx); const r = elx.getBoundingClientRect();
+    if (c && c.kind === "block") { gaps.push({ gap: c.bi, y: fr.top + r.top }); lastBottom = fr.top + r.bottom; }
+  });
+  const appendY = lastBottom != null ? lastBottom : (fr.top + main.getBoundingClientRect().top + 8);
+  gaps.push({ gap: (BLOCKS_WORK || []).length, y: appendY });
+  return { gaps: gaps, fr: fr };
+}
+function pdMove(e) {
+  if (!PDRAG) return;
+  const dx = e.clientX - PDRAG.startX, dy = e.clientY - PDRAG.startY;
+  if (!PDRAG.begun) { if (Math.abs(dx) + Math.abs(dy) < 6) return; pdBegin(); }
+  if (e.cancelable) e.preventDefault();
+  const p = pdParentXY(e);
+  if (PDRAG.ghost) { PDRAG.ghost.style.left = p.x + "px"; PDRAG.ghost.style.top = p.y + "px"; }
+  const info = pdGaps(); const line = document.getElementById("pdDropLine");
+  if (!info) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
+  const fr = info.fr;
+  // only a valid drop when the pointer is over (or just beside) the canvas frame
+  const inX = p.x >= fr.left - 24 && p.x <= fr.right + 24;
+  const inY = p.y >= fr.top - 40 && p.y <= fr.bottom + 40;
+  if (!inX || !inY) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
+  const cy = Math.max(fr.top, Math.min(p.y, fr.bottom));
+  const gap = pdPickGap(info.gaps, cy);
+  const chosen = info.gaps.find((g) => g.gap === gap) || info.gaps[0];
+  PDRAG.lastGap = gap;
+  if (line) {
+    const ly = Math.max(fr.top + 2, Math.min(chosen.y, fr.bottom - 4));
+    line.style.display = "block";
+    line.style.left = (fr.left + 14) + "px";
+    line.style.width = Math.max(0, fr.width - 28) + "px";
+    line.style.top = ly + "px";
+  }
+}
+function pdFinish(commit) {
+  if (!PDRAG) return;
+  const drag = PDRAG; PDRAG = null;
+  try { drag.sourceEl.releasePointerCapture(drag.pointerId); } catch (_) {}
+  drag.sourceEl.removeEventListener("pointermove", pdMove);
+  drag.sourceEl.removeEventListener("pointerup", pdEnd);
+  drag.sourceEl.removeEventListener("pointercancel", pdCancel);
+  document.body.classList.remove("pd-dragging");
+  if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
+  const line = document.getElementById("pdDropLine"); if (line) line.style.display = "none";
+  if (!drag.begun) return;               // never crossed the threshold → treat as a click
+  PD_JUST_DRAGGED = true;                // swallow the click that follows a real drag…
+  setTimeout(() => { PD_JUST_DRAGGED = false; }, 350);   // …but self-clear if none fires
+  closeInsertMenu();
+  if (commit && drag.lastGap != null) {  // a single resolved list index — never x/y
+    if (drag.kind === "new") dcAddAt(drag.type, drag.lastGap);
+    else if (drag.kind === "move") dcMove(drag.from, drag.lastGap);
+  }
+}
+function pdEnd(e) { pdFinish(true); }
+function pdCancel(e) { pdFinish(false); }
 // The "+" popover: the SAME grouped, searchable add-list as the tray, but every
 // pick inserts at THIS gap index (not append). One list builder, two entry points.
 let INSERT_MENU = null;
@@ -5914,8 +6175,6 @@ function refreshDesignPreview() {
 // blocks, always auto-responsive, always accessible. Nothing here changes output.
 let DC_SCROLL = null;   // preserve the canvas scroll position across the save→reload cycle
 function dcFrameDoc() { const f = $("designPreview"); try { return f && f.contentDocument; } catch (_) { return null; } }
-function dcSetDragging(on) { const d = dcFrameDoc(); if (d && d.body) d.body.classList.toggle("dc-drag", !!on); }
-function dcClearZones(doc) { (doc || dcFrameDoc() || document).querySelectorAll(".dc-drop.over").forEach((z) => z.classList.remove("over")); }
 function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.defaultView) ? d.defaultView.scrollY : null; }
 
 // ── canvas block ops — all REUSE the existing list model, then persist + redraw ──
@@ -5954,25 +6213,10 @@ function dcSetColumns(bi, n) {
   dcCaptureScroll(); renderBlocksCard(); saveBlocks();
 }
 
-// ── the drop-zone between two sections on the live page ──────────────────────
-// A gap at index `gap` means "insert before block `gap`" (a trailing gap = append)
-// — EXACTLY the side rail's blkGap model, so new/move both reuse addBlockAt /
-// moveBlockTo (+ the tested dndDropIndex reindex). List order only; no XY.
-function dcMakeZone(doc, gap) {
-  const z = doc.createElement("div"); z.className = "dc-drop"; z.dataset.gap = String(gap); z.setAttribute("aria-hidden", "true");
-  const over = (e) => { if (!DND) return; e.preventDefault(); try { e.dataTransfer.dropEffect = DND.kind === "new" ? "copy" : "move"; } catch (_) {} dcClearZones(doc); z.classList.add("over"); };
-  z.addEventListener("dragenter", over);
-  z.addEventListener("dragover", over);
-  z.addEventListener("dragleave", () => z.classList.remove("over"));
-  z.addEventListener("drop", (e) => {
-    e.preventDefault(); z.classList.remove("over");
-    const d = DND; DND = null; dcSetDragging(false);
-    if (!d) return;
-    if (d.kind === "new") dcAddAt(d.type, gap);
-    else if (d.kind === "move") dcMove(d.from, gap);
-  });
-  return z;
-}
+// NOTE: adding/reordering by drag no longer injects native drop-zones INTO the
+// iframe. The pointer-drag engine (pdStart/pdMove/pdEnd) draws its ghost + drop-line
+// in the PARENT over the iframe and reads section rects to resolve a single list-
+// index gap — so the drop can never be lost across the frame boundary. See pdGaps().
 
 // ── inject the editing chrome into the rendered preview document ─────────────
 function dcInjectCanvas(doc, main) {
@@ -5980,12 +6224,8 @@ function dcInjectCanvas(doc, main) {
   if (!doc.getElementById("dds-dc-style")) {
     const st = doc.createElement("style"); st.id = "dds-dc-style";
     st.textContent =
-      ".dc-drop{height:0;margin:0;position:relative;transition:height .12s ease}" +
-      "body.dc-drag .dc-drop{height:24px;margin:6px 0}" +
-      "body.dc-drag .dc-drop::before{content:'';position:absolute;left:16px;right:16px;top:50%;height:3px;transform:translateY(-50%);background:rgba(91,63,160,.35);border-radius:2px}" +
-      ".dc-drop.over{height:36px;margin:10px 0}" +
-      ".dc-drop.over::before{background:#5b3fa0;height:4px;box-shadow:0 0 0 3px rgba(91,63,160,.16)}" +
       ".dc-hot{outline:2px solid #5b3fa0!important;outline-offset:-2px}" +
+      "#dds-dc-bar .dc-grip{touch-action:none;user-select:none}" +
       "#dds-dc-bar{position:absolute;z-index:2147483000;display:none;gap:4px;flex-wrap:wrap;max-width:calc(100vw - 24px);background:#5b3fa0;border-radius:9px;padding:4px;box-shadow:0 6px 22px rgba(0,0,0,.34);font-family:system-ui,-apple-system,sans-serif}" +
       "#dds-dc-bar.on{display:flex}" +
       "#dds-dc-bar .dc-b{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 9px;cursor:pointer;white-space:nowrap}" +
@@ -6018,10 +6258,11 @@ function dcInjectCanvas(doc, main) {
     const c = eeClassify(el2); bar.textContent = "";
     if (c.kind === "block") {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};
-      const grip = mkBtn("⠿ Move", "Drag to move this section", null, { cls: "dc-grip" });
-      grip.draggable = true;
-      grip.addEventListener("dragstart", (e) => { DND = { kind: "move", from: bi }; dcSetDragging(true); try { e.dataTransfer.setData("text/plain", "move:" + bi); e.dataTransfer.effectAllowed = "move"; } catch (_) {} });
-      grip.addEventListener("dragend", () => { dcSetDragging(false); dcClearZones(doc); DND = null; });
+      const grip = mkBtn("⠿ Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip" });
+      // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
+      // iframe, so its coords are iframe-local (iframeLocal:true translates them to
+      // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
+      grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
       bar.appendChild(grip);
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi)));
       if (b.type === "columns") {   // responsive-grid column controls (2 or 3; stacks on mobile)
@@ -6038,8 +6279,9 @@ function dcInjectCanvas(doc, main) {
     }
     bar.classList.add("on"); place(el2);
   };
-  // Build the id→block map for THIS render, then wire every top-level section and
-  // drop a zone before each library block (+ one trailing zone to append).
+  // Build the id→block map for THIS render, then wire every top-level section's
+  // hover toolbar. Drop targets are computed live from these section rects by the
+  // pointer-drag engine (pdGaps) — no per-gap DOM nodes are injected any more.
   EE_IDMAP = eeBuildIdMap(Array.prototype.map.call(main.querySelectorAll("section[id]"), (s) => s.id));
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {
@@ -6048,10 +6290,7 @@ function dcInjectCanvas(doc, main) {
       el2.addEventListener("mouseenter", () => showBar(el2));
       el2.addEventListener("mouseleave", scheduleHide);
     }
-    const c = eeClassify(el2);
-    if (c.kind === "block") { el2.parentNode.insertBefore(dcMakeZone(doc, c.bi), el2); }
   });
-  main.appendChild(dcMakeZone(doc, (BLOCKS_WORK || []).length));   // trailing = append (also the first-drop target when empty)
 }
 
 // Install once: every time the canvas srcdoc (re)loads, inject the chrome and

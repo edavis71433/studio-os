@@ -57,6 +57,25 @@ ok(dcResizeColumns(two, 3).every((c) => typeof c === 'object' && !('x' in c) && 
 const dndDropIndex = new Function('return (' + extractFn(html, 'dndDropIndex') + ')')();
 ok(dndDropIndex(0, 3) === 2 && dndDropIndex(3, 1) === 1, 'canvas reorder still maps to one list index');
 
+// pdPickGap(gaps, cy): the pointer-drag engine's drop resolver. It replaced native
+// cross-frame DnD — on pointerup it must resolve the drop to a SINGLE LIST INDEX
+// (the nearest gap), NEVER an x/y coordinate. This pins that guarantee.
+const pdPickGap = new Function('return (' + extractFn(html, 'pdPickGap') + ')')();
+// three sections → gaps "before 0, before 1, before 2" + trailing append (gap 3),
+// spaced 100px apart in the parent viewport.
+const gaps = [{ gap: 0, y: 100 }, { gap: 1, y: 200 }, { gap: 2, y: 300 }, { gap: 3, y: 400 }];
+ok(pdPickGap(gaps, 104) === 0, 'cursor near the first boundary resolves to gap 0 (insert at top)');
+ok(pdPickGap(gaps, 210) === 1, 'cursor near the second boundary resolves to gap 1');
+ok(pdPickGap(gaps, 500) === 3, 'cursor past the last section resolves to the append gap (list length)');
+ok(pdPickGap(gaps, -50) === 0, 'cursor above everything clamps to the first gap');
+ok(pdPickGap(gaps, 251) === 2, 'a cursor between boundaries picks the nearer one');
+ok(pdPickGap([], 120) === 0, 'no sections (empty page) → the single append gap 0');
+// The resolved value is ALWAYS one integer list index — never an x/y or object (moat).
+for (let y = -100; y <= 600; y += 37) {
+  const r = pdPickGap(gaps, y);
+  ok(Number.isInteger(r) && r >= 0 && r <= 3, 'pdPickGap(' + y + ') is a single list index in range, not a coordinate');
+}
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);
