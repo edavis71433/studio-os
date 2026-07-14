@@ -437,12 +437,10 @@ async function clearBookingNotices(siteId: string, apptId: string): Promise<void
  *  status CHECK: pre-apply the PATCH fails the CHECK and returns no row → a calm
  *  "can't be updated" 404, never a throw.
  *
- *  NOTE (index.ts boundary): a concurrent agent owns index.ts, so this handler is
- *  intentionally NOT wired here to avoid clobbering that file. Wiring is a single
- *  line in the existing booking dispatch block (index.ts ~line 784), widening the
- *  action regex and dispatching 'complete'/'no_show' to this handler:
+ *  WIRED: dispatched from index.ts in the booking action block — the route regex
+ *  includes complete|no_show and routes them here:
  *    const m = route.match(/^\/bookings\/appointments\/([0-9a-f-]{36})\/(confirm|cancel|complete|no_show)$/);
- *    if (m[2] === 'complete' || m[2] === 'no_show') return handleBookingMark(site, m[1], m[2], principal, cors);
+ *    if (m && method === 'POST') { …; return handleBookingMark(site, m[1], m[2], principal, cors); }
  */
 export async function handleBookingMark(site: SiteRow, id: string, action: 'complete' | 'no_show', _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const status = action === 'complete' ? 'completed' : 'no_show';
