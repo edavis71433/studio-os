@@ -41,14 +41,15 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 - ✅ **"Add a section shows nothing"** — root-caused + fixed: added blocks are now seeded
   with editable placeholder content so a content section renders the instant you add it;
   media blocks open their editor to pick a file. Deployed + in presence.html (push).
-- ⏳ **#184 Layout containers / columns** — STILL OPEN. Eric's ask: "each layout container
-  you should also be able to choose a component," "drop arbitrary blocks INTO each
-  column." Columns exist (1–6 cols, resize, text/image/button per cell) but you can't yet
-  drop *arbitrary component types* into a cell. Needs a recursive render + serializer +
-  editor change — the biggest remaining builder item.
+- ✅ **#184 Drop a component into a column** — DONE. A column cell can now hold any
+  component (text OR media: video, image, gallery, feature list, stats, table, …) via an
+  "Or drop a component here" picker per column, each with a mini-editor. Backend +
+  editor, deployed. (1-column was already supported.) Containers can't nest (no infinite
+  recursion). NOTE: media already worked standalone (Image/Video/Gallery/Carousel
+  components + per-cell image) — this just adds nesting.
 - ⏳ **More visual templates/themes** (#183) — only 3 template *designs* exist
   (business-classic, editorial, restaurant-classic). Starter *layouts* are at 13, but
-  Eric also wants more full theme designs.
+  Eric also wants more full theme designs. The one substantial builder item left.
 
 ## Done this stretch (verify after push)
 
