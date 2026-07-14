@@ -76,6 +76,21 @@ for (let y = -100; y <= 600; y += 37) {
   ok(Number.isInteger(r) && r >= 0 && r <= 3, 'pdPickGap(' + y + ') is a single list index in range, not a coordinate');
 }
 
+// ── AEM parity: in-canvas insertion targets + Content Tree (structure guards) ──
+// The drop no longer depends on cross-frame section rects — it snaps to injected
+// "＋ Add section" bars, each carrying a LIST INDEX in data-gap. Confirm the engine
+// reads those bars and that every reorder/insert path is a single integer index.
+ok(/\.dc-ins\[data-gap\]/.test(html), 'pdGaps snaps the drag ghost to injected insertion bars (data-gap index)');
+ok(/class\s*=\s*["']dc-emptyzone["']|"dc-emptyzone"/.test(html), 'empty page gets a big "add your first section" drop placeholder (AEM "drag components here")');
+ok(/parseInt\(elx\.getAttribute\("data-gap"\), 10\)/.test(html), 'insertion targets resolve to an integer list index — never an x/y');
+const treeRow = extractFn(html, 'dcTreeRow');
+ok(/dcMove\(c\.bi, c\.bi - 1\)/.test(treeRow), 'content-tree "move up" reindexes by one list position');
+ok(/dcMove\(c\.bi, c\.bi \+ 2\)/.test(treeRow), 'content-tree "move down" reindexes by one list position');
+ok(/eeEditBlock\(c\.bi\)/.test(treeRow) && /eeEditCore\(c\.view\)/.test(treeRow), 'every tree component opens its own settings ("meta")');
+ok(!/left\s*:\s*e\.clientX|top\s*:\s*e\.clientY|style\.transform\s*=\s*["']translate\(\$\{/.test(treeRow), 'tree rows carry no free x/y placement (structured only)');
+const buildInserts = extractFn(html, 'dcBuildInserts');
+ok(/data-gap/.test(buildInserts) && /BLOCKS_WORK \|\| \[\]\)\.length/.test(buildInserts), 'the trailing insert bar appends at the list length');
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);

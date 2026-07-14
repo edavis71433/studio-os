@@ -408,7 +408,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
 .dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
 .dc-slideover.on{transform:translateX(0)}
-.dc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 16px;border-bottom:1px solid var(--hair);flex:0 0 auto}
+.dc-panel-head{position:sticky;top:0;z-index:2;background:var(--sheet,#fff);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 16px;border-bottom:1px solid var(--hair);flex:0 0 auto}
 .dc-panel-head .dc-panel-t{font-weight:600;font-size:14px}
 .dc-close{font:inherit;font-size:18px;line-height:1;width:34px;height:34px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
 .dc-close:hover{border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)}
@@ -435,6 +435,30 @@ h5.rune .whisper.ok{color:var(--sage)}
 .tray-item .ti-alias{font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
 .tray-item.pd-source{opacity:.5}
 .tray-empty{font-size:12px;color:var(--ink-2);padding:8px 2px}
+
+/* left-rail tabs: [ Contents | ＋ Add section ] — AEM's Content Tree + Components */
+.dc-tabs{display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--hair);flex:0 0 auto}
+.dc-tab{font:inherit;font-size:12.5px;font-weight:600;padding:8px 12px;border:none;border-bottom:2px solid transparent;background:none;color:var(--ink-2,#8a8172);cursor:pointer;border-radius:8px 8px 0 0}
+.dc-tab.on{color:var(--plum,#5b3fa0);border-bottom-color:var(--plum,#5b3fa0)}
+.dc-tab:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+.dc-tabpanel{flex:1;min-height:0;overflow:auto}
+/* the content tree — one row per component on the page, in render order */
+#designTreeList{padding:10px 12px 22px;display:flex;flex-direction:column;gap:2px}
+.dc-tree-hd{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);padding:8px 8px 2px}
+.dc-tree-empty{font-size:12px;color:var(--ink-2);padding:12px 6px;line-height:1.6}
+.dc-tree-row{display:flex;align-items:center;gap:2px;border-radius:9px;padding:1px}
+.dc-tree-row:hover,.dc-tree-row.sel{background:var(--wash,#f4f0fb)}
+.dc-tree-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;font:inherit;text-align:left;background:none;border:none;color:inherit;cursor:pointer;padding:7px 8px;border-radius:8px}
+.dc-tree-ico{flex:0 0 auto;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--wash,#f2eefb);border-radius:7px}
+.dc-tree-row.core .dc-tree-ico{background:#eee7de}
+.dc-tree-txt{min-width:0}
+.dc-tree-name{display:block;font-weight:600;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-tree-meta{display:block;font-size:10px;color:var(--ink-2,#8a8172);line-height:1.3;text-transform:uppercase;letter-spacing:.03em}
+.dc-tree-acts{display:flex;gap:1px;flex:0 0 auto;opacity:0;transition:opacity .12s}
+.dc-tree-row:hover .dc-tree-acts,.dc-tree-row:focus-within .dc-tree-acts{opacity:1}
+.dc-tree-acts button{font:inherit;font-size:12px;width:27px;height:27px;border-radius:7px;border:1px solid transparent;background:none;color:var(--ink-2,#8a8172);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.dc-tree-acts button:hover{border-color:var(--line,#ddd);color:var(--plum,#5b3fa0)}
+.dc-tree-acts button:disabled{opacity:.3;cursor:default}
 
 /* the floating drag "ghost" + the drop-line indicator — BOTH drawn in the PARENT
    document over the iframe (never inside it), so the drop never depends on native
@@ -744,6 +768,7 @@ body.pd-dragging *{cursor:grabbing !important}
                 </div>
               </div>
               <div class="dc-bar-acts">
+                <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Page contents</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
                 <button type="button" class="dc-actbtn" id="btnSettingsOpen" aria-haspopup="dialog" aria-controls="settingsPanel">Design settings</button>
               </div>
@@ -769,9 +794,14 @@ body.pd-dragging *{cursor:grabbing !important}
           </div>
           <!-- on-demand ADD-BLOCK tray (left slide-over, no scrim so the canvas stays a
                drop target); #designTray keeps its id so the engine mounts into it -->
-          <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Add a section" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t">Add a section</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Close">✕</button></div>
-            <div id="designTray"></div>
+          <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Page contents and sections" aria-hidden="true">
+            <div class="dc-panel-head"><span class="dc-panel-t">Your page</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Close">✕</button></div>
+            <div class="dc-tabs" role="tablist" aria-label="Page rail">
+              <button type="button" class="dc-tab on" id="tabContents" role="tab" aria-selected="true" data-tab="contents">Contents</button>
+              <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">＋ Add section</button>
+            </div>
+            <div id="designTreeWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabContents"><div id="designTreeList"></div></div>
+            <div id="designTray" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabAdd" hidden></div>
           </aside>
           <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
                into #designHost, id preserved -->
@@ -5712,16 +5742,36 @@ async function mountLookCard() {
 // screen. The tray has NO scrim (the canvas stays a visible drop target while
 // dragging a section onto it); the settings panel dims behind a scrim.
 let PANEL_LASTFOCUS = null;
+let DC_RAIL_TAB = "contents";
 function closeTrayPanel() {
   const p = $("trayPanel"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
 }
-function openTrayPanel() {
+// The left rail has two tabs — Contents (the page's component tree) and Add
+// section (the palette) — mirroring AEM's Content Tree + Components rails.
+function dcRailTab(name) {
+  DC_RAIL_TAB = (name === "add") ? "add" : "contents";
+  const add = DC_RAIL_TAB === "add";
+  const tc = $("tabContents"), ta = $("tabAdd"), pc = $("designTreeWrap"), pa = $("designTray");
+  if (tc) { tc.classList.toggle("on", !add); tc.setAttribute("aria-selected", String(!add)); }
+  if (ta) { ta.classList.toggle("on", add); ta.setAttribute("aria-selected", String(add)); }
+  if (pc) pc.hidden = add;
+  if (pa) pa.hidden = !add;
+  if (add) mountBlockTray(); else dcRefreshTree();
+}
+function openTrayPanel(tab) {
   const p = $("trayPanel"); if (!p) return;
   closeSettingsPanel();
   PANEL_LASTFOCUS = document.activeElement;
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
-  const s = p.querySelector(".tray-search"); setTimeout(() => { try { (s || $("btnTrayClose")).focus(); } catch (_) {} }, 40);
+  dcRailTab(tab === "add" ? "add" : "contents");
+  setTimeout(() => { try { (tab === "add" ? (p.querySelector(".tray-search") || $("tabAdd")) : $("tabContents")).focus(); } catch (_) {} }, 40);
+}
+// clicking a rail launcher again (same tab) closes it — a clear toggle
+function toggleTray(tab) {
+  const p = $("trayPanel"); const want = tab === "add" ? "add" : "contents";
+  if (p && p.classList.contains("on") && DC_RAIL_TAB === want) { closeDesignPanels(); return; }
+  openTrayPanel(want);
 }
 function closeSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
@@ -5739,7 +5789,9 @@ function openSettingsPanel() {
 function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
-  on("btnTrayOpen", openTrayPanel); on("btnAddFab", openTrayPanel); on("btnTrayClose", closeDesignPanels);
+  on("btnContentsOpen", () => toggleTray("contents"));
+  on("btnTrayOpen", () => toggleTray("add")); on("btnAddFab", () => openTrayPanel("add")); on("btnTrayClose", closeDesignPanels);
+  on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add"));
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
@@ -6001,6 +6053,10 @@ function pdParentXY(e) {
 function pdBegin() {
   PDRAG.begun = true;
   document.body.classList.add("pd-dragging");
+  // dragging a NEW section in from the palette → tuck the rail away so the whole
+  // canvas is a visible drop surface (the captured source stays in the DOM, so the
+  // drag keeps receiving move/up even with the panel hidden).
+  if (PDRAG.kind === "new") closeTrayPanel();
   const g = el("div", "pd-ghost");
   g.appendChild(Object.assign(el("span", "pd-ico"), { textContent: PDRAG.icon || "▧" }));
   g.appendChild(el("span", null, (PDRAG.kind === "move" ? "Move: " : "") + (PDRAG.label || "Section")));
@@ -6017,8 +6073,18 @@ function pdGaps() {
   const fr = frame.getBoundingClientRect();
   let doc; try { doc = frame.contentDocument; } catch (_) { return null; }
   const main = doc && doc.getElementById("main"); if (!main) return null;
+  // PRIMARY: snap to the injected insertion targets (they exist for every gap,
+  // including the empty-page placeholder), each of which carries its list index.
+  const bars = main.querySelectorAll(".dc-ins[data-gap], .dc-emptyzone[data-gap]");
+  const gaps = [];
+  Array.prototype.forEach.call(bars, (elx) => {
+    const r = elx.getBoundingClientRect();
+    gaps.push({ gap: parseInt(elx.getAttribute("data-gap"), 10) || 0, y: fr.top + r.top + r.height / 2, el: elx });
+  });
+  if (gaps.length) return { gaps: gaps, fr: fr };
+  // FALLBACK (bars not injected yet): derive gaps from the block section rects.
   const secs = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
-  const gaps = []; let lastBottom = null;
+  let lastBottom = null;
   Array.prototype.forEach.call(secs, (elx) => {
     const c = eeClassify(elx); const r = elx.getBoundingClientRect();
     if (c && c.kind === "block") { gaps.push({ gap: c.bi, y: fr.top + r.top }); lastBottom = fr.top + r.bottom; }
@@ -6026,6 +6092,12 @@ function pdGaps() {
   const appendY = lastBottom != null ? lastBottom : (fr.top + main.getBoundingClientRect().top + 8);
   gaps.push({ gap: (BLOCKS_WORK || []).length, y: appendY });
   return { gaps: gaps, fr: fr };
+}
+// mark ONE in-canvas insert target as the active drop-zone (AEM highlight)
+function dcHiliteInsert(elx) {
+  const doc = dcFrameDoc(); if (!doc) return;
+  Array.prototype.forEach.call(doc.querySelectorAll(".dc-drop-active"), (n) => { if (n !== elx) n.classList.remove("dc-drop-active"); });
+  if (elx) elx.classList.add("dc-drop-active");
 }
 function pdMove(e) {
   if (!PDRAG) return;
@@ -6040,11 +6112,12 @@ function pdMove(e) {
   // only a valid drop when the pointer is over (or just beside) the canvas frame
   const inX = p.x >= fr.left - 24 && p.x <= fr.right + 24;
   const inY = p.y >= fr.top - 40 && p.y <= fr.bottom + 40;
-  if (!inX || !inY) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
+  if (!inX || !inY) { PDRAG.lastGap = null; if (line) line.style.display = "none"; dcHiliteInsert(null); return; }
   const cy = Math.max(fr.top, Math.min(p.y, fr.bottom));
   const gap = pdPickGap(info.gaps, cy);
   const chosen = info.gaps.find((g) => g.gap === gap) || info.gaps[0];
   PDRAG.lastGap = gap;
+  dcHiliteInsert(chosen && chosen.el ? chosen.el : null);   // light up the AEM drop-zone
   if (line) {
     const ly = Math.max(fr.top + 2, Math.min(chosen.y, fr.bottom - 4));
     line.style.display = "block";
@@ -6063,6 +6136,7 @@ function pdFinish(commit) {
   document.body.classList.remove("pd-dragging");
   if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
   const line = document.getElementById("pdDropLine"); if (line) line.style.display = "none";
+  dcHiliteInsert(null);
   if (!drag.begun) return;               // never crossed the threshold → treat as a click
   PD_JUST_DRAGGED = true;                // swallow the click that follows a real drag…
   setTimeout(() => { PD_JUST_DRAGGED = false; }, 350);   // …but self-clear if none fires
@@ -6079,7 +6153,7 @@ function pdCancel(e) { pdFinish(false); }
 let INSERT_MENU = null;
 function closeInsertMenu() { if (INSERT_MENU) { INSERT_MENU.remove(); INSERT_MENU = null; document.removeEventListener("keydown", insertMenuKey, true); } }
 function insertMenuKey(e) { if (e.key === "Escape") { e.stopPropagation(); closeInsertMenu(); } }
-function openInsertMenu(atIndex, anchor) {
+function openInsertMenu(atIndex, anchor, rectOverride) {
   closeInsertMenu();
   const menu = el("div", "blk-insertmenu"); INSERT_MENU = menu;
   menu.appendChild(el("div", "tray-h", "Add a section here"));
@@ -6111,8 +6185,10 @@ function openInsertMenu(atIndex, anchor) {
   };
   search.addEventListener("input", paint); paint();
   document.body.appendChild(menu);
-  // position under the "+" (clamped to the viewport); it's a fixed layer, not XY content
-  const r = anchor.getBoundingClientRect();
+  // position under the anchor (a "+" gap, a tree row, or an in-canvas insert bar —
+  // rectOverride carries parent-viewport coords when the anchor lives in the iframe).
+  // Clamped to the viewport; it's a fixed layer, not XY page content.
+  const r = rectOverride || (anchor && anchor.getBoundingClientRect()) || { bottom: 80, left: 80 };
   menu.style.position = "fixed";
   menu.style.top = Math.min(r.bottom + 6, window.innerHeight - 20 - menu.offsetHeight) + "px";
   menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + "px";
@@ -6143,11 +6219,11 @@ function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
   clearTimeout(designPreviewTimer);
   designPreviewTimer = setTimeout(async () => {
-    if (draftLooksEmpty()) {
-      dpNote("Your preview appears once your pages have content.",
-        "The proof draws itself from your real words — nothing is invented. Start with the basics, or add what you offer.");
-      return;
-    }
+    // ALWAYS render the canvas — even a brand-new draft gets a page to build ON.
+    // The render engine returns a valid scaffold (nav · footer · whatever content
+    // exists); dcInjectCanvas then lays a big "add your first section" drop zone
+    // right on it (AEM's "Drag components here" box), so the empty page is a real
+    // build surface, not a dead sheet. No early-return-on-empty any more.
     try {
       frame.srcdoc = await apiHtml("/preview?version=draft&page=%2F");
       const box = $("designPreviewEmpty"); if (box) box.hidden = true;
@@ -6234,7 +6310,24 @@ function dcInjectCanvas(doc, main) {
       "#dds-dc-bar .dc-on{background:#fff;color:#3a2470;font-weight:700}" +
       "#dds-dc-bar .dc-danger:hover{background:#c0392b;border-color:#c0392b}" +
       "#dds-dc-bar .dc-b:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
-      "[data-dc]:focus-visible{outline:2px solid #5b3fa0;outline-offset:-2px}";
+      "[data-dc]:focus-visible{outline:2px solid #5b3fa0;outline-offset:-2px}" +
+      // ── AEM-style insertion targets: a hoverable "＋ Add section" bar between
+      // every section (and top/bottom), plus a big placeholder on an empty page.
+      // Clicking one opens the section picker AT that spot; it's also the drop
+      // target the drag ghost snaps to. Purely an editing overlay — never served.
+      ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:system-ui,-apple-system,sans-serif}" +
+      ".dc-ins::before{content:'';position:absolute;left:18px;right:18px;top:50%;height:0;border-top:2px dashed transparent;transform:translateY(-50%);transition:border-color .12s}" +
+      ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:#5b3fa0}" +
+      ".dc-ins .dc-ins-pill{opacity:0;transition:opacity .12s;position:relative;z-index:1;font:700 12px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border:none;border-radius:999px;padding:5px 13px;cursor:pointer;box-shadow:0 3px 10px rgba(91,63,160,.42);white-space:nowrap}" +
+      ".dc-ins:hover .dc-ins-pill,.dc-ins:focus-within .dc-ins-pill{opacity:1}" +
+      ".dc-ins.dc-drop-active{height:22px}" +
+      ".dc-ins.dc-drop-active::before{border-top:4px solid #5b3fa0}" +
+      ".dc-ins.dc-drop-active .dc-ins-pill{opacity:1}" +
+      ".dc-emptyzone{margin:26px 18px;padding:44px 24px;border:2px dashed #b9a9e0;border-radius:16px;text-align:center;background:rgba(91,63,160,.045);cursor:pointer;font-family:system-ui,-apple-system,sans-serif;transition:border-color .12s,background .12s}" +
+      ".dc-emptyzone:hover,.dc-emptyzone.dc-drop-active{border-color:#5b3fa0;background:rgba(91,63,160,.09)}" +
+      ".dc-emptyzone .dc-ez-t{font:700 18px system-ui,-apple-system,sans-serif;color:#3a2470;margin:0 0 6px}" +
+      ".dc-emptyzone .dc-ez-s{font:400 13px system-ui,-apple-system,sans-serif;color:#6b6478;max-width:34ch;margin:0 auto}" +
+      ".dc-emptyzone .dc-ez-btn{margin-top:16px;display:inline-block;font:700 13.5px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border-radius:999px;padding:11px 22px;box-shadow:0 6px 18px rgba(91,63,160,.4)}";
     (doc.head || doc.documentElement).appendChild(st);
   }
   let bar = doc.getElementById("dds-dc-bar");
@@ -6291,6 +6384,121 @@ function dcInjectCanvas(doc, main) {
       el2.addEventListener("mouseleave", scheduleHide);
     }
   });
+  // expose a selector so the content-tree rows can flash + select a section on click
+  DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
+  dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
+  dcBuildTree(main);           // left-rail Content Tree of every component on the page
+}
+
+// ── AEM insertion targets: a clickable/droppable "＋ Add section" bar at every gap
+// between top-level sections (and a big placeholder when the page is empty). Each
+// carries data-gap = the BLOCKS_WORK index to insert before. The pointer-drag ghost
+// snaps to these (pdGaps reads them), and a click opens the picker AT that spot. ──
+let DC_SHOWBAR = null;
+function dcBlockSections(main) {
+  const out = [];
+  Array.prototype.forEach.call(main.querySelectorAll(":scope > section, :scope > nav.block-toc"), (el2) => {
+    const c = eeClassify(el2); if (c && c.kind === "block") out.push({ el: el2, bi: c.bi });
+  });
+  return out;
+}
+function dcInsBar(doc, gap, label) {
+  const bar = doc.createElement("div"); bar.className = "dc-ins"; bar.setAttribute("data-gap", String(gap));
+  bar.setAttribute("role", "button"); bar.setAttribute("tabindex", "0"); bar.setAttribute("aria-label", label || "Add a section here");
+  const pill = doc.createElement("span"); pill.className = "dc-ins-pill"; pill.textContent = "＋ Add section";
+  bar.appendChild(pill);
+  const open = (e) => { e.preventDefault(); e.stopPropagation(); dcOpenInsertFromCanvas(gap, bar); };
+  bar.addEventListener("click", open);
+  bar.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
+  return bar;
+}
+function dcBuildInserts(doc, main) {
+  Array.prototype.forEach.call(main.querySelectorAll(".dc-ins, .dc-emptyzone"), (n) => n.remove());
+  const blocks = dcBlockSections(main);
+  const len = (BLOCKS_WORK || []).length;
+  if (!blocks.length) {
+    // empty page → one big "Drag components here" placeholder (AEM pattern)
+    const z = doc.createElement("div"); z.className = "dc-emptyzone"; z.setAttribute("data-gap", "0");
+    z.setAttribute("role", "button"); z.setAttribute("tabindex", "0"); z.setAttribute("aria-label", "Add your first section");
+    const t = doc.createElement("div"); t.className = "dc-ez-t"; t.textContent = "Start building your page";
+    const s = doc.createElement("div"); s.className = "dc-ez-s"; s.textContent = "Drag a section here, or click to pick one. Everything you add stays readable on phones automatically.";
+    const b = doc.createElement("span"); b.className = "dc-ez-btn"; b.textContent = "＋ Add your first section";
+    z.appendChild(t); z.appendChild(s); z.appendChild(b);
+    const open = (e) => { e.preventDefault(); e.stopPropagation(); dcOpenInsertFromCanvas(0, z); };
+    z.addEventListener("click", open);
+    z.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
+    main.appendChild(z);
+    return;
+  }
+  blocks.forEach((bs) => { const bar = dcInsBar(doc, bs.bi, "Add a section here"); bs.el.parentNode.insertBefore(bar, bs.el); });
+  const tail = dcInsBar(doc, len, "Add a section at the end"); main.appendChild(tail);
+}
+// open the section picker anchored to an in-canvas insert target (translate the
+// iframe-local rect to parent-viewport coords so the menu lands next to the spot).
+function dcOpenInsertFromCanvas(gap, anchorInFrame) {
+  const f = $("designPreview"); const fr = f ? f.getBoundingClientRect() : { left: 0, top: 0 };
+  const r = anchorInFrame.getBoundingClientRect();
+  const rect = { left: fr.left + r.left, top: fr.top + r.top, bottom: fr.top + r.bottom, right: fr.left + r.right };
+  closeTrayPanel();               // the picker replaces the big tray for in-canvas adds
+  openInsertMenu(gap, null, rect);
+}
+
+// ── CONTENT TREE (left rail) — AEM's Content Tree: every component on the page,
+// top-to-bottom, each with its own settings ("meta"), reorder + hide/remove, and
+// click-to-select on the canvas. Built fresh from the rendered sections each load
+// so it always mirrors what's actually on the page. ──
+const DC_CORE_NAME = { business: "Intro / hero", offerings: "What you offer", faqs: "Questions & answers", testimonials: "Reviews", updates: "Latest updates", design: "Section" };
+function dcTreeEmpty(msg) { const host = $("designTreeList"); if (!host) return; host.textContent = ""; host.appendChild(el("div", "dc-tree-empty", msg)); }
+function dcRefreshTree() { const doc = dcFrameDoc(); const main = doc && doc.getElementById("main"); if (main) dcBuildTree(main); else dcTreeEmpty("Your page is drawing… it’ll list here in a moment."); }
+function dcBuildTree(main) {
+  const host = $("designTreeList"); if (!host) return;
+  host.textContent = "";
+  const secs = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
+  if (!secs.length) { dcTreeEmpty("Nothing on your page yet. Open “＋ Add section” to place your first one — or click the box on the canvas."); return; }
+  host.appendChild(el("div", "dc-tree-hd", "Top → bottom on your page"));
+  Array.prototype.forEach.call(secs, (el2) => { const c = eeClassify(el2); host.appendChild(dcTreeRow(el2, c)); });
+}
+function dcTreeRow(el2, c) {
+  const isBlock = c && c.kind === "block";
+  const b = isBlock ? (BLOCKS_WORK[c.bi] || {}) : null;
+  const def = isBlock ? BLOCK_DEFS.find((x) => x.type === b.type) : null;
+  const heading = ((el2.querySelector("h1,h2,h3") || {}).textContent || "").trim();
+  const name = isBlock ? ((def && def.name) || b.type || "Section")
+    : (heading ? heading.slice(0, 42) : (DC_CORE_NAME[c.view] || "Section"));
+  const meta = isBlock ? (SECTION_ALIAS[b.type] || b.type || "section") : "built-in section";
+  const icon = isBlock ? (TRAY_TYPE_ICON[b.type] || "▧") : "◫";
+  const row = el("div", "dc-tree-row " + (isBlock ? "block" : "core"));
+  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this on the page";
+  mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: icon }));
+  const txt = el("span", "dc-tree-txt");
+  txt.appendChild(el("span", "dc-tree-name", name));
+  txt.appendChild(el("span", "dc-tree-meta", meta));
+  mainBtn.appendChild(txt);
+  mainBtn.addEventListener("click", () => dcTreeSelect(el2, row));
+  row.appendChild(mainBtn);
+  const acts = el("span", "dc-tree-acts");
+  const mkA = (label, title, fn, disabled) => {
+    const btn = el("button", null, label); btn.type = "button"; btn.title = title; btn.setAttribute("aria-label", title);
+    if (disabled) btn.disabled = true; else btn.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+    return btn;
+  };
+  if (isBlock) {
+    acts.appendChild(mkA("↑", "Move up", () => dcMove(c.bi, c.bi - 1), c.bi <= 0));
+    acts.appendChild(mkA("↓", "Move down", () => dcMove(c.bi, c.bi + 2), c.bi >= (BLOCKS_WORK.length - 1)));
+    acts.appendChild(mkA("⚙", "Settings for this section", () => eeEditBlock(c.bi)));
+    acts.appendChild(mkA("🗑", "Remove this section", () => dcDelete(c.bi)));
+  } else {
+    acts.appendChild(mkA("⚙", "Edit this section", () => eeEditCore(c.view)));
+    if (c.key) acts.appendChild(mkA("🙈", "Hide this section", () => eeHideKey(c.key)));
+  }
+  row.appendChild(acts);
+  return row;
+}
+function dcTreeSelect(el2, row) {
+  try { el2.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {}
+  if (DC_SHOWBAR) DC_SHOWBAR(el2);
+  const host = $("designTreeList"); if (host) Array.prototype.forEach.call(host.querySelectorAll(".dc-tree-row.sel"), (n) => n.classList.remove("sel"));
+  if (row) row.classList.add("sel");
 }
 
 // Install once: every time the canvas srcdoc (re)loads, inject the chrome and
