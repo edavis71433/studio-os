@@ -151,7 +151,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     const title = (String(p?.title || '').trim().slice(0, 80)) || slug;
     const pResolved = resolveLinkedBlocks(Array.isArray(p?.blocks) ? p.blocks : [], (id) => libMap.get(id) ?? null);
     const blocks = resolveBlockMedia(validateBlocks(pResolved), ref, reviewsWall ? { reviewsWall } : undefined);
-    return { slug, title, blocks };
+    return p?.hideNav === true ? { slug, title, blocks, hideNav: true } : { slug, title, blocks };
   }).filter((p): p is { slug: string; title: string; blocks: ReturnType<typeof resolveBlockMedia> } => !!p);
 
   const content: SnapshotContent = {

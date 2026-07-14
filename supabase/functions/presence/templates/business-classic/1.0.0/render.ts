@@ -473,8 +473,8 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     ['/', 'Home', 'home'], [v.offeringPath, v.offeringLabel, 'offerings'], ['/about/', 'About', 'about'],
     ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
   ];
-  // Multi-page: the owner's own pages join the main nav (after Contact).
-  for (const cp of (c.settings?.pages || [])) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]);
+  // Multi-page: the owner's own pages join the main nav (after Contact), unless hidden.
+  for (const cp of (c.settings?.pages || [])) { if (!cp.hideNav) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]); }
   const extras: Extras = { announce, icon, nav };
 
   // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,

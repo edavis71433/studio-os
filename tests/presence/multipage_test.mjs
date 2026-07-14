@@ -24,6 +24,7 @@ for (const slug of TEMPLATES) {
   withPage.content.settings.pages = [
     { slug: 'our-team', title: 'Our Team', blocks: [{ type: 'features', title: 'Meet the crew', items: [{ title: 'Jane Doe', text: 'Head chef' }] }] },
     { slug: 'partners-page', title: 'Partners', blocks: [{ type: 'richtext', title: 'Our partners', body: 'We work with **great** people.' }] },
+    { slug: 'secret', title: 'Secret Landing', hideNav: true, blocks: [{ type: 'richtext', title: 'Hidden', body: 'Not in the menu.' }] },
   ];
   const out = renderSnapshot(withPage, SITE);
 
@@ -35,6 +36,8 @@ for (const slug of TEMPLATES) {
   ok(`[${slug}] a custom page joins the nav on the home page`, out['index.html'].includes('href="/our-team/"') && out['index.html'].includes('Our Team') && out['index.html'].includes('href="/partners-page/"'));
   ok(`[${slug}] custom pages are in the sitemap`, out['sitemap.xml'].includes('/our-team/') && out['sitemap.xml'].includes('/partners-page/'));
   ok(`[${slug}] the second custom page also renders`, (out['partners-page/index.html'] || '').includes('<strong>great</strong>'));
+  // hidden-from-nav: the page still renders + has a URL, but is NOT in the menu
+  ok(`[${slug}] a hidden page renders its file but is NOT in the nav`, typeof out['secret/index.html'] === 'string' && !out['index.html'].includes('href="/secret/"'));
 
   // hostile content in a custom page must be escaped, never executable
   const hostile = structuredClone(fixture);

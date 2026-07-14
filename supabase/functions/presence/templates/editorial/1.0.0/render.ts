@@ -481,7 +481,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     ['/', 'Home', 'home'], [v.offeringPath, v.offeringLabel, 'offerings'], ['/about/', 'About', 'about'],
     ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
   ];
-  for (const cp of (c.settings?.pages || [])) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]);   // multi-page
+  for (const cp of (c.settings?.pages || [])) { if (!cp.hideNav) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]); }   // multi-page
   const extras: Extras = { announce, icon, nav };
 
   // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,

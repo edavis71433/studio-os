@@ -408,6 +408,8 @@ h5.rune .whisper.ok{color:var(--sage)}
 .pp-pop-item{font:inherit;font-size:13px;text-align:left;padding:9px 12px;border:none;background:none;cursor:pointer;border-radius:8px;color:var(--ink,#1b1525)}
 .pp-pop-item:hover{background:var(--wash,#f4f0fb)}
 .pp-pop-item.danger{color:#c0392b}
+.pp-pop-item:disabled{opacity:.4;cursor:default;background:none}
+.page-pill.hidden-nav .pp-name{opacity:.6}
 .dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 .dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff}
 /* the prominent floating "add section" affordance over the canvas */
@@ -4659,8 +4661,9 @@ function renderPagesBar() {
   host.textContent = "";
   dcPageList().forEach((pg) => {
     const on = pg.slug === DC_PAGE;
-    const pill = el("button", "page-pill" + (on ? " on" : "")); pill.type = "button"; pill.setAttribute("role", "tab"); pill.setAttribute("aria-selected", String(on));
-    pill.appendChild(el("span", "pp-name", pg.title));
+    const hidden = pg.slug && dcPageObj(pg.slug) && dcPageObj(pg.slug).hideNav;
+    const pill = el("button", "page-pill" + (on ? " on" : "") + (hidden ? " hidden-nav" : "")); pill.type = "button"; pill.setAttribute("role", "tab"); pill.setAttribute("aria-selected", String(on));
+    pill.appendChild(el("span", "pp-name", pg.title + (hidden ? " (hidden)" : "")));
     pill.addEventListener("click", () => dcSwitchPage(pg.slug));
     if (pg.slug) { const mn = el("span", "pp-menu", "⋯"); mn.title = "Rename or delete this page"; mn.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, mn); }); pill.appendChild(mn); }
     host.appendChild(pill);
@@ -4694,14 +4697,28 @@ async function dcAddPage() {
   } catch (err) { toast(nice(err), true); }
 }
 function dcPageMenu(slug, anchor) {
+  const p = dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
   const m = el("div", "pp-pop");
   const rn = el("button", "pp-pop-item", "Rename"); rn.type = "button"; rn.addEventListener("click", () => { m.remove(); dcRenamePage(slug); });
+  const nv = el("button", "pp-pop-item", (p && p.hideNav) ? "Show in menu" : "Hide from menu"); nv.type = "button"; nv.addEventListener("click", () => { m.remove(); dcTogglePageNav(slug); });
+  const ml = el("button", "pp-pop-item", "Move left"); ml.type = "button"; if (idx <= 0) ml.disabled = true; else ml.addEventListener("click", () => { m.remove(); dcMovePage(slug, -1); });
+  const mr = el("button", "pp-pop-item", "Move right"); mr.type = "button"; if (idx >= last) mr.disabled = true; else mr.addEventListener("click", () => { m.remove(); dcMovePage(slug, 1); });
   const dl = el("button", "pp-pop-item danger", "Delete page"); dl.type = "button"; dl.addEventListener("click", () => { m.remove(); dcDeletePage(slug); });
-  m.append(rn, dl); document.body.appendChild(m);
+  m.append(rn, nv, ml, mr, dl); document.body.appendChild(m);
   const r = anchor.getBoundingClientRect();
   m.style.cssText = "position:fixed;z-index:300;top:" + (r.bottom + 4) + "px;left:" + Math.max(8, r.left - 70) + "px;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px";
   const off = (e) => { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("mousedown", off, true); } };
   setTimeout(() => document.addEventListener("mousedown", off, true), 0);
+}
+async function dcTogglePageNav(slug) {
+  const pages = dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; });
+  try { const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages }; renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
+}
+async function dcMovePage(slug, dir) {
+  const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
+  if (i < 0 || j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  try { const r = await api("PUT", "/settings", { pages: arr }); S.settings = r.data || { ...S.settings, pages: arr }; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
 }
 async function dcRenamePage(slug) {
   const p = dcPageObj(slug); if (!p) return;

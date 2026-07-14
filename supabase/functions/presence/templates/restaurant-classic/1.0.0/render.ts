@@ -255,7 +255,7 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
     ['/', 'Home', 'home'], ['/menu/', 'Menu', 'menu'], ['/about/', 'About', 'about'],
     ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
   ];
-  for (const cp of (c.settings?.pages || [])) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]);   // multi-page
+  for (const cp of (c.settings?.pages || [])) { if (!cp.hideNav) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]); }   // multi-page
   const { addr, tel, mail } = contactBits(c);
   const social = Object.entries(i.social || {}).map(([k, v]) => {
     const href = safeHref(v); if (!href) return '';
