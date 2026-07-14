@@ -93,7 +93,10 @@
 //     the shared shell nav carries Website·Customers·Projects·Files·Inbox — one app.
 //   • team w/o workspace → honest panel (never a dead spinner).
 //   • a client           → their door (/portal.html).
-// Session is shared with every app page (storageKey 'dds-portal-auth').
+// Session is shared with every OPERATOR app page (storageKey 'dds-portal-auth').
+// The client app keeps its own separate realm ('dds-client-auth'), so a
+// client-only browser session no longer appears here — studio shows its sign-in
+// panel instead of bouncing, and an operator can be signed into both apps at once.
 var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 var FN = SUPABASE_URL + "/functions/v1";

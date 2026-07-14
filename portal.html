@@ -140,8 +140,9 @@
 // 6-digit code / magic link via GoTrue's signInWithOtp — lowest friction, best
 // mobile UX, no shared secret to phish. Password is kept as a quiet fallback so
 // nothing existing breaks. A verified OTP creates a NORMAL Supabase session in
-// the same 'dds-portal-auth' storage, so the role-routing below and every app
-// page (client.html, workspace) keep working unchanged.
+// the CLIENT realm ('dds-client-auth') — kept separate from the operator/studio
+// realm ('dds-portal-auth') so an operator can be signed into both apps at once.
+// The role-routing below and the client app (client.html) share this key.
 var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 var FN = SUPABASE_URL + "/functions/v1";
@@ -154,7 +155,7 @@ function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej)
 
 var sb = null;
 if (typeof supabase !== "undefined") {
-  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-client-auth', persistSession: true, autoRefreshToken: true } });
 } else {
   errIn('errEmail', "Connection problem — check your internet and refresh this page.");
 }
