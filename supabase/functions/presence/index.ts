@@ -29,7 +29,7 @@ import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handle
 import { handleSalesSummary, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
-import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
+import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientServices, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
@@ -689,6 +689,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // P2-D-3: project messages
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/messages$/);
     if (m && (method === 'GET' || method === 'POST')) return handleMessages(req, jwt, site, principal, m[1], cors);
+    // A customer's GENERAL (project-less) messages, surfaced inside their own delivery view.
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/client-messages$/);
+    if (m && method === 'GET') return handleProjectClientMessages(req, jwt, site, principal, m[1], cors);
     // P2-D-4: project surveys
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/surveys$/);
     if (m && (method === 'GET' || method === 'POST')) return handleProjectSurveys(req, jwt, site, principal, m[1], cors);

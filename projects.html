@@ -66,6 +66,50 @@
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     DETAIL VIEW REDESIGN — "everything is so small" fix.
+     The full-screen project view gets real breathing room: a wider page, a
+     larger type scale, and each section as a roomy card. On wide screens the
+     overview (progress + status) sits in a sticky side column while the working
+     sections (milestones, tasks, files, approvals, surveys, support, messages)
+     flow in the main column. It collapses to one comfortable column on mobile.
+     Everything below is SCOPED to #detailInner so the projects list is untouched.
+     ───────────────────────────────────────────────────────────────────────── */
+  #detailWrap{max-width:1120px}
+  #detailInner .backbar{padding:18px 22px 0}
+  #detailInner .dhead{padding:20px 24px 22px}
+  #detailInner #dtitle{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2}
+  #detailInner .dhead .mut{font-size:14px;margin-top:6px}
+  #detailInner .dbody{padding:22px 24px 28px}
+  /* two-column on wide screens; single column (side first) on smaller ones */
+  .dgrid{display:grid;gap:20px;align-items:start}
+  @media(min-width:900px){.dgrid:not(.nosplit){grid-template-columns:310px minmax(0,1fr)}}
+  .dside{display:flex;flex-direction:column;gap:16px;min-width:0}
+  @media(min-width:900px){.dside{position:sticky;top:14px}}
+  .dmain{display:flex;flex-direction:column;gap:16px;min-width:0}
+  /* every section is now a card that breathes */
+  #detailInner .sec{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  #detailInner .sec h3{font-family:var(--serif);font-weight:500;font-size:18px;text-transform:none;letter-spacing:normal;color:var(--ink);margin:0 0 12px;gap:10px}
+  #detailInner .sec h3 .btn{font-size:12.5px}
+  /* overview card: the at-a-glance numbers, enlarged */
+  #detailInner .ov{background:var(--p-soft);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  #detailInner .ov .stat{gap:18px 22px;margin:0}
+  #detailInner .ov .stat b{font-size:28px}
+  #detailInner .ov .stat span{font-size:12.5px;margin-top:2px}
+  #detailInner .ov .prog{height:10px;margin-top:14px}
+  /* roomier rows + wrapping so long words never force a sideways scroll */
+  #detailInner .item{padding:11px 0;gap:12px}
+  #detailInner .item .t{font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+  #detailInner .sec .mut{font-size:14px}
+  #detailInner .steps{gap:8px;margin:0}
+  #detailInner .sec .btn.sm{font-size:13px;padding:7px 12px}
+  /* Messages — the studio's main line to the client — reads a touch warmer */
+  #detailInner .sec.msgs{border-color:var(--p);box-shadow:0 1px 3px rgba(91,63,160,.08)}
+  #detailInner .sec.msgs form.mini textarea{min-height:90px}
+  #detailInner .sec.msgs form.mini{background:var(--card)}
+  #detailInner .sec form.mini{margin-top:12px}
+  #detailInner .sec form.mini .btn:not(.ghost){padding:9px 18px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script src="/shell.js" defer></script>
@@ -214,21 +258,26 @@ async function openProject(id){
     const ts=(data.tasks||[]).map(t=>{const d=t.derived||{};return `<div class="item"><div class="t">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(t.status.replace('_',' '))}</span>${STUDIO?(T_NEXT[t.status]||[]).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(s.replace('_',' '))}</button>`).join(''):''}</div></div>`;}).join('')||'<div class="mut">No tasks yet.</div>';
     const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="mut">No files yet.</div>';
     const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="mut">No approvals yet.</div>';
+    const overviewHtml=rp?`<div class="ov"><div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div>${rp.csat?`<div><b>${rp.csat.average}★</b><span>CSAT · ${rp.csat.count}</span></div>`:''}</div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div></div>`:'';
+    const statusHtml=(STUDIO&&statusBtns)?`<div class="sec"><h3>Status</h3><div class="steps">${statusBtns}</div></div>`:'';
+    const asideHtml=overviewHtml+statusHtml;
     $('detailInner').innerHTML=`
       <div class="backbar"><button class="btn ghost sm" id="closeDetail">← Back to projects</button></div>
-      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px" id="dtitle" tabindex="-1">${esc(p.name)}</div>
+      <div class="dhead"><div><div id="dtitle" tabindex="-1">${esc(p.name)}</div>
         <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div></div>
-      <div class="dbody">
-        ${rp?`<div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div>${rp.csat?`<div><b>${rp.csat.average}★</b><span>CSAT · ${rp.csat.count}</span></div>`:''}</div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div>`:''}
-        ${STUDIO&&statusBtns?`<div class="sec"><h3>Status</h3><div class="steps">${statusBtns}</div></div>`:''}
-        <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
-        <div class="sec"><h3>Tasks ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
-        <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share a file</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
-        <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
-        ${STUDIO?`<div class="sec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>
-        <div class="sec"><h3>Support</h3><div id="supList" class="mut">Loading…</div></div>`:''}
-        <div class="sec"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
-      </div>`;
+      <div class="dbody"><div class="dgrid${asideHtml?'':' nosplit'}">
+        ${asideHtml?`<aside class="dside">${asideHtml}</aside>`:''}
+        <div class="dmain">
+          <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
+          <div class="sec"><h3>Tasks ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
+          <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share a file</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
+          <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
+          ${STUDIO?`<div class="sec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>
+          <div class="sec"><h3>Support</h3><div id="supList" class="mut">Loading…</div></div>
+          <div class="sec"><h3 id="genHead">General messages</h3><div id="genList" class="mut">Loading…</div></div>`:''}
+          <div class="sec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
+        </div>
+      </div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
     // status
     $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
@@ -246,7 +295,7 @@ async function openProject(id){
     $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{try{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');openProject(id);}catch(e){toast(nice(e),true);}});
     // surveys + support (studio triage/review)
     if($('addSurvey'))$('addSurvey').onclick=()=>miniForm($('svForm'),[{name:'title',label:'Survey title'},{name:'q',label:'A question to ask'}],async v=>{await api('/projects/'+id+'/surveys','POST',{title:v.title,questions:[{label:v.q||'Your feedback',type:'text'}]});loadSurveys(id);});
-    loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);}
+    loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);loadClientGeneral(id);}
     // a11y: the re-render replaced whatever control had focus — land on the dialog title
     if(wasOpen){const t=$('dtitle');if(t)t.focus();}
   }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></div>'; }
@@ -297,7 +346,12 @@ async function loadSupport(id,focusRid){
 }
 // The owner can now READ the request + the client's messages and REPLY — the
 // backend was always there; only the UI (mark-resolved only) was missing.
-async function openStudioSupport(rid,pid){
+// Host-aware: the same conversation UI serves both the project's Support list
+// (host=#supList) and a customer's General messages (host=#genList). `back`
+// returns to whichever list opened it. Handlers are looked up WITHIN the host so
+// two open conversations (one per list) never collide on a shared id.
+async function openStudioSupport(rid,pid,opts){
+  opts=opts||{}; const host=opts.host||$('supList'); const back=opts.back||(()=>loadSupport(pid,rid)); if(!host)return;
   try{
     const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]); const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
     const resolved=rq.status==='resolved'||rq.status==='closed';
@@ -308,13 +362,33 @@ async function openStudioSupport(rid,pid){
     // nothing goes into an attribute; the <select> only carries escaped titles.
     const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
     const pickerHtml=replies.length?`<select id="sr-canned-${rid}" aria-label="Insert a saved reply" style="margin-bottom:6px"><option value="">Insert a saved reply…</option>${replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select>`:'';
-    $('supList').innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" id="sup-back">← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="sup-reply"><label for="sr-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" id="sup-res">Resolve</button>':''}</div></form>`}`;
-    $('sup-back').onclick=()=>loadSupport(pid,rid);
+    host.innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" data-supback>← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" data-supreply><label for="sr-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" data-supres>Resolve</button>':''}</div></form>`}`;
+    host.querySelector('[data-supback]').onclick=()=>back();
     const sta=$('sr-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta); // a half-written reply survives an accidental close/refresh
     const cn=$('sr-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
-    const rf=$('sup-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid);}catch(err){toast(nice(err),true);}};
-    const rb=$('sup-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(pid,rid);}catch(e){toast(nice(e),true);}};
+    const rf=host.querySelector('[data-supreply]'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupport(rid,pid,opts);}catch(err){toast(nice(err),true);}};
+    const rb=host.querySelector('[data-supres]'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');back();}catch(e){toast(nice(e),true);}};
   }catch(e){ toast('Couldn’t open that request.',true); }
+}
+
+// FIX B: a customer's GENERAL (project-less) messages, surfaced INSIDE their own
+// delivery view. The owner kept expecting a client's messages "inside the created
+// profile" — this resolves the project → its bridge → the customer (server-side)
+// and lists that customer's project-less requests here, with the same View & reply
+// / Resolve affordance as project Support. The studio-wide "Client messages" list
+// stays too (for requests not yet tied to a customer).
+async function loadClientGeneral(id,focusRid){
+  const host=$('genList'); if(!host)return;
+  try{
+    const {data,customer}=await api('/projects/'+id+'/client-messages');
+    const items=data||[]; const nm=(customer&&customer.name)?customer.name:'';
+    const head=$('genHead'); if(head)head.textContent='General messages'+(nm?' from '+nm:'');
+    if(!items.length){host.innerHTML='<div class="mut">'+(nm?('Nothing from '+esc(nm)+' outside this project yet. '):'')+'Anything this client sends that isn’t tied to a project shows up here.</div>';return;}
+    host.innerHTML=items.map(r=>`<div class="item"><div class="t">${esc(r.subject||'Message')} <span class="tag">${esc(r.status)}</span></div><div class="row2"><button class="btn ghost sm" data-gopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-gres="${r.id}">Resolve</button>`:''}</div></div>`).join('');
+    host.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.gopen,id,{host,back:()=>loadClientGeneral(id,b.dataset.gopen)}));
+    host.querySelectorAll('[data-gres]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.gres,'PATCH',{status:'resolved'});toast('Resolved');loadClientGeneral(id,b.dataset.gres);}catch(e){toast(nice(e),true);}});
+    if(focusRid){const el=host.querySelector('[data-gopen="'+focusRid+'"]');if(el)el.focus();}
+  }catch(e){ host.innerHTML='<div class="mut">Couldn’t load general messages.</div>'; }
 }
 
 // FIX 5: project-less client support requests belong to no single project, so the

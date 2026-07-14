@@ -38,6 +38,13 @@ ok('migration: message attachment references presence_media', /attachment_media_
 ok('bridge: the client thread + notifications are served via /client/* (not the reviewer path)', idx.includes('handleClientMessages(') && idx.includes('handleClientNotifications('));
 ok('B3: support activity folds into notifications (project-less tickets still notify)', /presence_support_requests\?site_id=eq\.\$\{site\.id\}[\s\S]*?support_message/.test(c));
 
+// FIX B: a customer's GENERAL (project-less) messages, surfaced inside their view
+ok('general: handler exists + is studio-gated (client side forbidden)', /export async function handleProjectClientMessages/.test(c) && /if \(!studio\) return json\(\{ error: 'forbidden'/.test(c));
+ok('general: project → bridge resolved on THIS studio’s site (tenant-safe)', /presence_service_links\?project_id=eq\.\$\{projectId\}&agency_site_id=eq\.\$\{site\.id\}&status=eq\.active/.test(c));
+ok('general: requests are the customer’s, project-LESS, and site-scoped', /presence_support_requests\?site_id=eq\.\$\{site\.id\}&project_id=is\.null&deleted_at=is\.null&requester=in\./.test(c));
+ok('general: matched by every requester identity (auth id, email, contact email)', /client\.auth_user_id, client\.email, client\.contact_email/.test(c));
+ok('general: route dispatched (GET /projects/:id/client-messages)', /client-messages\$/.test(idx) && idx.includes('handleProjectClientMessages('));
+
 // wiring + migration + pure lib
 ok('wiring: messages + notifications routes dispatched', idx.includes('handleMessages(') && idx.includes('handleNotifications(') && idx.includes('handleNotificationsRead('));
 ok('migration: message table site-scoped + audience CHECK + RLS', /audience text not null default 'client' check \(audience in \('internal','client'\)\)/.test(mig) && /alter table public\.presence_project_messages enable row level security/.test(mig));

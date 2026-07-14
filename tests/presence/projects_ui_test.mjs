@@ -23,6 +23,8 @@ ok('a11y/ux: no prompt()/alert()/confirm() — uses dialogs + ddsToast', !/\bpro
 ok('ux: valid next-stage buttons mirror the bounded ladders (no illegal jumps in UI)', /P_NEXT=\{active:\['on_hold','complete','archived'\]/.test(h) && /T_NEXT=\{todo:\['in_progress','blocked','done'\]/.test(h));
 ok('ux: shared/internal + client-action tags reflect visibility', /tag client/.test(h) && /your action/.test(h));
 ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /\$\('newProject'\)\.hidden=!STUDIO/.test(h));
+ok('ux: detail view redesigned into a roomy two-column layout (overview + sections)', /class="dgrid/.test(h) && /class="dside"/.test(h) && /class="dmain"/.test(h) && /#detailWrap\{max-width/.test(h));
+ok('FIX B: a customer’s general (project-less) messages surface inside their view', /loadClientGeneral/.test(h) && /\/client-messages/.test(h) && /id="genList"/.test(h));
 ok('nav: Projects is a primary outcome, gated to the relationship area', /single\('projects', 'Projects', '\/projects\.html'\)/.test(nav) && /if \(f\.hasRelationship\) single\('projects'/.test(nav));
 
 const passed = results.filter((r) => r.p).length;

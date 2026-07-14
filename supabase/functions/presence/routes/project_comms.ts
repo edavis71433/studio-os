@@ -68,6 +68,40 @@ export async function handleMessages(req: Request, jwt: string, site: SiteRow, p
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
+// ═══ A CUSTOMER'S GENERAL (project-less) MESSAGES ═══════════════════════════
+// The studio-wide "Client messages" list shows every project-less support
+// request. But the owner also expects a specific customer's general messages to
+// live INSIDE that customer's delivery view. Resolve the open project → its
+// Agency–Client Bridge → the customer, then return that customer's project-less
+// support requests — matched by the same requester key their tickets are filed
+// under (their auth user id, email, or contact email). Studio-side only; every
+// query is scoped to the studio's OWN site (tenant isolation). Read-only: the
+// operator still opens each request through the existing reply/resolve flow.
+export async function handleProjectClientMessages(req: Request, jwt: string, site: SiteRow, principal: Principal, projectId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(projectId)) return json({ error: 'bad_request' }, 400, cors);
+  if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  if (!studio) return json({ error: 'forbidden', message: 'Only your studio can see a customer’s messages.' }, 403, cors);
+  const project = await loadProject(site.id, projectId);
+  if (!project) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
+  // project → bridge → customer. The link must live on THIS studio's site.
+  const link = rows(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${site.id}&status=eq.active&select=customer_client_id&limit=1`))[0];
+  const custId = link?.customer_client_id ? String(link.customer_client_id) : '';
+  if (!custId) return json({ data: [], customer: null, is_studio_view: true }, 200, cors);
+  const client = rows(await svc(`clients?id=eq.${custId}&select=id,name,email,contact_email,auth_user_id&limit=1`))[0];
+  if (!client) return json({ data: [], customer: null, is_studio_view: true }, 200, cors);
+  const customer = { id: client.id, name: client.name || client.email || null };
+  // A customer's tickets are filed under readerKey(principal) = their auth user
+  // id OR email — match every identity they could have used so none is missed.
+  const keys = [client.auth_user_id, client.email, client.contact_email]
+    .filter((k) => k != null && String(k).trim() !== '')
+    .map((k) => encodeURIComponent(`"${String(k).replace(/"/g, '')}"`));
+  if (!keys.length) return json({ data: [], customer, is_studio_view: true }, 200, cors);
+  const r = await svc(`presence_support_requests?site_id=eq.${site.id}&project_id=is.null&deleted_at=is.null&requester=in.(${keys.join(',')})&select=id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at&order=updated_at.desc&limit=100`);
+  if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load that customer’s messages just now.' }, 502, cors);
+  return json({ data: rows(r), customer, is_studio_view: true }, 200, cors);
+}
+
 // ═══ NOTIFICATIONS (derived view over the activity log + a per-reader last-seen) ═══
 export async function handleNotifications(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const studio = await isStudioSide(jwt, site, principal);
