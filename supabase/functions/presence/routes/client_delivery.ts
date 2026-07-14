@@ -264,12 +264,37 @@ export async function handleClientServices(_req: Request, site: SiteRow, _princi
   const links = await linksForCustomer(me);
   if (!links.length) return json({ data: [] }, 200, cors);
   const s = links[0].agency_site_id;                 // a customer's delivery lives on their converting agency's site
-  const r = await svc(`presence_offerings?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&select=id,name,category,description,price_text&order=sort_order.asc,created_at.asc&limit=200`);
-  if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
-  const list = rows(r).map((o) => ({
-    id: o.id, name: clean(o.name, 120), category: clean(o.category, 60),
-    description: clean(o.description, 500), price: clean(o.price_text, 40),
-  }));
+  // A studio may keep its services in EITHER place: website Offerings (rich —
+  // name + description + price) OR the proposal "Manage services" catalog (name +
+  // price, stored as line_items on a reserved sales template). Merge BOTH so the
+  // client sees the studio's services wherever they were listed, then ALWAYS add a
+  // "Custom" option. Any id that isn't a real offering UUID degrades in POST
+  // /client/support to a plain named request — nothing is charged either way.
+  const [offR, salesR] = await Promise.all([
+    svc(`presence_offerings?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&select=id,name,category,description,price_text&order=sort_order.asc,created_at.asc&limit=200`),
+    svc(`presence_sales_templates?site_id=eq.${s}&kind=eq.proposal&name=eq.${encodeURIComponent('__services_catalog__')}&deleted_at=is.null&select=line_items&limit=1`),
+  ]);
+  if (!offR.ok) return json({ error: 'read_failed' }, 502, cors);
+  const list: Array<{ id: string; name: string; category: string; description: string; price: string }> = [];
+  const seen = new Set<string>();
+  for (const o of rows(offR)) {
+    const name = clean(o.name, 120); if (!name) continue;
+    seen.add(name.toLowerCase());
+    list.push({ id: o.id, name, category: clean(o.category, 60), description: clean(o.description, 500), price: clean(o.price_text, 40) });
+  }
+  const salesItems = rows(salesR)[0]?.line_items;
+  if (Array.isArray(salesItems)) {
+    salesItems.forEach((it: any, i: number) => {
+      const name = clean(it?.label, 120);
+      if (!name || seen.has(name.toLowerCase())) return;
+      seen.add(name.toLowerCase());
+      const cents = Math.max(0, Math.trunc(Number(it?.unit_cents)) || 0);
+      const price = cents > 0 ? '$' + (cents / 100).toFixed(2).replace(/\.00$/, '') : '';
+      list.push({ id: `svc:${i}`, name, category: '', description: '', price });
+    });
+  }
+  // Always offer a Custom request so a client can ask for anything not listed.
+  list.push({ id: 'custom', name: 'Custom request', category: '', description: 'Something else in mind? Tell your studio exactly what you’d like and they’ll follow up.', price: '' });
   return json({ data: list }, 200, cors);
 }
 
