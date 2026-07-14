@@ -70,6 +70,11 @@ export interface SnapshotContent {
      *  filled (validated + capped at serialize time). Rendered deterministically as
      *  home sections; each carries its own schema.org + a11y. Never free-form HTML. */
     blocks?: SiteBlock[];
+    /** Multi-page: owner-created pages, each with its own validated blocks. Rendered
+     *  as /{slug}/index.html by the template, sharing its header/nav/footer. Absent
+     *  or empty = single-page (byte-identical to before). Slugs are safe + unique and
+     *  never collide with a template's built-in pages. */
+    pages?: Array<{ slug: string; title: string; blocks: SiteBlock[] }>;
   };
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;

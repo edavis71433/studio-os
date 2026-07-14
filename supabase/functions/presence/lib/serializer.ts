@@ -124,13 +124,35 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
   // (validateBlocks → resolveBlockMedia) is unchanged, so a copy-inserted block and
   // a linked one render identically. No links → no query, byte-identical to before.
   const rawBlocks: unknown[] = Array.isArray(settings.blocks) ? settings.blocks : [];
-  const refIds = linkedRefIds(rawBlocks);
+  // Multi-page: owner-created pages carry their own block arrays. Collect linked
+  // refs across the home page AND every custom page so one library query resolves
+  // them all (a linked section can appear on any page).
+  const rawPages: any[] = Array.isArray(settings.pages) ? settings.pages : [];
+  const allRawForLinks: unknown[] = rawBlocks.slice();
+  for (const p of rawPages) if (Array.isArray(p?.blocks)) allRawForLinks.push(...p.blocks);
+  const refIds = linkedRefIds(allRawForLinks);
   const libMap = new Map<string, unknown>();
   if (refIds.length) {
     const libRows = await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`);
     for (const r of libRows as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
   }
   const resolvedBlocks = resolveLinkedBlocks(rawBlocks, (id) => libMap.get(id) ?? null);
+  // Build the custom pages: each page's blocks run through the SAME validate →
+  // resolve pipeline as the home blocks, so they're identical structured/safe blocks.
+  // Slugs are made URL-safe + unique and can never collide with a template's built-in
+  // pages (about/contact/services/faq/updates/…). Capped at 20.
+  const RESERVED_PAGE_SLUGS = new Set(['', 'index', 'home', '404', 'about', 'contact', 'faq', 'faqs', 'services', 'service', 'menu', 'products', 'classes', 'updates', 'blog', 'news', 'post', 'posts', 'thanks', 'thank-you', 'privacy', 'accessibility', 'search', 'sitemap', 'robots', 'assets', 'img']);
+  const pageSlug = (raw: unknown): string => String(raw ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  const seenSlugs = new Set<string>();
+  const customPages = rawPages.slice(0, 20).map((p: any) => {
+    const slug = pageSlug(p?.slug || p?.title);
+    if (!slug || RESERVED_PAGE_SLUGS.has(slug) || seenSlugs.has(slug)) return null;
+    seenSlugs.add(slug);
+    const title = (String(p?.title || '').trim().slice(0, 80)) || slug;
+    const pResolved = resolveLinkedBlocks(Array.isArray(p?.blocks) ? p.blocks : [], (id) => libMap.get(id) ?? null);
+    const blocks = resolveBlockMedia(validateBlocks(pResolved), ref, reviewsWall ? { reviewsWall } : undefined);
+    return { slug, title, blocks };
+  }).filter((p): p is { slug: string; title: string; blocks: ReturnType<typeof resolveBlockMedia> } => !!p);
 
   const content: SnapshotContent = {
     identity: {
@@ -162,6 +184,8 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       // FD-T17 resolves any block media IDs → MediaRefs via the SAME ref() (so block
       // photos land in the media manifest and get variants — one media pipeline).
       blocks: resolveBlockMedia(validateBlocks(resolvedBlocks), ref, reviewsWall ? { reviewsWall } : undefined),
+      // Multi-page: only present when the owner has custom pages (absent = byte-identical).
+      ...(customPages.length ? { pages: customPages } : {}),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],
