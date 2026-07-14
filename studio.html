@@ -121,7 +121,19 @@ async function route(token){
       headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token }
     }), 9000);
     var j = await r.json().catch(function(){ return {}; });
-    if (r.ok && j && j.data && j.data.landing) { location.href = j.data.landing; return; }
+    if (r.ok && j && j.data && j.data.landing) {
+      var d = j.data;
+      // FIX 4 — this is the STUDIO door. A "managed client" who ALSO owns a
+      // workspace is handed landing '/client.html' by /portal/context, but an
+      // operator-capable account signing in HERE must land in the operator
+      // workspace, not bounce to the client portal. Only a pure (non-operator)
+      // client follows a '/client.html' landing from the studio door.
+      var operatorCapable = d.sees_full_workspace === true || d.is_agency || d.is_operator;
+      if (d.landing === '/client.html' && operatorCapable) {
+        location.href = d.is_agency ? '/agency.html' : '/today.html'; return;
+      }
+      location.href = d.landing; return;
+    }
     // Honest states — a paused/lapsed account gets the server's own words, not a wrong door.
     if (r.status === 403 && j && j.message) { panel(j.message); return; }
     if (r.status !== 404) networkTrouble = true;  // 404 no_site → check team; anything else was a hiccup

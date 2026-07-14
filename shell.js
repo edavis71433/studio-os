@@ -94,19 +94,15 @@
   // the ONE canonical helper: same headers (incl. scope carry), same normalized
   // {ok,status,body} shape, plus method/body support. New code MUST use it;
   // existing pages migrate opportunistically after human browser QA.
-  // ── Editing opens the full editor in its own FULL-SCREEN window ──────────────
+  // ── Editing opens the full editor IN PLACE (same tab) ────────────────────────
   // Owner preference: when you open a page/section to edit — from the site map,
-  // Today, Inbox, anywhere — the whole editor pops in its own maximized window so
-  // you don't lose your place. Any link marked [data-dds-editor] or .edit, or a
-  // deep-link into the editor (/presence.html#section), routes through here.
-  window.ddsOpenEditor = function (href) {
-    try {
-      var w = window.open(href, 'dds-editor', 'width=' + screen.availWidth + ',height=' + screen.availHeight + ',left=0,top=0');
-      if (w) { try { w.moveTo(0, 0); w.resizeTo(screen.availWidth, screen.availHeight); } catch (_) { /* */ } w.focus(); return true; }
-    } catch (_) { /* */ }
-    try { window.open(href, '_blank', 'noopener'); } catch (_) { location.href = href; }   // popup blocked → new tab
-    return true;
-  };
+  // Today, Inbox, anywhere — the whole editor opens in the SAME TAB so you don't
+  // lose your session. presence.html reads the same operator realm
+  // ('dds-portal-auth'), so a same-tab navigation carries the live session — no
+  // separate-window "signed out" edge case, no popup blocker to fight. Any link
+  // marked [data-dds-editor] or .edit, or a deep-link into the editor
+  // (/presence.html#section), routes through here.
+  window.ddsOpenEditor = function (href) { location.assign(href); return true; };
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a || a.target === '_blank') return;
@@ -185,7 +181,7 @@
   //    Menu. presence.html keeps its own dock, so we stay out of its way. ──
   function mountMobileBar(nav, activeKey, att) {
     if (location.pathname.indexOf('/presence') === 0) return;
-    var isReviewer = CTX && CTX.site_role === 'client_reviewer';
+    var isReviewer = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
     var old = document.getElementById('dds-mbar'); if (old) old.remove();
     var bar = document.createElement('nav');
     bar.id = 'dds-mbar'; bar.setAttribute('aria-label', 'Quick navigation');
@@ -316,7 +312,7 @@
       var d = r.body.data || {}; var out = '';
       // A reviewer's whole world is client.html — every bell row lands THERE
       // (the owner pages these rows normally target are 403 walls for them).
-      var revr = CTX && CTX.site_role === 'client_reviewer';
+      var revr = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
       // Phase FLOW: notices first (a lead waiting, a domain expiring) — each taps
       // straight through to the page that resolves it, from any screen.
       (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(revr ? '/client.html' : withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
@@ -331,7 +327,7 @@
       // needs you" (also client messages, surveys, new leads). Send them to the one
       // place rather than have two surfaces compete. A client's "one place" is their
       // updates page — never the owner Inbox.
-      var isReviewer = CTX && CTX.site_role === 'client_reviewer';
+      var isReviewer = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
       var footer = isReviewer
         ? '<a class="row" href="/client.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See all your updates →</a>'
         : '<a class="row" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
@@ -439,7 +435,7 @@
     var so = document.getElementById('dds-signout');
     // Sign out to the RIGHT door: clients back to the client door, everyone else
     // (owners, team, agency) to the Studio OS door.
-    var door = (CTX && CTX.site_role === 'client_reviewer') ? '/portal.html' : '/studio.html';
+    var door = ((CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client)) ? '/portal.html' : '/studio.html';
     if (so) so.addEventListener('click', function (e) { e.preventDefault(); if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door; });
   }
   function closeProfile() { if (prof) prof.classList.remove('open'); setExpanded('dds-profile', false); }
@@ -455,7 +451,7 @@
 
   // ── Web Push opt-in (notifications when the app is closed) ──────────────────
   var pushOn = false;
-  function isReviewerCtx() { return CTX && CTX.site_role === 'client_reviewer'; }
+  function isReviewerCtx() { return (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client); }
   function urlB64ToU8(s) { var pad = '='.repeat((4 - s.length % 4) % 4); var b = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/')); var u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
   function refreshPushState() {
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.ready) return;

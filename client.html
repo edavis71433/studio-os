@@ -122,7 +122,13 @@
   .faq-answer{padding:0 18px 15px;color:var(--soft);font-size:14.5px}
   .faq-answer a{color:var(--p)}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<script>
+// Self-contained client portal: the operator shell (shell.css/shell.js) is
+// intentionally NOT loaded here — this page owns its own nav (#tabnav), bell,
+// help, sign-out and appearance. Apply a saved Light/Dark choice before paint;
+// with no choice stored the portal follows the device (prefers-color-scheme).
+(function(){try{var t=localStorage.getItem('dds-client-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(_){}})();
+</script>
 </head>
 <body>
 <nav id="tabnav" class="tabnav" aria-label="Portal sections" hidden></nav>
@@ -172,6 +178,11 @@ function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('appr
 // A friendly first name from the session user, or '' — never guessy.
 function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
 
+// Appearance (Light / Dark / System) — self-contained, the client's own choice
+// ("it's their eyes"), stored under the client realm. No operator shell needed.
+function clientTheme(){try{return localStorage.getItem('dds-client-theme')||'';}catch(_){return'';}}
+function themeLabel(){const t=clientTheme();return 'Appearance: '+(t==='light'?'Light':t==='dark'?'Dark':'System');}
+function cycleClientTheme(){let t=clientTheme();t=t===''?'light':t==='light'?'dark':'';try{t?localStorage.setItem('dds-client-theme',t):localStorage.removeItem('dds-client-theme');}catch(_){}if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);else document.documentElement.removeAttribute('data-theme');}
 function scrollToSection(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:(matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'),block:'start'});}
 function skeleton(){return'<div class="skel"><div class="l w40"></div><div class="l w80"></div></div><div class="skel"><div class="l w60"></div><div class="l"></div><div class="l w80"></div></div><div class="skel"><div class="l w40"></div><div class="l w60"></div></div>';}
 // Route a notification's href to the right in-portal view (no full navigation).
@@ -424,9 +435,10 @@ async function renderHelp(){
   }
   if(canMessage)html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
   const email=(USER&&USER.email)?USER.email:'';
-  html+=`<section id="sec-you"><h2>Your account</h2><div class="card">${email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>'}<div class="row"><button id="signout2">Sign out</button></div></div></section>`;
+  html+=`<section id="sec-you"><h2>Your account</h2><div class="card">${email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>'}<div class="row"><button id="appearance">${esc(themeLabel())}</button><button id="signout2">Sign out</button></div></div></section>`;
   $('main').innerHTML=html;
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',()=>openSupport(null));
+  const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
   const search=$('faqSearch');
   if(search)search.addEventListener('input',()=>{

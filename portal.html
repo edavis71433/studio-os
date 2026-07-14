@@ -58,11 +58,11 @@
   <div id="emailPanel">
     <div class="eyebrow">Client portal</div>
     <h1>Welcome</h1>
-    <p class="sub">Sign in to see your project, files, and what's next. No password needed — we'll email you a code.</p>
+    <p class="sub">Sign in to see your project, files, and what's next. No password needed — we'll email you a secure sign-in link.</p>
     <form id="fEmail" novalidate>
       <label for="em">Email</label>
       <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required>
-      <button id="sendGo" type="submit">Email me a sign-in code</button>
+      <button id="sendGo" type="submit">Email me a sign-in link</button>
     </form>
     <div class="err" id="errEmail" role="alert"></div>
     <p class="muted"><button class="linky" id="toPw" type="button">Prefer a password? Sign in with a password instead</button></p>
@@ -72,8 +72,8 @@
   <!-- CODE ENTRY (after a code is sent) -->
   <div id="codePanel" class="panel">
     <div class="eyebrow">Check your email</div>
-    <h1>Enter your code</h1>
-    <p class="sub" id="codeSub">If that email has an account, your 6-digit code is on the way. Enter it below — or just tap the sign-in link in the email.</p>
+    <h1>Check your email</h1>
+    <p class="sub" id="codeSub">If that email has an account, a sign-in link is on its way. Tap the link to sign in — or, if your email includes a 6-digit code, enter it below.</p>
     <form id="fCode" novalidate>
       <label for="code">6-digit code</label>
       <input id="code" class="code" type="text" inputmode="numeric" autocomplete="one-time-code"
@@ -236,9 +236,9 @@ $('fEmail').addEventListener('submit', async function(ev){
   var b = $('sendGo'); b.disabled = true; b.textContent = 'Sending…';
   await sendCode(em);
   pendingEmail = em;
-  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account, your 6-digit code is on the way. Enter it below — or just tap the sign-in link in the email.";
+  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account, a sign-in link is on its way. Tap the link to sign in — or, if your email includes a 6-digit code, enter it below.";
   $('codeSub').querySelector('.em').textContent = em;
-  b.disabled = false; b.textContent = 'Email me a sign-in code';
+  b.disabled = false; b.textContent = 'Email me a sign-in link';
   clearErr('errCode');
   $('code').value = '';
   show('codePanel');
@@ -251,7 +251,7 @@ $('fCode').addEventListener('submit', async function(ev){
   clearErr('errCode');
   if (!sb) { errIn('errCode', "Connection problem — check your internet and refresh this page."); return; }
   var token = ($('code').value || '').replace(/[^0-9]/g, '');
-  if (token.length < 6) { errIn('errCode', 'Enter the 6-digit code from your email.'); return; }
+  if (token.length < 6) { errIn('errCode', 'Enter the 6-digit code from your email — or tap the sign-in link in the email instead.'); return; }
   var b = $('codeGo'); b.disabled = true; b.textContent = 'Signing in…';
   try {
     var r = await sb.auth.verifyOtp({ email: pendingEmail, token: token, type: 'email' });
