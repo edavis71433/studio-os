@@ -105,6 +105,14 @@ ok(!/left\s*:\s*e\.clientX|top\s*:\s*e\.clientY|style\.transform\s*=\s*["']trans
 const buildInserts = extractFn(html, 'dcBuildInserts');
 ok(/data-gap/.test(buildInserts) && /BLOCKS_WORK \|\| \[\]\)\.length/.test(buildInserts), 'the trailing insert bar appends at the list length');
 
+// ── Undo / Redo (AEM parity) — must re-persist a prior snapshot through the SAME
+// validating save path (server re-validates), never mutate render output directly. ──
+ok(/function dcUndo\(\)/.test(html) && /function dcRedo\(\)/.test(html), 'undo + redo both exist');
+const applyHist = extractFn(html, 'dcApplyHistory');
+ok(/BLOCKS_WORK = arr/.test(applyHist) && /saveBlocks\(\)/.test(applyHist), 'undo/redo restore a block-list snapshot and re-persist through saveBlocks (server re-validates — moat)');
+ok(/JSON\.parse\(snapJson\)/.test(applyHist), 'history entries are serialized block lists (structured), not rendered HTML or x/y');
+ok(/DC_HIST_SILENT/.test(html), 'undo/redo suppress their own history recording (no infinite loop)');
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);
