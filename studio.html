@@ -74,6 +74,7 @@
     <p id="nwMsg">This account doesn't have its Studio OS workspace connected yet. If you just set it up, give it a minute and try again — otherwise write to
       <a href="mailto:support@davisdigitalstudio.com" style="color:var(--p)">support@davisdigitalstudio.com</a> and we'll connect you.</p>
     <button id="retry" type="button">Try again</button>
+    <p class="muted" id="nwPortal" style="display:none">Are you a client of the studio? <a href="/portal.html" style="color:var(--p)">Your sign-in is here</a>.</p>
     <p class="muted"><button class="linky" id="signout1" type="button">Sign out</button></p>
   </div>
 
@@ -149,8 +150,14 @@ async function route(token){
     var wj = await w.json().catch(function(){ return {}; });
     if (wj && wj.isTeam) { panel(null); return; }
   } catch (e) { panel("We couldn't reach the studio just now — try again in a moment."); return; }
-  // 3) a client — their door is the portal
-  location.href = "/portal.html";
+  // 3) Signed in, but this account runs no studio workspace and isn't a team member.
+  // DON'T silently bounce to the client portal — that cross-door redirect is
+  // confusing (and can loop with the portal, which may bounce team accounts back
+  // here). Be honest: show the "no workspace" panel with an explicit client-portal
+  // link. The usual cause is signing into the STUDIO door with a client/owner-less
+  // account (e.g. a personal email) instead of your studio (owner) account.
+  try { var lp = $('nwPortal'); if (lp) lp.style.display = 'block'; } catch (e) {}
+  panel("You’re signed in, but this account isn’t set up to run a studio workspace. If you own this studio, sign out and sign in with your studio (owner) account. If you’re a client, use the client-portal link below.");
 }
 
 $('f').addEventListener('submit', async function(ev){
