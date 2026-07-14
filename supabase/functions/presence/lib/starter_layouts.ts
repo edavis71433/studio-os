@@ -64,6 +64,104 @@ export const STARTER_LAYOUTS: StarterLayout[] = [
     ],
   },
   {
+    key: 'columns_layout',
+    name: 'Side-by-side',
+    description: 'A modern split layout: a welcome, two side-by-side intro columns, why-choose-you, and what you’re great at.',
+    blocks: [
+      { type: 'richtext', title: 'Welcome', body: 'Open with a warm, specific hello — who you are and who you help, in two or three sentences.' },
+      { type: 'columns', id: 'starter_cols', title: 'A bit about us', columns: [
+        { body: '**Who we are**\n\nA sentence or two about your story — how you started and what drives you.' },
+        { body: '**What we do**\n\nName what you offer and the result customers get. Keep it clear and concrete.' },
+      ] },
+      { type: 'features', title: 'Why choose us', items: [
+        { title: 'A clear strength', text: 'Say what you do better than anyone else.', icon: '⭐' },
+        { title: 'A reason to trust you', text: 'Experience, care, guarantees — pick one and be specific.', icon: '🤝' },
+        { title: 'A third reason', text: 'Something true and concrete about you.', icon: '✅' },
+      ] },
+      { type: 'progress', title: 'What we’re great at', items: [
+        { label: 'Add a strength', percent: 90 },
+        { label: 'Add another', percent: 80 },
+        { label: 'And one more', percent: 75 },
+      ] },
+      cta('Ready to talk? Add your phone, email or a booking link so people can reach you.'),
+    ],
+  },
+  {
+    key: 'tabbed_layout',
+    name: 'Tabbed & tidy',
+    description: 'Keeps a lot of info tidy: a welcome, tabbed sections for what you offer, why-choose-you, and good-to-know answers.',
+    blocks: [
+      { type: 'richtext', title: 'Welcome', body: 'Introduce your business in a few friendly sentences — the more human, the better.' },
+      { type: 'tabs', title: 'What we offer', tabs: [
+        { label: 'Overview', body: 'A short summary of what you do and who it’s for.' },
+        { label: 'Services', body: 'List your main services here, one per line or as a short paragraph.' },
+        { label: 'Pricing', body: 'Give a sense of pricing or how you quote — even a starting-from figure helps.' },
+      ] },
+      { type: 'features', title: 'Why choose us', items: [
+        { title: 'What sets you apart', text: 'Lead with your strongest reason.', icon: '✨' },
+        { title: 'A second reason', text: 'Keep it concrete and true.', icon: '👍' },
+        { title: 'A third reason', text: 'Something customers thank you for.', icon: '💬' },
+      ] },
+      { type: 'accordion', title: 'Good to know', items: [
+        { summary: 'Where you’re based / who you serve', body: 'Add your area or location.' },
+        { summary: 'How to get started', body: 'Explain the first step in a sentence.' },
+        { summary: 'A common question', body: 'Answer something customers often ask.' },
+      ] },
+      cta('Have a question? Add the best way to reach you and invite people to get in touch.'),
+    ],
+  },
+  {
+    key: 'onepage_pitch',
+    name: 'One-page pitch',
+    description: 'A punchy, sales-first page: the benefits you offer, the numbers, how it works, simple pricing and a strong close.',
+    blocks: [
+      { type: 'features', title: 'What you get', items: [
+        { title: 'A key benefit', text: 'Lead with the outcome the customer wants.', icon: '🎯' },
+        { title: 'A second benefit', text: 'What makes their life easier or better.', icon: '⚡' },
+        { title: 'A third benefit', text: 'One more reason to say yes.', icon: '🏆' },
+      ] },
+      { type: 'stats', title: 'By the numbers', items: [
+        { value: '10+', label: 'Years experience' },
+        { value: '500+', label: 'Customers served' },
+        { value: '5★', label: 'Average rating' },
+      ] },
+      { type: 'process', title: 'How it works', steps: [
+        { step: 'Reach out', detail: 'Describe the easy first step.' },
+        { step: 'We make a plan', detail: 'What happens next.' },
+        { step: 'You get results', detail: 'The outcome they walk away with.' },
+      ] },
+      { type: 'pricing', title: 'Simple pricing', tiers: [
+        { name: 'Starter', price_text: '$—', features: ['What’s included', 'A second line', 'A third line'] },
+        { name: 'Most popular', price_text: '$—', features: ['The best value', 'Key benefits', 'Keep lines short'] },
+      ] },
+      cta('Ready to start? Add your booking link, phone or email and invite people to take the next step.'),
+    ],
+  },
+  {
+    key: 'creative',
+    name: 'Creative portfolio',
+    description: 'For photographers, designers and makers: an intro, a few pieces of work, your skills, how you work, and a way to hire you.',
+    blocks: [
+      { type: 'richtext', title: 'About my work', body: 'Introduce yourself and your style in a few sentences — what you make, who it’s for, and what makes your work yours.' },
+      { type: 'cards', id: 'starter_work', title: 'Recent work', cards: [
+        { heading: 'A project', text: 'Name a piece of work and describe it in a line. Add photos to bring it to life.' },
+        { heading: 'Another project', text: 'A second example of what you do.' },
+        { heading: 'One more', text: 'A third — swap in your best work.' },
+      ] },
+      { type: 'progress', title: 'Skills & tools', items: [
+        { label: 'A skill', percent: 90 },
+        { label: 'Another', percent: 85 },
+        { label: 'And one more', percent: 80 },
+      ] },
+      { type: 'accordion', title: 'How we’ll work together', items: [
+        { summary: 'The process', body: 'Walk through what working with you looks like.' },
+        { summary: 'Timing & booking', body: 'How far ahead to book and what to expect.' },
+        { summary: 'Pricing', body: 'Give a sense of your rates or how you quote.' },
+      ] },
+      cta('Like what you see? Add your email or a booking link so people can hire you.'),
+    ],
+  },
+  {
     key: 'services_business',
     name: 'Services business',
     description: 'For trades, pros and studios: a welcome, why choose you, your services, how you work, and a call to reach out.',
@@ -168,8 +266,9 @@ const STARTER_FOR: Record<string, string> = {
   professional: 'services_business', law: 'services_business', accounting: 'services_business',
   insurance: 'services_business', consulting: 'services_business', marketing: 'services_business',
   real_estate: 'services_business', childcare: 'services_business', tutoring: 'services_business',
-  photography: 'services_business', videography: 'services_business', interior_design: 'services_business',
-  event_planning: 'services_business',
+  // creative & makers → creative portfolio
+  photography: 'creative', videography: 'creative', interior_design: 'creative',
+  event_planning: 'creative', graphic_design: 'creative', web_design: 'creative', artist: 'creative',
   // community → services business (about → what we do → get involved)
   nonprofit: 'services_business', church: 'services_business',
   // beauty, fitness & medical → wellness / appointments

@@ -6060,7 +6060,26 @@ function tgDemoNode(sw, name) {
   wrap.appendChild(el("div", "tgd-foot", "A representative sample of the " + name + " design."));
   return wrap;
 }
+// Seed the canvas with the recommended pre-filled STARTER LAYOUT when the page has
+// no sections yet — so picking a template (or an empty canvas) gives a real, editable
+// page instead of a blank sheet. Reuses the server starters (/blocks/suggested) +
+// the same validating save path. Returns true if it seeded. Safe: never overwrites
+// an existing layout (only runs when BLOCKS_WORK is empty).
+async function seedStarterIfEmpty() {
+  if (!Array.isArray(BLOCKS_WORK)) BLOCKS_WORK = currentBlocks();
+  if (BLOCKS_WORK.length) return false;
+  let sug = BLOCK_SUGGEST;
+  if (sug === null || sug === undefined) { try { sug = (await api("GET", "/blocks/suggested")).data; BLOCK_SUGGEST = sug || false; } catch (_) { return false; } }
+  if (!sug || !Array.isArray(sug.starters) || !sug.starters.length) return false;
+  const starter = sug.starters.find((s) => s.key === sug.recommendedStarter) || sug.starters[0];
+  if (!starter || !Array.isArray(starter.blocks) || !starter.blocks.length) return false;
+  BLOCKS_WORK = JSON.parse(JSON.stringify(starter.blocks)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
+  BLOCK_FOCUS = 0;
+  await saveBlocks();
+  return true;
+}
 async function applyTemplateFromGallery(t) {
+  if (!Array.isArray(BLOCKS_WORK)) BLOCKS_WORK = currentBlocks();
   // Non-destructive: switching template keeps content — it re-lays-out + re-styles.
   const hasContent = (BLOCKS_WORK && BLOCKS_WORK.length) || (S.offerings || []).length || (S.identity && S.identity.business_name);
   if (hasContent && !confirm("Start with the “" + t.name + "” template? Your words stay exactly as they are — only the layout and styling change. Nothing goes live until you publish.")) return;
@@ -6069,13 +6088,19 @@ async function applyTemplateFromGallery(t) {
     if (S.site) S.site.template = t.slug;
     LOOKS = null; PV.template = "";
     try { const s = await api("GET", "/site"); S.site = s.data.site; } catch (_) {}
+    // A brand-new, empty page gets the recommended starter layout so picking a
+    // template lands you on a real, editable page — never a blank canvas.
+    let seeded = false;
+    if (!hasContent) { try { seeded = await seedStarterIfEmpty(); } catch (_) {} }
     LOOKS = (await api("GET", "/site/templates")).data;
     renderTemplateGallery();
     // re-dress the Design studio + refresh both proofs, exactly like "Use this look"
     const dc = $("designCard"); if (dc) { dc.remove(); mountDesignCard(); }
     if (typeof applyVocab === "function") applyVocab();
     scheduleChangesRefresh(); refreshDesignPreview();
-    toast("Now on the " + (r.data && r.data.name ? r.data.name : t.name) + " template — publish to make it live");
+    toast(seeded
+      ? "Started on the " + (r.data && r.data.name ? r.data.name : t.name) + " template with a ready-made layout — edit any section, drag to reorder, then publish"
+      : "Now on the " + (r.data && r.data.name ? r.data.name : t.name) + " template — publish to make it live");
   } catch (err) { toast(nice(err), true); }
 }
 
@@ -6614,7 +6639,10 @@ function dcInjectCanvas(doc, main) {
       ".dc-emptyzone:hover,.dc-emptyzone.dc-drop-active{border-color:#5b3fa0;background:rgba(91,63,160,.09)}" +
       ".dc-emptyzone .dc-ez-t{font:700 18px system-ui,-apple-system,sans-serif;color:#3a2470;margin:0 0 6px}" +
       ".dc-emptyzone .dc-ez-s{font:400 13px system-ui,-apple-system,sans-serif;color:#6b6478;max-width:34ch;margin:0 auto}" +
-      ".dc-emptyzone .dc-ez-btn{margin-top:16px;display:inline-block;font:700 13.5px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border-radius:999px;padding:11px 22px;box-shadow:0 6px 18px rgba(91,63,160,.4)}" +
+      ".dc-emptyzone .dc-ez-acts{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}" +
+      ".dc-emptyzone .dc-ez-btn{font:700 13.5px system-ui,-apple-system,sans-serif;color:#fff;background:#5b3fa0;border:none;border-radius:999px;padding:11px 22px;cursor:pointer;box-shadow:0 6px 18px rgba(91,63,160,.4)}" +
+      ".dc-emptyzone .dc-ez-btn2{font:600 13.5px system-ui,-apple-system,sans-serif;color:#3a2470;background:#fff;border:1px solid #cdbff0;border-radius:999px;padding:11px 20px;cursor:pointer}" +
+      ".dc-emptyzone .dc-ez-btn:hover{filter:brightness(1.06)}.dc-emptyzone .dc-ez-btn2:hover{border-color:#5b3fa0}" +
       // Layout Mode: the drag-to-resize divider between two columns (Adobe's blue
       // dots) + the 12-unit grid guide shown while resizing.
       ".block-columns .col{position:relative}" +
@@ -6720,11 +6748,15 @@ function dcBuildInserts(doc, main) {
     const z = doc.createElement("div"); z.className = "dc-emptyzone"; z.setAttribute("data-gap", "0");
     z.setAttribute("role", "button"); z.setAttribute("tabindex", "0"); z.setAttribute("aria-label", "Add your first section");
     const t = doc.createElement("div"); t.className = "dc-ez-t"; t.textContent = "Start building your page";
-    const s = doc.createElement("div"); s.className = "dc-ez-s"; s.textContent = "Drag a section here, or click to pick one. Everything you add stays readable on phones automatically.";
-    const b = doc.createElement("span"); b.className = "dc-ez-btn"; b.textContent = "＋ Add your first section";
-    z.appendChild(t); z.appendChild(s); z.appendChild(b);
+    const s = doc.createElement("div"); s.className = "dc-ez-s"; s.textContent = "The fastest start: drop in a ready-made layout of real sections you then edit. Or add one section at a time.";
+    const acts = doc.createElement("div"); acts.className = "dc-ez-acts";
+    const seed = doc.createElement("button"); seed.type = "button"; seed.className = "dc-ez-btn"; seed.textContent = "✨ Use a ready-made layout";
+    const b = doc.createElement("button"); b.type = "button"; b.className = "dc-ez-btn2"; b.textContent = "＋ Add one section";
+    acts.appendChild(seed); acts.appendChild(b);
+    z.appendChild(t); z.appendChild(s); z.appendChild(acts);
+    seed.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); seedStarterIfEmpty().then((ok) => { if (!ok) toast("Pick a template first, then a layout drops in"); }); });
     const open = (e) => { e.preventDefault(); e.stopPropagation(); dcOpenInsertFromCanvas(0, z); };
-    z.addEventListener("click", open);
+    b.addEventListener("click", open);
     z.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
     main.appendChild(z);
     return;
