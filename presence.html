@@ -72,6 +72,9 @@ html.dds-has-shell .rail .wordmark{display:none}
 .pillbtn.inked{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .pillbtn.inked:hover{background:#3a332c}
 .content{padding:34px 56px 140px;max-width:860px}
+/* the Design builder uses the full available width (canvas stretches to the right,
+   with the app sidebar open); tighter side padding so nothing is wasted. */
+.content.design-wide{max-width:none;padding-left:26px;padding-right:26px}
 .view{display:none}
 .view.on{display:block;animation:viewin var(--dur) var(--ease)}
 @keyframes viewin{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
@@ -802,7 +805,6 @@ body.pd-dragging *{cursor:grabbing !important}
         <h1 class="doc" role="heading" aria-level="2">Design</h1>
         <p class="docsub">How your website looks — colors, type, layout, and what appears on your home page. Every choice is designed to stay readable; nothing applies until you publish, and every previous look stays restorable.</p>
         <!-- #1 template-first, BIG realistic-preview gallery (mountTemplateGallery) -->
-        <div id="designGallery" hidden></div>
         <!-- Multi-page: pick a page to author (Home + your own pages), or add one -->
         <div id="pagesBar" class="pages-bar" role="tablist" aria-label="Website pages"></div>
         <!-- #2 CANVAS-DOMINANT workspace: the live canvas fills the screen; the add
@@ -860,6 +862,9 @@ body.pd-dragging *{cursor:grabbing !important}
                into #designHost, id preserved -->
           <aside id="settingsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="true" aria-label="Design settings" aria-hidden="true">
             <div class="dc-panel-head"><span class="dc-panel-t">Design settings</span><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
+            <!-- The site's overall look (theme) lives here now — off the Design page,
+                 since starting a page/layout happens through "＋ Page". -->
+            <div id="designGallery" hidden></div>
             <div id="designHost"></div>
           </aside>
           <div class="dc-scrim" id="dcScrim" hidden></div>
@@ -1229,6 +1234,10 @@ function go(view) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
+  // Design is the builder — let it use the FULL width (canvas stretches right); every
+  // other view keeps the comfortable reading measure.
+  const contentEl = document.querySelector(".content");
+  if (contentEl) contentEl.classList.toggle("design-wide", view === "design");
   document.querySelectorAll("#nav .navitem").forEach((b) => {
     const on = b.dataset.view === view;
     b.classList.toggle("on", on);
