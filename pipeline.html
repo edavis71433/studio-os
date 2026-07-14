@@ -114,12 +114,34 @@
   .bc-menu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;border-radius:7px;cursor:pointer}
   .bc-menu button:hover{background:var(--p-soft)}
   .board-foot{margin-top:12px;font-size:12.5px}
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     FULL-SCREEN DEAL DETAIL — the deal opens as a roomy in-page page (same tab),
+     not a cramped modal. It sits in normal document flow inside its own .wrap, so
+     the page scrolls naturally. Everything below is SCOPED to #detailWrap /
+     #detailInner so the pipeline list, board, and the other dialogs are untouched.
+     ───────────────────────────────────────────────────────────────────────── */
+  #detailWrap{max-width:1000px}
+  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .backbar{padding:16px 20px 0}
+  .backbar .btn{padding:8px 14px}
+  #detailInner .dhead{padding:16px 22px 20px}
+  #detailInner #dtitle{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;outline-offset:3px}
+  #detailInner .dhead .mut{font-size:14px;margin-top:6px}
+  /* it's a full page now — no inner scroll box; each section breathes as a card */
+  #detailInner .dbody{padding:8px 22px 28px;max-height:none;overflow:visible}
+  #detailInner .sec{margin:0 0 16px;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  #detailInner .sec:last-child{margin-bottom:0}
+  #detailInner .sec h3{font-family:var(--serif);font-weight:500;font-size:18px;text-transform:none;letter-spacing:normal;color:var(--ink);margin-bottom:12px}
+  /* the inline mini-forms + quick-log sit on the card surface for contrast */
+  #detailInner form.mini{background:var(--card)}
+  @media(max-width:560px){#detailInner .dhead,#detailInner .dbody{padding-left:16px;padding-right:16px}#detailInner #dtitle{font-size:24px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="listWrap">
   <h1>Pipeline</h1>
   <div class="sub">From first enquiry through onboarding — one deal at a time.</div>
   <div class="summary" id="summary" aria-live="polite"></div>
@@ -128,6 +150,12 @@
   <div id="list" aria-live="polite"></div>
   <div id="board" aria-live="polite" hidden></div>
 </div>
+
+<!-- FIX: the deal detail opens as a FULL-SCREEN in-page view (same tab), not a
+     cramped left-side modal overlay — matching the delivery view's full-screen
+     page. The list and the detail are two panels of the ONE page; only one shows
+     at a time (showDetail/hideDetail swap them). -->
+<div class="wrap" id="detailWrap" hidden><div id="detailInner"></div></div>
 
 <dialog id="formDlg" aria-label="New deal">
   <form id="dealForm" class="dbody" style="max-height:none">
@@ -143,8 +171,6 @@
     <div class="row2" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn ghost" id="f-cancel">Cancel</button><button type="submit" class="btn">Create deal</button></div>
   </form>
 </dialog>
-
-<dialog id="detail" aria-label="Deal detail"><div id="detailInner"></div></dialog>
 
 <dialog id="svcDlg" aria-label="Manage your services">
   <div class="dbody" style="max-height:70vh">
@@ -406,7 +432,7 @@ function renderBoard(){
 }
 function wireBoard(){
   const host=$('board');
-  const move=async(id,to)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to});toast('Moved to '+stageLabel(to));load();if($('detail').open&&CURRENT_DEAL===id)openDeal(id);}catch(e){toast(nice(e),true);}};
+  const move=async(id,to)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to});toast('Moved to '+stageLabel(to));load();if(!$('detailWrap').hidden&&CURRENT_DEAL===id)openDeal(id);}catch(e){toast(nice(e),true);}};
   host.querySelectorAll('.bcard').forEach(c=>{
     const isCtrl=(e)=>e&&e.target&&e.target.closest&&e.target.closest('.bc-move,.bc-menu');
     c.onclick=(e)=>{if(!isCtrl(e))openDeal(c.dataset.id);};
@@ -515,10 +541,26 @@ $('svcSave').onclick=async()=>{
   catch(e){toast(nice(e),true);}finally{$('svcSave').disabled=false;}
 };
 
+// Show/hide the full-screen detail view (in-page, same tab) — the list and the
+// detail are two panels of the ONE page; only one is visible at a time. Idempotent
+// (safe to call while already showing, e.g. an in-view action re-opens to refresh).
+function showDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(l)l.hidden=true; if(d)d.hidden=false; window.scrollTo(0,0); }
+function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=true; if(l)l.hidden=false; }
+// ONE close path (the "← Back to pipeline" button + the error card's back button):
+// hide the panel, clean the ?deal= URL back to a bare path (so a refresh doesn't
+// reopen a stale deal), and restore keyboard focus to the card we came from.
+function closeDealDetail(){
+  const id=CURRENT_DEAL; CURRENT_DEAL=null;
+  hideDetail();
+  history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():''));
+  const c=(id&&document.querySelector('#list [data-id="'+id+'"], #board [data-id="'+id+'"]'))||document.querySelector('#list .card, #board .bcard');
+  if(c&&c.focus)c.focus();
+}
 async function openDeal(id){
+  const wasOpen=!$('detailWrap').hidden; // an in-view refresh re-renders; remember to restore focus
   CURRENT_DEAL=id;
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
-  const dlg=$('detail'); $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; dlg.showModal();
+  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   bizName(); // warm the studio-name cache so the agreement starter fills instantly
   try{
     const [{data},tplRes,svcRes]=await Promise.all([api('/sales/deals/'+id),api('/sales/templates').catch(()=>({data:[]})),api('/sales/services').catch(()=>({data:[]}))]);
@@ -588,9 +630,9 @@ async function openDeal(id){
     }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
     const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
     $('detailInner').innerHTML=`
-      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">${esc(d.title||'Deal')}</div>
-        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}${data.last_contacted_at?' · Last contacted '+esc(ago(data.last_contacted_at)):''}</div></div>
-        <button class="btn ghost" id="closeD" aria-label="Close">✕</button></div>
+      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div>
+      <div class="dhead"><div><div id="dtitle" tabindex="-1">${esc(d.title||'Deal')}</div>
+        <div class="mut">${c?esc((c.name||'')+(c.email?(' · '+c.email):'')):'No contact'} · ${stageBadge(d.stage)}${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?` · <span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?` · <span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}${data.last_contacted_at?' · Last contacted '+esc(ago(data.last_contacted_at)):''}</div></div></div>
       <div class="dbody">
         <div class="sec"><h3>Move stage</h3>${(()=>{const g=guidanceFor(d.converted_client_id?'won':d.stage);return `<div class="path"><span class="path-i" aria-hidden="true">🧭</span><span class="path-tx"><span class="path-tip">${esc(g.tip)}</span> <span class="path-do">${esc(g.suggested_action)}</span></span></div>`;})()}<div class="steps">${d.converted_client_id?'<span class="mut">Won ✓ — converted to a customer</span>':d.stage==='lost'?`<span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button>`:stepBtns||'<span class="mut">—</span>'}</div><div id="lostForm"></div></div>
         <div class="sec"><h3>Details</h3>
@@ -630,15 +672,12 @@ async function openDeal(id){
         </div>
         ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
-    $('closeD').onclick=()=>dlg.close();
-    // ONE cleanup for every way the dialog closes (✕, Esc, form-close) — else a
-    // refresh after Esc unexpectedly reopens the deal from the stale ?deal= URL.
-    if(!dlg.dataset.wiredClose){dlg.dataset.wiredClose='1';dlg.addEventListener('close',()=>history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():'')));}
+    $('closeD').onclick=closeDealDetail;
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(nice(e),true);}});
     // Lost is gentle but deliberate: an optional one-line reason (stored on the
     // deal via the stage route's `reason` → lost_reason) so "why" survives.
     const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — a note for your own records',placeholder:'e.g. Went with someone cheaper'}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});toast('Marked as lost');openDeal(id);load();}catch(e){toast(nice(e),true);}});
-    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');dlg.close();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
+    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // Activity quick-log: pick a kind, jot what happened (optional except a note),
@@ -866,7 +905,10 @@ async function openDeal(id){
       $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
     };
     const resend=$('resendInvite'); if(resend) resend.onclick=async()=>{resend.disabled=true;const was=resend.textContent;resend.textContent='Sending…';try{const r=await api('/sales/deals/'+id+'/resend-invite','POST',{});toast('Welcome email sent'+((r.data&&r.data.email)?' to '+r.data.email:'')+' ✓');openDeal(id);}catch(e){toast(nice(e),true);resend.disabled=false;resend.textContent=was;}};
-  }catch(e){ $('detailInner').innerHTML='<div class="dbody mut">'+esc(nice(e))+'</div>'; }
+    // a11y: an in-view action re-rendered the page and dropped focus — land it back
+    // on the deal title (a stable, focusable anchor) so keyboard users aren't lost.
+    if(wasOpen){const t=$('dtitle');if(t)t.focus();}
+  }catch(e){ $('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div><div class="dbody mut">'+esc(nice(e))+'</div>'; const b=$('closeD'); if(b)b.onclick=closeDealDetail; }
 }
 
 (async function(){
