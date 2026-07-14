@@ -8,24 +8,17 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 
 ## Needs Eric (do these "all at once")
 
-- 🔑 **Stock photos** — set edge secret `PEXELS_API_KEY` (free at pexels.com/api). The
-  keys Eric sent earlier were **Stripe** (restricted/live) + VAPID — NOT Pexels. Stock
-  photos won't turn on without a Pexels key. Turns on Files → Stock Library + the
-  builder's "Stock photos" picker tab.
-- 🔑 **Visual Studio (AI-generated images)** — set edge secret `VISUAL_MODEL_KEY`
-  (separate from the Anthropic *text* key that already exists). This is why Visual
-  Studio shows "not switched on."
-- 🔑 **Apply migration `0106_security_rls_hardening.sql`** on **staging AND prod**
-  (SQL editor, like 0105). Closes the 5 Security Advisor errors (4 tables missing
-  RLS + 1 SECURITY DEFINER view). Safe: those tables are service-role-only, so
-  deny-all RLS blocks anon without touching the app. (44 warnings + 84 suggestions
-  from the linter remain — lower priority, mostly function search_path / advisory.)
-- 🚀 **`git push`** — every builder + studio fix this stretch is frontend
-  (`presence.html`, `studio.html`) and only goes live on Eric's push.
+- ✅ **Stock photos** — DONE 2026-07-14. `PEXELS_API_KEY` set on prod + redeployed (the
+  key was in an image Eric pasted, which a text search of the transcript missed). Turns
+  on Files → Stock Library + the builder's "Stock photos" picker tab.
+- ✅ **Migration `0106`** — Eric applied it. Security Advisor errors closed. (44 warnings
+  + 84 suggestions remain — lower priority, mostly function search_path / advisory.)
+- ✅ **`git push`** — Eric pushed; the builder/studio frontend is live.
+- 🔑 **Visual Studio (AI-generated images)** — STILL needs `VISUAL_MODEL_KEY` (separate
+  from the Anthropic *text* key). The only remaining key.
 - ❓ **Messages** — Eric says he specified what he wants; it did not survive compaction.
   Messaging was audited + polished earlier (`messaging-ux-polish` merged) and the inbox
   groups client messages by client. **Need one line: what's actually wrong/missing now?**
-  (e.g. clients can't message from the portal / grouping wrong / feels slow.)
 
 ## Code — for me to do (Eric will batch-review)
 
