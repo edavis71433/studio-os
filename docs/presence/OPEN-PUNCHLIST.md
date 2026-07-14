@@ -14,8 +14,10 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 - ✅ **Migration `0106`** — Eric applied it. Security Advisor errors closed. (44 warnings
   + 84 suggestions remain — lower priority, mostly function search_path / advisory.)
 - ✅ **`git push`** — Eric pushed; the builder/studio frontend is live.
-- 🔑 **Visual Studio (AI-generated images)** — STILL needs `VISUAL_MODEL_KEY` (separate
-  from the Anthropic *text* key). The only remaining key.
+- ✅ **Visual Studio (AI-generated images)** — DONE 2026-07-14. `VISUAL_MODEL_KEY` (an
+  OpenAI key, `sk-proj-…`) set on prod + redeployed. Defaults to OpenAI images
+  (`gpt-image-1`); if that model needs org verification, switch `VISUAL_MODEL_NAME` to
+  `dall-e-3`. All owner keys now in.
 - ❓ **Messages** — Eric says he specified what he wants; it did not survive compaction.
   Messaging was audited + polished earlier (`messaging-ux-polish` merged) and the inbox
   groups client messages by client. **Need one line: what's actually wrong/missing now?**
