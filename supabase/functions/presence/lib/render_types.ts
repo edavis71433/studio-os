@@ -108,7 +108,7 @@ export function snapshotContentUsable(c: any): boolean {
 // ── Phase T-BLOCKS: structured content blocks (data only; logic in lib/site_blocks.ts) ──
 // Each block is a chosen-and-filled entry from the site_components catalog. Text-only
 // in v1 (no media plumbing), typed + capped, so the render stays deterministic.
-export interface SiteBlockFeatures { type: 'features'; title?: string; items: Array<{ title: string; text?: string }> }
+export interface SiteBlockFeatures { type: 'features'; title?: string; items: Array<{ title: string; text?: string; icon?: string }> }
 export interface SiteBlockStats { type: 'stats'; title?: string; items: Array<{ value: string; label: string }> }
 export interface SiteBlockTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media?: MediaRef | null }> }
 export interface SiteBlockProcess { type: 'process'; title?: string; steps: Array<{ step: string; detail?: string }> }

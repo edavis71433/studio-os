@@ -152,7 +152,7 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
     let block: StoredBlock | null = null;
     switch (type as SiteBlockType) {
       case 'features': {
-        const items = arr((b as any).items).map((it) => ({ title: s(it?.title, 80), text: s(it?.text, 240) || undefined })).filter((it) => it.title).slice(0, CAP.features);
+        const items = arr((b as any).items).map((it) => ({ title: s(it?.title, 80), text: s(it?.text, 240) || undefined, icon: s(it?.icon, 12) || undefined })).filter((it) => it.title).slice(0, CAP.features);
         if (items.length) block = { type: 'features', title, items } as SiteBlockFeatures;
         break;
       }
@@ -729,7 +729,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     switch (b.type) {
       case 'features':
         html = `<section class="block wrap block-features">${h2(b.title, 'Why choose us')}<div class="svc-grid">${b.items.map((it) =>
-          `<div class="svc"><div class="nm">${esc(it.title)}</div>${it.text ? `<div class="ds">${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
+          `<div class="svc">${it.icon ? `<div class="svc-ic" aria-hidden="true">${esc(it.icon)}</div>` : ''}<div class="nm">${esc(it.title)}</div>${it.text ? `<div class="ds">${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
         break;
       case 'stats':
         html = `<section class="block alt block-stats"><div class="wrap">${h2(b.title, 'By the numbers')}<div class="cards stats">${b.items.map((it) =>
@@ -1214,6 +1214,8 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .block-progress .pgb-pct{color:var(--accent)}
 .block-progress .pgb-track{background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;height:12px;overflow:hidden}
 .block-progress .pgb-fill{background:var(--accent);height:100%;border-radius:999px;min-width:2px}
+/* optional icon on a feature/highlight item (decorative — aria-hidden in markup) */
+.svc-ic{font-size:1.9rem;line-height:1;margin-bottom:8px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
 .teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
 a.teaser-card{text-decoration:none;color:inherit}

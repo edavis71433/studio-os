@@ -4451,8 +4451,8 @@ async function mountDevCssCard() {
 //    (one storage, one pipeline). Local working copy → explicit Save, so a half-filled
 //    block isn't stripped mid-edit. Media blocks (FD-T17) render read-only notes here. ──
 const BLOCK_DEFS = [
-  { type: "features", name: "Features / highlights", field: "items", hint: "One per line:  Title | short description",
-    parse: (p) => ({ title: p[0] || "", text: p[1] || "" }), fmt: (o) => [o.title, o.text].filter(Boolean).join(" | ") },
+  { type: "features", name: "Features / highlights", field: "items", hint: "One per line:  Title | short description | icon (optional emoji, e.g. ✅ 🚚 ⭐)",
+    parse: (p) => ({ title: p[0] || "", text: p[1] || "", icon: p[2] || "" }), fmt: (o) => { const c = [o.title, o.text || "", o.icon || ""]; while (c.length && !c[c.length - 1]) c.pop(); return c.join(" | "); } },
   { type: "stats", name: "Numbers that build trust", field: "items", hint: "One per line:  Value | Label   (e.g.  15 | Years in business)",
     parse: (p) => ({ value: p[0] || "", label: p[1] || "" }), fmt: (o) => [o.value, o.label].filter(Boolean).join(" | ") },
   { type: "team", name: "Team", field: "members", structured: "team", hint: "Add each person, with an optional photo from your library.",
