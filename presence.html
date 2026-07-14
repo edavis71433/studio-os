@@ -4750,13 +4750,16 @@ function renderBlocksCard() {
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Section heading (optional)"; ti.value = blk.title || ""; ti.style.cssText = inputCss;
     ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; });
     sub.appendChild(ti);
+    // "Write with AI" on the section heading itself — covers headings everywhere
+    // (a divider/auto table-of-contents has no heading to write).
+    if (!def.dividerSimple && !def.tocSimple) sub.appendChild(aiField(ti, { field: "heading" }));
     if (def.ctaSimple) {
       const t = el("input"), bt = el("input"), u = el("input");
       t.placeholder = "Banner text"; t.value = blk.text || ""; bt.placeholder = "Button label (optional)"; bt.value = blk.button || ""; u.placeholder = "Where the button goes (optional link)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
       const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
-      sub.append(t, bt, u);
+      sub.append(t, aiField(t, { field: "banner text" }), bt, u);
     } else if (def.reviewsSimple) {
       const rt = el("input"), ct = el("input"), sc = el("input");
       rt.type = "number"; rt.min = "1"; rt.max = "5"; rt.step = "0.1"; rt.placeholder = "Your rating (e.g. 4.9)"; rt.value = blk.rating || "";
@@ -4784,13 +4787,13 @@ function renderBlocksCard() {
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
       const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "appointment", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
-      sub.append(t, bt, u);
+      sub.append(t, aiField(t, { field: "banner text" }), bt, u);
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your booking page — nothing external loads on your site."));
     } else if (def.bookingSimple) {
       const t = el("input"); t.type = "text"; t.style.cssText = inputCss;
       t.placeholder = "A short intro (optional) — e.g. Pick a service and a time that suits you."; t.value = blk.intro || "";
       t.addEventListener("change", () => { BLOCKS_WORK[idx] = wLook(idx, { type: "booking", title: ti.value.trim(), intro: t.value.trim() }); });
-      sub.appendChild(t);
+      sub.appendChild(t); sub.appendChild(aiField(t, { field: "banner text" }));
       const go = el("button", null, "Set up services & hours →"); go.type = "button"; go.style.cssText = miniBtn;
       go.addEventListener("click", () => { location.hash = "#bookings"; });
       sub.appendChild(go);
@@ -4803,7 +4806,7 @@ function renderBlocksCard() {
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
       const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
-      sub.append(t, bt, u);
+      sub.append(t, aiField(t, { field: "banner text" }), bt, u);
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your sign-up page — nothing external loads on your site."));
     } else if (def.mapSimple) {
       const ad = el("input"), du = el("input");
@@ -4825,6 +4828,7 @@ function renderBlocksCard() {
       ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
       ta.addEventListener("change", () => { BLOCKS_WORK[idx] = wLook(idx, { type: "richtext", title: ti.value.trim(), body: ta.value.trim() }); });
       sub.appendChild(ta);
+      sub.appendChild(aiField(ta, {}));
       sub.appendChild(el("div", "hint", "Use the formatting buttons above — headings, bold, links and lists all work."));
     } else if (def.imageSimple) {
       const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
@@ -4845,7 +4849,7 @@ function renderBlocksCard() {
       dec.addEventListener("change", commit);
       alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1";
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, alt, decWrap, lk);
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, aiField(cap, { field: "caption" }), alt, decWrap, lk);
       sub.appendChild(el("div", "hint", "Alt text helps screen readers and search — describe what's in the photo. Tick “decorative” only for backgrounds/flourishes that add no information."));
     } else if (def.imageTextSimple) {
       const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
@@ -4864,7 +4868,7 @@ function renderBlocksCard() {
       const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
       [ta, side, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, sideWrap, bl, bu);
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), sideWrap, bl, bu);
       sub.appendChild(el("div", "hint", "On phones the image and text stack automatically."));
     } else if (def.dividerSimple) {
       const styWrap = el("label", "hint", "Style "); const sty = el("select");
@@ -4914,6 +4918,7 @@ function renderBlocksCard() {
       ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.5;box-sizing:border-box";
       ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = wLook(idx, textToBlock(def, t2, ta.value)); });
       sub.appendChild(ta);
+      sub.appendChild(aiField(ta, {}));
       sub.appendChild(el("div", "hint", def.hint));
     }
     // Phase T-STYLE: the shared "Look of this section" options — every content
@@ -5060,6 +5065,86 @@ function renderBlocksCard() {
   saveRow.appendChild(el("span", "hint", "Empty sections won’t appear on your site."));
   card.appendChild(saveRow);
 }
+// ── The builder's "Write with AI" — one control for every text field ────────
+// Reuses the studio Writer (POST /writer/rewrite): improve, shorten, lengthen,
+// change tone, or write-from-a-prompt when the field is empty. It PROPOSES a
+// draft; the owner taps "Use it" and it fills THIS field through the field's own
+// change handler (updating BLOCKS_WORK) — nothing publishes, nothing is stored
+// server-side. Voice grounding, the honest "not switched on" (503) note, and the
+// hard cost ceiling all live in the route. Same ✦ affordance as the rest of the
+// studio; propose-then-approve is the moat, kept intact.
+const AI_TONES = ["friendlier", "more professional", "warmer", "more confident", "calmer", "more playful"];
+function aiField(inputEl, opts) {
+  opts = opts || {};
+  const label = opts.field || "";
+  const miniPill = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line,#ddd);background:#fff;cursor:pointer";
+  const usePill = "font:inherit;font-size:12px;font-weight:600;padding:4px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  const wrap = el("div"); wrap.style.cssText = "margin:0 0 8px";
+  const trigger = el("button", null, "✦ Write with AI"); trigger.type = "button"; trigger.title = "Draft or improve this text — you approve before anything changes";
+  trigger.style.cssText = "font:inherit;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid #d9cef0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  wrap.appendChild(trigger);
+  const panel = el("div"); panel.hidden = true; panel.style.cssText = "margin-top:8px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:10px;padding:10px 12px";
+  wrap.appendChild(panel);
+  const curText = () => (inputEl.value || "").trim();
+  const place = (t) => {
+    inputEl.value = t;
+    if (inputEl.tagName === "TEXTAREA") inputEl.rows = Math.max(3, t.split("\n").length + 1);
+    inputEl.dispatchEvent(new Event("change", { bubbles: true }));   // reuse the field's own commit → BLOCKS_WORK
+  };
+  const go = (body) => {
+    panel.innerHTML = ""; panel.appendChild(Object.assign(el("div", "hint", "Writing… you’ll see a draft to approve."), { style: "margin:0" }));
+    api("POST", "/writer/rewrite", Object.assign({ field: label || undefined }, body))
+      .then((r) => result((r && r.data && r.data.text) || "", body))
+      .catch((err) => {
+        panel.innerHTML = "";
+        panel.appendChild(Object.assign(el("div", "hint", nice(err)), { style: "margin:0 0 8px" }));
+        const back = el("button", null, "Back"); back.type = "button"; back.style.cssText = miniPill; back.addEventListener("click", menu);
+        panel.appendChild(back);
+      });
+  };
+  function result(text, body) {
+    panel.innerHTML = "";
+    panel.appendChild(Object.assign(el("div", "hint", "A draft — nothing changes until you use it:"), { style: "margin:0 0 6px" }));
+    const box = el("div"); box.style.cssText = "white-space:pre-wrap;font-size:13px;line-height:1.5;background:#fff;border:1px solid #e6ddf5;border-radius:8px;padding:8px 10px;max-height:220px;overflow:auto"; box.textContent = text;
+    panel.appendChild(box);
+    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
+    const use = el("button", null, "Use it"); use.type = "button"; use.style.cssText = usePill;
+    use.addEventListener("click", () => { place(text); panel.hidden = true; panel.innerHTML = ""; toast("Placed in your draft — publish when it reads right"); });
+    const again = el("button", null, "Try again"); again.type = "button"; again.style.cssText = miniPill; again.addEventListener("click", () => go(body));
+    const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = miniPill; cancel.addEventListener("click", () => { panel.hidden = true; panel.innerHTML = ""; });
+    acts.append(use, again, cancel); panel.appendChild(acts);
+  }
+  function menu() {
+    panel.innerHTML = "";
+    const has = curText().length > 0;
+    panel.appendChild(Object.assign(el("div", "hint", has ? "Pick one — you’ll see a draft before anything changes." : "Tell me what this should say — I’ll draft it from your business’s own facts."), { style: "margin:0 0 8px" }));
+    if (has) {
+      const row = el("div"); row.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center";
+      [["Improve", "improve"], ["Shorten", "shorten"], ["Lengthen", "lengthen"]].forEach(([l, a]) => {
+        const b = el("button", null, l); b.type = "button"; b.style.cssText = miniPill; b.addEventListener("click", () => go({ action: a, text: curText() })); row.appendChild(b);
+      });
+      const toneSel = el("select"); toneSel.style.cssText = "font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px";
+      AI_TONES.forEach((t) => { const o = el("option", null, t); o.value = t; toneSel.appendChild(o); });
+      const toneBtn = el("button", null, "Change tone"); toneBtn.type = "button"; toneBtn.style.cssText = miniPill;
+      toneBtn.addEventListener("click", () => go({ action: "tone", text: curText(), tone: toneSel.value }));
+      const toneWrap = el("span"); toneWrap.style.cssText = "display:inline-flex;gap:6px;align-items:center"; toneWrap.append(toneBtn, toneSel);
+      row.appendChild(toneWrap);
+      panel.appendChild(row);
+    } else if (opts.write !== false) {
+      const pin = el("input"); pin.type = "text"; pin.placeholder = "e.g. a warm welcome line for the top of the page";
+      pin.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box";
+      const b = el("button", null, "Draft it"); b.type = "button"; b.style.cssText = usePill; b.style.marginTop = "8px";
+      const submit = () => { const p = pin.value.trim(); if (!p) { pin.focus(); return; } go({ action: "write", prompt: p }); };
+      b.addEventListener("click", submit);
+      pin.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+      panel.append(pin, b);
+    } else {
+      panel.appendChild(Object.assign(el("div", "hint", "Write a first line here, then I can improve it."), { style: "margin:0" }));
+    }
+  }
+  trigger.addEventListener("click", () => { panel.hidden = !panel.hidden; if (!panel.hidden) menu(); else panel.innerHTML = ""; });
+  return wrap;
+}
 // FD-T17 media block editors — pick photos from your library (openPicker → media id).
 function renderMediaBlockBody(def, blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
@@ -5085,7 +5170,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
     const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = blk.caption || ""; cap.style.cssText = inputCss;
     const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "video", title: ti.value.trim(), url: url.value.trim(), caption: cap.value.trim(), poster_id: BLOCKS_WORK[idx].poster_id || undefined }); };
     url.addEventListener("change", commit); cap.addEventListener("change", commit);
-    sub.append(url, cap);
+    sub.append(url, cap, aiField(cap, { field: "caption" }));
     const posterRow = el("div"); posterRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:4px";
     if (blk.poster_id) posterRow.appendChild(mediaThumb(blk.poster_id));
     const pick = el("button", null, blk.poster_id ? "Change poster" : "Add poster image"); pick.type = "button"; pick.style.cssText = miniBtn;
@@ -5136,7 +5221,7 @@ function renderTeamBlockBody(blk, idx, sub, ti) {
     const bio = el("input"); bio.type = "text"; bio.placeholder = "Short bio (optional)"; bio.value = m.bio || ""; bio.style.cssText = inputCss;
     const commit = () => { blk.members[k] = { name: nm.value.trim(), role: role.value.trim() || undefined, bio: bio.value.trim() || undefined, media_id: blk.members[k].media_id }; };
     [nm, role, bio].forEach((inp) => inp.addEventListener("change", commit));
-    fields.append(nm, role, bio);
+    fields.append(nm, role, bio, aiField(bio, { field: "", write: false }));
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); blk.members.splice(k, 1); renderBlocksCard(); });
     row.append(photo, fields, rm); sub.appendChild(row);
@@ -5159,7 +5244,7 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
     bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
     const commit = () => { blk.items[k] = { summary: sm.value.trim(), body: bd.value.trim() }; };
     sm.addEventListener("change", commit); bd.addEventListener("change", commit);
-    row.append(sm, bd);
+    row.append(sm, aiField(sm, { field: "question", write: false }), bd, aiField(bd, { field: "answer" }));
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
@@ -5185,7 +5270,7 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
     st.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; stWrap.appendChild(st);
     const commit = () => { blk.buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
     [lb, ur, st].forEach((inp) => inp.addEventListener("change", commit));
-    row.append(lb, ur, stWrap);
+    row.append(lb, aiField(lb, { field: "button label" }), ur, stWrap);
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); blk.buttons.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
@@ -5219,7 +5304,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
     const commit = () => { const o = { body: bd.value.trim(), image_id: blk.columns[k].image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; blk.columns[k] = o; };
     [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
-    row.append(bd, bl, bu);
+    row.append(bd, aiField(bd, {}), bl, bu);
     if (cols.length > 2) {
       const rm = el("button", null, "Remove column"); rm.type = "button"; rm.style.cssText = miniBtn;
       rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); renderBlocksCard(); });
@@ -5254,7 +5339,7 @@ function renderCardsBlockBody(blk, idx, sub, ti) {
     [hd, tx, lk].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
     const commit = () => { blk.cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: blk.cards[k].image_id || undefined, link: lk.value.trim() || undefined }; };
     [hd, tx, lk].forEach((inp) => inp.addEventListener("change", commit));
-    row.append(hd, tx, lk);
+    row.append(hd, tx, aiField(tx, { field: "caption" }), lk);
     const rm = el("button", null, "Remove card"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); blk.cards.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);

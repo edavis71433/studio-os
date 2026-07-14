@@ -10,6 +10,8 @@
 import { json } from '../../_shared/http.ts';
 import { asUser } from '../lib/db.ts';
 import { generateDraft, acceptDraft, discardDraft } from '../writer/engine.ts';
+import { rewriteSnippet, REWRITE_ACTIONS } from '../writer/rewrite.ts';
+import type { RewriteAction } from '../writer/rewrite.ts';
 import { anthropicModel } from '../writer/model.ts';
 import type { WriterRequest, WriterKind } from '../writer/contract.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -55,6 +57,47 @@ export async function handleWriterGenerate(req: Request, site: SiteRow, cors: Re
   // A successful generative op may raise the calm capacity notice (never blocks).
   raiseCapacityNoticeIfNeeded(site, plan).catch(() => {});
   return json({ data: summary }, 200, cors);
+}
+
+// ── POST /writer/rewrite — the builder's "Write with AI" on every text block ──
+//   {text, action:'improve'|'shorten'|'lengthen'|'tone'|'write', tone?, prompt?, field?}
+//   → { data: { text } }
+// Transforms ONE snippet and returns the words directly. Stores nothing,
+// publishes nothing, accepts nothing — the owner uses it into their draft and
+// publishes by hand. Same plan gate, same HARD cost ceiling, same voice
+// grounding, same honest 503 as handleWriterGenerate.
+export async function handleWriterRewrite(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const plan = await loadPlan(site.client_id);
+  const denied = draftingDenial(plan, cors);
+  if (denied) return denied;
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
+
+  const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'writer' });
+  if (!model) return json({ error: 'writer_unavailable', message: 'Writing help isn’t switched on right now. Everything can still be written by hand — nothing about your site depends on it.' }, 503, cors);
+  let body: { action?: unknown; text?: unknown; tone?: unknown; prompt?: unknown; field?: unknown } = {};
+  try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That request didn’t read right — nothing happened.' }, 400, cors); }
+  const action = typeof body.action === 'string' && (body.action in REWRITE_ACTIONS) ? body.action as RewriteAction : null;
+  if (!action) return json({ error: 'bad_action', message: 'Choose what you’d like to do first.' }, 400, cors);
+
+  const res = await rewriteSnippet(site, {
+    action,
+    text: typeof body.text === 'string' ? body.text.slice(0, 8000) : undefined,
+    tone: typeof body.tone === 'string' ? body.tone.slice(0, 40) : undefined,
+    prompt: typeof body.prompt === 'string' ? body.prompt.slice(0, 400) : undefined,
+    field: typeof body.field === 'string' ? body.field.slice(0, 40) : undefined,
+  }, model);
+
+  if (!res.ok) {
+    const msgs: Record<string, string> = {
+      nothing_to_rewrite: 'There isn’t any text there yet — tell me what it should say and I’ll draft it.',
+      no_prompt: 'Add a line about what it should say first.',
+      bad_action: 'Choose what you’d like to do first.',
+    };
+    const msg = msgs[res.error || ''] || 'The writing didn’t come through — nothing was changed. Try again in a moment.';
+    return json({ error: 'rewrite_failed', message: msg }, res.error === 'nothing_to_rewrite' || res.error === 'no_prompt' || res.error === 'bad_action' ? 400 : 502, cors);
+  }
+  return json({ data: { text: res.text } }, 200, cors);
 }
 
 export async function handleWriterList(jwt: string, site: SiteRow, cors: Record<string, string>) {

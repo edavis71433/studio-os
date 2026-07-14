@@ -61,7 +61,7 @@ import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewAp
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleHelpAsk } from './routes/help.ts';
-import { handleWriterGenerate, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
+import { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
 import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
@@ -851,6 +851,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/concierge/ask' && method === 'POST') return handleConciergeAsk(req, site, cors);
   // ── M9.5A: the AI Writer (Draft verb, rung 2 — proposals only; never publishes) ──
   if (route === '/writer/generate' && method === 'POST') return handleWriterGenerate(req, site, cors);
+  // ── M9.5H: snippet rewrite for the builder's "Write with AI" (returns text only; stores/publishes nothing) ──
+  if (route === '/writer/rewrite' && method === 'POST') return handleWriterRewrite(req, site, cors);
   // ── M9.5B: the AI Editor (improve existing content; shares the Writer's proposal flow) ──
   if (route === '/editor/improve' && method === 'POST') return handleEditorImprove(req, site, cors);
   // ── M9.5C: the AI Reviewer (critique only; no write path to content exists) ──
