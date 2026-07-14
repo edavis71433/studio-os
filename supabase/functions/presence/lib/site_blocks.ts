@@ -80,6 +80,7 @@ function parseLook(raw: unknown): BlockLook | undefined {
   if (l.width === 'full') out.width = 'full';
   if (l.spacing === 'tight' || l.spacing === 'roomy') out.spacing = l.spacing;
   if (l.align === 'center') out.align = 'center';
+  if (l.hideOn === 'mobile' || l.hideOn === 'desktop') out.hideOn = l.hideOn;
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -659,6 +660,8 @@ function lookClasses(look?: BlockLook): string {
   if (look.spacing === 'tight') c.push('block--space-tight');
   else if (look.spacing === 'roomy') c.push('block--space-roomy');
   if (look.align === 'center') c.push('block--align-center');
+  if (look.hideOn === 'mobile') c.push('block--hide-mobile');
+  else if (look.hideOn === 'desktop') c.push('block--hide-desktop');
   return c.join(' ');
 }
 /** Inject the look classes into a section's `class="block …"` (first occurrence).
@@ -1279,6 +1282,9 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
    (so full-width backgrounds reach the edges but text never touches the screen). */
 .block--full{max-width:none;padding-left:0;padding-right:0}
 .block--full>*{max-width:1000px;margin-left:auto;margin-right:auto;padding-left:22px;padding-right:22px}
+/* responsive visibility — hide a section on one device class */
+@media(max-width:620px){.block--hide-mobile{display:none!important}}
+@media(min-width:621px){.block--hide-desktop{display:none!important}}
 /* align: center the section's heading + short text; structured content (grids,
    lists, tables, prose bodies) stays left-aligned so it never turns ragged. */
 .block--align-center{text-align:center}

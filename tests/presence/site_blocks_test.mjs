@@ -387,6 +387,8 @@ const ctx = { esc, attr, safeHref };
   const darkR = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }], look: { background: 'dark' } }]), ctx)[0].html;
   ok('look: "dark" band validates + emits block--bg-dark', darkR.includes('block--bg-dark'));
   ok('look: bold bands force light text + define their CSS (contrast holds)', /\.block\.block--bg-accent\{background:var\(--accent-dark/.test(BLOCK_CSS) && /\.block\.block--bg-dark\{background:#1a1622;color:#f2eef8\}/.test(BLOCK_CSS));
+  const hideR = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }], look: { hideOn: 'mobile' } }]), ctx)[0].html;
+  ok('look: responsive visibility "hide on phones" validates + emits block--hide-mobile + media CSS', hideR.includes('block--hide-mobile') && /@media\(max-width:620px\)\{\.block--hide-mobile\{display:none/.test(BLOCK_CSS) && /@media\(min-width:621px\)\{\.block--hide-desktop\{display:none/.test(BLOCK_CSS));
   const def = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }] }]), ctx)[0].html;
   ok('look: a DEFAULT block emits NO block-- classes (page structure unchanged)', !def.includes('block--') && def.includes('class="block wrap block-features"'));
 

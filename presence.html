@@ -4764,6 +4764,7 @@ function blockLookRow(idx, blk, sub) {
     ["width", "Width", [["", "Normal"], ["full", "Full width"]]],
     ["spacing", "Spacing", [["", "Normal"], ["tight", "Tight"], ["roomy", "Roomy"]]],
     ["align", "Text", [["", "Default"], ["center", "Centered"]]],
+    ["hideOn", "Show on", [["", "All screens"], ["mobile", "Desktop only (hide on phones)"], ["desktop", "Phones only (hide on desktop)"]]],
   ];
   const det = el("details"); det.style.cssText = "margin-top:10px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
   if (chosen) det.open = true;

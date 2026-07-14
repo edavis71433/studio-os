@@ -195,6 +195,9 @@ export interface BlockLook {
   spacing?: 'tight' | 'roomy';
   /** 'center' = center the section heading + short text. */
   align?: 'center';
+  /** hide this section on one device class (responsive visibility). 'mobile' = hide
+   *  on phones (shows on larger screens); 'desktop' = hide on desktop (phones only). */
+  hideOn?: 'mobile' | 'desktop';
 }
 /** Distributive conditional: adds an optional `look` to EVERY union member while
  *  preserving the `type` discriminant (so `switch (b.type)` narrowing keeps working).
