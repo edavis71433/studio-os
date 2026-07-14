@@ -4562,6 +4562,12 @@ const BLOCK_DEFS = [
   { type: "cards", name: "Feature cards", structured: "cards", multi: true, hint: "A grid of cards — image, title, a line of text and an optional link." },
   { type: "download", name: "Download", downloadSimple: true, hint: "Offer a file from your library (e.g. a PDF or price list) as a clear Download link." },
   { type: "toc", name: "Table of contents", tocSimple: true, hint: "Auto-built “On this page” jump list from your section headings — nothing to fill in." },
+  // AEM-parity staples (r5).
+  { type: "title", name: "Title / heading", titleSimple: true, hint: "A standalone heading, with an optional subtitle beneath it." },
+  { type: "link_list", name: "Link list", field: "links", hint: "One per line:  Label | https://link",
+    parse: (p) => ({ label: p[0] || "", url: p[1] || "" }), fmt: (o) => [o.label, o.url].filter(Boolean).join(" | ") },
+  { type: "table", name: "Table", tableSimple: true, hint: "A simple table — headers on the first line, then rows. Scrolls sideways on phones." },
+  { type: "spotlight", name: "Spotlight", spotlightSimple: true, hint: "A prominent highlight band — an eyebrow, a heading, a line or two, and a button." },
 ];
 // ── FD-T-LIB: the "Add a section" library — purpose-grouped, with familiar-name
 //    aliases so owners recognize sections by the words they already know (carousel,
@@ -4573,9 +4579,9 @@ const SECTION_GROUPS = [
   { label: "Build trust", note: "Proof that turns visitors into customers.",
     types: ["features", "stats", "progress", "cards", "reviews_wall", "reviews", "certifications", "pricing", "process"] },
   { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
-    types: ["cta", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
+    types: ["cta", "spotlight", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
   { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
-    types: ["richtext", "columns", "tabs", "accordion", "divider", "toc"] },
+    types: ["title", "richtext", "columns", "tabs", "accordion", "table", "link_list", "divider", "toc"] },
   { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
     types: ["service_areas", "events", "social"] },
 ];
@@ -4591,6 +4597,7 @@ const SECTION_ALIAS = {
   richtext: "text / paragraph", image: "photo", image_text: "image + words",
   accordion: "expandable / toggle", tabs: "tabbed sections", carousel: "slideshow", progress: "skill bars / meters", buttons: "button / link", divider: "spacer / line",
   columns: "columns / grid", cards: "feature cards / tiles", download: "file / PDF", toc: "on this page / jump links",
+  title: "heading / section title", link_list: "links / resources", table: "data table / grid", spotlight: "highlight / feature banner",
 };
 // The CORE sections aren't blocks — they're edited in their own tabs. We surface
 // them read-only so an owner hunting for "hero / FAQ" sees they already have them.
@@ -4955,13 +4962,20 @@ function uniqueBlockId(prefix) {
   while (taken.has(id)) id = prefix + "_" + (++n);
   return id;
 }
+// Blocks that can't render until the owner picks a file — added EMPTY (a validator
+// would drop a placeholder with no media), so the add flow opens their editor/picker
+// instead of saving straight away.
+const MEDIA_FILL_TYPES = new Set(["image", "gallery", "carousel", "video", "before_after", "partners", "download", "form"]);
+// A freshly-added block is PRE-FILLED with short, editable placeholder content, so it
+// renders on the canvas immediately (never a blank/dropped section) and the owner just
+// edits the words — the same "never a cold start" idea as the starter layouts.
 function emptyBlock(def) {
   const b = { type: def.type };
-  if (def.structured === "columns") { b.id = uniqueBlockId("columns"); b.columns = [{ body: "" }, { body: "" }]; return b; }
-  if (def.structured === "cards") { b.id = uniqueBlockId("cards"); b.cards = [{ heading: "" }]; return b; }
+  if (def.structured === "columns") { b.id = uniqueBlockId("columns"); b.columns = [{ body: "**Column one**\n\nA little about this." }, { body: "**Column two**\n\nAnd a little about this." }]; return b; }
+  if (def.structured === "cards") { b.id = uniqueBlockId("cards"); b.cards = [{ heading: "A highlight", text: "A short line about it." }, { heading: "Another", text: "One more short line." }]; return b; }
   if (def.downloadSimple) { return b; }   // file_id set by the picker
   if (def.tocSimple) { return b; }         // nothing to fill — auto-built at render
-  if (def.ctaSimple) { b.text = ""; return b; }
+  if (def.ctaSimple) { b.text = "Ready to get started? Add your phone, email or a booking link."; return b; }
   if (def.reviewsSimple) { b.rating = 5; b.count = 0; return b; }
   if (def.reviewsWallSimple) { b.max = 12; return b; }   // approved reviews injected at publish
   if (def.apptSimple) { b.url = ""; return b; }
@@ -4971,17 +4985,32 @@ function emptyBlock(def) {
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
   if (def.mediaKind === "video") { b.url = ""; return b; }
   if (def.mediaKind === "ba") { b.items = []; return b; }
-  if (def.proseSimple) { b.body = ""; return b; }
+  if (def.proseSimple) { b.body = "Write your text here — tell visitors who you are and what you do, in a friendly sentence or two."; return b; }
   if (def.imageSimple) { return b; }   // image_id set by the picker
-  if (def.imageTextSimple) { b.body = ""; b.side = "left"; return b; }
+  if (def.imageTextSimple) { b.body = "Write the text that sits beside your image."; b.side = "left"; return b; }
   if (def.dividerSimple) { b.style = "line"; b.size = "medium"; return b; }
-  if (def.structured === "accordion") { b.items = []; return b; }
-  if (def.structured === "tabs") { b.tabs = [{ label: "Tab one", body: "" }, { label: "Tab two", body: "" }]; return b; }
+  if (def.titleSimple) { b.title = "Your heading"; b.subtitle = ""; return b; }
+  if (def.spotlightSimple) { b.title = "Something worth highlighting"; b.eyebrow = ""; b.body = "A sentence or two that draws the eye."; return b; }
+  if (def.tableSimple) { b.headers = ["Column A", "Column B"]; b.rows = [["Row 1", "Detail"], ["Row 2", "Detail"]]; return b; }
+  if (def.structured === "accordion") { b.items = [{ summary: "A common question", body: "Answer it here." }]; return b; }
+  if (def.structured === "tabs") { b.tabs = [{ label: "Tab one", body: "What goes in the first tab." }, { label: "Tab two", body: "And the second." }]; return b; }
   if (def.structured === "carousel") { b.slides = []; return b; }   // slides added via the picker
-  if (def.structured === "progress") { b.items = [{ label: "", percent: 60 }]; return b; }
-  if (def.structured === "buttons") { b.buttons = []; return b; }
-  if (def.areasSimple) { b.areas = []; return b; }
-  b[def.field] = []; return b;
+  if (def.structured === "progress") { b.items = [{ label: "A strength", percent: 80 }]; return b; }
+  if (def.structured === "buttons") { b.buttons = [{ label: "Learn more", url: "https://example.com", style: "primary" }]; return b; }
+  if (def.areasSimple) { b.areas = ["Your area", "A nearby town"]; return b; }
+  // The line-based (field) blocks — seed one guiding row so the section renders on add.
+  const SEED = {
+    features: [{ title: "What makes you great", text: "Say it in a clear line." }, { title: "A second strength", text: "Keep it specific." }, { title: "A third reason", text: "Something true about you." }],
+    stats: [{ value: "100+", label: "Happy customers" }, { value: "10 yrs", label: "In business" }, { value: "5★", label: "Average rating" }],
+    process: [{ step: "Get in touch", detail: "The easy first step." }, { step: "We make a plan", detail: "What happens next." }, { step: "You get results", detail: "The outcome." }],
+    pricing: [{ name: "Starter", price_text: "$—", features: ["What's included", "A second line"] }, { name: "Most popular", price_text: "$—", features: ["The best value", "Key benefits"] }],
+    certifications: [{ name: "Licensed & insured", issuer: "Your state" }],
+    events: [{ name: "An upcoming event", detail: "Add the details." }],
+    social: [{ network: "instagram", url: "https://instagram.com/yourbusiness" }],
+    link_list: [{ label: "A useful link", url: "https://example.com" }, { label: "Another link", url: "https://example.com" }],
+  };
+  b[def.field] = SEED[def.type] ? JSON.parse(JSON.stringify(SEED[def.type])) : [];
+  return b;
 }
 // ── Undo / Redo (AEM parity) — an in-session history of the block list ──────────
 // Every save records the PREVIOUS persisted state so it can be restored. Pure
@@ -5378,6 +5407,38 @@ function renderBlocksCard() {
       sub.appendChild(el("div", "hint", "Visitors get a clear “Download …” link. The file is served from your own site — nothing external loads."));
     } else if (def.tocSimple) {
       sub.appendChild(el("div", "hint", "Nothing to fill in — this builds an “On this page” jump list automatically from your section headings. Give the sections above headings and place this near the top."));
+    } else if (def.titleSimple) {
+      const st = el("input"); st.type = "text"; st.placeholder = "Subtitle (optional)"; st.value = blk.subtitle || ""; st.style.cssText = inputCss;
+      st.addEventListener("change", () => { BLOCKS_WORK[idx] = wLook(idx, { type: "title", title: ti.value.trim(), subtitle: st.value.trim() || undefined }); });
+      sub.appendChild(st);
+      sub.appendChild(el("div", "hint", "Type the heading in the title field above; the subtitle is an optional line beneath it."));
+    } else if (def.spotlightSimple) {
+      const ey = el("input"); ey.type = "text"; ey.placeholder = "Eyebrow — a small label above the heading (optional)"; ey.value = blk.eyebrow || ""; ey.style.cssText = inputCss;
+      const ta = el("textarea"); ta.value = blk.body || ""; ta.setAttribute("data-k", "body_md"); ta.placeholder = "A sentence or two…"; ta.rows = Math.max(3, (blk.body || "").split("\n").length + 1);
+      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box;margin:6px 0";
+      const bl = el("input"), bu = el("input");
+      bl.placeholder = "Button label (optional)"; bl.value = (blk.button && blk.button.label) || "";
+      bu.placeholder = "Button link (optional)"; bu.value = (blk.button && blk.button.url) || "";
+      [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
+      const commit = () => { const o = { type: "spotlight", title: ti.value.trim() }; const E = ey.value.trim(); if (E) o.eyebrow = E; const B = ta.value.trim(); if (B) o.body = B; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
+      [ey, ta, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
+      sub.append(ey, ta, aiField(ta, {}), bl, bu);
+      sub.appendChild(el("div", "hint", "A prominent highlight band. The heading goes in the title field above."));
+    } else if (def.tableSimple) {
+      const ta = el("textarea");
+      const toText = () => { const lines = []; if ((blk.headers || []).length) lines.push(blk.headers.join(" | ")); (blk.rows || []).forEach((r) => lines.push((r || []).join(" | "))); return lines.join("\n"); };
+      ta.value = toText(); ta.placeholder = "Name | Price | Notes\nBasic | $10 | Great to start\nPro | $25 | Most popular";
+      ta.rows = Math.max(4, ta.value.split("\n").length + 1);
+      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;box-sizing:border-box";
+      ta.addEventListener("change", () => {
+        const lines = ta.value.split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
+        const cells = (l) => l.split("|").map((c) => c.trim());
+        const headers = lines.length ? cells(lines[0]) : [];
+        const rows = lines.slice(1).map(cells);
+        BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers, rows });
+      });
+      sub.appendChild(ta);
+      sub.appendChild(el("div", "hint", "One row per line, columns separated by “ | ”. The FIRST line is your header row. It scrolls sideways on phones."));
     } else if (def.structured === "columns") {
       renderColumnsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
@@ -5459,7 +5520,7 @@ function renderBlocksCard() {
       b.style.cssText = "text-align:left;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0";
       b.appendChild(Object.assign(el("div", null, "+ " + d.name), { style: "font-weight:600;font-size:12.5px" }));
       if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:11px;color:var(--soft,#888)" }));
-      b.addEventListener("click", () => { dcCaptureScroll(); BLOCKS_WORK.push(emptyBlock(d)); BLOCK_FOCUS = BLOCKS_WORK.length - 1; DC_FOCUS_BI = BLOCKS_WORK.length - 1; saveBlocks(); });
+      b.addEventListener("click", () => { dcCaptureScroll(); BLOCKS_WORK.push(emptyBlock(d)); const at = BLOCKS_WORK.length - 1; BLOCK_FOCUS = at; DC_FOCUS_BI = at; if (MEDIA_FILL_TYPES.has(d.type)) { renderBlocksCard(); eeEditBlock(at); } else { saveBlocks(); } });
       return b;
     };
     // Recommended for you — the server suggestion, folded in as the lead group.
@@ -5478,7 +5539,7 @@ function renderBlocksCard() {
       if (recTypes.length > 1) {
         const all = el("button", null, "Add all recommended"); all.type = "button";
         all.style.cssText = "font:inherit;font-size:12px;margin-top:10px;padding:6px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
-        all.addEventListener("click", () => { dcCaptureScroll(); let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) { BLOCK_FOCUS = firstAt; DC_FOCUS_BI = firstAt; } saveBlocks(); });
+        all.addEventListener("click", () => { dcCaptureScroll(); let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) { BLOCK_FOCUS = firstAt; DC_FOCUS_BI = firstAt; } saveBlocks(); });   /* recommended set is content blocks — safe to save + render */
         wrap.appendChild(all);
       }
       lib.appendChild(wrap);
@@ -6437,6 +6498,7 @@ const TRAY_TYPE_ICON = {
   features: "✦", stats: "№", cards: "▤", reviews_wall: "★", reviews: "★", certifications: "✔", pricing: "＄", process: "⇢",
   cta: "❗", buttons: "🔘", booking: "🗓", appointment: "🗓", newsletter: "✉", download: "⭳", map: "📍",
   richtext: "¶", columns: "▥", accordion: "▾", tabs: "🗂", carousel: "🎠", progress: "▰", divider: "―", toc: "☰", service_areas: "📍", events: "📅", social: "◎",
+  title: "H", link_list: "🔗", table: "▦", spotlight: "◈",
 };
 // PURE + self-contained (no globals) so it can be unit-tested by extraction: does a
 // section (its name / familiar-alias / type) match a plain-text search query?
@@ -6701,7 +6763,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
         const txt = el("span", "ti-txt"); txt.appendChild(el("span", "ti-name", d.name));
         if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
         b.appendChild(txt);
-        b.addEventListener("click", () => { closeInsertMenu(); dcCaptureScroll(); addBlockAt(d, atIndex); saveBlocks(); });
+        b.addEventListener("click", () => { closeInsertMenu(); dcCaptureScroll(); addBlockAt(d, atIndex); if (MEDIA_FILL_TYPES.has(d.type)) { const bi = DC_FOCUS_BI; DC_FOCUS_BI = null; eeEditBlock(bi); } else { saveBlocks(); } });
         wrap.appendChild(b); shown++;
       });
       list.appendChild(wrap);
@@ -6784,7 +6846,7 @@ function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.default
 // saveBlocks() PUTs /settings then refreshDesignPreview(), which reloads the iframe;
 // the load handler re-injects the chrome and restores scroll. Same auto-save the
 // modal proof's eeMoveBlock already uses — nothing goes live until Publish.
-function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type); if (!def) return; dcCaptureScroll(); addBlockAt(def, gap); saveBlocks(); }
+function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type); if (!def) return; dcCaptureScroll(); addBlockAt(def, gap); if (MEDIA_FILL_TYPES.has(type)) { const bi = DC_FOCUS_BI; DC_FOCUS_BI = null; eeEditBlock(bi); } else { saveBlocks(); } }
 function dcMove(from, gap) { dcCaptureScroll(); moveBlockTo(from, gap); saveBlocks(); }
 function dcDuplicate(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
