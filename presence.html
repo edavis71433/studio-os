@@ -424,9 +424,18 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
 .dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
 .dc-slideover.on{transform:translateX(0)}
+/* Desktop: the LEFT rail (Contents / Add) DOCKS in the layout and PUSHES the canvas
+   over — it never floats on top of it. Collapsing it (✕) gives the canvas full width.
+   The right Design-settings panel stays a contextual overlay. */
+@media(min-width:761px){
+  .designstudio{display:flex;align-items:stretch;gap:20px}
+  #designCanvas{flex:1 1 auto;min-width:0;order:2}
+  #trayPanel.dc-left{position:relative;order:1;top:auto;bottom:auto;left:auto;z-index:1;flex:0 0 auto;width:min(320px,30vw);transform:none;visibility:visible;box-shadow:none;border:1px solid var(--hair);border-radius:12px;overflow:hidden;align-self:stretch;max-height:calc(100vh - 150px);transition:width var(--dur,.28s) var(--ease,ease),margin var(--dur,.28s) var(--ease,ease),opacity var(--dur,.2s)}
+  #trayPanel.dc-left:not(.on){width:0;border-width:0;margin-right:-20px;opacity:0;pointer-events:none}
+}
 .dc-panel-head{position:sticky;top:0;z-index:2;background:var(--sheet,#fff);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 16px;border-bottom:1px solid var(--hair);flex:0 0 auto}
 .dc-panel-head .dc-panel-t{font-weight:600;font-size:14px}
-.dc-close{font:inherit;font-size:18px;line-height:1;width:34px;height:34px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
+.dc-close{font:inherit;font-size:12.5px;font-weight:600;line-height:1;padding:7px 12px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
 .dc-close:hover{border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)}
 .dc-close:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 #designTray{flex:1;min-height:0;overflow:auto;padding:14px 16px 20px}
@@ -465,6 +474,15 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-tree-row{display:flex;align-items:center;gap:2px;border-radius:9px;padding:1px}
 .dc-tree-row:hover,.dc-tree-row.sel{background:var(--wash,#f4f0fb)}
 .dc-tree-row.child{margin-left:15px;border-left:2px solid var(--hair,#e7e0f2)}
+/* page-tree rows: a page is prominent; its sections nest (indented) beneath it */
+.dc-tree-row.pagerow{background:var(--wash,#f6f2fc);margin-top:4px}
+.dc-tree-row.pagerow.sel{background:var(--wash,#ece4fb)}
+.dc-tree-row.pagerow .dc-tree-name{font-weight:700}
+.dc-tree-row.pagerow .dc-tree-ico{background:transparent}
+.dc-tree-row.under-page{margin-left:16px;border-left:2px solid var(--hair,#e7e0f2)}
+.dc-tree-empty2{font-size:12px;color:var(--ink-2);padding:7px 8px 7px 24px;line-height:1.5}
+.dc-tree-addpage{margin-top:10px;font:inherit;font-size:13px;font-weight:600;padding:10px 12px;border-radius:10px;border:1px dashed var(--plum,#5b3fa0);background:transparent;color:var(--plum,#5b3fa0);cursor:pointer;width:100%;text-align:left}
+.dc-tree-addpage:hover{background:var(--wash,#f4f0fb)}
 .dc-tree-row.child .dc-tree-ico{width:20px;height:20px;font-size:12px;background:transparent}
 .dc-tree-row.child .dc-tree-name{font-weight:500;font-size:12.5px}
 .dc-tree-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;font:inherit;text-align:left;background:none;border:none;color:inherit;cursor:pointer;padding:7px 8px;border-radius:8px}
@@ -818,7 +836,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <!-- on-demand ADD-BLOCK tray (left slide-over, no scrim so the canvas stays a
                drop target); #designTray keeps its id so the engine mounts into it -->
           <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Page contents and sections" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t">Your page</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-head"><span class="dc-panel-t">Your website</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Collapse this panel" title="Collapse (gives the canvas full width)">◀ Collapse</button></div>
             <div class="dc-tabs" role="tablist" aria-label="Page rail">
               <button type="button" class="dc-tab on" id="tabContents" role="tab" aria-selected="true" data-tab="contents">Contents</button>
               <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">＋ Add section</button>
@@ -4419,6 +4437,9 @@ async function mountDesignCard() {
   mountTemplateGallery();   // #1 — template-first, big-preview gallery (top of the view)
   mountBlockTray();         // #3 — persistent, searchable add-block tray (left rail)
   renderPagesBar();         // Multi-page: Home + custom pages, click to author each
+  // Dock-open the left rail (the page tree) by default on desktop, so it's visible
+  // AND pushes the canvas over instead of covering it. Mobile stays a bottom sheet.
+  try { if (window.matchMedia && window.matchMedia("(min-width:761px)").matches) openTrayPanel("contents"); } catch (_) {}
 }
 // ── Custom CSS (advanced) — the first layer of the safe "Developer" story ─────
 // Deliberately OFF the main no-code path: a collapsed disclosure that appears ONLY
@@ -6903,23 +6924,56 @@ function dcOpenInsertFromCanvas(gap, anchorInFrame) {
 const DC_CORE_NAME = { business: "Intro / hero", offerings: "What you offer", faqs: "Questions & answers", testimonials: "Reviews", updates: "Latest updates", design: "Section" };
 function dcTreeEmpty(msg) { const host = $("designTreeList"); if (!host) return; host.textContent = ""; host.appendChild(el("div", "dc-tree-empty", msg)); }
 function dcRefreshTree() { const doc = dcFrameDoc(); const main = doc && doc.getElementById("main"); if (main) dcBuildTree(main); else dcTreeEmpty("Your page is drawing… it’ll list here in a moment."); }
+// The Content Tree is a real PAGE TREE: every page (Home + custom), and the page
+// you're editing expands to its sections (AEM Sites-console model). Click a page to
+// open it; click a section to jump to it on the canvas.
 function dcBuildTree(main) {
   const host = $("designTreeList"); if (!host) return;
   host.textContent = "";
+  host.appendChild(el("div", "dc-tree-hd", "Pages · click one to edit it"));
+  dcPageList().forEach((pg) => {
+    const cur = pg.slug === DC_PAGE;
+    host.appendChild(dcPageTreeRow(pg, cur));
+    if (cur) dcTreeSectionRows(host, main);   // the OPEN page expands to its sections
+  });
+  const add = el("button", "dc-tree-addpage", "＋ Add a page"); add.type = "button";
+  add.addEventListener("click", dcAddPage);
+  host.appendChild(add);
+}
+// One page row in the tree (Home or a custom page).
+function dcPageTreeRow(pg, cur) {
+  const row = el("div", "dc-tree-row pagerow" + (cur ? " sel" : ""));
+  const mn = el("button", "dc-tree-main"); mn.type = "button"; mn.title = "Open this page to edit it";
+  mn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: pg.slug ? "📄" : "🏠" }));
+  const hidden = pg.slug && dcPageObj(pg.slug) && dcPageObj(pg.slug).hideNav;
+  const txt = el("span", "dc-tree-txt");
+  txt.appendChild(el("span", "dc-tree-name", pg.title + (hidden ? " (hidden)" : "")));
+  txt.appendChild(el("span", "dc-tree-meta", pg.slug ? ("/" + pg.slug + "/") : "home page"));
+  mn.appendChild(txt);
+  mn.addEventListener("click", () => dcSwitchPage(pg.slug));
+  row.appendChild(mn);
+  if (pg.slug) {
+    const acts = el("span", "dc-tree-acts");
+    const m = el("button", null, "⋯"); m.type = "button"; m.title = "Rename, hide or delete this page";
+    m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
+    acts.appendChild(m); row.appendChild(acts);
+  }
+  return row;
+}
+// The sections of the currently-open page, nested (indented) under its page row.
+function dcTreeSectionRows(host, main) {
   const secs = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
-  if (!secs.length) { dcTreeEmpty("Nothing on your page yet. Open “＋ Add section” to place your first one — or click the box on the canvas."); return; }
-  host.appendChild(el("div", "dc-tree-hd", "Top → bottom on your page"));
+  if (!secs.length) { host.appendChild(el("div", "dc-tree-empty2", "No sections yet — use ＋ Add section on the canvas.")); return; }
   Array.prototype.forEach.call(secs, (el2) => {
     const c = eeClassify(el2);
-    host.appendChild(dcTreeRow(el2, c));
-    // Hierarchical tree (AEM): a Columns container expands to reveal its columns,
-    // each selectable + with its own settings ("meta").
+    const row = dcTreeRow(el2, c); row.classList.add("under-page"); host.appendChild(row);
+    // a Columns container expands to reveal its columns (each selectable)
     if (c && c.kind === "block" && el2.classList.contains("block-columns")) {
       const b = BLOCKS_WORK[c.bi];
       const colEls = el2.querySelectorAll(".cols > .col");
       if (b && b.type === "columns" && colEls.length) {
         const spans = dcLiveSpans(b, colEls.length);
-        Array.prototype.forEach.call(colEls, (colEl, k) => host.appendChild(dcTreeChildRow(colEl, c.bi, k, spans[k])));
+        Array.prototype.forEach.call(colEls, (colEl, k) => { const cr = dcTreeChildRow(colEl, c.bi, k, spans[k]); cr.classList.add("under-page"); host.appendChild(cr); });
       }
     }
   });
