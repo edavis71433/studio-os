@@ -67,7 +67,7 @@ async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'a
 function insightCard(i){
   const cls=i.tone==='good'?'good':i.tone==='attention'?'attention':'';
   const num=(i.number!=null&&i.number!=='')?`<span class="n">${esc(i.number)}</span>`:'';
-  const go=i.href?`<div class="go">Take a look →</div>`:'';
+  const go=i.href?`<div class="go">${esc(i.cta||'Take a look')} →</div>`:'';
   const tag=i.href?'a':'div';const href=i.href?` href="${esc(i.href)}"`:'';
   return `<${tag} class="card ${cls}"${href}>${num}<div class="s">${esc(i.sentence)}</div>${i.detail?`<div class="d">${esc(i.detail)}</div>`:''}${go}</${tag}>`;
 }

@@ -274,11 +274,24 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
     return agencySearchState({ impressions: cur, clicks: 0, priorImpressions: prior, priorClicks: null, ctr: null, position: null, period: periods[0], hasData: true, totalImpressions: cur, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null });
   };
   const counts = { not_connected: 0, growing: 0, falling: 0, steady: 0 } as Record<string, number>;
-  for (const s of sites) counts[stateFor(s.client_id)]++;
+  const notConnectedSites: any[] = [];
+  for (const s of sites) { const st = stateFor(s.client_id); counts[st]++; if (st === 'not_connected') notConnectedSites.push(s); }
   const searchInsightsAgency: any[] = [];
   if (counts.growing) searchInsightsAgency.push({ key: 'search_growing', title: 'Rising on Google', sentence: `${counts.growing} ${counts.growing === 1 ? 'client is' : 'clients are'} getting seen more on Google lately.`, number: counts.growing, tone: 'good' });
   if (counts.falling) searchInsightsAgency.push({ key: 'search_falling', title: 'Losing visibility', sentence: `${counts.falling} ${counts.falling === 1 ? 'client is' : 'clients are'} being seen less on Google — worth a fresh update.`, number: counts.falling, tone: 'attention' });
-  if (counts.not_connected) searchInsightsAgency.push({ key: 'search_not_connected', title: 'Search not connected', sentence: `${counts.not_connected} of ${siteIds.length} ${counts.not_connected === 1 ? 'client hasn’t' : 'clients haven’t'} connected Google Search Console — so their search numbers aren’t available yet.`, number: counts.not_connected, tone: 'neutral' });
+  if (counts.not_connected) {
+    // Connecting Search Console is the STUDIO's setup job — a client never touches it.
+    // Frame it as the operator's action and link straight to that client's connections
+    // (scoped) when there's exactly one; otherwise to the portfolio to pick the client.
+    const one = notConnectedSites.length === 1 ? notConnectedSites[0] : null;
+    searchInsightsAgency.push({
+      key: 'search_not_connected', title: 'Connect Search Console',
+      sentence: `${counts.not_connected} of ${siteIds.length} ${counts.not_connected === 1 ? 'client needs' : 'clients need'} Google Search Console connected — connect it for them (it’s your setup, not theirs) to unlock their search numbers.`,
+      number: counts.not_connected, tone: 'neutral',
+      href: one ? `/connections.html?client=${encodeURIComponent(String(one.id))}` : '/agency.html',
+      cta: one ? 'Connect it for them' : 'Choose a client',
+    });
+  }
 
   // P2-F G4 — Studio WEBSITE OVERSIGHT (§2). Coarse per-client website health for
   // the agency, at the already-authorized site scope. Two bounded queries; reads
