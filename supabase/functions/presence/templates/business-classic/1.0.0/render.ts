@@ -473,6 +473,8 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     ['/', 'Home', 'home'], [v.offeringPath, v.offeringLabel, 'offerings'], ['/about/', 'About', 'about'],
     ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
   ];
+  // Multi-page: the owner's own pages join the main nav (after Contact).
+  for (const cp of (c.settings?.pages || [])) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]);
   const extras: Extras = { announce, icon, nav };
 
   // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,
@@ -523,6 +525,19 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
   }
 
+  // Multi-page: the owner's own pages, each rendered with the SAME shell/nav/footer
+  // and the shared block engine — so a custom page is a first-class page of the site.
+  for (const cp of (c.settings?.pages || [])) {
+    const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });
+    page(`/${cp.slug}/`, {
+      title: `${cp.title} — ${i.business_name}`, description: siteDesc,
+      ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
+      active: `page:${cp.slug}`,
+      body: `<section class="hero wrap"><h1>${esc(cp.title)}</h1></section>${cblocks.map((b) => b.html).join('')}`,
+    });
+    if (noidx.has(`page:${cp.slug}`)) markNoindex(`${cp.slug}/index.html`);
+  }
+
   // Phase SEARCH: static, privacy-safe on-site search — the site's own content
   // index (zero external origins, zero trackers) + a calm results page whose
   // first-party inline script filters it client-side. Kept out of the sitemap +
@@ -541,7 +556,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
 
   const lastmod = snapshot.created_at.slice(0, 10);
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
-  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) }))];
+  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO (a WordPress default the SMB builders lack)

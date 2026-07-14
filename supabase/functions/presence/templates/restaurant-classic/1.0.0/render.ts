@@ -255,6 +255,7 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
     ['/', 'Home', 'home'], ['/menu/', 'Menu', 'menu'], ['/about/', 'About', 'about'],
     ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
   ];
+  for (const cp of (c.settings?.pages || [])) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]);   // multi-page
   const { addr, tel, mail } = contactBits(c);
   const social = Object.entries(i.social || {}).map(([k, v]) => {
     const href = safeHref(v); if (!href) return '';
@@ -511,6 +512,18 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
     if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
   }
 
+  // Multi-page: the owner's own pages, rendered with the SAME shell/nav/footer.
+  for (const cp of (c.settings?.pages || [])) {
+    const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });
+    page(`/${cp.slug}/`, {
+      title: `${cp.title} — ${i.business_name}`, description: siteDesc,
+      ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
+      active: `page:${cp.slug}`,
+      body: `<section class="hero wrap"><h1>${esc(cp.title)}</h1></section>${cblocks.map((b) => b.html).join('')}`,
+    });
+    if (noidx.has(`page:${cp.slug}`)) markNoindex(`${cp.slug}/index.html`);
+  }
+
   // Phase V FD-N1: the form's landing page — calm confirmation, noindex, not in nav/sitemap
   page('/thanks/', {
     title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact',
@@ -542,7 +555,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   // sitemap (lastmod = snapshot time — the only clock the renderer may read)
   const lastmod = snapshot.created_at.slice(0, 10);
   const KEY_PATHS: Array<[string, string]> = [['offerings', '/menu/'], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
-  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) }))];
+  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO
