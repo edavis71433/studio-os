@@ -75,10 +75,57 @@
   @keyframes sh{to{background-position:-200% 0}}
   @media (prefers-reduced-motion:reduce){.spin,.skel .l{animation:none}html{scroll-behavior:auto}}
   html{scroll-behavior:smooth}
+  /* ── persistent portal nav: bottom tab bar (mobile) → top rail (wider) ── */
+  .tabnav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -2px 12px rgba(27,21,37,.07);padding-bottom:env(safe-area-inset-bottom)}
+  .tabnav[hidden]{display:none}
+  .tabnav-inner{max-width:660px;margin:0 auto;display:flex;justify-content:space-around}
+  .tab{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;border-radius:0;background:transparent;color:var(--soft);padding:8px 2px 9px;font-size:11px;font-weight:600;cursor:pointer;min-height:52px}
+  .tab .ti{font-size:19px;line-height:1}
+  .tab:hover{color:var(--p)}
+  .tab[aria-current="page"]{color:var(--p)}
+  .toast{z-index:40}
+  @media (max-width:719px){.toast{bottom:74px}}
+  @media (min-width:720px){
+    .tabnav{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line);box-shadow:var(--shadow);padding-bottom:0}
+    .tabnav-inner{justify-content:center;gap:4px}
+    .tab{flex:0 0 auto;flex-direction:row;gap:7px;font-size:13.5px;padding:13px 16px;min-height:0}
+    .tab .ti{font-size:15px}
+    .tab[aria-current="page"]{box-shadow:inset 0 -2px 0 var(--p)}
+    .chipbar{top:56px}
+    section[id^="sec-"],#sec-overview{scroll-margin-top:118px}
+  }
+  /* ── group heading (Files by project) — normal case, not the uppercase eyebrow ── */
+  .grouphd{font-family:var(--serif);font-weight:500;font-size:17px;color:var(--ink);text-transform:none;letter-spacing:0;margin:0 0 12px}
+  /* ── vertical project timeline (milestones) ── */
+  .timeline{list-style:none;margin:0;padding:0}
+  .tl-node{position:relative;padding:0 0 20px 30px}
+  .tl-node::before{content:"";position:absolute;left:8px;top:16px;bottom:-4px;width:2px;background:var(--line)}
+  .tl-node:last-child::before{display:none}
+  .tl-dot{position:absolute;left:2px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--card);border:2px solid var(--line)}
+  .tl-node.done .tl-dot{background:var(--good);border-color:var(--good)}
+  .tl-node.done::before{background:var(--good)}
+  .tl-node.current .tl-dot{background:var(--p);border-color:var(--p);box-shadow:0 0 0 4px var(--p-soft)}
+  .tl-body h3{font-family:var(--serif);font-weight:500;font-size:17px;margin:0;line-height:1.25}
+  .tl-meta{color:var(--soft);font-size:13.5px;margin:2px 0 0}
+  .tl-here{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
+  @media (prefers-reduced-motion:no-preference){.tl-node.current .tl-dot{animation:tlpulse 2.2s ease-in-out infinite}}
+  @keyframes tlpulse{0%,100%{box-shadow:0 0 0 4px var(--p-soft)}50%{box-shadow:0 0 0 7px var(--p-soft)}}
+  /* ── FAQ / Help ── */
+  .faq{margin:0}
+  .faq-intro{color:var(--soft);font-size:14.5px;margin:0 0 12px}
+  details.faq-item{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden}
+  details.faq-item[hidden]{display:none}
+  details.faq-item>summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:600;font-size:15.5px;color:var(--ink)}
+  details.faq-item>summary::-webkit-details-marker{display:none}
+  details.faq-item>summary::after{content:"+";float:right;color:var(--p);font-weight:700}
+  details.faq-item[open]>summary::after{content:"–"}
+  .faq-answer{padding:0 18px 15px;color:var(--soft);font-size:14.5px}
+  .faq-answer a{color:var(--p)}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
+<nav id="tabnav" class="tabnav" aria-label="Portal sections" hidden></nav>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · by Davis Digital Studio — you see only what your studio shares with you.<br><a class="link" href="#" id="signout" style="font-size:12.5px">Sign out</a></footer>
@@ -135,56 +182,212 @@ function navFromHref(href){
   if(pm){openProject(pm[1],pm[2]?sectionForAnchor(pm[2]):null);return;}
 }
 
-// ── the reviewer feed (pre-existing owner-shared updates) ──
-function renderFeed(ctx,feed){
-  const moments=(feed.moments||[]); const pending=(feed.pending_approvals||[]); const pub=feed.last_published;
-  const need=pending.length;
-  const subtext = need ? (need===1 ? 'One thing needs your OK — no rush.' : `${need} things need your OK — no rush.`) : 'You’re all caught up — nothing needs you right now.';
-  let html=`<div class="rolebadge">● Client view</div><header><h1>Your updates</h1><p class="sub">${esc(subtext)}</p></header>`;
-  if(pub){const when=new Date(pub.completed_at||pub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});html+=`<div class="status"><span class="d"></span>Your website is live — last updated ${esc(when)}.</div>`;}
-  if(pending.length){html+=`<section><h2>Waiting for your OK</h2>`;for(const p of pending){html+=`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span><h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p><div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`;}html+=`</section>`;}
-  html+=`<section><h2>Recent updates</h2>`;
-  if(!moments.length){html+=`<div class="card"><p class="muted">Nothing new to share right now — your studio will surface anything worth a look here.</p></div>`;}
-  else for(const m of moments){html+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;}
-  html+=`</section>`;
-  $('main').innerHTML=html;
-  document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
-  document.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
+// ── PERSISTENT PORTAL NAV + cross-tab client state ──
+// One always-visible nav (bottom tab bar on phones, top rail on wider screens),
+// reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
+// never touch it). Home aggregates ACROSS projects; the other tabs are top-level
+// destinations over the SAME existing /client/* + /portal/* reads — no new backend.
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},unread:0,notifs:[],billing:null,snaps:null};
+let CURRENT_TAB='home';
+const TABS=[['home','🏠','Home'],['messages','💬','Messages'],['files','📁','Files'],['invoices','🧾','Invoices'],['requests','✨','Requests'],['help','❓','Help']];
+function showNav(){
+  const nav=$('tabnav');if(!nav)return;
+  nav.innerHTML=`<div class="tabnav-inner">`+TABS.map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')+`</div>`;
+  nav.hidden=false;
+  nav.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
+  setActiveTab(CURRENT_TAB);
+}
+function hideNav(){const nav=$('tabnav');if(nav){nav.hidden=true;nav.innerHTML='';}}
+function setActiveTab(tab){const nav=$('tabnav');if(!nav)return;nav.querySelectorAll('.tab').forEach(b=>{if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});}
+function showTab(tab){
+  CURRENT_TAB=tab;setActiveTab(tab);try{window.scrollTo(0,0);}catch(_){}
+  if(tab==='messages')return renderMessages();
+  if(tab==='files')return renderFiles();
+  if(tab==='invoices')return renderInvoices();
+  if(tab==='requests')return renderRequests();
+  if(tab==='help')return renderHelp();
+  return renderHome();
+}
+function goHome(){showTab('home');}
+// small shared building blocks for the tab views
+function portalHeader(title,sub){return `<header><h1>${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
+function emptyCard(msg){return `<div class="card"><p class="muted">${esc(msg)}</p></div>`;}
+function spinnerHtml(){return '<div class="spin" role="status" aria-label="Loading"></div>';}
+// billing (invoices) — cached per full load; degrades to empty for a reviewer
+async function ensureBilling(){if(PORTAL.billing)return PORTAL.billing;try{const r=await api('/client/billing');PORTAL.billing=(r.ok&&r.body&&r.body.data)||{invoices:[]};}catch(_){PORTAL.billing={invoices:[]};}return PORTAL.billing;}
+function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
+// per-project snapshots (the full client bundle, capped) — shared by Home + Files
+async function ensureSnaps(){
+  if(PORTAL.snaps)return PORTAL.snaps;
+  const list=PORTAL.projects.slice(0,8);
+  PORTAL.snaps=await Promise.all(list.map(async(p)=>{
+    try{const r=await api('/client/projects/'+p.id);const d=(r&&r.body&&r.body.data)||{};const prog=d.progress||{};
+      return {id:p.id,name:p.name,pct:prog.pct,total:prog.total,
+        approvals:(d.approvals||[]).filter(a=>a&&a.status==='pending'),
+        todos:(d.tasks||[]).filter(t=>t&&t.client_action_required&&t.status!=='done'),
+        surveys:(d.surveys||[]),deliverables:(d.deliverables||[])};
+    }catch(_){return {id:p.id,name:p.name,approvals:[],todos:[],surveys:[],deliverables:[]};}
+  }));
+  return PORTAL.snaps;
+}
+// shared deliverable download (Files tab + a project's Files section reuse it)
+async function downloadDeliverable(id){const r=await api('/client/deliverables/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('That file isn’t available.');}
+function wireDownloads(root){(root||document).querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>downloadDeliverable(b.getAttribute('data-dl'))));}
+// vertical timeline over data.milestones (ordered by sort_order server-side):
+// complete → done, the first still-open one → "you are here / Next up", rest upcoming.
+function tlDate(x){const t=Date.parse(x);return isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';}
+function timelineHtml(ms){
+  let firstOpen=true,h='<ol class="timeline">';
+  for(const m of (ms||[])){
+    const done=m.status==='complete';let state,label;
+    if(done){state='done';const w=tlDate(m.completed_at);label='✓ Done'+(w?` · ${w}`:'');}
+    else if(firstOpen){state='current';firstOpen=false;label='Next up'+(m.due_date?` · due ${m.due_date}`:'');}
+    else{state='upcoming';label='Upcoming'+(m.due_date?` · due ${m.due_date}`:'');}
+    h+=`<li class="tl-node ${state}"><span class="tl-dot" aria-hidden="true"></span><div class="tl-body"><h3>${esc(m.title)}</h3><p class="tl-meta">${esc(label)}${state==='current'?'<span class="tl-here">You’re here</span>':''}</p></div></li>`;
+  }
+  return h+'</ol>';
 }
 async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Noted — your studio has been told. Nothing changed.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
 
-// ── the CLIENT App service-delivery view (Agency–Client Bridge) ──
-function renderProjects(projects,unread,notifs){
-  notifs=notifs||[];
-  const badge=unread?`<span class="badge on" aria-hidden="true">${unread>9?'9+':unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
-  let html=`<div class="topbar"><div class="rolebadge">● Your projects</div>`+
-    `<button id="bell" class="bell" aria-label="What’s new${unread?` — ${unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button></div>`+
+// ── HOME — aggregates ACROSS all projects (needs-you · projects · updates) ──
+function projectCardsHtml(projects){
+  if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.');
+  let h='';
+  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
+  return h;
+}
+function renderHome(){
+  const P=PORTAL,projects=P.projects,feed=P.feed||{};
+  const badge=P.unread?`<span class="badge on" aria-hidden="true">${P.unread>9?'9+':P.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
+  let html=`<div class="topbar"><div class="rolebadge">● ${projects.length?'Your workspace':'Client view'}</div>`+
+    `<button id="bell" class="bell" aria-label="What’s new${P.unread?` — ${P.unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button></div>`+
     `<div id="np" class="notifpanel" role="region" aria-label="What’s new" hidden></div>`+
-    `<header><h1>Your projects</h1><p class="sub">${projects.length?'What your studio is working on with you.':'Your studio hasn’t started a project with you yet.'}</p></header>`;
+    `<header><h1>Home</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
   html+=welcomeCardHtml();
-  html+=`<section>`;
-  if(!projects.length) html+=`<div class="card"><p class="muted">When your studio starts a project, it’ll appear here with your tasks, files, and approvals.</p></div>`;
-  for(const p of projects){html+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
+  html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body">${emptyCard('Checking what needs you…')}</div></section>`;
+  html+=`<section><h2>Your projects</h2>${projectCardsHtml(projects)}</section>`;
+  html+=`<section><h2>Recent updates</h2>`;
+  const moments=(feed.moments||[]);
+  if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.');
+  else for(const m of moments)html+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
-  wireWelcome();
-  wireBell(notifs,unread);
+  wireWelcome();wireBell(P.notifs,P.unread);
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
-  // Glanceable list: progress % and "N things need your OK" WITHOUT a click —
-  // the report endpoint already computes both. Best-effort per card.
-  projects.slice(0,6).forEach(async(p)=>{
-    try{
-      const r=await api('/client/projects/'+p.id+'/report');
-      // the numbers live under data.summary (the same shape the detail view reads)
-      const d=(r&&r.body&&r.body.data&&(r.body.data.summary||r.body.data))||{};
-      const el=document.getElementById('glance-'+p.id);if(!el)return;
-      const pct=d.progress&&d.progress.pct;
-      const waiting=(Number(d.pending_approvals)||0)+(Number(d.open_client_actions)||0);
-      const bits=[];
-      if(pct!=null&&d.progress.total>0)bits.push(pct+'% along');
-      if(waiting>0)bits.push(`<strong style="color:var(--warn,#775d31)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);
-      el.innerHTML=bits.join(' · ');
-    }catch(_){/* the card still opens */}
+  buildNeedsYou();
+}
+// Fill glances + the aggregated "Needs you" list from feed + per-project snapshots
+// + unpaid invoices. Everything here is a clear, single action.
+async function buildNeedsYou(){
+  const [snaps,billing]=await Promise.all([ensureSnaps(),ensureBilling()]);
+  for(const s of snaps){const el=document.getElementById('glance-'+s.id);if(!el)continue;const bits=[];const waiting=s.approvals.length+s.todos.length;if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0)bits.push(`<strong style="color:var(--warn)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);el.innerHTML=bits.join(' · ');}
+  const body=document.getElementById('needs-body');if(!body)return;
+  const items=[];
+  for(const p of (PORTAL.feed.pending_approvals||[])){items.push(`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span><h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p><div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`);}
+  for(const s of snaps){
+    for(const a of s.approvals)items.push(`<div class="card approve"><span class="tag">Approval</span><h3>${esc(a.title||'A change is ready')}</h3><p>${esc(s.name)}${a.summary?` · ${esc(a.summary)}`:''}</p><div class="row"><button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals">Review →</button></div></div>`);
+    if(s.todos.length)items.push(`<div class="card"><span class="tag">To-do</span><h3>${s.todos.length} thing${s.todos.length===1?'':'s'} for you</h3><p>${esc(s.name)}</p><div class="row"><button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos">Open →</button></div></div>`);
+    for(const sv of s.surveys)items.push(`<div class="card"><span class="tag">Survey</span><h3>${esc(sv.title||'A quick survey')}</h3><p>${esc(s.name)}</p><div class="row"><button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}">Answer →</button></div></div>`);
+  }
+  for(const i of unpaidInvoices(billing)){items.push(`<div class="card"><span class="tag">Invoice</span><h3>${esc(i.name||'Invoice')}</h3><p>${i.amount?('$'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(i.due_date)}`:''}</p><div class="row">${i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener">Pay →</a>`:`<button data-tab-go="invoices">View →</button>`}</div></div>`);}
+  if(!items.length){body.innerHTML=`<div class="card"><p><strong>You’re all caught up.</strong></p><p class="muted" style="margin-top:4px">Nothing needs you right now — we’ll flag anything here the moment it does.</p></div>`;return;}
+  body.innerHTML=items.join('');
+  body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
+  body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
+  body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
+  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'))));
+  body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
+}
+// ── MESSAGES — a top-level destination that works with NO project ──
+async function renderMessages(){
+  $('main').innerHTML=spinnerHtml();
+  const canMessage=PORTAL.persona==='client';
+  let general=[];try{const r=await api('/client/support');general=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id&&!x.project_id);}catch(_){}
+  let html=portalHeader('Messages','Talk to your studio — they usually reply within a day.');
+  html+=`<section id="sec-messages"><h2>Message your studio</h2>`;
+  for(const rq of general){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
+  if(canMessage)html+=`<div class="card"><label for="gmsg" style="display:block;font-weight:600;margin-bottom:6px">${general.length?'Start a new message':'Send your studio a message'}</label><textarea id="gmsg" rows="3" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Type your message…"></textarea><div class="row"><button class="approve" id="gsend">Send</button></div></div>`;
+  else html+=emptyCard('Your studio will reach you here. Messaging opens up once they’ve set up your account.');
+  html+=`</section>`;
+  if(PORTAL.projects.length){
+    html+=`<section><h2>Project conversations</h2>`;
+    for(const p of PORTAL.projects)html+=`<div class="card" role="button" tabindex="0" data-msgproj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p class="muted">Open this project’s message thread →</p></div>`;
+    html+=`</section>`;
+  }
+  $('main').innerHTML=html;
+  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
+  document.querySelectorAll('[data-msgproj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-msgproj'),'sec-messages');c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
+  const gs=$('gsend');if(gs)gs.addEventListener('click',async()=>{const v=$('gmsg').value.trim();if(!v){toast('Type a message first.');return;}gs.disabled=true;const subject=(v.split('\n')[0]||'').slice(0,60)||'New message';const r=await api('/client/support','POST',{subject,body:v});if(r.ok&&r.body&&r.body.data&&r.body.data.id){toast('Sent — your studio will get back to you.');renderMessages();}else{toast('That didn’t send.');gs.disabled=false;}});
+}
+// ── FILES — every shared file, grouped by project ──
+async function renderFiles(){
+  $('main').innerHTML=spinnerHtml();
+  const snaps=await ensureSnaps();
+  const withFiles=snaps.filter(s=>s.deliverables&&s.deliverables.length);
+  let html=portalHeader('Files','Everything your studio has shared with you.');
+  if(!withFiles.length){html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.');$('main').innerHTML=html;return;}
+  for(const s of withFiles){
+    html+=`<section><h2 class="grouphd">${esc(s.name)}</h2>`;
+    for(const f of s.deliverables)html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;
+    html+=`</section>`;
+  }
+  $('main').innerHTML=html;
+  wireDownloads(document);
+}
+// ── INVOICES — the studio's service invoices (separate from the SaaS subscription) ──
+// appendBilling renders the invoice cards (service billing = the studio's project
+// invoices, explicitly distinct from the Studio OS software subscription).
+function appendBilling(inv){
+  let h=`<p class="muted" style="margin:-14px 0 14px">Your website subscription is billed separately.</p>`;
+  for(const i of (inv||[]))h+=`<div class="card"><h3>${esc(i.name||'Invoice')}</h3><p>${i.amount?('Amount: $'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?(' · due '+esc(i.due_date)):''}</p>${i.pay_url?`<p><a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener">Pay this invoice →</a></p>`:(i.paid_at?'<p class="muted">Paid — thank you.</p>':'<p class="muted">Your studio will send payment details.</p>')}</div>`;
+  return h;
+}
+async function renderInvoices(){
+  $('main').innerHTML=spinnerHtml();
+  const b=await ensureBilling();const inv=(b&&b.invoices)||[];
+  let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
+  if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)');$('main').innerHTML=html;return;}
+  html+=appendBilling(inv);
+  $('main').innerHTML=html;
+}
+// ── REQUESTS — Release-1 stand-in for the service catalog: your requests + ask for more ──
+async function renderRequests(){
+  $('main').innerHTML=spinnerHtml();
+  const canMessage=PORTAL.persona==='client';
+  let list=[];try{const r=await api('/client/support');list=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id);}catch(_){}
+  let html=portalHeader('Requests','Ask your studio for more work, or follow up on something.');
+  html+=`<section><div class="card"><h3>Need something new?</h3><p class="muted">Tell your studio what you’d like — a new page, an update, a fresh project. They’ll reply with next steps; nothing is charged automatically.</p><p class="muted" style="margin-top:6px">A menu of ready-to-pick services is coming soon.</p>${canMessage?`<div class="row"><button class="approve" id="newReq">Request more work</button></div>`:''}</div></section>`;
+  html+=`<section><h2>Your requests</h2>`;
+  if(!list.length)html+=emptyCard('You haven’t made any requests yet. When you ask your studio for something, you’ll be able to track it here.');
+  else for(const rq of list){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
+  html+=`</section>`;
+  $('main').innerHTML=html;
+  const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null));
+  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
+}
+// ── HELP — the studio's FAQ (searchable/expandable) + a way to reach a human ──
+async function renderHelp(){
+  $('main').innerHTML=spinnerHtml();
+  const canMessage=PORTAL.persona==='client';
+  let faqHtml='';try{const r=await api('/client/faq');faqHtml=(r&&r.body&&r.body.data&&r.body.data.html)||'';}catch(_){}
+  let html=portalHeader('Help','Quick answers from your studio.');
+  if(!faqHtml)html+=emptyCard('Your studio hasn’t added any help articles yet — but you can always ask them a question below.');
+  else{
+    html+=`<div class="card" style="padding:12px 14px"><input id="faqSearch" type="search" placeholder="Search help…" aria-label="Search help" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)"></div>`;
+    html+=`<div id="faqBody">${faqHtml}</div>`;
+    html+=`<p id="faqNone" class="muted" hidden style="padding:4px 2px">No answers match that. Try fewer words, or message your studio below.</p>`;
+  }
+  if(canMessage)html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
+  const email=(USER&&USER.email)?USER.email:'';
+  html+=`<section id="sec-you"><h2>Your account</h2><div class="card">${email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>'}<div class="row"><button id="signout2">Sign out</button></div></div></section>`;
+  $('main').innerHTML=html;
+  const hm=$('helpMsg');if(hm)hm.addEventListener('click',()=>openSupport(null));
+  const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
+  const search=$('faqSearch');
+  if(search)search.addEventListener('input',()=>{
+    const q=search.value.trim().toLowerCase();const items=document.querySelectorAll('#faqBody .faq-item');let shown=0;
+    items.forEach(it=>{const hit=!q||(it.textContent||'').toLowerCase().indexOf(q)>=0;it.hidden=!hit;if(hit)shown++;});
+    const none=$('faqNone');if(none)none.hidden=!(q&&shown===0);
   });
 }
 // First-run welcome — calm, one-time, dismissible (no modal, no tour).
@@ -236,92 +439,13 @@ function wireBell(notifs,unread){
   document.addEventListener('click',(e)=>{if(!panel.hidden&&!panel.contains(e.target)&&e.target!==bell&&!bell.contains(e.target))close();});
   document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!panel.hidden){close();bell.focus();}});
 }
-// "You & notifications" — a light settings surface: who you're signed in as +
-// a clear way out. A notification on/off toggle is intentionally deferred (no
-// existing endpoint persists a preference — adding a backend route for it is out
-// of scope). Appended last, after billing.
-function appendYou(){
-  if(document.getElementById('sec-you'))return;
-  const email=(USER&&USER.email)?USER.email:'';
-  const sec=document.createElement('section');sec.id='sec-you';
-  sec.innerHTML=`<h2>You &amp; notifications</h2><div class="card">`+
-    (email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>')+
-    `<p class="muted" style="margin-top:6px">You’ll see a note in the bell above whenever your studio shares something or needs your OK.</p>`+
-    `<div class="row"><button id="signout2">Sign out</button></div></div>`;
-  $('main').appendChild(sec);
-  const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
-}
-// Service billing — the studio's invoices for project work, SEPARATE from the
-// Studio OS software subscription. Appended below the projects; hidden if none.
-async function appendBilling(){
-  try{
-    const r=await api('/client/billing'); if(!r.ok) return;
-    const d=(r.body&&r.body.data)||{}; const inv=(d.invoices||[]);
-    if(!inv.length) return;
-    const row=(i)=>`<div class="card"><h3>${esc(i.name||'Invoice')}<\/h3><p>${i.amount?('Amount: $'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?(' · due '+esc(i.due_date)):''}</p>${i.pay_url?`<p><a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener">Pay this invoice →<\/a><\/p>`:(i.paid_at?'<p class="muted">Paid — thank you.<\/p>':'<p class="muted">Your studio will send payment details.<\/p>')}<\/div>`;
-    const sec=document.createElement('section');
-    sec.innerHTML=`<h2>Billing<\/h2><p class="muted" style="margin:-4px 0 10px">Invoices from your studio for project work. Your website subscription is billed separately.<\/p>${inv.map(row).join('')}`;
-    $('main').appendChild(sec);
-  }catch(_){/* billing is additive; never block the projects view */}
-}
-// Customer FAQ (service edge #5) — the studio's mini knowledge base, deflecting
-// repeat questions. The HTML arrives already sanitized (server-side renderFaq via
-// the markdown pipeline), so injecting it is safe. Best-effort + additive.
-async function appendFaq(){
-  try{
-    const r=await api('/client/faq'); if(!r.ok) return;
-    const html=(r.body&&r.body.data&&r.body.data.html)||'';
-    if(!html) return;
-    const sec=document.createElement('section');
-    sec.innerHTML=`<h2>Common questions<\/h2><p class="muted" style="margin:-4px 0 10px">Quick answers from your studio — you may find what you need here.<\/p>${html}`;
-    $('main').appendChild(sec);
-  }catch(_){/* the FAQ is additive; never block the view */}
-}
-// A MANAGED CLIENT (an agency's customer signed into their OWN site) whose studio
-// hasn't opened a delivery project yet must still reach the whole client app — never
-// the owner dead-end. Onto the calm "no project yet" home this appends every surface
-// they can still reach: things to approve + recent updates (from the shared feed),
-// and a "talk to your studio / request more work" channel (support). Billing (their
-// invoices) is appended separately by appendBilling. All values are escaped.
-async function appendManagedExtras(feed){
-  feed=feed||{};
-  const pending=(feed.pending_approvals||[]);
-  if(pending.length){
-    const sec=document.createElement('section');
-    let h=`<h2>Waiting for your OK</h2>`;
-    for(const p of pending){h+=`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span><h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p><div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`;}
-    sec.innerHTML=h;$('main').appendChild(sec);
-    sec.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
-    sec.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
-  }
-  const moments=(feed.moments||[]);
-  if(moments.length){
-    const sec=document.createElement('section');
-    let h=`<h2>Recent updates</h2>`;
-    for(const m of moments){h+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;}
-    sec.innerHTML=h;$('main').appendChild(sec);
-  }
-  // Talk to your studio — the general channel while there's no project yet: the
-  // client's own open requests (view & reply) + a way to ask for more work.
-  try{
-    const r=await api('/client/support');
-    const list=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id);
-    const sec=document.createElement('section');sec.id='sec-support';
-    let h=`<h2>Talk to your studio</h2><p class="muted" style="margin:-4px 0 10px">Ask a question, request more work, or follow up — your studio usually replies within a day.</p>`;
-    for(const rq of list){const resolved=rq.status==='resolved'||rq.status==='closed';h+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
-    h+=`<div class="card"><p class="muted">${list.length?'Need something else?':'Have a question, or want to start something new?'}</p><div class="row"><button id="newSupport">Message your studio</button></div></div>`;
-    sec.innerHTML=h;$('main').appendChild(sec);
-    sec.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
-    const ns=$('newSupport');if(ns)ns.addEventListener('click',()=>openSupport(null));
-  }catch(_){/* the support channel is additive; never block the home */}
-}
 async function openProject(id,focusSection){
   $('main').innerHTML=skeleton();
   const [d,rep,supRes]=await Promise.all([api('/client/projects/'+id),api('/client/projects/'+id+'/report').catch(()=>null),api('/client/support').catch(()=>null)]);
-  if(!d.ok){toast('That project isn’t available.');return load();}
+  if(!d.ok){toast('That project isn’t available.');return goHome();}
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
   const hasOverview=!!(s&&s.progress&&s.milestones);
-  let html=`<p><a class="link" href="/client.html">← Your projects</a></p><header><h1>${esc(p.name)}</h1><p class="sub">Status: ${esc((p.status||'').replace('_',' '))}</p></header>`;
+  let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><h1>${esc(p.name)}</h1><p class="sub">Status: ${esc((p.status||'').replace('_',' '))}</p></header>`;
   // slim sticky chip bar — anchors within this one screen (no new pages); only
   // sections that actually have content get a chip.
   const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true,hasSupport:true});
@@ -337,8 +461,8 @@ async function openProject(id,focusSection){
   if((data.deliverables||[]).length){html+=`<section id="sec-files"><h2>Files</h2>`;for(const f of data.deliverables){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}html+=`</section>`;}
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
-  // milestones
-  if((data.milestones||[]).length){html+=`<section id="sec-milestones"><h2>Milestones</h2>`;for(const m of data.milestones){html+=`<div class="card"><h3>${esc(m.title)}</h3><p>${m.status==='complete'?'✓ Complete':'In progress'}${m.due_date?` · due ${esc(m.due_date)}`:''}</p></div>`;}html+=`</section>`;}
+  // milestones — a real vertical timeline (done / you-are-here / upcoming)
+  if((data.milestones||[]).length){html+=`<section id="sec-milestones"><h2>Project timeline</h2>${timelineHtml(data.milestones)}</section>`;}
   // messages
   html+=`<section id="sec-messages"><h2>Messages</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div id="thread"></div><div class="card"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
   // support — the client can now SEE their requests + the studio's replies, not just fire one off
@@ -355,10 +479,10 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-acancel'));if(n)n.style.display='none';}));
   document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=$('nt-'+b.getAttribute('data-asend'));adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
-  document.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',async()=>{const r=await api('/client/deliverables/'+b.getAttribute('data-dl')+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('That file isn’t available.');}));
+  wireDownloads(document);
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
+  const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
   $('newSupport').addEventListener('click',()=>openSupport(id));
-  appendFaq();
   loadThread(id);
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
 }
@@ -367,7 +491,7 @@ async function loadThread(id){const r=await api('/client/projects/'+id+'/message
 async function openSupportThread(rid,pid){
   $('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   const r=await api('/client/support/'+rid);
-  if(!r.ok){toast('That request isn’t available.');return pid?openProject(pid):load();}
+  if(!r.ok){toast('That request isn’t available.');return pid?openProject(pid):goHome();}
   const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
   pid=pid||rq.project_id;
   const resolved=rq.status==='resolved'||rq.status==='closed';
@@ -376,7 +500,7 @@ async function openSupportThread(rid,pid){
   else html+=`<div class="card"><p class="muted">This request is resolved. Open a new one if you need anything else.</p></div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
-  $('back').addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):load();});
+  $('back').addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):goHome();});
   const thread=[];if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at});thread.push(...msgs);
   $('sthread').innerHTML=thread.length?thread.map(m=>`<div class="card"><p><strong>${m.author_kind==='staff'||m.author_kind==='system'?'Your studio':'You'}</strong>${m.created_at?` <span class="muted" style="font-size:12.5px">· ${esc(rel(m.created_at))}</span>`:''}</p><p style="margin-top:4px">${esc(m.body)}</p></div>`).join(''):'<p class="muted">No replies yet — your studio usually replies within a day.</p>';
   if(!resolved){const sbtn=$('ssend');sbtn.addEventListener('click',async()=>{const v=$('smsg').value.trim();if(!v)return;sbtn.disabled=true;const rr=await api('/client/support/'+rid+'/messages','POST',{body:v});if(rr.ok){openSupportThread(rid,pid);}else{toast('That didn’t send.');sbtn.disabled=false;}});}
@@ -419,39 +543,36 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 function ownerNote(){$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
 async function load(){
-  const dsup=new URLSearchParams(location.search).get('support'); if(dsup){await openSupportThread(dsup,null);api('/client/notifications/read','POST',{});return;}
-  const deep=new URLSearchParams(location.search).get('project'); if(deep){await openProject(deep);api('/client/notifications/read','POST',{});return;}
+  PORTAL.snaps=null;PORTAL.billing=null;         // fresh per-load caches (a re-load = fresh data)
+  const params=new URLSearchParams(location.search);
+  const dsup=params.get('support'); const deep=params.get('project');
+  // honor a deep link once, then drop it from the URL so any later re-load
+  // (e.g. after approving something) lands on Home instead of re-opening it.
+  if(dsup||deep){try{history.replaceState(null,'','/client.html'+location.hash);}catch(_){}}
   const ctx=await api('/portal/context');
-  if(!ctx.ok){trouble();return;}
+  if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
-  // Agency–Client Bridge: does this customer have linked delivery? If so, that IS their home.
   const proj=await api('/client/projects');
   const projects=(proj.ok&&proj.body.data)||[];
-  if(projects.length){
-    const n=await api('/client/notifications').catch(()=>null);const nb=(n&&n.body)||{};
-    const items=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
-    const unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
-    renderProjects(projects,unread,items); // read-state is marked when the bell is OPENED, not on load
-    await appendBilling();appendYou();
-    return;
-  }
-  // No delivery project yet. A MANAGED CLIENT (an agency's customer on their OWN
-  // site) must still get the client app — NEVER the owner dead-end. Show the calm
-  // "no project yet" home, then wire the surfaces they can still reach: things to
-  // approve + recent updates (shared feed), talk-to-your-studio / request more work
-  // (support), and their invoices (appendBilling).
-  if(c.is_managed_client){
-    const mfeed=await api('/portal/feed');
-    renderProjects([],0,[]);                        // friendly empty state + welcome + bell
-    await appendManagedExtras(mfeed.ok?(mfeed.body.data||{}):{});
-    await appendBilling();
-    appendYou();
-    return;
-  }
-  if(c.sees_full_workspace){ownerNote();return;}     // a plain owner (not a managed client) — the full workspace lives elsewhere
-  const feed=await api('/portal/feed');
-  if(!feed.ok){trouble();return;}
-  renderFeed(c,feed.body.data||{});
+  // A plain OWNER (full workspace, NOT a managed client, no delivery) — the full
+  // workspace lives elsewhere. No client tabs.
+  if(!projects.length && !c.is_managed_client && c.sees_full_workspace){hideNav();ownerNote();return;}
+  // Everyone else is a client-facing persona: a managed client (converted customer,
+  // with or without a project yet) OR an invited reviewer (feed only). Both get the
+  // persistent tab nav + the cross-project Home; tabs degrade to calm empty states.
+  PORTAL.ctx=c;
+  PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
+  PORTAL.projects=projects;
+  const feed=await api('/portal/feed'); PORTAL.feed=(feed.ok&&feed.body.data)||{};
+  const n=await api('/client/notifications').catch(()=>null); const nb=(n&&n.body)||{};
+  PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
+  PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
+  PORTAL.ready=true;
+  showNav();
+  // deep links open the relevant drill-down; the nav stays visible around it
+  if(dsup){await openSupportThread(dsup,null);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
+  if(deep){await openProject(deep);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
+  showTab(CURRENT_TAB||'home');
 }
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
 // a client needs an obvious, in-view way out). Lands back on the client door.
