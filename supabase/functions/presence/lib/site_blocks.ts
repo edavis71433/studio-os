@@ -18,6 +18,7 @@ import type {
   SiteBlockPartners, SiteBlockReviews, SiteBlockReviewsWall, SiteBlockAppointment, SiteBlockBooking,
   SiteBlockNewsletter, SiteBlockSocial, SiteBlockEvents,
   SiteBlockRichText, SiteBlockAccordion, SiteBlockButtons, SiteBlockDivider,
+  SiteBlockProgress,
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
   BlockLook,
 } from './render_types.ts';
@@ -32,7 +33,7 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'gallery', 'before_after', 'video',
   'partners', 'reviews', 'reviews_wall', 'appointment', 'booking',
   'newsletter', 'social', 'events', 'map',
-  'richtext', 'image', 'image_text', 'accordion', 'tabs', 'buttons', 'divider',
+  'richtext', 'image', 'image_text', 'accordion', 'tabs', 'carousel', 'progress', 'buttons', 'divider',
   'form',
   'columns', 'cards', 'download', 'toc',
 ];
@@ -41,11 +42,15 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, buttons: 3, columns: 6, cards: 8 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8 };
 // Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
 // snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
 const clampSpan = (v: unknown): number | undefined => {
   const n = Math.round(Number(v)); return Number.isFinite(n) && n >= 1 && n <= 12 ? n : undefined;
+};
+// A progress percentage, clamped to 0..100 (integers only).
+const clampPct = (v: unknown): number => {
+  const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
 };
 // The block types a site may hold more than one of (each de-collided to a unique id).
 const MULTI = new Set<string>(['form', 'columns', 'cards']);
@@ -101,6 +106,7 @@ interface StoredImageText { type: 'image_text'; title?: string; image_id?: strin
 interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string }; span?: number }> }
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
 interface StoredTabs { type: 'tabs'; title?: string; tabs: Array<{ label: string; body: string; image_id?: string }> }
+interface StoredCarousel { type: 'carousel'; title?: string; slides: Array<{ image_id: string; caption?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 // Same distributive WithLook as render_types: the owner-chosen per-section style
 // (Phase T-STYLE) rides on the stored block, orthogonal to its content. Phase EXP:
@@ -112,7 +118,7 @@ export type StoredBlock = WithLook<
   | StoredGallery | StoredBeforeAfter | StoredVideo
   | StoredPartners | SiteBlockReviews | StoredReviewsWall | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | StoredMap
-  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | StoredTabs | SiteBlockButtons | SiteBlockDivider
+  | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | StoredTabs | StoredCarousel | SiteBlockProgress | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
   | FormDefinition
 >;
@@ -317,6 +323,22 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         if (tabs.length) block = { type: 'tabs', title, tabs } as StoredTabs;
         break;
       }
+      case 'carousel': {   // a swipeable slideshow — each slide needs an image, caption optional
+        const slides = arr((b as any).slides).map((sl) => {
+          const image_id = uid(sl?.image_id); if (!image_id) return null;
+          const slide: StoredCarousel['slides'][number] = { image_id };
+          const cap = s(sl?.caption, 160); if (cap) slide.caption = cap;
+          return slide;
+        }).filter((sl): sl is StoredCarousel['slides'][number] => !!sl).slice(0, CAP.carousel);
+        if (slides.length) block = { type: 'carousel', title, slides } as StoredCarousel;
+        break;
+      }
+      case 'progress': {   // labeled progress/skill bars — label + a 0..100 percent
+        const items = arr((b as any).items).map((it) => ({ label: s(it?.label, 60), percent: clampPct(it?.percent) }))
+          .filter((it) => it.label).slice(0, CAP.progress);
+        if (items.length) block = { type: 'progress', title, items } as SiteBlockProgress;
+        break;
+      }
       case 'buttons': {   // a small row of real links; each label required, url via safeHref at render
         const buttons = arr((b as any).buttons).map((bt) => ({
           label: s(bt?.label, 40), url: s(bt?.url, 300),
@@ -460,6 +482,11 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       case 'tabs':   // each tab's body/label ride through; optional image resolves (or null)
         out.push({ type: 'tabs', title: b.title, tabs: b.tabs.map((t) => ({ label: t.label, body: t.body, image: t.image_id ? ref(t.image_id) : null })), ...lk(b) });
         break;
+      case 'carousel': {   // each slide's image resolves; a slide whose image is gone is dropped
+        const slides = b.slides.map((sl) => ({ image: sl.image_id ? ref(sl.image_id) : null, caption: sl.caption })).filter((sl) => sl.image);
+        if (slides.length) out.push({ type: 'carousel', title: b.title, slides, ...lk(b) });
+        break;
+      }
       case 'cards':
         out.push({ type: 'cards', id: b.id, title: b.title, cards: b.cards.map((c) => ({ heading: c.heading, text: c.text, image: c.image_id ? ref(c.image_id) : null, link: c.link })), ...lk(b) });
         break;
@@ -843,6 +870,23 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         html = `<section class="block wrap block-tabs">${b.title ? h2(b.title, '') : ''}<div class="tabs">${radios}<div class="tab-strip" role="tablist">${strip}</div><div class="tab-panels">${panels}</div></div></section>`;
         break;
       }
+      case 'carousel': {   // swipeable slideshow — ZERO JS (CSS scroll-snap). Keyboard-
+        // scrollable (the track is focusable); each slide snaps; images are lazy + responsive.
+        const slides = b.slides.map((sl) => {
+          const cap = sl.caption ? `<figcaption class="cr-cap">${esc(sl.caption)}</figcaption>` : '';
+          return `<figure class="cr-slide">${blockImg(sl.image!, esc, attr, '(max-width:760px) 100vw, 900px')}${cap}</figure>`;
+        }).join('');
+        html = `<section class="block wrap block-carousel">${b.title ? h2(b.title, '') : ''}<div class="carousel" tabindex="0" role="group" aria-roledescription="carousel" aria-label="${attr(b.title || 'Image carousel')}"><div class="cr-track">${slides}</div></div><p class="cr-hint">Swipe or scroll →</p></section>`;
+        break;
+      }
+      case 'progress': {   // labeled progress/skill bars — width via inline style (CSP allows it)
+        const rows = b.items.map((it) => {
+          const p = Math.max(0, Math.min(100, Math.round(it.percent)));
+          return `<div class="pgb"><div class="pgb-head"><span class="pgb-lbl">${esc(it.label)}</span><span class="pgb-pct">${p}%</span></div><div class="pgb-track"><div class="pgb-fill" style="width:${p}%" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${attr(it.label)}"></div></div></div>`;
+        }).join('');
+        html = `<section class="block wrap block-progress">${b.title ? h2(b.title, '') : ''}<div class="pgbars">${rows}</div></section>`;
+        break;
+      }
       case 'buttons': {   // a small centered row of real links; drop any without a safe href
         const btns = b.buttons.map((bt) => {
           const href = safeHref(bt.url); if (!href) return '';
@@ -1149,6 +1193,22 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .block-tabs .tab-radio:nth-of-type(1):checked~.tab-strip .tab-label:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):checked~.tab-strip .tab-label:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):checked~.tab-strip .tab-label:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):checked~.tab-strip .tab-label:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):checked~.tab-strip .tab-label:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):checked~.tab-strip .tab-label:nth-of-type(6){color:var(--accent);border-bottom-color:var(--accent)}
 .block-tabs .tab-radio:nth-of-type(1):checked~.tab-panels .tab-panel:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):checked~.tab-panels .tab-panel:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):checked~.tab-panels .tab-panel:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):checked~.tab-panels .tab-panel:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):checked~.tab-panels .tab-panel:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):checked~.tab-panels .tab-panel:nth-of-type(6){display:block}
 .block-tabs .tab-radio:nth-of-type(1):focus-visible~.tab-strip .tab-label:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):focus-visible~.tab-strip .tab-label:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):focus-visible~.tab-strip .tab-label:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):focus-visible~.tab-strip .tab-label:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):focus-visible~.tab-strip .tab-label:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):focus-visible~.tab-strip .tab-label:nth-of-type(6){outline:2px solid var(--accent);outline-offset:2px}
+/* Carousel — ZERO-JS swipeable slideshow via CSS scroll-snap. The track is focusable
+   (keyboard scroll) and each slide snaps to center; images stay responsive + lazy. */
+.block-carousel .carousel{margin-top:6px;border-radius:12px}
+.block-carousel .carousel:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.block-carousel .cr-track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.block-carousel .cr-slide{flex:0 0 100%;scroll-snap-align:center;margin:0}
+.block-carousel .cr-slide img{width:100%;height:auto;border-radius:12px;display:block}
+.block-carousel .cr-cap{margin-top:8px;color:var(--soft);font-size:.95rem;text-align:center}
+.block-carousel .cr-hint{margin:8px 0 0;text-align:center;color:var(--soft);font-size:.8rem;letter-spacing:.03em}
+@media(min-width:760px){.block-carousel .cr-slide{flex-basis:72%}.block-carousel .cr-hint{display:none}}
+/* Progress bars — labeled, animated-in, width set inline (0..100%). */
+.block-progress .pgbars{margin-top:8px;display:flex;flex-direction:column;gap:16px}
+.block-progress .pgb-head{display:flex;justify-content:space-between;font-weight:600;margin-bottom:6px}
+.block-progress .pgb-pct{color:var(--accent)}
+.block-progress .pgb-track{background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;height:12px;overflow:hidden}
+.block-progress .pgb-fill{background:var(--accent);height:100%;border-radius:999px;min-width:2px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
 .teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
 a.teaser-card{text-decoration:none;color:inherit}

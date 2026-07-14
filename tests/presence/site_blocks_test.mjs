@@ -289,6 +289,22 @@ const ctx = { esc, attr, safeHref };
   ok('tabs are zero-JS (no <script>) and exactly the first tab is pre-selected', !/<script/i.test(tabR.html) && tabR.html.includes('id="site-tabs-0" class="tab-radio" checked') && (tabR.html.match(/checked/g) || []).length === 1);
   ok('tabs escape a hostile label (no executable markup survives)', tabR.html.includes('&lt;script&gt;x&lt;/script&gt;') && !tabR.html.includes('<script>x'));
   ok('tabs CSS (hidden radios + hidden panels + checked-reveal) is defined in BLOCK_CSS', /\.block-tabs \.tab-panel\{display:none/.test(BLOCK_CSS) && /\.tab-radio:nth-of-type\(1\):checked~\.tab-panels \.tab-panel:nth-of-type\(1\)/.test(BLOCK_CSS) && /display:block\}/.test(BLOCK_CSS));
+
+  // — carousel: zero-JS scroll-snap slideshow; a slide with no image is dropped —
+  const carR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'carousel', title: 'Our work', slides: [
+    { image_id: G, caption: 'Kitchen **remodel**' }, { image_id: '', caption: 'orphan' }, { image_id: G },
+  ] }]), REF), ctx)[0];
+  ok('carousel renders a scroll-snap track; slides without an image are dropped', carR.html.includes('block-carousel') && carR.html.includes('cr-track') && (carR.html.match(/cr-slide/g) || []).length === 2 && carR.html.includes('/img/a-800.webp'));
+  ok('carousel caption is escaped/rendered + track is keyboard-focusable, zero JS', carR.html.includes('Kitchen') && carR.html.includes('tabindex="0"') && !/<script/i.test(carR.html));
+  ok('carousel CSS (scroll-snap) is in BLOCK_CSS', /scroll-snap-type:x mandatory/.test(BLOCK_CSS));
+  ok('a carousel with zero resolvable images renders nothing', renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'carousel', slides: [{ image_id: '' }] }]), REF), ctx).length === 0);
+
+  // — progress: labeled bars, percent clamped 0..100, ARIA progressbar —
+  const pgR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'progress', title: 'Skills', items: [
+    { label: 'Design', percent: 80 }, { label: 'Speed', percent: 150 }, { label: '', percent: 50 },
+  ] }]), REF), ctx)[0];
+  ok('progress renders labeled bars; empty-label rows dropped; percent clamped to 100', pgR.html.includes('block-progress') && (pgR.html.match(/class="pgb"/g) || []).length === 2 && pgR.html.includes('width:80%') && pgR.html.includes('width:100%') && !pgR.html.includes('width:150%'));
+  ok('progress bars are real ARIA progressbars', pgR.html.includes('role="progressbar"') && pgR.html.includes('aria-valuenow="80"'));
   const colR = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'columns', title: 'Our pillars', columns: [
     { body: 'Fast **service**', image_id: G, button: { label: 'Book', url: 'https://ex.com/b' } },
     { body: '<script>alert(1)</script>', button: { label: 'Bad', url: 'javascript:alert(1)' } },

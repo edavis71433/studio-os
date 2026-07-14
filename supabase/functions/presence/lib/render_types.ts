@@ -158,6 +158,8 @@ export interface SiteBlockImage { type: 'image'; title?: string; image?: MediaRe
 export interface SiteBlockImageText { type: 'image_text'; title?: string; image?: MediaRef | null; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
 export interface SiteBlockAccordion { type: 'accordion'; title?: string; items: Array<{ summary: string; body: string }> }
 export interface SiteBlockTabs { type: 'tabs'; title?: string; tabs: Array<{ label: string; body: string; image?: MediaRef | null }> }
+export interface SiteBlockCarousel { type: 'carousel'; title?: string; slides: Array<{ image: MediaRef | null; caption?: string }> }
+export interface SiteBlockProgress { type: 'progress'; title?: string; items: Array<{ label: string; percent: number }> }
 export interface SiteBlockButtons { type: 'buttons'; title?: string; buttons: Array<{ label: string; url: string; style: 'primary' | 'outline' }> }
 export interface SiteBlockDivider { type: 'divider'; style: 'line' | 'space'; size: 'small' | 'medium' | 'large' }
 // Layout & utility blocks (T-BLOCKS r4). Columns + Cards are MULTI-INSTANCE (like
@@ -205,7 +207,7 @@ export type SiteBlock = WithLook<
   | SiteBlockGallery | SiteBlockBeforeAfter | SiteBlockVideo
   | SiteBlockPartners | SiteBlockReviews | SiteBlockReviewsWall | SiteBlockAppointment | SiteBlockBooking
   | SiteBlockNewsletter | SiteBlockSocial | SiteBlockEvents | SiteBlockMap
-  | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockTabs | SiteBlockButtons | SiteBlockDivider
+  | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockTabs | SiteBlockCarousel | SiteBlockProgress | SiteBlockButtons | SiteBlockDivider
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc
   | FormDefinition
 >;

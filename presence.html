@@ -4489,6 +4489,8 @@ const BLOCK_DEFS = [
   { type: "image_text", name: "Image + text", imageTextSimple: true, hint: "" },
   { type: "accordion", name: "Accordion (expandable)", structured: "accordion", hint: "Add each expandable panel — a short label and the details inside." },
   { type: "tabs", name: "Tabs", structured: "tabs", hint: "Tabbed sections — a row of tabs, each revealing its own text and optional image. Great for services, plans, or FAQs by category. Keyboard-friendly and stacks on phones." },
+  { type: "carousel", name: "Carousel", structured: "carousel", hint: "A swipeable slideshow of images with optional captions. Scrolls smoothly on phones and by keyboard — no code, no plugins." },
+  { type: "progress", name: "Progress bars", structured: "progress", hint: "Labeled bars that fill to a percentage — great for skills, capacity, or “how it’s going”. Add each label and its level." },
   { type: "buttons", name: "Buttons", structured: "buttons", hint: "Up to three clear action links." },
   { type: "divider", name: "Divider / space", dividerSimple: true, hint: "" },
   // Layout & utility (r4). Columns + Cards are MULTI-INSTANCE (like forms) — add several.
@@ -4503,9 +4505,9 @@ const BLOCK_DEFS = [
 //    renamed. Every addable def appears under exactly one header below. ──
 const SECTION_GROUPS = [
   { label: "Show your work", note: "Photos, video and the people behind the work.",
-    types: ["gallery", "before_after", "image", "image_text", "video", "team", "partners"] },
+    types: ["gallery", "carousel", "before_after", "image", "image_text", "video", "team", "partners"] },
   { label: "Build trust", note: "Proof that turns visitors into customers.",
-    types: ["features", "stats", "cards", "reviews_wall", "reviews", "certifications", "pricing", "process"] },
+    types: ["features", "stats", "progress", "cards", "reviews_wall", "reviews", "certifications", "pricing", "process"] },
   { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
     types: ["cta", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
   { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
@@ -4523,7 +4525,7 @@ const SECTION_ALIAS = {
   cta: "banner", appointment: "book / schedule (link out)", booking: "appointments / scheduler", newsletter: "email sign-up", map: "location map",
   service_areas: "service area", events: "calendar", social: "social icons",
   richtext: "text / paragraph", image: "photo", image_text: "image + words",
-  accordion: "expandable / toggle", tabs: "tabbed sections", buttons: "button / link", divider: "spacer / line",
+  accordion: "expandable / toggle", tabs: "tabbed sections", carousel: "slideshow", progress: "skill bars / meters", buttons: "button / link", divider: "spacer / line",
   columns: "columns / grid", cards: "feature cards / tiles", download: "file / PDF", toc: "on this page / jump links",
 };
 // The CORE sections aren't blocks — they're edited in their own tabs. We surface
@@ -4662,6 +4664,8 @@ function emptyBlock(def) {
   if (def.dividerSimple) { b.style = "line"; b.size = "medium"; return b; }
   if (def.structured === "accordion") { b.items = []; return b; }
   if (def.structured === "tabs") { b.tabs = [{ label: "Tab one", body: "" }, { label: "Tab two", body: "" }]; return b; }
+  if (def.structured === "carousel") { b.slides = []; return b; }   // slides added via the picker
+  if (def.structured === "progress") { b.items = [{ label: "", percent: 60 }]; return b; }
   if (def.structured === "buttons") { b.buttons = []; return b; }
   if (def.areasSimple) { b.areas = []; return b; }
   b[def.field] = []; return b;
@@ -5068,6 +5072,10 @@ function renderBlocksCard() {
       renderAccordionBlockBody(blk, idx, sub, ti);
     } else if (def.structured === "tabs") {
       renderTabsBlockBody(blk, idx, sub, ti);
+    } else if (def.structured === "carousel") {
+      renderCarouselBlockBody(blk, idx, sub, ti);
+    } else if (def.structured === "progress") {
+      renderProgressBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.structured === "buttons") {
       renderButtonsBlockBody(blk, idx, sub, ti);
@@ -5449,6 +5457,62 @@ function renderTabsBlockBody(blk, idx, sub, ti) {
     sub.appendChild(add);
   }
   sub.appendChild(el("div", "hint", "Up to 6 tabs. Keyboard-friendly, and they stack neatly on phones — no code, works everywhere."));
+}
+// r3 carousel editor — a swipeable slideshow: each slide is an image + optional caption.
+function renderCarouselBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const slides = Array.isArray(blk.slides) ? blk.slides : (blk.slides = []);
+  slides.forEach((sl, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start";
+    if (sl.image_id) row.appendChild(mediaThumb(sl.image_id));
+    const col = el("div"); col.style.cssText = "flex:1;min-width:0";
+    const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = sl.caption || ""; cap.style.cssText = inputCss;
+    cap.addEventListener("change", () => { blk.slides[k].caption = cap.value.trim() || undefined; });
+    const acts = el("div"); acts.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    const ch = el("button", null, sl.image_id ? "Change image" : "Choose image"); ch.type = "button"; ch.style.cssText = miniBtn;
+    ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { blk.slides[k].image_id = id; renderBlocksCard(); } }); });
+    const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
+    rm.addEventListener("click", () => { commitTitle(); blk.slides.splice(k, 1); renderBlocksCard(); });
+    acts.append(ch, rm);
+    col.append(cap, acts); row.appendChild(col); sub.appendChild(row);
+  });
+  if (slides.length < 12) {
+    const add = el("button", null, "+ Add slide"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].slides = BLOCKS_WORK[idx].slides || []).push({ image_id: id }); renderBlocksCard(); } }); });
+    sub.appendChild(add);
+  }
+  sub.appendChild(el("div", "hint", "Up to 12 slides. Visitors swipe on phones or scroll with the keyboard — no plugins, and every image keeps its alt text."));
+}
+// r3 progress editor — labeled bars, each a label + a 0–100% level.
+function renderProgressBlockBody(blk, idx, sub, ti) {
+  const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+  const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const items = Array.isArray(blk.items) ? blk.items : (blk.items = []);
+  items.forEach((it, k) => {
+    const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
+    const lb = el("input"); lb.type = "text"; lb.placeholder = "Label (e.g. Design, Capacity)"; lb.value = it.label || ""; lb.style.cssText = "flex:1;min-width:140px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box";
+    const pctWrap = el("label", "hint", ""); pctWrap.style.cssText = "display:flex;align-items:center;gap:6px";
+    const pct = el("input"); pct.type = "number"; pct.min = "0"; pct.max = "100"; pct.value = String(typeof it.percent === "number" ? it.percent : 60);
+    pct.style.cssText = "width:74px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
+    pctWrap.append(pct, el("span", "hint", "%"));
+    const commit = () => { blk.items[k] = { label: lb.value.trim(), percent: Math.max(0, Math.min(100, parseInt(pct.value, 10) || 0)) }; };
+    lb.addEventListener("change", commit); pct.addEventListener("change", commit);
+    row.append(lb, pctWrap);
+    if (items.length > 1) {
+      const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
+      rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+      row.appendChild(rm);
+    }
+    sub.appendChild(row);
+  });
+  if (items.length < 8) {
+    const add = el("button", null, "+ Add bar"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); (BLOCKS_WORK[idx].items = BLOCKS_WORK[idx].items || []).push({ label: "", percent: 60 }); renderBlocksCard(); });
+    sub.appendChild(add);
+  }
+  sub.appendChild(el("div", "hint", "Up to 8 bars. Each is a real labeled progress meter — screen-reader friendly."));
 }
 // r3 buttons editor — up to three real action links (label + url + look).
 function renderButtonsBlockBody(blk, idx, sub, ti) {
@@ -6023,7 +6087,7 @@ const TRAY_TYPE_ICON = {
   gallery: "🖼", before_after: "🔀", image: "🖼", image_text: "🖽", video: "▶", team: "👥", partners: "🏷",
   features: "✦", stats: "№", cards: "▤", reviews_wall: "★", reviews: "★", certifications: "✔", pricing: "＄", process: "⇢",
   cta: "❗", buttons: "🔘", booking: "🗓", appointment: "🗓", newsletter: "✉", download: "⭳", map: "📍",
-  richtext: "¶", columns: "▥", accordion: "▾", tabs: "🗂", divider: "―", toc: "☰", service_areas: "📍", events: "📅", social: "◎",
+  richtext: "¶", columns: "▥", accordion: "▾", tabs: "🗂", carousel: "🎠", progress: "▰", divider: "―", toc: "☰", service_areas: "📍", events: "📅", social: "◎",
 };
 // PURE + self-contained (no globals) so it can be unit-tested by extraction: does a
 // section (its name / familiar-alias / type) match a plain-text search query?
