@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Customers — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Your customers — everyone you deliver work for, in one list.">
+<style>
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:720px;margin:0 auto;padding:34px 20px 90px}
+  h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,30px);margin:6px 0 3px}
+  .sub{color:var(--soft);font-size:14.5px;margin:0 0 20px}
+  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:16px}
+  .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .cust{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:11px}
+  .cust:hover{border-color:var(--p)}
+  .crow{display:flex;align-items:center;gap:14px}
+  .av{width:38px;height:38px;border-radius:10px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+  .n{font-weight:600;font-size:15px}
+  .m{font-size:12.5px;color:var(--faint)}
+  .badge{margin-left:auto;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .badge.wait{color:var(--warn);background:var(--warn-soft)} .badge.ok{color:var(--good);background:var(--good-soft)}
+  .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .pill.complete{background:var(--good-soft);color:var(--good)}
+  .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
+  .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn:hover{filter:brightness(1.05)}
+  .center{text-align:center;padding:52px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .muted{color:var(--soft);font-size:14.5px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script>
+// Customers roster (FIX 6): the studio's list of the customers it delivers work
+// for. Fed by /studio/customers (studio-side, tenant-scoped to the operator's own
+// site via the Agency–Client Bridge). "Open" routes to that customer's project
+// delivery view; "Manage their website" is the clearly-secondary website action.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
+// keep any agency drill-in scope on internal links
+function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
+let TOKEN="",CUSTOMERS=[];
+
+function openCustomer(c){
+  if(!c)return;
+  // FIX 7: opening a customer goes to YOUR delivery view (message thread, Share a
+  // file, approvals, support) on the STUDIO's own site — not the customer's website.
+  if(c.project_id){location.href='/projects.html?project='+encodeURIComponent(c.project_id)+(scope()?'&client='+encodeURIComponent(scope()):'');}
+  else if(c.customer_site_id){location.href='/today.html?client='+encodeURIComponent(c.customer_site_id);}
+}
+function manageSite(c){ if(c.customer_site_id) location.href='/today.html?client='+encodeURIComponent(c.customer_site_id); }
+
+function render(filter){
+  const q=(filter||'').toLowerCase();
+  const list=CUSTOMERS.filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
+  let h=`<h1>Customers</h1><p class="sub">${CUSTOMERS.length} ${CUSTOMERS.length===1?'customer':'customers'} you deliver work for. Open one to manage their project, messages, files, and approvals.</p>`;
+  h+=`<input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(filter||'')}">`;
+  if(!list.length){
+    h+=`<div class="center"><h2>${CUSTOMERS.length?'No customers match that.':'You haven’t added a customer yet.'}</h2><p class="muted">${CUSTOMERS.length?'Try a different name or email.':'When you convert an enquiry or add a customer, they’ll appear here — with everything you deliver for them in one place.'}</p>${CUSTOMERS.length?'':`<p style="margin-top:18px"><a class="link" href="${esc(scoped('/pipeline.html'))}">Go to your sales pipeline →</a></p>`}</div>`;
+    $('main').innerHTML=h; const s=$('search'); if(s) s.addEventListener('input',()=>render(s.value)); return;
+  }
+  for(const c of list){
+    const att=Number(c.open_support||0);
+    const st=String(c.status||'active');
+    h+=`<div class="cust"><div class="crow"><span class="av">${esc(initial(c.name))}</span>
+      <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${esc(c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span>
+      <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></div>
+      <div class="acts"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span>
+        <span style="flex:1"></span>
+        <button class="btn" data-open="${esc(c.client_id)}">Open</button>
+        ${c.customer_site_id?`<button class="btn ghost" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</div></div>`;
+  }
+  $('main').innerHTML=h;
+  const s=$('search'); if(s) s.addEventListener('input',()=>render(s.value));
+  const byId={}; CUSTOMERS.forEach(c=>byId[c.client_id]=c);
+  document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openCustomer(byId[b.getAttribute('data-open')])));
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',()=>manageSite(byId[b.getAttribute('data-web')])));
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your customers.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function notStudio(){$('main').innerHTML=`<div class="center"><h2>This is your studio’s customer list.</h2><p class="muted">It’s available to your studio team.</p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your customers just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+
+(async function(){
+  try{
+    const {data}=await sb.auth.getSession();
+    TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    const r=await api('/studio/customers');
+    if(r.status===401){signedOut();return;}
+    if(r.status===403){notStudio();return;}
+    if(!r.ok){trouble();return;}
+    CUSTOMERS=Array.isArray(r.body.data)?r.body.data:[];
+    render('');
+  }catch(_){trouble();}
+})();
+</script>
+</body>
+</html>

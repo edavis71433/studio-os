@@ -38,10 +38,13 @@
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
   .prog{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px}
   .prog>i{display:block;height:100%;background:var(--p)}
-  dialog{border:none;border-radius:16px;padding:0;max-width:640px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
-  dialog::backdrop{background:rgba(27,21,37,.4)}
+  /* FIX D: the detail is a full-page in-page view (not a modal). It sits in the
+     normal document flow inside its own .wrap, so the page scrolls naturally. */
+  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow,0 1px 2px rgba(27,21,37,.05));overflow:hidden}
   .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
-  .dbody{padding:18px 20px;max-height:70vh;overflow:auto}
+  .dbody{padding:18px 20px}
+  .backbar{padding:14px 16px 0}
+  .backbar .btn{padding:8px 14px}
   .sec{margin-top:18px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
   .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
   .item:last-child{border-bottom:none}
@@ -68,13 +71,20 @@
 <script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="listWrap">
   <h1>Projects</h1>
   <div class="sub" id="sub">The work you do for your customers — tasks, files, and approvals in one place.</div>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by status"></div>
   <div class="bar"><button class="btn" id="newProject" hidden>+ New project</button><span class="spacer"></span></div>
+  <!-- FIX 5: project-less client requests are studio-wide (they belong to no single
+       project) — surface them here so they're never silently dropped. -->
+  <div id="clientMsgs"></div>
   <div id="list" aria-live="polite"></div>
 </div>
+
+<!-- FIX D: the project detail opens as a FULL-SCREEN in-page view (same tab), not a
+     cramped modal overlay — matching the "editing opens full-screen" preference. -->
+<div class="wrap" id="detailWrap" hidden><div id="detailInner"></div></div>
 
 <dialog id="newDlg" aria-label="New project">
   <form id="newForm" class="dbody" style="max-height:none">
@@ -95,8 +105,6 @@
     </div>
   </form>
 </dialog>
-
-<dialog id="detail" aria-label="Project detail"><div id="detailInner"></div></dialog>
 
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
@@ -185,13 +193,17 @@ function miniForm(host, fields, onSubmit){
   setTimeout(()=>{const first=f.querySelector('input,textarea,select'); if(first)first.focus();},20);
 }
 
+// FIX D: show/hide the full-screen detail view (in-page, same tab) — the list and
+// the detail are two panels of the ONE page; only one is visible at a time.
+function showDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(l)l.hidden=true; if(d)d.hidden=false; window.scrollTo(0,0); }
+function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=true; if(l)l.hidden=false; }
+function closeProjectDetail(){ hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():'')); const c=document.querySelector('#list .card'); if(c)c.focus(); }
 async function openProject(id){
   history.replaceState(null,'','?project='+id+(scope()?'&client='+scope():''));
-  // a11y: in-dialog actions re-open the same project to refresh. Remember whether the
-  // dialog was already up so we can restore keyboard focus after the re-render (and
-  // never call showModal() on an open dialog — that throws).
-  const dlg=$('detail'); const wasOpen=dlg.open;
-  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; if(!wasOpen)dlg.showModal();
+  // a11y: in-view actions re-open the same project to refresh. Remember whether the
+  // detail was already showing so we can restore keyboard focus after the re-render.
+  const wasOpen=!$('detailWrap').hidden;
+  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
     const p=data.project; STUDIO=data.is_studio_view!==false;
@@ -203,9 +215,9 @@ async function openProject(id){
     const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="mut">No files yet.</div>';
     const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="mut">No approvals yet.</div>';
     $('detailInner').innerHTML=`
+      <div class="backbar"><button class="btn ghost sm" id="closeDetail">← Back to projects</button></div>
       <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px" id="dtitle" tabindex="-1">${esc(p.name)}</div>
-        <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div>
-        <button class="btn ghost sm" id="closeDetail">Close</button></div>
+        <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div></div>
       <div class="dbody">
         ${rp?`<div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div>${rp.csat?`<div><b>${rp.csat.average}★</b><span>CSAT · ${rp.csat.count}</span></div>`:''}</div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div>`:''}
         ${STUDIO&&statusBtns?`<div class="sec"><h3>Status</h3><div class="steps">${statusBtns}</div></div>`:''}
@@ -217,7 +229,7 @@ async function openProject(id){
         <div class="sec"><h3>Support</h3><div id="supList" class="mut">Loading…</div></div>`:''}
         <div class="sec"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
       </div>`;
-    $('closeDetail').onclick=()=>{dlg.close();history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():''));};
+    $('closeDetail').onclick=closeProjectDetail;
     // status
     $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
     // milestones
@@ -237,7 +249,7 @@ async function openProject(id){
     loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);}
     // a11y: the re-render replaced whatever control had focus — land on the dialog title
     if(wasOpen){const t=$('dtitle');if(t)t.focus();}
-  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="document.getElementById(\'detail\').close()">Close</button></div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></div>'; }
 }
 
 async function shareFile(id){
@@ -305,13 +317,56 @@ async function openStudioSupport(rid,pid){
   }catch(e){ toast('Couldn’t open that request.',true); }
 }
 
+// FIX 5: project-less client support requests belong to no single project, so the
+// per-project detail can never show them. Surface them studio-wide on the list page;
+// each opens a full-screen conversation you can reply to.
+async function loadClientMessages(){
+  if(!STUDIO){$('clientMsgs').innerHTML='';return;} const host=$('clientMsgs'); if(!host)return;
+  try{
+    const {data}=await api('/support');
+    const pless=(data||[]).filter(r=>!r.project_id&&r.status!=='resolved'&&r.status!=='closed');
+    if(!pless.length){host.innerHTML='';return;}
+    host.innerHTML=`<h2 style="font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:6px 0 10px">Client messages</h2>`+
+      pless.map(r=>`<div class="card" data-support="${r.id}" tabindex="0" role="button"><div><div class="t">${esc(r.subject||'Support request')}</div><div class="m">General request · ${esc((r.status||'open').replace('_',' '))}</div></div><span class="pill">reply</span></div>`).join('');
+    host.querySelectorAll('[data-support]').forEach(c=>{const open=()=>openStudioSupportFull(c.dataset.support);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
+  }catch(_){host.innerHTML='';}
+}
+// A project-less client request, opened as its own full-screen conversation (same
+// full-page treatment as a project) — read the thread and reply, or resolve it.
+async function openStudioSupportFull(rid){
+  history.replaceState(null,'','?support='+rid+(scope()?'&client='+scope():''));
+  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
+  try{
+    const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]);
+    const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
+    const resolved=rq.status==='resolved'||rq.status==='closed';
+    const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
+    const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
+    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
+    const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
+    const pickerHtml=replies.length?`<select id="srf-canned-${rid}" aria-label="Insert a saved reply" style="margin-bottom:6px"><option value="">Insert a saved reply…</option>${replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select>`:'';
+    $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost sm" id="closeDetail">← Back to projects</button></div>
+      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px" id="dtitle" tabindex="-1">${esc(rq.subject||'Client message')}</div><div class="mut"><span class="pill">${esc(rq.status||'open')}</span> · a general request (not tied to a project)</div></div></div>
+      <div class="dbody"><div class="sec"><h3>Conversation</h3>${rowsHtml}</div>
+      ${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="srf-reply"><label for="srf-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="srf-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button><button class="btn ghost sm" type="button" id="srf-res">Resolve</button></div></form>`}</div>`;
+    $('closeDetail').onclick=closeProjectDetail;
+    const t=$('dtitle'); if(t)t.focus();
+    const sta=$('srf-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta);
+    const cn=$('srf-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
+    const rf=$('srf-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupportFull(rid);}catch(err){toast(nice(err),true);}};
+    const rb=$('srf-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');closeProjectDetail();loadClientMessages();}catch(e){toast(nice(e),true);}};
+  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></div>'; }
+}
+
 (async function(){
   try{
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/studio.html">sign in</a> to see your projects.</p>'; return; }
-    renderFilters(); await load();
-    const deep=new URLSearchParams(location.search).get('project'); if(deep) openProject(deep);
+    renderFilters(); await load(); loadClientMessages();
+    const params=new URLSearchParams(location.search);
+    const deep=params.get('project'); if(deep) openProject(deep);
+    const sup=params.get('support'); if(sup) openStudioSupportFull(sup);
   }catch(_){ $('list').innerHTML='<p class="mut">We couldn’t load your projects just now.</p>'; }
 })();
 </script>

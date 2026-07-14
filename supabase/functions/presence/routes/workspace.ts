@@ -317,7 +317,42 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       }
     } catch { /* best-effort — the bell still works without this row */ }
   }
-  return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last } }, 200, cors);
+  // FIX 5: a FIRST-CLASS "Messages from your clients" section for the studio inbox.
+  // Client support requests + client project messages were only reachable through a
+  // dim, auto-marked-read "Project activity" line; a project-less request showed
+  // nowhere actionable. Surface them prominently here, each linking to WHERE the
+  // operator replies (the customer's delivery view, or the project-less request).
+  // Deliberately NOT tied to the per-reader last-seen mark, so opening the Inbox
+  // never clears them — an OPEN support request persists until resolved, and a
+  // client message persists until the studio actually replies (the latest message
+  // in the thread is no longer the client's). Owner/operator surfaces only.
+  let client_messages: any[] = [];
+  if (seesFull) {
+    try {
+      const [supR, evR] = await Promise.all([
+        svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,updated_at&order=updated_at.desc&limit=25`),
+        // kind=message events carry detail.from ('client'|'studio') — stamped by the
+        // client door — so we can tell whose turn it is without the author_kind
+        // ambiguity (a solo owner and their customer are both 'client').
+        svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=project_id,detail,created_at&order=created_at.desc&limit=100`),
+      ]);
+      // the latest message per project; a project "needs a reply" when that latest
+      // message came from the client (clears automatically once the studio answers).
+      const latest = new Map<string, any>();
+      for (const e of ((evR.json as any[]) || [])) { const pid = String(e.project_id || ''); if (pid && !latest.has(pid)) latest.set(pid, e); }
+      const needReply: Array<{ project_id: string; created_at: string }> = [];
+      for (const [pid, e] of latest) { if ((e.detail || {}).from === 'client') needReply.push({ project_id: pid, created_at: e.created_at }); }
+      const sup = ((supR.json as any[]) || []);
+      const pids = [...new Set([...sup.filter((r) => r.project_id).map((r) => String(r.project_id)), ...needReply.map((n) => n.project_id)])];
+      const nameById: Record<string, string> = {};
+      if (pids.length) { for (const p of (((await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name`)).json as any[]) || [])) nameById[String(p.id)] = String(p.name || ''); }
+      for (const r of sup) client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: r.project_id ? (nameById[String(r.project_id)] || '') : '', created_at: r.updated_at, href: r.project_id ? `/projects.html?project=${r.project_id}` : `/projects.html?support=${r.id}` });
+      for (const n of needReply) client_messages.push({ type: 'message', project: nameById[n.project_id] || '', created_at: n.created_at, href: `/projects.html?project=${n.project_id}` });
+      client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      client_messages = client_messages.slice(0, 20);
+    } catch { /* best-effort — the inbox still renders without this section */ }
+  }
+  return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last, client_messages } }, 200, cors);
 }
 
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

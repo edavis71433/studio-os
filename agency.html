@@ -67,7 +67,7 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // styled toast via the shared shell (replaces native alert()); bad→error styling
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
-let TOKEN="",ME=null,CLIENTS=[],ACTING=null;
+let TOKEN="",ME=null,CLIENTS=[],ACTING=null,PROJECT_BY_SITE={};
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
@@ -90,9 +90,14 @@ function renderList(filter){
     const si=Number(c.search_issues||0); if(si) bits.push(`${si} search issue${si===1?'':'s'}`);
     if(c.billing_issue) bits.push('billing needs a look');
     const statusLine=bits.length?`<br><span class="m" style="color:var(--warn);font-family:var(--sans)">${esc(bits.join(' · '))}</span>`:'';
-    html+=`<button class="client" data-open="${esc(c.site_id)}"><span class="av">${esc(initial(c.name))}</span>
+    const hasProject=!!PROJECT_BY_SITE[c.site_id];
+    html+=`<div style="margin-bottom:10px"><button class="client" style="margin-bottom:0" data-open="${esc(c.site_id)}"><span class="av">${esc(initial(c.name))}</span>
       <span><span class="n">${esc(c.name||'(unnamed)')}</span><br><span class="m">${esc(c.edition||'presence')} · ${esc(c.status||'')}</span>${statusLine}</span>
       <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
+    // FIX 7: opening a client goes to your DELIVERY view (project thread, files,
+    // approvals, support). Managing their website is a clearly-secondary action.
+    if(hasProject) html+=`<div style="text-align:right;margin-top:5px"><button data-web="${esc(c.site_id)}" style="background:none;border:none;color:var(--p);font-weight:600;font-size:12.5px;cursor:pointer;padding:2px 4px">Manage their website →</button></div>`;
+    html+=`</div>`;
   }
   // ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
   html+=`<div class="detail" style="margin-top:18px"><div class="card"><div class="stat" style="margin-bottom:6px">Starter kits</div>
@@ -111,6 +116,7 @@ function renderList(filter){
   $('main').innerHTML=html;
   const s=$('search'); if(s) s.addEventListener('input',()=>renderList(s.value));
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openClient(b.getAttribute('data-open'))));
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',()=>{location.href='/today.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
   loadKits();
 }
 let KITS=[];
@@ -136,11 +142,16 @@ async function loadKits(){
     });
   }catch(_){host.textContent='Kits wouldn’t load just now.';}
 }
-// SC-1: opening a client drills the WHOLE shell into that client's scope. The
-// scope rides the URL (?client=<id>) — per-tab, shareable, refresh-safe — and the
-// server re-validates it on every request (fail-closed). No app switch, one shell.
+// FIX 7: opening a client goes to that customer's DELIVERY view — the project
+// thread, Share-a-file, approvals and support on the STUDIO's own site — which is
+// where the work FOR the customer actually lives. Only when the client has no
+// delivery project (e.g. a plain managed-website client) do we fall back to their
+// website cockpit (today.html?client=<their site>), which is also the explicit
+// "Manage their website" secondary action.
 function openClient(siteId){
   const c = CLIENTS.find(x=>x.site_id===siteId); if(!c) return;
+  const pid = PROJECT_BY_SITE[siteId];
+  if(pid){ location.href = '/projects.html?project=' + encodeURIComponent(pid); return; }
   location.href = '/today.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
@@ -157,6 +168,12 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
     ME=me.body.data||{};
     const pf=await api('/agency/portfolio');
     CLIENTS=(pf.ok&&Array.isArray(pf.body.data))?pf.body.data:[];
+    // FIX 7: map each customer's own site → their delivery project id, so opening a
+    // client from the portfolio lands on the delivery view (not their website).
+    try{ const cust=await api('/studio/customers');
+      const clist=(cust.ok&&Array.isArray(cust.body.data))?cust.body.data:[];
+      PROJECT_BY_SITE={}; clist.forEach(c=>{ if(c.customer_site_id&&c.project_id) PROJECT_BY_SITE[c.customer_site_id]=c.project_id; });
+    }catch(_){/* the portfolio still opens (falls back to the website cockpit) */}
     renderList('');
     mountQueues();   // "what needs me today" — the cross-client morning cockpit
     mountHealthDoor();   // staff-only doorway to the platform Health Center

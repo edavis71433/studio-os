@@ -31,7 +31,7 @@ import { handleProjects, handleProject, handleProjectReport, handleProjectStatus
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
-import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientServices } from './routes/client_delivery.ts';
+import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientServices, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
@@ -711,6 +711,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // P2-D-3: notifications (derived from the activity log + a per-reader last-seen)
   if (route === '/notifications' && method === 'GET') return handleNotifications(req, jwt, site, principal, cors);
   if (route === '/notifications/read' && method === 'POST') return handleNotificationsRead(req, jwt, site, principal, cors);
+  // FIX 6: the operator's roster of THIS studio's customers (studio-side; site-scoped
+  // to the operator's own site via the Agency–Client Bridge). Powers customers.html.
+  if (route === '/studio/customers' && method === 'GET') return handleStudioCustomers(req, jwt, site, principal, cors);
   // ── P2-D hardening: the CLIENT App's service-delivery view (Agency–Client
   //    Bridge). The customer is on THEIR OWN site; every action resolves their
   //    client + verifies a service_link before touching agency-site data. ──

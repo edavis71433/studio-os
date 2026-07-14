@@ -14,6 +14,7 @@ import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, rep
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
+import { isStudioSide, studioDenied } from './projects.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -381,4 +382,55 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (reqRow.project_id) await clientEvent(s, reqRow.project_id, 'support_message', principal, { request_id: id });
   return json({ data: rows(ins)[0] }, 201, cors);
+}
+
+// ═══ STUDIO ROSTER (operator side): THIS studio's customers ═══
+// FIX 6: the operator's LIST of the customers they serve — the roster the primary
+// "Customers" nav needs. Resolved from the ACTIVE service-links on the operator's
+// OWN site (agency_site_id = this site), so it is strictly tenant-safe: only
+// customers linked to THIS studio are returned, and the global `clients` table is
+// read ONLY for ids already proven to belong here via the bridge. Studio-side only
+// (a client_reviewer never reaches the workspace). One row per customer, carrying
+// enough to render a roster + route straight to that customer's delivery project.
+export async function handleStudioCustomers(_req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (!(await isStudioSide(jwt, site, principal))) return studioDenied(cors);
+  const links = rows(await svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id,customer_site_id,created_at&order=created_at.desc&limit=500`));
+  if (!links.length) return json({ data: [] }, 200, cors);
+  const clientIds = [...new Set(links.map((l) => l.customer_client_id).filter(Boolean).map(String))];
+  const projectIds = [...new Set(links.map((l) => l.project_id).filter(Boolean).map(String))];
+  const [clientsR, projectsR, supR] = await Promise.all([
+    clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email`) : Promise.resolve({ json: [] }),
+    projectIds.length ? svc(`presence_projects?id=in.(${projectIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status`) : Promise.resolve({ json: [] }),
+    svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,project_id&limit=500`),
+  ]);
+  const clientById: Record<string, any> = {}; for (const c of rows(clientsR)) clientById[String(c.id)] = c;
+  const projectById: Record<string, any> = {}; for (const p of rows(projectsR)) projectById[String(p.id)] = p;
+  const supportByProject: Record<string, number> = {};
+  for (const sreq of rows(supR)) { const pid = sreq.project_id ? String(sreq.project_id) : ''; if (pid) supportByProject[pid] = (supportByProject[pid] || 0) + 1; }
+  // group by customer — the newest link is the primary project; sum open support
+  // across ALL their projects so the roster shows one honest "needs you" count.
+  const byCustomer = new Map<string, any>();
+  for (const l of links) {
+    const cid = l.customer_client_id ? String(l.customer_client_id) : '';
+    if (!cid) continue;
+    if (!byCustomer.has(cid)) {
+      const c = clientById[cid] || {};
+      const proj = projectById[String(l.project_id)] || null;
+      byCustomer.set(cid, {
+        client_id: cid,
+        name: clean(c.name, 200) || 'Customer',
+        email: clean(c.email, 200),
+        project_id: l.project_id || null,
+        project_name: proj ? clean(proj.name, 200) : '',
+        status: proj ? proj.status : 'active',
+        customer_site_id: l.customer_site_id || null,
+        open_support: 0,
+        project_count: 0,
+      });
+    }
+    const row = byCustomer.get(cid);
+    row.project_count += 1;
+    row.open_support += supportByProject[String(l.project_id)] || 0;
+  }
+  return json({ data: [...byCustomer.values()] }, 200, cors);
 }

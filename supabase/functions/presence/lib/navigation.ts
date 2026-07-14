@@ -81,8 +81,11 @@ export function buildNav(c: NavContext): NavSection[] {
 
   // Customers — the relationship area (internally: the CRM). Leads + the P2-C
   // sales Pipeline fold in here as sub-items (the primary bar stays outcomes-only).
+  // FIX 6: the primary "Customers" item opens the ROSTER of this studio's customers
+  // (customers.html), not the single-client CRM detail (which un-scoped showed the
+  // owner his OWN profile). Opening a customer from the roster re-scopes into them.
   if (f.hasRelationship) {
-    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/crm.html' }];
+    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html' }];
     customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html' });
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html' });
     customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });

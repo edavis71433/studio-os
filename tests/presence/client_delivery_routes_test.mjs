@@ -27,8 +27,10 @@ ok('bridge: linksForCustomer / linkForCustomerProject filter by customer_client_
   const tables = ['presence_projects', 'presence_milestones', 'presence_tasks', 'presence_project_events', 'presence_deliverables', 'presence_approvals', 'presence_surveys', 'presence_survey_responses', 'presence_project_messages', 'presence_support_requests', 'presence_support_messages'];
   for (const t of tables) {
     const uses = cd.match(new RegExp(`${t}\\?[^\\\`]*`, 'g')) || [];
-    // every read is scoped to the bridge's agency site (site_id=eq.${s} / agency_site_id) OR an on_conflict upsert
-    const unscoped = uses.filter((u) => !/site_id=eq\.\$\{(s|found\.link\.agency_site_id|links\[0\]\.agency_site_id|agencySiteId)\}/.test(u) && !/site_id=in\.|on_conflict|id=in\.\(\$\{ids/.test(u)); // id=in.(linked ids) is bridge-verified
+    // every read is scoped to the bridge's agency site (site_id=eq.${s} / agency_site_id)
+    // OR — for the studio-side roster (FIX 6, handleStudioCustomers) — to the operator's
+    // OWN site (site_id=eq.${site.id}); both are tenant-safe. OR an on_conflict upsert.
+    const unscoped = uses.filter((u) => !/site_id=eq\.\$\{(s|site\.id|found\.link\.agency_site_id|links\[0\]\.agency_site_id|agencySiteId)\}/.test(u) && !/site_id=in\.|on_conflict|id=in\.\(\$\{ids/.test(u)); // id=in.(linked ids) is bridge-verified
     ok(`scope: every ${t} query is scoped to the verified agency site (${uses.length})`, unscoped.length === 0, unscoped[0] || '');
   }
 }
@@ -45,6 +47,13 @@ ok('scope: client support sees ONLY its own requests (requester match)', /r\.req
 
 // ── wiring + migration ──
 ok('wiring: /client/* dispatched (projects/report/messages/download/decide/respond/notifications/support)', ['handleClientProjects', 'handleClientProject', 'handleClientReport', 'handleClientMessages', 'handleClientDeliverableDownload', 'handleClientApprovalDecide', 'handleClientSurveyRespond', 'handleClientNotifications', 'handleClientSupport'].every((h) => idx.includes(h + '(')));
+
+// ── FIX 6: the studio-side customer roster (operator's own list of customers) ──
+ok('roster: handleStudioCustomers is studio-gated (isStudioSide else studioDenied)', /export async function handleStudioCustomers[\s\S]*?if \(!\(await isStudioSide\(jwt, site, principal\)\)\) return studioDenied/.test(cd));
+ok('roster: resolves customers from ACTIVE links on the operator’s OWN site (agency_site_id=eq.${site.id})', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active/.test(cd));
+ok('roster: reads the global clients table ONLY for ids proven to belong here (id=in.(clientIds))', /clients\?id=in\.\(\$\{clientIds\.join/.test(cd));
+ok('roster: returns one row per customer with a project id to route into delivery', /project_id: l\.project_id/.test(cd) && /byCustomer/.test(cd));
+ok('roster: GET /studio/customers is wired', /route === '\/studio\/customers' && method === 'GET'\) return handleStudioCustomers\(/.test(idx));
 ok('migration: presence_service_links site-scoped, RLS, UNIQUE(project_id)', /create table if not exists public\.presence_service_links[\s\S]*?agency_site_id uuid not null references public\.presence_sites/.test(mig) && /presence_service_links_project_uq[\s\S]*?\(project_id\)/.test(mig) && /alter table public\.presence_service_links enable row level security/.test(mig));
 ok('migration: D3 support recent index added', /presence_support_site_recent_idx/.test(mig));
 ok('migration: rollback present', /drop table if exists public\.presence_service_links;/.test(mig));
