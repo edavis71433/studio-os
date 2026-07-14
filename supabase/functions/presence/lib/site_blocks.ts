@@ -63,6 +63,10 @@ const MULTI = new Set<string>(['form', 'columns', 'cards']);
 // duplicate a page-wide singleton (the on-this-page contents list; the reviews wall
 // that also feeds the page's single AggregateRating schema node). Only THESE dedupe.
 const SINGLETON = new Set<string>(['toc', 'reviews_wall']);
+// #184: types that may NOT be nested inside a column cell — the containers/multi blocks
+// (which would allow container-in-container / id-collision) and the page-level toc.
+// Everything else (text AND media: image, video, gallery, carousel, …) is allowed.
+const NOT_IN_CELL = new Set<string>(['columns', 'cards', 'form', 'toc']);
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 // Prose sanitizer: like s() but PRESERVES newlines (markdown structure) — collapses
@@ -113,7 +117,7 @@ interface StoredImageText { type: 'image_text'; title?: string; image_id?: strin
 // Layout & utility staples (T-BLOCKS r4). Columns/cards carry media by ID (resolved
 // by resolveBlockMedia) + a stable id (multi-instance). Download carries one file id.
 // Toc carries no media/id — its list is derived at render from sibling headings.
-interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string }; span?: number }> }
+interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string }; span?: number; block?: StoredBlock }> }
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
 interface StoredTabs { type: 'tabs'; title?: string; tabs: Array<{ label: string; body: string; image_id?: string }> }
 interface StoredCarousel { type: 'carousel'; title?: string; slides: Array<{ image_id: string; caption?: string }> }
@@ -378,8 +382,16 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
           const bl = s(c?.button?.label, 40), bu = s(c?.button?.url, 300);
           if (bl && bu) col.button = { label: bl, url: bu };   // url validated by safeHref at render
           const span = clampSpan(c?.span); if (span !== undefined) col.span = span;   // 12-grid width (optional)
+          // #184: a cell may instead hold a nested COMPONENT (any block except the
+          // container/multi ones + toc, so there's never container-in-container). It's
+          // validated by the SAME validateBlocks, so a nested image/video/gallery is a
+          // real, safe, media-resolvable block — just like a top-level one.
+          if (c?.block && typeof c.block === 'object' && !NOT_IN_CELL.has(String((c.block as any).type))) {
+            const nested = validateBlocks([c.block]);
+            if (nested[0]) col.block = nested[0];
+          }
           return col;
-        }).filter((c) => c.body || c.image_id || c.button).slice(0, CAP.columns);
+        }).filter((c) => c.body || c.image_id || c.button || c.block).slice(0, CAP.columns);
         // A single-column layout container is valid (Adobe allows 1..N). Only spans
         // are additive: columns with no span keep the original equal-width behavior.
         if (cols.length >= 1) block = { type: 'columns', id: uniqueId('columns', (b as any).id, 'columns'), title, columns: cols };
@@ -520,7 +532,14 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
         break;
       }
       case 'columns':   // prose/button ride through; each column's image resolves (or drops to null)
-        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => ({ body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button, span: c.span })), ...lk(b) });
+        out.push({ type: 'columns', id: b.id, title: b.title, columns: b.columns.map((c) => {
+          const cell: SiteBlockColumns['columns'][number] = { body: c.body, image: c.image_id ? ref(c.image_id) : null, button: c.button, span: c.span };
+          // #184: a nested cell component resolves its OWN media through the same ref()
+          // (one media pipeline). If it resolves to nothing (e.g. an image whose media is
+          // gone), the cell simply falls back to its body/image/button.
+          if (c.block) { const rb = resolveBlockMedia([c.block], ref, extras)[0]; if (rb) cell.block = rb; }
+          return cell;
+        }), ...lk(b) });
         break;
       case 'tabs':   // each tab's body/label ride through; optional image resolves (or null)
         out.push({ type: 'tabs', title: b.title, tabs: b.tabs.map((t) => ({ label: t.label, body: t.body, image: t.image_id ? ref(t.image_id) : null })), ...lk(b) });
@@ -997,6 +1016,10 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       }
       case 'columns': {   // Layout Container — a responsive grid that stacks < 620px
         const cells = b.columns.map((c) => {
+          // #184: a cell holding a nested COMPONENT renders it (recursively, via the
+          // SAME engine — never a container, so recursion is bounded). Falls back to the
+          // classic body/image/button stack when there's no nested block.
+          if (c.block) { const nested = renderSiteBlocks([c.block], ctx); if (nested[0] && nested[0].html) return { inner: `<div class="col-block">${nested[0].html}</div>`, span: c.span }; }
           const prose = c.body ? renderMarkdown(c.body) : '';
           const img = c.image ? `<div class="col-media">${blockImg(c.image, esc, attr, '(max-width:620px) 100vw, 320px')}</div>` : '';
           const href = c.button ? safeHref(c.button.url) : null;
@@ -1254,6 +1277,10 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .block-columns .cols{display:grid;gap:24px;grid-template-columns:1fr;margin-top:6px}
 .block-columns .col-media img{width:100%;border-radius:10px;display:block;margin-bottom:10px}
 .block-columns .col .prose{max-width:none}
+.block-columns .col-block>.block{padding-top:0;padding-bottom:0}
+.block-columns .col-block .wrap{padding-left:0;padding-right:0;max-width:none;margin:0}
+.block-columns .col-block section:first-child{margin-top:0}
+.block-columns .col-block h2{margin-top:0}
 .block-columns .col-cta{margin:12px 0 0}
 @media(min-width:620px){.block-columns .cols[data-cols="2"]{grid-template-columns:1fr 1fr}.block-columns .cols[data-cols="3"]{grid-template-columns:repeat(3,1fr)}}
 /* Layout Container: a 12-unit responsive grid. Each cell spans data-span units on

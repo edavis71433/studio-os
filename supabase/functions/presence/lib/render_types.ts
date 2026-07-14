@@ -184,7 +184,13 @@ export interface SiteBlockDivider { type: 'divider'; style: 'line' | 'space'; si
 // stacks to one column on mobile. Cards: a repeatable teaser grid (image + heading +
 // text + optional link). Download: an accessible link to a media-library file. Toc:
 // an auto-built "On this page" jump list, computed at render from section headings.
-export interface SiteBlockColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image?: MediaRef | null; button?: { label: string; url: string }; span?: number }> }
+// A column cell holds a small stack (markdown body + optional image + button) OR a
+// nested COMPONENT (`block`) dropped into it — the AEM "drop a component into a
+// container" idea. A nested block can be almost anything, INCLUDING media (image,
+// gallery, video, carousel — their media resolves through the same pipeline). The ONLY
+// exclusions are the container/multi blocks (columns, cards, form) and the page-level
+// toc, so there is never container-in-container nesting.
+export interface SiteBlockColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image?: MediaRef | null; button?: { label: string; url: string }; span?: number; block?: SiteBlock }> }
 export interface SiteBlockCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image?: MediaRef | null; link?: string }> }
 export interface SiteBlockDownload { type: 'download'; title?: string; file?: MediaRef | null; label?: string }
 export interface SiteBlockToc { type: 'toc'; title?: string }
