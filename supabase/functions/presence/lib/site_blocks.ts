@@ -76,7 +76,7 @@ function parseLook(raw: unknown): BlockLook | undefined {
   const l = (raw && typeof raw === 'object') ? (raw as any).look : undefined;
   if (!l || typeof l !== 'object') return undefined;
   const out: BlockLook = {};
-  if (l.background === 'tinted' || l.background === 'plain') out.background = l.background;
+  if (l.background === 'tinted' || l.background === 'plain' || l.background === 'accent' || l.background === 'dark') out.background = l.background;
   if (l.width === 'full') out.width = 'full';
   if (l.spacing === 'tight' || l.spacing === 'roomy') out.spacing = l.spacing;
   if (l.align === 'center') out.align = 'center';
@@ -653,6 +653,8 @@ function lookClasses(look?: BlockLook): string {
   const c: string[] = [];
   if (look.background === 'tinted') c.push('block--bg-tint');
   else if (look.background === 'plain') c.push('block--bg-plain');
+  else if (look.background === 'accent') c.push('block--bg-accent');
+  else if (look.background === 'dark') c.push('block--bg-dark');
   if (look.width === 'full') c.push('block--full');
   if (look.spacing === 'tight') c.push('block--space-tight');
   else if (look.spacing === 'roomy') c.push('block--space-roomy');
@@ -1261,6 +1263,15 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 .block.block--bg-tint{background:${TINT_FALLBACK}}
 @supports (background:color-mix(in srgb,red,#fff)){.block.block--bg-tint{background:var(--block-tint,color-mix(in srgb,var(--accent) 8%,var(--paper,#f7f7f5)))}}
 .block.block--bg-plain{background:none;border-top:0;border-bottom:0}
+/* bold bands — a strong accent or dark section with light text throughout. Text
+   colours are forced light so contrast holds regardless of the block's content. */
+.block.block--bg-accent{background:var(--accent-dark,var(--accent));color:#fff}
+.block.block--bg-dark{background:#1a1622;color:#f2eef8}
+.block.block--bg-accent :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary),.block.block--bg-dark :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
+.block.block--bg-accent a:not(.btn),.block.block--bg-dark a:not(.btn){color:#fff;text-decoration:underline}
+.block.block--bg-accent .btn{background:#fff;color:var(--accent-dark,var(--accent));border-color:#fff}
+.block.block--bg-dark .btn{background:var(--accent);color:#fff;border-color:var(--accent)}
+.block.block--bg-accent .card,.block.block--bg-dark .card{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
 /* spacing: vertical padding, honouring the site's --spacing-scale like .block does */
 .block--space-tight{padding-top:calc(28px * var(--spacing-scale,1));padding-bottom:calc(28px * var(--spacing-scale,1))}
 .block--space-roomy{padding-top:calc(84px * var(--spacing-scale,1));padding-bottom:calc(84px * var(--spacing-scale,1))}

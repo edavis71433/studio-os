@@ -186,8 +186,9 @@ import type { FormDefinition } from './forms.ts';
 // guarantee — the tint is derived + contrast-checked (lib/palettes.ts brandTint). ──
 export interface BlockLook {
   /** 'tinted' = a brand-derived, contrast-safe light wash; 'plain' = no background
-   *  (clears the auto-alternate band); omitted = the template's default. */
-  background?: 'tinted' | 'plain';
+   *  (clears the auto-alternate band); 'accent' = a bold brand-accent band with
+   *  light text; 'dark' = a dark band with light text; omitted = template default. */
+  background?: 'tinted' | 'plain' | 'accent' | 'dark';
   /** 'full' = edge-to-edge section; inner content still capped for readability. */
   width?: 'full';
   /** vertical padding vs the default. */

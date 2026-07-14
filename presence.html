@@ -4760,7 +4760,7 @@ function blockLookRow(idx, blk, sub) {
   const cur = (blk && blk.look) || {};
   const chosen = Object.keys(cur).some((k) => cur[k]);
   const OPTS = [
-    ["background", "Background", [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"]]],
+    ["background", "Background", [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"], ["accent", "Accent band"], ["dark", "Dark band"]]],
     ["width", "Width", [["", "Normal"], ["full", "Full width"]]],
     ["spacing", "Spacing", [["", "Normal"], ["tight", "Tight"], ["roomy", "Roomy"]]],
     ["align", "Text", [["", "Default"], ["center", "Centered"]]],

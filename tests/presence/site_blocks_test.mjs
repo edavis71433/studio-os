@@ -382,6 +382,11 @@ const ctx = { esc, attr, safeHref };
     styled.includes('block--bg-tint') && styled.includes('block--full') && styled.includes('block--space-roomy') && styled.includes('block--align-center') && /class="block block--/.test(styled));
   const plainR = renderSiteBlocks(validateBlocks([{ type: 'stats', items: [{ value: '9', label: 'Yrs' }], look: { background: 'plain', spacing: 'tight' } }]), ctx)[0].html;
   ok('look: plain background + tight spacing → their classes (on an auto-alternate block)', plainR.includes('block--bg-plain') && plainR.includes('block--space-tight'));
+  const accentR = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }], look: { background: 'accent' } }]), ctx)[0].html;
+  ok('look: bold "accent" band validates + emits block--bg-accent', accentR.includes('block--bg-accent'));
+  const darkR = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }], look: { background: 'dark' } }]), ctx)[0].html;
+  ok('look: "dark" band validates + emits block--bg-dark', darkR.includes('block--bg-dark'));
+  ok('look: bold bands force light text + define their CSS (contrast holds)', /\.block\.block--bg-accent\{background:var\(--accent-dark/.test(BLOCK_CSS) && /\.block\.block--bg-dark\{background:#1a1622;color:#f2eef8\}/.test(BLOCK_CSS));
   const def = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }] }]), ctx)[0].html;
   ok('look: a DEFAULT block emits NO block-- classes (page structure unchanged)', !def.includes('block--') && def.includes('class="block wrap block-features"'));
 
