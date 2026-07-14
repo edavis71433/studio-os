@@ -410,6 +410,18 @@ h5.rune .whisper.ok{color:var(--sage)}
 .pp-pop-item.danger{color:#c0392b}
 .pp-pop-item:disabled{opacity:.4;cursor:default;background:none}
 .page-pill.hidden-nav .pp-name{opacity:.6}
+/* new-page layout wizard (AEM Create Page) */
+.dc-modal-scrim{position:fixed;inset:0;z-index:400;background:rgba(20,16,28,.44);display:flex;align-items:center;justify-content:center;padding:20px}
+.dc-modal{background:var(--sheet,#fff);border-radius:16px;max-width:600px;width:100%;max-height:86vh;overflow:auto;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.dc-modal-h{font-size:18px;font-weight:700;margin:0 0 4px}
+.dc-modal-sub{font-size:13px;color:var(--ink-2,#8a8172);margin:0 0 16px;line-height:1.5}
+.dc-layout-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dc-layout-card{text-align:left;border:1px solid var(--line,#ddd);border-radius:12px;padding:14px;background:var(--sheet,#fff);cursor:pointer}
+.dc-layout-card:hover,.dc-layout-card:focus-visible{border-color:var(--plum,#5b3fa0);background:var(--wash,#f8f6fc);outline:none}
+.dc-layout-card .dl-t{font-weight:700;font-size:14px;margin-bottom:3px}
+.dc-layout-card .dl-d{font-size:12px;color:var(--ink-2,#8a8172);line-height:1.4}
+.dc-modal-cancel{margin-top:16px;font:inherit;font-size:13px;font-weight:600;padding:8px 18px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer}
+@media(max-width:560px){.dc-layout-grid{grid-template-columns:1fr}}
 .dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 .dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff}
 /* the prominent floating "add section" affordance over the canvas */
@@ -4702,20 +4714,48 @@ function dcSwitchPage(slug) {
   toast("Now editing: " + dcPageTitle(DC_PAGE));
 }
 async function dcAddPage() {
-  const name = await askText("Name your new page", { value: "", placeholder: "e.g. Services, Gallery, Pricing", ok: "Create page" });
+  const name = await askText("Name your new page", { value: "", placeholder: "e.g. Services, Gallery, Pricing", ok: "Next: pick a layout" });
   if (!name || !name.trim()) return;
   const title = name.trim().slice(0, 60);
   const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "page";
   const taken = new Set(dcPagesArr().map((p) => p.slug));
   let slug = base, n = 1; while (taken.has(slug) || DC_PAGE_RESERVED.has(slug)) slug = base + "-" + (++n);
-  const pages = [...dcPagesArr(), { slug, title, blocks: [] }];
+  // AEM "Create Page" wizard: choose a starting layout (or blank) for the new page.
+  const chosen = await dcChoosePageLayout(title);
+  if (chosen === null) return;   // cancelled
+  const blocks = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
+  const pages = [...dcPagesArr(), { slug, title, blocks }];
   try {
     const r = await api("PUT", "/settings", { pages });
     S.settings = r.data || { ...S.settings, pages };
     DC_PAGE = slug; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null;
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
-    toast("Page “" + title + "” created — add sections or a ready-made layout, then publish");
+    toast("Page “" + title + "” created — edit any section, then publish");
   } catch (err) { toast(nice(err), true); }
+}
+// The new-page layout wizard: a ready-made layout (starter blocks) or a blank page.
+async function dcChoosePageLayout(title) {
+  if (BLOCK_SUGGEST === null || BLOCK_SUGGEST === undefined) { try { BLOCK_SUGGEST = (await api("GET", "/blocks/suggested")).data || false; } catch (_) { BLOCK_SUGGEST = false; } }
+  const starters = (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.starters)) ? BLOCK_SUGGEST.starters : [];
+  return new Promise((resolve) => {
+    const scrim = el("div", "dc-modal-scrim");
+    const box = el("div", "dc-modal");
+    box.appendChild(el("h3", "dc-modal-h", "Choose a layout for “" + title + "”"));
+    box.appendChild(el("p", "dc-modal-sub", "Start with a ready-made layout of editable sections — or a blank page. You can change everything afterwards."));
+    const grid = el("div", "dc-layout-grid");
+    const opt = (t, d, blocks) => { const c = el("button", "dc-layout-card"); c.type = "button"; c.appendChild(el("div", "dl-t", t)); c.appendChild(el("div", "dl-d", d)); c.addEventListener("click", () => { cleanup(); resolve(blocks); }); grid.appendChild(c); };
+    opt("Blank page", "Start empty and add your own sections.", []);
+    starters.forEach((s) => opt(s.name || "Layout", s.description || "", s.blocks || []));
+    box.appendChild(grid);
+    const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", () => { cleanup(); resolve(null); });
+    box.appendChild(cancel);
+    scrim.appendChild(box); document.body.appendChild(scrim);
+    function cleanup() { scrim.remove(); document.removeEventListener("keydown", onKey, true); }
+    function onKey(e) { if (e.key === "Escape") { cleanup(); resolve(null); } }
+    document.addEventListener("keydown", onKey, true);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) { cleanup(); resolve(null); } });
+    setTimeout(() => { try { box.querySelector(".dc-layout-card").focus(); } catch (_) {} }, 30);
+  });
 }
 function dcPageMenu(slug, anchor) {
   const p = dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
