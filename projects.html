@@ -120,9 +120,9 @@
   <div class="sub" id="sub">The work you do for your customers — tasks, files, and approvals in one place.</div>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by status"></div>
   <div class="bar"><button class="btn" id="newProject" hidden>+ New project</button><span class="spacer"></span></div>
-  <!-- FIX 5: project-less client requests are studio-wide (they belong to no single
-       project) — surface them here so they're never silently dropped. -->
-  <div id="clientMsgs"></div>
+  <!-- Cross-client client messages now live in the Inbox (grouped by client). This
+       page is the projects list + the full-screen delivery view; a customer's own
+       general messages live INSIDE their delivery view (loadClientGeneral). -->
   <div id="list" aria-live="polite"></div>
 </div>
 
@@ -391,20 +391,6 @@ async function loadClientGeneral(id,focusRid){
   }catch(e){ host.innerHTML='<div class="mut">Couldn’t load general messages.</div>'; }
 }
 
-// FIX 5: project-less client support requests belong to no single project, so the
-// per-project detail can never show them. Surface them studio-wide on the list page;
-// each opens a full-screen conversation you can reply to.
-async function loadClientMessages(){
-  if(!STUDIO){$('clientMsgs').innerHTML='';return;} const host=$('clientMsgs'); if(!host)return;
-  try{
-    const {data}=await api('/support');
-    const pless=(data||[]).filter(r=>!r.project_id&&r.status!=='resolved'&&r.status!=='closed');
-    if(!pless.length){host.innerHTML='';return;}
-    host.innerHTML=`<h2 style="font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:6px 0 10px">Client messages</h2>`+
-      pless.map(r=>`<div class="card" data-support="${r.id}" tabindex="0" role="button"><div><div class="t">${esc(r.subject||'Support request')}</div><div class="m">General request · ${esc((r.status||'open').replace('_',' '))}</div></div><span class="pill">reply</span></div>`).join('');
-    host.querySelectorAll('[data-support]').forEach(c=>{const open=()=>openStudioSupportFull(c.dataset.support);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
-  }catch(_){host.innerHTML='';}
-}
 // A project-less client request, opened as its own full-screen conversation (same
 // full-page treatment as a project) — read the thread and reply, or resolve it.
 async function openStudioSupportFull(rid){
@@ -428,7 +414,7 @@ async function openStudioSupportFull(rid){
     const sta=$('srf-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta);
     const cn=$('srf-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
     const rf=$('srf-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupportFull(rid);}catch(err){toast(nice(err),true);}};
-    const rb=$('srf-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');closeProjectDetail();loadClientMessages();}catch(e){toast(nice(e),true);}};
+    const rb=$('srf-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');closeProjectDetail();}catch(e){toast(nice(e),true);}};
   }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></div>'; }
 }
 
@@ -437,7 +423,7 @@ async function openStudioSupportFull(rid){
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/studio.html">sign in</a> to see your projects.</p>'; return; }
-    renderFilters(); await load(); loadClientMessages();
+    renderFilters(); await load();
     const params=new URLSearchParams(location.search);
     const deep=params.get('project'); if(deep) openProject(deep);
     const sup=params.get('support'); if(sup) openStudioSupportFull(sup);

@@ -330,7 +330,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   if (seesFull) {
     try {
       const [supR, evR] = await Promise.all([
-        svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,updated_at&order=updated_at.desc&limit=25`),
+        svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,requester,updated_at&order=updated_at.desc&limit=25`),
         // kind=message events carry detail.from ('client'|'studio') — stamped by the
         // client door — so we can tell whose turn it is without the author_kind
         // ambiguity (a solo owner and their customer are both 'client').
@@ -344,10 +344,36 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       for (const [pid, e] of latest) { if ((e.detail || {}).from === 'client') needReply.push({ project_id: pid, created_at: e.created_at }); }
       const sup = ((supR.json as any[]) || []);
       const pids = [...new Set([...sup.filter((r) => r.project_id).map((r) => String(r.project_id)), ...needReply.map((n) => n.project_id)])];
-      const nameById: Record<string, string> = {};
-      if (pids.length) { for (const p of (((await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name`)).json as any[]) || [])) nameById[String(p.id)] = String(p.name || ''); }
-      for (const r of sup) client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: r.project_id ? (nameById[String(r.project_id)] || '') : '', created_at: r.updated_at, href: r.project_id ? `/projects.html?project=${r.project_id}` : `/projects.html?support=${r.id}` });
-      for (const n of needReply) client_messages.push({ type: 'message', project: nameById[n.project_id] || '', created_at: n.created_at, href: `/projects.html?project=${n.project_id}` });
+      // project → { name, client_id }. client_id ties a project's messages back to the
+      // CUSTOMER so the Inbox can group by client (tenant-safe: the project is fetched
+      // on THIS studio's site).
+      const projById: Record<string, { name: string; client_id: string }> = {};
+      if (pids.length) { for (const p of (((await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,client_id`)).json as any[]) || [])) projById[String(p.id)] = { name: String(p.name || ''), client_id: p.client_id ? String(p.client_id) : '' }; }
+      // Grouping-by-client enrichment. TWO cheap, batched lookups (never N+1):
+      //  1) the Agency–Client Bridge for THIS studio (agency_site_id = my site) — the
+      //     authoritative "who are my customers" list + project→customer mapping.
+      //  2) one clients read for every customer id we touched — name + identity keys.
+      // A project-less request carries only a `requester` reader key; match it to a
+      // customer via their auth-user-id/email so it groups under the right client too.
+      const links = (((await svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`)).json as any[]) || []);
+      const projToClient: Record<string, string> = {};
+      const clientIds = new Set<string>();
+      for (const l of links) { const pid = String(l.project_id || ''); const cid = String(l.customer_client_id || ''); if (cid) { clientIds.add(cid); if (pid) projToClient[pid] = cid; } }
+      for (const pid of pids) { const cid = projById[pid]?.client_id; if (cid) clientIds.add(cid); }
+      const clientById: Record<string, string> = {};       // client id → display name
+      const requesterToClient: Record<string, string> = {}; // reader key → client id
+      if (clientIds.size) {
+        for (const c of (((await svc(`clients?id=in.(${[...clientIds].join(',')})&select=id,name,email,contact_email,auth_user_id`)).json as any[]) || [])) {
+          const cid = String(c.id); clientById[cid] = String(c.name || c.email || 'Client');
+          for (const k of [c.auth_user_id, c.email, c.contact_email]) { if (k != null && String(k).trim() !== '') requesterToClient[String(k)] = cid; }
+        }
+      }
+      const clientFor = (pid: string, requester: string) => {
+        const cid = (pid && (projToClient[pid] || projById[pid]?.client_id)) || (requester ? requesterToClient[requester] : '') || '';
+        return { client_id: cid, client: cid ? (clientById[cid] || 'Client') : '' };
+      };
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, href: pid ? `/projects.html?project=${r.project_id}` : `/projects.html?support=${r.id}` }); }
+      for (const n of needReply) { const c = clientFor(n.project_id, ''); client_messages.push({ type: 'message', project: projById[n.project_id]?.name || '', client_id: c.client_id, client: c.client, created_at: n.created_at, href: `/projects.html?project=${n.project_id}` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20);
     } catch { /* best-effort — the inbox still renders without this section */ }

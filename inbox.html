@@ -26,6 +26,9 @@
   .item .when{margin-left:auto;font-size:12.5px;color:var(--faint)}
   .item .body{margin-top:8px;font-size:14.5px;color:var(--soft)}
   .item .go{margin-top:12px;color:var(--p);font-weight:600;font-size:13.5px}
+  .cmbar{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--soft)}
+  .cmbar select{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:13.5px}
+  .cmhead{font-family:var(--serif);font-weight:500;font-size:16px;color:var(--ink);margin:16px 0 8px;text-transform:none;letter-spacing:0}
   .center{text-align:center;padding:56px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
   .allclear{background:var(--good-soft);border-color:transparent;color:var(--good);text-align:center;padding:22px}
   .muted{color:var(--soft);font-size:14.5px}
@@ -111,11 +114,26 @@ function render(feed,leads,notifs){
   if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div><p style="text-align:center;margin-top:14px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p>`;h+=toolkit();$('main').innerHTML=h;return;}
   if(!total&&activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing new — recent activity is below.</div>`;}
 
+  // Messages from your clients — grouped BY CLIENT (not a flat list) with a
+  // dropdown to switch which client you're viewing. Each message still links to
+  // where you reply (the customer's delivery view / the support thread).
   if(clientMsgs.length){h+=`<h2>Messages from your clients</h2>`;
-    for(const c of clientMsgs){const isSup=c.type==='support';
-      const title=isSup?esc(c.subject||'Support request'):'A client sent you a message';
-      const ctx=c.project?('Project: '+esc(c.project)):(isSup?'General request':'');
-      h+=`<a class="item approve" href="${esc(scoped(c.href||'/projects.html'))}"><div class="top"><span class="tag">${isSup?'Support':'Message'}</span>${c.created_at?`<span class="when">${esc(when(c.created_at))}</span>`:''}</div><div class="who" style="margin-top:8px">${title}</div>${ctx?`<div class="body">${ctx}</div>`:''}<div class="go">View &amp; reply →</div></a>`;}}
+    const groups=new Map(); // client_id → {name, items}
+    for(const c of clientMsgs){const key=c.client_id||'';const nm=c.client||'Other clients';
+      if(!groups.has(key))groups.set(key,{name:nm,items:[]});groups.get(key).items.push(c);}
+    const glist=[...groups.entries()];
+    if(glist.length>1){
+      h+=`<div class="cmbar"><label for="cmSel">Show</label> <select id="cmSel" onchange="filterClientMsgs(this.value)"><option value="">All clients (${clientMsgs.length})</option>${glist.map(([k,g])=>`<option value="${esc(k||'__none')}">${esc(g.name)} (${g.items.length})</option>`).join('')}</select></div>`;}
+    for(const [k,g] of glist){
+      h+=`<div class="cmgroup" data-cm="${esc(k||'__none')}">`;
+      if(glist.length>1){h+=`<h3 class="cmhead">${esc(g.name)}</h3>`;}
+      for(const c of g.items){const isSup=c.type==='support';
+        const title=isSup?esc(c.subject||'Support request'):'A client sent you a message';
+        const bits=[]; if(c.client)bits.push(esc(c.client)); if(c.project)bits.push('Project: '+esc(c.project)); else if(isSup)bits.push('General request');
+        const ctx=bits.join(' · ');
+        h+=`<a class="item approve" href="${esc(scoped(c.href||'/projects.html'))}"><div class="top"><span class="tag">${isSup?'Support':'Message'}</span>${c.created_at?`<span class="when">${esc(when(c.created_at))}</span>`:''}</div><div class="who" style="margin-top:8px">${title}</div>${ctx?`<div class="body">${ctx}</div>`:''}<div class="go">View &amp; reply →</div></a>`;}
+      h+=`</div>`;}
+    h+=`<div id="cmEmpty" class="mut" style="display:none">No messages from this client right now.</div>`;}
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
     for(const p of approvals){const href=scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations');
@@ -136,6 +154,9 @@ function render(feed,leads,notifs){
   h+=toolkit();
   $('main').innerHTML=h;
 }
+// Client-messages dropdown: show one client's group (or all). No re-fetch — just
+// toggles the pre-rendered groups. Empty note appears only if nothing's visible.
+function filterClientMsgs(v){var any=false;document.querySelectorAll('[data-cm]').forEach(function(el){var on=(!v||el.getAttribute('data-cm')===v);el.style.display=on?'':'none';if(on)any=true;});var e=$('cmEmpty');if(e)e.style.display=any?'none':'';}
 // ── Support toolkit: two owner-managed tools that live right here in the Inbox.
 //   • Saved replies — canned answers you reuse when replying to enquiries.
 //   • Customer FAQ  — common Q&A your clients can read anytime in their portal.

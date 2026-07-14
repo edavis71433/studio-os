@@ -49,8 +49,18 @@ ok('FIX5: section links to where the operator replies (the delivery view / the r
 ok('FIX5: the section is NOT gated on the per-reader last-seen (not auto-read on open)', !/last_seen|activity_reads/.test(ws.slice(ws.indexOf('let client_messages'))));
 ok('FIX5: inbox renders a prominent "Messages from your clients" section', /Messages from your clients/.test(inbox) && /feed\.client_messages/.test(inbox));
 ok('FIX5: inbox counts client messages toward "needs you" total', /\+clientMsgs\.length/.test(inbox));
-ok('FIX5: projects.html surfaces project-less client requests studio-wide', /loadClientMessages/.test(projects) && /filter\(r=>!r\.project_id/.test(projects));
 ok('FIX5: projects.html can open + reply to a project-less request (full-screen)', /function openStudioSupportFull/.test(projects) && /params\.get\('support'\)/.test(projects));
+
+// ═══ BY-CLIENT — Inbox groups client messages by CLIENT (with a dropdown); the
+//     studio-wide roll-up is REMOVED from projects.html (it lives in the Inbox now) ═══
+ok('BYCLIENT: feed enriches each message with the CLIENT id + name', /client_id: c\.client_id, client: c\.client/.test(ws));
+ok('BYCLIENT: client lookups are BATCHED via the bridge + one clients read (no N+1)', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active&select=project_id,customer_client_id/.test(ws) && /clients\?id=in\.\(\$\{\[\.\.\.clientIds\]\.join\(','\)\}\)/.test(ws));
+ok('BYCLIENT: a project-less request groups by matching its requester → customer', /requesterToClient\[requester\]/.test(ws));
+ok('BYCLIENT: inbox groups the section by client_id', /const key=c\.client_id/.test(inbox) && /groups\.set\(key/.test(inbox));
+ok('BYCLIENT: inbox offers a client dropdown/toggle to switch clients', /id="cmSel"/.test(inbox) && /filterClientMsgs\(this\.value\)/.test(inbox) && /function filterClientMsgs/.test(inbox));
+ok('BYCLIENT: inbox has a clear empty state for the section', /id="cmEmpty"/.test(inbox));
+ok('BYCLIENT: projects.html no longer shows the studio-wide client-messages list', !/loadClientMessages/.test(projects) && !/id="clientMsgs"/.test(projects));
+ok('BYCLIENT: projects.html KEEPS the per-customer general messages inside the delivery view', /loadClientGeneral/.test(projects) && /id="genList"/.test(projects));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ OPERATOR DELIVERY UX (FIX 5/6/7/D): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
