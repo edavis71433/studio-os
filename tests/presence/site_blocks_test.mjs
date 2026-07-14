@@ -21,12 +21,13 @@ const ctx = { esc, attr, safeHref };
 {
   ok('unknown block types are dropped', validateBlocks([{ type: 'evil_iframe' }, { type: 'features', items: [{ title: 'A' }] }]).length === 1);
   ok('empty blocks (no items) are dropped', validateBlocks([{ type: 'features', items: [] }, { type: 'stats', items: [{ value: '', label: '' }] }]).length === 0);
-  ok('one instance per type (first kept)', validateBlocks([{ type: 'stats', items: [{ value: '10', label: 'Years' }] }, { type: 'stats', items: [{ value: '99', label: 'Other' }] }]).length === 1);
+  ok('content blocks repeat (a real builder — several stats/features/etc. allowed)', validateBlocks([{ type: 'stats', items: [{ value: '10', label: 'Years' }] }, { type: 'stats', items: [{ value: '99', label: 'Other' }] }]).length === 2);
+  ok('genuine singletons still dedupe (toc / reviews_wall — first kept)', validateBlocks([{ type: 'toc' }, { type: 'toc' }]).length === 1);
   const capped = validateBlocks([{ type: 'features', items: Array.from({ length: 40 }, (_, i) => ({ title: `f${i}` })) }])[0];
   ok('per-block item cap enforced (features ≤ 8)', capped.items.length === 8);
   const strs = validateBlocks([{ type: 'cta', text: '  hi   there  ', button: 'x'.repeat(200) }])[0];
   ok('strings trimmed + length-capped', strs.text === 'hi there' && strs.button.length <= 40);
-  ok('total blocks capped at 12', validateBlocks(Array.from({ length: 30 }, (_, i) => ({ type: REALIZED_BLOCK_TYPES[i % REALIZED_BLOCK_TYPES.length], items: [{ title: 'a', value: '1', label: 'x', name: 'n' }], members: [{ name: 'n' }], steps: [{ step: 's' }], tiers: [{ name: 't' }], areas: ['a'], text: 't' }))).length <= 12);
+  ok('total blocks capped at MAX_BLOCKS (32) even when repeating', validateBlocks(Array.from({ length: 50 }, () => ({ type: 'features', items: [{ title: 'a' }] }))).length === 32);
   ok('non-array / junk input → empty', validateBlocks(null).length === 0 && validateBlocks('nope').length === 0 && validateBlocks(undefined).length === 0);
   ok('owner order preserved', JSON.stringify(validateBlocks([{ type: 'team', members: [{ name: 'A' }] }, { type: 'stats', items: [{ value: '1', label: 'x' }] }]).map((b) => b.type)) === '["team","stats"]');
 }
@@ -46,6 +47,14 @@ const ctx = { esc, attr, safeHref };
   const r = renderSiteBlocks(all, ctx);
   ok('every enabled block renders a <section>; every non-CTA carries an <h2>', r.length === 8 && r.every((b) => b.html.includes('<section')) && r.filter((b) => b.type !== 'cta').every((b) => b.html.includes('<h2>')));
   ok('stable block_<type> keys', r.map((b) => b.key).join(',') === 'block_features,block_stats,block_team,block_process,block_pricing,block_certifications,block_service_areas,block_cta');
+  ok('duplicate content blocks get UNIQUE render keys (no silent overwrite)', (() => {
+    const dup = renderSiteBlocks(validateBlocks([{ type: 'features', items: [{ title: 'A' }] }, { type: 'features', items: [{ title: 'B' }] }]), ctx);
+    return dup.length === 2 && dup[0].key === 'block_features' && dup[1].key === 'block_features_2' && dup[0].html.includes('A') && dup[1].html.includes('B');
+  })());
+  ok('two tabs blocks get distinct radio-group names (no cross-wiring)', (() => {
+    const two = renderSiteBlocks(validateBlocks([{ type: 'tabs', tabs: [{ label: 'X', body: 'x' }, { label: 'Y', body: 'y' }] }, { type: 'tabs', tabs: [{ label: 'P', body: 'p' }, { label: 'Q', body: 'q' }] }]), ctx);
+    return two.length === 2 && two[0].html.includes('name="site-tabs"') && two[1].html.includes('name="site-tabs-1"');
+  })());
   ok('team → Person/ItemList schema; process → HowTo; pricing → Offer', (() => {
     const team = r.find((b) => b.type === 'team').ld; const proc = r.find((b) => b.type === 'process').ld; const price = r.find((b) => b.type === 'pricing').ld;
     return team?.itemListElement?.[0]?.item?.['@type'] === 'Person' && proc?.['@type'] === 'HowTo' && price?.itemListElement?.[0]?.item?.['@type'] === 'Offer';
@@ -360,8 +369,8 @@ const ctx = { esc, attr, safeHref };
   ok('a non-decorative image keeps its descriptive alt (no presentation role)', decOff.includes('alt="A photo"') && !decOff.includes('role="presentation"'));
   ok('decorative flag validates to boolean true, and is absent when unset', validateBlocks([{ type: 'image', image_id: G, decorative: true }])[0].decorative === true && !('decorative' in validateBlocks([{ type: 'image', image_id: G }])[0]));
 
-  // — dedupe posture: MULTI for columns/cards; single-instance for download/toc —
-  ok('download + toc stay single-instance (first kept, one-per-type)', validateBlocks([{ type: 'download', file_id: G }, { type: 'download', file_id: H }]).length === 1 && validateBlocks([{ type: 'toc' }, { type: 'toc' }]).length === 1);
+  // — dedupe posture: content blocks (incl. download) repeat; only toc/reviews_wall stay one-per-page —
+  ok('download now repeats (several files); toc stays single-instance (first kept)', validateBlocks([{ type: 'download', file_id: G }, { type: 'download', file_id: H }]).length === 2 && validateBlocks([{ type: 'toc' }, { type: 'toc' }]).length === 1);
   ok('all four r4 blocks are catalog-declared AND realized', ['columns', 'cards', 'download', 'toc'].every((t) => COMPONENTS.some((c) => c.key === t) && REALIZED_BLOCK_TYPES.includes(t)));
 }
 

@@ -52,8 +52,15 @@ const clampSpan = (v: unknown): number | undefined => {
 const clampPct = (v: unknown): number => {
   const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
 };
-// The block types a site may hold more than one of (each de-collided to a unique id).
+// MULTI = types that carry a stable per-instance id (needed to address their nested
+// content), so their render key is block_<type>_<id>. Every OTHER type may now also
+// repeat freely (a real builder lets you stack several text boxes, feature grids,
+// image+text rows…); duplicates are de-collided by a numeric render-key suffix.
 const MULTI = new Set<string>(['form', 'columns', 'cards']);
+// The few types that are genuinely one-per-page — a second one would be nonsense or
+// duplicate a page-wide singleton (the on-this-page contents list; the reviews wall
+// that also feeds the page's single AggregateRating schema node). Only THESE dedupe.
+const SINGLETON = new Set<string>(['toc', 'reviews_wall']);
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 // Prose sanitizer: like s() but PRESERVES newlines (markdown structure) — collapses
@@ -146,8 +153,9 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
   for (const b of arr(raw)) {
     if (!b || typeof b !== 'object') continue;
     const type = String((b as any).type || '');
-    // MULTI blocks (form/columns/cards) are exempt from the one-per-type rule.
-    if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || (!MULTI.has(type) && seen.has(type))) continue;
+    // Only the genuine SINGLETON types (toc / reviews_wall) are one-per-page; every
+    // other realized type may repeat, so a dropped second instance is KEPT, not dropped.
+    if (!(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || (SINGLETON.has(type) && seen.has(type))) continue;
     const title = s((b as any).title, 80) || undefined;
     let block: StoredBlock | null = null;
     switch (type as SiteBlockType) {
@@ -402,7 +410,7 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
       // is clockless — WHEN it shows is decided at render against snapshot.created_at.
       const win = parseWindow(b);
       if (win) { if (win.show_from) (block as any).show_from = win.show_from; if (win.show_until) (block as any).show_until = win.show_until; }
-      out.push(block); if (!MULTI.has(type)) seen.add(type);
+      out.push(block); if (SINGLETON.has(type)) seen.add(type);
     }
     if (out.length >= MAX_BLOCKS) break;
   }
@@ -719,6 +727,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   // every OTHER section's heading + anchor, known only after this pass).
   const built: Array<{ b: SiteBlock; html: string; ld?: object }> = [];
   const h2 = (t: string | undefined, fallback: string) => `<h2>${esc(t || fallback)}</h2>`;
+  let tabsSeq = 0;   // per-page counter → each tabs block gets a unique radio-group name
 
   for (const b of blocks || []) {
     // Phase EXP: auto-expiring content — a section outside its window at the publish
@@ -864,7 +873,8 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       }
       case 'tabs': {   // tabbed panels — ZERO JS (CSS radio pattern): keyboard-operable,
         // stacks on phones, no external anything. One tabs section per page (nm fixed).
-        const nm = 'site-tabs';
+        const nm = 'site-tabs' + (tabsSeq ? '-' + tabsSeq : '');   // first keeps 'site-tabs' (byte-identical); duplicates get their own group
+        tabsSeq++;
         const radios = b.tabs.map((_t, i) => `<input type="radio" name="${nm}" id="${nm}-${i}" class="tab-radio"${i === 0 ? ' checked' : ''}>`).join('');
         const strip = b.tabs.map((t, i) => `<label class="tab-label" for="${nm}-${i}">${esc(t.label)}</label>`).join('');
         const panels = b.tabs.map((t) => {
@@ -1054,14 +1064,23 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   }
 
   const out: RenderedBlock[] = [];
+  const usedKeys = new Set<string>();
   for (const e of built) {
     if (!e.html) continue;
     const b = e.b;
-    // MULTI blocks (form/columns/cards) add their id → a per-instance key so the
-    // section-order/visibility machinery never collides two of the same type.
-    const key = (b.type === 'form' || b.type === 'columns' || b.type === 'cards')
+    // Every rendered block needs a UNIQUE key: the template keys its parts map by it
+    // (parts[key] = html) and the section-order/visibility machinery addresses it by
+    // it — two blocks sharing a key silently overwrite each other (a dropped second
+    // "rich text"/"features"/etc. would vanish). MULTI blocks (form/columns/cards)
+    // key off their stable id; every other type keys off its type, then de-dupes with
+    // a numeric suffix so the FIRST instance keeps `block_<type>` (byte-identical to
+    // before) and later duplicates get `block_<type>_2`, `_3`, … — all distinct.
+    const baseKey = (b.type === 'form' || b.type === 'columns' || b.type === 'cards')
       ? `block_${b.type}_${(b as { id: string }).id}`
       : `block_${b.type}`;
+    let key = baseKey, n = 2;
+    while (usedKeys.has(key)) key = `${baseKey}_${n++}`;
+    usedKeys.add(key);
     out.push({ key, type: b.type, html: e.html, ...(e.ld ? { ld: e.ld } : {}) });
   }
   return out;

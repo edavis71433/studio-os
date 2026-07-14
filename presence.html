@@ -4607,6 +4607,10 @@ function mediaThumb(id) {
 let BLOCKS_WORK = null;
 let BLOCK_FOCUS = null;      // FD-T-LIB: index of a just-added block to scroll to + focus
 let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
+// One-per-page in the builder (mirrors site_blocks.ts SINGLETON). EVERY other block
+// type may be added more than once — stack as many text boxes, image+text rows,
+// feature grids etc. as you like; the server keeps them all.
+const BLOCK_SINGLETON = new Set(["toc", "reviews_wall"]);
 let CL_ITEMS = null;        // CL-1: saved content-library items (null = not loaded)
 let CL_SHOW = false;
 let CL_LOADING = false;     // CL-LINK: one-shot guard for the lazy saved-items load
@@ -4623,6 +4627,7 @@ function clInsert(block) {   // CL-1: insert a saved block into the SAME editor 
   // MULTI-INSTANCE (columns/cards): always add a fresh copy with a new id — never
   // offer to replace, since a site can hold several.
   if (def && def.multi) { copy.id = uniqueBlockId(block.type); BLOCKS_WORK.push(copy); }
+  else if (!BLOCK_SINGLETON.has(block.type)) { BLOCKS_WORK.push(copy); }   // repeatable → just add another copy
   else {
     const at = BLOCKS_WORK.findIndex((b) => b.type === block.type);
     if (at >= 0) { if (!confirm("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?")) return; BLOCKS_WORK[at] = copy; }
@@ -5322,8 +5327,9 @@ function renderBlocksCard() {
   card.appendChild(blkGap(BLOCKS_WORK.length));   // #3/#4 — trailing "+" insert point / drop-line target
   if ($("designTray")) renderBlockTray();   // #3 — keep the tray's "already added" states in sync
   const present = new Set(BLOCKS_WORK.map((b) => b.type));
-  // MULTI-INSTANCE defs (columns/cards) stay addable even when already present.
-  const addable = BLOCK_DEFS.filter((d) => d.multi || !present.has(d.type));
+  // Every type is addable more than once now — only true singletons (toc / reviews
+  // wall) drop out of the menu once the page already has one.
+  const addable = BLOCK_DEFS.filter((d) => !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)));
   // ── FD-T-LIB: "Already on your site" — your CORE sections live in their own tabs.
   //    Chips route there so an owner isn't hunting for a "hero / FAQ" to add when
   //    they already have one. Read-only; reuses go().
@@ -6358,7 +6364,7 @@ function renderBlockTray() {
   SECTION_GROUPS.forEach((grp) => {
     const defs = grp.types
       .map((ty) => BLOCK_DEFS.find((d) => d.type === ty))
-      .filter((d) => d && (d.multi || !present.has(d.type)))
+      .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
       .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, TRAY_QUERY));
     if (!defs.length) return;
     const wrap = el("div", "tray-grp");
@@ -6393,7 +6399,7 @@ function addBlockAt(d, at) {
   const blk = emptyBlock(d);   // REUSE the exact block factory the click path uses
   const i = Math.max(0, Math.min(at, BLOCKS_WORK.length));
   BLOCKS_WORK.splice(i, 0, blk);
-  BLOCK_FOCUS = i;
+  BLOCK_FOCUS = i; DC_FOCUS_BI = i;   // canvas will scroll to + flash this new section after reload
   renderBlocksCard();
 }
 function moveBlockTo(from, gap) {
@@ -6585,7 +6591,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
     list.textContent = ""; let shown = 0;
     SECTION_GROUPS.forEach((grp) => {
       const defs = grp.types.map((ty) => BLOCK_DEFS.find((d) => d.type === ty))
-        .filter((d) => d && (d.multi || !present.has(d.type)))
+        .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
         .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, search.value));
       if (!defs.length) return;
       const wrap = el("div", "tray-grp");
@@ -6671,6 +6677,7 @@ function refreshDesignPreview() {
 // still stack to one column below 620px, order is still the list order. Structured
 // blocks, always auto-responsive, always accessible. Nothing here changes output.
 let DC_SCROLL = null;   // preserve the canvas scroll position across the save→reload cycle
+let DC_FOCUS_BI = null; // a just-added/dropped block index → scroll the canvas to it + flash it after reload
 function dcFrameDoc() { const f = $("designPreview"); try { return f && f.contentDocument; } catch (_) { return null; } }
 function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.defaultView) ? d.defaultView.scrollY : null; }
 
@@ -6685,7 +6692,7 @@ function dcDuplicate(bi) {
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
   if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
-  dcCaptureScroll(); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; renderBlocksCard(); saveBlocks();
+  dcCaptureScroll(); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
 }
 function dcDelete(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
@@ -6719,7 +6726,7 @@ function dcPasteAt(gap) {
   const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit;
   if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
   const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
-  dcCaptureScroll(); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; renderBlocksCard(); saveBlocks();
+  dcCaptureScroll(); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; DC_FOCUS_BI = at; renderBlocksCard(); saveBlocks();
 }
 // ── column controls (responsive grid) — PURE helpers, extracted + unit-tested ──
 // The Columns block is the render engine's LAYOUT CONTAINER (Adobe Layout Mode):
@@ -6869,7 +6876,11 @@ function dcInjectCanvas(doc, main) {
       ".dc-colh::before{content:'';width:5px;height:46px;max-height:60%;background:#5b3fa0;border-radius:4px;box-shadow:0 0 0 3px rgba(91,63,160,.18);opacity:.5;transition:opacity .12s}" +
       ".dc-colh:hover::before,.dc-colh:active::before{opacity:1}" +
       ".block-columns .cols.dc-grid-show{background-image:repeating-linear-gradient(90deg,rgba(91,63,160,.09) 0,rgba(91,63,160,.09) 1px,transparent 1px,transparent 8.3333%);background-position:0 0}" +
-      "#dds-dc-bar .dc-off{opacity:.4;pointer-events:none}";
+      "#dds-dc-bar .dc-off{opacity:.4;pointer-events:none}" +
+      // a just-added section pulses so a drop is never invisible
+      "@keyframes dcJustAdded{0%{box-shadow:0 0 0 3px rgba(91,63,160,.55),0 0 0 9px rgba(91,63,160,.22)}100%{box-shadow:0 0 0 3px rgba(91,63,160,0),0 0 0 9px rgba(91,63,160,0)}}" +
+      ".dc-justadded{animation:dcJustAdded 1.5s ease-out;border-radius:6px}" +
+      "@media (prefers-reduced-motion:reduce){.dc-justadded{animation:none;outline:3px solid rgba(91,63,160,.5);outline-offset:-3px}}";
     (doc.head || doc.documentElement).appendChild(st);
   }
   let bar = doc.getElementById("dds-dc-bar");
@@ -7131,7 +7142,24 @@ function dcTreeSelect(el2, row) {
     const wrap = frame.closest(".dp-frame"); if (wrap) wrap.classList.add("dc-live");
     frame.removeAttribute("aria-hidden");   // the canvas is now interactive, not decorative
     try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
-    if (DC_SCROLL != null && doc.defaultView) { try { doc.defaultView.scrollTo(0, DC_SCROLL); } catch (_) {} DC_SCROLL = null; }
+    // A just-added / dropped / duplicated / pasted section: scroll the canvas to it
+    // and flash it, so the change is NEVER invisible (blocks render below the core
+    // sections, so a silent add looked like nothing happened). Falls back to the
+    // preserved scroll position for edits/moves that didn't add a section.
+    if (DC_FOCUS_BI != null) {
+      let landed = false;
+      try {
+        const hit = dcBlockSections(main).find((s) => s.bi === DC_FOCUS_BI);
+        if (hit && hit.el) {
+          hit.el.scrollIntoView({ block: "center", behavior: pdReducedMotion() ? "auto" : "smooth" });
+          hit.el.classList.add("dc-justadded");
+          setTimeout(() => { try { hit.el.classList.remove("dc-justadded"); } catch (_) {} }, 1500);
+          landed = true;
+        }
+      } catch (_) {}
+      DC_FOCUS_BI = null; DC_SCROLL = null;
+      if (!landed && doc.defaultView) { try { doc.defaultView.scrollTo({ top: doc.body.scrollHeight, behavior: "smooth" }); } catch (_) {} }
+    } else if (DC_SCROLL != null && doc.defaultView) { try { doc.defaultView.scrollTo(0, DC_SCROLL); } catch (_) {} DC_SCROLL = null; }
   });
 })();
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
