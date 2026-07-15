@@ -451,7 +451,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   const ann = c.settings?.announcement;
   const annLive = ann && ann.text && (!ann.expires_at || String(ann.expires_at) > snapshot.created_at);
   const announce = annLive
-    ? `<div class="annbar" role="status">${ann!.url ? `<a href="${attr(ann!.url)}">${esc(ann!.text)}</a>` : esc(ann!.text)}</div>` : '';
+    ? `<div class="annbar" role="status">${(ann!.url && safeHref(ann!.url)) ? `<a href="${attr(safeHref(ann!.url)!)}">${esc(ann!.text)}</a>` : esc(ann!.text)}</div>` : '';
   // Phase V FD-N2: the logo becomes the favicon when present
   const icon = c.settings?.logo?.variants?.w400 || '';
   const extras = { announce, icon };

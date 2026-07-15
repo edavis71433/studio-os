@@ -11,6 +11,14 @@ import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.t
 import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
 import { render as aurora_1_0_0 } from '../templates/aurora/1.0.0/render.ts';
 import manifest_au_1_0_0 from '../templates/aurora/1.0.0/manifest.json' with { type: 'json' };
+import { render as slate_1_0_0 } from '../templates/slate/1.0.0/render.ts';
+import manifest_sl_1_0_0 from '../templates/slate/1.0.0/manifest.json' with { type: 'json' };
+import { render as meadow_1_0_0 } from '../templates/meadow/1.0.0/render.ts';
+import manifest_me_1_0_0 from '../templates/meadow/1.0.0/manifest.json' with { type: 'json' };
+import { render as atelier_1_0_0 } from '../templates/atelier/1.0.0/render.ts';
+import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { type: 'json' };
+import { render as harbor_1_0_0 } from '../templates/harbor/1.0.0/render.ts';
+import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 
@@ -29,6 +37,10 @@ const LOADERS: Record<string, Record<string, () => TemplateEntry>> = {
   'business-classic': { '1.0.0': () => ({ render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest }) },  // Phase T3 production default
   'editorial': { '1.0.0': () => ({ render: editorial_1_0_0, manifest: manifest_ed_1_0_0 as unknown as TemplateManifest }) },               // Phase PT premium family
   'aurora': { '1.0.0': () => ({ render: aurora_1_0_0, manifest: manifest_au_1_0_0 as unknown as TemplateManifest }) },                     // #183 modern family
+  'slate': { '1.0.0': () => ({ render: slate_1_0_0, manifest: manifest_sl_1_0_0 as unknown as TemplateManifest }) },                       // #183 bold dark professional
+  'meadow': { '1.0.0': () => ({ render: meadow_1_0_0, manifest: manifest_me_1_0_0 as unknown as TemplateManifest }) },                     // #183 warm organic wellness
+  'atelier': { '1.0.0': () => ({ render: atelier_1_0_0, manifest: manifest_at_1_0_0 as unknown as TemplateManifest }) },                   // #183 boutique luxury serif
+  'harbor': { '1.0.0': () => ({ render: harbor_1_0_0, manifest: manifest_ha_1_0_0 as unknown as TemplateManifest }) },                     // #183 structured navy trust
 };
 const _entryCache = new Map<string, TemplateEntry>();
 

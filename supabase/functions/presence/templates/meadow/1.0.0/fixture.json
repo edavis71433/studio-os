@@ -1,0 +1,261 @@
+{
+  "content": {
+    "identity": {
+      "business_name": "Vermilion & Vine",
+      "tagline": "Neighborhood wine bar & wood-fired kitchen in Highland Park",
+      "description": "A small neighborhood spot where wood-fired plates meet a thoughtful natural wine list. Walk-ins welcome at the bar; the patio seats twenty under the pepper tree.",
+      "story": "We opened in 2019 with one oven, six tables, and a wine list written on butcher paper.\n\nFive years later the butcher paper is framed above the bar, the patio doubled, and the menu still changes with whatever the Wednesday farmers market has too much of.",
+      "phone": "(323) 555-0142",
+      "email": "hello@vermilionandvine.example",
+      "service_area": "Highland Park, Eagle Rock, and northeast Los Angeles",
+      "booking_url": "https://resy.example/vermilion-and-vine",
+      "ordering_url": "",
+      "social": {
+        "instagram": "https://instagram.com/vermilionvine.example"
+      },
+      "seo_title": "Vermilion & Vine \u2014 Wine Bar & Wood-Fired Kitchen, Highland Park",
+      "seo_description": "Wood-fired plates and natural wine in Highland Park, Los Angeles. Patio seating, weekend brunch, walk-ins welcome."
+    },
+    "offerings": [
+      {
+        "id": "o1",
+        "name": "Charred Leeks & Romesco",
+        "category": "To Start",
+        "description": "Wood-fired leeks, almond romesco, smoked olive oil",
+        "price_text": "$14",
+        "sort_order": 1,
+        "media": {
+          "alt": "Charred leeks on almond romesco",
+          "variants": {
+            "w400": "/img/leeks-400.webp",
+            "w800": "/img/leeks-800.webp",
+            "w1600": "/img/leeks-1600.webp"
+          },
+          "width": 1600,
+          "height": 1067
+        }
+      },
+      {
+        "id": "o2",
+        "name": "Burrata & Market Peaches",
+        "category": "To Start",
+        "description": "With basil, chile crisp, grilled sourdough",
+        "price_text": "$17",
+        "sort_order": 2
+      },
+      {
+        "id": "o3",
+        "name": "Oven Chicken for Two",
+        "category": "Wood-Fired",
+        "description": "Half chicken, salsa verde, pan drippings, little gems",
+        "price_text": "$38",
+        "sort_order": 1
+      },
+      {
+        "id": "o4",
+        "name": "Mushroom Cavatelli",
+        "category": "Wood-Fired",
+        "description": "Maitake, brown butter, pecorino, black pepper",
+        "price_text": "$24",
+        "sort_order": 2
+      },
+      {
+        "id": "o5",
+        "name": "Whole Branzino",
+        "category": "Wood-Fired",
+        "description": "Charred lemon, herb salad \u2014 market price",
+        "price_text": "market price",
+        "sort_order": 3
+      },
+      {
+        "id": "o6",
+        "name": "Basque Cheesecake",
+        "category": "Sweet",
+        "description": "Burnt top, cold center",
+        "price_text": "$11",
+        "sort_order": 1
+      }
+    ],
+    "testimonials": [
+      {
+        "id": "t1",
+        "quote": "The chicken for two is the best date-night order on the east side.",
+        "author": "Maria G.",
+        "source": "Google",
+        "sort_order": 1
+      },
+      {
+        "id": "t2",
+        "quote": "Wine list is small and perfect. Staff always finds us something new.",
+        "author": "Devon P.",
+        "source": "Yelp",
+        "sort_order": 2
+      }
+    ],
+    "faqs": [
+      {
+        "id": "f1",
+        "question": "Do you take walk-ins?",
+        "answer": "Always at the bar, and we keep a third of the patio unreserved. Parties of 5+ should book ahead.",
+        "sort_order": 1
+      },
+      {
+        "id": "f2",
+        "question": "Is the patio dog-friendly?",
+        "answer": "Yes \u2014 water bowls provided, treats negotiable.",
+        "sort_order": 2
+      },
+      {
+        "id": "f3",
+        "question": "Do you have vegetarian options?",
+        "answer": "About half the menu, and the kitchen is happy to adapt most plates. Just ask your server.",
+        "sort_order": 3
+      }
+    ],
+    "posts": [
+      {
+        "id": "p1",
+        "title": "Winter menu is live",
+        "slug": "winter-menu-2026",
+        "excerpt": "Six new plates, two returning favorites, and a mulled thing for the patio.",
+        "body_md": "The **winter menu** landed this week.\n\n## What's new\n\n- Squash agnolotti with brown butter\n- Wood-fired cabbage with bagna cauda\n- The return of the *short rib* for two\n\nBook the patio heaters early on weekends \u2014 [reservations here](https://resy.example/vermilion-and-vine).",
+        "published_at": "2026-01-12T18:00:00Z",
+        "hero": {
+          "alt": "Squash agnolotti in brown butter",
+          "variants": {
+            "w400": "/img/winter-400.webp",
+            "w800": "/img/winter-800.webp",
+            "w1600": "/img/winter-1600.webp"
+          },
+          "width": 1600,
+          "height": 1067
+        }
+      }
+    ],
+    "redirects": [
+      {
+        "from_path": "/menu.html",
+        "to_path": "/menu/"
+      },
+      {
+        "from_path": "/reservations",
+        "to_path": "https://resy.example/vermilion-and-vine"
+      }
+    ],
+    "locations": [
+      {
+        "address_line1": "5119 York Boulevard",
+        "address_line2": "",
+        "city": "Los Angeles",
+        "region": "CA",
+        "postal_code": "90042",
+        "country": "US",
+        "phone": "(323) 555-0142",
+        "timezone": "America/Los_Angeles",
+        "hours": [
+          {
+            "day": "mon",
+            "closed": true,
+            "intervals": []
+          },
+          {
+            "day": "tue",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "17:00",
+                "close": "22:00"
+              }
+            ]
+          },
+          {
+            "day": "wed",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "17:00",
+                "close": "22:00"
+              }
+            ]
+          },
+          {
+            "day": "thu",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "17:00",
+                "close": "23:00"
+              }
+            ]
+          },
+          {
+            "day": "fri",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "12:00",
+                "close": "14:30"
+              },
+              {
+                "open": "17:00",
+                "close": "24:00"
+              }
+            ]
+          },
+          {
+            "day": "sat",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "10:00",
+                "close": "14:30"
+              },
+              {
+                "open": "17:00",
+                "close": "24:00"
+              }
+            ]
+          },
+          {
+            "day": "sun",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "10:00",
+                "close": "15:00"
+              }
+            ]
+          }
+        ],
+        "holiday_exceptions": [
+          {
+            "date": "2026-11-26",
+            "label": "Thanksgiving",
+            "closed": true
+          },
+          {
+            "date": "2026-12-24",
+            "label": "Christmas Eve",
+            "closed": false,
+            "intervals": [
+              {
+                "open": "12:00",
+                "close": "20:00"
+              }
+            ]
+          }
+        ],
+        "temporarily_closed": false,
+        "temporarily_closed_note": ""
+      }
+    ],
+    "settings": {
+      "category_order": [],
+      "industry": "plumber"
+    }
+  },
+  "content_contract_version": 1,
+  "template_slug": "meadow",
+  "template_version": "1.0.0",
+  "created_at": "2026-07-01T12:00:00Z"
+}

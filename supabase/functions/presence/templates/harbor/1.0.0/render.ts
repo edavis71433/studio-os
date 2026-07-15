@@ -1,11 +1,16 @@
-// ── business-classic 1.0.0 — pure render function (Phase T3) ─────────────────
-// THE neutral production default: one render, every industry. Reads the snapshot's
-// settings.industry and adapts vocabulary, paths, CTAs, and schema.org via
-// lib/industry_vocab — a plumber gets "Services" + @type:Plumber; a salon gets
-// HairSalon; a restaurant gets Menu/@type:Restaurant. Same laws as every template:
-// snapshot in → FileMap out; no network, no clock (snapshot timestamps only), no
-// randomness, zero JavaScript emitted. Accessibility/SEO/performance are
-// properties of this file, never author responsibilities.
+// ── harbor 1.0.0 — pure render function ──────────────────────────────────────
+// "Harbor": a structured, trustworthy design language for finance, legal,
+// insurance, and home services. White ground anchored by deep navy (#1b2a4a)
+// with a steel-blue secondary (#4a6fa5); strong left-aligned hierarchy; every
+// section opens on a 40px/3px navy accent bar; boxed cards with 10px radii,
+// 1px steel borders and a crisp 2px navy bottom rule; a split hero — text left,
+// stat/checklist panel on a pale steel wash right; nav links underline on a
+// 2px navy rule; tabular numerals on prices/stats; a dark-navy trust strip
+// carrying the contact details. Same engine, same laws as every template:
+// snapshot in → FileMap out; no network, no clock (snapshot timestamps only),
+// no randomness, zero JavaScript beyond the shared first-party search/tag
+// scripts. Accessibility/SEO/performance are properties of this file, never
+// author responsibilities.
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
@@ -68,76 +73,87 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
   return `<picture><source type="image/avif" srcset="${avifSrcset}"${sz}><source type="image/webp" srcset="${srcset}"${sz}>${imgTag}</picture>`;
 }
 
-// ═════════ CSS — a modern, confident, industry-neutral look (zero external assets) ═════════
-const CSS = `:root{--ink:#16171d;--soft:#636471;--paper:var(--bg,#ffffff);--card:#ffffff;--accent:#4f46e5;--accent-dark:#3730a3;--line:#eaeaf1;--wash:#f4f3fc}
+// ═════════ CSS — structured, trustworthy: navy anchor on a white ground (zero external assets) ═════════
+const CSS = `:root{--ink:#1c2434;--soft:#4a556a;--paper:var(--bg,#ffffff);--card:#ffffff;--accent:#1b2a4a;--accent-dark:#12203a;--steel:#4a6fa5;--steel-dark:#3a5a8a;--line:#c9d5e6;--wash:#eef2f8}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
 picture{display:contents}
-body{font-family:var(--font-body,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.65;font-size:1.04rem;-webkit-font-smoothing:antialiased}
-h1,h2,h3{font-family:var(--font-display,inherit);line-height:1.08;letter-spacing:-.03em;font-weight:800}
-h1{font-size:clamp(2.4rem,6vw,4rem)}h2{font-size:clamp(1.5rem,3.4vw,2.1rem);margin-bottom:16px}h3{font-size:1.12rem;letter-spacing:-.02em}
-.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}
+body{font-family:var(--font-body,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.65;font-size:1.02rem;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--font-display,inherit);line-height:1.14;letter-spacing:-.015em;font-weight:700;color:var(--accent)}
+h1{font-size:clamp(2.1rem,5vw,3.15rem);font-weight:800}h2{font-size:clamp(1.45rem,3vw,1.9rem);margin-bottom:16px}h3{font-size:1.08rem}
+.block>.wrap>h1::before,.block>.wrap>h2::before,.block.wrap>h1::before,.block.wrap>h2::before{content:"";display:block;width:40px;border-top:3px solid var(--accent);margin:0 0 14px}
+.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--accent);color:#fff;padding:10px 18px;z-index:99}
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
 .nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
-.hero-split{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center;text-align:left}
-.hero-split .cta-row{justify-content:flex-start}
-.hero-split .split-img{border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(79,70,229,.16)}
-.hero-split .split-img img{width:100%;height:100%;min-height:300px;object-fit:cover;display:block}
-@media (max-width:760px){.hero-split{grid-template-columns:1fr}}
-.annbar{background:var(--accent);color:#fff;text-align:center;padding:10px 16px;font-size:.95rem;font-weight:500}
+.annbar{background:var(--steel-dark);color:#fff;text-align:center;padding:10px 16px;font-size:.94rem;font-weight:600}
 .annbar a{color:#fff;text-decoration:underline}
 .notice{background:#fdf3e4;color:#6b4c12;text-align:center;padding:10px 16px;font-size:.95rem}
-header.site{background:rgba(255,255,255,.82);backdrop-filter:saturate(1.6) blur(12px);-webkit-backdrop-filter:saturate(1.6) blur(12px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;flex-wrap:wrap}
-.brand{font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
-.brandlogo{height:34px;width:auto;vertical-align:middle;margin-right:10px;border-radius:8px}
-nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap}
-nav.primary a{display:inline-block;padding:9px 14px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.94rem;border-radius:999px}
-nav.primary a:hover{color:var(--ink);background:var(--wash)}
-nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
-.hero{padding:calc(88px * var(--spacing-scale,1)) 0 calc(56px * var(--spacing-scale,1))}
-.hero .kicker{display:inline-block;color:var(--accent-dark);background:var(--wash);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;padding:6px 14px;border-radius:999px}
-.hero h1{margin:16px 0 14px;max-width:18ch;text-wrap:balance}
-.tagline{font-size:1.28rem;color:var(--soft);max-width:54ch;line-height:1.5}
-.cta-row{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
-.btn{display:inline-block;background:var(--accent);color:#fff;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:700;font-size:1rem;box-shadow:0 8px 22px rgba(79,70,229,.28);transition:transform .12s,box-shadow .12s}
-.btn:hover{background:var(--accent-dark);transform:translateY(-1px);box-shadow:0 12px 28px rgba(79,70,229,.34)}
-.btn.ghost{background:transparent;color:var(--accent-dark);border:2px solid var(--line);box-shadow:none}
-.btn.ghost:hover{background:var(--wash);border-color:var(--accent);transform:none}
-.hero-img{margin-top:44px;border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(79,70,229,.16)}
+header.site{background:var(--paper);border-top:4px solid var(--accent);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}
+.brand{font-weight:800;font-size:1.18rem;letter-spacing:-.02em;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center}
+.brandlogo{height:34px;width:auto;vertical-align:middle;margin-right:10px;border-radius:6px}
+nav.primary ul{display:flex;gap:18px;list-style:none;flex-wrap:wrap}
+nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.93rem;border-bottom:2px solid transparent}
+nav.primary a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+nav.primary a[aria-current="page"]{color:var(--accent);border-bottom-color:var(--accent)}
+.hero{padding:calc(72px * var(--spacing-scale,1)) 0 calc(60px * var(--spacing-scale,1))}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:44px;align-items:center}
+.hero-grid.solo{grid-template-columns:1fr}
+.hero .kicker{display:inline-block;color:var(--steel-dark);font-weight:700;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;border-left:3px solid var(--accent);padding-left:10px}
+.hero h1{margin:14px 0 12px;max-width:20ch;text-wrap:balance}
+.tagline{font-size:1.22rem;color:var(--soft);max-width:54ch;line-height:1.55}
+.cta-row{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.btn{display:inline-block;background:var(--accent);color:#fff;padding:12px 26px;border:2px solid var(--accent);border-radius:8px;text-decoration:none;font-weight:700;font-size:.98rem;transition:background .12s,border-color .12s}
+.btn:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+.btn.ghost{background:transparent;color:var(--steel-dark);border-color:var(--steel)}
+.btn.ghost:hover{background:var(--wash);color:var(--accent);border-color:var(--steel-dark)}
+.hero-panel{background:var(--wash);border:1px solid var(--line);border-bottom:2px solid var(--accent);border-radius:10px;padding:26px 28px}
+.hp-title{font-size:.76rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--steel-dark);margin-bottom:10px}
+.checklist{list-style:none}
+.checklist li{position:relative;padding:9px 0 9px 26px;border-bottom:1px solid var(--line);font-weight:600;font-size:.97rem}
+.checklist li:last-child{border-bottom:0}
+.checklist li::before{content:"✓";position:absolute;left:2px;top:8px;color:var(--accent);font-weight:800}
+.hp-stats{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px}
+.hp-stats .num{display:block;font-size:1.55rem;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1.2}
+.hp-stats .lb{display:block;font-size:.78rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+.hp-contact{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-weight:600;font-variant-numeric:tabular-nums}
+.hp-contact a{color:var(--steel-dark)}
+.split-img{border-radius:10px;overflow:hidden;border:1px solid var(--line);border-bottom:2px solid var(--accent)}
+.split-img img{width:100%;height:100%;min-height:300px;object-fit:cover;display:block}
+.hero-img{margin-top:40px;border-radius:10px;overflow:hidden;border:1px solid var(--line);border-bottom:2px solid var(--accent)}
 .hero-img img{width:100%;height:auto;display:block}
-.strip{background:var(--ink);color:#e7e7ef;font-size:.92rem}
-.strip .wrap{display:flex;gap:22px;flex-wrap:wrap;padding:12px 24px}
-.strip a{color:#c7c4f5}
+.strip{background:var(--accent);color:#d9e1f0;font-size:.92rem;font-variant-numeric:tabular-nums}
+.strip .wrap{display:flex;gap:24px;flex-wrap:wrap;padding:12px 24px}
+.strip a{color:#b9cdea}
 .block{padding:calc(60px * var(--spacing-scale,1)) 0}
 .block.alt{background:var(--wash)}
-.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;margin-top:8px}
-.svc{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 1px 3px rgba(22,23,40,.05);transition:transform .12s,box-shadow .12s}
-.svc:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(22,23,40,.09)}
-.svc .nm{font-weight:800;font-size:1.08rem;letter-spacing:-.01em}
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:8px}
+.svc{background:var(--card);border:1px solid var(--steel);border-bottom:2px solid var(--accent);border-radius:10px;padding:22px;transition:transform .12s,box-shadow .12s}
+.svc:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(27,42,74,.12)}
+.svc .nm{font-weight:700;font-size:1.06rem;color:var(--accent)}
 .svc .ds{color:var(--soft);font-size:.95rem;margin-top:6px}
-.svc .pr{color:var(--accent-dark);font-weight:800;margin-top:10px}
-.svc img{width:100%;height:auto;border-radius:12px;margin-top:12px}
-.cat-h{margin-top:38px;padding-bottom:8px;border-bottom:2px solid var(--wash)}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 4px 24px rgba(22,23,40,.05)}
-blockquote.t p{font-size:1.05rem}
+.svc .pr{color:var(--steel-dark);font-weight:800;margin-top:10px;font-variant-numeric:tabular-nums}
+.svc img{width:100%;height:auto;border-radius:6px;margin-top:12px}
+.cat-h{margin-top:38px;border-left:3px solid var(--accent);padding-left:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--steel);border-bottom:2px solid var(--accent);border-radius:10px;padding:24px}
+blockquote.t p{font-size:1.02rem}
 blockquote.t footer{margin-top:12px;color:var(--soft);font-size:.92rem;font-weight:700}
-dl.faq dt{font-weight:800;margin-top:22px;letter-spacing:-.01em}
+dl.faq dt{font-weight:700;margin-top:22px;color:var(--accent)}
 dl.faq dd{color:var(--soft);margin-top:6px}
-table.hours{border-collapse:collapse;width:100%;max-width:420px}
-table.hours caption{text-align:left;font-weight:800;margin-bottom:10px;font-size:1.05rem}
+table.hours{border-collapse:collapse;width:100%;max-width:420px;font-variant-numeric:tabular-nums}
+table.hours caption{text-align:left;font-weight:700;margin-bottom:10px;font-size:1.02rem}
 table.hours th{text-align:left;font-weight:600;padding:7px 14px 7px 0;color:var(--soft)}
 table.hours td{padding:7px 0}
 .holiday{margin-top:14px;font-size:.94rem}.holiday ul{margin:6px 0 0 18px}
 address{font-style:normal}
 form.card label{font-weight:700;font-size:.94rem}
-form.card input,form.card textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;font:inherit;margin-top:5px;background:var(--paper)}
-form.card input:focus,form.card textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+form.card input,form.card textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;font:inherit;margin-top:5px;background:var(--paper)}
+form.card input:focus,form.card textarea:focus{outline:2px solid var(--steel-dark);outline-offset:1px}
 form.card p{margin-bottom:14px}
 .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
 .post-list article{padding:24px 0;border-bottom:1px solid var(--line)}
-.post-meta{color:var(--soft);font-size:.9rem;margin:4px 0 8px}
+.post-meta{color:var(--soft);font-size:.9rem;margin:4px 0 8px;font-variant-numeric:tabular-nums}
 article.post{max-width:720px}
 article.post p{margin-bottom:16px}
 .prose>:first-child{margin-top:0}.prose>:last-child{margin-bottom:0}
@@ -146,20 +162,24 @@ article.post p{margin-bottom:16px}
 .prose ul,.prose ol{margin:0 0 1em;padding-left:1.4em}
 .prose li{margin:.2em 0}
 .prose blockquote{border-left:3px solid var(--accent);padding-left:16px;margin:0 0 1em;color:var(--soft)}
-.prose a{color:var(--accent);text-decoration:underline}
-footer.site{background:var(--ink);color:#dfe0ea;padding:52px 0 34px;margin-top:72px}
-footer.site a{color:#c7c4f5}
-footer.site h2{font-size:1.1rem}
+.prose a{color:var(--steel-dark);text-decoration:underline}
+footer.site{background:var(--accent);color:#d9e1f0;padding:50px 0 32px;margin-top:72px;border-top:3px solid var(--steel)}
+footer.site a{color:#b9cdea}
+footer.site h2{font-size:1.08rem;color:#fff}
+footer.site table.hours th{color:#b6c4dc}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:30px}
-.credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:.88rem;color:#9a9bb0;display:flex;gap:14px;flex-wrap:wrap}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.16);font-size:.88rem;color:#a7b6d1;display:flex;gap:14px;flex-wrap:wrap}
+:focus-visible{outline:2px solid var(--steel-dark);outline-offset:2px}
+footer.site :focus-visible,.strip :focus-visible,.annbar :focus-visible{outline-color:#b9cdea}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
-@media (prefers-reduced-motion:reduce){.btn,.svc{transition:none}}
-@media (max-width:640px){.hero{padding:60px 0 40px}.block{padding:44px 0}}
+@media (prefers-reduced-motion:reduce){.btn,.svc{transition:none}.svc:hover{transform:none}}
+@media (max-width:860px){.hero-grid{grid-template-columns:1fr;gap:28px}}
+@media (max-width:640px){.hero{padding:52px 0 40px}.block{padding:44px 0}}
+@media print{.annbar,.sitesearch,.skip,.cta-row{display:none}header.site{position:static;border-top-color:#000}.strip,footer.site{background:#fff;color:#000;border:0}.strip a,footer.site a{color:#000}footer.site h2{color:#000}footer.site table.hours th{color:#333}}
 ${BLOCK_CSS}
 ${SEARCH_CSS}`;
 
-const CRITICAL = `:root{--ink:#16171d;--soft:#636471;--paper:var(--bg,#ffffff);--accent:#4f46e5;--line:#eaeaf1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.4rem,6vw,4rem);line-height:1.08;letter-spacing:-.03em;font-weight:800}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 14px;text-decoration:none;color:#636471;font-weight:600}.hero{padding:88px 0 56px}`;
+const CRITICAL = `:root{--ink:#1c2434;--soft:#4a556a;--paper:var(--bg,#ffffff);--accent:#1b2a4a;--steel:#4a6fa5;--line:#c9d5e6;--wash:#eef2f8}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.3px}h1{font-size:clamp(2.1rem,5vw,3.15rem);line-height:1.14;letter-spacing:-.015em;font-weight:800;color:var(--accent)}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--accent);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-top:4px solid var(--accent);border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:18px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4a556a;font-weight:600;border-bottom:2px solid transparent}.hero{padding:72px 0 60px}.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:44px;align-items:center}.hero-panel{background:var(--wash);border:1px solid var(--line);border-bottom:2px solid var(--accent);border-radius:10px;padding:26px 28px}@media (max-width:860px){.hero-grid{grid-template-columns:1fr;gap:28px}}`;
 
 // ═════════ partials ═════════
 
@@ -195,7 +215,7 @@ function mapsHref(c: SnapshotContent): string | null {
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
-// ═════════ JSON-LD (industry-correct — the whole point of this template) ═════════
+// ═════════ JSON-LD (industry-correct via lib/industry_vocab) ═════════
 
 function ldBusiness(c: SnapshotContent, site: SiteConfig, schemaType: string, offeringPath: string, isMenu: boolean): object {
   const l = loc0(c);   // may be null on a brand-new/empty draft — must not crash the render
@@ -293,9 +313,8 @@ ${o.body}
 
 // ═════════ page bodies ═════════
 
-// Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
-// Phase T-BLOCKS: enabled structured blocks (block_<type>) join the same order/
-// visibility machinery — they default after the core sections, reorderable/hideable.
+// Home sections — owner-chosen order + visibility, structured; enabled structured
+// blocks (block_<type>) join the same order/visibility machinery.
 const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
 function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[] {
   const all = [...HOME_SECTIONS, ...blockKeys];
@@ -305,13 +324,34 @@ function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[
   return [...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
+// Harbor's signature: the hero's right column is a stat/checklist panel on a pale
+// steel wash — top offerings as a checked list, honest counts from the snapshot
+// (tabular numerals), and the contact line. Everything derives deterministically
+// from content; if there is nothing to show, the panel disappears and the hero
+// falls back to a single column.
+function heroPanel(c: SnapshotContent, v: ReturnType<typeof vocabFor>): string {
+  const items = bySort(c.offerings).slice(0, 4);
+  const cats = orderedCats(c);
+  const { tel, mail } = contactBits(c);
+  const stats: Array<[string, string]> = [];
+  if (c.offerings.length) stats.push([String(c.offerings.length), v.offeringLabel]);
+  if (cats.length > 1) stats.push([String(cats.length), 'Categories']);
+  if (c.testimonials.length) stats.push([String(c.testimonials.length), 'Client reviews']);
+  const rows = [
+    items.length ? `<ul class="checklist">${items.map((o) => `<li>${esc(o.name)}</li>`).join('')}</ul>` : '',
+    stats.length ? `<div class="hp-stats">${stats.map(([n, l]) => `<div class="stat"><span class="num">${esc(n)}</span><span class="lb">${esc(l)}</span></div>`).join('')}</div>` : '',
+    (tel || mail) ? `<p class="hp-contact">${[tel, mail].filter(Boolean).join('<br>')}</p>` : '',
+  ].filter(Boolean).join('');
+  return rows ? `<aside class="hero-panel" aria-label="At a glance"><p class="hp-title">At a glance</p>${rows}</aside>` : '';
+}
+
 function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>, blocks: RenderedBlock[] = []): string {
   const i = c.identity;
   const hero = c.settings?.cover || bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || c.settings?.logo || null;
   const featured = bySort(c.offerings).slice(0, 6);
   const tst = bySort(c.testimonials).slice(0, 3);
   const faqs = bySort(c.faqs).slice(0, 4);
-  const { tel } = contactBits(c);
+  const { tel, mail } = contactBits(c);
   const maps = mapsHref(c);
   const book = safeHref(i.booking_url || '');
   const order = safeHref(i.ordering_url || '');
@@ -326,20 +366,23 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
     ${(book || order) ? `<a class="btn ghost" href="/contact/">Contact us</a>` : ''}
   </div>`;
   const heroImgOk = hero && hero !== c.settings?.logo;
-  // DS-6 split layout — the first CROPPING presentation, so the focal point (DS-5) drives it
+  // Split layout with a chosen image respects the focal point; otherwise Harbor's
+  // default right column is the stat/checklist panel.
   const useSplit = c.settings?.hero_layout === 'split' && heroImgOk;
   const focalStyle = hero?.focal ? ` style="object-position:${hero.focal.x}% ${hero.focal.y}%"` : '';
   const splitImg = useSplit && hero?.variants
-    ? `<div class="split-img"><img src="${attr(hero.variants.w800 || hero.variants.w400 || '')}"${hero.variants.w400 && hero.variants.w1600 ? ` srcset="${attr(hero.variants.w400)} 400w, ${attr(hero.variants.w800 || hero.variants.w1600)} 800w, ${attr(hero.variants.w1600)} 1600w" sizes="(max-width:760px) 100vw, 45vw"` : ''} alt="${attr(hero.alt)}" fetchpriority="high"${focalStyle}></div>`
+    ? `<div class="split-img"><img src="${attr(hero.variants.w800 || hero.variants.w400 || '')}"${hero.variants.w400 && hero.variants.w1600 ? ` srcset="${attr(hero.variants.w400)} 400w, ${attr(hero.variants.w800 || hero.variants.w1600)} 800w, ${attr(hero.variants.w1600)} 1600w" sizes="(max-width:860px) 100vw, 42vw"` : ''} alt="${attr(hero.alt)}" fetchpriority="high"${focalStyle}></div>`
     : '';
+  const right = useSplit ? splitImg : heroPanel(c, v);
   const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
   return `${heroOff ? '' : `
-<section class="hero wrap">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
-  ${heroImgOk ? `<div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div>` : ''}`}
+<section class="hero"><div class="wrap hero-grid${right ? '' : ' solo'}"><div class="hero-copy">${heroText}</div>${right}</div>
+${heroImgOk && !useSplit ? `<div class="wrap"><div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div></div>` : ''}
 </section>`}
 <div class="strip"><div class="wrap">
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
+  ${mail ? `<span>${mail}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
 </div></div>
 ${(() => {
@@ -348,14 +391,14 @@ ${(() => {
     offerings: featured.length ? `<section class="block alt"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
 </div><p style="margin-top:22px"><a class="btn ghost" href="${attr(v.offeringPath)}">All ${esc(v.offeringLabel.toLowerCase())}</a></p></div></section>` : '',
-    testimonials: tst.length ? `<section class="block wrap"><h2>What customers say</h2><div class="cards">${tst.map((t) => `
+    testimonials: tst.length ? `<section class="block wrap"><h2>What clients say</h2><div class="cards">${tst.map((t) => `
   <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
 </div></section>` : '',
     faqs: faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd class="prose">${renderMarkdown(f.answer)}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
   };
-  for (const b of blocks) parts[b.key] = b.html;   // Phase T-BLOCKS: enabled structured blocks
+  for (const b of blocks) parts[b.key] = b.html;   // enabled structured blocks
   return homeSectionOrder(c, blocks.map((b) => b.key)).map((k) => parts[k] || '').join('');
 })()}`;
 }
@@ -424,7 +467,7 @@ function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): stri
   return `<section class="block wrap"><article class="post prose">
 <h1>${esc(p.title)}</h1>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.hero ? `<div style="margin:20px 0;border-radius:14px;overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
+${p.hero ? `<div style="margin:20px 0;border-radius:10px;overflow:hidden;border:1px solid var(--line)">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
 ${renderMarkdown(p.body_md)}
 ${postTagsHtml(normalizeTags(p.tags), esc)}</article>
 <p style="margin-top:28px"><a href="/updates/">← All updates</a></p></section>`;
@@ -453,8 +496,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
 
   const ann = c.settings?.announcement;
   const annLive = ann && ann.text && (!ann.expires_at || String(ann.expires_at) > snapshot.created_at);
+  const annHref = annLive && ann!.url ? safeHref(ann!.url) : '';
   const announce = annLive
-    ? `<div class="annbar" role="status">${(ann!.url && safeHref(ann!.url)) ? `<a href="${attr(safeHref(ann!.url)!)}">${esc(ann!.text)}</a>` : esc(ann!.text)}</div>` : '';
+    ? `<div class="annbar" role="status">${annHref ? `<a href="${attr(annHref)}">${esc(ann!.text)}</a>` : esc(ann!.text)}</div>` : '';
   const icon = c.settings?.logo?.variants?.w400 || '';
   const nav: Array<[string, string, string]> = [
     ['/', 'Home', 'home'], [v.offeringPath, v.offeringLabel, 'offerings'], ['/about/', 'About', 'about'],
@@ -464,8 +508,8 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   for (const cp of (c.settings?.pages || [])) { if (!cp.hideNav) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]); }
   const extras: Extras = { announce, icon, nav };
 
-  // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,
-  // and per-page search headline/description overrides. Plain choices, our plumbing.
+  // "Show this page on Google?" — noindex + sitemap exclusion per page,
+  // and per-page search headline/description overrides.
   const noidx = new Set(c.settings?.pages_noindex || []);
   const pseo = c.settings?.page_seo || {};
   const seoOv = (key: string, title: string, description: string) => ({
@@ -481,10 +525,10 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
     files[file] = html;
   };
 
-  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });   // structured blocks (+ form blocks + booking + window)
   const ldBiz = ldBusiness(c, site, v.schemaType, v.offeringPath, v.isMenu);
-  // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
-  // only) onto the ONE business node — home only, where the reviews_wall is visible.
+  // Fold the HONEST reviews schema (AggregateRating + Review, approved rows only)
+  // onto the ONE business node — home only, where the reviews_wall is visible.
   const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
   const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
   page('/', { title: siteTitle, description: siteDesc, ld: [ldBizHome, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
@@ -496,9 +540,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   if (noidx.has('faq')) markNoindex('faq/index.html');
   page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, `Address, phone, and hours for ${i.business_name}.`), ld: [ldBiz], active: 'contact', body: contactBody(c, site) });
   if (noidx.has('contact')) markNoindex('contact/index.html');
-  page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>` });
+  page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero"><div class="wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></div></section>` });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
-  // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
+  // The generated legal foundation — facts-true, the owner never writes legal HTML
   page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
   page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
   page('/updates/', { ...seoOv('updates', `Updates — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', body: postIndexBody(c) });
@@ -520,26 +564,25 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
       title: `${cp.title} — ${i.business_name}`, description: siteDesc,
       ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
       active: `page:${cp.slug}`,
-      body: `<section class="hero wrap"><h1>${esc(cp.title)}</h1></section>${cblocks.map((b) => b.html).join('')}`,
+      body: `<section class="hero"><div class="wrap"><h1>${esc(cp.title)}</h1></div></section>${cblocks.map((b) => b.html).join('')}`,
     });
     if (noidx.has(`page:${cp.slug}`)) markNoindex(`${cp.slug}/index.html`);
   }
 
-  // Phase SEARCH: static, privacy-safe on-site search — the site's own content
-  // index (zero external origins, zero trackers) + a calm results page whose
-  // first-party inline script filters it client-side. Kept out of the sitemap +
-  // noindexed (a thin utility page).
+  // Static, privacy-safe on-site search — the site's own content index (zero
+  // external origins, zero trackers) + a results page whose first-party inline
+  // script filters it client-side. Kept out of the sitemap + noindexed.
   files['search-index.json'] = searchIndexJson(c, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel });
   page('/search/', { title: `Search — ${i.business_name}`, description: `Search ${i.business_name}.`, ld: [], active: '', body: searchPageBody(esc, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel }) + searchClientScript() });
   markNoindex('search/index.html');
 
   files['404.html'] = shell(c, site, cssPath, {
     path: '/404.html', title: `Page not found — ${i.business_name}`, description: siteDesc, ld: [], active: '',
-    body: `<section class="hero wrap"><h1>That page isn’t here</h1><p class="tagline">The page you’re after may have moved.</p><div class="cta-row"><a class="btn" href="/">Back to ${esc(i.business_name)}</a><a class="btn ghost" href="${attr(v.offeringPath)}">See our ${esc(v.offeringLabel.toLowerCase())}</a></div></section>`,
+    body: `<section class="hero"><div class="wrap"><h1>That page isn’t here</h1><p class="tagline">The page you’re after may have moved.</p><div class="cta-row"><a class="btn" href="/">Back to ${esc(i.business_name)}</a><a class="btn ghost" href="${attr(v.offeringPath)}">See our ${esc(v.offeringLabel.toLowerCase())}</a></div></div></section>`,
   }, extras);
 
   const letter = (i.business_name || 'B').trim()[0]?.toUpperCase() || 'B';
-  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#23635a"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#f7f7f5" text-anchor="middle">${esc(letter)}</text></svg>`;
+  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#1b2a4a"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#ffffff" text-anchor="middle">${esc(letter)}</text></svg>`;
 
   const lastmod = snapshot.created_at.slice(0, 10);
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
