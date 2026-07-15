@@ -374,8 +374,11 @@ async function renderSummary(){
   const winPart=(wr.pct===null||wr.pct===undefined)?`Win rate: <strong>—</strong> <span class="mut">(no closed deals yet)</span>`
     :`Win rate: <strong>${wr.pct}%</strong> <span class="mut">(${wr.won} of ${wr.won+wr.lost}, last 90 days)</span>`;
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
+  // AR strip — "who owes me money" across all deals, in one glance (open invoices).
+  const ar=s.ar||{}; let arPart='';
+  if((ar.count||0)>0){ arPart=`<div class="sum-line" style="margin-top:6px">💰 Outstanding: <strong>${money(ar.outstanding_cents)||'$0'}</strong> across ${plur(ar.count,'invoice')}`+((ar.overdue_count||0)>0?` <span class="dot">·</span> <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong> (${ar.overdue_count})`:'')+`</div>`; }
   host.innerHTML=`<div class="sum-line">${openPart} <span class="dot">·</span> ${wonPart} <span class="dot">·</span> ${winPart}</div>`
-    +(open.count?`<div class="sum-stages">${cells}</div>`:'');
+    +(open.count?`<div class="sum-stages">${cells}</div>`:'')+arPart;
 }
 
 // List ⇄ Board view toggle. The board is additive — the List view is unchanged

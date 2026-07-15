@@ -274,10 +274,19 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
   const CAP = 2000;
-  const r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`);
+  const [r, invR] = await Promise.all([
+    svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`),
+    // AR rollup — "who owes me money" across every deal, in one place (a Salesforce
+    // gap: invoices were only ever visible one-deal-at-a-time). Open invoices only.
+    svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`),
+  ]);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t total your pipeline just now.' }, 502, cors);
   const deals = rows(r);
-  return json({ data: summarizePipeline(deals, nowIso()), truncated: deals.length >= CAP }, 200, cors);
+  const today = nowIso().slice(0, 10);
+  let outstanding = 0, overdue = 0, overdueCount = 0;
+  for (const iv of rows(invR)) { const amt = Number(iv.amount_cents) || 0; outstanding += amt; if (iv.due_date && String(iv.due_date) < today) { overdue += amt; overdueCount++; } }
+  const ar = { outstanding_cents: outstanding, count: rows(invR).length, overdue_cents: overdue, overdue_count: overdueCount };
+  return json({ data: { ...summarizePipeline(deals, nowIso()), ar }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ DEALS ═══
