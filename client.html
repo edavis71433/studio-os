@@ -119,6 +119,16 @@
   .tl-here{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
   @media (prefers-reduced-motion:no-preference){.tl-node.current .tl-dot{animation:tlpulse 2.2s ease-in-out infinite}}
   @keyframes tlpulse{0%,100%{box-shadow:0 0 0 4px var(--p-soft)}50%{box-shadow:0 0 0 7px var(--p-soft)}}
+  /* ── chat-style message threads (project messages + support) ── */
+  .msgs{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+  .bubble{max-width:85%;align-self:flex-start;background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 5px;padding:10px 14px;box-shadow:var(--shadow)}
+  .bubble.me{align-self:flex-end;background:var(--p-soft);border-color:transparent;border-radius:16px 16px 5px 16px}
+  .bubble .meta{display:block;font-size:12px;color:var(--faint);margin-bottom:3px;font-weight:600}
+  .bubble p{margin:0;color:var(--ink);font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+  /* ── friendly empty states (distinct from content cards) ── */
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:26px 20px;text-align:center;margin-bottom:14px}
+  .empty .ei{font-size:26px;display:block;margin-bottom:8px}
+  .empty p{color:var(--soft);font-size:14.5px;margin:0 auto;max-width:44ch}
   /* ── FAQ / Help ── */
   .faq{margin:0}
   .faq-intro{color:var(--soft);font-size:14.5px;margin:0 0 12px}
@@ -231,8 +241,10 @@ function showTab(tab){
 function goHome(){showTab('home');}
 // small shared building blocks for the tab views
 function portalHeader(title,sub){return `<header><h1>${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
-function emptyCard(msg){return `<div class="card"><p class="muted">${esc(msg)}</p></div>`;}
-function spinnerHtml(){return '<div class="spin" role="status" aria-label="Loading"></div>';}
+function emptyCard(msg,icon){return `<div class="empty">${icon?`<span class="ei" aria-hidden="true">${icon}</span>`:''}<p>${esc(msg)}</p></div>`;}
+function spinnerHtml(){return skeleton();}
+// one message bubble — the studio sits left, the client's own messages right
+function bubbleHtml(m){const mine=!(m.author_kind==='staff'||m.author_kind==='system');return `<div class="bubble${mine?' me':''}"><span class="meta">${mine?'You':'Your studio'}${m.created_at?` · ${esc(rel(m.created_at))}`:''}</span><p>${esc(m.body)}</p></div>`;}
 // billing (invoices) — cached per full load; degrades to empty for a reviewer
 async function ensureBilling(){if(PORTAL.billing)return PORTAL.billing;try{const r=await api('/client/billing');PORTAL.billing=(r.ok&&r.body&&r.body.data)||{invoices:[]};}catch(_){PORTAL.billing={invoices:[]};}return PORTAL.billing;}
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
@@ -271,7 +283,7 @@ async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api
 
 // ── HOME — aggregates ACROSS all projects (needs-you · projects · updates) ──
 function projectCardsHtml(projects){
-  if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.');
+  if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.','🚀');
   let h='';
   for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   return h;
@@ -284,11 +296,11 @@ function renderHome(){
     `<div id="np" class="notifpanel" role="region" aria-label="What’s new" hidden></div>`+
     `<header><h1>Home</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
   html+=welcomeCardHtml();
-  html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body">${emptyCard('Checking what needs you…')}</div></section>`;
+  html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
   html+=`<section><h2>Your projects</h2>${projectCardsHtml(projects)}</section>`;
   html+=`<section><h2>Recent updates</h2>`;
   const moments=(feed.moments||[]);
-  if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.');
+  if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
   else for(const m of moments)html+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
@@ -327,7 +339,7 @@ async function renderMessages(){
   html+=`<section id="sec-messages"><h2>Message your studio</h2>`;
   for(const rq of general){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
   if(canMessage)html+=`<div class="card"><label for="gmsg" style="display:block;font-weight:600;margin-bottom:6px">${general.length?'Start a new message':'Send your studio a message'}</label><textarea id="gmsg" rows="3" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Type your message…"></textarea><div class="row"><button class="approve" id="gsend">Send</button></div></div>`;
-  else html+=emptyCard('Your studio will reach you here. Messaging opens up once they’ve set up your account.');
+  else html+=emptyCard('Your studio will reach you here. Messaging opens up once they’ve set up your account.','💬');
   html+=`</section>`;
   if(PORTAL.projects.length){
     html+=`<section><h2>Project conversations</h2>`;
@@ -358,7 +370,7 @@ async function renderFiles(){
     }
     html+=`</section>`;
   }
-  if(!withFiles.length&&!docs.length){html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.');$('main').innerHTML=html;return;}
+  if(!withFiles.length&&!docs.length){html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');$('main').innerHTML=html;return;}
   for(const s of withFiles){
     html+=`<section><h2 class="grouphd">${esc(s.name)}</h2>`;
     for(const f of s.deliverables)html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;
@@ -379,7 +391,7 @@ async function renderInvoices(){
   $('main').innerHTML=spinnerHtml();
   const b=await ensureBilling();const inv=(b&&b.invoices)||[];
   let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
-  if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)');$('main').innerHTML=html;return;}
+  if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
   html+=appendBilling(inv);
   $('main').innerHTML=html;
 }
@@ -519,7 +531,7 @@ async function renderHelp(){
   const canMessage=PORTAL.persona==='client';
   let faqHtml='';try{const r=await api('/client/faq');faqHtml=(r&&r.body&&r.body.data&&r.body.data.html)||'';}catch(_){}
   let html=portalHeader('Help','Quick answers from your studio.');
-  if(!faqHtml)html+=emptyCard('Your studio hasn’t added any help articles yet — but you can always ask them a question below.');
+  if(!faqHtml)html+=emptyCard('Your studio hasn’t added any help articles yet — but you can always ask them a question below.','❓');
   else{
     html+=`<div class="card" style="padding:12px 14px"><input id="faqSearch" type="search" placeholder="Search help…" aria-label="Search help" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)"></div>`;
     html+=`<div id="faqBody">${faqHtml}</div>`;
@@ -649,10 +661,10 @@ async function openProject(id,focusSection){
   loadThread(id);
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
 }
-async function loadThread(id){const r=await api('/client/projects/'+id+'/messages');const items=((r.body&&r.body.data)||[]).slice().reverse();$('thread').innerHTML=items.length?items.map(m=>`<div class="card"><p><strong>${m.author_kind==='staff'||m.author_kind==='system'?'Your studio':'You'}</strong>${m.created_at?` <span class="muted" style="font-size:12.5px">· ${esc(rel(m.created_at))}</span>`:''}</p><p style="margin-top:4px">${esc(m.body)}</p></div>`).join(''):'<p class="muted">No messages yet.</p>';}
+async function loadThread(id){const r=await api('/client/projects/'+id+'/messages');const items=((r.body&&r.body.data)||[]).slice().reverse();$('thread').innerHTML=items.length?`<div class="msgs">${items.map(bubbleHtml).join('')}</div>`:emptyCard('No messages yet — say hello any time.','💬');}
 // C1: the client's own support thread — see the studio's replies and reply back
 async function openSupportThread(rid,pid){
-  $('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  $('main').innerHTML=skeleton();
   const r=await api('/client/support/'+rid);
   if(!r.ok){toast('That request isn’t available.');return pid?openProject(pid):goHome();}
   const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
@@ -665,7 +677,7 @@ async function openSupportThread(rid,pid){
   $('main').innerHTML=html;
   $('back').addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):goHome();});
   const thread=[];if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at});thread.push(...msgs);
-  $('sthread').innerHTML=thread.length?thread.map(m=>`<div class="card"><p><strong>${m.author_kind==='staff'||m.author_kind==='system'?'Your studio':'You'}</strong>${m.created_at?` <span class="muted" style="font-size:12.5px">· ${esc(rel(m.created_at))}</span>`:''}</p><p style="margin-top:4px">${esc(m.body)}</p></div>`).join(''):'<p class="muted">No replies yet — your studio usually replies within a day.</p>';
+  $('sthread').innerHTML=thread.length?`<div class="msgs">${thread.map(bubbleHtml).join('')}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
   if(!resolved){const sbtn=$('ssend');sbtn.addEventListener('click',async()=>{const v=$('smsg').value.trim();if(!v)return;sbtn.disabled=true;const rr=await api('/client/support/'+rid+'/messages','POST',{body:v});if(rr.ok){openSupportThread(rid,pid);}else{toast('That didn’t send.');sbtn.disabled=false;}});}
 }
 async function openSurvey(sid,pid){
