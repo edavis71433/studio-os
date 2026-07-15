@@ -15,8 +15,12 @@ import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
+import { signDocToken, type DocKind } from '../lib/documents.ts';
+import { linkSecret } from './sales.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+
+const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
@@ -60,6 +64,31 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
     invoices: list,
     summary: { open_count: open.length, paid_count: paid.length },
   } }, 200, cors);
+}
+
+// ═══ DOCUMENTS (the client's proposals & agreements, findable in-portal) ═══
+// A top client-portal gap: signing worked ONLY via an emailed link, so a client who
+// lost the email couldn't find their proposal/contract again. This lists every
+// document on the deals that made them a customer, with a branded view link (a short-
+// lived signed doc token → the read-only Document of Record). Read-only; drafts are
+// never exposed; scoped to the caller's own client id.
+export async function handleClientDocuments(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const me = customerOf(site);
+  if (!me) return json({ data: { documents: [] } }, 200, cors);
+  const deals = rows(await svc(`presence_deals?converted_client_id=eq.${me}&deleted_at=is.null&select=id&limit=50`));
+  if (!deals.length) return json({ data: { documents: [] } }, 200, cors);
+  const ids = deals.map((d) => d.id).join(',');
+  const [props, cons] = await Promise.all([
+    svc(`presence_proposals?deal_id=in.(${ids})&status=in.(sent,accepted,declined,superseded)&deleted_at=is.null&select=id,title,status,subtotal_cents,created_at,site_id&order=created_at.desc&limit=100`),
+    svc(`presence_contracts?deal_id=in.(${ids})&status=in.(sent,signed)&deleted_at=is.null&select=id,title,status,signed_at,created_at,site_id&order=created_at.desc&limit=100`),
+  ]);
+  const secret = linkSecret();
+  const mk = async (kind: DocKind, id: string, siteId: string) => secret ? `${fnBase()}/functions/v1/presence/sales/doc/${await signDocToken({ t: 'doc', k: kind, id, site_id: String(siteId), exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
+  const documents: any[] = [];
+  for (const p of rows(props)) documents.push({ kind: 'proposal', id: p.id, title: clean(p.title, 200) || 'Proposal', status: p.status, amount: (Number(p.subtotal_cents) || 0) / 100, created_at: p.created_at, view_url: await mk('proposal', p.id, p.site_id) });
+  for (const c of rows(cons)) documents.push({ kind: 'contract', id: c.id, title: clean(c.title, 200) || 'Agreement', status: c.status, signed_at: c.signed_at, created_at: c.created_at, view_url: await mk('contract', c.id, c.site_id) });
+  documents.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  return json({ data: { documents } }, 200, cors);
 }
 
 // ═══ PROJECTS (list + bundle + report) ═══
