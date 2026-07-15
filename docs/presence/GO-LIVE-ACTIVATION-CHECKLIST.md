@@ -1,6 +1,6 @@
 # Go-live activation checklist (owner)
 
-Everything below is done in external dashboards with your accounts. **Status Jul 12 2026: push DONE (allowlist build live — source paths 404) · dead ADMIN_SHARED_SECRET deleted · migrations 0086–0093 + workspace-connect applied (prod; 0086–0093 staging) · VAPID set + push live · Resend bounce webhook armed · Stripe consolidated to ONE destination (Studio OS - platform webhook).** Remaining: NURTURE_DRIP decision, PITR check, external uptime monitor, human browser/mobile QA.
+Everything below is done in external dashboards with your accounts. **Status Jul 15 2026: latest push DONE (Jul 14 — allowlist build live, source paths 404) · dead ADMIN_SHARED_SECRET deleted · migrations applied through 0108 (prod; 0107/0108 via APPLY-0107-0108-prod.sql, Jul 15) · VAPID set + push live · Resend bounce webhook armed · Stripe consolidated to ONE destination (Studio OS - platform webhook).** Remaining: NURTURE_DRIP decision, PITR check, external uptime monitor, human browser/mobile QA.
 
 Prod project ref: **`qksstlqzbhesadrrofgn`**
 
@@ -17,6 +17,8 @@ Prod project ref: **`qksstlqzbhesadrrofgn`**
      - `customer.subscription.deleted`
      - `payment_intent.succeeded`
      - `payment_intent.payment_failed`
+     - `invoice.payment_succeeded`
+     - `invoice.payment_failed`
    - After creating it, copy the **Signing secret** (`whsec_…`).
 2. **Developers → API keys** → copy your **live Secret key** (`sk_live_…`).
 
@@ -25,7 +27,7 @@ Prod project ref: **`qksstlqzbhesadrrofgn`**
 |---|---|
 | `STRIPE_SECRET` (and `STRIPE_SECRET_KEY` if present) | your `sk_live_…` |
 | `STRIPE_WEBHOOK_SECRET` | the `whsec_…` from step 1 |
-| `STRIPE_EXPECT_LIVEMODE` | `true`  ← **the live-mode guard; without this the webhook rejects live events** |
+| `STRIPE_EXPECT_LIVEMODE` | `true` (optional override) — the live-mode guard normally **infers** the expected mode from the key prefix (`sk_live_`/`sk_test_`); set this only to override. If neither is known the webhook **fails open** (processes, logs a warning) — it never silently drops events |
 
 **Verify:** Stripe → your webhook → **Send test webhook** (`checkout.session.completed`) → it should show **200**. Then do one real small test purchase and confirm it appears.
 

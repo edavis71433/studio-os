@@ -12,7 +12,7 @@
 ## ⚡ Do Now / Standing (⟐ pulled forward — don't wait for a launch phase)
 These de-risk everything below them and are near-immediate (owner actions / one decision), not big builds.
 - **⟐ Activate CI as a required gate** — M1 built the runner; it's *dormant* until pushed + branch-protected. It gates all of M3–M10. (Owner)
-- **⟐ Resolve the GitHub ↔ Production divergence** — *(updated 2026-07-12)* the fence-lift push happened **Jul 11** (344 commits synced), but the Jul 11–12 audit campaign has put **13 commits ahead again** — including the **publish-root security fix** (backend source/docs/`_internal` runbook were publicly fetchable; the `_redirects` block rules + file removals are **INERT until pushed**) — and **prod migrations `0086`–`0092` need owner-apply** (see `APPLY-0086-0092-prod.sql`). **This push + apply is the current #1 owner action.** *Standing risk whenever local runs ahead of GitHub.* (Owner)
+- ✅ **⟐ GitHub ↔ Production divergence — RESOLVED** *(updated 2026-07-15)*: fence-lift push Jul 11 (344 commits), audit-campaign push landed **Jul 14** (publish-root security fix live), prod migrations applied through **0108** (0107/0108 Jul 15 via `APPLY-0107-0108-prod.sql`). *Standing risk whenever local runs ahead of GitHub — re-open this item if commits pile up unpushed.* (Owner)
 - **⟐ Decide the name/positioning** — Studio OS = platform · Presence = the website product · Davis Digital Studio = the studio. A 5-minute decision that unblocks all Phase 3 copy + screenshots. (Owner decision)
 
 ---

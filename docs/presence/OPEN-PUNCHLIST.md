@@ -1,7 +1,7 @@
 # Open punch-list — things raised in conversation (living doc)
 
 Purpose: we keep losing items to context compaction. This is the durable list of
-what Eric asked for that is **outstanding or needs Eric**. Updated 2026-07-14.
+what Eric asked for that is **outstanding or needs Eric**. Updated 2026-07-15.
 Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · 🚀 needs Eric's `git push` · ❓ needs Eric to clarify.
 
 ---
@@ -18,9 +18,9 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
   OpenAI key, `sk-proj-…`) set on prod + redeployed. Defaults to OpenAI images
   (`gpt-image-1`); if that model needs org verification, switch `VISUAL_MODEL_NAME` to
   `dall-e-3`. All owner keys now in.
-- ❓ **Messages** — Eric says he specified what he wants; it did not survive compaction.
-  Messaging was audited + polished earlier (`messaging-ux-polish` merged) and the inbox
-  groups client messages by client. **Need one line: what's actually wrong/missing now?**
+- ✅ **Messages** — DONE 2026-07-15. Salesforce-style record thread shipped (messages live
+  on the client record) + #181 inbox client grouping shipped. Pending function deploy to
+  go live.
 
 ## Code — for me to do (Eric will batch-review)
 
@@ -42,9 +42,9 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
   editor, deployed. (1-column was already supported.) Containers can't nest (no infinite
   recursion). NOTE: media already worked standalone (Image/Video/Gallery/Carousel
   components + per-cell image) — this just adds nesting.
-- ⏳ **More visual templates/themes** (#183) — only 3 template *designs* exist
-  (business-classic, editorial, restaurant-classic). Starter *layouts* are at 13, but
-  Eric also wants more full theme designs. The one substantial builder item left.
+- ✅ **More visual templates/themes** (#183) — DONE 2026-07-15. Now **8 template families**
+  registered (restaurant-classic, business-classic, editorial, aurora, slate, meadow,
+  atelier, harbor — `lib/render.ts` LOADERS). Starter *layouts* remain at 13.
 
 ## Done this stretch (verify after push)
 
@@ -63,10 +63,10 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 
 ## Backlog tasks already tracked (not conversation-lost — see task list)
 
-#180 Files→Design fold · #181 inbox client grouping ("client msgs ONLY in client
-profile" part) · #174 admin consolidation + freelancer/agency provisioning · #166
-compliance/doc-truth · #167 seamlessness redesign · #169 optimization pass · #172 final
-verification.
+#180 Files→Design fold (✅ increment 1 done; increment 2 in progress) · #181 inbox client
+grouping ("client msgs ONLY in client profile" part — ✅ done, pending function deploy) ·
+#174 admin consolidation + freelancer/agency provisioning · #166 compliance/doc-truth ·
+#167 seamlessness redesign · #169 optimization pass · #172 final verification.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 

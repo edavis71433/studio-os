@@ -18,13 +18,13 @@
 
 Everything else is **data and composition** over those two spines. That is why the platform grew from a single restaurant site (M1) to an industry platform with connected providers, a marketplace, enterprise multi-location, and agency orchestration (L5.7) — with **zero engine changes** (invariants 14/14 held throughout).
 
-**The editions ladder:** Presence Monitor → Presence → Presence Managed → Presence Agency → Presence Enterprise → (operator surface) Studio OS. Editions are capability gates, not separate codebases.
+**The editions ladder** (7 rungs — `commerce/catalog.ts` PLANS is the truth): Presence Monitor → CMS → Business OS → Presence → Presence Managed → Agency → Enterprise, plus the operator surface (Studio OS). Editions are capability gates, not separate codebases.
 
 ---
 
 ## 2. Studio OS Architecture Overview
 
-- **Runtime:** one Supabase Edge Function, `presence` (Deno/TypeScript), fronting Postgres (RLS-guarded) and Supabase Storage. A second function, `stripe-webhook`, handles billing callbacks.
+- **Runtime:** three Supabase Edge Functions (Deno/TypeScript) fronting Postgres (RLS-guarded) and Supabase Storage: `presence` (the platform), `stripe-webhook` (billing callbacks), and `clever-api` (retained + documented — see P2-G).
 - **Frontend:** static HTML (customer portal + public site) deployed to Netlify by `git push`. No SPA framework; each page talks to the `presence` function with the portal's auth pattern.
 - **Boundary (every request):** CORS → resolve principal → [operator/public routes] → resolve caller site via RLS → entitlement gate → router. See [Request Flow](#request-flow).
 - **Determinism:** one renderer, one pipeline. Same content snapshot → byte-identical HTML, atomically deployed, every version retained.
@@ -59,7 +59,7 @@ Each subsystem is a folder under `supabase/functions/presence/`. (Deep dive per 
 | `commerce/` | Commerce | signup, plans, entitlements, metering, capacity, subscriptions |
 | `ops/` | Operations | the unattended scheduler cycle |
 | `routes/` | HTTP handlers | one file per route family; `index.ts` is the router |
-| `templates/` | Renderers | versioned deterministic templates (e.g. `restaurant-classic/1.0.0`) |
+| `templates/` | Renderers | versioned deterministic templates — 8 registered families (`restaurant-classic`, `business-classic`, `editorial`, `aurora`, `slate`, `meadow`, `atelier`, `harbor`; `lib/render.ts` LOADERS is the truth) |
 
 ---
 
@@ -130,10 +130,11 @@ No cycles: the industry/enterprise/agency/visual layers depend on the spines; th
 ## 7. Folder Structure (repo)
 
 ```
-supabase/functions/presence/   the one edge function (subsystems in §3; index.ts = router)
+supabase/functions/presence/   the main edge function (subsystems in §3; index.ts = router)
 supabase/functions/stripe-webhook/   billing callbacks
-supabase/migrations/           0000–0044 (see DATABASE.md; hold-back technique in DEPLOYMENT-AND-OPERATIONS.md)
-tests/presence/                44 suites (pure + live-staging integration)
+supabase/functions/clever-api/ retained legacy API (documented — P2-G)
+supabase/migrations/           0000–0109 at last count (see DATABASE.md; hold-back technique in DEPLOYMENT-AND-OPERATIONS.md)
+tests/presence/                199 suites at last count (pure + live-staging integration)
 docs/presence/                 this documentation set (README.md = index)
 *.html (repo root)             customer portal + public site (Netlify)
 scripts/deploy-presence.ps1    verified function deploy
@@ -143,7 +144,7 @@ scripts/deploy-presence.ps1    verified function deploy
 
 ## 8. Testing
 
-- **44 suites** in `tests/presence/`. Most are **pure** (no I/O — the engines are pure functions); several have a **live-staging integration tier** gated on env vars.
+- **199 suites at last count** in `tests/presence/` (the folder is the truth). Most are **pure** (no I/O — the engines are pure functions); several have a **live-staging integration tier** gated on env vars.
 - **Run pure:** `deno run --allow-read --allow-env tests/presence/<name>_test.mjs` (set `$TMPDIR=$TEMP` on Windows).
 - **Run integration:** set `SB` + `SR_KEY` + `ANON` (room/pipeline/service/admin) or `SUPABASE_URL` + `SERVICE_ROLE_KEY` + `ANON_KEY` (connected/operations/commerce) to the staging project, then run.
 - **Guardrails:** `platform_invariants_test.mjs` enforces 14 architectural invariants — a change that violates a frozen contract fails here. Keep it green.

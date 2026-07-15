@@ -12,7 +12,7 @@
 
 - **Content model:** `presence_settings.blocks` (structured `SiteBlock[]`), `presence_identity`, `presence_offerings`, `presence_faqs`, `presence_testimonials`, `presence_voice`, `presence_brand_profile`, `presence_redirects`.
 - **Snapshot + publish:** `serializeDraft()` → `presence_snapshots` → `runPipeline()` → `presence_publishes` (with a partial-unique-index one-in-flight gate) → content-addressed atomic **Netlify** deploy (`lib/netlify.ts`).
-- **Render:** `renderSnapshot()` — one pure, synchronous, deterministic render entry; a versioned template registry (`lib/render.ts`: `getTemplate`, `templateIndex`, `registryIntegrity`) with 3 templates (`business-classic`, `editorial`, `restaurant-classic`) + industry vocabulary + structured block components.
+- **Render:** `renderSnapshot()` — one pure, synchronous, deterministic render entry; a versioned template registry (`lib/render.ts`: `getTemplate`, `templateIndex`, `registryIntegrity`) with 8 template families (`restaurant-classic`, `business-classic`, `editorial`, `aurora`, `slate`, `meadow`, `atelier`, `harbor`) + industry vocabulary + structured block components.
 - **Preview:** `/preview`, `lib/staging.ts` (`captureDraftSnapshot`), `lib/preview_env.ts`, promote/publish flow.
 - **Launches:** `presence_launches` + `routes/launches.ts` (named parallel drafts, approve → schedule/promote → rollback), reusing the one publish pipeline.
 - **Media:** private `presence-media` bucket, function-issued signed upload URLs, MIME allow-list, size caps, DB-enforced alt text, EXIF/GPS stripped at publish, self-hosted on the published site (zero external origins).
