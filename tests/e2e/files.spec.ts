@@ -35,7 +35,9 @@ test.describe('Files (the DAM, customer-facing)', () => {
     const CLIENT = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
     let sentScope = '';
     await installApp(page, { api: filesApi });
-    await page.route('**/functions/v1/presence/assets**', (route) => {
+    // match ONLY the /assets list call (never /assets/collections or /assets/health,
+    // which need their own response shapes and stay on the installApp fixtures)
+    await page.route(/\/functions\/v1\/presence\/assets(\?|$)/, (route) => {
       sentScope = route.request().headers()['x-dds-scope-site'] || '';
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(filesApi['/assets']) });
     });

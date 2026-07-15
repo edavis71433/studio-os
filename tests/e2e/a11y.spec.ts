@@ -31,15 +31,23 @@ test.describe('Accessibility', () => {
     await page.goto('/today.html');
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
+    // the Menu control (burger) is CSS-hidden at desktop widths (the full nav
+    // shows instead) — assert it still carries its accessible name.
+    await expect(page.locator('#dds-burger')).toHaveAttribute('aria-label', 'Menu');
     await expect(page.getByLabel('Search')).toBeVisible();
   });
 
   test('keyboard: the command palette is reachable and Escapable', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');
+    // the ⌘K listener is wired when the shell renders (after /portal/context) —
+    // wait for the shell's search control before pressing, or the key is lost.
+    await expect(page.locator('#dds-search')).toBeVisible();
     await page.keyboard.press('Control+k');
     await expect(page.locator('.dds-palette')).toBeVisible();
+    // the palette moves focus into its input shortly after opening; Escape is
+    // handled there — wait for the focus hand-off before pressing it.
+    await expect(page.locator('.dds-palette input')).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.locator('.dds-palette')).toBeHidden();
   });

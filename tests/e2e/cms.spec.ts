@@ -6,8 +6,15 @@ import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 const PRESENCE_API = {
   '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } },
   '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },
-  '/media': { data: [] }, '/settings': { data: {} }, '/health': { data: {} }, '/changes': { data: [] }, '/notes': { data: [] },
+  '/media': { data: [] }, '/settings': { data: {} }, '/health': { data: {} }, '/notes': { data: [] },
+  // GET /changes returns an OBJECT (routes/room.ts handleChanges) — renderRecent
+  // reads data.changes.length, so an array-shaped fixture throws in the page.
+  '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
   '/moments': { data: [] },
+  // routes newer page code calls on boot / #design — real shapes from the routes:
+  '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: ['accent', 'accent_soft', 'accent_dark', 'soft', 'ink', 'bg', 'radius', 'font_display', 'font_body', 'spacing_scale', 'font_scale'], can_edit_css: false, updated_at: null, updated_by: null } },
+  '/schedule': { data: { scheduled: [] } },
+  '/content-library': { data: [] },
 };
 const ctx = (features: string[]) => ({ data: {
   site_role: 'business_owner', edition: 'presence', edition_key: features.includes('business_moments') ? 'studio_os' : 'cms_only',
@@ -28,8 +35,10 @@ test.describe('CMS workspace', () => {
   test('CMS edition hides the Business-OS links it does not include (Phase SKU)', async ({ page }) => {
     await installApp(page, { api: { ...PRESENCE_API, '/portal/context': ctx(['website', 'developer', 'forms', 'client_portal', 'reports']) } });
     await page.goto('/presence.html');
-    await expect(page.locator('#lnkConnections')).toBeHidden();
-    await expect(page.locator('#lnkVisual')).toBeHidden();
+    await expect(page.locator('#lnkConnections')).toBeHidden();   // Business-OS ('connected') — not in a CMS edition
+    // Visual Studio folded under the 'website' feature (it makes site imagery),
+    // so a drafting CMS edition keeps it — only watch-plan (monitor) sites lose it.
+    await expect(page.locator('#lnkVisual')).toBeVisible();
   });
 
   test('the media section is called "Files" everywhere (Architecture v1.0 terminology)', async ({ page }) => {
@@ -60,9 +69,11 @@ test.describe('CMS workspace', () => {
       ] } },
     } });
     await page.goto('/presence.html#design');
-    await expect(page.locator('#lookSeg button[data-look="business-classic"]')).toBeVisible();
-    await expect(page.locator('#lookSeg button[data-look="editorial"]')).toBeVisible();
-    await expect(page.locator('#lookSeg')).toContainText('Editorial');
-    await expect(page.locator('#lookSeg')).toContainText('print serif'); // the family's swatch tag
+    // the template-family gallery lives in the on-demand Design settings panel now
+    await page.locator('#btnSettingsOpen').click();
+    await expect(page.locator('#designGallery .tg-card[data-look="business-classic"]')).toBeVisible();
+    await expect(page.locator('#designGallery .tg-card[data-look="editorial"]')).toBeVisible();
+    await expect(page.locator('#designGallery')).toContainText('Editorial');
+    await expect(page.locator('#designGallery')).toContainText('print serif'); // the family's swatch tag
   });
 });

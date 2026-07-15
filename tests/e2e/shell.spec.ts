@@ -31,6 +31,9 @@ test.describe('App shell', () => {
   test('⌘K command palette opens, filters, and targets the right destination', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');
+    // the ⌘K listener is wired when the shell renders (after /portal/context) —
+    // wait for the shell's search control before pressing, or the key is lost.
+    await expect(page.locator('#dds-search')).toBeVisible();
     await page.keyboard.press('Control+k');
     const pal = page.locator('.dds-palette');
     await expect(pal).toBeVisible();
@@ -75,7 +78,7 @@ test.describe('App shell', () => {
   test('signed-out: shell degrades to brand + sign-in, no nav or search', async ({ page }) => {
     await installApp(page, { session: null });
     await page.goto('/today.html');
-    await expect(page.locator('#dds-shell .dds-brand')).toContainText('Presence');
+    await expect(page.locator('#dds-shell .dds-brand')).toContainText('Studio OS');
     await expect(page.locator('.dds-nav')).toHaveCount(0);
     await expect(page.locator('#dds-search')).toHaveCount(0);
   });

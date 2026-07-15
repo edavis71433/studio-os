@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // Today — the home surface. It must tell ONE story with the bell (Phase OS): the
 // same notices + approvals appear here as "needs you" cards, plus Moments.
@@ -20,6 +20,9 @@ test.describe('Today', () => {
   test('the ONE health experience is the Business Health Coach (PT-2C)', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');
+    // the coach line is secondary context now — it lives inside the collapsed
+    // "More about your business" disclosure; open it first.
+    await page.locator('details.more > summary').click();
     await expect(page.getByText('One thing could help.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/leads.html');
   });
@@ -27,8 +30,12 @@ test.describe('Today', () => {
   test('the Customer Journey celebrates milestones, never a score', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');
+    // the journey strip lives inside the collapsed "More about your business"
+    // disclosure; open it first.
+    await page.locator('details.more > summary').click();
     await expect(page.getByText('Your journey')).toBeVisible();
-    await expect(page.getByText('Your website went live for the first time.')).toBeVisible();
+    // appears twice by design: the celebration line + the milestone row
+    await expect(page.getByText('Your website went live for the first time.').first()).toBeVisible();
     await expect(page.getByText('Your presence began')).toBeVisible();
     // no numeric score anywhere in the journey card
     const journeyText = await page.locator('div', { hasText: 'Your journey' }).last().innerText();
@@ -53,12 +60,22 @@ test.describe('Today', () => {
 
   test('all-clear empty state (website edition) speaks website language', async ({ page }) => {
     await installApp(page, { api: {
+      // attention_count must be 0 too — the page trusts the bell count and
+      // renders a "things need you → Inbox" card instead of "all clear" otherwise.
+      '/portal/context': { data: {
+        site_role: 'business_owner', edition: 'presence',
+        edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
+        is_agency: false, is_operator: false, sees_full_workspace: true, is_client_portal: false,
+        capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'],
+        landing: '/today.html', attention_count: 0, nav: STUDIO_NAV,
+        plan_key: 'presence', upsell: null,
+      } },
       '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
       '/moments': { data: [] },
     } });
     await page.goto('/today.html');
     await expect(page.getByText('All clear')).toBeVisible();
-    await expect(page.getByText('Everything customers can see is current.')).toBeVisible();
+    await expect(page.getByText('Everything we watch looks good.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open your website' })).toBeVisible();
   });
 
@@ -76,7 +93,7 @@ test.describe('Today', () => {
     } });
     await page.goto('/today.html');
     await expect(page.getByText('Everything’s quiet across your business.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Open your relationships' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Customers' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open your website' })).toHaveCount(0);
   });
 
