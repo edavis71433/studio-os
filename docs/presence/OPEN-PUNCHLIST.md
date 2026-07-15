@@ -74,6 +74,24 @@ Tier 2 needs staging creds, Tier 3 owner items listed there) ·
 #167 seamlessness redesign — STILL GATED, see the standing rule below; Eric declares
 the gate clear, not a session.
 
+## 🎨 ADOBE PARITY DECISIONS FROM ERIC (2026-07-15 — do not lose to compaction)
+
+Scope: SMB/mid-market value only, not enterprise (his words: "just the things that
+add value for a small/mid business"). Spec: ADOBE-PARITY-ATLAS.md (29 gaps, 3 waves).
+The four philosophy decisions, made explicitly by Eric with tradeoffs presented:
+1. Per-breakpoint controls → CURATED TOGGLES (hide-on-phone/desktop per section + safe presets).
+2. Freeform canvas → **BUILD IT** — Eric chose to add a true drag-anywhere layout mode,
+   overriding the founding "structured list, never x/y" law. Build with guardrails
+   (snapping, containment, mobile auto-stacking). Large/architectural — design doc first.
+3. Template-author tier → SAVE-AS-STARTER-LAYOUT (operator saves a page's arrangement
+   as a reusable starter layout; no locked-template role).
+4. Per-element style overrides → **ALLOW THEM** — Eric chose full per-element styling,
+   overriding contrast-by-construction; ship with contrast warnings, not blocks.
+Also standing: the builder (presence.html) joins the workspace brand system (increment 6),
+now Adobe-informed: side panel (blocks/files/content-tree tabs), editor modes incl.
+Annotate + Timewarp candidates, Page Information menu. Workflows: route-for-review UX
+on top of the existing approvals + launches machinery.
+
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
