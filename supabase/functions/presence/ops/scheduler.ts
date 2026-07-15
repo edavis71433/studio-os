@@ -10,7 +10,7 @@
 // SiteRow, exactly as the agency bulk runner already does.
 
 import { svc } from '../lib/db.ts';
-import { runPipeline } from '../routes/publish.ts';
+import { runPipeline, takeSiteOffline } from '../routes/publish.ts';
 import { reconcileOnePublish, RECONCILE_STALE_MS, type InflightPublish } from '../lib/deploy_reconcile.ts';
 import { blocksNeedRewindow } from '../lib/content_window.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -114,6 +114,19 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
     let ok = false, err = '';
     try {
       const site = (await svc(`presence_sites?id=eq.${row.site_id}&select=${SITE_COLS}&limit=1`)).json?.[0];
+      // G5 "unpublish at": a kind='offline' row carries no snapshot — it takes the
+      // site offline via the SAME core the POST /site/offline route uses (G10).
+      if (row.kind === 'offline') {
+        if (!site) { err = 'site gone'; }
+        else {
+          const res = await takeSiteOffline(site as SiteRow, sysPrincipal);
+          ok = res.ok;
+          if (!res.ok) err = `${res.error}: ${res.message}`.slice(0, 200);
+        }
+        await svc(`presence_scheduled_publishes?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ status: ok ? 'done' : 'failed', last_error: err }) });
+        results.push({ site_id: String(row.site_id), ok, steps: { offline: ok }, error: err || undefined });
+        continue;
+      }
       const snap = (await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization&limit=1`)).json?.[0];
       if (!site || !snap) { err = 'site or snapshot gone'; }
       else {

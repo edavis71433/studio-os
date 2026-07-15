@@ -847,6 +847,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="dc-bar-acts">
                 <button type="button" class="dc-actbtn" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled>↶ Undo</button>
                 <button type="button" class="dc-actbtn" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button>
+                <button type="button" class="dc-actbtn" id="btnShareDraft" title="Copy a private, expiring link to this draft — no sign-in needed to view">🔗 Share draft</button>
                 <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Page contents</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
                 <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">☰ Menu</button>
@@ -3834,6 +3835,8 @@ async function loadRitual() {
       promise.style.cssText = "font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2);text-align:center;margin-top:22px;line-height:1.7";
       acts.appendChild(promise);
     }
+    // G5: pending scheduled changes (+ "publish later" when publishable)
+    renderRitualSchedule(acts, c.blockers === 0 && (c.count > 0 || c.first_publish));
   } catch (err) {
     $("ritSub").textContent = nice(err);
   }
@@ -3928,6 +3931,115 @@ function showReceipt(firstPublish) {
   scheduleChangesRefresh();
 }
 
+/* ── G5: publish later — the ordinary publish flow gains a "publish at" (and an
+   optional "take offline at") on the EXISTING /schedule machinery (the same
+   table + cron that runs scheduled launches). The draft is frozen at schedule
+   time, so what you reviewed is exactly what goes up. ── */
+function dtLocalDefault(hoursFromNow) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const d = new Date(Date.now() + (hoursFromNow || 24) * 3600000); d.setMinutes(0, 0, 0);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function parseDtLocal(v) { if (!v) return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+async function renderRitualSchedule(host, publishable) {
+  const wrap = el("div"); wrap.style.cssText = "margin-top:26px;text-align:center";
+  host.appendChild(wrap);
+  // pending scheduled changes (list + cancel) — honest view of what will happen on its own
+  let pending = [];
+  try { pending = ((await api("GET", "/schedule")).data || {}).scheduled || []; } catch (_) { /* keep the ritual calm */ }
+  if (pending.length) {
+    const box = el("div"); box.style.cssText = "margin:0 auto 14px;max-width:440px;text-align:left";
+    box.appendChild(Object.assign(el("div", null, "Scheduled — will happen on its own"), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:6px" }));
+    pending.forEach((s) => {
+      const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:8px 12px;margin-top:6px";
+      const kindWord = s.kind === "offline" ? "Take the site offline" : s.kind === "revert" ? "Return to an earlier version" : "Publish";
+      const t = el("div"); t.style.cssText = "flex:1;font-size:12.5px";
+      t.innerHTML = `<strong>${esc(kindWord)}</strong> · ${esc(new Date(s.scheduled_for).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }))}${s.summary ? `<br><span style="color:var(--ink-2,#666)">${esc(s.summary)}</span>` : ""}`;
+      row.appendChild(t);
+      const x = el("button", null, "Cancel"); x.type = "button";
+      x.style.cssText = "font:inherit;font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+      x.addEventListener("click", async () => { try { await api("POST", `/schedule/${s.id}/cancel`); toast("Canceled — nothing will happen at that time."); loadRitual(); } catch (err) { toast(nice(err), true); } });
+      row.appendChild(x);
+      box.appendChild(row);
+    });
+    wrap.appendChild(box);
+  }
+  if (!publishable) return;
+  const open = el("button", "textact", "Publish later — pick a time…"); open.type = "button";
+  wrap.appendChild(open);
+  open.addEventListener("click", () => {
+    if (wrap.querySelector(".sched-panel")) { const f = wrap.querySelector(".sched-panel input"); if (f) f.focus(); return; }
+    const panel = el("div", "sched-panel"); panel.style.cssText = "margin:14px auto 0;max-width:440px;text-align:left;border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:14px 16px";
+    const mkRow = (labelText, defValue, withToggle) => {
+      const r = el("div"); r.style.cssText = "margin-top:" + (withToggle ? "12px" : "0");
+      const lab = el("label", null, labelText); lab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
+      const inp = el("input"); inp.type = "datetime-local"; inp.value = defValue;
+      inp.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
+      r.appendChild(lab); r.appendChild(inp); panel.appendChild(r);
+      return { row: r, inp };
+    };
+    const pub = mkRow("Publish these changes at", dtLocalDefault(24), false);
+    panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
+    // the optional "unpublish at" leg — same table, same cron, kind=offline
+    const offWrap = el("div"); offWrap.style.marginTop = "12px";
+    const offToggle = el("label"); offToggle.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer";
+    const offCb = el("input"); offCb.type = "checkbox";
+    offToggle.appendChild(offCb); offToggle.appendChild(document.createTextNode("Also take the site offline later (optional)"));
+    offWrap.appendChild(offToggle); panel.appendChild(offWrap);
+    let off = null;
+    offCb.addEventListener("change", () => {
+      if (offCb.checked && !off) {
+        off = mkRow("Take the site offline at", dtLocalDefault(24 * 8), true);
+        off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
+      } else if (off) { off.row.style.display = offCb.checked ? "" : "none"; }
+    });
+    const btns = el("div"); btns.style.cssText = "display:flex;gap:8px;margin-top:14px";
+    const okb = el("button", null, "Schedule it"); okb.type = "button";
+    okb.style.cssText = "font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;font-weight:600";
+    const nob = el("button", null, "Never mind"); nob.type = "button";
+    nob.style.cssText = "font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
+    nob.addEventListener("click", () => panel.remove());
+    okb.addEventListener("click", async () => {
+      const when = parseDtLocal(pub.inp.value);
+      if (!when) { toast("Pick a date and time.", true); return; }
+      if (when.getTime() <= Date.now()) { toast("Pick a time in the future.", true); return; }
+      let offWhen = null;
+      if (offCb.checked && off && off.row.style.display !== "none") {
+        offWhen = parseDtLocal(off.inp.value);
+        if (!offWhen) { toast("Pick a time for going offline, or untick it.", true); return; }
+        if (offWhen.getTime() <= when.getTime()) { toast("The offline time needs to be after the publish time.", true); return; }
+      }
+      okb.disabled = true; okb.textContent = "Scheduling…";
+      try {
+        await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish" });
+        if (offWhen) await api("POST", "/schedule", { scheduled_for: offWhen.toISOString(), kind: "offline" });
+        toast(offWhen ? "Scheduled — it publishes, then comes down, on its own." : "Scheduled — it publishes on its own.");
+        loadRitual();
+      } catch (err) { okb.disabled = false; okb.textContent = "Schedule it"; toast(nice(err), true); }
+    });
+    btns.appendChild(okb); btns.appendChild(nob); panel.appendChild(btns);
+    wrap.appendChild(panel);
+    pub.inp.focus();
+  });
+}
+
+/* ── G6: share the draft — one tap mints a signed, expiring, read-only link to
+   the current draft (captured into the private preview through the one preview
+   machinery) and copies it. No sign-in needed to view; it expires on its own. ── */
+async function shareDraftLink() {
+  const b = $("btnShareDraft");
+  if (b) { b.disabled = true; b.textContent = "Preparing link…"; }
+  try {
+    const r = (await api("POST", "/preview/share-link", { capture: true, ttl_seconds: 7 * 86400 })).data;
+    const until = r.expires_at ? new Date(r.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+    let copied = false;
+    try { await navigator.clipboard.writeText(r.url); copied = true; } catch (_) { /* clipboard can be blocked */ }
+    if (copied) toast(`Draft link copied — read-only, works until ${until}. Text it to anyone.`);
+    else { window.prompt(`Your read-only draft link (works until ${until}) — copy it:`, r.url); }
+  } catch (err) { toast(nice(err), true); }
+  if (b) { b.disabled = false; b.textContent = "🔗 Share draft"; }
+}
+
 /* ── history journal (identical /publishes + /restore-to-draft) ── */
 // FD-T7: Launches — stage a redesign as a named release, preview/approve, then go
 // live in one step (all through the existing publish pipeline). Live keeps running.
@@ -4000,7 +4112,11 @@ async function renderPreviewPanel() {
   const dc = st.draft.unpublished_changes || 0;
   grid.appendChild(stateCard("Draft", [dc + " unpublished change" + (dc === 1 ? "" : "s")]));
   grid.appendChild(stateCard("Preview", st.preview.exists ? ["Updated " + new Date(st.preview.updated_at).toLocaleString(), st.preview.has_password ? "🔒 Password-protected" : "🔗 Open link"] : ["Not created yet"]));
-  grid.appendChild(stateCard("Live", st.live.published ? ["Published " + new Date(st.live.last_published_at).toLocaleDateString(), st.live.summary || ""] : ["Not live yet"]));
+  grid.appendChild(stateCard("Live", st.live.published
+    ? (st.live.offline_since
+      ? ["⏸ Offline since " + new Date(st.live.offline_since).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }), "Visitors see a “temporarily offline” page"]
+      : ["Published " + new Date(st.live.last_published_at).toLocaleDateString(), st.live.summary || ""])
+    : ["Not live yet"]));
   card.appendChild(grid);
   const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:12px";
   const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
@@ -4016,6 +4132,28 @@ async function renderPreviewPanel() {
     mk("Promote to Live", () => { if (confirm("Promote the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Promoting to Live — this usually takes under a minute"); }, true);
   }
   card.appendChild(acts);
+  // ── G10: take offline / bring back — the reversible holding-page veil ──
+  if (st.live.published) {
+    const offRow = el("div"); offRow.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px dashed var(--line,#e5e5e5);display:flex;gap:10px;align-items:center;flex-wrap:wrap";
+    if (st.live.offline_since) {
+      offRow.appendChild(Object.assign(el("div", null, "Your site is offline. Everything is kept — bring it back whenever you like."), { style: "font-size:12.5px;color:var(--ink-2,#666);flex:1;min-width:200px" }));
+      const back = el("button", null, "Bring my site back online"); back.type = "button";
+      back.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;font-weight:600";
+      back.addEventListener("click", () => act("/site/online", "Bringing your site back — this usually takes under a minute"));
+      offRow.appendChild(back);
+    } else {
+      offRow.appendChild(Object.assign(el("div", null, "Need to disappear for a while? Going offline shows visitors a simple “temporarily offline” page — nothing is deleted."), { style: "font-size:12.5px;color:var(--ink-2,#666);flex:1;min-width:200px" }));
+      const off = el("button", null, "Take site offline"); off.type = "button";
+      off.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:1px solid #a3423a;background:transparent;color:#a3423a;font-weight:600";
+      off.addEventListener("click", () => {
+        const name = (S.identity && S.identity.business_name) || "your site";
+        if (!confirm(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring my site back online”) restores everything.`)) return;
+        act("/site/offline", "Your site is offline. Publish, or use “Bring my site back online”, to return.");
+      });
+      offRow.appendChild(off);
+    }
+    card.appendChild(offRow);
+  }
   box.appendChild(card);
 }
 // ── Checkpoints — name + save the current draft as a safety point ────────────
@@ -6645,6 +6783,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); if (PANEL
   on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add"));
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
   on("btnNavEdit", dcEditNav);
+  on("btnShareDraft", shareDraftLink);
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;

@@ -7,8 +7,11 @@
 // stateless token.
 
 // ── FD-1: scheduling ─────────────────────────────────────────────────────────
-export type ScheduleKind = 'publish' | 'revert';   // publish a captured draft · revert to a prior version (expiry)
-export function isScheduleKind(x: unknown): x is ScheduleKind { return x === 'publish' || x === 'revert'; }
+// G5 adds 'offline' — the "unpublish at" leg of a publish window: at the
+// scheduled time the site is taken offline (holding page over live; G10's
+// takeSiteOffline), through the SAME table and cron as publish/revert.
+export type ScheduleKind = 'publish' | 'revert' | 'offline';   // publish a captured draft · revert to a prior version (expiry) · take offline (unpublish)
+export function isScheduleKind(x: unknown): x is ScheduleKind { return x === 'publish' || x === 'revert' || x === 'offline'; }
 
 /** A scheduled action is due when its time has arrived (and it's still pending). */
 export function isDue(scheduledFor: string, nowIso: string): boolean {

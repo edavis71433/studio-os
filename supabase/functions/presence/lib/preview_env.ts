@@ -39,13 +39,14 @@ export function newPreviewToken(): string {
 export interface PreviewStatus {
   draft: { unpublished_changes: number };
   preview: { exists: boolean; url: string | null; updated_at: string | null; has_password: boolean };
-  live: { published: boolean; last_published_at: string | null; summary: string | null };
+  live: { published: boolean; last_published_at: string | null; summary: string | null; offline_since: string | null };
 }
 export function shapePreviewStatus(input: {
   draftChanges: number;
   preview: { token: string | null; snapshot_id: string | null; updated_at: string | null; password_hash: string | null } | null;
   live: { last_published_at: string | null; summary: string | null } | null;
   baseUrl: string;
+  offlineAt?: string | null;   // G10: when the owner took the site offline (null/absent = online)
 }): PreviewStatus {
   const p = input.preview;
   return {
@@ -56,7 +57,7 @@ export function shapePreviewStatus(input: {
       updated_at: p?.updated_at ?? null,
       has_password: !!(p && p.password_hash),
     },
-    live: { published: !!(input.live && input.live.last_published_at), last_published_at: input.live?.last_published_at ?? null, summary: input.live?.summary ?? null },
+    live: { published: !!(input.live && input.live.last_published_at), last_published_at: input.live?.last_published_at ?? null, summary: input.live?.summary ?? null, offline_since: input.offlineAt ?? null },
   };
 }
 

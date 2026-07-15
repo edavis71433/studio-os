@@ -40,24 +40,39 @@ async function lastLive(siteId: string) {
 
 // ── GET /preview/status — the three states for the management surface ────────
 export async function handlePreviewStatus(site: SiteRow, cors: Record<string, string>) {
-  const [p, draftChanges, live] = await Promise.all([previewRow(site.id), draftChangeCount(site.id), lastLive(site.id)]);
-  return json({ data: shapePreviewStatus({ draftChanges, preview: p, live, baseUrl: fnBase() }) }, 200, cors);
+  const [p, draftChanges, live, off] = await Promise.all([
+    previewRow(site.id), draftChangeCount(site.id), lastLive(site.id),
+    // G10: the offline marker — read separately + best-effort so a database
+    // without 0111 applied still serves the status untouched (offline = null).
+    svc(`presence_sites?id=eq.${site.id}&select=offline_at&limit=1`).catch(() => ({ ok: false, json: null } as any)),
+  ]);
+  const offlineAt = (off.ok && off.json?.[0]?.offline_at) || null;
+  return json({ data: shapePreviewStatus({ draftChanges, preview: p, live, baseUrl: fnBase(), offlineAt }) }, 200, cors);
 }
 
-// ── POST /preview/publish — capture the draft into the Preview slot ──────────
-export async function handlePreviewPublish(site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: 'This site can’t update its preview right now.' }, 409, cors);
+/** Capture the CURRENT draft into the Preview slot (snapshot + upsert). The ONE
+ *  implementation behind "Update preview" and the share-a-draft capture. */
+async function capturePreviewSlot(site: SiteRow, principal: Principal):
+  Promise<{ ok: true; token: string; blockers: any[]; warnings: any[] } | { ok: false; error: string; message: string; status: number }> {
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return { ok: false, error: 'lifecycle_blocked', message: 'This site can’t update its preview right now.', status: 409 };
   const cap = await captureDraftSnapshot(site, principal);
-  if ('error' in cap) return json({ error: cap.error, message: cap.message }, cap.status, cors);
+  if ('error' in cap) return { ok: false, error: cap.error, message: cap.message, status: cap.status };
   const existing = await previewRow(site.id);
   const token = existing?.token || newPreviewToken();
   const up = await svc(`presence_site_preview?on_conflict=site_id`, {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: site.id, snapshot_id: cap.snapshotId, token, updated_at: new Date().toISOString() }),
   });
-  if (!up.ok) return json({ error: 'write_failed', message: 'The preview couldn’t be saved — please try again.' }, 502, cors);
+  if (!up.ok) return { ok: false, error: 'write_failed', message: 'The preview couldn’t be saved — please try again.', status: 502 };
+  return { ok: true, token, blockers: cap.blockers, warnings: cap.warnings };
+}
+
+// ── POST /preview/publish — capture the draft into the Preview slot ──────────
+export async function handlePreviewPublish(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const cap = await capturePreviewSlot(site, principal);
+  if (!cap.ok) return json({ error: cap.error, message: cap.message }, cap.status, cors);
   await writeChangeEvent({ siteId: site.id, entityType: 'preview', entityId: null, action: 'update', summary: 'Updated the preview site', principal, provenance: 'human' });
-  return json({ data: { ok: true, url: `${fnBase()}/functions/v1/presence/p/${token}`, blockers: cap.blockers, warnings: cap.warnings, message: 'Preview updated. Share the link, then promote to Live when you’re happy.' } }, 200, cors);
+  return json({ data: { ok: true, url: `${fnBase()}/functions/v1/presence/p/${cap.token}`, blockers: cap.blockers, warnings: cap.warnings, message: 'Preview updated. Share the link, then promote to Live when you’re happy.' } }, 200, cors);
 }
 
 // ── POST /preview/promote — promote the Preview snapshot to Live (one pipeline) ─
@@ -185,16 +200,23 @@ export async function handleSignedPreview(req: Request, token: string, cors: Rec
 
 // ── POST /preview/share-link — mint a signed, time-limited link (authed) ──────
 // Site-scoped to the caller's site; TTL clamped to [1min, 7d] (default 24h).
+// G6: pass { capture: true } to first capture the CURRENT draft into the Preview
+// slot (same one implementation as "Update preview"), so "Share draft" hands out
+// a link to the draft as it stands right now — one tap, no separate update step.
 export async function handlePreviewShareLink(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const secret = previewLinkSecret();
   if (!secret) return json({ error: 'unavailable', message: 'Shareable preview links aren’t configured yet.' }, 503, cors);
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  if (body?.capture === true) {
+    const cap = await capturePreviewSlot(site, principal);
+    if (!cap.ok) return json({ error: cap.error, message: cap.message }, cap.status, cors);
+  }
   const p = await previewRow(site.id);
   if (!p || !p.snapshot_id) return json({ error: 'no_preview', message: 'Update your preview first, then you can share a timed link.' }, 409, cors);
-  let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const ttl = clampTtlSeconds(body?.ttl_seconds ?? (body?.ttl_hours ? Number(body.ttl_hours) * 3600 : undefined));
   const exp = nowSec() + ttl;
   const token = await signPreviewToken({ site_id: site.id, exp, scope: 'preview' }, secret);
-  await writeChangeEvent({ siteId: site.id, entityType: 'preview', entityId: null, action: 'update', summary: 'Created a timed preview link', principal, provenance: 'human' });
+  await writeChangeEvent({ siteId: site.id, entityType: 'preview', entityId: null, action: 'update', summary: body?.capture === true ? 'Shared a timed draft preview link' : 'Created a timed preview link', principal, provenance: 'human' });
   return json({ data: { ok: true, url: `${fnBase()}/functions/v1/presence/p/s/${token}`, expires_at: new Date(exp * 1000).toISOString(), ttl_seconds: ttl } }, 200, cors);
 }
 

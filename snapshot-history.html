@@ -30,6 +30,30 @@
   a.act:hover{background:var(--accent-soft);border-color:var(--accent)} a.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   a.act.primary{background:var(--accent);color:#fff;border-color:var(--accent)} a.act.primary:hover{filter:brightness(1.06);background:var(--accent)}
 
+  /* ── G9: visual publish diff (compare two versions) ── */
+  .cmp{margin-top:36px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:17px 19px;box-shadow:var(--shadow)}
+  .cmp .glabel{margin-top:0}
+  .cmp-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .cmp-pick label{font-size:13px;color:var(--soft);display:flex;gap:7px;align-items:center}
+  .cmp-pick select{font:inherit;font-size:13.5px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:6px 9px;max-width:46vw}
+  .cmp-pick .arrow{color:var(--faint)}
+  .strip{margin:0 0 14px}
+  .strip .note{font-size:13.5px;color:var(--soft);margin:0 0 8px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{display:inline-block;font-size:12.5px;font-weight:600;border-radius:999px;padding:4px 11px;border:1px solid transparent;white-space:nowrap}
+  .chip.added{background:#e7f5ec;color:#1c6b3a;border-color:#bfe3cc}
+  .chip.removed{background:#fdecea;color:#a3271f;border-color:#f2c7c3}
+  .chip.changed{background:#fbf3df;color:#8a5f04;border-color:#ecd9a8}
+  .chip.moved{background:#e8effc;color:#25549e;border-color:#c3d4f0}
+  .strip details{margin-top:10px}
+  .strip summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:600}
+  .strip ul{margin:8px 0 0;padding-left:20px}
+  .strip li{font-size:13.5px;color:var(--soft);margin:3px 0;line-height:1.45}
+  .panes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.panes{grid-template-columns:1fr}}
+  .pane-t{margin:0 0 7px;font-size:12.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .pane iframe{width:100%;height:420px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block}
+
   .center{text-align:center;padding:56px 20px}
   .center .mark{font-size:40px;display:block;margin-bottom:12px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
@@ -46,6 +70,22 @@
     <p class="sub" id="sub">Every saved version of your website, newest first — like flipping through past editions. You can revisit or restore an earlier one anytime.</p>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+
+  <!-- G9 — visual publish diff: pick two versions, see what changed section by
+       section, and look at both side by side (the SAME /preview render engine). -->
+  <section class="cmp" id="compare" hidden aria-label="Compare two versions">
+    <p class="glabel">Compare two versions</p>
+    <div class="cmp-pick">
+      <label>From <select id="cmpA" aria-label="Older version"></select></label>
+      <span class="arrow" aria-hidden="true">→</span>
+      <label>To <select id="cmpB" aria-label="Newer version"></select></label>
+    </div>
+    <div class="strip" id="cmpStrip" aria-live="polite"></div>
+    <div class="panes">
+      <div class="pane"><p class="pane-t" id="paneAT">From</p><iframe id="frameA" title="Older version preview"></iframe></div>
+      <div class="pane"><p class="pane-t" id="paneBT">To</p><iframe id="frameB" title="Newer version preview"></iframe></div>
+    </div>
+  </section>
 </div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -107,6 +147,142 @@ function render(h){
     + `<p class="foot">Every published edition is saved automatically. Restoring brings an earlier version back as your live website — you can always switch again.</p>`;
 }
 
+// ── G9 — visual publish diff ─────────────────────────────────────────────────
+// Two pickers (default: latest previous version → current live), a section-level
+// diff strip, and side-by-side previews rendered by the EXISTING /preview engine
+// (fetched with auth headers, drawn via srcdoc — same pattern as the editor).
+// The diff itself is pure + unit-tested: tests/presence/publish_diff_test.mjs
+// mirrors diffPublishBlocks/blockKeys/blockName 1:1. Keep both copies in sync.
+
+// Plain-word names for common section (block) types — a small local map in the
+// spirit of the editor's SECTION_ALIAS; unknown types fall back to the raw type.
+const BLOCK_NAMES = {
+  hero:'Hero', gallery:'Photo gallery', cta:'Banner', team:'Team', partners:'Partners',
+  features:'Highlights', stats:'Counters', reviews:'Star rating', reviews_wall:'Reviews',
+  certifications:'Badges', pricing:'Pricing', process:'Steps', service_areas:'Service area',
+  before_after:'Before / after', video:'Video', booking:'Booking', appointment:'Scheduling link',
+  newsletter:'Email sign-up', map:'Map', events:'Events', social:'Social links',
+  richtext:'Text', image:'Photo', image_text:'Image & words', accordion:'Expandable',
+  tabs:'Tabs', carousel:'Slideshow', progress:'Meters', buttons:'Buttons', divider:'Divider',
+  columns:'Columns', cards:'Cards', download:'Download', toc:'Jump links', title:'Heading',
+  link_list:'Links', table:'Table', spotlight:'Spotlight', form:'Form', faq:'FAQ',
+  testimonials:'Testimonials',
+};
+function blockName(type){ const t=String(type||'section'); return BLOCK_NAMES[t] || (t.replace(/[_-]+/g,' ').replace(/^./,c=>c.toUpperCase())); }
+
+// Stable matching keys: a block's own id when present (first occurrence wins),
+// else type + occurrence-index of that type within the list.
+function blockKeys(list){
+  const seen=Object.create(null), counts=Object.create(null);
+  return (list||[]).map((b)=>{
+    const rawId = b && b.id != null && String(b.id) !== '' ? String(b.id) : '';
+    if(rawId && !seen['id:'+rawId]){ seen['id:'+rawId]=1; return 'id:'+rawId; }
+    const t = (b && b.type) || 'section';
+    const n = counts[t] = (counts[t]||0)+1;
+    return 'ix:'+t+'#'+(n-1);
+  });
+}
+const deepEqJson = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+// diffPublishBlocks(aBlocks, bBlocks) — the section-level diff between two
+// versions' block lists, going FROM a TO b. Pure. Returns entries
+// { key, type, status:'added'|'removed'|'changed'|'moved', moved?, from_index?, to_index? }:
+//   added/changed/moved in b's order, then removed in a's order.
+//   changed = deep-inequality of the block JSON (a changed block that also moved
+//   keeps status 'changed' and carries moved:true). moved = a block present in
+//   both whose rank among the matched blocks differs between the two lists.
+function diffPublishBlocks(aBlocks, bBlocks){
+  const A = Array.isArray(aBlocks)?aBlocks:[], B = Array.isArray(bBlocks)?bBlocks:[];
+  const ka = blockKeys(A), kb = blockKeys(B);
+  const posA = new Map(ka.map((k,i)=>[k,i])), posB = new Map(kb.map((k,i)=>[k,i]));
+  const rankA = new Map(); { let r=0; for(const k of ka){ if(posB.has(k)) rankA.set(k, r++); } }
+  const rankB = new Map(); { let r=0; for(const k of kb){ if(posA.has(k)) rankB.set(k, r++); } }
+  const out = [];
+  B.forEach((b,j)=>{
+    const k = kb[j], t = (b && b.type) || 'section';
+    if(!posA.has(k)){ out.push({ key:k, type:t, status:'added', to_index:j }); return; }
+    const i = posA.get(k);
+    const changed = !deepEqJson(A[i], b);
+    const moved = rankA.get(k) !== rankB.get(k);
+    if(changed) out.push({ key:k, type:t, status:'changed', moved, from_index:i, to_index:j });
+    else if(moved) out.push({ key:k, type:t, status:'moved', from_index:i, to_index:j });
+  });
+  A.forEach((a,i)=>{ if(!posB.has(ka[i])) out.push({ key:ka[i], type:(a&&a.type)||'section', status:'removed', from_index:i }); });
+  return out;
+}
+
+// Plain names for the compare endpoint's sentence sections (its current payload).
+const SECTION_NAMES = { business:'Business details', offerings:'Offerings', faqs:'FAQ', testimonials:'Testimonials', updates:'Updates', media:'Photos', site:'Site' };
+
+// Chips for the strip. Preferred source: the two versions' block lists (if the
+// compare payload ever carries data.from.blocks / data.to.blocks) → full
+// added/removed/changed/moved coloring via diffPublishBlocks. Today's payload
+// carries change SENTENCES only, so we fall back to one amber "changed" chip per
+// affected section (grouped, counted) — honest, never invented. Pure.
+function computeCompareChips(data){
+  data = data || {};
+  const fb = data.from && Array.isArray(data.from.blocks) ? data.from.blocks : null;
+  const tb = data.to && Array.isArray(data.to.blocks) ? data.to.blocks : null;
+  if(fb && tb){
+    return { structured:true, chips: diffPublishBlocks(fb, tb).map((d)=>({ kind:d.status, label: blockName(d.type) + (d.status==='changed' && d.moved ? ' (also moved)' : '') })) };
+  }
+  const bySec = {}; const order = [];
+  for(const ch of (data.changes||[])){ const s=(ch && ch.section)||'site'; if(!(s in bySec)){ bySec[s]=0; order.push(s); } bySec[s]++; }
+  return { structured:false, chips: order.map((s)=>({ kind:'changed', label:(SECTION_NAMES[s]||s)+(bySec[s]>1?' · '+bySec[s]:'') })) };
+}
+
+async function apiHtml(p){ const r = await fetch(FN+p, { headers:H() }); if(!r.ok) return Promise.reject(r.status); return r.text(); }
+const previewPath = (ref) => '/preview?page=%2F&' + (ref==='live'||ref==='draft' ? 'version='+ref : 'publish_id='+encodeURIComponent(ref));
+const calmFrame = (msg) => `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px 24px;text-align:center;font-size:15px;line-height:1.6">${esc(msg)}</div>`;
+
+let CMP_SEQ = 0;
+async function runCompare(){
+  const a = $('cmpA').value, b = $('cmpB').value;
+  const seq = ++CMP_SEQ;
+  $('paneAT').textContent = 'From — ' + ($('cmpA').selectedOptions[0]||{}).textContent;
+  $('paneBT').textContent = 'To — ' + ($('cmpB').selectedOptions[0]||{}).textContent;
+  $('cmpStrip').innerHTML = '<div class="spin" role="status" aria-label="Comparing"></div>';
+  $('frameA').srcdoc = calmFrame('Drawing this version…');
+  $('frameB').srcdoc = calmFrame('Drawing this version…');
+  if(a === b){ if(seq===CMP_SEQ) $('cmpStrip').innerHTML = '<p class="note">That’s the same version on both sides — pick two different ones to compare.</p>'; }
+  else apiGet('/publishes/compare?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b)).then((res)=>{
+    if(seq!==CMP_SEQ) return;
+    const d = (res && res.data) || {};
+    if(d.identical){ $('cmpStrip').innerHTML = '<p class="note">These two versions are identical — nothing changed between them.</p>'; return; }
+    const cc = computeCompareChips(d);
+    const chips = cc.chips.map((c)=>`<span class="chip ${esc(c.kind)}">${esc(c.label)}</span>`).join('');
+    const sentences = (d.changes||[]).map((ch)=>`<li>${esc(ch.sentence)}</li>`).join('');
+    const n = d.count || (d.changes||[]).length;
+    $('cmpStrip').innerHTML = `<p class="note">${n} change${n===1?'':'s'} between these versions${cc.structured?'':' — by section'}:</p>`
+      + `<div class="chips">${chips}</div>`
+      + (sentences ? `<details><summary>What changed, in plain words</summary><ul>${sentences}</ul></details>` : '');
+  }).catch(()=>{ if(seq===CMP_SEQ) $('cmpStrip').innerHTML = '<p class="note">We couldn’t compare those two versions just now — one of them may be too old to compare. Try another pair.</p>'; });
+  apiHtml(previewPath(a)).then((h)=>{ if(seq===CMP_SEQ) $('frameA').srcdoc = h; }).catch(()=>{ if(seq===CMP_SEQ) $('frameA').srcdoc = calmFrame('This version can’t be shown anymore.'); });
+  apiHtml(previewPath(b)).then((h)=>{ if(seq===CMP_SEQ) $('frameB').srcdoc = h; }).catch(()=>{ if(seq===CMP_SEQ) $('frameB').srcdoc = calmFrame('This version can’t be shown anymore.'); });
+}
+
+// Version pickers come from the EXISTING GET /publishes rows (the friendly
+// /snapshot-history projection deliberately carries no version ids).
+async function initCompare(){
+  try{
+    const res = await apiGet('/publishes');
+    const rows = (res && res.data) || [];
+    const live = rows.filter((p)=>p.status==='live');
+    if(!live.length) return;                       // nothing published → nothing to compare
+    const when = (p)=>{ const d=new Date(p.completed_at||p.at); return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
+    const opts = [{ value:'draft', text:'Your working draft' }, { value:'live', text:'Current live site' }];
+    live.slice(1).forEach((p)=>{ if(p.restorable) opts.push({ value:p.id, text:(p.label||p.summary||'Version')+' — '+when(p) }); });
+    const fill = (sel)=>{ sel.innerHTML = opts.map((o)=>`<option value="${esc(o.value)}">${esc(o.text)}</option>`).join(''); };
+    fill($('cmpA')); fill($('cmpB'));
+    $('cmpA').value = opts.length>2 ? opts[2].value : 'draft';   // latest previous version, else the draft
+    $('cmpB').value = 'live';
+    $('cmpA').addEventListener('change', runCompare);
+    $('cmpB').addEventListener('change', runCompare);
+    $('compare').hidden = false;
+    runCompare();
+  }catch(_e){ /* compare is an extra — the history list above stands on its own */ }
+}
+
 function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>Sign in to see your website versions.</h2><p class="sub">Your saved versions live with your account — sign in to look back through them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
 function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your versions just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page. Please refresh in a moment.</p></div>`; }
 
@@ -117,6 +293,7 @@ function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t
     if(!TOKEN){ signedOut(); return; }
     const res = await apiGet('/snapshot-history');
     render(res && res.data);
+    initCompare();   // G9 — never blocks or breaks the history list above
   }catch(e){ if(e === 401){ signedOut(); return; } trouble(); }
 })();
 </script>

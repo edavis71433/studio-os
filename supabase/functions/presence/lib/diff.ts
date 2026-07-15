@@ -137,5 +137,28 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
   // ── redirects (rare; keep honest) ──
   if (!jeq(d.redirects, l.redirects)) out.push({ section: 'site', sentence: 'Link redirects are updated.' });
 
+  // ── custom section blocks (home + pages) — without this, two versions that
+  //    differ ONLY in blocks reported "identical" (G9 finding). Coarse but
+  //    honest: count add/remove/change per page by stable id (type+index else).
+  const blockDelta = (a: unknown[], b: unknown[], where: string) => {
+    const key = (x: any, i: number) => (x && typeof x.id === 'string' && x.id ? `id:${x.id}` : `ix:${x?.type}#${i}`);
+    const am = new Map((a || []).map((x: any, i: number) => [key(x, i), x]));
+    const bm = new Map((b || []).map((x: any, i: number) => [key(x, i), x]));
+    let added = 0, removed = 0, changed = 0;
+    for (const [k, v] of bm) { if (!am.has(k)) added++; else if (!jeq(am.get(k), v)) changed++; }
+    for (const k of am.keys()) if (!bm.has(k)) removed++;
+    const bits: string[] = [];
+    if (added) bits.push(`${added} section${added > 1 ? 's' : ''} added`);
+    if (removed) bits.push(`${removed} removed`);
+    if (changed) bits.push(`${changed} changed`);
+    if (bits.length) out.push({ section: 'site', sentence: `${bits.join(', ')}${where}.` });
+  };
+  blockDelta((l as any).blocks || [], (d as any).blocks || [], ' on your home page');
+  const dPages = new Map(((d as any).pages || []).map((p: any) => [p.slug || p.id, p]));
+  for (const p of ((l as any).pages || []) as any[]) {
+    const dp: any = dPages.get(p.slug || p.id);
+    if (dp) blockDelta(p.blocks || [], dp.blocks || [], ` on ${q(dp.title || dp.slug || 'a page')}`);
+  }
+
   return { count: out.length, changes: out, first_publish: false };
 }

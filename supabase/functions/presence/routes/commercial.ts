@@ -34,8 +34,13 @@ export async function handleScheduleCreate(req: Request, site: SiteRow, principa
   if (!when.ok) return json({ error: when.error, message: when.error === 'past' ? 'Pick a time in the future.' : 'That date doesn’t look right.' }, 400, cors);
   const kind = isScheduleKind(b?.kind) ? b.kind : 'publish';
 
-  let snapshotId: string; let summary: string;
-  if (kind === 'revert') {
+  let snapshotId: string | null; let summary: string;
+  if (kind === 'offline') {
+    // G5 "unpublish at": no frozen snapshot — the holding page is rendered at
+    // fire time (G10 takeSiteOffline) through the same deploy machinery.
+    snapshotId = null;
+    summary = String(b?.note || 'Scheduled to take the site offline');
+  } else if (kind === 'revert') {
     // expiry: restore a chosen prior version at the scheduled time
     const pubId = String(b?.publish_id || '');
     const rec = await svc(`presence_publishes?id=eq.${encodeURIComponent(pubId)}&site_id=eq.${site.id}&select=snapshot_id&limit=1`);

@@ -23,6 +23,8 @@ import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/opti
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
 import { applySnapshotToDraft } from '../lib/draft_writer.ts';
+import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -179,6 +181,10 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     body: JSON.stringify({ status: live ? 'live' : 'deploying', netlify_deploy_id: dep.deployId, ...(live ? { completed_at: new Date().toISOString() } : {}) }),
   });
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: new Date().toISOString() }) });
+  // G10: a live deploy of real content IS being online — any publish/restore that
+  // goes live lifts the offline veil. Separate best-effort PATCH so a database
+  // without 0111 applied never fails the main status write above.
+  if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
   // G3 — a successful publish clears any lingering publish-failed attention notice.
   if (live && site.client_id) await clearNotice(site.client_id, 'publish_failed');
 
@@ -394,10 +400,14 @@ export async function handleCompareVersions(req: Request, site: SiteRow, cors: R
   const B = await loadVersionContent(site, b);
   if ('error' in B) return json({ error: B.error, message: B.message }, B.status, cors);
   const cs = describeVersionDiff(A.content, B.content);
+  // Raw home block lists ride along so the compare UI (snapshot-history.html)
+  // can render its structured section-level diff strip (G9) — matched by
+  // stable id there; sentences above stay the plain-words summary.
+  const blocksOf = (c: unknown) => (((c as any)?.blocks as unknown[]) || []);
   return json({
     data: {
-      from: { ref: a, label: A.label, at: A.at },
-      to: { ref: b, label: B.label, at: B.at },
+      from: { ref: a, label: A.label, at: A.at, blocks: blocksOf(A.content) },
+      to: { ref: b, label: B.label, at: B.at, blocks: blocksOf(B.content) },
       count: cs.count, identical: cs.count === 0, changes: cs.changes,
     },
   }, 200, cors);
@@ -469,6 +479,79 @@ export async function handleCheckpointRestore(site: SiteRow, principal: Principa
   const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`);
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' }, 502, cors);
   return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft. Your previous draft was set aside as a safety copy — nothing was lost.` } }, 200, cors);
+}
+
+// ── G10 · Unpublish / take offline — the reversible veil ─────────────────────
+// "Offline" NEVER deletes the deploy or any kept version: it deploys a minimal,
+// on-brand, noindex holding page over the live site through the SAME Netlify
+// deploy machinery every publish uses. Reversible by POST /site/online (restores
+// the last live version through the ONE pipeline) or by any ordinary publish
+// (runPipeline clears offline_at when a deploy goes live). Provenance-logged.
+
+/** Core take-offline, shared by the route and the scheduler (kind='offline'
+ *  rows on presence_scheduled_publishes — G5's "unpublish at" leg). */
+export async function takeSiteOffline(site: SiteRow, principal: Principal): Promise<{ ok: true } | { ok: false; error: string; message: string; status: number }> {
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return { ok: false, error: 'lifecycle_blocked', message: 'This site is archived and can’t be changed. Contact your studio to reactivate it.', status: 409 };
+  if (site.status === 'paused' && principal.kind !== 'staff' && principal.kind !== 'system') return { ok: false, error: 'site_paused', message: 'Your site is currently paused. Contact your studio first.', status: 409 };
+  if (!site.netlify_site_id || !netlifyConfigured()) return { ok: false, error: 'config', message: 'Hosting isn’t connected for this site yet.', status: 409 };
+
+  // offline only makes sense for a site that has actually gone live
+  const lastLive = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=id&order=created_at.desc&limit=1`);
+  if (!lastLive.json?.[0]) return { ok: false, error: 'not_live', message: 'Your site isn’t live yet — there’s nothing to take offline.', status: 409 };
+  // never interleave with a publish in flight (the deploy would race it)
+  const inflight = await svc(`presence_publishes?site_id=eq.${site.id}&status=in.(queued,deploying)&select=id&limit=1`);
+  if (Array.isArray(inflight.json) && inflight.json.length) return { ok: false, error: 'publish_in_progress', message: 'A publish is in progress — let it finish, then take the site offline.', status: 409 };
+  // capability + idempotence, checked BEFORE any deploy: if the offline marker
+  // column can't be read (migration 0111 not applied yet), refuse up front —
+  // never deploy a veil that can't be recorded. Already-offline is a calm no-op.
+  const cur = await svc(`presence_sites?id=eq.${site.id}&select=offline_at&limit=1`).catch(() => ({ ok: false, json: null } as any));
+  if (!cur.ok) return { ok: false, error: 'unavailable', message: 'Taking the site offline isn’t available on this environment yet.', status: 503 };
+  if (cur.json?.[0]?.offline_at) return { ok: false, error: 'already_offline', message: 'Your site is already offline. Publish to bring it back whenever you’re ready.', status: 409 };
+
+  // on-brand holding page: business name + contact (already public on the live
+  // site) + the Brand Kit accent (loadEmailBrand = the one brand resolver)
+  const [ident, brand] = await Promise.all([
+    svc(`presence_identity?site_id=eq.${site.id}&select=business_name,email,phone&limit=1`),
+    loadEmailBrand(site.id),
+  ]);
+  const id0 = ident.json?.[0] || {};
+  const html = renderOfflinePage({ businessName: id0.business_name, accent: brand.accent, email: id0.email, phone: id0.phone });
+  const dep = await deployFileMap(site.netlify_site_id, offlineFileMap(html), { title: 'offline holding page' });
+  if (!dep.ok) return { ok: false, error: 'deploy_failed', message: 'That didn’t go through — your live site is unchanged.', status: 502 };
+
+  const mark = await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: new Date().toISOString() }) });
+  if (!mark.ok) {
+    // the column exists (pre-checked above), so this is a transient write hiccup
+    // AFTER the veil deployed — say so honestly instead of pretending nothing happened.
+    console.log(JSON.stringify({ evt: 'offline_mark_failed', site_id: site.id }));
+    return { ok: false, error: 'write_failed', message: 'The offline page may be up, but we couldn’t record it. Publish to bring your site back, or try again.', status: 502 };
+  }
+  await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: null, action: 'update', summary: 'Took the website offline — visitors see a simple “temporarily offline” page. Every version is kept.', principal, provenance: 'human', fields: ['offline_at'] });
+  console.log(JSON.stringify({ evt: 'site_offline', site_id: site.id, deploy_id: dep.deployId || null }));
+  return { ok: true };
+}
+
+/** POST /site/offline — take the site offline (holding page over live). */
+export async function handleTakeOffline(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const r = await takeSiteOffline(site, principal);
+  if (!r.ok) return json({ error: r.error, message: r.message }, r.status, cors);
+  return json({ data: { ok: true, offline: true, message: 'Your site is offline. Visitors see a simple “temporarily offline” page — nothing was deleted, and publishing brings everything back.' } }, 200, cors);
+}
+
+/** POST /site/online — bring the site back by restoring the last live version
+ *  through the ONE pipeline (same path as /restore; no second deploy path). */
+export async function handleBackOnline(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const cur = await svc(`presence_sites?id=eq.${site.id}&select=offline_at&limit=1`).catch(() => ({ ok: false, json: null } as any));
+  if (!(cur.ok && cur.json?.[0]?.offline_at)) return json({ error: 'not_offline', message: 'Your site is already online.' }, 409, cors);
+  const rec = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&snapshot_id=not.is.null&select=snapshot_id,created_at&order=created_at.desc&limit=1`);
+  const row = rec.json?.[0];
+  if (!row?.snapshot_id) return json({ error: 'not_restorable', message: 'No kept version is available to bring back — publish your draft instead.' }, 410, cors);
+  const snap = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization&limit=1`);
+  const s = snap.json?.[0];
+  if (!s) return json({ error: 'not_restorable', message: 'No kept version is available to bring back — publish your draft instead.' }, 410, cors);
+  const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
+  // runPipeline clears offline_at the moment the deploy goes live — one invariant, one place.
+  return runPipeline(site, principal, 'restore', { snapshot, snapshotId: row.snapshot_id, mediaManifest: s.media_manifest || [] }, 'Brought the website back online', cors);
 }
 
 /** DELETE /publishes/checkpoints/:id — remove a saved checkpoint (its snapshot is
