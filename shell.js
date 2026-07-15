@@ -64,9 +64,7 @@
     return new Promise(function (resolve) {
       if (window.supabase) return resolve();
       var s = document.createElement('script');
-      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4";
-      s.integrity = "sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug";
-      s.crossOrigin = "anonymous";
+      s.src = "/vendor/supabase-js-2.45.4.js";
       s.onload = function () { resolve(); }; s.onerror = function () { resolve(); };
       document.head.appendChild(s);
     });
@@ -832,6 +830,27 @@
     if (!f) return;
     var key = 'dds-draft:' + location.pathname + ':' + (f.id || f.getAttribute('data-dds-draft'));
     try { localStorage.removeItem(key); } catch (_) { /* */ }
+  };
+
+  // ── Shared context handoff (PERF) ──
+  // /portal/context is the single most expensive boot read and the shell already
+  // fetches it — boot() publishes it as window.__ddsContext + the 'dds:context'
+  // event. Pages await this instead of firing an identical second request:
+  // resolves immediately when the shell's copy exists, else on the shell's
+  // event; rejects after ~2500ms (minimal shell, signed out, or a non-shell
+  // embed) so the caller falls back to its own api('/portal/context') read.
+  window.ddsContext = function () {
+    return new Promise(function (resolve, reject) {
+      if (window.__ddsContext) return resolve(window.__ddsContext);
+      var done = false;
+      function settle() {
+        if (done) return; done = true;
+        if (window.__ddsContext) resolve(window.__ddsContext);
+        else reject(new Error('shell context unavailable'));
+      }
+      document.addEventListener('dds:context', settle, { once: true });
+      setTimeout(settle, 2500);
+    });
   };
 
   function boot() {

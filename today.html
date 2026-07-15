@@ -98,7 +98,7 @@
 <!-- PT-5: one-time contextual tip, taught where it's relevant, then gone forever -->
 <div class="dds-hint" data-hint="today-bell" hidden>The 🔔 at the top shows everything that needs you — from any page in Studio&nbsp;OS.</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features.
 //    No engine, no new system. Calm, plain language; nothing technical.
@@ -300,7 +300,7 @@ function trouble(){
     const [moments, features, ctx, feed, bridged] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
-      apiGet('/portal/context').catch(()=>null),
+      (window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null)),   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
       apiGet('/portal/feed').catch(()=>{feedFailed=true;return null;}),
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
     ]);

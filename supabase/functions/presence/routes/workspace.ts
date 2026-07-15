@@ -19,7 +19,7 @@ import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelt
 import { nextPlanUp } from '../commerce/catalog.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 
@@ -57,10 +57,49 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
-  // agency membership drives the Agency nav section (reviewers never need it)
-  let isAgency = false;
-  if (role !== 'client_reviewer') { try { isAgency = !!(await resolveAgencyMember(jwt)); } catch { /* */ } }
   const caps = capabilitiesOf(role);
+  const seesFull = siteCan(role, 'view_all');
+  const showApprovals = visibleTo(role, 'approvals');
+  const reader = String(principal.userId || principal.email || 'anon'); // same key /notifications(/read) uses
+
+  // ONE concurrent wave for every independent read on this boot path — agency
+  // membership, the bridged-customer links, the entitlement plan, and BOTH
+  // attention (bell badge) waves that used to run serially. The predicates are
+  // unchanged: a caller without the capability never fires the studio-only
+  // reads — their slot resolves to the empty shape ('none') instead. Every
+  // best-effort slot swallows its own failure so one bad read never costs the
+  // others (same net effect as the old per-block try/catch).
+  const none = Promise.resolve({ ok: true, json: [] as any[] });
+  const swallow = () => ({ ok: false, json: null as any });
+  const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ] = await Promise.all([
+    // agency membership drives the Agency nav section (reviewers never need it)
+    role !== 'client_reviewer' ? resolveAgencyMember(jwt).catch(() => null) : Promise.resolve(null),
+    // Bridged-customer links (see isManagedClient below). Fired without waiting on
+    // the agency lookup — the old !isAgency guard moved to the CONSUMER, so an
+    // agency operator's result is simply discarded, never acted on.
+    site.client_id && !isOperator && !scopedName
+      ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).then((r) => ((r.json as any[]) || [])).catch(() => null)
+      : Promise.resolve(null),
+    // Phase D: the licensed plan (shared per-request memo — the boundary gate already read this row)
+    site.client_id
+      ? import('../middleware/entitlement.ts').then((m) => m.entitlementFor(principal, site.client_id)).catch(() => null)
+      : Promise.resolve(null),
+    // Phase FLOW: active notices (owner surfaces only; bounded — the badge caps out anyway)
+    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind&limit=100`).catch(swallow) : none,
+    // proposed plans/writes are pure counts — HEAD + count=exact, flat cost at any size
+    showApprovals ? svcCount(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed`) : Promise.resolve(0),
+    showApprovals ? svcCount(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed`) : Promise.resolve(0),
+    showApprovals ? svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,metadata`).catch(swallow) : none, // DAM-2: files awaiting approval
+    // FIX 1: brand-new website enquiries must ring the bell too (owner surfaces only).
+    seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`).catch(swallow) : none,
+    // P2-D (studio side): open support requests + unread client messages need triage
+    seesFull ? svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id&limit=50`).catch(swallow) : none,
+    seesFull ? svc(`presence_activity_reads?site_id=eq.${site.id}&reader=eq.${encodeURIComponent(reader)}&select=last_seen_at&limit=1`).catch(swallow) : none,
+    // FD-N: a client's message — AND their approval decisions / survey answers —
+    // must reach the bell/Today, not only the Inbox.
+    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,survey_submitted)&select=created_at,kind,detail,actor_kind&order=created_at.desc&limit=50`).catch(swallow) : none,
+  ]);
+  const isAgency = !!agencyMember;
 
   // Bridged-customer detection (presentation only): the signed-in user is an
   // agency's CLIENT signed into their OWN site (converted from a deal → provisioned
@@ -70,29 +109,17 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // the bridge. Guarded so an agency operator who scope-switched INTO this customer
   // (isAgency / isOperator / scopedName) KEEPS the operator tools, and a plain
   // studio owner (no customer-side link) is never mistaken for a client.
-  // The lookup is hoisted here so the attention block below reuses it (no 2nd query).
-  let isManagedClient = false;
-  let customerLinks: any[] | null = null;
-  if (site.client_id && !isOperator && !isAgency && !scopedName) {
-    try {
-      customerLinks = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
-      isManagedClient = customerLinks.length > 0;
-    } catch { /* keep false — a plain owner is unaffected */ }
-  }
+  // The lookup rides the wave above so the attention block below reuses it (no 2nd query).
+  const customerLinks: any[] | null = isAgency ? null : linksQ;
+  const isManagedClient = !!(customerLinks && customerLinks.length > 0);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
   // the site edition when no entitlement plan is recorded). Navigation adapts to
   // it automatically — one nav, many editions. Never throws on missing rows.
   let editionKey: EditionKey = editionFromSite(site.edition, { isAgency });
   let planKey: string | null = null;
-  try {
-    if (site.client_id) {
-      // shared per-request memo — the boundary gate already read this row
-      const { entitlementFor } = await import('../middleware/entitlement.ts');
-      const plan = (await entitlementFor(principal, site.client_id)).plan;
-      if (plan) { planKey = String(plan); editionKey = editionFromPlan(planKey); }
-    }
-  } catch { /* keep the fallback edition */ }
+  const plan = ent?.plan;
+  if (plan) { planKey = String(plan); editionKey = editionFromPlan(planKey); }
 
   // Phase P: the honest upsell — the next self-serve rung + what it GAINS (from
   // featureDelta, so it can never overpromise). Shown only to owners (never to
@@ -111,42 +138,23 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 
   // Phase FLOW: one "needs you" count powers the shell bell badge on EVERY page,
   // so the owner sees there's something waiting without clicking into the portal.
-  // Active notices (owner surfaces only) + plans awaiting approval, one cheap
-  // parallel read on the boot path; best-effort so the shell never breaks on it.
+  // All the reads already landed in the wave above; best-effort so the shell
+  // never breaks on it.
   let attention_count = 0;
   try {
-    const seesFull = siteCan(role, 'view_all');
-    const showApprovals = visibleTo(role, 'approvals');
-    const none = Promise.resolve({ ok: true, json: [] as any[] });
-    const [nQ, iQ, wQ, fQ, eQ] = await Promise.all([
-      seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind`) : none,
-      showApprovals ? svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
-      showApprovals ? svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id`) : none,
-      showApprovals ? svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,metadata`) : none, // DAM-2: files awaiting approval
-      // FIX 1: brand-new website enquiries must ring the bell too (owner surfaces only).
-      seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`) : none,
-    ]);
     const filesPending = ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length;
     // FIX 1 dedupe: the lead-followup cron already raises a per-lead notice for AGED
     // 'new' leads (counted via nQ). Count only the still-fresh new enquiries not yet
     // represented by a follow-up notice, so a single lead never stacks two signals.
     const leadFollowups = ((nQ.json as any[]) || []).filter((n) => n.kind === 'lead_followup').length;
     const newEnquiries = Math.max(0, ((eQ.json as any[])?.length || 0) - leadFollowups);
-    attention_count = ((nQ.json as any[])?.length || 0) + ((iQ.json as any[])?.length || 0) + ((wQ.json as any[])?.length || 0) + filesPending + newEnquiries;
+    attention_count = ((nQ.json as any[])?.length || 0) + (iQ || 0) + (wQ || 0) + filesPending + newEnquiries;
   } catch { /* the badge is best-effort — never block the shell on it */ }
 
   // P2-D: fold service delivery into the ONE attention surface (no second bell).
   try {
-    if (siteCan(role, 'view_all')) { // studio: open support requests + unread client messages need triage
-      const reader = String(principal.userId || principal.email || 'anon'); // same key /notifications(/read) uses
-      const [sup, seenQ, msgQ] = await Promise.all([
-        svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id&limit=50`),
-        svc(`presence_activity_reads?site_id=eq.${site.id}&reader=eq.${encodeURIComponent(reader)}&select=last_seen_at&limit=1`),
-        // FD-N: a client's message — AND their approval decisions / survey answers —
-        // must reach the bell/Today, not only the Inbox.
-        svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,survey_submitted)&select=created_at,kind,detail,actor_kind&order=created_at.desc&limit=50`),
-      ]);
-      attention_count += ((sup.json as any[])?.length || 0);
+    if (seesFull) { // studio: open support requests + unread client messages need triage
+      attention_count += ((supQ.json as any[])?.length || 0);
       const lastSeen = (seenQ.json as any[])?.[0]?.last_seen_at || null;
       attention_count += ((msgQ.json as any[]) || []).filter((e) => {
         if (lastSeen && String(e.created_at) <= String(lastSeen)) return false;
@@ -228,16 +236,22 @@ export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html'
  *  Computed server-side with the visibility model, so it can never over-expose. */
 export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
-  const shares = await loadShares(site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
+  const swallow = () => ({ ok: false, json: [] as any[] });   // best-effort slots must never sink the whole feed
   // FIX 4: kick off the Content Tree read CONCURRENTLY with the feed's own queries
   // (owner-only, best-effort) so surfacing missing-required content adds no serial
   // latency to this bell hot path. Dynamic import avoids any top-level import cycle.
   const treeP: Promise<any> = seesFull
     ? import('./room.ts').then((m) => m.siteContentTree(site)).catch(() => null)
     : Promise.resolve(null);
-  const [momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ] = await Promise.all([
+  // ONE initial wave: shares + the feed's own queries + every independent
+  // owner-only read the sections below consume (bridge links, support requests,
+  // message events, agency links). Predicates unchanged — a reviewer never
+  // fires the studio-only reads. Only genuinely dependent stages (bridge
+  // links → unread reads, projects → clients → contacts) stay sequential.
+  const [shares, momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ, bridgeQ, supR, evR, agencyLinksQ] = await Promise.all([
+    loadShares(site.id),
     svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id,title,summary,risk&limit=10`),
@@ -247,6 +261,17 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // FIX 1: brand-new website enquiries (owner surfaces only) — one synthetic feed
     // row so the bell + Inbox surface them like every other needs-you item.
     seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`) : noEnq,
+    // bridged-customer links (owner-only; the unread reads that DEPEND on them stay below)
+    seesFull && site.client_id ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
+    // FIX 5 inputs: open support requests + client message events (owner-only, best-effort)
+    seesFull ? svc(`presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=id,subject,project_id,requester,updated_at&order=updated_at.desc&limit=25`).catch(swallow) : noEnq,
+    // kind=message events carry detail.from ('client'|'studio') — stamped by the
+    // client door — so we can tell whose turn it is without the author_kind
+    // ambiguity (a solo owner and their customer are both 'client').
+    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=project_id,detail,created_at&order=created_at.desc&limit=100`).catch(swallow) : noEnq,
+    // the Agency–Client Bridge for THIS studio (agency_site_id = my site) — the
+    // authoritative "who are my customers" list + project→customer mapping.
+    seesFull ? svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`).catch(swallow) : noEnq,
   ]);
   const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
@@ -304,7 +329,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // Owners only: a client_reviewer can't open /client/* (403), so never show them the row.
   if (seesFull && site.client_id) {
     try {
-      const links = ((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || [];
+      const links = ((bridgeQ.json as any[]) || []);
       if (links.length) {
         const s = links[0].agency_site_id; const ids = links.filter((l) => l.agency_site_id === s).map((l) => l.project_id);
         const [seen, ev] = await Promise.all([
@@ -329,13 +354,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   let client_messages: any[] = [];
   if (seesFull) {
     try {
-      const [supR, evR] = await Promise.all([
-        svc(`presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=id,subject,project_id,requester,updated_at&order=updated_at.desc&limit=25`),
-        // kind=message events carry detail.from ('client'|'studio') — stamped by the
-        // client door — so we can tell whose turn it is without the author_kind
-        // ambiguity (a solo owner and their customer are both 'client').
-        svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=project_id,detail,created_at&order=created_at.desc&limit=100`),
-      ]);
+      // supR + evR landed in the initial wave above.
       // Summarize EVERY project conversation, not only the ones awaiting a reply, so
       // the operator sees who they're talking with even after they've answered. evR is
       // created_at.desc, so the FIRST event seen per project is its latest; `needs_reply`
@@ -350,12 +369,12 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       const projById: Record<string, { name: string; client_id: string }> = {};
       if (pids.length) { for (const p of (((await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,client_id`)).json as any[]) || [])) projById[String(p.id)] = { name: String(p.name || ''), client_id: p.client_id ? String(p.client_id) : '' }; }
       // Grouping-by-client enrichment. TWO cheap, batched lookups (never N+1):
-      //  1) the Agency–Client Bridge for THIS studio (agency_site_id = my site) — the
+      //  1) the Agency–Client Bridge (agencyLinksQ, read in the initial wave) — the
       //     authoritative "who are my customers" list + project→customer mapping.
       //  2) one clients read for every customer id we touched — name + identity keys.
       // A project-less request carries only a `requester` reader key; match it to a
       // customer via their auth-user-id/email so it groups under the right client too.
-      const links = (((await svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`)).json as any[]) || []);
+      const links = ((agencyLinksQ.json as any[]) || []);
       const projToClient: Record<string, string> = {};
       const clientToProject: Record<string, string> = {};  // client id → one of their projects (to open their profile)
       const clientIds = new Set<string>();

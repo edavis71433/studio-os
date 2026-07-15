@@ -52,7 +52,7 @@
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · Analytics — your business in plain language. Numbers only where they’re real.</footer>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -110,7 +110,7 @@ async function load(){
 }
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const c=await api('/portal/context');CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
 </script>
 </body>
 </html>

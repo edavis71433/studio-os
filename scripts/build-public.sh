@@ -28,8 +28,8 @@ done
 # images at root (og-image, favicons, marketing screenshots)
 cp ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.ico dist/ 2>/dev/null || true
 
-# public asset directories (marketing photos / case studies)
-for d in life case-studies; do
+# public asset directories (marketing photos / case studies / vendored libs)
+for d in life case-studies vendor; do
   [ -d "$d" ] && cp -r "$d" dist/
 done
 

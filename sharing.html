@@ -49,7 +49,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Sharing & access (A7.2). The owner invites a client reviewer and chooses what
 // the client sees. Consumes /portal/context + /portal/members + /portal/shares
@@ -119,7 +119,11 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to man
 function trouble(){$('main').innerHTML=`<div class="center"><h2>Couldn’t load this just now.</h2><p class="muted">Please refresh.</p></div>`;}
 
 async function load(){
-  const ctx=await api('/portal/context');if(!ctx.ok){trouble();return;}
+  // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
+  // Only when UNSCOPED: this page's api() carries no x-dds-scope-site, so under a
+  // drilled-in ?client= the shell's copy describes the CLIENT site, not ours.
+  const useShared=window.ddsContext&&!new URLSearchParams(location.search).get('client');
+  const ctx=await (useShared?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));if(!ctx.ok){trouble();return;}
   if(!(ctx.body.data&&ctx.body.data.sees_full_workspace)){notOwner();return;}
   const [mem,sh]=await Promise.all([api('/portal/members'),api('/portal/shares')]);
   if(mem.status===403){notOwner();return;}

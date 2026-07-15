@@ -1031,7 +1031,7 @@ body.pd-dragging *{cursor:grabbing !important}
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 /* ════ The Client Room · Direction A dress over the frozen M7 movement ════
    Every API call, route, and contract is byte-identical to M7. Only the
@@ -4258,7 +4258,8 @@ async function refreshAll() {
     tagged("site", api("GET", "/site")),
     soft(api("GET", "/offerings")), soft(api("GET", "/faqs")), soft(api("GET", "/testimonials")), soft(api("GET", "/posts")),
     soft(api("GET", "/media")), soft(api("GET", "/settings")),
-    api("GET", "/portal/context").catch(() => null),
+    // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
+    (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject()).catch(() => api("GET", "/portal/context").catch(() => null)),
   ]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];

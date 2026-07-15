@@ -59,7 +59,7 @@
 <div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Presence · Studio OS drafts; you approve. Nothing goes live without your OK.</footer>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -195,7 +195,11 @@ function signedOut(){$('main').innerHTML=`<div class="center"><p class="big">Sig
     if(!TOKEN){signedOut();return;}
     // greet by name + skip drafting for editions without a website (route them to Today)
     try{
-      const ctx=await api('/portal/context');
+      // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
+      // Only when UNSCOPED: this page's api() carries no x-dds-scope-site, so under a
+      // drilled-in ?client= the shell's copy describes the CLIENT site, not ours.
+      const useShared=window.ddsContext&&!new URLSearchParams(location.search).get('client');
+      const ctx=await (useShared?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));
       const c=(ctx.body&&ctx.body.data)||{};
       if(c.edition_flags&&c.edition_flags.hasWebsite===false){location.href=c.landing||'/today.html';return;}
     }catch(_){/* proceed with defaults */}
