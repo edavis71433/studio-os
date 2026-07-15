@@ -634,7 +634,13 @@ async function openDeal(id){
       const canRevise=!superseded&&(p.status==='sent'||p.status==='declined');
       const act=superseded?'':p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
       const revise=canRevise?`<button class="btn ghost" data-revise-prop="${p.id}" title="Create a new version to renegotiate — this one is kept and marked superseded">Revise →</button>`:'';
-      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
+      // viewed-tracking + expiry (#205): tell the operator whether the prospect opened
+      // it and when it lapses. first_viewed_at/expires_at are null before migration 0107.
+      const vbits=[];
+      if(p.first_viewed_at)vbits.push('👁 Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
+      if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?'⏳ Expired':'Expires '+exp.toLocaleDateString());}
+      const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
+      return `<div class="row2"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const cons=(data.contracts||[]).map(k=>{

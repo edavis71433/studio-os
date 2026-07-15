@@ -394,7 +394,9 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   if (req.method === 'GET') {
     const [contact, proposals, contracts, events, invoices] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
-      svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`),
+      // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
+      // proposals list never disappears if a deploy is ahead of the migration.
+      (async () => { let r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`); return r; })(),
       svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`),
@@ -1009,6 +1011,10 @@ export async function handleSalesProposalSend(req: Request, site: SiteRow, princ
   if (p.status !== 'draft') return json({ error: 'bad_state', message: 'Only a draft proposal can be sent.' }, 409, cors);
   const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
+  // Default a 30-day expiry on send (best-effort; no-ops before migration 0107). The
+  // signing link already carries a 30-day token — this makes the expiry explicit and
+  // blocks a late acceptance after the window closes.
+  svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ expires_at: new Date(Date.now() + 30 * 86400000).toISOString() }) }).catch(() => {});
   const secret = linkSecret();
   const token = secret ? await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret) : null;
   const url = token ? `${siteUrl()}/sign.html?t=${token}` : null;   // the human signing PAGE, not the raw API
@@ -1036,6 +1042,9 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   // A revised (superseded) proposal's old link can NEVER be accepted — the studio
   // replaced it with a newer version (the enforcement point for revise/supersede).
   if (splitLineItems(p.line_items).meta.superseded_by) return json({ error: 'superseded', message: 'This proposal was replaced by a newer version — ask your studio for the latest.' }, 409, cors);
+  // Expired proposals can't be ACCEPTED (declining is always allowed). expires_at is
+  // present only after migration 0107 — undefined here is simply "no expiry".
+  if (decision === 'accepted' && p.expires_at && String(p.expires_at) < nowIso()) return json({ error: 'expired', message: 'This proposal has expired — ask your studio to send an updated one.' }, 409, cors);
   if (p.status === decision) return json({ data: { status: p.status }, already: true }, 200, cors); // idempotent
   if (!canDecideProposal(p.status, decision)) return json({ error: 'bad_state', message: 'This proposal can’t be updated.' }, 409, cors);
   const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=deal_id,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: nowIso(), decided_note: clean(b.note, 500) }) });
@@ -1182,9 +1191,18 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
   let brand: { name: string; accent: string } | null = null;
   try { const eb = await loadEmailBrand(tok.site_id); brand = { name: eb.name, accent: eb.accent }; } catch { /* neutral fallback */ }
   if (tok.t === 'proposal') {
-    const p = rows(await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&limit=1`))[0];
+    // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
+    // back to the pre-0107 shape so a deploy ahead of the migration never breaks the
+    // public proposal view.
+    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&limit=1`);
+    if (!pr.ok) pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&limit=1`);
+    const p = rows(pr)[0];
     if (!p) return json({ error: 'not_found' }, 404, cors);
-    return json({ data: { kind: 'proposal', brand, ...p } }, 200, cors);
+    // stamp the FIRST open so the operator knows the prospect saw it (best-effort;
+    // no-ops before the migration adds the column).
+    if (!p.first_viewed_at) { svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ first_viewed_at: nowIso() }) }).catch(() => {}); }
+    const expired = !!(p.expires_at && String(p.expires_at) < nowIso());
+    return json({ data: { kind: 'proposal', brand, expired, ...p } }, 200, cors);
   }
   const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at&limit=1`))[0];
   if (!c) return json({ error: 'not_found' }, 404, cors);
