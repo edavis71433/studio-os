@@ -243,6 +243,22 @@ h5.rune .whisper.ok{color:var(--sage)}
 .mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 8px;font-size:11px;color:var(--paper);background:linear-gradient(transparent,rgba(33,29,25,.75))}
 .mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
 .uploadprep{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:20px 24px;margin-top:18px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+/* #180: the full Files library in this view — collections · search · sort · non-image tiles */
+.flbar{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.flchips{display:flex;gap:6px;flex-wrap:wrap}
+.flchip{font-size:12px;font-weight:550;padding:4px 12px;border-radius:100px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink-2);transition:color var(--dur) var(--ease)}
+.flchip:hover{color:var(--ink)}
+.flchip.on{background:var(--plum-soft);border-color:var(--plum);color:var(--plum);font-weight:600}
+.flchip .n{margin-left:5px;font-size:10.5px;opacity:.75;font-variant-numeric:tabular-nums}
+.flrow{display:flex;gap:8px;align-items:center}
+.flrow input{flex:1;min-width:160px;padding:8px 12px;font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:8px;background:var(--sheet);color:var(--ink)}
+.flrow select{padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:8px;background:var(--sheet);color:var(--ink);cursor:pointer}
+.mcell.fldoc{display:flex;align-items:center;justify-content:center;color:var(--ink-2);text-decoration:none}
+.mcell.fldoc svg{width:32px;height:32px;opacity:.6}
+.mcell .badge.fldocb{background:var(--plum)}
+.mcell .badge.flpend{background:var(--amber)}
+.mcell .fldot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#b3a892;margin-right:5px;vertical-align:1px}
+.mcell .fldot.on{background:#8fd0a5}
 /* in-picker source switch: Your photos / Stock photos (FD-T10 in-builder stock) */
 .pickerTabs{display:flex;gap:6px;margin:14px 0 4px;border-bottom:1px solid var(--hair)}
 .pickerTab{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink-2);background:transparent;border:0;border-bottom:2px solid transparent;padding:8px 4px;margin-bottom:-1px;cursor:pointer;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
@@ -768,10 +784,10 @@ body.pd-dragging *{cursor:grabbing !important}
         <div id="postAddWrap"></div>
       </section>
 
-      <!-- PHOTOGRAPHS -->
+      <!-- FILES (#180: the full library — collections · search · sort · non-image kinds) -->
       <section class="view" id="view-media">
         <h1 class="doc" role="heading" aria-level="2">Files</h1>
-        <p class="docsub">Your business library — the photos on your website plus everything you’ve uploaded. Anything marked “on your site” is at work; the rest wait here.</p>
+        <p class="docsub">Your business library — photos, documents and brand files, plus everything you’ve uploaded. Anything marked “on your site” is at work; the rest wait here.</p>
         <div id="assetHealth" style="margin:2px 0 8px" hidden></div>
         <div style="display:flex;align-items:baseline;gap:20px">
           <button class="textact" id="btnUpload">＋ Add a photograph</button>
@@ -784,6 +800,13 @@ body.pd-dragging *{cursor:grabbing !important}
             <div class="hint">A sentence helps customers who can’t see it — and the people searching for you.</div>
           </div>
           <div style="display:flex;gap:22px;align-items:baseline"><button class="pillbtn inked" id="btnUploadGo">Add it to the collection</button><button class="quietact" id="btnUploadCancel">Never mind</button></div>
+        </div>
+        <div class="flbar" id="flBar" hidden>
+          <div class="flchips" id="flChips" role="group" aria-label="Collections"></div>
+          <div class="flrow">
+            <input id="flSearch" type="search" aria-label="Search files" placeholder="Search files — try “logo”" autocomplete="off">
+            <select id="flSort" aria-label="Sort files"><option value="recent">Recent</option><option value="name">Name</option><option value="size">Largest</option></select>
+          </div>
         </div>
         <div class="mediagrid" id="mediaGrid"></div>
       </section>
@@ -2416,10 +2439,196 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault(); $("findInput").focus();
 });
 
-/* ── photographs (identical media API) ── */
+/* ── photographs → the Files library (#180). GET /media still feeds S.media (block
+ *    pickers + thumbnails, unchanged); the VIEW's grid renders via FL_load below. ── */
 async function loadMedia() {
-  try { const r = await api("GET", "/media"); S.media = r.data || []; renderMediaGrid($("mediaGrid"), true); loadAssetHealth(); }
+  // FL_load is NOT awaited: callers like importStockToBlock await loadMedia only
+  // for S.media (the block thumbnail); the library grid refresh rides behind it
+  // and never rejects (FL_load handles its own failures).
+  try { const r = await api("GET", "/media"); S.media = r.data || []; FL_load(); }
   catch (err) { toast(nice(err), true); }
+}
+
+/* ── #180: the full Files library folded into this view, namespaced FL_ (files.html
+ *    defines $/esc/api/toast/S with incompatible shapes — nothing is shared, the
+ *    COLS/qstr/tile ideas are ported onto presence's api(), which throws on error).
+ *    files.html keeps the deep detail surface (versions, where-used, crops, replace);
+ *    every tile links there. Block pickers keep the classic /media path untouched. ── */
+const FL_COLS = [
+  { key: "all", label: "All files", f: {} },
+  { key: "fav", label: "Favorites", f: {}, favs: true },
+  { key: "photos", label: "Photos", f: {}, kind: "image" },
+  { key: "brand", label: "Brand", f: { brand: "true" } },
+  { key: "documents", label: "Documents", f: {}, kind: "document" },
+  { key: "templates", label: "Templates", f: { collection: "Templates" } },
+  { key: "downloads", label: "Downloads", f: { collection: "Downloads" } },
+  { key: "archive", label: "Archive", f: { status: "archived" } },
+  { key: "stock", label: "Stock", stock: true },
+];
+const FL_S = { col: "all", q: "", sort: "recent", rows: [], counts: {}, loaded: false, seq: 0,
+  stock: { state: null, results: [] } };
+// Once the library has loaded, IT owns the view grid: manage-mode repaints (alt edit,
+// assign, delete, boot) route here so filters/badges survive. Pickers pass manage=false.
+function FL_takeover(grid) {
+  if (!FL_S.loaded || grid !== $("mediaGrid")) return false;
+  FL_load();
+  return true;
+}
+function FL_qstr() {
+  const c = FL_COLS.find((x) => x.key === FL_S.col) || FL_COLS[0];
+  const p = new URLSearchParams();
+  Object.entries(c.f || {}).forEach(([k, v]) => p.set(k, v));
+  if (FL_S.q.trim()) p.set("q", FL_S.q.trim());
+  p.set("limit", "300");
+  return p.toString();
+}
+function FL_sortRows(rows) {
+  const r = [...rows];
+  if (FL_S.sort === "name") r.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  else if (FL_S.sort === "size") r.sort((a, b) => (b.bytes || 0) - (a.bytes || 0));
+  else r.sort((a, b) => Date.parse(b.created_at || 0) - Date.parse(a.created_at || 0));
+  return r;
+}
+async function FL_load() {
+  const grid = $("mediaGrid"); if (!grid) return;
+  loadAssetHealth();
+  if (FL_S.col === "stock") { FL_paintBar(); return FL_renderStock(); }
+  const seq = ++FL_S.seq;
+  try {
+    const [a, c] = await Promise.all([api("GET", "/assets?" + FL_qstr()), api("GET", "/assets/collections")]);
+    if (seq !== FL_S.seq) return;   // a newer chip/search won the race
+    let rows = (a.data && a.data.assets) || [];
+    const col = FL_COLS.find((x) => x.key === FL_S.col);
+    if (col && col.kind) rows = rows.filter((r) => r.kind === col.kind);
+    if (col && col.favs) rows = rows.filter((r) => r.favorite);
+    FL_S.rows = FL_sortRows(rows);
+    FL_S.counts = {}; (c.data || []).forEach((x) => { FL_S.counts[x.name] = x.count; });
+    FL_S.loaded = true;
+  } catch (err) {
+    if (seq !== FL_S.seq) return;
+    // /assets not on this server or plan — the classic photo grid still works
+    if (!FL_S.loaded) { $("flBar").hidden = true; renderMediaGrid(grid, true); return; }
+    // background refresh failed AFTER a successful mutation: no error toast (the
+    // action itself succeeded), and reconcile image rows against S.media so a
+    // just-deleted photo can't ghost back as a stale tile. Archived images may
+    // drop from this paint too — they return on the next successful load.
+    FL_S.rows = FL_S.rows.filter((r) => r.kind !== "image" || S.media.some((m) => String(m.id) === String(r.id)));
+  }
+  FL_render();
+}
+function FL_paintBar() {
+  const bar = $("flBar"); if (!bar) return;
+  bar.hidden = false;
+  const chips = $("flChips"); chips.innerHTML = "";
+  FL_COLS.forEach((c) => {
+    const on = FL_S.col === c.key;
+    const n = c.key === "templates" ? FL_S.counts.Templates : c.key === "downloads" ? FL_S.counts.Downloads : 0;
+    const b = el("button", "flchip" + (on ? " on" : ""), c.label);
+    b.type = "button"; b.setAttribute("aria-pressed", String(on));
+    if (n) b.appendChild(el("span", "n", String(n)));
+    b.addEventListener("click", () => { if (FL_S.col === c.key) return; FL_S.col = c.key; FL_load(); });
+    chips.appendChild(b);
+  });
+  if (!bar.dataset.wired) {
+    bar.dataset.wired = "1";
+    let t;
+    $("flSearch").addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { FL_S.q = $("flSearch").value; FL_S.col === "stock" ? FL_loadStock() : FL_load(); }, 280); });
+    $("flSearch").addEventListener("keydown", (e) => { if (e.key === "Enter" && FL_S.col === "stock") { e.preventDefault(); FL_S.q = $("flSearch").value; FL_loadStock(); } });
+    $("flSort").addEventListener("change", () => { FL_S.sort = $("flSort").value; FL_S.rows = FL_sortRows(FL_S.rows); FL_render(); });
+  }
+}
+function FL_render() {
+  const grid = $("mediaGrid"); if (!grid) return;
+  FL_paintBar();
+  if (FL_S.col === "stock") return FL_renderStock();
+  grid.innerHTML = "";
+  if (!FL_S.rows.length) {
+    grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">${FL_S.q ? "No files match that search." : "Nothing here yet."}</div><div class="eh">Photos, PDFs and brand files all live here — add one above and it’s ready to place anywhere on your site.</div></div>`;
+    return;
+  }
+  const byId = new Map(S.media.map((m) => [m.id, m]));
+  FL_S.rows.forEach((a) => {
+    const m = a.kind === "image" ? byId.get(a.id) : null;
+    // images in the classic collection keep EVERY current behavior (logo/hero/share ·
+    // alt edit · AI suggest · focus · delete) via the same cell builder
+    const cell = m ? mediaCell(grid, m, true) : FL_cell(a);
+    if (a.state === "pending") { const b = el("span", "badge flpend", "Pending"); if (cell.querySelector(".badge")) b.style.top = "36px"; cell.appendChild(b); }
+    if (m) { const row = cell.querySelector("div"); (row || cell).appendChild(FL_openLink(a.id)); }
+    grid.appendChild(cell);
+  });
+}
+// Non-image kinds (and images the classic /media list doesn't carry, e.g. archived):
+// the whole tile opens the deep view in Files — versions, where-used, crops, replace.
+function FL_cell(a) {
+  const cell = el("a", "mcell fldoc");
+  cell.href = FL_filesHref(a.id);
+  cell.title = "Open in Files — versions, where-used and replace live there";
+  cell.setAttribute("aria-label", "Open " + (a.name || "file") + " in Files");
+  if (a.thumb) { const img = el("img"); img.src = a.thumb; img.alt = ""; img.loading = "lazy"; cell.appendChild(img); }
+  else cell.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" stroke="currentColor" stroke-width="1.6"/><path d="M14 3v4h4M9 13h6M9 16h6" stroke="currentColor" stroke-width="1.5"/></svg>');
+  if (a.kind === "document") cell.appendChild(el("span", "badge fldocb", "PDF"));
+  const alt = el("span", "alt", a.name || "");
+  const use = el("i", "usedline", a.in_use ? "at work: on your site" : "not used yet");
+  use.prepend(el("i", "fldot" + (a.in_use ? " on" : "")));
+  alt.appendChild(use);
+  cell.appendChild(alt);
+  return cell;
+}
+// SC-1: dynamic links out of the editor carry the agency drill-in scope too.
+function FL_filesHref(id) {
+  const c = new URLSearchParams(location.search).get("client");
+  return "/files.html?focus=" + encodeURIComponent(id) + (c ? "&client=" + encodeURIComponent(c) : "");
+}
+function FL_openLink(id) {
+  const a = el("a", null, "Open in Files");
+  a.href = FL_filesHref(id);
+  a.title = "Versions, where-used, crops and replace live in Files";
+  a.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);color:inherit;text-decoration:none";
+  a.addEventListener("click", (e) => e.stopPropagation());
+  return a;
+}
+/* the Stock chip — same /stock endpoints as the picker's stock tab; imports land in
+ * the library (POST /stock/import) and S.media refreshes quietly for the pickers */
+async function FL_loadStock() {
+  const st = FL_S.stock; st.state = "loading"; FL_render();
+  try {
+    const r = await api("GET", "/stock/search?q=" + encodeURIComponent(FL_S.q || "") + "&page=1");
+    st.results = ((r && r.data) || {}).images || []; st.state = "ok";
+  } catch (err) {
+    if (err && err.status === 503) st.state = "off";
+    else { st.results = []; st.state = "ok"; toast(nice(err), true); }
+  }
+  FL_render();
+}
+function FL_renderStock() {
+  const grid = $("mediaGrid"), st = FL_S.stock;
+  if (st.state === "off") { grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:24px 8px"><div class="eq">Stock photos aren’t turned on yet.</div><div class="eh">Add a Pexels key to search professional royalty-free photos and add them straight to your Files — hosted on your own site.</div></div>`; return; }
+  if (st.state === "loading") { grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">Searching…</p>`; return; }
+  if (st.state == null) { grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:24px 8px"><div class="eq">Search for a photo above.</div><div class="eh">Try “office”, “coffee”, “construction”, “salon”…</div></div>`; return; }
+  if (!st.results.length) { grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:24px 8px"><div class="eq">No matches — try another word.</div><div class="eh">Try “office”, “coffee”, “construction”, “salon”…</div></div>`; return; }
+  grid.innerHTML = "";
+  st.results.forEach((im) => {
+    const cell = el("button", "mcell"); cell.type = "button";
+    cell.setAttribute("aria-label", "Add this stock photo to your files" + (im.credit ? " — by " + im.credit : ""));
+    const img = el("img"); img.src = im.thumb; img.alt = im.alt || ""; img.loading = "lazy"; cell.appendChild(img);
+    if (im.credit) cell.appendChild(el("span", "alt", im.credit));
+    cell.addEventListener("click", () => FL_addStock(im, cell));
+    grid.appendChild(cell);
+  });
+}
+async function FL_addStock(im, cell) {
+  if (cell.dataset.busy) return; cell.dataset.busy = "1"; cell.style.opacity = ".5";
+  const badge = el("span", "badge", "Adding…"); cell.appendChild(badge);
+  try {
+    await api("POST", "/stock/import", { stock_id: im.id, alt_text: im.alt, credit: im.credit || "" });
+    cell.style.opacity = ""; badge.textContent = "Added ✓";
+    toast("Added to your Files");
+    api("GET", "/media").then((r) => { S.media = r.data || []; }).catch(() => {});   // keep the pickers fresh
+  } catch (err) {
+    cell.style.opacity = ""; badge.remove(); delete cell.dataset.busy;
+    if (err && err.status === 503) { FL_S.stock.state = "off"; FL_render(); }
+    else toast(nice(err), true);
+  }
 }
 
 /* ── Bookings (Phase BK): the owner's native booking desk — services, weekly
@@ -2744,121 +2953,125 @@ async function loadAssetHealth() {
   host.textContent = attn ? ("Your library: " + bits.join(" · ") + ".") : "✓ Your library looks healthy — everything described and in good shape.";
 }
 function renderMediaGrid(grid, manage, onPick) {
+  if (manage && FL_takeover(grid)) return;   // #180: once loaded, the Files library owns the view grid (pickers pass manage=false — untouched)
   grid.innerHTML = "";
   if (!S.media.length) {
     if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">A photograph is worth a paragraph you don’t have to write.</div><div class="eh">Add your best plate, your room, your storefront — they’ll be ready to place anywhere on your site.</div></div>`;
     else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No photographs in the collection yet.</p>`;
     return;
   }
-  S.media.forEach((m) => {
-    const cell = el(onPick ? "button" : "div", "mcell");
-    if (m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.loading = "lazy"; cell.appendChild(img); }
-    if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "At work: " + m.used_by.join(", "); cell.appendChild(b); }
-    const alt = el("span", "alt", m.alt_text || "");
-    if (m.used_by && m.used_by.length) alt.appendChild(el("i", "usedline", "at work: " + m.used_by.join(", ")));
-    cell.appendChild(alt);
-    if (onPick) cell.addEventListener("click", () => onPick(m.id));
-    if (manage) {
-      // Phase V (FD-N2/N3): one-tap logo + share-image assignment — no code, publish applies it
-      const row = el("div"); row.style.cssText = "display:flex;gap:6px;margin-top:6px;flex-wrap:wrap";
-      const mkAssign = (field, onLabel, offLabel) => {
-        const on = S.settings && S.settings[field] === m.id;
-        const b = el("button", null, on ? onLabel + " ✓" : offLabel);
-        b.type = "button";
-        b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--accent, #8c3b2e)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--accent, #8c3b2e)" : "transparent") + ";color:" + (on ? "#fff" : "inherit") + ";cursor:pointer";
-        b.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          try {
-            const body = {}; body[field] = on ? null : m.id;
-            const r = await api("PUT", "/settings", body);
-            S.settings = r.data || { ...(S.settings || {}), ...body };
-            renderMediaGrid(grid, true);
-            toast(on ? offLabel + " cleared" : onLabel + " set — publish to apply");
-            scheduleChangesRefresh();
-          } catch (err) { toast(nice(err), true); }
-        });
-        return b;
-      };
-      row.appendChild(mkAssign("logo_media_id", "Logo", "Set as logo"));
-      row.appendChild(mkAssign("cover_media_id", "Hero photo", "Set as hero image"));
-      row.appendChild(mkAssign("og_media_id", "Share image", "Use when shared"));
-      // Phase O: edit the photo description (alt text) after upload — a11y/SEO
-      const ed = el("button", null, "Edit description");
-      ed.type = "button";
-      ed.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
-      ed.addEventListener("click", (e) => {
+  S.media.forEach((m) => grid.appendChild(mediaCell(grid, m, manage, onPick)));
+}
+// One photograph cell + its manage actions — used by the classic grid above AND by
+// FL_render (#180), so images keep every behavior inside the Files library view.
+function mediaCell(grid, m, manage, onPick) {
+  const cell = el(onPick ? "button" : "div", "mcell");
+  if (m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.loading = "lazy"; cell.appendChild(img); }
+  if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "At work: " + m.used_by.join(", "); cell.appendChild(b); }
+  const alt = el("span", "alt", m.alt_text || "");
+  if (m.used_by && m.used_by.length) alt.appendChild(el("i", "usedline", "at work: " + m.used_by.join(", ")));
+  cell.appendChild(alt);
+  if (onPick) cell.addEventListener("click", () => onPick(m.id));
+  if (manage) {
+    // Phase V (FD-N2/N3): one-tap logo + share-image assignment — no code, publish applies it
+    const row = el("div"); row.style.cssText = "display:flex;gap:6px;margin-top:6px;flex-wrap:wrap";
+    const mkAssign = (field, onLabel, offLabel) => {
+      const on = S.settings && S.settings[field] === m.id;
+      const b = el("button", null, on ? onLabel + " ✓" : offLabel);
+      b.type = "button";
+      b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--accent, #8c3b2e)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--accent, #8c3b2e)" : "transparent") + ";color:" + (on ? "#fff" : "inherit") + ";cursor:pointer";
+      b.addEventListener("click", async (e) => {
         e.stopPropagation();
-        if (cell.querySelector(".altedit")) return;
-        const inp = el("input", "altedit");
-        inp.type = "text"; inp.value = m.alt_text || ""; inp.maxLength = 300;
-        inp.setAttribute("aria-label", "Photo description");
-        inp.style.cssText = "width:100%;margin-top:6px;padding:6px 8px;font:inherit;font-size:12px;border:1px solid var(--line,#ddd);border-radius:8px";
-        const commit = async () => {
-          const val = inp.value.trim();
-          if (val === (m.alt_text || "") || val.length < 3) { inp.remove(); return; }
-          try {
-            await api("PUT", `/media/${m.id}`, { alt_text: val });
-            m.alt_text = val; renderMediaGrid(grid, true);
-            toast("Description updated — publish to apply");
-          } catch (err) { toast(nice(err), true); inp.remove(); }
-        };
-        inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
-        inp.addEventListener("blur", commit);
-        cell.appendChild(inp); inp.focus(); inp.select();
-      });
-      row.appendChild(ed);
-      // AI-proposed description + tags + caption — one tap, propose-then-approve.
-      // Nothing saves until the owner accepts; the manual "Edit description" above
-      // always works, so this is calm and obviously optional.
-      const ai = el("button", null, "✦ Suggest with AI");
-      ai.type = "button";
-      ai.title = "Let AI propose a description, a few tags, and a caption — you approve or edit before anything saves";
-      ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid #cfc2ee;background:rgba(91,63,160,.06);color:#5b3fa0;cursor:pointer";
-      ai.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (cell.querySelector(".aisuggest")) return;
-        const label = ai.textContent; ai.disabled = true; ai.textContent = "Looking at the photo…";
         try {
-          const r = await api("POST", `/assets/${m.id}/suggest`, {});
-          showSuggest(cell, m, grid, (r.data || {}).proposal || {});
+          const body = {}; body[field] = on ? null : m.id;
+          const r = await api("PUT", "/settings", body);
+          S.settings = r.data || { ...(S.settings || {}), ...body };
+          renderMediaGrid(grid, true);
+          toast(on ? offLabel + " cleared" : onLabel + " set — publish to apply");
+          scheduleChangesRefresh();
         } catch (err) { toast(nice(err), true); }
-        finally { ai.disabled = false; ai.textContent = label; }
       });
-      row.appendChild(ai);
-      // Phase CP-2 (DS-5): focus point — 3×3 chooser; used wherever the site crops
-      const fp = el("button", null, "Set focus");
-      fp.type = "button";
-      fp.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
-      fp.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (cell.querySelector(".focalgrid")) return;
-        const g = el("div", "focalgrid");
-        g.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px;width:96px";
-        [["Top left",0,0],["Top",50,0],["Top right",100,0],["Left",0,50],["Center",50,50],["Right",100,50],["Bottom left",0,100],["Bottom",50,100],["Bottom right",100,100]].forEach(([nm,x,y]) => {
-          const dot = el("button", null, "");
-          dot.type = "button"; dot.title = "Focus: " + nm; dot.setAttribute("aria-label", "Focus point: " + nm);
-          const cur = (m.focal_x === x && m.focal_y === y);
-          dot.style.cssText = "width:28px;height:22px;border-radius:5px;cursor:pointer;border:1px solid var(--line,#ccc);background:" + (cur ? "#5b3fa0" : "rgba(0,0,0,.06)");
-          dot.addEventListener("click", async () => {
-            try { await api("PUT", `/media/${m.id}`, { focal_x: x, focal_y: y }); m.focal_x = x; m.focal_y = y; g.remove(); toast("Focus set — publish to apply"); scheduleChangesRefresh(); }
-            catch (err) { toast(nice(err), true); }
-          });
-          g.appendChild(dot);
+      return b;
+    };
+    row.appendChild(mkAssign("logo_media_id", "Logo", "Set as logo"));
+    row.appendChild(mkAssign("cover_media_id", "Hero photo", "Set as hero image"));
+    row.appendChild(mkAssign("og_media_id", "Share image", "Use when shared"));
+    // Phase O: edit the photo description (alt text) after upload — a11y/SEO
+    const ed = el("button", null, "Edit description");
+    ed.type = "button";
+    ed.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+    ed.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (cell.querySelector(".altedit")) return;
+      const inp = el("input", "altedit");
+      inp.type = "text"; inp.value = m.alt_text || ""; inp.maxLength = 300;
+      inp.setAttribute("aria-label", "Photo description");
+      inp.style.cssText = "width:100%;margin-top:6px;padding:6px 8px;font:inherit;font-size:12px;border:1px solid var(--line,#ddd);border-radius:8px";
+      const commit = async () => {
+        const val = inp.value.trim();
+        if (val === (m.alt_text || "") || val.length < 3) { inp.remove(); return; }
+        try {
+          await api("PUT", `/media/${m.id}`, { alt_text: val });
+          m.alt_text = val; renderMediaGrid(grid, true);
+          toast("Description updated — publish to apply");
+        } catch (err) { toast(nice(err), true); inp.remove(); }
+      };
+      inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
+      inp.addEventListener("blur", commit);
+      cell.appendChild(inp); inp.focus(); inp.select();
+    });
+    row.appendChild(ed);
+    // AI-proposed description + tags + caption — one tap, propose-then-approve.
+    // Nothing saves until the owner accepts; the manual "Edit description" above
+    // always works, so this is calm and obviously optional.
+    const ai = el("button", null, "✦ Suggest with AI");
+    ai.type = "button";
+    ai.title = "Let AI propose a description, a few tags, and a caption — you approve or edit before anything saves";
+    ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid #cfc2ee;background:rgba(91,63,160,.06);color:#5b3fa0;cursor:pointer";
+    ai.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (cell.querySelector(".aisuggest")) return;
+      const label = ai.textContent; ai.disabled = true; ai.textContent = "Looking at the photo…";
+      try {
+        const r = await api("POST", `/assets/${m.id}/suggest`, {});
+        showSuggest(cell, m, grid, (r.data || {}).proposal || {});
+      } catch (err) { toast(nice(err), true); }
+      finally { ai.disabled = false; ai.textContent = label; }
+    });
+    row.appendChild(ai);
+    // Phase CP-2 (DS-5): focus point — 3×3 chooser; used wherever the site crops
+    const fp = el("button", null, "Set focus");
+    fp.type = "button";
+    fp.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+    fp.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (cell.querySelector(".focalgrid")) return;
+      const g = el("div", "focalgrid");
+      g.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px;width:96px";
+      [["Top left",0,0],["Top",50,0],["Top right",100,0],["Left",0,50],["Center",50,50],["Right",100,50],["Bottom left",0,100],["Bottom",50,100],["Bottom right",100,100]].forEach(([nm,x,y]) => {
+        const dot = el("button", null, "");
+        dot.type = "button"; dot.title = "Focus: " + nm; dot.setAttribute("aria-label", "Focus point: " + nm);
+        const cur = (m.focal_x === x && m.focal_y === y);
+        dot.style.cssText = "width:28px;height:22px;border-radius:5px;cursor:pointer;border:1px solid var(--line,#ccc);background:" + (cur ? "#5b3fa0" : "rgba(0,0,0,.06)");
+        dot.addEventListener("click", async () => {
+          try { await api("PUT", `/media/${m.id}`, { focal_x: x, focal_y: y }); m.focal_x = x; m.focal_y = y; g.remove(); toast("Focus set — publish to apply"); scheduleChangesRefresh(); }
+          catch (err) { toast(nice(err), true); }
         });
-        cell.appendChild(g);
+        g.appendChild(dot);
       });
-      row.appendChild(fp);
-      cell.appendChild(row);
-      const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
-      del.addEventListener("click", async () => {
-        if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
-        try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
-        catch (err) { toast(nice(err), true); }
-      });
-      cell.appendChild(del);
-    }
-    grid.appendChild(cell);
-  });
+      cell.appendChild(g);
+    });
+    row.appendChild(fp);
+    cell.appendChild(row);
+    const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
+    del.addEventListener("click", async () => {
+      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
+      try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
+      catch (err) { toast(nice(err), true); }
+    });
+    cell.appendChild(del);
+  }
+  return cell;
 }
 // The AI proposal panel: fills editable description / tags / caption fields for the
 // owner to accept or edit. It NEVER auto-saves — accepting writes alt via /media and
