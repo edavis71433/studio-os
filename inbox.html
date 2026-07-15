@@ -156,8 +156,18 @@ function render(feed,leads,notifs){
   }
 
   if(approvals.length){h+=`<h2>Needs your OK</h2>`;
-    for(const p of approvals){const href=scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations');
-      h+=`<a class="item approve" href="${href}"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go">Review &amp; approve →</div></a>`;}}
+    for(const p of approvals){
+      // Infra + connected approvals can be decided RIGHT HERE (mirrors the one-tap
+      // approve spine). File approvals still open the file where you review the swap.
+      const inline=p.decide_path&&p.kind!=='file';
+      if(inline){
+        const bs='font:inherit;font-weight:600;border-radius:999px;padding:7px 15px;cursor:pointer;border:1px solid var(--line)';
+        h+=`<div class="item approve"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go" style="display:flex;gap:8px;margin-top:10px"><button data-fapprove="${esc(p.decide_path)}" style="${bs};background:var(--p,#5b3fa0);color:#fff;border-color:var(--p,#5b3fa0)">Approve</button><button data-fdecline="${esc(p.decide_path)}" style="${bs};background:transparent;color:var(--ink)">Not yet</button></div></div>`;
+      } else {
+        const href=scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations');
+        h+=`<a class="item approve" href="${href}"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go">Review &amp; approve →</div></a>`;
+      }
+    }}
 
   if(newLeads.length){h+=`<h2>New enquiries</h2>`;
     for(const l of newLeads){const who=esc(l.name||l.email||'Someone');
@@ -173,6 +183,11 @@ function render(feed,leads,notifs){
 
   h+=toolkit();
   $('main').innerHTML=h;
+  // inline approve/decide — the operator acts without leaving the Inbox (the one-tap
+  // approve spine; same decide_path the client uses). Reloads to reflect the result.
+  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){if(window.ddsToast)ddsToast(decision==='approve'?'Approved.':'Set aside — nothing changed.');location.reload();return;}}catch(_){}if(window.ddsToast)ddsToast('That didn’t go through — try again.');btn.disabled=false;};
+  document.querySelectorAll('[data-fapprove]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fapprove'),'approve',b)));
+  document.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
 }
 // ── Support toolkit: two owner-managed tools that live right here in the Inbox.
 //   • Saved replies — canned answers you reuse when replying to enquiries.
