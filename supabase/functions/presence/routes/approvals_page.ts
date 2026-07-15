@@ -59,10 +59,10 @@ export async function handleApprovalCenter(site: SiteRow, cors: Record<string, s
         for (const l of links) { const a = bySite.get(l.agency_site_id) || []; a.push(l.project_id); bySite.set(l.agency_site_id, a); }
         for (const [agencySite, ids] of bySite) {
           const [pendQ, doneQ] = await Promise.all([
-            svc(`presence_approvals?site_id=eq.${agencySite}&project_id=in.(${ids.join(',')})&status=eq.pending&client_visible=is.true&select=subject_type,title,summary&order=requested_at.desc&limit=25`),
+            svc(`presence_approvals?site_id=eq.${agencySite}&project_id=in.(${ids.join(',')})&status=eq.pending&client_visible=is.true&select=subject_type,title,summary,project_id&order=requested_at.desc&limit=25`),
             svc(`presence_approvals?site_id=eq.${agencySite}&project_id=in.(${ids.join(',')})&status=eq.approved&client_visible=is.true&decided_at=not.is.null&select=title,decided_at&order=decided_at.desc&limit=10`),
           ]);
-          for (const a of arr(pendQ)) waiting.push({ kind: approvalKind(a.subject_type), title: a.title || undefined, summary: a.summary || undefined, href: '/client.html' });
+          for (const a of arr(pendQ)) waiting.push({ kind: approvalKind(a.subject_type), title: a.title || undefined, summary: a.summary || undefined, href: a.project_id ? `/client.html?project=${a.project_id}` : '/client.html' });
           for (const a of arr(doneQ)) recently_approved.push({ title: a.title || 'A change', at: String(a.decided_at) });
         }
       }
