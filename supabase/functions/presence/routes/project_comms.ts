@@ -129,11 +129,14 @@ export async function handleNotifications(req: Request, jwt: string, site: SiteR
   ]);
   const lastSeen = rows(seenR)[0]?.last_seen_at || null;
   const items = [
-    ...rows(evR).map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: notifHref(e.kind, e.project_id, e.detail || {}), project_id: e.project_id, created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
-    // W5 (3rd copy): the /support#… page doesn't exist. A project-scoped request
-    // deep-links to its project (inbox rewrites /projects/:id → projects.html?project=…,
-    // where the studio now has a full support thread); project-less ones open the list.
-    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${String(r.subject || '').slice(0, 60)}`, href: r.project_id ? `/projects/${r.project_id}#support-${r.id}` : '/projects.html', project_id: r.project_id || null, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
+    // #181: for the STUDIO, a client message belongs on the Client Record (Messages
+    // tab), not a project page. The client side keeps the /projects/:id href shape —
+    // client.html's deep-link parser depends on it.
+    ...rows(evR).map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: (studio && e.kind === 'message' && e.project_id) ? `/crm.html?project=${e.project_id}&tab=messages` : notifHref(e.kind, e.project_id, e.detail || {}), project_id: e.project_id, created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
+    // W5 (3rd copy): the /support#… page doesn't exist. Studio-side, support lands on
+    // the Client Record (project-scoped) or the Inbox's grouped conversations
+    // (project-less). Client-side keeps the project deep-link / list fallback.
+    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${String(r.subject || '').slice(0, 60)}`, href: studio ? (r.project_id ? `/crm.html?project=${r.project_id}&tab=messages` : '/inbox.html') : (r.project_id ? `/projects/${r.project_id}#support-${r.id}` : '/projects.html'), project_id: r.project_id || null, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
   ].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit);
   const unread_count = items.filter((i) => !i.read).length;
   return json({ data: items, unread_count, is_studio_view: studio }, 200, cors);

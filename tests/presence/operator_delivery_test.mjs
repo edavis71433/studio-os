@@ -58,7 +58,7 @@ ok('BYCLIENT: client lookups are BATCHED via the bridge + one clients read (no N
 ok('BYCLIENT: a project-less request groups by matching its requester → customer', /requesterToClient\[requester\]/.test(ws));
 ok('BYCLIENT: inbox groups the section by client_id', /const key=c\.client_id/.test(inbox) && /groups\.set\(key/.test(inbox));
 ok('BYCLIENT: inbox shows ONE conversation row per client (avatar + name + open)', /class="item convo/.test(inbox) && /class="avatar"/.test(inbox) && /Open conversation/.test(inbox));
-ok('BYCLIENT: each conversation opens that client’s thread + shows a message-count badge', /class="cmbadge"/.test(inbox) && /scoped\(g\.href/.test(inbox));
+ok('BYCLIENT: each conversation opens that client’s RECORD thread (#181) + shows a message-count badge', /class="cmbadge"/.test(inbox) && /crm\.html\?client_id=/.test(inbox) && /g\.href\|\|/.test(inbox));
 ok('BYCLIENT: projects.html no longer shows the studio-wide client-messages list', !/loadClientMessages/.test(projects) && !/id="clientMsgs"/.test(projects));
 ok('BYCLIENT: projects.html KEEPS the per-customer general messages inside the delivery view', /loadClientGeneral/.test(projects) && /id="genList"/.test(projects));
 

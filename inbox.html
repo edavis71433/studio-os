@@ -149,7 +149,9 @@ function render(feed,leads,notifs){
       const reply=needs(g);
       const preview=isSup?('Support: '+esc(latest.subject||'a request')):(latest.needs_reply?'Sent you a message':'You replied — waiting on them');
       const n=g.items.length;
-      const href=scoped(g.href||'/projects.html');
+      // #181: a known client's conversation ALWAYS opens on their Client Record
+      // (Messages tab) — never a project page. Unattributed items keep the old path.
+      const href=scoped(k?('/crm.html?client_id='+encodeURIComponent(k)+'&tab=messages'):(g.href||'/projects.html'));
       const initials=esc((g.name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
       h+=`<a class="item convo${reply?' needsreply':''}" href="${esc(href)}"><div class="convo-row"><span class="avatar" aria-hidden="true">${initials}</span><span class="convo-main"><span class="top"><span class="who">${esc(g.name)}</span>${latest.created_at?`<span class="when">${esc(when(latest.created_at))}</span>`:''}</span><span class="body">${preview}</span></span>${reply?`<span class="cmbadge reply">Reply</span>`:(n>1?`<span class="cmbadge">${n}</span>`:'')}</div><div class="go">Open conversation →</div></a>`;
     }

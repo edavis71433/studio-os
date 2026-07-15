@@ -53,14 +53,18 @@ const isClientKind = (k: unknown) => k === 'client' || k === 'customer';
 
 /** Resolve a customer's identity keys (auth id via their contact + emails) so a
  *  project-less support request they filed still ties to them. `clients` has NO
- *  auth_user_id column — it lives on the linked contact. Mirrors project_comms. */
-async function customerRequesterKeys(agencySiteId: string, clientId: string): Promise<string[]> {
-  if (!clientId) return [];
+ *  auth_user_id column — it lives on the linked contact. Mirrors project_comms.
+ *  Also returns the raw email addresses (original + lowercased) so email-keyed
+ *  channels (bookings, broadcast sends) can join onto the same identity. */
+async function customerRequesterKeys(_agencySiteId: string, clientId: string): Promise<{ keys: string[]; emails: string[] }> {
+  if (!clientId) return { keys: [], emails: [] };
   const c = one(await svc(`clients?id=eq.${clientId}&select=email,contact_email,contact_id&limit=1`));
-  if (!c) return [];
+  if (!c) return { keys: [], emails: [] };
   let authId = '';
   if (c.contact_id) { const ct = one(await svc(`contacts?id=eq.${c.contact_id}&select=auth_user_id&limit=1`)); authId = ct?.auth_user_id ? String(ct.auth_user_id) : ''; }
-  return [authId, c.email, c.contact_email].filter((k) => k != null && String(k).trim() !== '').map((k) => encodeURIComponent(`"${String(k).replace(/"/g, '')}"`));
+  const raw = [authId, c.email, c.contact_email].filter((k) => k != null && String(k).trim() !== '').map((k) => String(k));
+  const emails = [...new Set(raw.filter((k) => k.includes('@')).flatMap((e) => [e, e.toLowerCase()]))];
+  return { keys: raw.map((k) => encodeURIComponent(`"${k.replace(/"/g, '')}"`)), emails };
 }
 
 /** ── /crm/search — global record search (the Salesforce global-search pattern) ──
@@ -88,18 +92,23 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   }
 }
 
-/** ── /crm/messages — ONE conversation per client (the Salesforce activity model) ──
- *  Every message with a customer, merged into a single chronological thread on their
- *  record: project/general messages (presence_project_messages) + support tickets
- *  (presence_support_requests) + ticket replies (presence_support_messages), each
- *  tagged from client|studio. The operator replies from ONE composer (POST to the
- *  project's /messages). Studio-side only; resolves the agency site the data lives on. */
+/** ── /crm/messages — ONE activity thread per client (the Salesforce model) ──
+ *  Every communication with a customer, merged chronologically on their record:
+ *  project/general messages across ALL linked projects (not just the first) +
+ *  support tickets/replies + their original website enquiry + bookings + logged
+ *  calls/emails/meetings + email broadcasts they received — each tagged with its
+ *  channel and from client|studio. The operator replies from ONE composer: into
+ *  the project thread when one exists, else into the newest open support thread
+ *  (reply_support_to). Studio-side only; resolves the agency site the data lives
+ *  on. Every added channel is best-effort — one failing read never blanks the
+ *  conversation, it just omits that channel. */
 export async function handleCrmMessages(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (!(await isStudioSide(jwt, principal))) return json({ error: 'forbidden', message: 'Only your studio can open a client conversation.' }, 403, cors);
   const u = new URL(req.url);
   const qp = (k: string) => { const v = u.searchParams.get(k) || ''; return UUID_RE.test(v) ? v : ''; };
   let projectId = qp('project');
   let clientId = qp('client_id');
+  let dealId = qp('deal_id') || qp('deal');
   let agencySiteId = site.id;
   if (site.client_id) {
     clientId = clientId || String(site.client_id);
@@ -111,27 +120,85 @@ export async function handleCrmMessages(req: Request, jwt: string, site: SiteRow
   const AS = agencySiteId;
 
   try {
+    // every project on this relationship — a multi-project client loses nothing
+    const projectIds: string[] = projectId ? [projectId] : [];
+    if (clientId) { try { for (const lk of await linksForCustomer(clientId)) { const p = String(lk.project_id || ''); if (p && !projectIds.includes(p)) projectIds.push(p); } } catch { /* additive */ } }
+    // the deal anchors the enquiry + logged-activity channels
+    let srcSub = '';
+    if (!dealId && clientId) {
+      const d = one(await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,source_submission_id&order=updated_at.desc&limit=1`));
+      if (d) { dealId = String(d.id); srcSub = String(d.source_submission_id || ''); }
+    } else if (dealId) {
+      const d = one(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&select=source_submission_id&limit=1`));
+      if (d) srcSub = String(d.source_submission_id || '');
+    }
+
     const items: any[] = [];
-    if (projectId) {
-      for (const m of arr(await svc(`presence_project_messages?project_id=eq.${projectId}&site_id=eq.${AS}&deleted_at=is.null&select=id,audience,body,author_kind,created_at&order=created_at.asc&limit=300`))) {
+    if (projectIds.length) {
+      for (const m of arr(await svc(`presence_project_messages?project_id=in.(${projectIds.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,project_id,audience,body,author_kind,created_at&order=created_at.asc&limit=300`))) {
         if (m.audience === 'internal') continue;   // internal notes aren't part of the client conversation
-        items.push({ id: m.id, kind: 'message', from: isClientKind(m.author_kind) ? 'client' : 'studio', body: String(m.body || ''), created_at: m.created_at });
+        items.push({ id: m.id, kind: 'message', project_id: m.project_id, from: isClientKind(m.author_kind) ? 'client' : 'studio', body: String(m.body || ''), created_at: m.created_at });
       }
     }
-    const keys = clientId ? await customerRequesterKeys(AS, clientId) : [];
+    const ident = clientId ? await customerRequesterKeys(AS, clientId) : { keys: [], emails: [] };
     const sup: any[] = [];
     const seen = new Set<string>();
     const addSup = (rows_: any[]) => { for (const s of rows_) { if (!seen.has(String(s.id))) { seen.add(String(s.id)); sup.push(s); } } };
-    if (projectId) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=eq.${projectId}&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.asc&limit=100`)));
-    if (keys.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&deleted_at=is.null&requester=in.(${keys.join(',')})&select=id,subject,body,status,requester_kind,created_at&order=created_at.asc&limit=100`)));
+    if (projectIds.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=in.(${projectIds.join(',')})&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.asc&limit=100`)));
+    if (ident.keys.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&deleted_at=is.null&requester=in.(${ident.keys.join(',')})&select=id,subject,body,status,requester_kind,created_at&order=created_at.asc&limit=100`)));
+    let replySupportTo: string | null = null;
     for (const s of sup) {
+      if (s.status !== 'resolved' && s.status !== 'closed') replySupportTo = `/support/${s.id}/messages`;   // newest open wins (sup is created_at asc)
       items.push({ id: s.id, kind: 'support', support_id: s.id, subject: String(s.subject || 'Support request'), status: s.status, from: 'client', body: String(s.body || ''), created_at: s.created_at });
       for (const r of arr(await svc(`presence_support_messages?request_id=eq.${s.id}&site_id=eq.${AS}&deleted_at=is.null&select=id,body,author_kind,created_at&order=created_at.asc&limit=200`))) {
         items.push({ id: r.id, kind: 'support_reply', support_id: s.id, from: isClientKind(r.author_kind) ? 'client' : 'studio', body: String(r.body || ''), created_at: r.created_at });
       }
     }
+    // the original website enquiry that started the relationship
+    if (srcSub) {
+      try {
+        const f = one(await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${AS}&select=id,form_kind,message,created_at&limit=1`));
+        if (f) items.push({ id: f.id, kind: 'enquiry', from: 'client', subject: 'Website enquiry', body: String(f.message || ''), created_at: f.created_at });
+      } catch { /* channel is additive */ }
+    }
+    // bookings with the studio (matched on the client's email identity)
+    if (ident.emails.length) {
+      try {
+        const em = ident.emails.map((e) => encodeURIComponent(`"${e.replace(/"/g, '')}"`)).join(',');
+        for (const a of arr(await svc(`presence_appointments?site_id=eq.${AS}&customer_email=in.(${em})&select=id,type_name,slot_start_local,slot_start,note,status,created_at&order=created_at.asc&limit=50`))) {
+          if (a.status === 'canceled') continue;
+          const when = String(a.slot_start_local || '').replace('T', ' ') || String(a.slot_start || '').slice(0, 16).replace('T', ' ');
+          items.push({ id: a.id, kind: 'booking', from: 'client', subject: `Booked: ${String(a.type_name || 'a call')}${when ? ` · ${when}` : ''}`, body: String(a.note || ''), created_at: a.created_at });
+        }
+      } catch { /* channel is additive */ }
+    }
+    // logged calls/emails/meetings + sent-document stamps (the deal quick-log)
+    if (dealId) {
+      try {
+        const SYS = ['proposal_sent', 'contract_sent', 'invoice_sent'];
+        for (const ev of arr(await svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${AS}&select=id,kind,detail,created_at&order=created_at.asc&limit=200`))) {
+          const d = (ev.detail && typeof ev.detail === 'object') ? ev.detail : {};
+          if (ev.kind === 'note' && ['call', 'email', 'meeting', 'note'].includes(String(d.activity_kind))) {
+            items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at) });
+          } else if (SYS.includes(String(ev.kind))) {
+            items.push({ id: ev.id, kind: 'activity', activity_kind: String(ev.kind), from: 'studio', body: '', created_at: ev.created_at });
+          }
+        }
+      } catch { /* channel is additive */ }
+    }
+    // email broadcasts this client actually received
+    if (ident.emails.length) {
+      try {
+        const em = ident.emails.map((e) => encodeURIComponent(`"${e.replace(/"/g, '')}"`)).join(',');
+        const sends = arr(await svc(`presence_broadcast_sends?site_id=eq.${AS}&status=eq.sent&email=in.(${em})&select=broadcast_id,created_at&order=created_at.asc&limit=50`));
+        const bIds = [...new Set(sends.map((s) => String(s.broadcast_id)))];
+        const subj = new Map<string, string>();
+        if (bIds.length) for (const b of arr(await svc(`presence_broadcasts?id=in.(${bIds.join(',')})&select=id,subject&limit=50`))) subj.set(String(b.id), String(b.subject || 'A studio update'));
+        for (const s of sends) items.push({ id: `${s.broadcast_id}:${s.created_at}`, kind: 'broadcast', from: 'studio', subject: subj.get(String(s.broadcast_id)) || 'A studio update', body: '', created_at: s.created_at });
+      } catch { /* channel is additive */ }
+    }
     items.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-    return json({ data: { items, project_id: projectId || null, reply_to: projectId ? `/projects/${projectId}/messages` : null } }, 200, cors);
+    return json({ data: { items, project_id: projectId || null, reply_to: projectId ? `/projects/${projectId}/messages` : null, reply_support_to: replySupportTo } }, 200, cors);
   } catch (_e) {
     return json({ error: 'read_failed', message: 'We couldn’t load this conversation just now.' }, 502, cors);
   }
