@@ -56,7 +56,7 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   const paid = list.filter((i) => i.status === 'paid');
   return json({ data: {
     billing_type: 'service',   // agency project work — SEPARATE from the software subscription
-    note: 'These are invoices from your studio for project and service work. Your Studio OS software subscription is billed separately.',
+    note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.',
     invoices: list,
     summary: { open_count: open.length, paid_count: paid.length },
   } }, 200, cors);
