@@ -18,3 +18,8 @@ node_modules/
 # Machine-local Claude Code settings
 .claude/settings.local.json
 deno.lock
+
+# Playwright local artifacts + sandbox-only config override (never committed)
+test-results/
+playwright-report/
+pw-sandbox.config.ts
