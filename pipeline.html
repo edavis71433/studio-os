@@ -790,7 +790,7 @@ async function openDeal(id){
       const rowHtml=()=>{ln++;
         const pick=hasCat?`<select class="pl-pick" aria-label="Choose a service"><option value="">Pick a service…</option>${optsHtml}<option value="__custom__">Custom…</option></select>`:'';
         const hide=hasCat?' style="display:none"':'';
-        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label"${draftAttr('label',ln)} placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" step="0.01" class="pl-price"${draftAttr('price',ln)} placeholder="Price (USD)" aria-label="Price in dollars" style="max-width:140px"></div></div>`;};
+        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label"${draftAttr('label',ln)} placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" min="1" step="1" class="pl-qty" value="1" placeholder="Qty" aria-label="Quantity" title="Quantity" style="max-width:64px"><input type="number" step="0.01" class="pl-price"${draftAttr('price',ln)} placeholder="Price each (USD)" aria-label="Price each in dollars" style="max-width:140px"></div></div>`;};
       const hint=hasCat?'':`<div class="mut" style="margin-top:8px"><a href="#" id="plManageHint">Add your services</a> to pick them from a list here.</div>`;
       // Seed one row per prefilled item (revise/clone), else a single blank row.
       const seedRows=(pf&&pf.items&&pf.items.length)?pf.items.map(()=>rowHtml()).join(''):rowHtml();
@@ -814,7 +814,7 @@ async function openDeal(id){
           recalc();
         };
       };
-      const wireRow=(row)=>{wirePick(row&&row.querySelector('.pl-pick'));if(row){row.querySelectorAll('.pl-label,.pl-price').forEach(el=>el.addEventListener('input',recalc));}};
+      const wireRow=(row)=>{wirePick(row&&row.querySelector('.pl-pick'));if(row){row.querySelectorAll('.pl-label,.pl-price,.pl-qty').forEach(el=>el.addEventListener('input',recalc));}};
       const restoreDrafts=()=>{if(!rev&&window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
       const revealFilled=()=>host.querySelectorAll('.prop-line').forEach(row=>{const lab=row.querySelector('.pl-label');const box=row.querySelector('.pl-custom');const sel=row.querySelector('.pl-pick');if(lab&&lab.value&&box){box.style.display='';if(sel)sel.value='__custom__';}});
       // Live breakdown — mirrors the server's computeProposalTotals exactly.
@@ -824,7 +824,7 @@ async function openDeal(id){
       restoreDrafts();
       // Prefill (revise/clone): fill each row from the prior's items, and the
       // discount/tax controls from its meta. Else seed the FIRST row from the deal.
-      if(pf&&pf.items&&pf.items.length){const rowsEls=host.querySelectorAll('.prop-line');pf.items.forEach((it,i)=>{const r=rowsEls[i];if(!r)return;r.querySelector('.pl-label').value=it.label||'';r.querySelector('.pl-price').value=((it.unit_cents||0)/100);});
+      if(pf&&pf.items&&pf.items.length){const rowsEls=host.querySelectorAll('.prop-line');pf.items.forEach((it,i)=>{const r=rowsEls[i];if(!r)return;r.querySelector('.pl-label').value=it.label||'';r.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=r.querySelector('.pl-qty');if(q)q.value=Math.max(1,Math.trunc(it.qty)||1);});
         if(pf.discount){$('plDiscMode').value=pf.discount.mode;$('plDiscVal').style.display='';$('plDiscVal').value=pf.discount.mode==='percent'?pf.discount.value:((pf.discount.value||0)/100);}
         if(pf.tax_pct!=null)$('plTaxPct').value=pf.tax_pct;
       } else { const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price'); if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100); } }
@@ -833,7 +833,7 @@ async function openDeal(id){
       $('plDiscVal').addEventListener('input',recalc); $('plTaxPct').addEventListener('input',recalc);
       $('plMore').onclick=()=>{host.querySelector('#plMore').closest('.row2').insertAdjacentHTML('beforebegin',rowHtml());const rowsEls=host.querySelectorAll('.prop-line');wireRow(rowsEls[rowsEls.length-1]);restoreDrafts();recalc();};
       const clearPropDrafts=()=>{if(!rev&&window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
-      const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:1,unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
+      const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:Math.max(1,Math.trunc(parseFloat((r.querySelector('.pl-qty')||{}).value||'1'))||1),unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
       // Save writes the record (revise → vN+1 that supersedes the prior); Save &
       // send then immediately emails the review link.
       const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};const path=rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
