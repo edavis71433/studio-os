@@ -63,6 +63,31 @@ async function customerRequesterKeys(agencySiteId: string, clientId: string): Pr
   return [authId, c.email, c.contact_email].filter((k) => k != null && String(k).trim() !== '').map((k) => encodeURIComponent(`"${String(k).replace(/"/g, '')}"`));
 }
 
+/** ── /crm/search — global record search (the Salesforce global-search pattern) ──
+ *  Searches contacts + deals + projects on the operator's site by name/title, each
+ *  result linking to its Client Record. Studio-side only; feeds the ⌘K palette. */
+export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (!(await isStudioSide(jwt, principal))) return json({ data: { results: [] } }, 200, cors);
+  const u = new URL(req.url);
+  const q = (u.searchParams.get('q') || '').replace(/[(),*"\\%]/g, ' ').trim().slice(0, 60);
+  if (q.length < 2) return json({ data: { results: [] } }, 200, cors);
+  const eq = encodeURIComponent(q);
+  try {
+    const [contacts, deals, projects] = await Promise.all([
+      svc(`presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&or=(name.ilike.*${eq}*,email.ilike.*${eq}*,company.ilike.*${eq}*)&select=id,name,email,company&limit=6`),
+      svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&title=ilike.*${eq}*&select=id,title,stage&order=updated_at.desc&limit=6`),
+      svc(`presence_projects?site_id=eq.${site.id}&deleted_at=is.null&name=ilike.*${eq}*&select=id,name,status&limit=6`),
+    ]);
+    const results: any[] = [];
+    for (const c of arr(contacts)) results.push({ label: String(c.name || c.email || 'Contact'), sub: 'Contact' + (c.company ? ' · ' + String(c.company) : ''), href: `/crm.html?contact=${c.id}&tab=details` });
+    for (const d of arr(deals)) results.push({ label: String(d.title || 'Deal'), sub: 'Deal' + (d.stage ? ' · ' + String(d.stage) : ''), href: `/crm.html?deal=${d.id}&tab=deal` });
+    for (const p of arr(projects)) results.push({ label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });
+    return json({ data: { results } }, 200, cors);
+  } catch (_e) {
+    return json({ data: { results: [] } }, 200, cors);
+  }
+}
+
 /** ── /crm/messages — ONE conversation per client (the Salesforce activity model) ──
  *  Every message with a customer, merged into a single chronological thread on their
  *  record: project/general messages (presence_project_messages) + support tickets

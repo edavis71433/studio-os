@@ -271,24 +271,26 @@
     var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" id="dds-res-' + i + '" role="option" aria-selected="' + (i === 0 ? 'true' : 'false') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
     box.innerHTML = navHtml || (qq ? '' : '');
     var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', navHtml ? 'dds-res-0' : '');
-    // ── Files: search actual files by name/tag/description (reuses GET /assets?q=) ──
+    // ── Records + Files: global search across CRM records (GET /crm/search) AND
+    //    files (GET /assets?q=) — the Salesforce global-search pattern. Both join the
+    //    SAME listbox contract as nav rows (role=option + id + aria-selected).
     var tok = ++fileSearchTok;
-    if (qq.length >= 2 && hasFiles()) {
-      api('/assets?q=' + encodeURIComponent(qq) + '&limit=6').then(function (r) {
+    if (qq.length >= 2 && (hasFiles() || hasCrm())) {
+      var enc = encodeURIComponent(qq);
+      Promise.all([
+        hasCrm() ? api('/crm/search?q=' + enc).then(function (r) { return (r.ok && r.body && r.body.data && r.body.data.results) || []; }, function () { return []; }) : Promise.resolve([]),
+        hasFiles() ? api('/assets?q=' + enc + '&limit=6').then(function (r) { return (r.ok && r.body && r.body.data && r.body.data.assets) || []; }, function () { return []; }) : Promise.resolve([]),
+      ]).then(function (res) {
         if (tok !== fileSearchTok) return; // a newer keystroke won
-        var files = (r.ok && r.body && r.body.data && r.body.data.assets) || [];
+        var recs = res[0], files = res[1];
         var cur = pal.querySelector('.results'); if (!cur) return;
         var have = !!navHtml;
-        if (!files.length) { if (!have) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
-        // file rows join the SAME listbox contract as nav rows (role=option +
-        // id + aria-selected) — arrowing onto one must announce, not go silent.
-        var base = (navHtml.match(/id="dds-res-/g) || []).length;
-        var fhtml = files.map(function (a, i) {
-          var sub = a.in_use ? 'Files · on your site' : 'Files';
-          var sel = !have && i === 0;
-          return '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + (base + i) + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>';
-        }).join('');
-        cur.innerHTML = navHtml + fhtml;
+        if (!recs.length && !files.length) { if (!have) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
+        var n = (navHtml.match(/id="dds-res-/g) || []).length;
+        var extra = '';
+        recs.forEach(function (rec) { var sel = !have && !extra; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope(rec.href)) + '">' + esc(rec.label) + '<span class="s">' + esc(rec.sub || 'Record') + '</span></a>'; n++; });
+        files.forEach(function (a) { var sel = !have && !extra; var sub = a.in_use ? 'Files · on your site' : 'Files'; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>'; n++; });
+        cur.innerHTML = navHtml + extra;
         var inpF = pal.querySelector('input'); var firstSel = cur.querySelector('.res.sel');
         if (inpF) inpF.setAttribute('aria-activedescendant', firstSel ? firstSel.id : '');
       });
@@ -296,6 +298,7 @@
       box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>';
     }
   }
+  function hasCrm() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'customers'; }); }
 
   // ── notifications (lazy; reuses /portal/feed — no new system) ──
   var notif;
