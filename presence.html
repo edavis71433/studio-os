@@ -1100,6 +1100,21 @@ function toast(msg, bad) {
   $("toasts").appendChild(t);
   setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
 }
+// Wave-1 G7: a toast that carries ONE action (Undo a page delete, Load the latest
+// after an edit conflict). Always local (never ddsToast — it can't hold a button);
+// stays up `ms` (default 20s) so the action is genuinely reachable.
+function toastAction(msg, label, fn, ms) {
+  const t = el("div", "toast");
+  t.style.cssText = "display:flex;gap:12px;align-items:center;pointer-events:auto";
+  t.appendChild(el("span", null, msg));
+  const b = el("button", null, label); b.type = "button";
+  b.style.cssText = "font:inherit;font-size:12.5px;font-weight:700;padding:4px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.75);background:transparent;color:inherit;cursor:pointer;white-space:nowrap";
+  b.addEventListener("click", () => { t.remove(); fn(); });
+  t.appendChild(b);
+  $("toasts").appendChild(t);
+  setTimeout(() => { if (!t.parentNode) return; t.style.opacity = "0"; t.style.transition = "opacity .4s"; setTimeout(() => t.remove(), 450); }, ms || 20000);
+  return t;
+}
 /* ══ Rich-text writing toolbar ═══════════════════════════════════════════════
    Owner need: "normal website writing tools" on the long-form fields — Heading,
    Subheading, Bold, Italic, Link, lists, Quote — easy and intuitive. The buttons
@@ -1213,11 +1228,15 @@ async function api(method, route, body) {
   let j = null; try { j = JSON.parse(text); } catch {}
   if (!r.ok) {
     if (r.status === 409 && j && j.error === "stale_draft") {
-      // someone else (or another tab) changed this site — reload the latest and
-      // let the user reapply; never overwrite the newer edit.
+      // someone else (or another tab) changed this site — say WHO when the server
+      // knows (G7: the newest provenance event rides the 409), and let the user
+      // load the latest; never overwrite the newer edit.
       S.draftHash = (j && j.current_hash) || null;
       scheduleChangesRefresh();
-      const e = new Error("This site changed since you opened it — I reloaded the latest just now. Please reapply that change so nothing is lost."); e.status = 409; e.stale = true; throw e;
+      const lc = j.last_change || null;
+      const who = lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor_kind === "system" ? "an automatic update" : "someone else on your account") : "someone else";
+      const e = new Error("This site was changed by " + who + " while you had it open — nothing was overwritten. Load the latest, then reapply your change.");
+      e.status = 409; e.stale = true; e.lastChange = lc; e.who = who; throw e;
     }
     const e = new Error((j && j.message) || "Nothing was lost — that just didn’t go through. Try once more."); e.status = r.status; e.body = j; throw e;
   }
@@ -4537,25 +4556,42 @@ async function mountSearchCard() {
   });
   sec.appendChild(el("div", "hint", "Your home page always shows. Hiding a page keeps it on your site — it just stops appearing in search results."));
   card.appendChild(sec);
-  // 3. per-page search wording (page_seo overrides)
+  // 3. per-page search wording + share appearance (page_seo overrides).
+  // G7: covers the owner's OWN pages too (key "page:<slug>"), and each page gains
+  // optional SHARE fields — the og:/twitter: title, description and image used when
+  // the page is texted or posted. Blank = the good default (the search wording).
   const ov = el("details"); ov.style.cssText = "margin-top:10px";
-  ov.appendChild(Object.assign(el("summary", null, "Fine-tune how each page reads in search results (optional)"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
-  PAGE_DEFS.forEach(([key, label]) => {
+  ov.appendChild(Object.assign(el("summary", null, "Fine-tune how each page reads in search results and when shared (optional)"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
+  const seoDefs = PAGE_DEFS.concat(dcPagesArr().map((p) => ["page:" + p.slug, (p.title || p.slug) + " (your page)"]));
+  seoDefs.forEach(([key, label]) => {
     const cur = ((S.settings && S.settings.page_seo) || {})[key] || {};
     const box = el("div"); box.style.cssText = "margin:8px 0 12px";
     box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:3px" }));
     const ti = el("input"); ti.type = "text"; ti.maxLength = 60; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
     const di = el("input"); di.type = "text"; di.maxLength = 160; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
-    [ti, di].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
+    const sti = el("input"); sti.type = "text"; sti.maxLength = 60; sti.placeholder = "Share headline — when texted or posted (blank = the search headline)"; sti.value = cur.share_title || "";
+    const sdi = el("input"); sdi.type = "text"; sdi.maxLength = 160; sdi.placeholder = "Share description (blank = the search description)"; sdi.value = cur.share_description || "";
+    const sim = el("select"); sim.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--bg,#fff);color:inherit";
+    sim.setAttribute("aria-label", "Share image for " + label);
+    const noneOpt = el("option", null, "Share image: your site’s usual one"); noneOpt.value = ""; sim.appendChild(noneOpt);
+    (S.media || []).filter((m) => m.thumb).forEach((m) => { const o = el("option", null, "Share image: " + (m.alt_text || "photo").slice(0, 60)); o.value = m.id; sim.appendChild(o); });
+    sim.value = cur.share_image || "";
+    if (sim.value !== (cur.share_image || "")) sim.value = "";   // the stored photo is gone → fall back
+    [ti, di, sti, sdi].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
     const save = async () => {
       const map = { ...((S.settings && S.settings.page_seo) || {}) };
-      const entry = { title: ti.value.trim(), description: di.value.trim() };
-      if (!entry.title && !entry.description) delete map[key]; else map[key] = entry;
-      try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Search wording saved — publish to apply"); scheduleChangesRefresh(); }
+      const entry = {};
+      if (ti.value.trim()) entry.title = ti.value.trim();
+      if (di.value.trim()) entry.description = di.value.trim();
+      if (sti.value.trim()) entry.share_title = sti.value.trim();
+      if (sdi.value.trim()) entry.share_description = sdi.value.trim();
+      if (sim.value) entry.share_image = sim.value;
+      if (!Object.keys(entry).length) delete map[key]; else map[key] = entry;
+      try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Saved — publish to apply"); scheduleChangesRefresh(); }
       catch (err) { toast(nice(err), true); }
     };
-    [ti, di].forEach((inp) => inp.addEventListener("change", save));
-    box.append(ti, di); ov.appendChild(box);
+    [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
+    box.append(ti, di, sti, sdi, sim); ov.appendChild(box);
   });
   card.appendChild(ov);
   // 4. redirects manager (moved a page? send visitors to the new spot)
@@ -5045,7 +5081,13 @@ function renderLinkedChip(blk, idx, card) {
   const row = el("div"); row.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
   const edit = el("button", null, "Edit the saved section"); edit.type = "button"; edit.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
   edit.disabled = !item;
-  edit.addEventListener("click", () => { const it = clItemById(blk.ref); if (!it || !it.block) { toast("Loading the saved section…"); return; } BLOCKS_WORK[idx] = Object.assign(JSON.parse(JSON.stringify(it.block)), { _clEdit: blk.ref }); renderBlocksCard(); });
+  edit.addEventListener("click", () => {
+    const it = clItemById(blk.ref); if (!it || !it.block) { toast("Loading the saved section…"); return; }
+    BLOCKS_WORK[idx] = Object.assign(JSON.parse(JSON.stringify(it.block)), { _clEdit: blk.ref }); renderBlocksCard();
+    // G8: editing a LIVE-LINKED entry first shows where it appears
+    const uses = Array.isArray(it.used_on) ? it.used_on : [];
+    if (uses.length > 1) toast("This section appears on: " + uses.map((u) => u.title).join(", ") + " — changes will show everywhere");
+  });
   const indep = el("button", null, "Make independent"); indep.type = "button"; indep.style.cssText = miniBtn;
   indep.addEventListener("click", () => { const it = clItemById(blk.ref); if (!it || !it.block) { toast("Loading the saved section…"); return; } const copy = JSON.parse(JSON.stringify(it.block)); const d = BLOCK_DEFS.find((x) => x.type === copy.type); if (d && d.multi) copy.id = uniqueBlockId(copy.type); BLOCKS_WORK[idx] = copy; renderBlocksCard(); toast("Now independent — edits here won’t affect other places"); });
   row.append(edit, indep); sub.appendChild(row);
@@ -5075,7 +5117,7 @@ function renderPagesBar() {
     const pill = el("button", "page-pill" + (on ? " on" : "") + (hidden ? " hidden-nav" : "")); pill.type = "button"; pill.setAttribute("role", "tab"); pill.setAttribute("aria-selected", String(on));
     pill.appendChild(el("span", "pp-name", pg.title + (hidden ? " (hidden)" : "")));
     pill.addEventListener("click", () => dcSwitchPage(pg.slug));
-    const mn = el("span", "pp-menu", "⋯"); mn.title = pg.slug ? "Rename, clear or delete this page" : "Clear this page"; mn.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, mn); }); pill.appendChild(mn);
+    const mn = el("span", "pp-menu", "⋯"); mn.title = pg.slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page"; mn.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, mn); }); pill.appendChild(mn);
     host.appendChild(pill);
   });
   const add = el("button", "page-add", "＋ Page"); add.type = "button"; add.title = "Add a new page to your website";
@@ -5250,6 +5292,9 @@ function dcPageMenu(slug, anchor) {
     const mr = el("button", "pp-pop-item", "Move right"); mr.type = "button"; if (idx >= last) mr.disabled = true; else mr.addEventListener("click", () => { m.remove(); dcMovePage(slug, 1); });
     m.append(rn, nv, ml, mr);
   }
+  // G7: duplicate any page (Home too) — a full copy you then edit independently
+  const dp = el("button", "pp-pop-item", "Duplicate page"); dp.type = "button"; dp.addEventListener("click", () => { m.remove(); dcDuplicatePage(slug); });
+  m.appendChild(dp);
   // Clear the template/sections off the canvas → a blank page (works on Home too)
   const cl = el("button", "pp-pop-item", "Clear page (start blank)"); cl.type = "button"; cl.addEventListener("click", () => { m.remove(); dcClearPage(slug); });
   m.appendChild(cl);
@@ -5270,21 +5315,93 @@ async function dcMovePage(slug, dir) {
   [arr[i], arr[j]] = [arr[j], arr[i]];
   try { const r = await api("PUT", "/settings", { pages: arr }); S.settings = r.data || { ...S.settings, pages: arr }; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
 }
+// G7: duplicate a page ('' = Home) server-side — deep copy with fresh section ids,
+// "<Title> copy" + a "-copy" address; the response carries the whole new pages list.
+async function dcDuplicatePage(slug) {
+  try {
+    const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
+    const d = (r && r.data) || {};
+    S.settings = { ...(S.settings || {}), pages: Array.isArray(d.pages) ? d.pages : dcPagesArr() };
+    if (d.slug) { DC_PAGE = d.slug; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; }
+    renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
+    toast("Duplicated — now editing “" + (d.title || "the copy") + "”. Publish when it’s ready.");
+  } catch (err) { toast(nice(err), true); }
+}
+// G7: rename = the display title AND (optionally) the page address. A changed
+// address rides a `prev_slug` marker so the SERVER forwards the old link through
+// the existing redirects manager (only if the page was ever live) — and the menu +
+// per-page search settings follow the new address in the same save.
 async function dcRenamePage(slug) {
   const p = dcPageObj(slug); if (!p) return;
-  const name = await askText("Rename this page", { value: p.title || "", ok: "Save" });
+  const name = await askText("Rename this page", { value: p.title || "", ok: "Next" });
   if (!name || !name.trim()) return;
-  const pages = dcPagesArr().map((x) => (x.slug === slug ? { ...x, title: name.trim().slice(0, 60) } : x));
-  try { const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages }; renderPagesBar(); refreshDesignPreview(); toast("Renamed — publish to update your live site"); } catch (err) { toast(nice(err), true); }
+  const title = name.trim().slice(0, 60);
+  const addr = await askText("Page address", { value: slug, ok: "Save", hint: "This page’s link: yoursite.com/…/. Lowercase letters, numbers and dashes. If you change it, visitors to the old link are redirected to the new one automatically." });
+  if (addr === null) return;
+  const newSlug = String(addr || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || slug;
+  const renamed = newSlug !== slug;
+  if (renamed) {
+    const taken = new Set(dcPagesArr().filter((x) => x.slug !== slug).map((x) => x.slug));
+    if (taken.has(newSlug) || DC_PAGE_RESERVED.has(newSlug)) { toast("That address is already used by another page — pick a different one.", true); return; }
+  }
+  const pages = dcPagesArr().map((x) => (x.slug === slug ? (renamed ? { ...x, title, slug: newSlug, prev_slug: slug } : { ...x, title }) : x));
+  const body = { pages };
+  if (renamed) {
+    // keep the menu + per-page search settings pointing at the new address
+    const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/";
+    const swapHref = (it) => (it && it.href === oldHref ? { ...it, href: newHref } : it);
+    if (Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length) {
+      body.nav = S.settings.nav.map((it) => { const t = swapHref(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swapHref) } : t; });
+    }
+    const pseo = (S.settings && S.settings.page_seo) || {};
+    if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
+    const nix = (S.settings && S.settings.pages_noindex) || [];
+    if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
+  }
+  try {
+    const r = await api("PUT", "/settings", body);
+    S.settings = r.data || { ...S.settings, ...body };
+    if (renamed && DC_PAGE === slug) DC_PAGE = newSlug;
+    renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
+    toast(renamed ? "Renamed — visitors to the old link are redirected to the new address once you publish" : "Renamed — publish to update your live site");
+  } catch (err) { toast(nice(err), true); }
 }
 async function dcDeletePage(slug) {
   const p = dcPageObj(slug); if (!p) return;
-  if (!confirm("Delete the page “" + (p.title || slug) + "”? Its sections will be removed. Your live site is unchanged until you publish.")) return;
-  const pages = dcPagesArr().filter((x) => x.slug !== slug);
+  const title = p.title || slug;
+  // G7: delete-awareness — one cheap server check for anything pointing AT this page
+  let warn = "";
+  try {
+    const refs = (await api("GET", "/pages/refs?slug=" + encodeURIComponent(slug))).data || {};
+    const bits = [];
+    if (refs.nav && refs.nav.length) bits.push("your menu links to it (" + refs.nav.join(", ") + ")");
+    if (refs.redirects && refs.redirects.length) bits.push((refs.redirects.length === 1 ? "a forward points" : refs.redirects.length + " forwards point") + " to it (" + refs.redirects.join(", ") + ")");
+    if (refs.pages && refs.pages.length) bits.push("other pages link to it (" + refs.pages.map((x) => x.title).join(", ") + ")");
+    if (refs.library && refs.library.length) bits.push("saved sections link to it (" + refs.library.join(", ") + ")");
+    if (bits.length) warn = "\n\nHeads up — " + bits.join("; ") + ". Those links will stop working until you update them.";
+  } catch (_) { /* the check is best-effort — the confirm still asks plainly */ }
+  if (!confirm("Delete the page “" + title + "”? Its sections will be removed. Your live site is unchanged until you publish." + warn)) return;
+  // a durable safety point beyond the 20-second Undo (best-effort, never blocks the delete)
+  try { await api("POST", "/publishes/checkpoints", { name: ("Before deleting “" + title + "”").slice(0, 80) }); } catch (_) {}
+  const all = dcPagesArr(); const at = all.findIndex((x) => x.slug === slug);
+  const removed = all[at];
+  const pages = all.filter((x) => x.slug !== slug);
   try {
     const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages };
     if (DC_PAGE === slug) { DC_PAGE = ""; dcResetHistory(); BLOCKS_WORK = currentBlocks(); }
-    renderPagesBar(); renderBlocksCard(); refreshDesignPreview(); toast("Page deleted — publish to update your live site");
+    renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
+    // G7: an honest Undo — we still hold the full page (it lives in the draft
+    // settings row), so putting it back IS a true restore; a checkpoint (above)
+    // covers anything beyond the toast's window.
+    toastAction("Page “" + title + "” deleted", "Undo", async () => {
+      const cur = dcPagesArr().slice();
+      if (cur.some((x) => x.slug === removed.slug)) { toast("That page is already back"); return; }
+      cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
+      try {
+        const rr = await api("PUT", "/settings", { pages: cur }); S.settings = rr.data || { ...S.settings, pages: cur };
+        renderPagesBar(); renderBlocksCard(); refreshDesignPreview(); toast("Page “" + title + "” restored");
+      } catch (err) { toast(nice(err), true); }
+    }, 20000);
   } catch (err) { toast(nice(err), true); }
 }
 // Clear a page's sections back to a blank canvas (removes the applied template).
@@ -5422,7 +5539,20 @@ async function saveBlocks() {
     renderBlocksCard();
     if (typeof renderBlockTray === "function" && $("designTray") && $("designTray").childElementCount) renderBlockTray();   // reflect which types are now on the page
     toast("Sections saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { toast(nice(err), true); }
+  } catch (err) {
+    // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
+    // action (with who, when the server knows) instead of a dead-end error.
+    if (err && err.stale) {
+      toastAction(nice(err), "Load the latest", async () => {
+        try {
+          await refreshAll();
+          BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; dcResetHistory();
+          renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
+          toast("Loaded the latest version — your unsaved edit was set aside, reapply what you still want");
+        } catch (e2) { toast(nice(e2), true); }
+      }, 30000);
+    } else toast(nice(err), true);
+  }
 }
 // ── T-STARTER: apply a pre-arranged, pre-filled starter layout. Replaces the
 //    working sections with a ready-made set the owner then EDITS (never a blank
@@ -5965,16 +6095,32 @@ function renderBlocksCard() {
         libRow.appendChild(Object.assign(el("div", "hint", "Insert a copy = an independent section you edit on its own. Link = it stays tied to this saved section, so editing the saved section updates every linked spot."), { style: "margin-top:6px;font-size:11.5px" }));
         const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
         CL_ITEMS.forEach((it) => {
-          const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
+          const wrap = el("div"); wrap.style.cssText = "border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
+          const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
           row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;min-width:120px;font-size:12.5px" }));
           row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
+          // G8: where-used — how many pages LIVE-LINK this saved section; expands to name them
+          const used = Array.isArray(it.used_on) ? it.used_on : [];
+          if (used.length) {
+            const uc = el("button", null, "used on " + used.length + " page" + (used.length === 1 ? "" : "s")); uc.type = "button";
+            uc.title = "Show which pages link this saved section";
+            uc.style.cssText = "font:inherit;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid #d9cef0;background:#faf7ff;color:#3a2470;cursor:pointer";
+            const usedLine = el("div", "hint", "Linked on: " + used.map((u) => u.title).join(", ") + " — editing the saved section changes it everywhere it’s linked.");
+            usedLine.style.cssText = "margin-top:5px;font-size:11.5px"; usedLine.hidden = true;
+            uc.addEventListener("click", () => { usedLine.hidden = !usedLine.hidden; });
+            row.appendChild(uc); wrap.appendChild(row); wrap.appendChild(usedLine);
+          } else wrap.appendChild(row);
           const ins = el("button", null, "Insert a copy"); ins.type = "button"; ins.title = "An independent copy you edit on its own"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid #5b3fa0;background:transparent;color:#3a2470;cursor:pointer";
           ins.addEventListener("click", () => clInsert(it.block));
           const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
           lnk.addEventListener("click", () => clInsertLink(it));
           const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-          del.addEventListener("click", async () => { try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); } });
-          row.append(ins, lnk, del); list.appendChild(row);
+          del.addEventListener("click", async () => {
+            // G8: deleting a LIVE-LINKED entry first names the pages it appears on
+            if (used.length && !confirm("“" + it.name + "” appears on: " + used.map((u) => u.title).join(", ") + ". Removing it from the library removes it from " + (used.length === 1 ? "that page" : "those pages") + " at your next publish. Remove anyway?")) return;
+            try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); }
+          });
+          row.append(ins, lnk, del); list.appendChild(wrap);
         });
         libRow.appendChild(list);
       }

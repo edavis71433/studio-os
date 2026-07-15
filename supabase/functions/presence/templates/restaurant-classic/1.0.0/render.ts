@@ -257,7 +257,7 @@ const ldSite = (c: SnapshotContent, site: SiteConfig) => ({ '@context': 'https:/
 
 // ═════════ page shell ═════════
 
-interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; active: string; body: string }
+interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; shareTitle?: string; shareDescription?: string; shareImage?: string; active: string; body: string }
 
 function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpts, x: { announce?: string; icon?: string } = {}): string {
   const i = c.identity;
@@ -477,9 +477,14 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   // and per-page search headline/description overrides. Plain choices, our plumbing.
   const noidx = new Set(c.settings?.pages_noindex || []);
   const pseo = c.settings?.page_seo || {};
+  // Wave-1 G7: the same page_seo map now carries optional SHARE overrides — they
+  // feed the og:/twitter: tags via the ONE shared seoHead; absent = same bytes.
   const seoOv = (key: string, title: string, description: string) => ({
     title: (pseo[key]?.title || '').trim() || title,
     description: (pseo[key]?.description || '').trim() || description,
+    ...((pseo[key]?.share_title || '').trim() ? { shareTitle: String(pseo[key]?.share_title).trim() } : {}),
+    ...((pseo[key]?.share_description || '').trim() ? { shareDescription: String(pseo[key]?.share_description).trim() } : {}),
+    ...(pseo[key]?.share_image ? { shareImage: String(pseo[key]?.share_image) } : {}),
   });
   const markNoindex = (file: string) => { files[file] = (files[file] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">'); };
 
@@ -519,7 +524,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   for (const cp of (c.settings?.pages || [])) {
     const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });
     page(`/${cp.slug}/`, {
-      title: `${cp.title} — ${i.business_name}`, description: siteDesc,
+      ...seoOv(`page:${cp.slug}`, `${cp.title} — ${i.business_name}`, siteDesc),
       ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
       active: `page:${cp.slug}`,
       body: `<section class="hero wrap"><h1>${esc(cp.title)}</h1></section>${cblocks.map((b) => b.html).join('')}`,

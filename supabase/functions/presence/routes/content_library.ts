@@ -7,15 +7,26 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { cleanLibraryName, validateLibraryBlock } from '../lib/content_library.ts';
+import { linkedUsageMap } from '../lib/linked_sections.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const MAX_ITEMS = 100;
 
+// Wave-1 G8 · Where-used rides the list read: each item carries the pages that
+// LIVE-LINK it (`used_on: [{slug,title}]` — '' = Home), derived in one pass over
+// the same draft block lists the serializer resolves at publish (lib/
+// linked_sections.ts linkedUsageMap). One extra site-scoped settings read for the
+// whole list — never a per-item query.
 export async function handleContentLibraryList(site: SiteRow, cors: Record<string, string>) {
-  const r = await svc(`presence_content_library?site_id=eq.${site.id}&select=id,name,kind,payload,created_at&order=created_at.desc&limit=${MAX_ITEMS}`);
+  const [r, setQ] = await Promise.all([
+    svc(`presence_content_library?site_id=eq.${site.id}&select=id,name,kind,payload,created_at&order=created_at.desc&limit=${MAX_ITEMS}`),
+    svc(`presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`),
+  ]);
   const rows = Array.isArray(r.json) ? r.json : [];
-  return json({ data: rows.map((x: any) => ({ id: x.id, name: x.name, kind: x.kind, block: x.payload, created_at: x.created_at })) }, 200, cors);
+  const set = setQ.json?.[0] ?? {};
+  const usage = linkedUsageMap(set.blocks, set.pages);
+  return json({ data: rows.map((x: any) => ({ id: x.id, name: x.name, kind: x.kind, block: x.payload, created_at: x.created_at, used_on: usage[x.id] ?? [] })) }, 200, cors);
 }
 
 export async function handleContentLibrarySave(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {

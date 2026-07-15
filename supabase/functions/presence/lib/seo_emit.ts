@@ -11,8 +11,12 @@ import { esc, attr } from './markdown.ts';
 import type { SiteConfig, SnapshotContent } from './render_types.ts';
 
 /** The page-level SEO inputs a template already computes. (A template's own PageOpts
- *  is a structural superset of this, so it can be passed straight through.) */
-export interface SeoHeadPage { title: string; description: string; path: string; ogImage?: string; ld: object[] }
+ *  is a structural superset of this, so it can be passed straight through.)
+ *  Wave-1 G7: the optional share* fields are per-page SOCIAL overrides (page_seo
+ *  share_title / share_description / share_image) — they change only the og:/
+ *  twitter: tags, never the <title>/description Google reads. Absent = the exact
+ *  same bytes as before. */
+export interface SeoHeadPage { title: string; description: string; path: string; ogImage?: string; ld: object[]; shareTitle?: string; shareDescription?: string; shareImage?: string }
 
 /** The full `<!DOCTYPE html> … </head>` for one page — byte-identical to what the
  *  templates emitted inline. `critical` is the template's above-the-fold CSS and
@@ -21,6 +25,10 @@ export interface SeoHeadPage { title: string; description: string; path: string;
 export function seoHead(o: SeoHeadPage, site: SiteConfig, c: SnapshotContent, x: { icon?: string }, critical: string, cssPath: string): string {
   const canonical = `${site.baseUrl}${o.path}`;
   const i = c.identity;
+  // Wave-1 G7: share overrides apply to og:/twitter: only; unset → identical bytes.
+  const ogTitle = (o.shareTitle || '').trim() || o.title;
+  const ogDesc = (o.shareDescription || '').trim() || o.description;
+  const ogImg = o.shareImage || o.ogImage;
   return `<!DOCTYPE html>
 <html lang="${attr(site.locale || 'en')}">
 <head>
@@ -33,13 +41,13 @@ ${c.settings?.verification?.google ? `<meta name="google-site-verification" cont
 <link rel="icon" href="${attr(x.icon || '/favicon.svg')}"${x.icon ? '' : ' type="image/svg+xml"'}>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${attr(i.business_name)}">
-<meta property="og:title" content="${attr(o.title)}">
-<meta property="og:description" content="${attr(o.description)}">
+<meta property="og:title" content="${attr(ogTitle)}">
+<meta property="og:description" content="${attr(ogDesc)}">
 <meta property="og:url" content="${attr(canonical)}">
-${o.ogImage ? `<meta property="og:image" content="${attr(site.baseUrl + o.ogImage)}">` : ''}
-<meta name="twitter:card" content="${o.ogImage ? 'summary_large_image' : 'summary'}">
-<meta name="twitter:title" content="${attr(o.title)}">
-<meta name="twitter:description" content="${attr(o.description)}">
+${ogImg ? `<meta property="og:image" content="${attr(site.baseUrl + ogImg)}">` : ''}
+<meta name="twitter:card" content="${ogImg ? 'summary_large_image' : 'summary'}">
+<meta name="twitter:title" content="${attr(ogTitle)}">
+<meta name="twitter:description" content="${attr(ogDesc)}">
 <style>${critical}</style>
 <link rel="stylesheet" href="${attr(cssPath)}">
 ${o.ld.map((j) => `<script type="application/ld+json">${JSON.stringify(j).replaceAll('<', '\\u003c')}</script>`).join('\n')}

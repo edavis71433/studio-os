@@ -44,6 +44,27 @@ export function linkedRefIds(rawBlocks: unknown): string[] {
   return [...out];
 }
 
+/** Wave-1 G8 · Where-used: which pages LIVE-LINK each library item. One pass over
+ *  the draft's block lists (home + every custom page — the same lists the
+ *  serializer resolves), so usage derives from exactly what publish would resolve;
+ *  no per-item queries. Returns item id → the pages it appears on, in page order.
+ *  Pure. */
+export function linkedUsageMap(homeBlocks: unknown, pages: unknown): Record<string, Array<{ slug: string; title: string }>> {
+  const out: Record<string, Array<{ slug: string; title: string }>> = {};
+  const add = (blocks: unknown, slug: string, title: string) => {
+    for (const id of linkedRefIds(blocks)) (out[id] ??= []).push({ slug, title });
+  };
+  add(homeBlocks, '', 'Home');
+  if (Array.isArray(pages)) {
+    for (const p of pages) {
+      if (!p || typeof p !== 'object') continue;
+      const pg = p as { slug?: unknown; title?: unknown; blocks?: unknown };
+      add(pg.blocks, String(pg.slug ?? ''), String(pg.title || pg.slug || ''));
+    }
+  }
+  return out;
+}
+
 /** Resolve linked blocks to their library item's CURRENT content, in order.
  *  `lookup(id)` returns the stored library payload (one block) or null/undefined.
  *  A link whose item is missing/deleted is DROPPED — graceful, never an error:

@@ -20,6 +20,7 @@ import { REALIZED_BLOCK_TYPES } from '../lib/site_blocks.ts';
 import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
+import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -270,7 +271,7 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
 // ═══ singletons ═══
 async function singleton(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, cfg: {
   table: string; entityType: string; noun: string; fields: Record<string, FieldRule>; select: string; conflict: string; summary: string;
-}) {
+}, preParsed?: Record<string, unknown>) {
   const method = req.method.toUpperCase();
   if (method === 'GET') {
     const r = await asUser(jwt, `${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
@@ -282,7 +283,8 @@ async function singleton(req: Request, jwt: string, site: SiteRow, principal: Pr
     const stale = await guardStaleDraft(req, site, cors);
     if (stale) return stale;
     let payload: Record<string, unknown> = {};
-    try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
+    if (preParsed !== undefined) payload = preParsed;   // G7: handleSettings pre-reads the body (a Request body reads once)
+    else { try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); } }
     const v = validateFields(payload, cfg.fields, false);
     if (!v.ok) return json({ error: 'validation_failed', message: 'Some fields need a second look.', fields: v.errors }, 422, cors);
     if (v.fields.length === 0) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
@@ -349,9 +351,102 @@ export async function handleVoice(req: Request, jwt: string, site: SiteRow, prin
   return null;
 }
 
-export const handleSettings = (req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
-  singleton(req, jwt, site, principal, cors, {
-    table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
-    select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at',
-    conflict: 'site_id', summary: 'Updated site settings',
+const SETTINGS_CFG = {
+  table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
+  select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at',
+  conflict: 'site_id', summary: 'Updated site settings',
+} as const;
+
+// Wave-1 G7 (SC-7): a page-slug RENAME automatically forwards the old address —
+// through the EXISTING redirects manager (presence_redirects; same rows the
+// snapshot has always shipped). The client marks a rename with `prev_slug` on the
+// page it renamed; the marker is stripped before the draft is stored. Best-effort
+// AFTER a successful save (a redirect hiccup never fails the rename), provenance-
+// logged, and skipped when the old address was never on the live site (nothing to
+// forward). Existing forwards that pointed AT the old address follow the page, so
+// a rename never leaves a redirect chain behind.
+async function redirectsForRenames(site: SiteRow, principal: Principal, renames: PageRename[]): Promise<void> {
+  try {
+    const pub = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id&order=created_at.desc&limit=1`);
+    const snapId = pub.json?.[0]?.snapshot_id;
+    let liveSlugs: Set<string> | null = null;   // null = never published → skip every forward
+    if (snapId) {
+      const s = await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content&limit=1`);
+      const livePages = s.json?.[0]?.content?.settings?.pages;
+      liveSlugs = new Set(Array.isArray(livePages) ? livePages.map((p: { slug?: unknown }) => String(p?.slug ?? '')) : []);
+    }
+    for (const rn of renames.slice(0, 5)) {
+      const from = `/${rn.from}/`, to = `/${rn.to}/`;
+      // reference adjust: forwards that landed on the old address follow the page (no chains)
+      await svc(`presence_redirects?site_id=eq.${site.id}&to_path=eq.${encodeURIComponent(from)}`, { method: 'PATCH', body: JSON.stringify({ to_path: to }) });
+      if (!liveSlugs || !liveSlugs.has(rn.from)) continue;   // never live under the old address → no forward needed
+      const existing = await svc(`presence_redirects?site_id=eq.${site.id}&from_path=eq.${encodeURIComponent(from)}&select=id&limit=1`);
+      if (Array.isArray(existing.json) && existing.json.length) continue;   // the owner already forwards it
+      const cnt = await svc(`presence_redirects?site_id=eq.${site.id}&select=id&limit=51`);
+      if ((cnt.json ?? []).length >= 50) continue;   // the manager's cap — never blow past it silently
+      const w = await svc('presence_redirects', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ site_id: site.id, from_path: from, to_path: to }),
+      });
+      if (w.ok) await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed a page address ${from} → ${to} and added a forward so old links keep working`, principal, provenance: 'human', fields: ['pages', 'redirect'] });
+    }
+  } catch { /* best-effort — the rename itself already succeeded */ }
+}
+
+export async function handleSettings(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (req.method.toUpperCase() !== 'PUT') return singleton(req, jwt, site, principal, cors, SETTINGS_CFG);
+  let payload: Record<string, unknown> = {};
+  try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
+  // G7: pull rename markers out of a pages payload (the stored draft never carries them)
+  let renames: PageRename[] = [];
+  if (payload && Array.isArray(payload.pages)) {
+    const d = detectPageRenames(payload.pages);
+    payload.pages = d.pages; renames = d.renames;
+  }
+  const resp = await singleton(req, jwt, site, principal, cors, SETTINGS_CFG, payload);
+  if (resp && resp.status === 200 && renames.length) await redirectsForRenames(site, principal, renames);
+  return resp;
+}
+
+// ═══ Wave-1 G7 · page operations ═══
+
+/** POST /pages/duplicate { slug } — duplicate one page ('' = the Home canvas)
+ *  into a new custom page: deep-copied block list with REGENERATED stable ids,
+ *  title "<Title> copy", slug "<slug>-copy" collision-bumped. One settings.pages
+ *  write through the caller's JWT (RLS proves ownership), one provenance event —
+ *  the same shape every pages edit already takes. */
+export async function handlePageDuplicate(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const stale = await guardStaleDraft(req, site, cors);
+  if (stale) return stale;
+  let payload: Record<string, unknown> = {};
+  try { payload = await req.json(); } catch { /* {} → duplicate Home */ }
+  const slug = String(payload?.slug ?? '');
+  if (slug && !PAGE_SLUG_RE.test(slug)) return json({ error: 'bad_request', message: 'Which page should be duplicated?' }, 400, cors);
+  const cur = await asUser(jwt, `presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`);
+  if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pages just now.' }, 502, cors);
+  const row = cur.json?.[0] ?? {};
+  const dup = duplicatePageInSettings({ blocks: row.blocks, pages: row.pages }, slug);
+  if ('error' in dup) return json({ error: dup.error, message: dup.message }, dup.error === 'not_found' ? 404 : 422, cors);
+  const w = await asUser(jwt, `presence_settings?on_conflict=site_id&select=site_id,pages`, {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({ site_id: site.id, pages: dup.pages }),
   });
+  if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'create', summary: `Duplicated the “${dup.sourceTitle}” page as “${dup.title}”`, principal, provenance: 'human', fields: ['pages'] });
+  return json({ data: { slug: dup.slug, title: dup.title, pages: w.json[0].pages ?? dup.pages } }, 201, cors);
+}
+
+/** GET /pages/refs?slug=x — delete-awareness: what points AT this page (menu
+ *  items, forwards, other pages' sections, saved library sections). One pass
+ *  over three small site-scoped reads; the logic is pure (lib/page_ops.ts). */
+export async function handlePageRefs(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const slug = String(new URL(req.url).searchParams.get('slug') || '');
+  if (!PAGE_SLUG_RE.test(slug)) return json({ error: 'bad_request', message: 'Which page?' }, 400, cors);
+  const [setQ, redirQ, libQ] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${site.id}&select=blocks,pages,nav&limit=1`),
+    svc(`presence_redirects?site_id=eq.${site.id}&select=from_path,to_path&limit=50`),
+    svc(`presence_content_library?site_id=eq.${site.id}&select=name,payload&limit=100`),
+  ]);
+  const refs = pageRefs(slug, setQ.json?.[0] ?? {}, Array.isArray(redirQ.json) ? redirQ.json : [], Array.isArray(libQ.json) ? libQ.json : []);
+  return json({ data: refs }, 200, cors);
+}

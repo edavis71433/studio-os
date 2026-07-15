@@ -69,8 +69,12 @@ export interface SnapshotContent {
     footer?: { hours: boolean; social: boolean };
     /** Phase SD: page keys hidden from search (noindex + out of the sitemap). */
     pages_noindex?: string[];
-    /** Phase SD: per-page search headline/description overrides, keyed by page. */
-    page_seo?: Record<string, { title?: string; description?: string }>;
+    /** Phase SD: per-page search headline/description overrides, keyed by page.
+     *  Wave-1 G7 (additive): optional per-page SOCIAL share overrides — share_title /
+     *  share_description feed og:/twitter: tags; share_image is the RESOLVED
+     *  site-relative variant path (the serializer maps the owner's media id through
+     *  the one media pipeline, so it lands in the manifest like any other image). */
+    page_seo?: Record<string, { title?: string; description?: string; share_title?: string; share_description?: string; share_image?: string }>;
     /** Phase T-BLOCKS: optional structured content blocks the owner turned on and
      *  filled (validated + capped at serialize time). Rendered deterministically as
      *  home sections; each carries its own schema.org + a11y. Never free-form HTML. */

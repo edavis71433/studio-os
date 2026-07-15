@@ -12,6 +12,7 @@ import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDev
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
 import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
 import { linkedRefIds, resolveLinkedBlocks } from './linked_sections.ts';
+import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
 
@@ -81,6 +82,30 @@ export function buildDevLayer(row: { theme_tokens?: unknown; custom_css?: unknow
   return { theme_tokens, custom_css, custom_html };
 }
 
+// Wave-1 G7: per-page SHARE image — the owner stores a media ID in
+// page_seo[key].share_image; the snapshot must carry a RESOLVED site-relative
+// variant path (through the ONE ref() pipeline, so it lands in the media
+// manifest and gets variants like every other image). A page_seo with no
+// share_image passes through UNTOUCHED — byte-identical snapshots for every
+// existing site. An unknown/deleted media id is dropped (never a broken og:).
+const SHARE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+type PageSeoMap = NonNullable<NonNullable<SnapshotContent['settings']>['page_seo']>;
+function resolvePageSeoShare(rawPageSeo: unknown, ref: (id: string | null | undefined) => MediaRef | null): PageSeoMap {
+  const raw = (rawPageSeo && typeof rawPageSeo === 'object' && !Array.isArray(rawPageSeo)) ? rawPageSeo as Record<string, unknown> : {};
+  const hasShareImage = Object.values(raw).some((v) => !!v && typeof v === 'object' && (v as { share_image?: unknown }).share_image);
+  if (!hasShareImage) return raw as PageSeoMap;   // byte-identical passthrough (the common case)
+  return Object.fromEntries(Object.entries(raw).map(([k, v]) => {
+    const entry = (v && typeof v === 'object') ? v as Record<string, unknown> : null;
+    if (!entry || !entry.share_image) return [k, v];
+    const out = { ...entry };
+    const id = String(entry.share_image);
+    const m = SHARE_UUID_RE.test(id) ? ref(id) : null;
+    const path = m?.variants?.w1600 || m?.variants?.w800 || Object.values(m?.variants ?? {})[0];
+    if (path) out.share_image = path; else delete out.share_image;
+    return [k, out];
+  })) as PageSeoMap;
+}
+
 export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
   const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr, devArr, reviewsArr] = await Promise.all([
@@ -141,7 +166,6 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
   // resolve pipeline as the home blocks, so they're identical structured/safe blocks.
   // Slugs are made URL-safe + unique and can never collide with a template's built-in
   // pages (about/contact/services/faq/updates/…). Capped at 20.
-  const RESERVED_PAGE_SLUGS = new Set(['', 'index', 'home', '404', 'about', 'contact', 'faq', 'faqs', 'services', 'service', 'menu', 'products', 'classes', 'updates', 'blog', 'news', 'post', 'posts', 'thanks', 'thank-you', 'privacy', 'accessibility', 'search', 'sitemap', 'robots', 'assets', 'img']);
   const pageSlug = (raw: unknown): string => String(raw ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   const seenSlugs = new Set<string>();
   const customPages = rawPages.slice(0, 20).map((p: any) => {
@@ -215,7 +239,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
       pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],
-      page_seo: (settings.page_seo && typeof settings.page_seo === 'object') ? settings.page_seo : {},
+      page_seo: resolvePageSeoShare(settings.page_seo, ref),
       // Phase Z: ownership-verification tokens (emitted as meta tags when set)
       ...(String(settings.google_site_verification || '').trim() || String(settings.bing_site_verification || '').trim()
         ? { verification: { google: String(settings.google_site_verification || '').trim() || undefined, bing: String(settings.bing_site_verification || '').trim() || undefined } }
