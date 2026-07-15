@@ -117,9 +117,7 @@ function render(feed,leads,notifs){
   const clientMsgs=(feed.client_messages||[]);
   // Keep recently-read activity VISIBLE (dimmed) — glancing at the Inbox must
   // never make unhandled items vanish; they just stop counting as new.
-  // Client messages/support now live in their own "Messages" conversations section
-  // above — keep them OUT of the dim "Project activity" list so they're not shown twice.
-  const activity=(notifs||[]).filter(n=>!/^(new message|support:)/i.test(String(n.label||''))).slice(0,12);
+  const activity=(notifs||[]).slice(0,12);
   const unreadCount=activity.filter(n=>!n.read).length;
   const total=approvals.length+clientMsgs.length+notices.length+moments.length+newLeads.length+unreadCount;
   let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;
