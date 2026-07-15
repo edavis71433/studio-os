@@ -63,10 +63,16 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 
 ## Backlog tasks already tracked (not conversation-lost — see task list)
 
-#180 Files→Design fold (✅ increment 1 done; increment 2 in progress) · #181 inbox client
-grouping ("client msgs ONLY in client profile" part — ✅ done, pending function deploy) ·
-#174 admin consolidation + freelancer/agency provisioning · #166 compliance/doc-truth ·
-#167 seamlessness redesign · #169 optimization pass · #172 final verification.
+#180 Files→Design fold ✅ (both increments) · #181 inbox client grouping ✅ (pending
+function deploy) · #174 admin consolidation + freelancer/agency provisioning ✅ (agency
+provisioner + invites + door; page retirements can follow) · #166 compliance/doc-truth
+✅ docs half (LEGAL HALF NEEDS ERIC: terms/privacy platform-subscription sections +
+OpenAI/Pexels in the privacy provider list — drafts on request) · #169 optimization
+pass ✅ (migration 0109 + waterfall collapse + context dedupe + vendored supabase-js) ·
+#172 final verification ✅ Tier 1 all green 2026-07-15 (see FINAL-VERIFICATION-RUNBOOK.md;
+Tier 2 needs staging creds, Tier 3 owner items listed there) ·
+#167 seamlessness redesign — STILL GATED, see the standing rule below; Eric declares
+the gate clear, not a session.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
