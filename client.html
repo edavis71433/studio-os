@@ -466,6 +466,22 @@ async function submitBooking(){
   if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});}
   else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
 }
+// Client file upload — signed-URL flow (mirrors the studio deliverable upload):
+// request an upload URL → PUT the bytes → record it as a client-visible file.
+async function uploadClientFile(id){
+  const inp=$('upFile'); const file=inp&&inp.files&&inp.files[0]; if(!file){toast('Choose a file first.');return;}
+  const btn=$('upBtn'); btn.disabled=true; const was=btn.textContent; btn.textContent='Uploading…';
+  const fail=(m)=>{toast(m||'Couldn’t upload that.');btn.disabled=false;btn.textContent=was;};
+  try{
+    const up=await api('/client/projects/'+id+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title:file.name});
+    if(!up.ok||!up.body.data||!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');
+    const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+    if(!put.ok)return fail('The upload didn’t finish — please try again.');
+    const rec=await api('/client/projects/'+id+'/uploads','POST',{media_id:up.body.data.media_id,title:file.name});
+    if(!rec.ok)return fail((rec.body&&rec.body.message)||'Couldn’t save that file.');
+    toast('Sent to your studio ✓'); PORTAL.snaps=null; openProject(id);
+  }catch(_){fail();}
+}
 // A short, standard brief for a picked service → POST as a PENDING support
 // request (service ref + structured fields). Per-service custom fields are out
 // of R2 scope. Crystal-clear that NOTHING is charged or ordered automatically.
@@ -591,7 +607,10 @@ async function openProject(id,focusSection){
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
   if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`}</div>`;}html+=`</section>`;}
   // files
-  if((data.deliverables||[]).length){html+=`<section id="sec-files"><h2>Files</h2>`;for(const f of data.deliverables){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}html+=`</section>`;}
+  html+=`<section id="sec-files"><h2>Files</h2>`;
+  for(const f of (data.deliverables||[])){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}
+  // client upload — send the studio a file (logo, content, a document)
+  html+=`<div class="card"><p class="muted" style="margin-bottom:8px">Send your studio a file — a logo, content, or a document.</p><div class="row" style="gap:8px;align-items:center"><input type="file" id="upFile" style="flex:1;min-width:0"><button class="approve" id="upBtn">Upload</button></div></div></section>`;
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
   // milestones — a real vertical timeline (done / you-are-here / upcoming)
@@ -613,6 +632,7 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=$('nt-'+b.getAttribute('data-asend'));adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
   document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id);}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));
+  const upBtn=$('upBtn'); if(upBtn)upBtn.addEventListener('click',()=>uploadClientFile(id));
   wireDownloads(document);
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});

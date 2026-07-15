@@ -7,7 +7,7 @@
 // visible records. Internal notes/tasks/files/approvals never appear here.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { signDownload } from '../lib/media.ts';
+import { signDownload, createUpload } from '../lib/media.ts';
 import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient } from '../lib/service_bridge.ts';
 import { csatRatingsForProject } from '../lib/csat.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
@@ -95,6 +95,44 @@ export async function handleClientBook(_req: Request, site: SiteRow, _principal:
   const links = me ? await linksForCustomer(me) : [];
   const agencySite = links[0]?.agency_site_id ? String(links[0].agency_site_id) : '';
   return json({ data: { site_id: agencySite || null } }, 200, cors);
+}
+
+// ═══ CLIENT FILE UPLOAD — the client can send the studio a file ═══
+// The #1 client-portal gap (and the Terms already promise it). Reuses the ONE hardened
+// media store (createUpload = mime/size/quota validation + a signed upload URL) on the
+// AGENCY site the project lives on, gated by the bridge. Recorded as a client-visible
+// deliverable + a client-visible event, so it lands in the studio's project Files and
+// the client's own Files, and the studio sees that the client sent it.
+export async function handleClientUploadUrl(req: Request, site: SiteRow, principal: Principal, projectId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(projectId)) return json({ error: 'bad_request' }, 400, cors);
+  const me = customerOf(site);
+  if (!me) return json({ error: 'forbidden' }, 403, cors);
+  const link = await linkForCustomerProject(me, projectId);
+  if (!link) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const res = await createUpload(link.agency_site_id, { mime: String(b?.mime || ''), bytes: Number(b?.bytes || 0), alt_text: clean(b?.title, 200) || 'Client upload' });
+  if ('error' in (res as any)) return json(res, 422, cors);
+  return json({ data: res }, 200, cors); // { media_id, upload_url, storage_path }
+}
+export async function handleClientUploadCreate(req: Request, site: SiteRow, principal: Principal, projectId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(projectId)) return json({ error: 'bad_request' }, 400, cors);
+  const me = customerOf(site);
+  if (!me) return json({ error: 'forbidden' }, 403, cors);
+  const link = await linkForCustomerProject(me, projectId);
+  if (!link) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
+  const s = link.agency_site_id;
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const mediaId = UUID_RE.test(b.media_id || '') ? b.media_id : null;
+  if (!mediaId) return json({ error: 'validation', message: 'Pick a file to upload.' }, 422, cors);
+  const media = rows(await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${s}&deleted_at=is.null&select=id,alt_text&limit=1`))[0];
+  if (!media) return json({ error: 'bad_media', message: 'That file isn’t here.' }, 422, cors);
+  const title = clean(b.title, 200) || clean(media.alt_text, 200) || 'Client upload';
+  const ins = await svc('presence_deliverables', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: s, project_id: projectId, media_id: mediaId, title, note: 'Uploaded by the client.', status: 'shared', client_visible: true }) });
+  if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ project_id: projectId, site_id: s, kind: 'client_upload', actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', title } }) }).catch(() => {});
+  return json({ data: rows(ins)[0] }, 201, cors);
 }
 
 // ═══ DOCUMENTS (the client's proposals & agreements, findable in-portal) ═══
