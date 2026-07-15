@@ -40,6 +40,8 @@ import {
   normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef,
 } from '../lib/dam.ts';
 import { socialCropList } from '../lib/social_crops.ts';
+import { composeSocialCards, HEADLINE_MAX } from '../lib/social_card.ts';
+import { brandFromKit } from '../lib/email_brand.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
 import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 
@@ -251,6 +253,65 @@ export async function handleAssetSocial(site: SiteRow, id: string, cors: Record<
 }
 async function isCurrentOg(site: SiteRow, id: string): Promise<boolean> {
   try { const s = await svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id&limit=1`); return arr(s)[0]?.og_media_id === id; } catch { return false; }
+}
+
+// ── G31: branded social cards — one photo → many platform formats, COMPOSED ──
+// A step beyond /assets/:id/social (bare crops): each card re-lays out the photo
+// PLUS the owner's brand — accent bar (Brand Kit, contrast-derived exactly like
+// the email shell), logo, business name, optional headline — per platform preset
+// (Instagram / story / Facebook / X / Pinterest). The composer is pure SVG
+// (lib/social_card.ts): the photo and logo ride short-lived signed variant URLs
+// from the SAME self-hosted pipeline as everything else — never an external
+// origin, nothing rasterized server-side, everything entity-escaped. Drafting-
+// class plan gate (same boundary as the other drafting quick actions): Monitor
+// watches, it doesn't produce collateral.
+const CARD_SOURCE_WIDTH = 1600;   // one uncropped variant feeds every preset
+const CARD_LOGO_WIDTH = 320;      // the logo rides small in the brand bar
+
+export async function handleAssetCards(req: Request, site: SiteRow, id: string, cors: Record<string, string>) {
+  const asset = await loadAsset(site.id, id);
+  if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  if (!isImageMime(asset.mime || '')) {
+    return json({ error: 'not_an_image', message: 'Branded cards are for photos — this file isn’t an image.' }, 400, cors);
+  }
+  const denied = draftingDenial(await loadPlan(site.client_id), cors);
+  if (denied) return denied;
+
+  const url = new URL(req.url);
+  const headline = String(url.searchParams.get('headline') || '').replace(/\s+/g, ' ').trim().slice(0, HEADLINE_MAX);
+
+  // The brand: Brand Kit + business name (the same two reads the email shell
+  // makes) + the logo the kit/site points at. All existing rows — nothing new.
+  const [settingsR, identityR] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${site.id}&select=brand_kit,logo_media_id&limit=1`),
+    svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`),
+  ]);
+  const settings = arr(settingsR)[0] || {};
+  const kit = (settings.brand_kit && typeof settings.brand_kit === 'object' ? settings.brand_kit : null) as { primary?: string; logo_media_id?: string } | null;
+  const businessName = String(arr(identityR)[0]?.business_name || '').trim();
+  const brand = brandFromKit(kit, null);   // accent + accentDark only — the card shows the OWNER's name, never a default
+  const logoId = String(kit?.logo_media_id || settings.logo_media_id || '');
+
+  // Sign the uncropped photo variant + (when set and an image) the logo — the
+  // same private-bucket transform pipeline as thumbnails and crops.
+  const logoAsset = /^[0-9a-f-]{36}$/.test(logoId) ? await loadAsset(site.id, logoId) : null;
+  const [photoUrl, logoUrl] = await Promise.all([
+    signThumb(asset.storage_path, asset.mime || '', CARD_SOURCE_WIDTH),
+    logoAsset && isImageMime(logoAsset.mime || '') ? signThumb(logoAsset.storage_path, logoAsset.mime || '', CARD_LOGO_WIDTH) : Promise.resolve(null),
+  ]);
+  if (!photoUrl) return json({ error: 'image_unreadable', message: 'We couldn’t prepare that photo just now — try again in a moment.' }, 502, cors);
+
+  const cards = composeSocialCards({
+    media: {
+      url: photoUrl, width: asset.width, height: asset.height,
+      focal: { x: Number((asset as any).focal_x), y: Number((asset as any).focal_y) },
+      alt: asset.alt_text || '',
+    },
+    brand: { accent: brand.accent, accent_dark: brand.accentDark, logo_url: logoUrl },
+    business_name: businessName,
+    headline,
+  });
+  return json({ data: { cards, business_name: businessName, headline } }, 200, cors);
 }
 
 // ── one file: the detail panel (metadata + complete where-used + versions) ────

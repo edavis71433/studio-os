@@ -340,6 +340,8 @@ Consequences: final Section C tallies become **✅ 21 · ⚠️ 46 · ❌ 10 · 
 
 ## E. Recommended build waves (SMB-value balanced)
 
+**STATUS 2026-07-15: WAVE 1 COMPLETE AND DEPLOYED** — G1-G10, G30-G32 + writer tones all live (see git log "Adobe parity Wave 1"). Wave 2 next: G11 annotations leads.
+
 **Wave 1 — highest owner value, S/M, philosophy-clean (14 items):** G1 radius-everywhere · G2 un-gate hero/header presets · G3 focal-point-in-galleries · G4 per-block style variants · G5 scheduled publish windows · G6 shareable draft preview link · G7 page operations suite · G8 block where-used · G9 visual publish diff · G10 unpublish/offline · **G30 apply-brand one-click + recolor · G31 many-formats reformatter · G32 background removal · writer tone presets** (Express additions, per G29). Rationale: G1–G3 close the inventory's own known gaps (owner-visible controls that currently half-work); G4 imports Adobe's single best philosophy-compatible idea; G5–G10 finish publish/version UX where our pipeline is already 80% built; G30–G32 are Express's stickiest weekly-use wins on machinery we already have.
 
 **Wave 2 — M/L, philosophy-clean (13 items):** G11 section annotations/review comments · G12 library variations · G13 in-place canvas editing · G14 launch upgrades (edit-in-launch, per-section resync, partial promote) · G15 timewarp-forward preview · G16 attention/notifications surface · G17 rendition presets + WebP/AVIF · G18 product media sets + zoom · G19 model-backed design suggestion · G20 video · G21 RTE tiers + a11y · G22 quick-find + shortcuts · G23 asset lifecycle polish. Gate G13/G14/G20 scope on G28 code-check results.

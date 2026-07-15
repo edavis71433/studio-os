@@ -37,7 +37,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetRemoveBackground } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin, handleDomain } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -513,6 +513,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const msoc = route.match(/^\/assets\/([0-9a-f-]{36})\/social$/);
     if (msoc && method === 'GET') return handleAssetSocial(site, msoc[1], cors);
+    // G31: branded social cards — photo + brand bar + headline, composed per platform preset
+    const mcards = route.match(/^\/assets\/([0-9a-f-]{36})\/cards$/);
+    if (mcards && method === 'GET') return handleAssetCards(req, site, mcards[1], cors);
     const ms = route.match(/^\/assets\/([0-9a-f-]{36})\/status$/);
     if (ms && method === 'POST') return handleAssetStatus(req, site, principal, ms[1], cors);
     const mdl = route.match(/^\/assets\/([0-9a-f-]{36})\/download$/);

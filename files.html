@@ -87,6 +87,13 @@
   .social .box img{width:100%;height:100%;object-fit:cover;display:block}
   .social figcaption{font-size:10.5px;color:var(--faint);line-height:1.25}
   .social .ogbtn{margin-top:10px;width:100%}
+  /* G31: branded cards */
+  .social .cardgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .social .cardgrid figure{margin:0;text-align:center}
+  .social .cardbox{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--p-soft)}
+  .social .cardbox svg{display:block}
+  .social .cardgrid figcaption{font-size:10.5px;color:var(--faint);line-height:1.25;margin:4px 0}
+  .social .cdl{width:100%;padding:6px 8px;font-size:12px;justify-content:center}
   .empty{text-align:center;padding:60px 20px;color:var(--soft)}
   .empty h2{font-family:var(--serif);font-weight:500;font-size:22px;color:var(--ink);margin-bottom:8px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:60px auto}
@@ -186,7 +193,7 @@ const COLS=[
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
-let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null,
+let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null,cards:[],
   selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 
@@ -478,6 +485,7 @@ function renderDetail(){
     <div class="field"><label for="f-tags">Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
     <div class="where"><div class="hl">Where it’s used</div><ul>${usage}</ul><div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div></div>
     ${a.kind==='image'?`<div class="social" id="social-slot"><div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Preparing crops…</div></div>`:''}
+    ${a.kind==='image'?`<div class="social" id="cards-slot"><div class="hl">Branded cards</div><div style="font-size:12.5px;color:var(--faint)">Preparing cards…</div></div>`:''}
     <div id="rbg-slot"></div>
     ${ver}
     ${ed?`<div class="acts">
@@ -489,7 +497,7 @@ function renderDetail(){
       ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
       <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
-  if(a.kind==='image')loadSocial(a.id);
+  if(a.kind==='image'){loadSocial(a.id);loadCards(a.id,'');}
 }
 // Focal-aware social crops (square / portrait / story / link-preview). The sizes are
 // the Visual Studio specs; each crop is a signed self-hosted transform. Set the
@@ -511,6 +519,84 @@ async function loadSocial(id){
   slot.innerHTML=`<div class="hl">Social sizes</div><div class="row">${cells}</div>
     <div style="font-size:11.5px;color:var(--faint);margin-top:6px">Cropped from your focus point. Set the focus in the Website editor.</div>${ogBtn}`;
 }
+// ── G31: branded cards — the photo re-laid-out per platform (Instagram / story /
+// Facebook / X / Pinterest) with the owner's brand: accent bar, logo, business
+// name, optional headline. The server composes pure SVG (photo + logo ride
+// short-lived signed URLs); here we preview each card inline and export a PNG
+// client-side via canvas at natural size — with an SVG download as the fallback
+// when canvas export is blocked. Nothing is stored; it's an on-demand export.
+async function loadCards(id,headline){
+  const slot=$('cards-slot'); if(!slot)return;
+  const q=headline?('?headline='+encodeURIComponent(headline)):'';
+  const r=await api('GET','/assets/'+id+'/cards'+q);
+  if(!$('cards-slot')||!S.current||S.current.asset.id!==id)return;   // panel changed while loading
+  if(!r.ok||!r.body.data||!(r.body.data.cards||[]).length){
+    const msg=r.status===403?((r.body&&r.body.message)||'Branded cards aren’t included in your plan.'):'Not available for this file.';
+    slot.innerHTML=`<div class="hl">Branded cards</div><div style="font-size:12.5px;color:var(--faint)">${esc(msg)}</div>`;
+    return;
+  }
+  S.cards=r.body.data.cards;
+  const cells=S.cards.map((c,i)=>`<figure><div class="cardbox" style="aspect-ratio:${c.w}/${c.h}" data-card="${i}"></div><figcaption>${esc(c.label)}<br>${c.w}×${c.h}</figcaption><button class="btn cdl" data-dl="${i}">Download PNG</button></figure>`).join('');
+  slot.innerHTML=`<div class="hl">Branded cards</div>
+    <div style="font-size:12.5px;color:var(--faint);margin-bottom:8px">Your photo with your brand — ready to post. Add a headline if you like.</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px"><label for="card-headline" class="sr-only" style="position:absolute;left:-9999px">Headline</label><input id="card-headline" maxlength="120" placeholder="Optional headline (e.g. Grand opening Saturday)" style="flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font-size:13px;font-family:inherit" value="${esc(headline||'')}"><button class="btn" id="card-apply">Apply</button></div>
+    <div class="cardgrid">${cells}</div>`;
+  slot.querySelectorAll('[data-card]').forEach(box=>{
+    const c=S.cards[+box.dataset.card]; if(!c)return;
+    box.innerHTML=c.svg;   // server-composed, fully escaped SVG
+    const el=box.querySelector('svg');
+    if(el){el.removeAttribute('width');el.removeAttribute('height');el.style.width='100%';el.style.height='100%';}
+  });
+  slot.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>downloadCard(+b.dataset.dl,b));
+  const ap=$('card-apply');if(ap)ap.onclick=()=>loadCards(id,(($('card-headline')||{}).value||'').trim());
+  const hi=$('card-headline');if(hi)hi.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();loadCards(id,hi.value.trim());}};
+}
+function cardSlug(){const a=S.current&&S.current.asset;return String((a&&a.name)||'card').toLowerCase().replace(/\.[a-z0-9]{2,5}$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'card';}
+async function downloadCard(i,btn){
+  const c=(S.cards||[])[i]; if(!c)return;
+  const name=cardSlug()+'-'+c.platform;
+  if(btn){btn.disabled=true;btn.textContent='Preparing…';}
+  let svg=c.svg;
+  try{svg=await inlineCardImages(c.svg);}catch(_){/* export continues with linked images */}
+  try{
+    const blob=await cardToPng(svg,c.w,c.h);
+    saveBlob(blob,name+'.png');
+  }catch(_){
+    saveBlob(new Blob([svg],{type:'image/svg+xml'}),name+'.svg');
+    toast('PNG export was blocked here — saved the SVG instead');
+  }
+  if(btn){btn.disabled=false;btn.textContent='Download PNG';}
+}
+// The card references the photo/logo by signed URL; an SVG rasterized via <img>
+// can't load external resources, so inline them as data: URIs before export.
+async function inlineCardImages(svg){
+  const hrefs=[...new Set(svg.match(/href="https:[^"]*"/g)||[])];
+  for(const h of hrefs){
+    const url=h.slice(6,-1).replace(/&amp;/g,'&');
+    const resp=await fetch(url); if(!resp.ok)throw new Error('image fetch failed');
+    const b=await resp.blob();
+    const data=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(new Error('read failed'));fr.readAsDataURL(b);});
+    svg=svg.split(h).join('href="'+data+'"');
+  }
+  return svg;
+}
+function cardToPng(svg,w,h){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const cv=document.createElement('canvas');cv.width=w;cv.height=h;   // natural size
+        const ctx=cv.getContext('2d'); if(!ctx)throw new Error('no 2d context');
+        ctx.drawImage(img,0,0,w,h);
+        cv.toBlob((b)=>{URL.revokeObjectURL(url);b?resolve(b):reject(new Error('toBlob blocked'));},'image/png');
+      }catch(e){URL.revokeObjectURL(url);reject(e);}
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('svg load failed'));};
+    img.src=url;
+  });
+}
+function saveBlob(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);}
 // ── G32: background removal — one tap proposes a transparent-background copy.
 // The result is an approval-gated draft (the same review step as every AI image):
 // Keep stores it as a NEW file beside the original; Discard throws it away. The
