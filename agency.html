@@ -150,9 +150,10 @@ async function loadKits(){
 // "Manage their website" secondary action.
 function openClient(siteId){
   const c = CLIENTS.find(x=>x.site_id===siteId); if(!c) return;
+  // Open the customer's unified CLIENT RECORD (Overview · Deal · Delivery · Details).
   const pid = PROJECT_BY_SITE[siteId];
-  if(pid){ location.href = '/projects.html?project=' + encodeURIComponent(pid); return; }
-  location.href = '/today.html?client=' + encodeURIComponent(siteId);
+  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&tab=delivery'; return; }
+  location.href = '/crm.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your agency workspace.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

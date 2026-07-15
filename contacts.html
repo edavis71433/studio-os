@@ -389,9 +389,9 @@ async function newDeal(cid){
   try{
     const d=await api('/sales/deals','POST',{title,contact_id:cid});
     if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
-    const dealId=d.body&&d.body.data&&d.body.data.id;const sc=scope();
+    const dealId=d.body&&d.body.data&&d.body.data.id;
     toast('Deal started.');
-    if(dealId)setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},700);
+    if(dealId)setTimeout(()=>{location.href='/crm.html?deal='+dealId+'&tab=deal';},700);
   }catch(_){toast('Couldn’t start that deal.');}
 }
 // ── CONTACT DETAIL: tap a contact → their deals, activity, last-spoke, fields ──
@@ -401,13 +401,10 @@ const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent
 function money(cents){cents=Number(cents)||0;if(!cents)return '';return '$'+(cents/100).toLocaleString('en-US',{minimumFractionDigits:0});}
 function relWhen(iso){if(!iso)return '';const then=Date.parse(iso);if(!isFinite(then))return '';const days=Math.floor((Date.now()-then)/86400000);if(days<=0)return 'today';if(days===1)return 'yesterday';if(days<7)return days+' days ago';if(days<14)return 'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
 async function loadFieldDefs(force){if(FIELD_DEFS.length&&!force)return FIELD_DEFS;try{const r=await api('/sales/contacts/fields');if(r.ok)FIELD_DEFS=(r.body&&r.body.data)||[];}catch(_){}return FIELD_DEFS;}
-async function openDetail(id){
-  const dlg=$('detailDlg'),body=$('detailBody');
-  body.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
-  if(!dlg.open)dlg.showModal();
-  const r=await api('/sales/contacts/'+id);
-  if(!r.ok){body.innerHTML='<h3 style="margin:0 0 10px">'+(r.status===404?'That contact is no longer here.':'We couldn’t open that contact.')+'</h3><div class="row2"><button class="btn" id="dt-close">Close</button></div>';const cl=$('dt-close');if(cl)cl.onclick=()=>dlg.close();return;}
-  CUR_DETAIL=(r.body&&r.body.data)||null;renderDetailView();
+// Opening a contact goes to their unified CLIENT RECORD (Details tab) — the whole
+// relationship in one place — rather than a here-only modal with no shareable URL.
+function openDetail(id){
+  location.href='/crm.html?contact='+encodeURIComponent(id)+'&tab=details';
 }
 function renderDetailView(){
   const d=CUR_DETAIL;if(!d)return;const c=d.contact||{};

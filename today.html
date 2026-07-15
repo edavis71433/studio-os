@@ -179,7 +179,7 @@ function render(moments, features, feed, ctx){
     const _sep = ' <span style="color:var(--soft)">·</span> ';
     const clearLinks = (hasWebsite
       ? [['/inbox.html','What needs you'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/snapshot-history.html','History'],['/schedule.html','What’s next'],['/analytics.html','Insights'],['/leads.html','Website enquiries']]
-      : [['/crm.html','Open Customers'],['/connections.html','Connections']]
+      : [['/customers.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
     html += `<div class="moment calm"><span class="tag">All clear</span>
       <h2>${hasWebsite ? 'Everything we watch looks good.' : 'Everything’s quiet across your business.'}</h2>

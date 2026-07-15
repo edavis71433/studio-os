@@ -93,7 +93,7 @@ function render(){
       ${l.message?`<div class="msg">${esc(l.message)}</div>`:''}
       <div class="acts">
         ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">Call</a>`:'')}
-        ${l.converted?`<a class="reply" href="/pipeline.html?deal=${esc(l.deal_id||'')}${(()=>{const c=new URLSearchParams(location.search).get('client');return c?'&client='+encodeURIComponent(c):'';})()}" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
+        ${l.converted?`<a class="reply" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
         ${l.status==='new'?`<button data-read="${esc(l.id)}">Mark read</button>`:''}
         ${l.converted?'':`<button data-arch="${esc(l.id)}">Archive</button>`}
       </div></div>`;
@@ -136,8 +136,7 @@ async function createDeal(id){
     // reflect converted state locally (idempotent: server returns the existing deal on a repeat)
     l.converted=true; l.deal_id=dealId; if(l.status==='new')l.status='read';
     toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.'); render();
-    const sc=new URLSearchParams(location.search).get('client')||'';
-    if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href='/pipeline.html?deal='+dealId+(sc?'&client='+sc:'');},800);
+    if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href='/crm.html?deal='+dealId+'&tab=deal';},800);
   }catch(_){toast('Couldn’t start that deal.');}
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

@@ -89,6 +89,7 @@ export function buildNav(c: NavContext): NavSection[] {
     customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html' });
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html' });
     customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });
+    customers.push({ key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' });
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }
 

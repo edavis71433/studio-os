@@ -66,11 +66,14 @@ let TOKEN="",CUSTOMERS=[];
 
 function openCustomer(c){
   if(!c)return;
-  // FIX 7: opening a customer goes to YOUR delivery view (message thread, Share a
-  // file, approvals, support) on the STUDIO's own site — not the customer's website.
-  if(c.project_id){location.href='/projects.html?project='+encodeURIComponent(c.project_id)+(scope()?'&client='+encodeURIComponent(scope()):'');}
-  else if(c.customer_site_id){location.href='/today.html?client='+encodeURIComponent(c.customer_site_id);}
+  // Opening a customer lands on their unified CLIENT RECORD (Overview · Deal ·
+  // Delivery · Details) — the whole relationship in one place. Address by their
+  // site when they have one (best scope), else by their client id.
+  if(c.customer_site_id){location.href='/crm.html?client='+encodeURIComponent(c.customer_site_id)+'&tab=delivery';}
+  else if(c.client_id){location.href='/crm.html?client_id='+encodeURIComponent(c.client_id);}
+  else if(c.project_id){location.href='/crm.html?project='+encodeURIComponent(c.project_id)+'&tab=delivery';}
 }
+// "Manage their website" stays the secondary action — the website cockpit, not the record.
 function manageSite(c){ if(c.customer_site_id) location.href='/today.html?client='+encodeURIComponent(c.customer_site_id); }
 
 function render(filter){

@@ -27,9 +27,9 @@ ok('FIX6: customers.html has a plain-language empty state', /haven’t added a c
 ok('FIX6: roster handler is tenant-scoped to the operator’s own site + active links', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active/.test(cd));
 
 // ═══ FIX 7 — opening a customer → the delivery view ═══
-ok('FIX7: customers.html "Open" routes to the delivery project (projects.html?project=)', /projects\.html\?project='\+encodeURIComponent\(c\.project_id\)/.test(customers));
+ok('FIX7: customers.html "Open" routes to the unified Client Record (crm.html)', /crm\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers) && /tab=delivery/.test(customers));
 ok('FIX7: customers.html keeps "Manage their website" as a secondary action', /Manage their website/.test(customers) && /today\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers));
-ok('FIX7: agency.html opens the delivery view when a project exists', /const pid = PROJECT_BY_SITE\[siteId\];[\s\S]*?projects\.html\?project=/.test(agency));
+ok('FIX7: agency.html opens the unified Client Record when a project exists', /const pid = PROJECT_BY_SITE\[siteId\];[\s\S]*?crm\.html\?project=/.test(agency));
 ok('FIX7: agency.html builds the site→project map from /studio/customers', /\/studio\/customers/.test(agency) && /PROJECT_BY_SITE\[c\.customer_site_id\]=c\.project_id/.test(agency));
 ok('FIX7: agency.html keeps "Manage their website" as a secondary action', /data-web=/.test(agency) && /Manage their website/.test(agency));
 
@@ -45,7 +45,7 @@ ok('FIXD: all detail sections still present (milestones/tasks/files/approvals/su
 ok('FIX5: the feed builds a client_messages section (studio side only)', /let client_messages/.test(ws) && /return json\(\{ data: \{ role, moments, notices, pending_approvals: pending, last_published: last, client_messages \}/.test(ws));
 ok('FIX5: OPEN support requests (incl. project-less) feed the section', /presence_support_requests\?site_id=eq\.\$\{site\.id\}&status=in\.\(open,in_progress\)/.test(ws));
 ok('FIX5: client project messages use the authoritative from=client signal', /\(e\.detail \|\| \{\}\)\.from === 'client'/.test(ws));
-ok('FIX5: section links to where the operator replies (the delivery view / the request)', /\/projects\.html\?project=\$\{/.test(ws) && /\/projects\.html\?support=\$\{r\.id\}/.test(ws));
+ok('FIX5: section links to where the operator replies (the Client Record / the request)', /\/crm\.html\?project=\$\{/.test(ws) && /\/projects\.html\?support=\$\{r\.id\}/.test(ws));
 ok('FIX5: the section is NOT gated on the per-reader last-seen (not auto-read on open)', !/last_seen|activity_reads/.test(ws.slice(ws.indexOf('let client_messages'))));
 ok('FIX5: inbox renders a prominent "Messages from your clients" section', /Messages from your clients/.test(inbox) && /feed\.client_messages/.test(inbox));
 ok('FIX5: inbox counts client messages toward "needs you" total', /\+clientMsgs\.length/.test(inbox));

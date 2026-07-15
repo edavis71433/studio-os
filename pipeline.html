@@ -8,6 +8,15 @@
 <meta name="description" content="Your sales pipeline — from first enquiry through onboarding.">
 <!-- P2-C: Studio App sales pipeline on the ONE shared shell + shared state helpers. -->
 <link rel="stylesheet" href="/shell.css">
+<script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('dds-embed');</script>
+<style>
+html.dds-embed .dds-nav,html.dds-embed .dds-search,html.dds-embed #dds-mbar,html.dds-embed .dds-drawer,html.dds-embed #dds-offline{display:none!important}
+html.dds-embed{--dds-shell-h:0px}
+html.dds-embed body{padding-top:0!important;background:transparent}
+html.dds-embed #listWrap{display:none!important}
+html.dds-embed .backbar{display:none!important}
+html.dds-embed #detailWrap{padding-top:0}
+</style>
 <style>
   :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e}}
@@ -190,6 +199,11 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// EMBED: this page is hosted inside the unified Client Record's Deal tab (?embed=1).
+// The shell chrome + list are hidden by CSS; internal "open the project" links are
+// forwarded to the parent record so they switch tabs instead of navigating the iframe.
+const EMBED=new URLSearchParams(location.search).get('embed')==='1';
+if(EMBED)document.addEventListener('click',(e)=>{const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const href=a.getAttribute('href')||'';if(/^\/projects\.html/.test(href)){e.preventDefault();try{window.parent.postMessage({type:'dds-open-delivery'},location.origin);}catch(_){}}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
 const money0=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{minimumFractionDigits:0});
@@ -902,7 +916,12 @@ async function openDeal(id){
         <div class="mut" style="margin-top:6px">Adding them creates their <strong>client portal</strong> and emails them a link to set their password and sign in — that’s where they work with you: files, approvals, messages, invoices. You bill them for your work the usual way — they never pay for software here. You can change this later.</div>
         <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, add them as my customer</button></div>`;
       $('convNo').onclick=()=>openDeal(id);
-      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
+      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));
+        // "Won stays put": when this panel is embedded in the unified Client Record,
+        // tell the record to reveal + switch to Delivery — the relationship never
+        // jumps to a separate destination at closed-won.
+        if(EMBED){try{window.parent.postMessage({type:'dds-deal-converted',project_id:x.project_id||'',site_id:x.site_id||'',client_id:x.client_id||''},location.origin);}catch(_){}}
+        openDeal(id);load();}catch(e){toast(nice(e),true);$('convYes').disabled=false;}};
     };
     const resend=$('resendInvite'); if(resend) resend.onclick=async()=>{resend.disabled=true;const was=resend.textContent;resend.textContent='Sending…';try{const r=await api('/sales/deals/'+id+'/resend-invite','POST',{});toast('Welcome email sent'+((r.data&&r.data.email)?' to '+r.data.email:'')+' ✓');openDeal(id);}catch(e){toast(nice(e),true);resend.disabled=false;resend.textContent=was;}};
     // a11y: an in-view action re-rendered the page and dropped focus — land it back

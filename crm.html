@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Customers — Studio OS</title>
+<title>Client — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="One calm view of a client relationship — health, activity, approvals, and notes.">
+<meta name="description" content="One client record — the whole relationship from first enquiry through delivery, in one place.">
 <style>
   :root{
     --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;
@@ -19,24 +19,35 @@
   :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
+  .wrap{max-width:940px;margin:0 auto;padding:26px 20px 90px}
+  a.back{display:inline-flex;align-items:center;gap:5px;color:var(--soft);text-decoration:none;font-size:13.5px;font-weight:600}
+  a.back:hover{color:var(--p)}
+  .rec-head{margin-top:14px}
+  .rec-head h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,33px);letter-spacing:-.01em;margin:0}
+  .rec-sub{color:var(--soft);font-size:14.5px;margin-top:5px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+  .rec-sub a{color:var(--p);text-decoration:none} .rec-sub a:hover{text-decoration:underline}
+  .statuschip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p)}
+  .statuschip.customer{background:var(--good-soft);color:var(--good)}
+  .tabs{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tabs button{border:none;background:transparent;font-family:inherit;font-size:14.5px;font-weight:600;color:var(--soft);padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap;transition:.15s}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button.on{color:var(--p);border-bottom-color:var(--p)}
+  #tabbody{margin-top:22px}
+  .embed-frame{width:100%;height:calc(100vh - 210px);min-height:540px;border:0;border-radius:14px;background:var(--card);box-shadow:var(--shadow)}
   .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .15em;letter-spacing:-.01em}
-  header .summary{color:var(--soft);font-size:15.5px;margin:0;max-width:60ch}
   .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px}
   .chip .d{width:7px;height:7px;border-radius:50%}
   .chip.healthy{background:var(--good-soft);color:var(--good)} .chip.healthy .d{background:var(--good)}
   .chip.attention{background:var(--warn-soft);color:var(--warn)} .chip.attention .d{background:var(--warn)}
   .chip.new,.chip.quiet{background:var(--p-soft);color:var(--p)} .chip.new .d,.chip.quiet .d{background:var(--p)}
-  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:22px}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
   .fact{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
   .fact .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
   .fact .v{font-family:var(--serif);font-size:20px;margin-top:3px}
   .fact .v small{font-family:var(--sans);font-size:12.5px;color:var(--soft);font-weight:400}
-  section{margin-top:32px}
+  section{margin-top:28px}
   h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 14px;display:flex;align-items:center;justify-content:space-between}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
-  .attention-card{border-left:3px solid var(--warn)}
   .note{display:flex;gap:12px;align-items:flex-start}
   .note .body{flex:1;font-size:14.5px;white-space:pre-wrap}
   .note .meta{font-size:12px;color:var(--faint);margin-top:5px}
@@ -52,6 +63,8 @@
   .ev .t{font-size:14.5px;font-weight:600}
   .ev .dt{font-size:13.5px;color:var(--soft);margin-top:1px}
   .ev .when{font-size:12px;color:var(--faint);margin-top:2px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:14.5px}
+  .kv .k{color:var(--faint);font-weight:600}
   textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;resize:vertical;min-height:70px}
   textarea:focus{outline:none;border-color:var(--p)}
   .noterow{display:flex;gap:9px;align-items:center;margin-top:10px;flex-wrap:wrap}
@@ -61,7 +74,6 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
   .seg button{border:none;border-radius:0;padding:8px 14px;font-size:13px}
   .seg button.on{background:var(--p-soft);color:var(--p)}
-  .links{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
   a.link{color:var(--p);text-decoration:none;font-weight:600;font-size:14px} a.link:hover{text-decoration:underline}
   .muted{color:var(--soft);font-size:14px}
   .center{text-align:center;padding:56px 20px}
@@ -78,18 +90,20 @@
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Customers — one calm view of how a customer is doing. It reflects real activity; it never sells or scores.</footer>
+  <footer>Studio OS · One client record — the whole relationship in one place. It reflects real activity; it never sells or scores.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<!-- PT-2C: one-time contextual tip -->
 <div class="dds-hint" data-hint="crm-notes" hidden>Notes here stay private to you unless you mark one “shared” — then the client sees it too.</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
-// The Client Relationship Center (Phase C). Aggregates existing signals via
-// /crm/* into one calm view + relationship notes. The server enforces audience
-// (studio sees internal; the client side sees shared only) — this page just
-// presents what it's given.
+// ── The unified Client Record ────────────────────────────────────────────────
+// ONE relationship, one page. /crm/record resolves whatever key the URL carries
+// (?client= / ?deal= / ?contact= / ?project=) into a canonical identity + which
+// tabs exist. Overview + Details render inline (relationship health, contact
+// facts); Deal + Delivery embed the existing, battle-tested pipeline/project
+// panels (same-origin iframes, ?embed=1) so nothing is duplicated. The server
+// enforces audience + tenant scope; this page just presents what it's given.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -97,109 +111,171 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
-sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const QP=()=>new URLSearchParams(location.search);
+const scopeParam=()=>QP().get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scopeParam()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
-
-let STUDIO=false, NEWAUD='internal';
 const ICON={publish:'✓',change:'✎',connected:'⇄',moment:'✦',approval:'⏳',note:'✐'};
 
-function render(profile,summary,notes,items,studio){
-  STUDIO=studio;
+let REC=null, TAB='', STUDIO=true, NEWAUD='internal';
+const TAB_LABEL={overview:'Overview',deal:'Deal',delivery:'Delivery',details:'Details'};
+const TAB_ORDER=['overview','deal','delivery','details'];
+
+// Build the query for /crm/record from whatever the URL carries.
+function recordQuery(){
+  const q=QP(); const parts=[];
+  for(const k of ['client','client_id','deal','contact','project']){const v=q.get(k); if(v)parts.push(k+'='+encodeURIComponent(v));}
+  return parts.length?('?'+parts.join('&')):'';
+}
+function idParams(){ // the identity keys to carry onto embed iframes / sub-links
+  const id=(REC&&REC.identity)||{}; return {client:id.customer_site_id||scopeParam()||'', deal:id.deal_id||'', project:id.project_id||'', contact:id.contact_id||''};
+}
+
+async function loadRecord(){
+  const rq=recordQuery();
+  if(!rq){ picker(); return; }
+  const r=await api('/crm/record'+rq);
+  if(r.status===403){ $('main').innerHTML=`<div class="center"><h2>This lives in your studio workspace.</h2><p class="muted">${esc((r.body&&r.body.message)||'Only your studio can open a client record.')}</p></div>`; return; }
+  if(!r.ok){ trouble(); return; }
+  REC=r.body.data||{};
+  // Canonical addressing: a converted customer is addressed by their SITE so the
+  // scope (x-dds-scope-site) is right for Overview + every embed. If we arrived by
+  // ?deal=/?contact= but the canonical key is the customer site and it isn't the
+  // current scope, reload once to the canonical URL (one hop, no loop).
+  const canon=REC.canonical||{};
+  if(canon.key==='client' && canon.value && QP().get('client')!==canon.value){
+    const t=QP().get('tab')||REC.default_tab||''; const suffix=t?('&tab='+encodeURIComponent(t)):'';
+    location.replace('/crm.html?client='+encodeURIComponent(canon.value)+suffix); return;
+  }
+  const want=QP().get('tab');
+  const avail=TAB_ORDER.filter(t=>REC.sections&&REC.sections[t]);
+  TAB=(want&&avail.includes(want))?want:(avail.includes(REC.default_tab)?REC.default_tab:(avail[0]||''));
+  renderShell(); showTab(TAB,true);
+}
+
+function renderShell(){
+  const hd=REC.header||{}; const nm=hd.name||'Client'; const isCust=hd.status==='customer';
+  const bits=[];
+  if(hd.company)bits.push(esc(hd.company));
+  if(hd.email)bits.push(`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`);
+  if(hd.phone)bits.push(`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`);
+  const avail=TAB_ORDER.filter(t=>REC.sections&&REC.sections[t]);
+  const tabsHtml=avail.map(t=>`<button data-tab="${t}"${t===TAB?' class="on"':''} role="tab" aria-selected="${t===TAB?'true':'false'}">${TAB_LABEL[t]}</button>`).join('');
+  $('main').innerHTML=`
+    <a class="back" href="/customers.html">← Customers</a>
+    <div class="rec-head">
+      <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
+      <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' · ')+'</span>':''}</div>
+    </div>
+    <div class="tabs" role="tablist">${tabsHtml}</div>
+    <div id="tabbody"><div class="spin" role="status" aria-label="Loading"></div></div>`;
+  document.querySelectorAll('.tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
+}
+
+function setTabUrl(tab){ const q=QP(); q.set('tab',tab); history.replaceState(null,'', '/crm.html?'+q.toString()); }
+
+function showTab(tab,initial){
+  TAB=tab;
+  document.querySelectorAll('.tabs [data-tab]').forEach(b=>{const on=b.getAttribute('data-tab')===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');});
+  if(!initial)setTabUrl(tab);
+  const host=$('tabbody'); if(!host)return; host.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  if(tab==='overview')return loadOverview(host);
+  if(tab==='details')return loadDetails(host);
+  // Deal + Delivery embeds run UNSCOPED on purpose: the deal/project rows live on
+  // the operator's own agency site, so the embedded page must resolve against that
+  // site (no ?client=, which would mis-scope it to the customer's own site where
+  // the deal doesn't exist). Only the Overview tab needs the customer-site scope.
+  const ids=idParams();
+  if(tab==='deal'){ const src='/pipeline.html?deal='+encodeURIComponent(ids.deal)+'&embed=1'; host.innerHTML=`<iframe class="embed-frame" title="Deal" src="${esc(src)}"></iframe>`; return; }
+  if(tab==='delivery'){ const src='/projects.html?project='+encodeURIComponent(ids.project)+'&embed=1'; host.innerHTML=`<iframe class="embed-frame" title="Delivery" src="${esc(src)}"></iframe>`; return; }
+}
+
+// ── Overview tab (the relationship view — reuses /crm/profile|timeline|notes) ──
+async function loadOverview(host){
+  const [p,tl,nt]=await Promise.all([api('/crm/profile'),api('/crm/timeline'),api('/crm/notes')]);
+  if(!p.ok){host.innerHTML='<p class="muted">Couldn’t load the overview just now.</p>';return;}
+  const d=p.body.data||{}; STUDIO=!!d.is_studio_view;
+  renderOverview(host, d.profile||{}, d.summary||'', (nt.ok&&nt.body.data.notes)||[], (tl.ok&&tl.body.data.items)||[]);
+}
+function renderOverview(host, profile, summary, notes, items){
   const h=profile.health;
   const facts=[
     ['Website', profile.live?'Live':(profile.last_published_at?'Offline':'Not yet'), profile.last_published_at?('published '+when(profile.last_published_at)):''],
-    ['Approvals', String(profile.pending_approvals), profile.pending_approvals?'waiting':'all clear'],
-    ['Connected', String(profile.connected), profile.connected_needing_attention?(profile.connected_needing_attention+' need a look'):'healthy'],
-    ['Moments', String(profile.active_moments), 'worth a look'],
-    ['Team', String(profile.members), 'with access'],
+    ['Approvals', String(profile.pending_approvals||0), profile.pending_approvals?'waiting':'all clear'],
+    ['Connected', String(profile.connected||0), profile.connected_needing_attention?(profile.connected_needing_attention+' need a look'):'healthy'],
+    ['Moments', String(profile.active_moments||0), 'worth a look'],
+    ['Team', String(profile.members||0), 'with access'],
   ];
-  let html=`<div class="rolebadge">● ${studio?'Studio view':'Your account'}</div>
-    <header><h1 id="pagehead" tabindex="-1">${esc(profile.business_name||'This business')}</h1>
-      <div style="margin:6px 0 10px"><span class="chip ${esc(h)}"><span class="d"></span>${h==='attention'?'Needs attention':h==='new'?'Getting set up':h==='quiet'?'Quiet':'Healthy'}</span></div>
-      <p class="summary">${esc(summary)}</p></header>`;
-
+  let html=`<div style="margin-bottom:6px"><span class="chip ${esc(h)}"><span class="d"></span>${h==='attention'?'Needs attention':h==='new'?'Getting set up':h==='quiet'?'Quiet':'Healthy'}</span></div>`;
+  if(summary)html+=`<p class="muted" style="margin:0 2px 14px;font-size:15px">${esc(summary)}</p>`;
   html+=`<div class="facts">`+facts.map(f=>`<div class="fact"><div class="k">${esc(f[0])}</div><div class="v">${esc(f[1])} <small>${esc(f[2])}</small></div></div>`).join('')+`</div>`;
-
-  // relationship notes
-  html+=`<section><h2>Notes</h2>`;
-  html+=`<div class="card"><textarea id="nb" aria-label="${studio?'A note about this client':'A note for your studio'}" placeholder="${studio?'A note about this client… (internal by default)':'Leave a note for your studio…'}"></textarea>
-    <div class="noterow">`;
-  if(studio){html+=`<span class="seg" role="group" aria-label="Who can see this note"><button data-aud="internal" class="on" aria-pressed="true">Internal</button><button data-aud="shared" aria-pressed="false">Shared with client</button></span>`;}
-  html+=`<button class="primary" id="addnote">Add note</button><span class="muted" id="notehint">${studio?'Internal notes stay with your studio.':'Your studio will see this.'}</span></div></div>`;
+  if(STUDIO && profile.pending_approvals>0){
+    html+=`<section><div class="card"><p class="muted" style="margin-bottom:12px">${profile.pending_approvals} ${profile.pending_approvals===1?'change is':'changes are'} waiting for approval. Send a plain email with a one-tap approve link.</p><button class="primary" id="notifyapprove">Email the client to approve</button></div></section>`;
+  }
+  html+=`<section><h2>Notes</h2><div class="card"><textarea id="nb" aria-label="${STUDIO?'A note about this client':'A note for your studio'}" placeholder="${STUDIO?'A note about this client… (internal by default)':'Leave a note for your studio…'}"></textarea><div class="noterow">`;
+  if(STUDIO)html+=`<span class="seg" role="group" aria-label="Who can see this note"><button data-aud="internal" class="on" aria-pressed="true">Internal</button><button data-aud="shared" aria-pressed="false">Shared with client</button></span>`;
+  html+=`<button class="primary" id="addnote">Add note</button><span class="muted" id="notehint">${STUDIO?'Internal notes stay with your studio.':'Your studio will see this.'}</span></div></div>`;
   if(!notes.length)html+=`<p class="muted" style="margin:2px 4px 0">No notes yet.</p>`;
   for(const n of notes){
     html+=`<div class="card note"><div class="body">${esc(n.body)}<div class="meta"><span class="aud ${esc(n.audience)}">${n.audience==='internal'?'Internal':'Shared'}</span> · ${esc(when(n.created_at))}</div></div>`;
-    if(studio)html+=`<div class="acts"><button data-pin="${esc(n.id)}">${n.pinned?'Unpin':'Pin'}</button><button data-del="${esc(n.id)}">Remove</button></div>`;
+    if(STUDIO)html+=`<div class="acts"><button data-pin="${esc(n.id)}">${n.pinned?'Unpin':'Pin'}</button><button data-del="${esc(n.id)}">Remove</button></div>`;
     html+=`</div>`;
   }
   html+=`</section>`;
-
-  // activity timeline
   html+=`<section><h2>Activity</h2>`;
   if(!items.length)html+=`<p class="muted">Nothing yet — activity will appear here as it happens.</p>`;
   else{html+=`<div class="tl">`;for(const e of items){html+=`<div class="ev ${esc(e.kind)}"><div class="t">${ICON[e.kind]||'•'} ${esc(e.title)}</div>${e.detail?`<div class="dt">${esc(e.detail)}</div>`:''}<div class="when">${esc(when(e.at))}</div></div>`;}html+=`</div>`;}
   html+=`</section>`;
-
-  // studio action: nudge the client to approve what's pending, in one tap (surfaces the existing one-tap loop)
-  if(studio && profile.pending_approvals>0){
-    html+=`<section><h2>Waiting on the client</h2><div class="card"><p class="muted" style="margin-bottom:12px">${profile.pending_approvals} ${profile.pending_approvals===1?'change is':'changes are'} waiting for approval. Send a plain email with a one-tap approve link.</p><button class="primary" id="notifyapprove">Email the client to approve</button></div></section>`;
-  }
-  // integrated doorways (no duplication — these open the existing surfaces).
-  // Carry the agency ?client= scope so drilling in never loses the client context.
-  const _q=(()=>{const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';})();
-  const _ctx=profile._ctx||{};
-  const _dealLink=(studio&&_ctx.deal_id)?`<a class="link" href="/pipeline.html?deal=${esc(_ctx.deal_id)}${_q?'&'+_q.slice(1):''}">Pipeline deal →</a>`:'';
-  const _projLink=(studio&&_ctx.project_id)?`<a class="link" href="/projects.html?project=${esc(_ctx.project_id)}${_q?'&'+_q.slice(1):''}">Their project →</a>`:'';
-  html+=`<section><h2>Open in context</h2><div class="links">
-    <a class="link" href="/today.html${_q}">Today →</a>
-    ${_dealLink}
-    ${_projLink}
-    <a class="link" href="/leads.html${_q}">Website enquiries →</a>
-    <a class="link" href="/connections.html${_q}">Connected services →</a>
-    <a class="link" href="/presence.html${_q}">Website & publishing →</a>
-    <a class="link" href="/sharing.html${_q}">Sharing & access →</a>
-    <a class="link" href="#" id="exportlink">Export everything →</a></div></section>`;
-
-  $('main').innerHTML=html;wire();
+  host.innerHTML=html; wireOverview();
 }
-function wire(){
+function wireOverview(){
   const add=$('addnote');if(add)add.addEventListener('click',addNote);
-  document.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');document.querySelectorAll('[data-aud]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',x===b?'true':'false');});const h=$('notehint');if(h)h.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
+  document.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');document.querySelectorAll('[data-aud]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',x===b?'true':'false');});const hh=$('notehint');if(hh)hh.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
   document.querySelectorAll('[data-pin]').forEach(b=>b.addEventListener('click',()=>pin(b.getAttribute('data-pin'),b.textContent==='Pin')));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>del(b.getAttribute('data-del'))));
-  const ex=$('exportlink');if(ex)ex.addEventListener('click',(e)=>{e.preventDefault();doExport();});
   const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'));});
 }
-// a11y: load() rebuilds #main, which drops keyboard focus to <body> — after an
-// action, put focus back on the recreated control (or the page heading if it's gone).
-function refocus(sel){const el=(sel&&document.querySelector(sel))||$('pagehead');if(el)el.focus();}
-async function addNote(){
-  const t=$('nb');const body=(t&&t.value||'').trim();if(!body){toast('Write a little something first.');return;}
-  const btn=$('addnote');btn.disabled=true;
-  const r=await api('/crm/notes','POST',{audience:STUDIO?NEWAUD:'shared',body});
-  btn.disabled=false;
-  if(r.ok){toast(r.body.data&&r.body.data.message||'Saved.');await load();refocus('#addnote');}else{toast(r.body.message||'That didn’t save.');}
-}
-async function pin(id,on){const r=await api('/crm/notes/'+id+'/pin','POST',{pinned:on});if(r.ok){await load();refocus('[data-pin="'+id+'"]');}else toast('Couldn’t update that note.');}
-async function del(id){const r=await api('/crm/notes/'+id,'DELETE');if(r.ok){toast('Removed.');await load();refocus();}else toast('Couldn’t remove that note.');}
-async function doExport(){toast('Preparing your export…');const r=await fetch(FN+'/export',{headers:H()});if(!r.ok){toast('Export isn’t available right now.');return;}const blob=await r.blob();const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='website-export.json';a.click();URL.revokeObjectURL(u);}
+async function addNote(){const t=$('nb');const body=(t&&t.value||'').trim();if(!body){toast('Write a little something first.');return;}const btn=$('addnote');btn.disabled=true;const r=await api('/crm/notes','POST',{audience:STUDIO?NEWAUD:'shared',body});btn.disabled=false;if(r.ok){toast(r.body.data&&r.body.data.message||'Saved.');loadOverview($('tabbody'));}else{toast(r.body.message||'That didn’t save.');}}
+async function pin(id,on){const r=await api('/crm/notes/'+id+'/pin','POST',{pinned:on});if(r.ok)loadOverview($('tabbody'));else toast('Couldn’t update that note.');}
+async function del(id){const r=await api('/crm/notes/'+id,'DELETE');if(r.ok){toast('Removed.');loadOverview($('tabbody'));}else toast('Couldn’t remove that note.');}
 
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open Customers.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
-
-async function load(){
-  const [p,tl,nt]=await Promise.all([api('/crm/profile'),api('/crm/timeline'),api('/crm/notes')]);
-  if(p.status===403||tl.status===403){const m=(p.body&&p.body.message)||(tl.body&&tl.body.message)||"";$('main').innerHTML=`<div class="center"><h2>${/plan|includ/i.test(m)?"Not part of your plan yet.":"This view lives in your studio workspace."}</h2><p class="muted">${esc(m)||"Your client view shows what your studio shares with you."}</p></div>`;return;}
-  if(!p.ok){trouble();return;}
-  const d=p.body.data||{};
-  render(Object.assign(d.profile||{},{_ctx:d.context||{}}),d.summary||'',(nt.ok&&nt.body.data.notes)||[],(tl.ok&&tl.body.data.items)||[],!!d.is_studio_view);
+// ── Details tab (contact facts + custom fields — inline from /sales/contacts/:id) ──
+async function loadDetails(host){
+  const cid=(REC.identity&&REC.identity.contact_id)||''; if(!cid){host.innerHTML='<p class="muted">No contact on file yet.</p>';return;}
+  const r=await api('/sales/contacts/'+cid);
+  if(!r.ok){host.innerHTML='<p class="muted">Couldn’t load contact details just now.</p>';return;}
+  const d=r.body.data||{}; const c=d.contact||{}; const cf=d.custom_fields||[]; const cv=c.custom||{};
+  const rows=[['Name',c.name],['Company',c.company],['Email',c.email],['Phone',c.phone]].filter(x=>x[1]);
+  let html=`<section><h2>Contact</h2><div class="card"><div class="kv">`+rows.map(x=>`<div class="k">${esc(x[0])}</div><div>${esc(x[1])}</div>`).join('')+`</div></div></section>`;
+  if(cf.length){
+    html+=`<section><h2>Details</h2><div class="card"><div class="kv">`+cf.map(f=>`<div class="k">${esc(f.label||f.key)}</div><div>${esc(cv[f.key]!=null&&cv[f.key]!==''?cv[f.key]:'—')}</div>`).join('')+`</div></div></section>`;
+  }
+  const deals=d.deals||[];
+  if(deals.length){
+    html+=`<section><h2>Deals</h2>`+deals.map(dl=>`<div class="card"><div style="font-weight:600">${esc(dl.title||'Deal')}</div><div class="muted">${esc(dl.stage||'')}${dl.last_contacted_at?' · last contacted '+esc(when(dl.last_contacted_at)):''}</div></div>`).join('')+`</section>`;
+  }
+  host.innerHTML=html;
 }
+
+function picker(){$('main').innerHTML=`<div class="center"><h2>Open a client to see their record.</h2><p class="muted" style="margin-bottom:18px">Pick a customer, contact, or deal — their whole relationship opens here.</p><p><a class="link" href="/customers.html">Go to Customers →</a></p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open a client record.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',loadRecord);}
+
+// "Won stays put" + embedded-link forwarding: the Deal/Delivery iframes post back
+// here (same-origin) to switch tabs — a convert reveals Delivery on the SAME record.
+window.addEventListener('message',(e)=>{
+  if(e.origin!==location.origin)return; const m=(e&&e.data)||{};
+  if(m.type==='dds-deal-converted'||m.type==='dds-open-delivery'){
+    const q=QP(); q.set('tab','delivery'); history.replaceState(null,'', '/crm.html?'+q.toString());
+    loadRecord();
+  }
+});
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
-    if(!TOKEN){signedOut();return;}await load();
+    if(!TOKEN){signedOut();return;}await loadRecord();
   }catch(_){trouble();}
 })();
 </script>
