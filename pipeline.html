@@ -382,6 +382,17 @@ async function renderSummary(){
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};
 }
 
+// First-class deal to-dos (#203) — multiple, each with a due date + done-state.
+// Degrades to a calm empty state if migration 0108 isn't applied yet.
+async function loadDealTasks(id){
+  const host=$('dealTasks'); if(!host)return;
+  let items=[];try{const r=await api('/sales/deals/'+id+'/tasks');items=(r&&r.data)||[];}catch(_){}
+  if(!items.length){host.innerHTML='<span class="mut">No to-dos yet.</span>';return;}
+  const today=new Date().toISOString().slice(0,10);
+  host.innerHTML=items.map(t=>{const done=t.status==='done';const overdue=!done&&t.due_date&&t.due_date<=today;return `<div class="row2" style="align-items:center;gap:8px"><input type="checkbox" data-tk="${t.id}"${done?' checked':''} aria-label="Mark done"><span style="flex:1;${done?'text-decoration:line-through;color:var(--soft,#888)':''}">${esc(t.title)}${t.due_date?` <span class="mut" style="${overdue?'color:var(--warn,#775d31);font-weight:600':''}">· ${overdue?'due ':''}${esc(t.due_date)}</span>`:''}</span><button class="btn ghost sm" data-tkdel="${t.id}" aria-label="Remove to-do">✕</button></div>`;}).join('');
+  host.querySelectorAll('[data-tk]').forEach(c=>c.onchange=async()=>{try{await api('/sales/deal-tasks/'+c.getAttribute('data-tk'),'PATCH',{status:c.checked?'done':'open'});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
+  host.querySelectorAll('[data-tkdel]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deal-tasks/'+b.getAttribute('data-tkdel'),'PATCH',{delete:true});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
+}
 // "Who owes you" — the receivables list behind the AR strip (open invoices across
 // all deals). Opens in the same full-screen detail panel; each row jumps to its deal.
 async function openReceivables(){
@@ -691,6 +702,8 @@ async function openDeal(id){
           <textarea id="ed-notes-${d.id}" data-dds-draft="1" rows="3" placeholder="Anything worth remembering about this deal…" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">${esc(d.notes||'')}</textarea>
           <div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ed-save">Save details</button></div>
         </div>
+        <div class="sec"><h3>To-dos</h3><div id="dealTasks" class="mut">Loading…</div>
+          <div class="row2" style="margin-top:8px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
         <div class="sec"><h3>Proposals</h3>${props}<div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3>${cons}<div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
@@ -725,6 +738,9 @@ async function openDeal(id){
     const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    // first-class deal to-dos (#203)
+    loadDealTasks(id);
+    const dta=$('dt-add'); if(dta) dta.onclick=async()=>{const t=($('dt-title').value||'').trim();if(!t){toast('Add a to-do first.');return;}dta.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:t,due_date:$('dt-due').value||undefined});$('dt-title').value='';$('dt-due').value='';loadDealTasks(id);}catch(e){toast(nice(e),true);}dta.disabled=false;};
     // Activity quick-log: pick a kind, jot what happened (optional except a note),
     // optionally date it, "Log it". A logged activity feeds the merged timeline +
     // "last contacted", so the drawer + card refresh after saving.

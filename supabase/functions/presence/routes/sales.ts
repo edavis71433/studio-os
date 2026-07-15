@@ -302,6 +302,38 @@ export async function handleSalesReceivables(_req: Request, site: SiteRow, _prin
   return json({ data: { items, total_cents: total, overdue_cents: overdue } }, 200, cors);
 }
 
+// ═══ DEAL TASKS — first-class to-dos on a deal (Salesforce Activities parity) ═══
+// Multiple to-dos, each with a due date + done-state, vs the old single "next step".
+// All reads/writes tolerate migration 0108 not being applied yet (degrade to empty).
+export async function handleDealTasksList(_req: Request, site: SiteRow, _principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  const r = await svc(`presence_deal_tasks?site_id=eq.${site.id}&deal_id=eq.${dealId}&deleted_at=is.null&select=id,title,due_date,status,completed_at,created_at&order=status.asc,due_date.asc.nullslast,created_at.asc&limit=200`);
+  if (!r.ok) return json({ data: [] }, 200, cors);   // table not migrated yet → empty, never breaks the deal
+  return json({ data: rows(r) }, 200, cors);
+}
+export async function handleDealTaskCreate(req: Request, site: SiteRow, _principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const title = clean(b.title, 200);
+  if (!title) return json({ error: 'validation', message: 'Give the to-do a title.' }, 422, cors);
+  const due = (typeof b.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.due_date)) ? b.due_date : null;
+  const ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, deal_id: dealId, title, due_date: due, status: 'open' }) });
+  if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'Deal to-dos need a database update (migration 0108) before they can be saved.' }, 502, cors);
+  return json({ data: rows(ins)[0] }, 201, cors);
+}
+export async function handleDealTaskUpdate(req: Request, site: SiteRow, _principal: Principal, taskId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(taskId)) return json({ error: 'bad_request' }, 400, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const patch: Record<string, unknown> = {};
+  if (b.delete === true) patch.deleted_at = nowIso();
+  else if (b.status === 'done') { patch.status = 'done'; patch.completed_at = nowIso(); }
+  else if (b.status === 'open') { patch.status = 'open'; patch.completed_at = null; }
+  else if (b.title !== undefined) { const t = clean(b.title, 200); if (!t) return json({ error: 'validation' }, 422, cors); patch.title = t; }
+  if (!Object.keys(patch).length) return json({ error: 'bad_request' }, 400, cors);
+  const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+  return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
+}
+
 // ═══ DEALS ═══
 export async function handleSalesDeals(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {

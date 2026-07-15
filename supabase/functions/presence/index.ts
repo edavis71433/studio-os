@@ -26,6 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
+import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
 import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
@@ -608,6 +609,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // feeds the deal's activity timeline + "last contacted". Site-scoped & authed.
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/activity$/);
     if (m && method === 'POST') return handleSalesDealActivity(req, site, principal, m[1], cors);
+    // First-class deal to-dos (Salesforce Activities parity)
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/tasks$/);
+    if (m && method === 'GET') return handleDealTasksList(req, site, principal, m[1], cors);
+    if (m && method === 'POST') return handleDealTaskCreate(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deal-tasks\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') return handleDealTaskUpdate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/proposals$/);
     if (m && method === 'POST') return handleSalesProposalCreate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/contracts$/);
