@@ -211,6 +211,21 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
     // against the operator's own site (the old crm.html landmine). Gate on the site.
     // messages = the ONE conversation with this client (project msgs + support), shown
     // whenever we can tie the record to a project or a customer.
+    // highlights — the pinned key facts (Salesforce highlights panel): deal value +
+    // stage + next step, and total owed. Cheap, best-effort; never blocks the record.
+    const highlights: Record<string, unknown> = {};
+    try {
+      if (dealId) {
+        const dv = one(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&select=stage,expected_value_cents,next_step&limit=1`));
+        if (dv) { if (dv.expected_value_cents) highlights.value_cents = Number(dv.expected_value_cents) || 0; if (dv.stage) highlights.stage = String(dv.stage); if (dv.next_step) highlights.next_step = String(dv.next_step); }
+      }
+      if (dealId || clientId) {
+        const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${clientId}`;
+        const owed = arr(await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=amount_cents&limit=100`)).reduce((a, i) => a + (Number(i.amount_cents) || 0), 0);
+        if (owed) highlights.owed_cents = owed;
+      }
+    } catch { /* highlights are additive — never block the record */ }
+
     const sections = { overview: !!customerSiteId, messages: !!(projectId || clientId), deal: !!dealId, delivery: !!projectId, details: !!contactId };
     const default_tab = projectId ? 'delivery' : (dealId ? 'deal' : (customerSiteId ? 'overview' : 'details'));
     // canonical addressing: the most-stable key that exists (customer site → deal → contact)
@@ -218,7 +233,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
 
     return json({ data: {
       identity: { contact_id: contactId || null, deal_id: dealId || null, client_id: clientId || null, customer_site_id: customerSiteId || null, project_id: projectId || null },
-      header, sections, default_tab, canonical,
+      header, highlights, sections, default_tab, canonical,
     } }, 200, cors);
   } catch (_e) {
     return json({ error: 'resolve_failed', message: 'We couldn’t open that client record just now.' }, 502, cors);
