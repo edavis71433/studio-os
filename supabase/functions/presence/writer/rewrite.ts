@@ -35,12 +35,12 @@ export interface RewriteRequest {
   field?: string;       // a plain field label, e.g. "heading", "button label" — bounds the length
 }
 
-export interface RewriteResult { ok: boolean; text: string; model: string; error?: string; ms: number }
+export interface RewriteResult { ok: boolean; text: string; model: string; error?: string; ms: number; options?: string[] }
 
 // A self-contained system prompt: the Fact Law and the voice rules, but a
 // single-object output (the shared WRITER_SYSTEM_BASE mandates an options array,
 // which is the wrong shape for a one-snippet rewrite).
-export const REWRITE_SYSTEM = `You are the studio's writer, improving one small piece of text for a small business's website.
+const REWRITE_SYSTEM_BASE = `You are the studio's writer, improving one small piece of text for a small business's website.
 
 THE FACT LAW (absolute):
 - You may state ONLY facts present in the fact sheet or already in the text you are given.
@@ -48,9 +48,18 @@ THE FACT LAW (absolute):
 - If a needed fact is unknown, leave it as a [bracketed placeholder]; never make one up.
 - Respect the never_claim list absolutely.
 
-VOICE: follow the voice profile and the vertical guardrails. Plain, warm, concrete merchant language. No marketing jargon, no exclamation marks, no clichés.
+VOICE: follow the voice profile and the vertical guardrails. Plain, warm, concrete merchant language. No marketing jargon, no exclamation marks, no clichés.`;
+
+export const REWRITE_SYSTEM = REWRITE_SYSTEM_BASE + `
 
 OUTPUT: respond with ONLY a JSON object of the shape {"text": string}. No prose, no options, no other keys. "text" is the finished words, ready to drop straight onto the page — no labels, no quotation marks around the whole thing, no markdown fences.`;
+
+// Express-parity (Wave-1 tone presets): the same rewrite, asked for N distinct
+// candidates in ONE model call. A separate output clause — never mixed with the
+// single-object one, so the model is never given contradictory shapes.
+const rewriteSystemMulti = (n: number) => REWRITE_SYSTEM_BASE + `
+
+OUTPUT: respond with ONLY a JSON object of the shape {"options": string[]} containing exactly ${n} genuinely different candidates. Each entry is the finished words, ready to drop straight onto the page — no labels, no numbering, no quotation marks around the whole thing, no markdown fences. No prose, no other keys.`;
 
 // Field-shape hints keep a heading from coming back as a paragraph, etc.
 const FIELD_HINTS: Record<string, string> = {
@@ -65,11 +74,14 @@ const FIELD_HINTS: Record<string, string> = {
   answer: 'This is the answer to a customer question — direct first, then any detail.',
 };
 
-/** Pure prompt builder — no I/O. Returns the model messages, or an error reason. */
+/** Pure prompt builder — no I/O. Returns the model messages, or an error reason.
+ *  `count` (1–3, default 1) asks for that many candidates in one call; 1 keeps
+ *  the original single-object shape exactly (old callers unchanged). */
 export function buildRewritePrompt(
   facts: FactSheet,
   pack: IndustryPack,
   req: RewriteRequest,
+  count = 1,
 ): { ok: true; system: string; user: string } | { ok: false; error: string } {
   const instruction = REWRITE_ACTIONS[req.action];
   if (!instruction) return { ok: false, error: 'bad_action' };
@@ -85,7 +97,8 @@ export function buildRewritePrompt(
   const fieldHint = FIELD_HINTS[fieldKey] || '';
   const toneLine = req.action === 'tone' && req.tone ? `TONE TO USE: ${String(req.tone).trim().slice(0, 40)}\n` : '';
 
-  const system = REWRITE_SYSTEM +
+  const n = Math.max(1, Math.min(3, Math.floor(count) || 1));
+  const system = (n > 1 ? rewriteSystemMulti(n) : REWRITE_SYSTEM) +
     `\n\nVERTICAL GUARDRAILS (${pack.slug}): ${pack.voiceGuardrails}\nVOCABULARY: ${pack.vocabularyHints}`;
   const user =
     `<<<FACTS\n${JSON.stringify(facts)}\nFACTS>>>\n` +
@@ -109,17 +122,39 @@ export function parseRewriteText(raw: string): string {
   return t.slice(0, 8000);
 }
 
-/** Orchestration: fact sheet (voice grounding) → pure prompt → model → text. */
-export async function rewriteSnippet(site: SiteRow, req: RewriteRequest, model: ModelFn): Promise<RewriteResult> {
+/** Pull up to `max` candidate strings out of the multi-option JSON. Tolerant of
+ *  fences/stray prose, and of a model answering the single {"text"} shape anyway
+ *  (that becomes one option). Deduped, trimmed, each bounded like the single path. */
+export function parseRewriteOptions(raw: string, max = 3): string[] {
+  const cleaned = String(raw || '').replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+  let obj: { options?: unknown; text?: unknown } | null = null;
+  try { obj = JSON.parse(cleaned); } catch { /* try embedded */ }
+  if (!obj) { const m = cleaned.match(/\{[\s\S]*\}/); if (m) { try { obj = JSON.parse(m[0]); } catch { /* no */ } } }
+  const bound = Math.max(1, Math.min(3, Math.floor(max) || 1));
+  const out: string[] = [];
+  const push = (v: unknown) => {
+    const t = typeof v === 'string' ? v.trim().slice(0, 8000) : '';
+    if (t && !out.includes(t)) out.push(t);
+  };
+  if (obj && Array.isArray(obj.options)) obj.options.forEach(push);
+  if (!out.length && obj && typeof obj.text === 'string') push(obj.text);
+  return out.slice(0, bound);
+}
+
+/** Orchestration: fact sheet (voice grounding) → pure prompt → model → text.
+ *  `count` > 1 asks for that many candidates in ONE call; `text` stays the first
+ *  candidate so every existing caller keeps working unchanged. */
+export async function rewriteSnippet(site: SiteRow, req: RewriteRequest, model: ModelFn, count = 1): Promise<RewriteResult> {
   const t0 = Date.now();
+  const n = Math.max(1, Math.min(3, Math.floor(count) || 1));
   const facts = await buildFactSheet(site);
   const pack = packFor(site.template_slug);
-  const built = buildRewritePrompt(facts, pack, req);
+  const built = buildRewritePrompt(facts, pack, req, n);
   if (!built.ok) return { ok: false, text: '', model: '', error: built.error, ms: Date.now() - t0 };
 
   const res = await model(built.system, built.user);
   if (!res.ok) return { ok: false, text: '', model: res.model, error: res.error || 'model_failed', ms: Date.now() - t0 };
-  const text = parseRewriteText(res.text);
-  if (!text) return { ok: false, text: '', model: res.model, error: 'unparseable_output', ms: Date.now() - t0 };
-  return { ok: true, text, model: res.model, ms: Date.now() - t0 };
+  const options = n > 1 ? parseRewriteOptions(res.text, n) : [parseRewriteText(res.text)].filter(Boolean);
+  if (!options.length) return { ok: false, text: '', model: res.model, error: 'unparseable_output', ms: Date.now() - t0 };
+  return { ok: true, text: options[0], options, model: res.model, ms: Date.now() - t0 };
 }

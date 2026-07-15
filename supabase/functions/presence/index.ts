@@ -37,7 +37,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetRemoveBackground } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin, handleDomain } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -51,7 +51,7 @@ import { handleBusinessInsights } from './routes/insights_page.ts';
 import { handleSnapshotHistory } from './routes/history_page.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
-import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
+import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } from './routes/dev.ts';
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmRecord, handleCrmMessages, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
@@ -526,6 +526,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // AI-proposed alt text + tags + caption (propose-then-approve; never auto-applied)
     const msg = route.match(/^\/assets\/([0-9a-f-]{36})\/suggest$/);
     if (msg && method === 'POST') return handleAssetSuggest(site, principal, msg[1], cors);
+    // G32: background removal — a proposed visual plan (decide via /visual/plans/:id/decide);
+    // approving stores a NEW file beside the original. Never destructive.
+    const mrb = route.match(/^\/assets\/([0-9a-f-]{36})\/remove-background$/);
+    if (mrb && method === 'POST') return handleAssetRemoveBackground(site, principal, mrb[1], cors);
     const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleAssetDetail(site, m[1], cors);
     if (m && method === 'PATCH') return handleAssetUpdate(req, site, principal, m[1], cors);
@@ -788,6 +792,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/dev/customization' && method === 'PUT') return handleDevCustomizationPut(req, jwt, site, principal, cors);
   if (route === '/dev/brand-kit' && method === 'GET') return handleBrandKitGet(jwt, site, principal, cors);      // FD-T9
   if (route === '/dev/brand-kit' && method === 'PUT') return handleBrandKitPut(req, jwt, site, principal, cors);  // FD-T9
+  if (route === '/dev/brand-kit/apply' && method === 'POST') return handleBrandKitApply(jwt, site, principal, cors);  // G30: one-tap apply-brand
 
   // ── Phase C: the Client Relationship Center (CRM) — aggregates existing
   //    signals into one calm per-client view + relationship notes. Audience is

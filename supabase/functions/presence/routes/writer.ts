@@ -60,8 +60,11 @@ export async function handleWriterGenerate(req: Request, site: SiteRow, cors: Re
 }
 
 // ── POST /writer/rewrite — the builder's "Write with AI" on every text block ──
-//   {text, action:'improve'|'shorten'|'lengthen'|'tone'|'write', tone?, prompt?, field?}
-//   → { data: { text } }
+//   {text, action:'improve'|'shorten'|'lengthen'|'tone'|'write', tone?, prompt?, field?, count?}
+//   → { data: { text, options? } }
+// `count` (1–3, Express-Rewrite parity) asks for that many candidates in ONE
+// metered call; the reply keeps `text` (the first candidate) so old clients are
+// untouched, and adds `options` when more than one came back.
 // Transforms ONE snippet and returns the words directly. Stores nothing,
 // publishes nothing, accepts nothing — the owner uses it into their draft and
 // publishes by hand. Same plan gate, same HARD cost ceiling, same voice
@@ -75,10 +78,11 @@ export async function handleWriterRewrite(req: Request, site: SiteRow, cors: Rec
 
   const model = meterModel(anthropicModel(), { siteId: site.id, clientId: site.client_id, agent: 'writer' });
   if (!model) return json({ error: 'writer_unavailable', message: 'Writing help isn’t switched on right now. Everything can still be written by hand — nothing about your site depends on it.' }, 503, cors);
-  let body: { action?: unknown; text?: unknown; tone?: unknown; prompt?: unknown; field?: unknown } = {};
+  let body: { action?: unknown; text?: unknown; tone?: unknown; prompt?: unknown; field?: unknown; count?: unknown } = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That request didn’t read right — nothing happened.' }, 400, cors); }
   const action = typeof body.action === 'string' && (body.action in REWRITE_ACTIONS) ? body.action as RewriteAction : null;
   if (!action) return json({ error: 'bad_action', message: 'Choose what you’d like to do first.' }, 400, cors);
+  const count = Math.max(1, Math.min(3, Number(body.count) || 1));   // bounded; 1 = the original shape
 
   const res = await rewriteSnippet(site, {
     action,
@@ -86,7 +90,7 @@ export async function handleWriterRewrite(req: Request, site: SiteRow, cors: Rec
     tone: typeof body.tone === 'string' ? body.tone.slice(0, 40) : undefined,
     prompt: typeof body.prompt === 'string' ? body.prompt.slice(0, 400) : undefined,
     field: typeof body.field === 'string' ? body.field.slice(0, 40) : undefined,
-  }, model);
+  }, model, count);
 
   if (!res.ok) {
     const msgs: Record<string, string> = {
@@ -97,7 +101,11 @@ export async function handleWriterRewrite(req: Request, site: SiteRow, cors: Rec
     const msg = msgs[res.error || ''] || 'The writing didn’t come through — nothing was changed. Try again in a moment.';
     return json({ error: 'rewrite_failed', message: msg }, res.error === 'nothing_to_rewrite' || res.error === 'no_prompt' || res.error === 'bad_action' ? 400 : 502, cors);
   }
-  return json({ data: { text: res.text } }, 200, cors);
+  // {text} stays exactly as before (old clients); {options} rides along when the
+  // caller asked for candidates (even if the model returned fewer than asked).
+  const payload: { text: string; options?: string[] } = { text: res.text };
+  if (count > 1 && Array.isArray(res.options)) payload.options = res.options;
+  return json({ data: payload }, 200, cors);
 }
 
 export async function handleWriterList(jwt: string, site: SiteRow, cors: Record<string, string>) {

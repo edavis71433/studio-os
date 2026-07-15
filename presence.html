@@ -4783,7 +4783,71 @@ async function mountBrandKitCard() {
     } catch (err) { toast(nice(err), true); }
   });
   card.appendChild(apply);
+  // ── G30: one-tap "Apply my brand" — re-applies the SAVED kit to everything
+  // (palette + type + corners through the one token layer), then reports which
+  // library images can honestly be re-made in the brand palette. Only shown once
+  // a kit is saved; the builder button above stays the first-run path.
+  if (kit) {
+    const row2 = el("div"); row2.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px";
+    const applySaved = el("button", null, "Apply my brand"); applySaved.type = "button";
+    applySaved.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;cursor:pointer";
+    applySaved.title = "One tap: re-apply your saved brand to the whole site — colours, type and corners";
+    row2.appendChild(applySaved);
+    row2.appendChild(el("span", "hint", "Re-applies your saved brand to the whole site in one tap."));
+    const report = el("div"); report.style.cssText = "margin-top:8px";
+    applySaved.addEventListener("click", async () => {
+      applySaved.disabled = true; const was = applySaved.textContent; applySaved.textContent = "Applying…";
+      try {
+        const r = await api("POST", "/dev/brand-kit/apply", {});
+        const d = (r && r.data) || {};
+        DESIGN_TOKENS = d.applied_tokens || DESIGN_TOKENS;
+        const c = $("designCard"); if (c) c.remove(); mountDesignCard();
+        toast("Brand applied — publish to take it live"); scheduleChangesRefresh(); refreshDesignPreview();
+        renderBrandImageryReport(report, d);
+      } catch (err) { toast(nice(err), true); }
+      applySaved.disabled = false; applySaved.textContent = was;
+    });
+    card.append(row2, report);
+  }
   host.appendChild(card);
+}
+// G30 imagery half, honestly scoped: AI-made images re-GENERATE in the brand
+// palette through the existing approval-gated /visual routes (options land in
+// AI Visual Studio to review and approve). Uploaded photos are never recolored —
+// repainting a real photo would misrepresent it — and the report says so.
+function renderBrandImageryReport(host, d) {
+  host.innerHTML = "";
+  const im = (d && d.imagery) || {}; const list = im.recolorable || [];
+  if (!list.length && !im.not_recolorable_count) return;
+  const box = el("div"); box.style.cssText = "margin-top:10px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:10px;padding:10px 12px";
+  box.appendChild(Object.assign(el("div", null, "Your images, on-brand"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
+  if (list.length) {
+    box.appendChild(el("div", "hint", "These AI-made images can be re-created in your brand palette — each comes back as options to review and approve in the Visual Studio."));
+    list.forEach((it) => {
+      const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:10px;padding:6px 0";
+      rowEl.appendChild(mediaThumb(it.media_id));
+      const lbl = el("span", null, (it.alt_text || it.brief || "AI-made image").slice(0, 70));
+      lbl.style.cssText = "flex:1;min-width:120px;font-size:12.5px";
+      const b = el("button", null, "Re-create in my palette"); b.type = "button";
+      b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid #5b3fa0;background:transparent;color:#3a2470;cursor:pointer";
+      b.addEventListener("click", async () => {
+        b.disabled = true; b.textContent = "Making options…";
+        try {
+          await api("POST", "/visual/generate", { kind: it.kind || "general", subject: it.brief || it.alt_text || "the same image, in my brand colours", palette: d.palette || [], count: 2 });
+          b.textContent = "Options ready ✓";
+          toast("Options ready — review and approve them in the Visual Studio");
+        } catch (err) { toast(nice(err), true); b.disabled = false; b.textContent = "Re-create in my palette"; }
+      });
+      rowEl.append(lbl, b); box.appendChild(rowEl);
+    });
+    const lk = el("a", null, "Open the Visual Studio to review →");
+    lk.href = "/visual-studio.html"; lk.style.cssText = "font-size:12.5px;color:var(--accent,#5b3fa0);font-weight:600;text-decoration:none";
+    box.appendChild(lk);
+  }
+  if (im.not_recolorable_count) {
+    box.appendChild(el("div", "hint", im.not_recolorable_count + " uploaded photo" + (im.not_recolorable_count === 1 ? "" : "s") + " stay exactly as they are — we never repaint a real photo."));
+  }
+  host.appendChild(box);
 }
 async function mountDesignCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
@@ -6144,6 +6208,11 @@ function renderBlocksCard() {
 // hard cost ceiling all live in the route. Same ✦ affordance as the rest of the
 // studio; propose-then-approve is the moat, kept intact.
 const AI_TONES = ["friendlier", "more professional", "warmer", "more confident", "calmer", "more playful"];
+// Express-Rewrite parity: preset tone chips (label → the AI_TONES direction sent
+// to the route) and up to 3 candidates per ask (count:3 — old servers that
+// answer a single {text} still work; the picker just shows one).
+const AI_TONE_PRESETS = [["Friendly", "friendlier"], ["Professional", "more professional"], ["Confident", "more confident"], ["Playful", "more playful"]];
+const AI_REWRITE_COUNT = 3;
 function aiField(inputEl, opts) {
   opts = opts || {};
   const label = opts.field || "";
@@ -6162,9 +6231,13 @@ function aiField(inputEl, opts) {
     inputEl.dispatchEvent(new Event("change", { bubbles: true }));   // reuse the field's own commit → BLOCKS_WORK
   };
   const go = (body) => {
-    panel.innerHTML = ""; panel.appendChild(Object.assign(el("div", "hint", "Writing… you’ll see a draft to approve."), { style: "margin:0" }));
-    api("POST", "/writer/rewrite", Object.assign({ field: label || undefined }, body))
-      .then((r) => result((r && r.data && r.data.text) || "", body))
+    panel.innerHTML = ""; panel.appendChild(Object.assign(el("div", "hint", "Writing… you’ll see drafts to pick from."), { style: "margin:0" }));
+    api("POST", "/writer/rewrite", Object.assign({ field: label || undefined, count: AI_REWRITE_COUNT }, body))
+      .then((r) => {
+        const d = (r && r.data) || {};
+        const opts2 = (Array.isArray(d.options) && d.options.length ? d.options : [d.text]).filter(Boolean);
+        result(opts2, body);
+      })
       .catch((err) => {
         panel.innerHTML = "";
         panel.appendChild(Object.assign(el("div", "hint", nice(err)), { style: "margin:0 0 8px" }));
@@ -6172,17 +6245,22 @@ function aiField(inputEl, opts) {
         panel.appendChild(back);
       });
   };
-  function result(text, body) {
+  // Express parity: up to 3 candidates, each with its own "Use" — still
+  // propose-then-approve; nothing changes until one is chosen.
+  function result(options, body) {
     panel.innerHTML = "";
-    panel.appendChild(Object.assign(el("div", "hint", "A draft — nothing changes until you use it:"), { style: "margin:0 0 6px" }));
-    const box = el("div"); box.style.cssText = "white-space:pre-wrap;font-size:13px;line-height:1.5;background:#fff;border:1px solid #e6ddf5;border-radius:8px;padding:8px 10px;max-height:220px;overflow:auto"; box.textContent = text;
-    panel.appendChild(box);
-    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-    const use = el("button", null, "Use it"); use.type = "button"; use.style.cssText = usePill;
-    use.addEventListener("click", () => { place(text); panel.hidden = true; panel.innerHTML = ""; toast("Placed in your draft — publish when it reads right"); });
+    const many = options.length > 1;
+    panel.appendChild(Object.assign(el("div", "hint", many ? "Pick the one that reads right — nothing changes until you use one:" : "A draft — nothing changes until you use it:"), { style: "margin:0 0 6px" }));
+    options.forEach((text, i) => {
+      const box = el("div"); box.style.cssText = "white-space:pre-wrap;font-size:13px;line-height:1.5;background:#fff;border:1px solid #e6ddf5;border-radius:8px;padding:8px 10px;max-height:180px;overflow:auto" + (i ? ";margin-top:8px" : ""); box.textContent = text;
+      const use = el("button", null, many ? "Use this one" : "Use it"); use.type = "button"; use.style.cssText = usePill + ";margin-top:6px";
+      use.addEventListener("click", () => { place(text); panel.hidden = true; panel.innerHTML = ""; toast("Placed in your draft — publish when it reads right"); });
+      panel.append(box, use);
+    });
+    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:10px";
     const again = el("button", null, "Try again"); again.type = "button"; again.style.cssText = miniPill; again.addEventListener("click", () => go(body));
     const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = miniPill; cancel.addEventListener("click", () => { panel.hidden = true; panel.innerHTML = ""; });
-    acts.append(use, again, cancel); panel.appendChild(acts);
+    acts.append(again, cancel); panel.appendChild(acts);
   }
   function menu() {
     panel.innerHTML = "";
@@ -6193,13 +6271,25 @@ function aiField(inputEl, opts) {
       [["Improve", "improve"], ["Shorten", "shorten"], ["Lengthen", "lengthen"]].forEach(([l, a]) => {
         const b = el("button", null, l); b.type = "button"; b.style.cssText = miniPill; b.addEventListener("click", () => go({ action: a, text: curText() })); row.appendChild(b);
       });
-      const toneSel = el("select"); toneSel.style.cssText = "font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px";
-      AI_TONES.forEach((t) => { const o = el("option", null, t); o.value = t; toneSel.appendChild(o); });
-      const toneBtn = el("button", null, "Change tone"); toneBtn.type = "button"; toneBtn.style.cssText = miniPill;
-      toneBtn.addEventListener("click", () => go({ action: "tone", text: curText(), tone: toneSel.value }));
-      const toneWrap = el("span"); toneWrap.style.cssText = "display:inline-flex;gap:6px;align-items:center"; toneWrap.append(toneBtn, toneSel);
-      row.appendChild(toneWrap);
       panel.appendChild(row);
+      // Tone preset chips (Express parity) — one tap asks for 3 candidates in that
+      // direction; the extra directions stay reachable in the "More tones" select.
+      const toneRow = el("div"); toneRow.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px";
+      toneRow.appendChild(Object.assign(el("span", "hint", "Tone:"), { style: "margin:0" }));
+      AI_TONE_PRESETS.forEach(([lbl, tone]) => {
+        const b = el("button", null, lbl); b.type = "button"; b.style.cssText = miniPill;
+        b.addEventListener("click", () => go({ action: "tone", text: curText(), tone })); toneRow.appendChild(b);
+      });
+      const presetVals = AI_TONE_PRESETS.map(([, v]) => v);
+      const rest = AI_TONES.filter((t) => !presetVals.includes(t));
+      if (rest.length) {
+        const toneSel = el("select"); toneSel.style.cssText = "font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px";
+        const ph = el("option", null, "More tones…"); ph.value = ""; toneSel.appendChild(ph);
+        rest.forEach((t) => { const o = el("option", null, t); o.value = t; toneSel.appendChild(o); });
+        toneSel.addEventListener("change", () => { if (toneSel.value) go({ action: "tone", text: curText(), tone: toneSel.value }); });
+        toneRow.appendChild(toneSel);
+      }
+      panel.appendChild(toneRow);
     } else if (opts.write !== false) {
       const pin = el("input"); pin.type = "text"; pin.placeholder = "e.g. a warm welcome line for the top of the page";
       pin.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box";

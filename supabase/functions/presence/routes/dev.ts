@@ -19,6 +19,8 @@ import { resolveSiteRole } from '../lib/workspace.ts';
 import { svc } from '../lib/db.ts';
 import { ALLOWED_TOKENS, buildCustomization, projectFiles, validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from '../lib/devmode.ts';
 import { sanitizeBrandKit, deriveBrandTokens } from '../lib/brand_kit.ts';
+import type { BrandKit } from '../lib/brand_kit.ts';
+import { writeChangeEvent } from '../lib/provenance.ts';
 
 /** Access rule (route logic — the role model is NOT modified): the operator, or
  *  a member with `use_developer_mode`. Pure + exported for tests. */
@@ -104,6 +106,15 @@ export async function handleBrandKitPut(req: Request, jwt: string, site: SiteRow
   });
   if (!s.ok) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
   // 2) derive tokens and merge into the ONE dev-token layer (owner tier: tokens only)
+  const applied = await applyKitTokens(site, kit, principal);
+  if (!applied) return json({ error: 'write_failed', message: 'The brand was saved but couldn’t be applied — please try again.' }, 502, cors);
+  return json({ data: { ok: true, brand_kit: kit, applied_tokens: applied, message: 'Brand kit saved and applied. Publish through your normal approval flow to take it live.' } }, 200, cors);
+}
+
+/** Derive the kit's tokens and merge them into the ONE dev-token layer (the same
+ *  write the PUT does — shared so "apply" can never drift from "save"). Returns
+ *  the applied theme tokens, or null on a write failure. */
+async function applyKitTokens(site: SiteRow, kit: BrandKit, principal: Principal): Promise<Record<string, string> | null> {
   const derived = deriveBrandTokens(kit);
   const existing = await svc(`presence_dev_customizations?site_id=eq.${site.id}&select=theme_tokens,custom_css,custom_html&limit=1`);
   const cur = (existing.ok && existing.json?.[0]) || {};
@@ -112,8 +123,64 @@ export async function handleBrandKitPut(req: Request, jwt: string, site: SiteRow
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: site.id, theme_tokens: clean.theme_tokens, custom_css: clean.custom_css, custom_html: clean.custom_html, updated_by: principal.userId || 'owner', updated_at: new Date().toISOString() }),
   });
-  if (!w.ok) return json({ error: 'write_failed', message: 'The brand was saved but couldn’t be applied — please try again.' }, 502, cors);
-  return json({ data: { ok: true, brand_kit: kit, applied_tokens: clean.theme_tokens, message: 'Brand kit saved and applied. Publish through your normal approval flow to take it live.' } }, 200, cors);
+  return w.ok ? clean.theme_tokens : null;
+}
+
+// ── G30: one-tap "Apply my brand" — re-derive the STORED kit onto everything ──
+// Express parity: applies the saved brand to existing content in one tap —
+// palette + type + corners through the SAME token layer (no re-entering the
+// kit), and reports which library images can honestly be re-made in the brand
+// palette. Only AI-generated images (stored visual plans) qualify: re-generating
+// them through /visual/generate with the brand palette is real; pixel-recoloring
+// an uploaded photograph would misrepresent it, so we never offer that.
+export async function handleBrandKitApply(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  if (!designAllowed(role, principal.kind)) return json({ error: 'forbidden', message: 'Design is available to the account owner or a developer.' }, 403, cors);
+  const r = await svc(`presence_settings?site_id=eq.${site.id}&select=brand_kit&limit=1`);
+  const kit = sanitizeBrandKit((r.ok && r.json?.[0]?.brand_kit) || null);
+  if (!kit) return json({ error: 'no_brand_kit', message: 'Set up your brand kit first — a brand colour is all it needs.' }, 409, cors);
+
+  const applied = await applyKitTokens(site, kit, principal);
+  if (!applied) return json({ error: 'write_failed', message: 'That didn’t apply — nothing was changed. Please try again.' }, 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: 'Applied the brand kit across the site', principal, provenance: 'human', fields: ['theme_tokens'] });
+
+  // Imagery, honestly scoped: AI-made library images (their stored plans carry the
+  // original brief) can be RE-GENERATED in the brand palette via the existing
+  // approval-gated /visual routes. Uploaded photos are listed as not recolorable.
+  const palette = [kit.primary, kit.secondary].filter(Boolean) as string[];
+  let recolorable: Array<{ media_id: string; kind: string; brief: string; alt_text: string }> = [];
+  let uploadedCount = 0;
+  try {
+    const [plansR, mediaR] = await Promise.all([
+      svc(`presence_visual_plans?site_id=eq.${site.id}&status=eq.stored&media_id=not.is.null&select=media_id,kind,brief&order=created_at.desc&limit=100`),
+      svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&mime=like.image*&select=id,alt_text&limit=1000`),
+    ]);
+    const plans = (plansR.ok && Array.isArray(plansR.json) ? plansR.json : []) as Array<{ media_id: string; kind: string; brief: string }>;
+    const media = (mediaR.ok && Array.isArray(mediaR.json) ? mediaR.json : []) as Array<{ id: string; alt_text?: string }>;
+    const alive = new Map(media.map((m) => [m.id, m]));
+    const seen = new Set<string>();
+    for (const p of plans) {
+      const m = alive.get(p.media_id);
+      if (!m || seen.has(p.media_id)) continue;
+      seen.add(p.media_id);
+      recolorable.push({ media_id: p.media_id, kind: p.kind, brief: String(p.brief || '').slice(0, 200), alt_text: String(m.alt_text || '').slice(0, 200) });
+    }
+    recolorable = recolorable.slice(0, 24);
+    uploadedCount = media.length - seen.size;
+  } catch { /* the imagery report is best-effort; the token apply above already succeeded */ }
+
+  return json({ data: {
+    ok: true,
+    brand_kit: kit,
+    applied_tokens: applied,
+    palette,
+    imagery: {
+      recolorable,
+      not_recolorable_count: Math.max(0, uploadedCount),
+      note: 'Only AI-made images can be re-created in your brand palette (each goes through the same review-and-approve step). Photos you uploaded are never recolored — repainting a real photo would misrepresent it.',
+    },
+    message: 'Brand applied — colours, type and corners follow your kit. Publish through your normal approval flow to take it live.',
+  } }, 200, cors);
 }
 
 export async function handleDevCustomizationPut(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

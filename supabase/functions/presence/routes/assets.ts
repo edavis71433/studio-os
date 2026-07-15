@@ -28,7 +28,11 @@ import type { Principal } from '../../_shared/auth.ts';
 import { editionFromPlan, editionFromSite } from '../commerce/editions.ts';
 import { anthropicVisionModel } from '../writer/vision.ts';
 import { suggestFromImage } from '../lib/media_suggest.ts';
-import { checkAiCeiling, ceilingDenial, recordUsage } from '../commerce/metering.ts';
+import { checkAiCeiling, ceilingDenial, recordUsage, recordImageUsage } from '../commerce/metering.ts';
+import { loadPlan, draftingDenial } from '../commerce/enforce.ts';
+import { imageEditModel, editSizeFor } from '../visual/model.ts';
+import type { VisualPlan } from '../visual/contract.ts';
+import { saveVisualPlan, attachVariations, getVisualPlan, withPreviews } from '../visual/store.ts';
 import {
   searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
@@ -324,6 +328,82 @@ export async function handleAssetSuggest(site: SiteRow, principal: Principal, id
   }
   // A PROPOSAL only — the owner accepts or edits before anything is saved.
   return json({ data: { proposal: res.suggestion, note: 'A suggestion — look it over, edit anything, and it only saves when you accept.' } }, 200, cors);
+}
+
+// ── G32: background removal quick action — instruction-guided edit of ONE photo ──
+// Uses the SAME metered image machinery as AI Visual Studio, and the SAME
+// approval-gated plan lifecycle: the result is a PROPOSED visual plan the owner
+// decides on (POST /visual/plans/:id/decide). Approving promotes it into the
+// library as a NEW file beside the original — the original is never touched.
+// Honest gate (no provider key → 503), HARD cost ceiling BEFORE the call,
+// metered after it, drafting-class plan gate like /visual/generate.
+const REMOVE_BG_PROMPT =
+  'Remove the background completely. Keep the subject exactly as it is — same colors, same details, same edges; add nothing and change nothing else. Place the subject on a fully transparent background.';
+const REMOVE_BG_MAX_BYTES = 12 * 1024 * 1024;   // originals are capped at 10MB on upload; defensive headroom
+
+async function fetchOriginalBytes(url: string): Promise<Uint8Array | null> {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return null;
+    const buf = new Uint8Array(await r.arrayBuffer());
+    return buf.byteLength > 0 && buf.byteLength <= REMOVE_BG_MAX_BYTES ? buf : null;
+  } catch { return null; }
+}
+
+export async function handleAssetRemoveBackground(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const asset = await loadAsset(site.id, id);
+  if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  if (!isImageMime(asset.mime || '')) {
+    return json({ error: 'not_an_image', message: 'Background removal is for photos — this file isn’t an image.' }, 400, cors);
+  }
+  // Honest gate: no provider key → the quick action is dark, never faked.
+  const edit = imageEditModel();
+  if (!edit) return json({ error: 'not_available', message: 'Background removal isn’t switched on for your studio yet. Your photo is untouched — everything else here works exactly as always.' }, 503, cors);
+  // Drafting-class gate (same boundary /visual/generate honors) + HARD cost
+  // ceiling — both enforced BEFORE the expensive provider call.
+  const denied = draftingDenial(await loadPlan(site.client_id), cors);
+  if (denied) return denied;
+  const ceil = await checkAiCeiling(site.client_id);
+  if (!ceil.allowed) { const d = ceilingDenial(cors); return json(d.body, d.status, d.cors); }
+
+  const dl = await signDownload(asset.storage_path);
+  const bytes = dl ? await fetchOriginalBytes(dl) : null;
+  if (!bytes) return json({ error: 'image_unreadable', message: 'We couldn’t open that photo just now — nothing was changed. Try again in a moment.' }, 502, cors);
+
+  const dims = editSizeFor(asset.width, asset.height);
+  const name = displayName(asset);
+  const plan: VisualPlan = {
+    kind: 'general',
+    title: `Background removed: ${name.slice(0, 60)}`,
+    summary: `We’ll prepare a copy of “${name}” with the background removed (transparent). Nothing is saved to your library until you approve it — the original stays exactly as it is either way.`,
+    risk: 'Low. This is a draft — it doesn’t touch the original photo, your library, or your website until you approve it.',
+    reversible: true,
+    rollback: 'Discard the draft, or remove the stored copy from your library any time. The original photo is never changed.',
+    requires_approval: true,
+    brief: `Remove the background from “${name}”`,
+    prompt: REMOVE_BG_PROMPT,
+    brand_snapshot: { palette: [], personality: '', vocabulary: [], avoid: [], industry: '' },
+    width: dims.width,
+    height: dims.height,
+    variations: [],
+    provenance: 'ai',
+  };
+  const row = await saveVisualPlan(site.id, plan);
+  if (!row) return json({ error: 'save_failed', message: 'We couldn’t start that — nothing was made. Please try again.' }, 502, cors);
+
+  const run = await edit({ image: bytes, mime: asset.mime || 'image/png', prompt: REMOVE_BG_PROMPT, size: dims.size, count: 1, transparent: true });
+  if (!run.ok || !run.images.length) {
+    await svc(`presence_visual_plans?id=eq.${row.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed' }) });
+    return json({ error: 'edit_failed', message: 'That didn’t come through — your photo is untouched. Please try again in a moment.' }, 502, cors);
+  }
+  await attachVariations(site.id, row.id, run.images, run.model, dims.width, dims.height);
+  recordImageUsage({ siteId: site.id, clientId: site.client_id, agent: 'visual' }, run.model, run.images.length).catch(() => {});   // meter cost
+  void principal;   // site scope + RLS enforce ownership; the router already authed
+  return json({ data: {
+    plan: await withPreviews(await getVisualPlan(site.id, row.id)),
+    source_asset_id: id,
+    note: 'A draft — approve it to save a new file beside the original, or discard it. The original photo is never changed.',
+  } }, 200, cors);
 }
 
 export async function handleAssetDownload(site: SiteRow, id: string, cors: Record<string, string>) {

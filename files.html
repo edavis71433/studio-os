@@ -478,9 +478,11 @@ function renderDetail(){
     <div class="field"><label for="f-tags">Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
     <div class="where"><div class="hl">Where it’s used</div><ul>${usage}</ul><div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div></div>
     ${a.kind==='image'?`<div class="social" id="social-slot"><div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Preparing crops…</div></div>`:''}
+    <div id="rbg-slot"></div>
     ${ver}
     ${ed?`<div class="acts">
       <button class="btn" onclick="saveDetail()">Save details</button>
+      ${a.kind==='image'?`<button class="btn" onclick="removeBg('${a.id}',this)">Remove background</button>`:''}
       <button class="btn" onclick="$('replacer').click()">Replace…</button>
       <button class="btn" onclick="duplicate('${a.id}')">Duplicate</button>
       <button class="btn" onclick="download('${a.id}')">Download</button>
@@ -508,6 +510,46 @@ async function loadSocial(id){
   const ogBtn=ed?`<button class="btn ogbtn" onclick="setShareImage('${id}',${isOg?'true':'false'})">${isOg?'✓ This is your share image':'Use as share image'}</button>`:'';
   slot.innerHTML=`<div class="hl">Social sizes</div><div class="row">${cells}</div>
     <div style="font-size:11.5px;color:var(--faint);margin-top:6px">Cropped from your focus point. Set the focus in the Website editor.</div>${ogBtn}`;
+}
+// ── G32: background removal — one tap proposes a transparent-background copy.
+// The result is an approval-gated draft (the same review step as every AI image):
+// Keep stores it as a NEW file beside the original; Discard throws it away. The
+// original photo is never touched either way.
+async function removeBg(id,btn){
+  if(btn){btn.disabled=true;btn.textContent='Removing background…';}
+  const r=await api('POST','/assets/'+id+'/remove-background');
+  if(btn){btn.disabled=false;btn.textContent='Remove background';}
+  if(!S.current||S.current.asset.id!==id)return;   // panel changed while working
+  if(!r.ok){
+    toast((r.body&&r.body.message)||(r.status===503?'Background removal isn’t switched on yet':'That didn’t come through — your photo is untouched'));
+    return;
+  }
+  const plan=(r.body.data&&r.body.data.plan)||{};
+  const vars=plan.variations||[];const v=vars[vars.length-1];
+  const slot=$('rbg-slot');
+  if(!v||!slot){toast('That didn’t come through — your photo is untouched');return;}
+  slot.innerHTML=`<div class="where" style="margin:14px 0">
+    <div class="hl">Background removed — a draft to review</div>
+    <div style="border-radius:10px;overflow:hidden;background:repeating-conic-gradient(var(--line) 0% 25%,var(--card) 0% 50%) 0 0/18px 18px;margin:8px 0">
+      ${v.preview_url?`<img src="${esc(v.preview_url)}" alt="Preview with the background removed" style="width:100%;display:block">`:'<div style="padding:20px;font-size:13px;color:var(--faint)">Preview unavailable — you can still keep or discard it.</div>'}
+    </div>
+    <div style="font-size:12.5px;color:var(--faint);margin-bottom:8px">Keeping it saves a new file beside the original — the original photo is never changed.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" onclick="rbgDecide('${esc(plan.id)}','${esc(v.id)}','approve')">Keep it</button>
+      <button class="btn" onclick="rbgDecide('${esc(plan.id)}','${esc(v.id)}','abandon')">Discard</button>
+    </div></div>`;
+  slot.scrollIntoView({block:'nearest'});
+}
+async function rbgDecide(planId,variationId,decision){
+  const a=S.current&&S.current.asset;
+  const body=decision==='approve'
+    ?{decision,variation_id:variationId,alt_text:(((a&&(a.alt_text||a.name))||'Photo').slice(0,180))+' (background removed)'}
+    :{decision};
+  const r=await api('POST','/visual/plans/'+planId+'/decide',body);
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through — nothing changed');return;}
+  const slot=$('rbg-slot');if(slot)slot.innerHTML='';
+  if(decision==='approve'){toast('Saved as a new file beside the original');closeDetail();load();}
+  else toast('Discarded — nothing was saved');
 }
 async function setShareImage(id,isOg){
   if(isOg){toast('Already your share image');return;}
