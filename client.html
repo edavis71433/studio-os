@@ -502,10 +502,11 @@ async function renderHelp(){
   }
   if(canMessage)html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
   const email=(USER&&USER.email)?USER.email:'';
-  html+=`<section id="sec-you"><h2>Your account</h2><div class="card">${email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>'}<div class="row"><button id="appearance">${esc(themeLabel())}</button><button id="signout2">Sign out</button></div></div></section>`;
+  html+=`<section id="sec-you"><h2>Your account</h2><div class="card">${email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>'}<div class="row"><button id="appearance">${esc(themeLabel())}</button>${email?`<button id="chgpw">Change password</button>`:''}<button id="signout2">Sign out</button></div><p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p></div></section>`;
   $('main').innerHTML=html;
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',()=>openSupport(null));
   const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
+  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
   const search=$('faqSearch');
   if(search)search.addEventListener('input',()=>{
