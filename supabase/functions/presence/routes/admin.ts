@@ -10,6 +10,8 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { estimateUsageCostUsd } from '../commerce/pricing.ts';
+import { findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, sendEmail } from '../commerce/account.ts';
+import { provisionForSignup } from '../commerce/provision.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
@@ -464,6 +466,104 @@ async function handleAiUsage(req: Request, cors: Record<string, string>) {
   } }, 200, cors);
 }
 
+// ═══ M13: AGENCY PROVISIONING — POST /admin/agencies ═════════════════════════
+// Idempotent end to end (mirrors sql/connect-studio-workspace.sql): the agency
+// is found by lower(name) — there is NO unique(name) constraint, so a paused
+// row is reactivated and never duplicated. The owner reuses the ONE account +
+// provisioning path (commerce/account + provisionForSignup) with hosting
+// skipped — the agency's own workspace is 'presence' edition with no hosting
+// attached (connect later). Rolls back only what THIS call created on failure.
+async function handleAgencyProvision(req: Request, cors: Record<string, string>) {
+  const b = await readBody(req);
+  const name = String(b?.name || '').trim().slice(0, 160);
+  const ownerEmail = String(b?.owner_email || '').toLowerCase().trim();
+  if (!name || !ownerEmail.includes('@')) return json({ error: 'bad_request', message: 'A name and an owner email are needed.' }, 400, cors);
+
+  // 1) agency by lower(name) — reactivate, never duplicate. UNQUOTED ilike with
+  //    only the LIKE metachars escaped = case-insensitive equality: PostgREST
+  //    parses simple vertical-filter values verbatim (quote-stripping exists only
+  //    inside in.() lists and or=/and= trees), so a quoted pattern would send
+  //    literal quote characters into the LIKE and never match anything.
+  const pat = encodeURIComponent(name.replace(/([\\%_])/g, '\\$1'));
+  const AG_COLS = 'id,name,status,seat_limit,client_limit,plan';
+  let agency = (await svc(`presence_agencies?name=ilike.${pat}&select=${AG_COLS}&limit=1`)).json?.[0];
+  let createdAgency = false, reactivatedFrom: string | null = null;
+  if (agency && agency.status !== 'active') {
+    reactivatedFrom = String(agency.status);
+    await svc(`presence_agencies?id=eq.${agency.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'active' }) });
+    agency.status = 'active';
+  }
+  if (!agency) {
+    const ins = await svc(`presence_agencies?select=${AG_COLS}`, {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ name, seat_limit: Number(b?.seat_limit) || 5, client_limit: Number(b?.client_limit) || 25, plan: String(b?.plan || 'agency').slice(0, 40) }),
+    });
+    if (!ins.ok || !ins.json?.[0]) return json({ error: 'write_failed', message: 'The agency didn’t save.' }, 502, cors);
+    agency = ins.json[0]; createdAgency = true;
+  }
+  const rollbackAgency = async () => {
+    if (createdAgency) await svc(`presence_agencies?id=eq.${agency.id}`, { method: 'DELETE' }).catch(() => {});
+    else if (reactivatedFrom) await svc(`presence_agencies?id=eq.${agency.id}`, { method: 'PATCH', body: JSON.stringify({ status: reactivatedFrom }) }).catch(() => {});
+  };
+
+  // 2) the owner's login + client record — reuse by email, never duplicate
+  //    (the provisionCustomerAccount pattern; rollback tracks only what WE made)
+  let clientId: string | null = null, createdAuthId: string | null = null, createdClient = false, alreadyExisted = false;
+  const existing = await findClientByEmail(ownerEmail);
+  if (existing) { clientId = existing.id; alreadyExisted = true; }
+  else {
+    const auth = await createAuthUser(ownerEmail, crypto.randomUUID() + 'Aa1!');
+    if ('id' in auth) {
+      createdAuthId = auth.id;
+      const chain = await createContactAndClient(auth.id, ownerEmail, name);
+      if ('error' in chain) { await deleteAuthUser(auth.id); await rollbackAgency(); return json({ error: 'client_failed', message: 'We couldn’t create the owner’s account — please try again.' }, 502, cors); }
+      clientId = chain.clientId; createdClient = true;
+    } else if (auth.error === 'account_exists') {   // they already sign in; link a client by email if missing
+      alreadyExisted = true;
+      clientId = (await findClientByEmail(ownerEmail))?.id || null;
+      if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, email: ownerEmail, contact_email: ownerEmail, status: 'active' }) }); clientId = ci.json?.[0]?.id || null; if (clientId) createdClient = true; }
+    } else { await rollbackAgency(); return json({ error: 'auth_failed', message: 'We couldn’t set up the owner’s login — please try again.' }, 502, cors); }
+  }
+  if (!clientId) { await rollbackAgency(); return json({ error: 'client_failed', message: 'We couldn’t create the owner’s account — please try again.' }, 502, cors); }
+  const rollbackOwner = async () => { if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) { await svc(`contacts?auth_user_id=eq.${createdAuthId}`, { method: 'DELETE' }).catch(() => {}); await deleteAuthUser(createdAuthId); } } };
+
+  // 2b) an EXISTING customer's entitlement must never be clobbered into 'agency'
+  //     (provisionForSignup upserts plan+status on conflict — that would overwrite
+  //     a paying customer's plan or freely reactivate a lapsed one). Same-plan
+  //     re-runs are the idempotent case and pass through.
+  if (alreadyExisted) {
+    const ent = (await svc(`presence_entitlements?client_id=eq.${clientId}&product=eq.presence&select=plan,status&limit=1`)).json?.[0];
+    if (ent && ent.plan !== 'agency') {
+      await rollbackAgency();
+      return json({ error: 'owner_is_customer', message: 'That email belongs to an existing customer account — provisioning an agency on it would overwrite their subscription. Use a different owner email.' }, 409, cors);
+    }
+  }
+
+  // 3) the agency's own workspace — the ONE idempotent provisioning path
+  const prov = await provisionForSignup({ clientId, businessName: name, plan: 'agency', patch: { status: 'active' } as any, actorEmail: ownerEmail, skipHosting: true });
+  if (!prov.ok) { await rollbackOwner(); await rollbackAgency(); return json({ error: 'provision_incomplete', message: 'We created the agency but hit a snag provisioning its workspace.' }, 502, cors); }
+
+  // 4) the owner seat (unique agency_id+email → clean upsert)
+  const seat = await svc('presence_agency_members?on_conflict=agency_id,email', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ agency_id: agency.id, email: ownerEmail, role: 'owner', status: 'active' }),
+  });
+  if (!seat.ok) { await rollbackOwner(); await rollbackAgency(); return json({ error: 'write_failed', message: 'The owner seat didn’t save.' }, 502, cors); }
+
+  // 5) the set-password invite (best-effort; the seat row is the truth)
+  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const link = await generateSetPasswordLink(ownerEmail, `${base}/set-password.html?next=/agency.html`);
+  const cta = link
+    ? `<a href="${link}">Create your password &amp; sign in →</a> — you’ll land in your agency workspace.`
+    : `<a href="${base}/studio.html">Sign in at the studio door →</a> — use “Forgot your password?” to set one any time.`;
+  const nameHtml = name.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const invited = await sendEmail(ownerEmail, `Your agency workspace is ready — ${name}`,
+    `<p>Welcome! <strong>${nameHtml}</strong> is set up on Studio OS.</p><p>${cta}</p>`,
+    undefined, { critical: true }).catch(() => false);   // login access = transactional
+
+  return json({ data: { id: agency.id, agency_id: agency.id, client_id: clientId, site_id: prov.siteId, invited: !!invited, already_existed: alreadyExisted } }, 200, cors);
+}
+
 // ═══ ROUTER ═══════════════════════════════════════════════════════════════════
 /** Dispatch /admin/* routes. Returns null when no admin route matches.
  *  Caller (index.ts) has already proven principal.kind === 'staff'. */
@@ -499,22 +599,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   }
 
   // ── M13: agency provisioning (operator creates the agency + its owner seat) ──
-  if (route === '/admin/agencies' && method === 'POST') {
-    const b = await readBody(req);
-    const name = String(b?.name || '').trim().slice(0, 160);
-    const ownerEmail = String(b?.owner_email || '').toLowerCase().trim();
-    if (!name || !ownerEmail.includes('@')) return json({ error: 'bad_request', message: 'A name and an owner email are needed.' }, 400, cors);
-    const a = await svc('presence_agencies?select=id,name,seat_limit,client_limit,plan', {
-      method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ name, seat_limit: Number(b?.seat_limit) || 5, client_limit: Number(b?.client_limit) || 25, plan: String(b?.plan || 'agency').slice(0, 40) }),
-    });
-    if (!a.ok || !a.json?.[0]) return json({ error: 'write_failed', message: 'The agency didn’t save.' }, 502, cors);
-    await svc('presence_agency_members', {
-      method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ agency_id: a.json[0].id, email: ownerEmail, role: 'owner', status: 'active' }),
-    });
-    return json({ data: a.json[0] }, 200, cors);
-  }
+  if (route === '/admin/agencies' && method === 'POST') return handleAgencyProvision(req, cors);
   if (route === '/admin/agencies' && method === 'GET') {
     const r = await svc('presence_agencies?select=id,name,plan,status,seat_limit,client_limit,created_at&order=created_at.desc&limit=100');
     return json({ data: r.json ?? [] }, 200, cors);

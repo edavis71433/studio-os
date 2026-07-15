@@ -58,10 +58,11 @@ export async function provisionForSignup(opts: {
   plan: PlanKey;
   patch: EntitlementPatch;
   actorEmail?: string | null;
+  skipHosting?: boolean;   // an agency's own workspace: full edition, no hosting attach (connect later)
 }): Promise<ProvisionResult> {
   const { clientId, plan, patch } = opts;
   const edition = editionFor(plan);
-  const needsHosting = edition === 'presence';
+  const needsHosting = edition === 'presence' && !opts.skipHosting;
 
   // 1) entitlement (plan + billing) — the gate the whole platform reads
   if (!(await upsertEntitlement(clientId, plan, patch))) {

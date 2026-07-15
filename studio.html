@@ -140,6 +140,16 @@ async function route(token){
     if (r.status !== 404) networkTrouble = true;  // 404 no_site → check team; anything else was a hiccup
   } catch (e) { networkTrouble = true; }
   if (networkTrouble) { panel("We couldn't reach your workspace just now — it's probably the connection, not you. Try again in a moment."); return; }
+  // 1.5) an agency member whose account owns no workspace → the agency door
+  try {
+    var a = await withTimeout(fetch(FN + "/presence/agency/me", {
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token }
+    }), 9000);
+    if (a.status === 200) {
+      var aj = await a.json().catch(function(){ return {}; });
+      if (aj && aj.data) { location.href = '/agency.html'; return; }
+    }
+  } catch (e) {} // 401/403/timeout → not an agency member; keep the existing fallbacks
   // 2) team member without a connected workspace → honest panel
   try {
     var w = await withTimeout(fetch(FN + "/clever-api", {

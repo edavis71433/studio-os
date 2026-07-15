@@ -9,6 +9,7 @@ import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
 import { isSiteRole } from './site_roles.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
+import type { EmailBrand } from './email_brand.ts';
 
 async function callerOf(jwt: string): Promise<{ id?: string; email?: string } | null> {
   // shared memoized resolver — the auth boundary already validated this JWT
@@ -59,10 +60,12 @@ export async function listSiteMembers(siteId: string): Promise<Array<{ id: strin
 
 // CP-9: the invite email — a one-tap magic link instead of a hand-typed code.
 // Best-effort: the membership row is the truth; the email never blocks it.
-/** Sends the invite/sign-in email. Returns true only if an email was actually
- *  sent — so the caller can honestly tell the owner whether the client was
+/** The ONE membership-invite sender (site + agency seats): a signed one-tap
+ *  link — invite for a new user, magic link for an existing one — on the
+ *  caller's brand, landing on `next`. Returns true only if an email was
+ *  actually sent — so the caller can honestly say whether the person was
  *  notified (rather than silently swallowing a failed send). */
-async function sendInviteLink(email: string, siteId: string): Promise<boolean> {
+export async function sendInviteLink(email: string, opts: { subject: string; intro: string; brand: EmailBrand; next: string }): Promise<boolean> {
   const base = Deno.env.get('SUPABASE_URL') || '';
   const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   if (!base || !key) return false;
@@ -70,7 +73,7 @@ async function sendInviteLink(email: string, siteId: string): Promise<boolean> {
   const gen = async (type: string) => {
     const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
       method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, email, options: { redirect_to: `${site}/portal.html` } }),
+      body: JSON.stringify({ type, email, options: { redirect_to: `${site}${opts.next}` } }),
     });
     const j = await r.json().catch(() => null);
     return (r.ok && j && (j.action_link || j.properties?.action_link)) || '';
@@ -79,13 +82,18 @@ async function sendInviteLink(email: string, siteId: string): Promise<boolean> {
   if (!link) link = await gen('magiclink');  // existing user → magic link
   if (!link) return false;
   const { sendEmail } = await import('../commerce/account.ts');
+  const sent = await sendEmail(email, opts.subject,
+    `<p>${opts.intro}</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
+  return sent !== false;
+}
+
+/** The site-membership flavor: the business's own brand + name, landing on the portal. */
+async function sendSiteInvite(email: string, siteId: string): Promise<boolean> {
   const { loadEmailBrand } = await import('./email_brand.ts');
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
   const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
   const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand (never the platform name)
-  const sent = await sendEmail(email, `You’ve been invited to help run ${name}`,
-    `<p>You’ve been invited to help run <strong>${name}</strong>.</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
-  return sent !== false;
+  return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: '/portal.html' });
 }
 
 export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string; emailed?: boolean }> {
@@ -97,7 +105,7 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
     body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }),
   });
   if (!r.ok) return { ok: false, error: 'write_failed' };
-  const emailed = await sendInviteLink(clean, siteId).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
+  const emailed = await sendSiteInvite(clean, siteId).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
   return { ok: true, emailed };
 }
 

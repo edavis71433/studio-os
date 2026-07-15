@@ -13,6 +13,8 @@ import type { PortfolioInput } from './portfolio.ts';
 import { buildKitPayload, applyPlan } from '../lib/kits.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
+import { sendInviteLink } from '../lib/workspace.ts';
+import { brandFromKit } from '../lib/email_brand.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
 import { runRecommendation } from '../recommendation/engine.ts';
@@ -313,7 +315,17 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       body: JSON.stringify({ agency_id: member.agency_id, email, role, status: 'active' }),
     });
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
-    return json({ data: w.json[0] }, 200, cors);
+    // best-effort invite — the seat row is the truth; email never blocks it.
+    // The ONE shared sender (lib/workspace.ts), on the AGENCY's brand (white label).
+    const agencyName = String(member.branding?.display_name || member.agency_name || 'your agency');
+    const agencyNameHtml = agencyName.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const emailed = await sendInviteLink(email, {
+      subject: `You’ve been invited to join ${agencyName}`,
+      intro: `You’ve been invited to join the <strong>${agencyNameHtml}</strong> team.`,
+      brand: brandFromKit({ primary: String(member.branding?.color_accent || '') }, agencyName),
+      next: '/agency.html',
+    }).catch(() => false);
+    return json({ data: { ...w.json[0], emailed } }, 200, cors);
   }
   {
     const m = route.match(/^\/agency\/members\/([0-9a-f-]{36})$/);
