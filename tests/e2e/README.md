@@ -28,7 +28,7 @@ VISUAL=1 npm run test:e2e                     # enforce
 |---|---|---|
 | Shell | `shell.spec.ts` | brand/nav render, ⌘K palette open+filter+target, bell unified feed (notices→approvals), attention badge, profile sign-out, signed-out degrade |
 | Today | `today.spec.ts` | needs-you cards (notices+approvals), **attention == bell badge**, moment dismiss, website vs CRM empty state (PP-5), upgrade orientation once + never-again (PP-6) |
-| CMS | `cms.spec.ts` | edition gating hides Business-OS links for CMS (SKU), "Photos" terminology (PP), `#design`/`#business` deep-links (OS) |
+| CMS | `cms.spec.ts` | edition gating hides Business-OS links for CMS (SKU), "Files" terminology (Architecture v1.0), `#design`/`#business` deep-links (OS) |
 | CRM | `crm.spec.ts` | leads inbox render + prefilled reply + filter + mark-read toast; relationship timeline |
 | Client portal | `portal.spec.ts` | mirrored "needs you" heading + approvals, approve→toast, caught-up state, owner-redirect |
 | Agency | `agency.spec.ts` | portfolio status row (attention badge, leads, domain+registrar, billing), non-agency turned away |

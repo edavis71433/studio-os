@@ -614,10 +614,11 @@ body.pd-dragging *{cursor:grabbing !important}
       <button class="navitem on" data-view="today" aria-current="page">Today</button>
       <div class="railsep"></div>
       <!-- Consolidated: your business info, menu, questions, kind words and updates
-           are all edited ON the page in Design (click a section to edit it). Photos
-           is your media library; Bookings & Reviews are their own tools. -->
+           are all edited ON the page in Design (click a section to edit it). Files
+           is your business library — photos, brand, documents; Bookings & Reviews
+           are their own tools. -->
       <button class="navitem" data-view="design">Design</button>
-      <button class="navitem" data-view="media">Photos</button>
+      <button class="navitem" data-view="media">Files</button>
       <a class="navitem" href="/visual-studio.html">Visual Studio</a>
       <button class="navitem" data-view="bookings">Bookings</button>
       <button class="navitem" data-view="reviews">Reviews</button>
@@ -769,8 +770,8 @@ body.pd-dragging *{cursor:grabbing !important}
 
       <!-- PHOTOGRAPHS -->
       <section class="view" id="view-media">
-        <h1 class="doc" role="heading" aria-level="2">Photos</h1>
-        <p class="docsub">The images on your website. Anything marked “on your site” is at work; the rest wait here. Your full library — photos, brand, documents — lives in <a class="link" href="/files.html">Files</a>.</p>
+        <h1 class="doc" role="heading" aria-level="2">Files</h1>
+        <p class="docsub">Your business library — the photos on your website plus everything you’ve uploaded. Anything marked “on your site” is at work; the rest wait here.</p>
         <div id="assetHealth" style="margin:2px 0 8px" hidden></div>
         <div style="display:flex;align-items:baseline;gap:20px">
           <button class="textact" id="btnUpload">＋ Add a photograph</button>
@@ -1292,7 +1293,7 @@ $("dock").addEventListener("click", (e) => {
 });
 (function buildSectionsSheet() {
   const wrap = $("sectionsNav");
-  [["business","Business"],["offerings","Menu"],["faqs","Questions"],["testimonials","Kind words"],["updates","Updates"],["media","Photos"],["history","History"]].forEach(([v, label]) => {
+  [["business","Business"],["offerings","Menu"],["faqs","Questions"],["testimonials","Kind words"],["updates","Updates"],["media","Files"],["history","History"]].forEach(([v, label]) => {
     const b = el("button", "navitem", label); b.style.padding = "10px 0"; b.style.fontSize = "15px";
     b.dataset.view = v;   // so applyVocab keeps the offerings label (Menu/Services) in sync here too
     b.addEventListener("click", () => { closeSheet("sectionsScrim"); go(v); });
