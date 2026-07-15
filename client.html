@@ -119,6 +119,14 @@
   .tl-here{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
   @media (prefers-reduced-motion:no-preference){.tl-node.current .tl-dot{animation:tlpulse 2.2s ease-in-out infinite}}
   @keyframes tlpulse{0%,100%{box-shadow:0 0 0 4px var(--p-soft)}50%{box-shadow:0 0 0 7px var(--p-soft)}}
+  /* ── decision history (already-decided approvals) ── */
+  .hist{list-style:none;margin:0;padding:0}
+  .hist li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+  .hist li:first-child{border-top:0;padding-top:2px}
+  .hist li:last-child{padding-bottom:2px}
+  .hist .ht{color:var(--ink);min-width:0}
+  .hist .hs{flex:0 0 auto;font-weight:600;font-size:13px;white-space:nowrap;color:var(--soft)}
+  .hist .hs.ok{color:var(--good)} .hist .hs.chg{color:var(--warn)}
   /* ── chat-style message threads (project messages + support) ── */
   .msgs{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
   .bubble{max-width:85%;align-self:flex-start;background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 5px;padding:10px 14px;box-shadow:var(--shadow)}
@@ -621,9 +629,15 @@ async function openProject(id,focusSection){
   const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true,hasSupport:true});
   if(chips.length>1)html+=`<nav class="chipbar" aria-label="Jump to a section">${chips.map(c=>`<button class="chip" data-chip="${esc(c.id)}">${esc(c.label)}</button>`).join('')}</nav>`;
   if(hasOverview) html+=`<div class="status" id="sec-overview"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${(s.open_client_actions||0)} action${s.open_client_actions===1?'':'s'} for you</div>`;
-  // approvals that need the client
+  // approvals that need the client — per-kind tag, per-card id (notification
+  // anchors emit #approval-<id>), and a helper line so "request changes" is
+  // clearly safe. Decided ones form a paper-trail section below.
+  const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
-  if(aps.length){html+=`<section id="sec-approvals"><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section id="sec-approvals"><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  const decided=(data.approvals||[]).filter(a=>a.status==='approved'||a.status==='rejected'||a.status==='changes_requested');
+  if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
+    html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}
   // your tasks
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
   if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`}</div>`;}html+=`</section>`;}
@@ -646,7 +660,16 @@ async function openProject(id,focusSection){
   $('main').innerHTML=html;
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
   if(focusSection)requestAnimationFrame(()=>scrollToSection(focusSection));
-  const adec=async(aid,ah,decision,note,btn)=>{if(btn)btn.disabled=true;const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:ah,note:note||''});if(r.ok){toast(decision==='approved'?'Approved — thank you.':'Sent — your studio will take a look.');openProject(id);}else{toast('That didn’t go through.');if(btn)btn.disabled=false;}};
+  // decide — surface the server's own sentence on failure (409s carry
+  // 'This item was updated…' / 'already been decided…'), and on any 409 the
+  // presented version/status is stale, so reload the bundle instead of letting
+  // a retry loop on the same stale hash. Clearing PORTAL.snaps keeps Home's
+  // "Needs you" honest (it renders from that cache).
+  const adec=async(aid,ah,decision,note,btn)=>{if(btn)btn.disabled=true;const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:ah,note:note||''});
+    if(r.ok){PORTAL.snaps=null;toast(decision==='approved'?'Approved — thank you.':'Sent — your studio will take a look.');openProject(id);return;}
+    toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
+    if(r.status===409){PORTAL.snaps=null;openProject(id);return;}
+    if(btn)btn.disabled=false;};
   document.querySelectorAll('[data-adec]').forEach(b=>b.addEventListener('click',()=>adec(b.getAttribute('data-adec'),b.getAttribute('data-ah'),'approved',null,b)));
   document.querySelectorAll('[data-areq]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-areq'));if(n){n.style.display='block';const t=$('nt-'+b.getAttribute('data-areq'));if(t)t.focus();}}));
   document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-acancel'));if(n)n.style.display='none';}));

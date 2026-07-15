@@ -76,10 +76,14 @@ the gate clear, not a session.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
-**The redesign (#167) is GATED. Do NOT touch it until EVERY other update above is
-done**: #183 templates/themes, Messages (needs Eric's one-line spec), #180, #181,
-#174, #166, #169, #172. Order of work: updates first, #172 final verification, and
-only THEN #167. If a future session sees "start the redesign"-type context, check
-this list first — if items are open, do them instead. (Redesign increments 1–2 on
-client.html shipped 2026-07-15 before this rule was re-established; that work is
-merged and stays, but no further redesign work until the gate clears.)
+**The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
+first, #172 final verification, only THEN #167. If a future session sees
+"start the redesign"-type context, check this list first — if items are open,
+do them instead.
+
+**GATE STATUS: CLEARED by Eric 2026-07-15** ("as long as all the updates were done
+we can do the redesign") — every update above shipped, deployed (functions +
+frontend + migrations 0107–0110 in prod AND staging), and Tier-1 verified. #167
+work may proceed: client portal first (increments 1–2 shipped; increment 3 =
+approval-flow polish), then the studio side. The rule above still applies to any
+NEW update Eric raises mid-redesign: new updates outrank redesign work.
