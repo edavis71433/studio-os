@@ -66,6 +66,26 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   } }, 200, cors);
 }
 
+// ═══ TASK DONE — let the client mark a to-do assigned to them complete ═══
+// Client to-dos were read-only (a client saw "N things for you" but couldn't act).
+// Only a client_action_required, client_visible task on their OWN linked project can
+// be marked done here; a client_visible event lets the studio see they acted.
+export async function handleClientTaskDone(_req: Request, site: SiteRow, principal: Principal, projectId: string, taskId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(projectId) || !UUID_RE.test(taskId)) return json({ error: 'bad_request' }, 400, cors);
+  const me = customerOf(site);
+  if (!me) return json({ error: 'forbidden' }, 403, cors);
+  const link = await linkForCustomerProject(me, projectId);
+  if (!link) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
+  const s = link.agency_site_id;
+  const t = rows(await svc(`presence_tasks?id=eq.${taskId}&project_id=eq.${projectId}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&client_action_required=is.true&select=id,title,status&limit=1`))[0];
+  if (!t) return json({ error: 'not_found', message: 'That to-do isn’t here.' }, 404, cors);
+  if (t.status === 'done') return json({ data: { ok: true } }, 200, cors);
+  const up = await svc(`presence_tasks?id=eq.${taskId}&site_id=eq.${s}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'done', completed_at: nowIso() }) });
+  if (!up.ok) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ project_id: projectId, site_id: s, kind: 'task_done', actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', title: String(t.title || 'A to-do') } }) }).catch(() => {});
+  return json({ data: { ok: true } }, 200, cors);
+}
+
 // ═══ BOOK A CALL — resolve the client's studio so they can self-schedule ═══
 // The #1 forgotten portal gap. The booking engine (/book/:site/*) is public and keyed
 // by site id; this hands the client their studio's site id so the portal widget can

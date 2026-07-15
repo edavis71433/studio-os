@@ -580,7 +580,7 @@ async function openProject(id,focusSection){
   if(aps.length){html+=`<section id="sec-approvals"><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve"><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   // your tasks
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
-  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${t.derived&&t.derived.overdue?'Overdue · ':''}${esc(t.status.replace('_',' '))}</p></div>`;}html+=`</section>`;}
+  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`}</div>`;}html+=`</section>`;}
   // files
   if((data.deliverables||[]).length){html+=`<section id="sec-files"><h2>Files</h2>`;for(const f of data.deliverables){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}html+=`</section>`;}
   // surveys
@@ -603,6 +603,7 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-acancel'));if(n)n.style.display='none';}));
   document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=$('nt-'+b.getAttribute('data-asend'));adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
+  document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id);}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));
   wireDownloads(document);
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});

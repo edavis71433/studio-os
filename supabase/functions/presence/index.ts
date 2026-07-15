@@ -31,7 +31,7 @@ import { handleProjects, handleProject, handleProjectReport, handleProjectStatus
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
-import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientServices, handleStudioCustomers } from './routes/client_delivery.ts';
+import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientServices, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
@@ -736,6 +736,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handleClientReport(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/projects\/([0-9a-f-]{36})\/messages$/);
     if (m && (method === 'GET' || method === 'POST')) return handleClientMessages(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/projects\/([0-9a-f-]{36})\/tasks\/([0-9a-f-]{36})\/done$/);
+    if (m && method === 'POST') return handleClientTaskDone(req, site, principal, m[1], m[2], cors);
     m = route.match(/^\/client\/deliverables\/([0-9a-f-]{36})\/download$/);
     if (m && method === 'GET') return handleClientDeliverableDownload(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/decide$/);
