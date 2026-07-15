@@ -125,12 +125,13 @@ export function vocabFor(industryKey: string | null | undefined): IndustryVocab 
 export function isKnownIndustry(key: string): boolean { return Object.prototype.hasOwnProperty.call(VOCAB, key); }
 export function allIndustryKeys(): string[] { return Object.keys(VOCAB); }
 
-/** Industry → the V1 template slug that realizes it. Until a vertical template is
- *  authored, an industry falls back to the neutral `business-classic` (correct
- *  schema/vocab for any LocalBusiness). Food industries use the restaurant family.
- *  This is how "default template by industry" resolves — data, not code. */
+/** Industry → the V1 template slug that realizes it. Food industries use the
+ *  restaurant family; everything else starts on `atelier` (Eric's pick, Jul 2026 —
+ *  the boutique serif family; vocabulary/schema still adapt per industry via
+ *  vocabFor). Existing sites keep their pinned template — this only picks for
+ *  NEW sites. This is how "default template by industry" resolves — data, not code. */
 export function templateSlugForIndustry(industryKey: string): string {
   const v = vocabFor(industryKey);
   if (v.isMenu) return 'restaurant-classic';        // the shipped food template
-  return 'business-classic';                          // the neutral V1 template (to author)
+  return 'atelier';                                   // the non-food default (was business-classic)
 }

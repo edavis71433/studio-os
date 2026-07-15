@@ -27,7 +27,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 // ═══ 2. template resolution by industry (default-template-as-data) ═══
 {
   ok('food industries → the shipped restaurant template', templateSlugForIndustry('restaurant') === 'restaurant-classic' && templateSlugForIndustry('coffee_shop') === 'restaurant-classic');
-  ok('non-food industries → the neutral business template', templateSlugForIndustry('plumber') === 'business-classic' && templateSlugForIndustry('law') === 'business-classic' && templateSlugForIndustry('generic') === 'business-classic');
+  ok('non-food industries → atelier (the new-site default, Eric Jul 2026)', templateSlugForIndustry('plumber') === 'atelier' && templateSlugForIndustry('law') === 'atelier' && templateSlugForIndustry('generic') === 'atelier');
 }
 
 // ═══ 3. component catalog — well-formed structured blocks ═══
