@@ -67,3 +67,13 @@ Legend: ⏳ open · ✅ done this stretch · 🔑 needs Eric (key/secret) · �
 profile" part) · #174 admin consolidation + freelancer/agency provisioning · #166
 compliance/doc-truth · #167 seamlessness redesign · #169 optimization pass · #172 final
 verification.
+
+## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
+
+**The redesign (#167) is GATED. Do NOT touch it until EVERY other update above is
+done**: #183 templates/themes, Messages (needs Eric's one-line spec), #180, #181,
+#174, #166, #169, #172. Order of work: updates first, #172 final verification, and
+only THEN #167. If a future session sees "start the redesign"-type context, check
+this list first — if items are open, do them instead. (Redesign increments 1–2 on
+client.html shipped 2026-07-15 before this rule was re-established; that work is
+merged and stays, but no further redesign work until the gate clears.)
