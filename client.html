@@ -333,10 +333,23 @@ async function renderMessages(){
 // ── FILES — every shared file, grouped by project ──
 async function renderFiles(){
   $('main').innerHTML=spinnerHtml();
-  const snaps=await ensureSnaps();
+  const [snaps,docsRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null)]);
   const withFiles=snaps.filter(s=>s.deliverables&&s.deliverables.length);
-  let html=portalHeader('Files','Everything your studio has shared with you.');
-  if(!withFiles.length){html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.');$('main').innerHTML=html;return;}
+  const docs=(docsRes&&docsRes.ok&&docsRes.body.data&&docsRes.body.data.documents)||[];
+  let html=portalHeader('Files & documents','Everything your studio has shared — files, proposals, and agreements.');
+  // Documents section: proposals & agreements the client can re-open any time (a top
+  // portal gap — before this they were reachable only from the original email).
+  if(docs.length){
+    html+=`<section><h2 class="grouphd">Documents</h2>`;
+    for(const d of docs){
+      const kindLabel=d.kind==='contract'?'Agreement':'Proposal';
+      const statusLabel=d.kind==='contract'?(d.signed_at?'Signed':'Awaiting signature'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
+      const view=d.view_url?`<a class="btn" href="${esc(d.view_url)}" target="_blank" rel="noopener">View</a>`:'';
+      html+=`<div class="card"><h3>${esc(d.title)}</h3><p>${kindLabel} · ${esc(statusLabel)}</p><div class="row">${view}</div></div>`;
+    }
+    html+=`</section>`;
+  }
+  if(!withFiles.length&&!docs.length){html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.');$('main').innerHTML=html;return;}
   for(const s of withFiles){
     html+=`<section><h2 class="grouphd">${esc(s.name)}</h2>`;
     for(const f of s.deliverables)html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;

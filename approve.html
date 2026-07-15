@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Review &amp; approve — Studio OS</title>
+<title>Review &amp; approve — Davis Digital Studio</title>
 <meta name="robots" content="noindex, nofollow">
 <style>
   :root{
@@ -52,7 +52,7 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const token=new URLSearchParams(location.search).get('token')||'';
 const H={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY};
 
-function brand(){return `<div class="brand"><span class="m">S</span>Studio OS</div>`;}
+function brand(){return `<div class="brand"><span class="m">D</span>Davis Digital Studio</div>`;}
 function trouble(msg){$('box').innerHTML=`${brand()}<div class="center"><p class="big">This link isn’t usable.</p><p class="muted">${esc(msg||'Open your workspace to review.')}</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
 function done(kind){const approved=kind==='approved';$('box').innerHTML=`${brand()}<div class="center"><p class="big">${approved?'Approved — thank you.':'Set aside.'}</p><p class="muted">${approved?'Your studio will take it from here. Nothing goes live without your OK — and you just gave it.':'No change was made. Your studio will follow up.'}</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
 
@@ -83,7 +83,7 @@ async function decide(decision){
     const r=await fetch(FN+'/approve?token='+encodeURIComponent(token),{headers:H});
     const b=await r.json().catch(()=>({}));
     if(r.ok){render(b.data||{});}
-    else if(r.status===409){$('box').innerHTML=`${brand()}<div class="center"><p class="big">Already handled.</p><p class="muted">This was already reviewed — nothing more to do.</p><p style="margin-top:18px"><a class="link" href="/today.html">Open your workspace →</a></p></div>`;}
+    else if(r.status===409){$('box').innerHTML=`${brand()}<div class="center"><p class="big">Already handled.</p><p class="muted">This was already reviewed — nothing more to do.</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
     else{trouble(b.message);}
   }catch(_){trouble('We couldn’t load this just now.');}
 })();
