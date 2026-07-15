@@ -521,13 +521,21 @@ function welcomed(){try{return localStorage.getItem(WELCOME_KEY)==='1';}catch(_)
 function welcomeCardHtml(){
   if(welcomed())return'';
   const n=firstName(USER);
+  const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:13px">${desc}</span></span></button>`;
+  // First-run orientation — names every destination, not just approve/download/message.
   return `<div class="card welcome" id="welcome" role="note"><button class="x" id="welcomeX" aria-label="Dismiss welcome">×</button>`+
     `<h3>Welcome${n?`, ${esc(n)}`:''}</h3>`+
-    `<p>This is your workspace. Here you’ll approve work, download the files your studio shares, and message them any time — all in one place.</p></div>`;
+    `<p>This is your workspace with your studio — here's where everything lives:</p>`+
+    step('messages','💬','Messages','Talk to your studio any time.')+
+    step('files','📁','Files & documents','Download what they share; find your proposals & agreements.')+
+    step('invoices','🧾','Invoices','See and pay what you owe.')+
+    step('requests','✨','Requests &amp; booking','Ask for more work, or book a call.')+
+    `</div>`;
 }
 function wireWelcome(){
-  const x=$('welcomeX');if(!x)return;
-  x.addEventListener('click',()=>{try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}const w=$('welcome');if(w)w.remove();});
+  const x=$('welcomeX');
+  if(x)x.addEventListener('click',()=>{try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}const w=$('welcome');if(w)w.remove();});
+  document.querySelectorAll('.wl-step[data-wtab]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-wtab'))));
 }
 // What's-new bell/panel over the ALREADY-BUILT /client/notifications (with
 // read-state). Marks read via /client/notifications/read only when opened, so
