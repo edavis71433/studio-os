@@ -26,7 +26,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleSalesSummary, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages } from './routes/project_comms.ts';
@@ -597,6 +597,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Pipeline rollup (open value / won this month / win rate / per-stage) over ALL
   // the site's deals — computed server-side because the list below is paged.
   if (route === '/sales/summary' && method === 'GET') return handleSalesSummary(req, site, principal, cors);
+  if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   {
     let m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})$/);

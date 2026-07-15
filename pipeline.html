@@ -376,11 +376,25 @@ async function renderSummary(){
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
   // AR strip — "who owes me money" across all deals, in one glance (open invoices).
   const ar=s.ar||{}; let arPart='';
-  if((ar.count||0)>0){ arPart=`<div class="sum-line" style="margin-top:6px">💰 Outstanding: <strong>${money(ar.outstanding_cents)||'$0'}</strong> across ${plur(ar.count,'invoice')}`+((ar.overdue_count||0)>0?` <span class="dot">·</span> <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong> (${ar.overdue_count})`:'')+`</div>`; }
+  if((ar.count||0)>0){ arPart=`<div class="sum-line" style="margin-top:6px">💰 Outstanding: <strong>${money(ar.outstanding_cents)||'$0'}</strong> across ${plur(ar.count,'invoice')}`+((ar.overdue_count||0)>0?` <span class="dot">·</span> <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong> (${ar.overdue_count})`:'')+` <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a></div>`; }
   host.innerHTML=`<div class="sum-line">${openPart} <span class="dot">·</span> ${wonPart} <span class="dot">·</span> ${winPart}</div>`
     +(open.count?`<div class="sum-stages">${cells}</div>`:'')+arPart;
+  const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};
 }
 
+// "Who owes you" — the receivables list behind the AR strip (open invoices across
+// all deals). Opens in the same full-screen detail panel; each row jumps to its deal.
+async function openReceivables(){
+  showDetail();
+  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:50%"></div></div>';
+  let d=null;try{const r=await api('/sales/receivables');d=r&&r.data;}catch(e){/* */}
+  if(!d){$('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dbody mut">Couldn’t load receivables just now.</div>';const b=$('rcBack');if(b)b.onclick=closeDealDetail;return;}
+  const items=d.items||[];
+  const list=items.length?items.map(i=>`<div class="item"><div><div class="t">${esc(i.title)}${i.overdue?' <span class="pill" style="color:var(--bad,#a3423a)">overdue</span>':''}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}</div></div>${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</div>`).join(''):'<div class="mut">Nothing outstanding — you’re all paid up. 🎉</div>';
+  $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">Who owes you</div><div class="mut">Outstanding: ${money(d.total_cents)||'$0'}${d.overdue_cents?` · <span style="color:var(--bad,#a3423a)">${money(d.overdue_cents)} overdue</span>`:''}</div></div></div><div class="dbody">${list}</div>`;
+  const b=$('rcBack');if(b)b.onclick=closeDealDetail;
+  $('detailInner').querySelectorAll('[data-rcdeal]').forEach(x=>x.onclick=()=>openDeal(x.dataset.rcdeal));
+}
 // List ⇄ Board view toggle. The board is additive — the List view is unchanged
 // and stays the default. The board shows ALL open deals across columns, so the
 // stage filter chips (a list convenience) are hidden while it's open.
