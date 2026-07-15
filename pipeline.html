@@ -102,8 +102,9 @@ html.dds-embed #detailWrap{padding-top:0}
   .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;align-items:start}
   .col{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:220px}
   .col-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
-  .col-t{font-weight:600;font-size:13.5px}
+  .col-t{font-weight:600;font-size:13.5px;flex:1}
   .col-n{font-size:12px;color:var(--faint);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+  .col-val{font-size:11.5px;color:var(--soft);font-weight:600;font-variant-numeric:tabular-nums}
   .col-tip{font-size:11.5px;margin-bottom:8px;line-height:1.4}
   .col-body{display:flex;flex-direction:column;gap:8px;min-height:40px;border-radius:8px;padding:2px;transition:background .12s}
   .col-body.drop-ok{outline:1px dashed var(--p);outline-offset:-2px}
@@ -115,6 +116,8 @@ html.dds-embed #detailWrap{padding-top:0}
   .bc-t{font-weight:600;font-size:13.5px;line-height:1.35}
   .bc-v{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;margin-top:3px}
   .bc-m{color:var(--faint);font-size:12px;margin-top:3px}
+  .bcard.is-stale{border-left:2px solid var(--warn,#775d31)}
+  .bc-stale{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
   .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:3px}
   .bc-actions{margin-top:8px;position:relative}
   .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer}
@@ -424,9 +427,13 @@ function boardCard(d,today){
   const val=money(d.expected_value_cents);
   const lc=d.last_contacted_at?`Last contacted ${esc(ago(d.last_contacted_at))}`:'';
   const due=(d.next_step&&d.next_step_at&&d.next_step_at<=today)?`<div class="bc-due">Due: ${esc(d.next_step)}</div>`:'';
+  // Stalled: no contact in 30+ days (a card the system nudges you about instead of
+  // relying on memory). Never-contacted brand-new deals don't flag — avoids noise.
+  const stale=d.last_contacted_at&&((Date.now()-Date.parse(d.last_contacted_at))/86400000>=30);
+  const staleBadge=stale?`<span class="bc-stale" title="No contact in 30+ days — worth a nudge">⏳ Stalled</span>`:'';
   const canMove=boardMoveTargets(d.stage).length>0;
   const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
-  return `<article class="bcard" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}<div class="bc-actions">${moveBtn}</div></article>`;
+  return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}<div class="bc-actions">${moveBtn}</div></article>`;
 }
 function renderBoard(){
   const host=$('board');
@@ -435,8 +442,9 @@ function renderBoard(){
   const open=DEALS.filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);
   const cols=BOARD_STAGES.map(stg=>{
     const ds=open.filter(d=>d.stage===stg);
+    const sum=ds.reduce((a,d)=>a+(d.expected_value_cents||0),0);   // per-column total value (pipeline health at a glance)
     const cards=ds.map(d=>boardCard(d,today)).join('')||'<div class="bempty mut">Nothing here yet</div>';
-    return `<section class="col" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span></header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div></section>`;
+    return `<section class="col" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span>${sum?`<span class="col-val">${money(sum)}</span>`:''}</header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div></section>`;
   }).join('');
   const terminal=DEALS.length-open.length;
   host.innerHTML=`<div class="board-scroll"><div class="board">${cols}</div></div>`
