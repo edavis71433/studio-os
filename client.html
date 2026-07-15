@@ -387,6 +387,8 @@ async function renderRequests(){
     services=(((svr&&svr.body&&svr.body.data)||[])).filter(x=>x&&x.id);
   }catch(_){}
   let html=portalHeader('Requests','Browse what your studio offers and ask for what you need. Nothing is charged automatically — every request is reviewed first.');
+  // ── book a call (self-schedule with the studio) ──
+  if(canMessage)html+=`<section><div class="card"><h3>📅 Book a call</h3><p class="muted">Grab a time to talk with your studio.</p><div class="row"><button id="bookCall">See available times</button></div></div></section>`;
   // ── service catalog ──
   html+=`<section><h2>Request a service</h2>`;
   if(!services.length)html+=emptyCard('Your studio hasn’t listed services here yet — you can still message them for anything you need using the button below.');
@@ -408,9 +410,61 @@ async function renderRequests(){
   else for(const rq of list){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
   html+=`</section>`;
   $('main').innerHTML=html;
+  const bc=$('bookCall');if(bc)bc.addEventListener('click',openBooking);
   const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null));
   document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-svc');const svc=services.find(x=>x.id===id);if(svc)openServiceRequest(svc);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
+}
+// ── Book a call — self-schedule with the studio via the public /book/* engine ──
+// The #1 forgotten portal gap. Resolves the studio site (/client/book), lists
+// services, reads open slots for a chosen day, and books — all grounded on the
+// existing public booking flow. The slot string is passed straight back as slot_start.
+let BOOK={site:'',type:null,slot:'',maxDays:30};
+const bkInput='style="width:100%;box-sizing:border-box;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
+function bookLabel(s){s=String(s);const t=s.indexOf('T')>=0?s.slice(s.indexOf('T')+1):s;return t.slice(0,5);}
+async function openBooking(){
+  $('main').innerHTML=spinnerHtml();
+  const back=`<p><a class="link" href="#" id="bk-back">← Back to requests</a></p>`;
+  const backReq=()=>{const b=$('bk-back');if(b)b.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});};
+  let site='';try{const r=await api('/client/book');site=(r&&r.ok&&r.body.data&&r.body.data.site_id)||'';}catch(_){}
+  if(!site){$('main').innerHTML=back+emptyCard('Online booking isn’t set up yet — use “Message your studio” and they’ll find a time with you.');backReq();return;}
+  let types=[],intro='';
+  try{const r=await api('/book/'+site+'/types');const d=(r&&r.body&&r.body.data)||{};if(d.enabled){types=d.types||[];intro=d.intro||'';BOOK={site,type:null,slot:'',maxDays:d.max_days_ahead||30};}}catch(_){}
+  if(!types.length){$('main').innerHTML=back+emptyCard('Your studio hasn’t opened any times for booking yet — message them and they’ll find a slot with you.');backReq();return;}
+  let html=back+`<header><h1>Book a call</h1>${intro?`<p class="sub">${esc(intro)}</p>`:''}</header><section><h2>Choose a service</h2>`;
+  for(const t of types)html+=`<div class="card"><h3>${esc(t.name)}</h3><p class="muted">${t.duration_min?esc(String(t.duration_min))+' min':''}${t.price_text?' · '+esc(t.price_text):''}</p>${t.description?`<p>${esc(t.description)}</p>`:''}<div class="row"><button data-bt="${esc(t.id)}">Choose</button></div></div>`;
+  html+=`</section>`;
+  $('main').innerHTML=html;backReq();
+  document.querySelectorAll('[data-bt]').forEach(b=>b.addEventListener('click',()=>{const t=types.find(x=>x.id===b.getAttribute('data-bt'));if(t)bookPickDate(t);}));
+}
+function bookPickDate(t){
+  BOOK.type=t;
+  const now=Date.now();const iso=(ms)=>new Date(ms).toISOString().slice(0,10);const min=iso(now+86400000),max=iso(now+(BOOK.maxDays||30)*86400000);
+  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>${esc(t.name)}</h1><p class="sub">Pick a day, then a time.</p></header><section><div class="card"><label for="bk-date" style="display:block;font-weight:600;margin-bottom:6px">Day</label><input id="bk-date" type="date" min="${min}" max="${max}" value="${min}" ${bkInput}><div id="bk-slots" style="margin-top:14px"></div></div></section>`;
+  const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();openBooking();});
+  const dt=$('bk-date');const load=()=>bookLoadSlots(dt.value);dt.addEventListener('change',load);load();
+}
+async function bookLoadSlots(date){
+  const host=$('bk-slots');if(!host)return;host.innerHTML='<p class="muted">Finding open times…</p>';
+  let slots=[];try{const r=await api('/book/'+BOOK.site+'/slots?type='+encodeURIComponent(BOOK.type.id)+'&date='+encodeURIComponent(date));slots=((r&&r.body&&r.body.data&&r.body.data.slots)||[]);}catch(_){}
+  if(!slots.length){host.innerHTML='<p class="muted">No open times that day — try another.</p>';return;}
+  host.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+slots.map(s=>`<button data-slot="${esc(String(s))}">${esc(bookLabel(s))}</button>`).join('')+'</div>';
+  host.querySelectorAll('[data-slot]').forEach(b=>b.addEventListener('click',()=>bookConfirm(b.getAttribute('data-slot'))));
+}
+function bookConfirm(slot){
+  BOOK.slot=slot;
+  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>Confirm your booking</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(slot))}</p></header><section><div class="card"><label for="bk-name" style="display:block;font-weight:600;margin-bottom:6px">Your name</label><input id="bk-name" type="text" ${bkInput}><label for="bk-email" style="display:block;font-weight:600;margin:12px 0 6px">Email</label><input id="bk-email" type="email" placeholder="you@example.com" ${bkInput}><div class="row" style="margin-top:14px"><button class="approve" id="bk-go">Book it</button></div></div></section>`;
+  const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();bookPickDate(BOOK.type);});
+  $('bk-go').addEventListener('click',submitBooking);
+}
+async function submitBooking(){
+  const name=($('bk-name').value||'').trim(),email=($('bk-email').value||'').trim();
+  if(!name){toast('Please add your name.');return;}
+  if(!email){toast('Please add your email.');return;}
+  const btn=$('bk-go');btn.disabled=true;
+  let r=null;try{r=await api('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
+  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});}
+  else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
 }
 // A short, standard brief for a picked service → POST as a PENDING support
 // request (service ref + structured fields). Per-service custom fields are out

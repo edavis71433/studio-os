@@ -66,6 +66,17 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   } }, 200, cors);
 }
 
+// ═══ BOOK A CALL — resolve the client's studio so they can self-schedule ═══
+// The #1 forgotten portal gap. The booking engine (/book/:site/*) is public and keyed
+// by site id; this hands the client their studio's site id so the portal widget can
+// list services, read open slots, and book — all through the existing public flow.
+export async function handleClientBook(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const me = customerOf(site);
+  const links = me ? await linksForCustomer(me) : [];
+  const agencySite = links[0]?.agency_site_id ? String(links[0].agency_site_id) : '';
+  return json({ data: { site_id: agencySite || null } }, 200, cors);
+}
+
 // ═══ DOCUMENTS (the client's proposals & agreements, findable in-portal) ═══
 // A top client-portal gap: signing worked ONLY via an emailed link, so a client who
 // lost the email couldn't find their proposal/contract again. This lists every
