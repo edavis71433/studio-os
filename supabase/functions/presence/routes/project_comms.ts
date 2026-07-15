@@ -88,12 +88,17 @@ export async function handleProjectClientMessages(req: Request, jwt: string, sit
   const link = rows(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${site.id}&status=eq.active&select=customer_client_id&limit=1`))[0];
   const custId = link?.customer_client_id ? String(link.customer_client_id) : '';
   if (!custId) return json({ data: [], customer: null, is_studio_view: true }, 200, cors);
-  const client = rows(await svc(`clients?id=eq.${custId}&select=id,name,email,contact_email,auth_user_id&limit=1`))[0];
+  const client = rows(await svc(`clients?id=eq.${custId}&select=id,name,email,contact_email,contact_id&limit=1`))[0];
   if (!client) return json({ data: [], customer: null, is_studio_view: true }, 200, cors);
   const customer = { id: client.id, name: client.name || client.email || null };
-  // A customer's tickets are filed under readerKey(principal) = their auth user
-  // id OR email — match every identity they could have used so none is missed.
-  const keys = [client.auth_user_id, client.email, client.contact_email]
+  // A customer's tickets are filed under readerKey(principal) = their auth user id
+  // OR email. `clients` has no auth_user_id column — the customer's auth identity
+  // lives on their linked contact (clients.contact_id -> contacts.auth_user_id), the
+  // same linkage the RLS uses. Match every identity they could have used so none is
+  // missed (a request filed while signed in carries the auth uuid, not the email).
+  let authId: string | null = null;
+  if (client.contact_id) { const ct = rows(await svc(`contacts?id=eq.${client.contact_id}&select=auth_user_id&limit=1`))[0]; authId = ct?.auth_user_id ? String(ct.auth_user_id) : null; }
+  const keys = [authId, client.email, client.contact_email]
     .filter((k) => k != null && String(k).trim() !== '')
     .map((k) => encodeURIComponent(`"${String(k).replace(/"/g, '')}"`));
   if (!keys.length) return json({ data: [], customer, is_studio_view: true }, 200, cors);

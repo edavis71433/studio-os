@@ -364,9 +364,18 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       const clientById: Record<string, string> = {};       // client id → display name
       const requesterToClient: Record<string, string> = {}; // reader key → client id
       if (clientIds.size) {
-        for (const c of (((await svc(`clients?id=in.(${[...clientIds].join(',')})&select=id,name,email,contact_email,auth_user_id`)).json as any[]) || [])) {
+        // `clients` has no auth_user_id column — the customer's auth identity lives on
+        // their linked contact (clients.contact_id -> contacts.auth_user_id). Read the
+        // clients + their contacts (two batched lookups), then a project-less request
+        // filed while signed in (requester = auth uuid) still groups under the client.
+        const clientRows = (((await svc(`clients?id=in.(${[...clientIds].join(',')})&select=id,name,email,contact_email,contact_id`)).json as any[]) || []);
+        const contactIds = [...new Set(clientRows.map((c) => c.contact_id).filter(Boolean).map(String))];
+        const authByContact: Record<string, string> = {};
+        if (contactIds.length) { for (const ct of (((await svc(`contacts?id=in.(${contactIds.join(',')})&select=id,auth_user_id`)).json as any[]) || [])) { if (ct.auth_user_id) authByContact[String(ct.id)] = String(ct.auth_user_id); } }
+        for (const c of clientRows) {
           const cid = String(c.id); clientById[cid] = String(c.name || c.email || 'Client');
-          for (const k of [c.auth_user_id, c.email, c.contact_email]) { if (k != null && String(k).trim() !== '') requesterToClient[String(k)] = cid; }
+          const authId = c.contact_id ? authByContact[String(c.contact_id)] : '';
+          for (const k of [authId, c.email, c.contact_email]) { if (k != null && String(k).trim() !== '') requesterToClient[String(k)] = cid; }
         }
       }
       const clientFor = (pid: string, requester: string) => {
