@@ -73,6 +73,7 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 }
 
 // ═════════ CSS — Slate: bold dark charcoal, one electric teal accent, crisp grid lines ═════════
+// G1 radius token: surfaces (btn, hero/split images, svc/card, svc img, inputs, post hero) take var(--radius,<current>); the tiny 6px nav/kicker chips and brandlogo stay hardcoded — structural to Slate's crisp-grid look.
 const CSS = `:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--line:#262a33;--wash:#14171d}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -86,7 +87,7 @@ h1{font-size:clamp(2.5rem,6.4vw,4.2rem)}h2{font-size:clamp(1.5rem,3.4vw,2.1rem);
 .nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
 .hero-split{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center;text-align:left}
 .hero-split .cta-row{justify-content:flex-start}
-.hero-split .split-img{border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.hero-split .split-img{border:1px solid var(--line);border-radius:var(--radius,8px);overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
 .hero-split .split-img img{width:100%;height:100%;min-height:300px;object-fit:cover;display:block}
 @media (max-width:760px){.hero-split{grid-template-columns:1fr}}
 .annbar{background:var(--accent);color:#06201c;text-align:center;padding:10px 16px;font-size:.92rem;font-weight:700;letter-spacing:.02em}
@@ -105,11 +106,11 @@ nav.primary a[aria-current="page"]{color:var(--accent);background:var(--card);bo
 .hero h1{margin:18px 0 14px;max-width:20ch;text-wrap:balance}
 .tagline{font-size:1.25rem;color:var(--soft);max-width:54ch;line-height:1.55}
 .cta-row{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
-.btn{display:inline-block;background:var(--accent);color:#06201c;border:1px solid var(--accent);padding:13px 24px;border-radius:8px;text-decoration:none;font-weight:800;font-size:.95rem;letter-spacing:.02em;transition:background .12s,border-color .12s,color .12s}
+.btn{display:inline-block;background:var(--accent);color:#06201c;border:1px solid var(--accent);padding:13px 24px;border-radius:var(--radius,8px);text-decoration:none;font-weight:800;font-size:.95rem;letter-spacing:.02em;transition:background .12s,border-color .12s,color .12s}
 .btn:hover{background:var(--accent-dark);border-color:var(--accent-dark);color:#06201c}
 .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
 .btn.ghost:hover{background:rgba(45,212,191,.12);border-color:var(--accent);color:var(--accent)}
-.hero-img{margin-top:44px;border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.hero-img{margin-top:44px;border:1px solid var(--line);border-radius:var(--radius,8px);overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
 .hero-img img{width:100%;height:auto;display:block}
 .strip{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--soft);font-size:.9rem}
 .strip .wrap{display:flex;gap:22px;flex-wrap:wrap;padding:12px 24px}
@@ -117,15 +118,15 @@ nav.primary a[aria-current="page"]{color:var(--accent);background:var(--card);bo
 .block{padding:calc(60px * var(--spacing-scale,1)) 0}
 .block.alt{background:var(--wash);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:8px}
-.svc{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);transition:border-color .12s}
+.svc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,8px);padding:22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);transition:border-color .12s}
 .svc:hover{border-color:#3a4150}
 .svc .nm{font-weight:800;font-size:1.06rem;letter-spacing:-.01em}
 .svc .ds{color:var(--soft);font-size:.94rem;margin-top:6px}
 .svc .pr{color:var(--accent);font-weight:800;margin-top:10px;font-variant-numeric:tabular-nums}
-.svc img{width:100%;height:auto;border:1px solid var(--line);border-radius:6px;margin-top:12px}
+.svc img{width:100%;height:auto;border:1px solid var(--line);border-radius:var(--radius,6px);margin-top:12px}
 .cat-h{margin-top:38px;padding-bottom:8px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.14em;font-size:.85rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,8px);padding:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 blockquote.t p{font-size:1.05rem}
 blockquote.t footer{margin-top:12px;color:var(--soft);font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 dl.faq dt{font-weight:800;margin-top:22px;padding-top:22px;border-top:1px solid var(--line);letter-spacing:-.01em}
@@ -139,7 +140,7 @@ table.hours tr{border-bottom:1px solid var(--line)}
 .holiday{margin-top:14px;font-size:.94rem}.holiday ul{margin:6px 0 0 18px}
 address{font-style:normal}
 form.card label{font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
-form.card input,form.card textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:6px;font:inherit;margin-top:6px;background:var(--paper);color:var(--ink)}
+form.card input,form.card textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:var(--radius,6px);font:inherit;margin-top:6px;background:var(--paper);color:var(--ink)}
 form.card input:focus,form.card textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
 form.card p{margin-bottom:14px}
 .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
@@ -434,7 +435,7 @@ function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): stri
   return `<section class="block wrap"><article class="post prose">
 <h1>${esc(p.title)}</h1>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.hero ? `<div style="margin:20px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
+${p.hero ? `<div style="margin:20px 0;border:1px solid var(--line);border-radius:var(--radius,8px);overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
 ${renderMarkdown(p.body_md)}
 ${postTagsHtml(normalizeTags(p.tags), esc)}</article>
 <p style="margin-top:28px"><a href="/updates/">← All updates</a></p></section>`;

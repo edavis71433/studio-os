@@ -74,6 +74,7 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 // Ground: warm cream. Ink: deep moss. Accent: muted sage/moss (#4a7c59 — white on
 // it is 4.87:1, AA). Soft (#55624f) is 5.8:1 on cream and 5.6:1 on the sage wash.
 // Radii are large and friendly (20–26px), shadows are layered with a green tint,
+// G1 radius token: those large surface radii (hero/split images, svc/card, svc img, inputs, footer top, post hero) take var(--radius,<current>); pills (btn/nav/kicker, 999px) and the brandlogo chip stay hardcoded — pill-ness is the design.
 // buttons are pills, headings use --font-display with a Georgia-ending fallback,
 // and leaf-like dots (pure CSS radial-gradients) mark section headings.
 const CSS = `:root{--ink:#243428;--soft:#55624f;--paper:var(--bg,#faf7f0);--card:#fffdf7;--accent:#4a7c59;--accent-dark:#345c41;--line:#e4dfcd;--wash:#edf2e2;--sprout:#7ba374;--seed:#b8cfa2}
@@ -88,7 +89,7 @@ h1{font-size:clamp(2.3rem,5.6vw,3.7rem)}h2{font-size:clamp(1.5rem,3.2vw,2.05rem)
 .nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
 .hero-split{display:grid;grid-template-columns:1.1fr 1fr;gap:44px;align-items:center;text-align:left}
 .hero-split .cta-row{justify-content:flex-start}
-.hero-split .split-img{border-radius:26px;overflow:hidden;box-shadow:0 3px 8px rgba(53,92,66,.07),0 28px 64px rgba(53,92,66,.14)}
+.hero-split .split-img{border-radius:var(--radius,26px);overflow:hidden;box-shadow:0 3px 8px rgba(53,92,66,.07),0 28px 64px rgba(53,92,66,.14)}
 .hero-split .split-img img{width:100%;height:100%;min-height:300px;object-fit:cover;display:block}
 @media (max-width:760px){.hero-split{grid-template-columns:1fr}}
 .annbar{background:var(--accent);color:#fff;text-align:center;padding:11px 16px;font-size:.95rem;font-weight:500}
@@ -111,7 +112,7 @@ nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
 .btn:hover{background:var(--accent-dark);transform:translateY(-1px);box-shadow:0 3px 8px rgba(53,92,66,.14),0 14px 32px rgba(53,92,66,.26)}
 .btn.ghost{background:transparent;color:var(--accent-dark);border:2px solid #cfdcc0;box-shadow:none}
 .btn.ghost:hover{background:var(--wash);border-color:var(--accent);transform:none}
-.hero-img{margin-top:48px;border-radius:26px;overflow:hidden;box-shadow:0 3px 8px rgba(53,92,66,.07),0 32px 72px rgba(53,92,66,.15)}
+.hero-img{margin-top:48px;border-radius:var(--radius,26px);overflow:hidden;box-shadow:0 3px 8px rgba(53,92,66,.07),0 32px 72px rgba(53,92,66,.15)}
 .hero-img img{width:100%;height:auto;display:block}
 .strip{background:var(--ink);color:#dfe7db;font-size:.92rem}
 .strip .wrap{display:flex;gap:22px;flex-wrap:wrap;padding:13px 24px}
@@ -120,15 +121,15 @@ nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
 .block.alt{background:var(--wash)}
 .block>.wrap>h1::before,.block.wrap>h1::before,.block>.wrap>h2::before,.block.wrap>h2::before{content:"";display:block;width:46px;height:10px;margin-bottom:14px;background:radial-gradient(9px 10px at 5px 5px,var(--accent) 60%,transparent 64%),radial-gradient(9px 10px at 22px 5px,var(--sprout) 60%,transparent 64%),radial-gradient(9px 10px at 39px 5px,var(--seed) 60%,transparent 64%)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px;margin-top:8px}
-.svc{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:26px;box-shadow:0 1px 3px rgba(53,92,66,.05),0 6px 18px rgba(53,92,66,.05);transition:transform .12s,box-shadow .12s}
+.svc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,24px);padding:26px;box-shadow:0 1px 3px rgba(53,92,66,.05),0 6px 18px rgba(53,92,66,.05);transition:transform .12s,box-shadow .12s}
 .svc:hover{transform:translateY(-3px);box-shadow:0 2px 6px rgba(53,92,66,.07),0 20px 44px rgba(53,92,66,.12)}
 .svc .nm{font-family:var(--font-display,"Palatino Linotype",Palatino,Georgia,serif);font-weight:700;font-size:1.12rem}
 .svc .ds{color:var(--soft);font-size:.95rem;margin-top:6px}
 .svc .pr{color:var(--accent-dark);font-weight:700;margin-top:10px}
-.svc img{width:100%;height:auto;border-radius:16px;margin-top:14px}
+.svc img{width:100%;height:auto;border-radius:var(--radius,16px);margin-top:14px}
 .cat-h{margin-top:42px;padding-bottom:8px;border-bottom:2px solid #dbe6cb}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:26px;box-shadow:0 1px 3px rgba(53,92,66,.05),0 8px 26px rgba(53,92,66,.06)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,24px);padding:26px;box-shadow:0 1px 3px rgba(53,92,66,.05),0 8px 26px rgba(53,92,66,.06)}
 blockquote.t{position:relative;padding-top:16px}
 blockquote.t::before{content:"\\201C";position:absolute;top:-8px;left:-4px;font-family:var(--font-display,"Palatino Linotype",Palatino,Georgia,serif);font-size:3.6rem;line-height:1;color:var(--accent);opacity:.3;transform:rotate(-9deg)}
 blockquote.t p{font-size:1.05rem}
@@ -142,7 +143,7 @@ table.hours td{padding:7px 0}
 .holiday{margin-top:14px;font-size:.94rem}.holiday ul{margin:6px 0 0 18px}
 address{font-style:normal}
 form.card label{font-weight:700;font-size:.94rem}
-form.card input,form.card textarea{width:100%;padding:12px 14px;border:1px solid #d5d0bd;border-radius:14px;font:inherit;margin-top:5px;background:var(--paper)}
+form.card input,form.card textarea{width:100%;padding:12px 14px;border:1px solid #d5d0bd;border-radius:var(--radius,14px);font:inherit;margin-top:5px;background:var(--paper)}
 form.card input:focus,form.card textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 form.card p{margin-bottom:14px}
 .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
@@ -158,7 +159,7 @@ article.post p{margin-bottom:16px}
 .prose li{margin:.2em 0}
 .prose blockquote{border-left:3px solid var(--accent);padding-left:16px;margin:0 0 1em;color:var(--soft)}
 .prose a{color:var(--accent-dark);text-decoration:underline}
-footer.site{background:var(--ink);color:#dfe7db;padding:56px 0 36px;margin-top:80px;border-radius:26px 26px 0 0}
+footer.site{background:var(--ink);color:#dfe7db;padding:56px 0 36px;margin-top:80px;border-radius:var(--radius,26px) var(--radius,26px) 0 0}
 footer.site a{color:#bcd9bb}
 footer.site h2{font-size:1.15rem}
 footer.site table.hours th{color:#a9bda5}
@@ -437,7 +438,7 @@ function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): stri
   return `<section class="block wrap"><article class="post prose">
 <h1>${esc(p.title)}</h1>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.hero ? `<div style="margin:20px 0;border-radius:20px;overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
+${p.hero ? `<div style="margin:20px 0;border-radius:var(--radius,20px);overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
 ${renderMarkdown(p.body_md)}
 ${postTagsHtml(normalizeTags(p.tags), esc)}</article>
 <p style="margin-top:28px"><a href="/updates/">← All updates</a></p></section>`;

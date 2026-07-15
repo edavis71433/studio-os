@@ -69,6 +69,7 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 }
 
 // ═════════ CSS — a modern, confident, industry-neutral look (zero external assets) ═════════
+// G1 radius token: big surfaces (hero/split images, svc/card, svc img, inputs, post hero) take var(--radius,<current>); pills (btn/nav/kicker, 999px) and the brandlogo chip stay hardcoded — pill-ness is the design.
 const CSS = `:root{--ink:#16171d;--soft:#636471;--paper:var(--bg,#ffffff);--card:#ffffff;--accent:#4f46e5;--accent-dark:#3730a3;--line:#eaeaf1;--wash:#f4f3fc}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -81,7 +82,7 @@ h1{font-size:clamp(2.4rem,6vw,4rem)}h2{font-size:clamp(1.5rem,3.4vw,2.1rem);marg
 .nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
 .hero-split{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center;text-align:left}
 .hero-split .cta-row{justify-content:flex-start}
-.hero-split .split-img{border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(79,70,229,.16)}
+.hero-split .split-img{border-radius:var(--radius,22px);overflow:hidden;box-shadow:0 30px 70px rgba(79,70,229,.16)}
 .hero-split .split-img img{width:100%;height:100%;min-height:300px;object-fit:cover;display:block}
 @media (max-width:760px){.hero-split{grid-template-columns:1fr}}
 .annbar{background:var(--accent);color:#fff;text-align:center;padding:10px 16px;font-size:.95rem;font-weight:500}
@@ -104,7 +105,7 @@ nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
 .btn:hover{background:var(--accent-dark);transform:translateY(-1px);box-shadow:0 12px 28px rgba(79,70,229,.34)}
 .btn.ghost{background:transparent;color:var(--accent-dark);border:2px solid var(--line);box-shadow:none}
 .btn.ghost:hover{background:var(--wash);border-color:var(--accent);transform:none}
-.hero-img{margin-top:44px;border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(79,70,229,.16)}
+.hero-img{margin-top:44px;border-radius:var(--radius,22px);overflow:hidden;box-shadow:0 30px 70px rgba(79,70,229,.16)}
 .hero-img img{width:100%;height:auto;display:block}
 .strip{background:var(--ink);color:#e7e7ef;font-size:.92rem}
 .strip .wrap{display:flex;gap:22px;flex-wrap:wrap;padding:12px 24px}
@@ -112,15 +113,15 @@ nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
 .block{padding:calc(60px * var(--spacing-scale,1)) 0}
 .block.alt{background:var(--wash)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;margin-top:8px}
-.svc{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 1px 3px rgba(22,23,40,.05);transition:transform .12s,box-shadow .12s}
+.svc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,18px);padding:24px;box-shadow:0 1px 3px rgba(22,23,40,.05);transition:transform .12s,box-shadow .12s}
 .svc:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(22,23,40,.09)}
 .svc .nm{font-weight:800;font-size:1.08rem;letter-spacing:-.01em}
 .svc .ds{color:var(--soft);font-size:.95rem;margin-top:6px}
 .svc .pr{color:var(--accent-dark);font-weight:800;margin-top:10px}
-.svc img{width:100%;height:auto;border-radius:12px;margin-top:12px}
+.svc img{width:100%;height:auto;border-radius:var(--radius,12px);margin-top:12px}
 .cat-h{margin-top:38px;padding-bottom:8px;border-bottom:2px solid var(--wash)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 4px 24px rgba(22,23,40,.05)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,18px);padding:24px;box-shadow:0 4px 24px rgba(22,23,40,.05)}
 blockquote.t p{font-size:1.05rem}
 blockquote.t footer{margin-top:12px;color:var(--soft);font-size:.92rem;font-weight:700}
 dl.faq dt{font-weight:800;margin-top:22px;letter-spacing:-.01em}
@@ -132,7 +133,7 @@ table.hours td{padding:7px 0}
 .holiday{margin-top:14px;font-size:.94rem}.holiday ul{margin:6px 0 0 18px}
 address{font-style:normal}
 form.card label{font-weight:700;font-size:.94rem}
-form.card input,form.card textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;font:inherit;margin-top:5px;background:var(--paper)}
+form.card input,form.card textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:var(--radius,12px);font:inherit;margin-top:5px;background:var(--paper)}
 form.card input:focus,form.card textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 form.card p{margin-bottom:14px}
 .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
@@ -424,7 +425,7 @@ function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): stri
   return `<section class="block wrap"><article class="post prose">
 <h1>${esc(p.title)}</h1>
 <p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.hero ? `<div style="margin:20px 0;border-radius:14px;overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
+${p.hero ? `<div style="margin:20px 0;border-radius:var(--radius,14px);overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
 ${renderMarkdown(p.body_md)}
 ${postTagsHtml(normalizeTags(p.tags), esc)}</article>
 <p style="margin-top:28px"><a href="/updates/">← All updates</a></p></section>`;

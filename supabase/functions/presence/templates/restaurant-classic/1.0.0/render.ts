@@ -75,6 +75,8 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 }
 
 // ═════════ CSS (one hand-authored sheet; system font stack — zero external assets) ═════════
+// G2 parity: hero_layout 'split' (photo beside the welcome text, cream-framed) and
+// nav_style 'centered' (stacked, centered header) — same settings as business-classic.
 const CSS = `:root{--ink:#241d1a;--soft:#6b5f58;--cream:var(--bg,#faf6ef);--card:#ffffff;--accent:#8c3b2e;--accent-dark:#6f2e24;--line:#e7ddd0;--good:#2e6b46}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -91,6 +93,7 @@ a{color:var(--accent)}a:hover{color:var(--accent-dark)}
 .wrap{max-width:960px;margin:0 auto;padding:0 20px}
 header.site{background:var(--cream);border-bottom:1px solid var(--line)}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}
+.nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
 .brand{font-size:1.35rem;color:var(--ink);text-decoration:none}
 nav.primary ul{display:flex;gap:6px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:var(--ink);border-radius:8px;font-size:.95rem;min-height:44px;line-height:24px}
@@ -101,6 +104,12 @@ main{display:block}
 .hero .tagline{font-size:1.15rem;color:var(--soft);max-width:38rem;margin:14px auto 0}
 .hero-img{margin-top:32px}.hero-img img{width:100%;max-width:860px;border-radius:14px;display:block;margin:0 auto}
 .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.hero-split{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:center;text-align:left}
+.hero-split .tagline{margin:14px 0 0}
+.hero-split .cta-row{justify-content:flex-start}
+.hero-split .split-img{border-radius:var(--radius,14px);overflow:hidden;border:1px solid var(--line);background:var(--card)}
+.hero-split .split-img img{width:100%;height:100%;min-height:280px;object-fit:cover;display:block}
+@media (max-width:760px){.hero-split{grid-template-columns:1fr;text-align:center}.hero-split .cta-row{justify-content:center}.hero-split .tagline{margin:14px auto 0}}
 .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:13px 26px;border-radius:999px;font-weight:600;min-height:44px}
 .btn:hover{background:var(--accent-dark);color:#fff}
 .btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
@@ -273,7 +282,7 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
 <a class="skip" href="#main">Skip to main content</a>
 ${x.announce || ''}
 ${closedNotice}
-<header class="site"><div class="wrap nav">
+<header class="site"><div class="wrap nav${c.settings?.nav_style === 'centered' ? ' centered' : ''}">
   <a class="brand" href="/">${logo?.variants?.w400 ? `<img src="${attr(logo.variants.w400)}" alt="" class="brandlogo">` : ''}${esc(i.business_name)}</a>
   <nav class="primary" aria-label="Main"><ul>${
     c.settings?.nav?.length
@@ -320,17 +329,25 @@ function homeBody(c: SnapshotContent, site: SiteConfig, blocks: RenderedBlock[] 
   const maps = mapsHref(c);
   const book = safeHref(i.booking_url || '');
   const order = safeHref(i.ordering_url || '');
-  const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
-  return `${heroOff ? '' : `
-<section class="hero wrap">
+  const heroText = `
   <h1${pr('identity.business_name')}>${esc(i.business_name)}</h1>
   ${i.tagline ? `<p class="tagline"${pr('identity.tagline')}>${esc(i.tagline)}</p>` : ''}
   <div class="cta-row">
     ${book ? `<a class="btn" href="${attr(book)}" rel="noopener">Reserve a table</a>` : ''}
     ${order ? `<a class="btn${book ? ' ghost' : ''}" href="${attr(order)}" rel="noopener">Order online</a>` : ''}
     ${!book && !order ? `<a class="btn" href="/menu/">See the menu</a>` : ''}
-  </div>
-  ${hero ? `<div class="hero-img">${img(hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
+  </div>`;
+  // G2 (DS-6 parity): split layout — the photo sits beside the welcome text in a
+  // cream frame; a CROPPING presentation, so the focal point (DS-5) drives it.
+  const useSplit = c.settings?.hero_layout === 'split' && !!hero;
+  const focalStyle = hero?.focal ? ` style="object-position:${hero.focal.x}% ${hero.focal.y}%"` : '';
+  const splitImg = useSplit && hero?.variants
+    ? `<div class="split-img"><img src="${attr(hero.variants.w800 || hero.variants.w400 || '')}"${hero.variants.w400 && hero.variants.w1600 ? ` srcset="${attr(hero.variants.w400)} 400w, ${attr(hero.variants.w800 || hero.variants.w1600)} 800w, ${attr(hero.variants.w1600)} 1600w" sizes="(max-width:760px) 100vw, 45vw"` : ''} alt="${attr(hero.alt)}" fetchpriority="high"${focalStyle}></div>`
+    : '';
+  const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
+  return `${heroOff ? '' : `
+<section class="hero wrap">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
+  ${hero ? `<div class="hero-img">${img(hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}`}
 </section>`}
 <div class="strip"><div class="wrap">
   <span id="open-now" class="open-now" aria-live="polite"></span>

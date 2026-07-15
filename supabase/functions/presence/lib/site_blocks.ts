@@ -584,7 +584,15 @@ function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => 
   const webpSrcset = order.map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
   const src = v.w800 || v.w400 || Object.values(v)[0]; if (!src) return '';
   const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
-  const focal = m.focal ? ` style="object-position:${m.focal.x}% ${m.focal.y}%"` : '';
+  // Phase G3 (focal beyond hero): presence_media.focal_x/y ride the MediaRef into every
+  // block image (gallery, carousel, cards, columns, team, image, image_text, before/after,
+  // video poster, map, teaser) — object-position keeps the chosen point framed wherever
+  // the block's CSS cover-crops. Guarded: both coordinates must be finite numbers,
+  // clamped to 0-100; anything else omits the style entirely (deterministic + safe).
+  const fx = Number(m.focal?.x), fy = Number(m.focal?.y);
+  const focal = m.focal && Number.isFinite(fx) && Number.isFinite(fy)
+    ? ` style="${attr(`object-position:${Math.min(100, Math.max(0, fx))}% ${Math.min(100, Math.max(0, fy))}%`)}"`
+    : '';
   // Decorative → empty alt + role="presentation" (announced by nothing). Otherwise
   // the media's alt describes the image for AT + search.
   const a11y = opts?.decorative ? ` alt="" role="presentation"` : ` alt="${attr(m.alt || '')}"`;

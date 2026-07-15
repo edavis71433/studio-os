@@ -4639,15 +4639,14 @@ async function mountDesignCard() {
   pillRow(card, "Corners", CORNER_OPTS, (o) => String(T.radius || "") === o[1], (o) => saveTokens({ radius: o[1] }, "Corners: " + o[0]));
   pillRow(card, "Background", BG_OPTS, (o) => String(T.bg || "") === o[1], (o) => saveTokens({ bg: o[1] }, "Background: " + o[0]));
   pillRow(card, "Spacing", DENSITY_OPTS, (o) => String(T.spacing_scale || "") === o[1], (o) => saveTokens({ spacing_scale: o[1] }, "Spacing: " + o[0]));
-  // DS-6/DS-7: layout choices (business-classic renders them; restaurant keeps its identity)
-  if (((S.site && S.site.template) || "").indexOf("business-classic") === 0) {
-    const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
-    pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-      async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
-    const navRow = [["Standard", ""], ["Centered", "centered"]];
-    pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-      async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
-  }
+  // DS-6/DS-7: layout choices — every template family renders both variants,
+  // each in its own visual voice, so the controls show for all templates (G2).
+  const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
+  pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
+    async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+  const navRow = [["Standard", ""], ["Centered", "centered"]];
+  pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
+    async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
