@@ -256,13 +256,15 @@ async function pin(id,on){const r=await api('/crm/notes/'+id+'/pin','POST',{pinn
 async function del(id){const r=await api('/crm/notes/'+id,'DELETE');if(r.ok){toast('Removed.');loadOverview($('tabbody'));}else toast('Couldn’t remove that note.');}
 
 // ── Details tab (contact facts + custom fields — inline from /sales/contacts/:id) ──
+let DETAIL=null;
 async function loadDetails(host){
   const cid=(REC.identity&&REC.identity.contact_id)||''; if(!cid){host.innerHTML='<p class="muted">No contact on file yet.</p>';return;}
   const r=await api('/sales/contacts/'+cid);
   if(!r.ok){host.innerHTML='<p class="muted">Couldn’t load contact details just now.</p>';return;}
   const d=r.body.data||{}; const c=d.contact||{}; const cf=d.custom_fields||[]; const cv=c.custom||{};
+  DETAIL={cid,c};
   const rows=[['Name',c.name],['Company',c.company],['Email',c.email],['Phone',c.phone]].filter(x=>x[1]);
-  let html=`<section><h2>Contact</h2><div class="card"><div class="kv">`+rows.map(x=>`<div class="k">${esc(x[0])}</div><div>${esc(x[1])}</div>`).join('')+`</div></div></section>`;
+  let html=`<section><h2>Contact <button class="link" id="editContact" style="border:none;background:none;font-size:13px;color:var(--p);cursor:pointer;padding:0;text-transform:none;letter-spacing:0">Edit</button></h2><div class="card"><div class="kv">`+(rows.length?rows.map(x=>`<div class="k">${esc(x[0])}</div><div>${esc(x[1])}</div>`).join(''):'<div class="muted">No details yet — tap Edit to add them.</div>')+`</div></div></section>`;
   if(cf.length){
     html+=`<section><h2>Details</h2><div class="card"><div class="kv">`+cf.map(f=>`<div class="k">${esc(f.label||f.key)}</div><div>${esc(cv[f.key]!=null&&cv[f.key]!==''?cv[f.key]:'—')}</div>`).join('')+`</div></div></section>`;
   }
@@ -271,6 +273,22 @@ async function loadDetails(host){
     html+=`<section><h2>Deals</h2>`+deals.map(dl=>`<div class="card"><div style="font-weight:600">${esc(dl.title||'Deal')}</div><div class="muted">${esc(dl.stage||'')}${dl.last_contacted_at?' · last contacted '+esc(when(dl.last_contacted_at)):''}</div></div>`).join('')+`</section>`;
   }
   host.innerHTML=html;
+  const eb=$('editContact'); if(eb)eb.onclick=()=>editContact(host);
+}
+// Edit the contact inline — restores the severed contact-editing path (PATCH /sales/contacts/:id).
+function editContact(host){
+  const c=(DETAIL&&DETAIL.c)||{}; const cid=DETAIL&&DETAIL.cid;
+  const field=(id,label,val,type)=>`<label class="mut" for="${id}" style="font-size:12.5px;color:var(--faint);display:block;margin-top:10px">${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px">`;
+  host.innerHTML=`<section><h2>Edit contact</h2><div class="card">
+    ${field('ec-name','Name',c.name)}${field('ec-company','Company',c.company)}${field('ec-email','Email',c.email,'email')}${field('ec-phone','Phone',c.phone,'tel')}
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px"><button id="ec-cancel">Cancel</button><button class="primary" id="ec-save">Save</button></div></div></section>`;
+  $('ec-cancel').onclick=()=>loadDetails(host);
+  $('ec-save').onclick=async()=>{
+    const body={name:$('ec-name').value.trim(),company:$('ec-company').value.trim(),email:$('ec-email').value.trim(),phone:$('ec-phone').value.trim()};
+    const btn=$('ec-save'); btn.disabled=true;
+    const r=await api('/sales/contacts/'+cid,'PATCH',body);
+    if(r.ok){toast('Saved.');loadDetails(host);}else{toast((r.body&&r.body.message)||'Couldn’t save.');btn.disabled=false;}
+  };
 }
 
 // ── Messages tab — ONE conversation with this client (Salesforce activity model) ──
