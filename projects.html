@@ -273,7 +273,7 @@ async function openProject(id){
     $('detailInner').innerHTML=`
       <div class="backbar"><button class="btn ghost sm" id="closeDetail">← Back to projects</button></div>
       <div class="dhead"><div><div id="dtitle" tabindex="-1">${esc(p.name)}</div>
-        <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div></div>
+        <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div>${STUDIO?`<button class="btn ghost sm" id="renameProj">Rename</button>`:''}</div>
       <div class="dbody"><div class="dgrid${asideHtml?'':' nosplit'}">
         ${asideHtml?`<aside class="dside">${asideHtml}</aside>`:''}
         <div class="dmain">
@@ -287,6 +287,14 @@ async function openProject(id){
         </div>
       </div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
+    // rename the project (studio only) — wires the existing PATCH /projects/:id
+    if(STUDIO&&$('renameProj'))$('renameProj').onclick=()=>{
+      const dt=$('dtitle');
+      dt.innerHTML=`<input id="renInput" value="${esc(p.name||'')}" aria-label="Project name" style="font:inherit;font-family:var(--serif);font-size:24px;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:4px 8px"><div class="row2" style="margin-top:8px"><button class="btn sm" id="renSave">Save</button><button class="btn ghost sm" id="renCancel">Cancel</button></div>`;
+      const inp=$('renInput');if(inp)inp.focus();
+      $('renCancel').onclick=()=>openProject(id);
+      $('renSave').onclick=async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.');return;}try{await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');openProject(id);}catch(e){toast(nice(e),true);}};
+    };
     // status
     $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
     // milestones
