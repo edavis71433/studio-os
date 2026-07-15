@@ -32,7 +32,9 @@
   .convo-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
   .convo-main .top{display:flex;align-items:center;gap:10px}
   .convo-main .body{margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .cmbadge{flex:0 0 auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--p,#5b3fa0);color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .cmbadge{flex:0 0 auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--faint,#948bad);color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .cmbadge.reply{background:var(--warn,#d8b878);color:#3a2f12}
+  .item.convo.needsreply{border-left:3px solid var(--warn,#d8b878)}
   h2 .cmcount{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;padding:0 7px;margin-left:8px;border-radius:999px;background:var(--p,#5b3fa0);color:#fff;font-size:13px;font-weight:700;vertical-align:middle}
   .cmbar{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--soft)}
   .cmbar select{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:13.5px}
@@ -133,19 +135,22 @@ function render(feed,leads,notifs){
     for(const c of clientMsgs){const key=c.client_id||'';const nm=c.client||'Other clients';
       if(!groups.has(key))groups.set(key,{name:nm,items:[],href:''});const g=groups.get(key);g.items.push(c);if(c.href&&!g.href)g.href=c.href;}
     const glist=[...groups.entries()];
-    // most-recently-active client first
+    // reply-needed clients first, then most-recently-active
+    const needs=(g)=>g.items.some(c=>c.needs_reply||c.type==='support')?1:0;
     const lastAt=(g)=>g.items.reduce((m,c)=>String(c.created_at||'')>m?String(c.created_at||''):m,'');
-    glist.sort((a,b)=>lastAt(b[1]).localeCompare(lastAt(a[1])));
+    glist.sort((a,b)=>needs(b[1])-needs(a[1])||lastAt(b[1]).localeCompare(lastAt(a[1])));
+    const waiting=glist.filter(([k,g])=>needs(g)).length;
     h+=`<h2>Messages <span class="cmcount">${glist.length}</span></h2>`;
-    h+=`<p class="mut" style="margin:-6px 0 12px">${glist.length===1?'1 client is waiting to hear back from you.':glist.length+' clients are waiting to hear back from you.'}</p>`;
+    h+=`<p class="mut" style="margin:-6px 0 12px">${waiting?`${waiting} ${waiting===1?'conversation needs':'conversations need'} a reply.`:'You’re caught up on replies — recent conversations below.'}</p>`;
     for(const [k,g] of glist){
       const latest=g.items.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||{};
       const isSup=latest.type==='support';
-      const preview=isSup?('Support: '+esc(latest.subject||'a request')):'Sent you a message';
+      const reply=needs(g);
+      const preview=isSup?('Support: '+esc(latest.subject||'a request')):(latest.needs_reply?'Sent you a message':'You replied — waiting on them');
       const n=g.items.length;
       const href=scoped(g.href||'/projects.html');
       const initials=esc((g.name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
-      h+=`<a class="item convo" href="${esc(href)}"><div class="convo-row"><span class="avatar" aria-hidden="true">${initials}</span><span class="convo-main"><span class="top"><span class="who">${esc(g.name)}</span>${latest.created_at?`<span class="when">${esc(when(latest.created_at))}</span>`:''}</span><span class="body">${preview}</span></span>${n>1?`<span class="cmbadge">${n}</span>`:''}</div><div class="go">Open conversation →</div></a>`;
+      h+=`<a class="item convo${reply?' needsreply':''}" href="${esc(href)}"><div class="convo-row"><span class="avatar" aria-hidden="true">${initials}</span><span class="convo-main"><span class="top"><span class="who">${esc(g.name)}</span>${latest.created_at?`<span class="when">${esc(when(latest.created_at))}</span>`:''}</span><span class="body">${preview}</span></span>${reply?`<span class="cmbadge reply">Reply</span>`:(n>1?`<span class="cmbadge">${n}</span>`:'')}</div><div class="go">Open conversation →</div></a>`;
     }
   }
 

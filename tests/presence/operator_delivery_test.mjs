@@ -57,7 +57,7 @@ ok('BYCLIENT: feed enriches each message with the CLIENT id + name', /client_id:
 ok('BYCLIENT: client lookups are BATCHED via the bridge + one clients read (no N+1)', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active&select=project_id,customer_client_id/.test(ws) && /clients\?id=in\.\(\$\{\[\.\.\.clientIds\]\.join\(','\)\}\)/.test(ws));
 ok('BYCLIENT: a project-less request groups by matching its requester → customer', /requesterToClient\[requester\]/.test(ws));
 ok('BYCLIENT: inbox groups the section by client_id', /const key=c\.client_id/.test(inbox) && /groups\.set\(key/.test(inbox));
-ok('BYCLIENT: inbox shows ONE conversation row per client (avatar + name + open)', /class="item convo"/.test(inbox) && /class="avatar"/.test(inbox) && /Open conversation/.test(inbox));
+ok('BYCLIENT: inbox shows ONE conversation row per client (avatar + name + open)', /class="item convo/.test(inbox) && /class="avatar"/.test(inbox) && /Open conversation/.test(inbox));
 ok('BYCLIENT: each conversation opens that client’s thread + shows a message-count badge', /class="cmbadge"/.test(inbox) && /scoped\(g\.href/.test(inbox));
 ok('BYCLIENT: projects.html no longer shows the studio-wide client-messages list', !/loadClientMessages/.test(projects) && !/id="clientMsgs"/.test(projects));
 ok('BYCLIENT: projects.html KEEPS the per-customer general messages inside the delivery view', /loadClientGeneral/.test(projects) && /id="genList"/.test(projects));

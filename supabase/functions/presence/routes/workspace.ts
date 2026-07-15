@@ -336,14 +336,14 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
         // ambiguity (a solo owner and their customer are both 'client').
         svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=project_id,detail,created_at&order=created_at.desc&limit=100`),
       ]);
-      // the latest message per project; a project "needs a reply" when that latest
-      // message came from the client (clears automatically once the studio answers).
-      const latest = new Map<string, any>();
-      for (const e of ((evR.json as any[]) || [])) { const pid = String(e.project_id || ''); if (pid && !latest.has(pid)) latest.set(pid, e); }
-      const needReply: Array<{ project_id: string; created_at: string }> = [];
-      for (const [pid, e] of latest) { if ((e.detail || {}).from === 'client') needReply.push({ project_id: pid, created_at: e.created_at }); }
+      // Summarize EVERY project conversation, not only the ones awaiting a reply, so
+      // the operator sees who they're talking with even after they've answered. evR is
+      // created_at.desc, so the FIRST event seen per project is its latest; `needs_reply`
+      // (that latest message came FROM the client) flags the ones still on the studio.
+      const convo = new Map<string, { latest: any; count: number }>();
+      for (const e of ((evR.json as any[]) || [])) { const pid = String(e.project_id || ''); if (!pid) continue; const cur = convo.get(pid); if (cur) cur.count++; else convo.set(pid, { latest: e, count: 1 }); }
       const sup = ((supR.json as any[]) || []);
-      const pids = [...new Set([...sup.filter((r) => r.project_id).map((r) => String(r.project_id)), ...needReply.map((n) => n.project_id)])];
+      const pids = [...new Set([...sup.filter((r) => r.project_id).map((r) => String(r.project_id)), ...convo.keys()])];
       // project → { name, client_id }. client_id ties a project's messages back to the
       // CUSTOMER so the Inbox can group by client (tenant-safe: the project is fetched
       // on THIS studio's site).
@@ -373,7 +373,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
         return { client_id: cid, client: cid ? (clientById[cid] || 'Client') : '' };
       };
       for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, href: pid ? `/projects.html?project=${r.project_id}` : `/projects.html?support=${r.id}` }); }
-      for (const n of needReply) { const c = clientFor(n.project_id, ''); client_messages.push({ type: 'message', project: projById[n.project_id]?.name || '', client_id: c.client_id, client: c.client, created_at: n.created_at, href: `/projects.html?project=${n.project_id}` }); }
+      for (const [pid, cv] of convo) { const c = clientFor(pid, ''); client_messages.push({ type: 'message', project: projById[pid]?.name || '', client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: (cv.latest.detail || {}).from === 'client', count: cv.count, href: `/projects.html?project=${pid}` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20);
     } catch { /* best-effort — the inbox still renders without this section */ }
