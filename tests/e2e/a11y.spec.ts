@@ -6,7 +6,9 @@ import { installApp } from './helpers/app';
 // basics of the shared shell. Only runs on the desktop project (one scan is
 // enough; layout-per-viewport is covered by responsive.spec).
 test.describe('Accessibility', () => {
-  test.skip((_, testInfo) => testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+  // hook form: (fixtures, testInfo) is stable across Playwright versions, while
+  // the skip-predicate second argument was dropped in newer majors.
+  test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
 
   for (const path of ['/today.html', '/leads.html', '/client.html']) {
     test(`no serious/critical axe violations on ${path}`, async ({ page }) => {

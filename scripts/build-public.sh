@@ -29,7 +29,7 @@ done
 cp ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.ico dist/ 2>/dev/null || true
 
 # public asset directories (marketing photos / case studies / vendored libs)
-for d in life case-studies vendor; do
+for d in life case-studies vendor fonts; do
   [ -d "$d" ] && cp -r "$d" dist/
 done
 

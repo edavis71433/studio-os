@@ -81,9 +81,11 @@ test.describe('Today', () => {
   });
 
   test('upgrade orientation card appears once, then dismisses (PP-6)', async ({ page }) => {
-    // seed a PRIOR edition so studio_os reads as an upgrade
+    // seed a PRIOR edition so studio_os reads as an upgrade. Guarded: init
+    // scripts re-run on reload, and an unguarded seed would overwrite the
+    // advanced marker and re-trigger the card — falsifying the reload assertion.
     await page.addInitScript(() => {
-      localStorage.setItem('dds-oriented', JSON.stringify({ key: 'cms_only', feats: ['website', 'developer', 'forms', 'client_portal', 'reports'] }));
+      if (!localStorage.getItem('dds-oriented')) localStorage.setItem('dds-oriented', JSON.stringify({ key: 'cms_only', feats: ['website', 'developer', 'forms', 'client_portal', 'reports'] }));
     });
     await installApp(page, { api: { '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } }, '/moments': { data: [] } } });
     await page.goto('/today.html');

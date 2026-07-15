@@ -119,8 +119,9 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
   // seed the session before any page script runs
   await page.addInitScript((s) => { (window as unknown as { __E2E_SESSION: unknown }).__E2E_SESSION = s; }, session);
 
-  // serve the supabase-js CDN request with our stub (fully offline)
-  await page.route(/@supabase\/supabase-js/, (route: Route) =>
+  // serve the supabase-js request with our stub (fully offline) — matches both
+  // the historical CDN URL and the self-hosted /vendor/ copy (#169 vendoring)
+  await page.route(/@supabase\/supabase-js|\/vendor\/supabase-js/, (route: Route) =>
     route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
 
   // mock every presence Edge Function call
