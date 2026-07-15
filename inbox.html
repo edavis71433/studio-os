@@ -115,9 +115,12 @@ function render(feed,leads,notifs){
   // FIX 5: client support requests + client project messages, surfaced first-class
   // (not the dim, auto-read "Project activity" line). Each links to where you reply.
   const clientMsgs=(feed.client_messages||[]);
+  // Project activity is the studio's OWN worklog (milestones, files, approvals) —
+  // NOT client messages. Support requests and client messages belong to the grouped
+  // "Messages" section above (one row per client), never a flat cross-client list.
   // Keep recently-read activity VISIBLE (dimmed) — glancing at the Inbox must
   // never make unhandled items vanish; they just stop counting as new.
-  const activity=(notifs||[]).slice(0,12);
+  const activity=(notifs||[]).filter(n=>n.kind!=='support_message'&&n.kind!=='message').slice(0,12);
   const unreadCount=activity.filter(n=>!n.read).length;
   const total=approvals.length+clientMsgs.length+notices.length+moments.length+newLeads.length+unreadCount;
   let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;

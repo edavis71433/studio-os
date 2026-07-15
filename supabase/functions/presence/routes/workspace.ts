@@ -330,7 +330,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   if (seesFull) {
     try {
       const [supR, evR] = await Promise.all([
-        svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,requester,updated_at&order=updated_at.desc&limit=25`),
+        svc(`presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=id,subject,project_id,requester,updated_at&order=updated_at.desc&limit=25`),
         // kind=message events carry detail.from ('client'|'studio') — stamped by the
         // client door — so we can tell whose turn it is without the author_kind
         // ambiguity (a solo owner and their customer are both 'client').
@@ -357,8 +357,9 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       // customer via their auth-user-id/email so it groups under the right client too.
       const links = (((await svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`)).json as any[]) || []);
       const projToClient: Record<string, string> = {};
+      const clientToProject: Record<string, string> = {};  // client id → one of their projects (to open their profile)
       const clientIds = new Set<string>();
-      for (const l of links) { const pid = String(l.project_id || ''); const cid = String(l.customer_client_id || ''); if (cid) { clientIds.add(cid); if (pid) projToClient[pid] = cid; } }
+      for (const l of links) { const pid = String(l.project_id || ''); const cid = String(l.customer_client_id || ''); if (cid) { clientIds.add(cid); if (pid) { projToClient[pid] = cid; if (!clientToProject[cid]) clientToProject[cid] = pid; } } }
       for (const pid of pids) { const cid = projById[pid]?.client_id; if (cid) clientIds.add(cid); }
       const clientById: Record<string, string> = {};       // client id → display name
       const requesterToClient: Record<string, string> = {}; // reader key → client id
@@ -372,7 +373,11 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
         const cid = (pid && (projToClient[pid] || projById[pid]?.client_id)) || (requester ? requesterToClient[requester] : '') || '';
         return { client_id: cid, client: cid ? (clientById[cid] || 'Client') : '' };
       };
-      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, href: pid ? `/projects.html?project=${r.project_id}` : `/projects.html?support=${r.id}` }); }
+      // href: a request opens the CLIENT'S PROFILE (delivery view) wherever we can tie
+      // it to one — a project-scoped request opens its project; a project-less request
+      // opens the customer's project when the bridge knows one; only a truly orphaned
+      // request (no client, no project) falls back to its standalone conversation page.
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, href: profilePid ? `/projects.html?project=${profilePid}` : `/projects.html?support=${r.id}` }); }
       for (const [pid, cv] of convo) { const c = clientFor(pid, ''); client_messages.push({ type: 'message', project: projById[pid]?.name || '', client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: (cv.latest.detail || {}).from === 'client', count: cv.count, href: `/projects.html?project=${pid}` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20);
