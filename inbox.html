@@ -168,9 +168,6 @@ function render(feed,leads,notifs){
   h+=toolkit();
   $('main').innerHTML=h;
 }
-// Client-messages dropdown: show one client's group (or all). No re-fetch — just
-// toggles the pre-rendered groups. Empty note appears only if nothing's visible.
-function filterClientMsgs(v){var any=false;document.querySelectorAll('[data-cm]').forEach(function(el){var on=(!v||el.getAttribute('data-cm')===v);el.style.display=on?'':'none';if(on)any=true;});var e=$('cmEmpty');if(e)e.style.display=any?'none':'';}
 // ── Support toolkit: two owner-managed tools that live right here in the Inbox.
 //   • Saved replies — canned answers you reuse when replying to enquiries.
 //   • Customer FAQ  — common Q&A your clients can read anytime in their portal.

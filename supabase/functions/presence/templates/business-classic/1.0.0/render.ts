@@ -11,6 +11,7 @@ import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { renderNavList, NAV_DROPDOWN_CSS } from '../../../lib/site_nav.ts';
+import { seoHead } from '../../../lib/seo_emit.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
@@ -257,34 +258,11 @@ function shell(c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpt
     const label = k === 'x' ? 'X' : k === 'google_maps' ? 'Google Maps' : k[0].toUpperCase() + k.slice(1);
     return `<a href="${attr(href)}" rel="noopener">${esc(label)}</a>`;
   }).filter(Boolean).join(' · ');
-  const canonical = `${site.baseUrl}${o.path}`;
   const closedNotice = loc0(c)?.temporarily_closed
     ? `<div class="notice" role="status">${esc(loc0(c)!.temporarily_closed_note || 'We are temporarily closed. See you soon.')}</div>` : '';
   const credit = site.brand?.credit ? `<span>${esc(site.brand.credit)}</span>` : '';
 
-  return `<!DOCTYPE html>
-<html lang="${attr(site.locale || 'en')}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(o.title)}</title>
-<meta name="description" content="${attr(o.description)}">
-<link rel="canonical" href="${attr(canonical)}">
-${c.settings?.verification?.google ? `<meta name="google-site-verification" content="${attr(c.settings.verification.google)}">` : ''}${c.settings?.verification?.bing ? `\n<meta name="msvalidate.01" content="${attr(c.settings.verification.bing)}">` : ''}
-<link rel="icon" href="${attr(x.icon || '/favicon.svg')}"${x.icon ? '' : ' type="image/svg+xml"'}>
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="${attr(i.business_name)}">
-<meta property="og:title" content="${attr(o.title)}">
-<meta property="og:description" content="${attr(o.description)}">
-<meta property="og:url" content="${attr(canonical)}">
-${o.ogImage ? `<meta property="og:image" content="${attr(site.baseUrl + o.ogImage)}">` : ''}
-<meta name="twitter:card" content="${o.ogImage ? 'summary_large_image' : 'summary'}">
-<meta name="twitter:title" content="${attr(o.title)}">
-<meta name="twitter:description" content="${attr(o.description)}">
-<style>${CRITICAL}</style>
-<link rel="stylesheet" href="${attr(cssPath)}">
-${o.ld.map((j) => `<script type="application/ld+json">${JSON.stringify(j).replaceAll('<', '\\u003c')}</script>`).join('\n')}
-</head>
+  return `${seoHead(o, site, c, x, CRITICAL, cssPath)}
 <body>
 <a class="skip" href="#main">Skip to main content</a>
 ${x.announce}
