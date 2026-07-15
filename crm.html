@@ -33,6 +33,18 @@
   .tabs button:hover{color:var(--ink)}
   .tabs button.on{color:var(--p);border-bottom-color:var(--p)}
   #tabbody{margin-top:22px}
+  .msg-thread{display:flex;flex-direction:column;gap:10px;max-width:720px}
+  .brow{display:flex}
+  .brow.me{justify-content:flex-end}
+  .bubble{max-width:80%;border:1px solid var(--line);border-radius:14px;padding:10px 13px;box-shadow:var(--shadow)}
+  .bubble.client{background:var(--card);border-bottom-left-radius:4px}
+  .bubble.studio{background:var(--p-soft);border-color:transparent;border-bottom-right-radius:4px}
+  .b-sub{font-weight:700;font-size:13px;margin-bottom:4px}
+  .b-status{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:1px 7px;margin-left:4px}
+  .b-body{font-size:14.5px;white-space:pre-wrap;line-height:1.5}
+  .b-when{font-size:11.5px;color:var(--faint);margin-top:5px}
+  .msg-compose{margin-top:18px;max-width:720px}
+  .msg-compose textarea{margin-top:5px}
   .embed-frame{width:100%;height:calc(100vh - 210px);min-height:540px;border:0;border-radius:14px;background:var(--card);box-shadow:var(--shadow)}
   .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
   .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px}
@@ -120,9 +132,9 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const ICON={publish:'✓',change:'✎',connected:'⇄',moment:'✦',approval:'⏳',note:'✐'};
 
-let REC=null, TAB='', STUDIO=true, NEWAUD='internal';
-const TAB_LABEL={overview:'Overview',deal:'Deal',delivery:'Delivery',details:'Details'};
-const TAB_ORDER=['overview','deal','delivery','details'];
+let REC=null, TAB='', STUDIO=true, NEWAUD='internal', MSG_REPLY_TO=null;
+const TAB_LABEL={overview:'Overview',messages:'Messages',deal:'Deal',delivery:'Delivery',details:'Details'};
+const TAB_ORDER=['overview','messages','deal','delivery','details'];
 
 // Build the query for /crm/record from whatever the URL carries.
 function recordQuery(){
@@ -183,6 +195,7 @@ function showTab(tab,initial){
   if(!initial)setTabUrl(tab);
   const host=$('tabbody'); if(!host)return; host.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   if(tab==='overview')return loadOverview(host);
+  if(tab==='messages')return loadMessages(host);
   if(tab==='details')return loadDetails(host);
   // Deal + Delivery embeds run UNSCOPED on purpose: the deal/project rows live on
   // the operator's own agency site, so the embedded page must resolve against that
@@ -258,6 +271,27 @@ async function loadDetails(host){
     html+=`<section><h2>Deals</h2>`+deals.map(dl=>`<div class="card"><div style="font-weight:600">${esc(dl.title||'Deal')}</div><div class="muted">${esc(dl.stage||'')}${dl.last_contacted_at?' · last contacted '+esc(when(dl.last_contacted_at)):''}</div></div>`).join('')+`</section>`;
   }
   host.innerHTML=html;
+}
+
+// ── Messages tab — ONE conversation with this client (Salesforce activity model) ──
+// Every message + support ticket + reply, merged chronologically. One reply box that
+// sends to the client (a project message). Support tickets show inline with status.
+async function loadMessages(host){
+  const ids=idParams(); const q=[]; if(ids.project)q.push('project='+encodeURIComponent(ids.project)); if(REC.identity&&REC.identity.client_id)q.push('client_id='+encodeURIComponent(REC.identity.client_id));
+  const r=await api('/crm/messages'+(q.length?('?'+q.join('&')):''));
+  if(!r.ok){host.innerHTML='<p class="muted">Couldn’t load this conversation just now.</p>';return;}
+  const d=r.body.data||{}; const items=d.items||[]; MSG_REPLY_TO=d.reply_to||null;
+  let thread='';
+  if(!items.length)thread='<p class="muted" style="padding:8px 2px">No messages yet. Say hello below.</p>';
+  else thread=items.map(m=>{
+    const mine=m.from==='studio';
+    const head=m.kind==='support'?`<div class="b-sub">🎫 ${esc(m.subject||'Support request')}${m.status?` <span class="b-status">${esc(m.status)}</span>`:''}</div>`:'';
+    return `<div class="brow ${mine?'me':'them'}"><div class="bubble ${mine?'studio':'client'}">${head}<div class="b-body">${esc(m.body||'')}</div><div class="b-when">${mine?'You':'Client'} · ${esc(when(m.created_at))}</div></div></div>`;
+  }).join('');
+  host.innerHTML=`<div class="msg-thread">${thread}</div>`+
+    (MSG_REPLY_TO?`<form id="msgForm" class="msg-compose"><label class="mut" for="msgBody" style="font-size:12.5px;color:var(--faint)">Reply to the client</label><textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="primary" type="submit">Send</button></div></form>`
+      :`<p class="muted" style="margin-top:14px">Replies open once this client has a project.</p>`);
+  const f=$('msgForm'); if(f)f.onsubmit=async(e)=>{e.preventDefault();const ta=$('msgBody');const body=(ta.value||'').trim();if(!body)return;const btn=f.querySelector('button');btn.disabled=true;try{const rr=await api(MSG_REPLY_TO,'POST',{body,audience:'client'});if(rr.ok){ta.value='';loadMessages($('tabbody'));}else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}}catch(_){toast('Couldn’t send.');btn.disabled=false;}};
 }
 
 function picker(){$('main').innerHTML=`<div class="center"><h2>Open a client to see their record.</h2><p class="muted" style="margin-bottom:18px">Pick a customer, contact, or deal — their whole relationship opens here.</p><p><a class="link" href="/customers.html">Go to Customers →</a></p></div>`;}

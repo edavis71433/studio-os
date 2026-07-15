@@ -53,7 +53,7 @@ import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberA
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut } from './routes/dev.ts';
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
-import { handleCrmRecord, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
+import { handleCrmRecord, handleCrmMessages, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
@@ -774,6 +774,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    studio-vs-client (existing principal/agency signals); reviewer is already
   //    refused. No new permission/visibility/navigation model.
   if (route === '/crm/record' && method === 'GET') return handleCrmRecord(req, jwt, site, principal, cors);
+  if (route === '/crm/messages' && method === 'GET') return handleCrmMessages(req, jwt, site, principal, cors);
   if (route === '/crm/profile' && method === 'GET') return handleCrmProfile(jwt, site, principal, cors);
   if (route === '/crm/timeline' && method === 'GET') return handleCrmTimeline(jwt, site, principal, cors);
   if (route === '/crm/notes' && method === 'GET') return handleCrmNotesList(jwt, site, principal, cors);

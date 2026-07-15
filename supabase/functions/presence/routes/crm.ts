@@ -48,6 +48,69 @@ async function isStudioSide(jwt: string, principal: Principal): Promise<boolean>
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const one = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json[0] : null) as any;
+const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
+const isClientKind = (k: unknown) => k === 'client' || k === 'customer';
+
+/** Resolve a customer's identity keys (auth id via their contact + emails) so a
+ *  project-less support request they filed still ties to them. `clients` has NO
+ *  auth_user_id column — it lives on the linked contact. Mirrors project_comms. */
+async function customerRequesterKeys(agencySiteId: string, clientId: string): Promise<string[]> {
+  if (!clientId) return [];
+  const c = one(await svc(`clients?id=eq.${clientId}&select=email,contact_email,contact_id&limit=1`));
+  if (!c) return [];
+  let authId = '';
+  if (c.contact_id) { const ct = one(await svc(`contacts?id=eq.${c.contact_id}&select=auth_user_id&limit=1`)); authId = ct?.auth_user_id ? String(ct.auth_user_id) : ''; }
+  return [authId, c.email, c.contact_email].filter((k) => k != null && String(k).trim() !== '').map((k) => encodeURIComponent(`"${String(k).replace(/"/g, '')}"`));
+}
+
+/** ── /crm/messages — ONE conversation per client (the Salesforce activity model) ──
+ *  Every message with a customer, merged into a single chronological thread on their
+ *  record: project/general messages (presence_project_messages) + support tickets
+ *  (presence_support_requests) + ticket replies (presence_support_messages), each
+ *  tagged from client|studio. The operator replies from ONE composer (POST to the
+ *  project's /messages). Studio-side only; resolves the agency site the data lives on. */
+export async function handleCrmMessages(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (!(await isStudioSide(jwt, principal))) return json({ error: 'forbidden', message: 'Only your studio can open a client conversation.' }, 403, cors);
+  const u = new URL(req.url);
+  const qp = (k: string) => { const v = u.searchParams.get(k) || ''; return UUID_RE.test(v) ? v : ''; };
+  let projectId = qp('project');
+  let clientId = qp('client_id');
+  let agencySiteId = site.id;
+  if (site.client_id) {
+    clientId = clientId || String(site.client_id);
+    const links = await linksForCustomer(String(site.client_id));
+    if (links[0]) { agencySiteId = links[0].agency_site_id; if (!projectId) projectId = links[0].project_id; }
+  }
+  // project → its customer (so a project-scoped record still resolves project-less tickets)
+  if (projectId && !clientId) { const lk = one(await svc(`presence_service_links?project_id=eq.${projectId}&status=eq.active&select=customer_client_id,agency_site_id&limit=1`)); if (lk) { clientId = String(lk.customer_client_id || ''); if (lk.agency_site_id) agencySiteId = String(lk.agency_site_id); } }
+  const AS = agencySiteId;
+
+  try {
+    const items: any[] = [];
+    if (projectId) {
+      for (const m of arr(await svc(`presence_project_messages?project_id=eq.${projectId}&site_id=eq.${AS}&deleted_at=is.null&select=id,audience,body,author_kind,created_at&order=created_at.asc&limit=300`))) {
+        if (m.audience === 'internal') continue;   // internal notes aren't part of the client conversation
+        items.push({ id: m.id, kind: 'message', from: isClientKind(m.author_kind) ? 'client' : 'studio', body: String(m.body || ''), created_at: m.created_at });
+      }
+    }
+    const keys = clientId ? await customerRequesterKeys(AS, clientId) : [];
+    const sup: any[] = [];
+    const seen = new Set<string>();
+    const addSup = (rows_: any[]) => { for (const s of rows_) { if (!seen.has(String(s.id))) { seen.add(String(s.id)); sup.push(s); } } };
+    if (projectId) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=eq.${projectId}&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.asc&limit=100`)));
+    if (keys.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&deleted_at=is.null&requester=in.(${keys.join(',')})&select=id,subject,body,status,requester_kind,created_at&order=created_at.asc&limit=100`)));
+    for (const s of sup) {
+      items.push({ id: s.id, kind: 'support', support_id: s.id, subject: String(s.subject || 'Support request'), status: s.status, from: 'client', body: String(s.body || ''), created_at: s.created_at });
+      for (const r of arr(await svc(`presence_support_messages?request_id=eq.${s.id}&site_id=eq.${AS}&deleted_at=is.null&select=id,body,author_kind,created_at&order=created_at.asc&limit=200`))) {
+        items.push({ id: r.id, kind: 'support_reply', support_id: s.id, from: isClientKind(r.author_kind) ? 'client' : 'studio', body: String(r.body || ''), created_at: r.created_at });
+      }
+    }
+    items.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    return json({ data: { items, project_id: projectId || null, reply_to: projectId ? `/projects/${projectId}/messages` : null } }, 200, cors);
+  } catch (_e) {
+    return json({ error: 'read_failed', message: 'We couldn’t load this conversation just now.' }, 502, cors);
+  }
+}
 
 /** ── /crm/record — the RESOLVER behind the unified Client Record ───────────────
  *  One relationship is physically split across four tables (contact → deal →
@@ -121,7 +184,9 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
     // overview (the relationship health view) reads /crm/profile, which is only
     // SAFE when we can scope to a real customer site — otherwise it would run
     // against the operator's own site (the old crm.html landmine). Gate on the site.
-    const sections = { overview: !!customerSiteId, deal: !!dealId, delivery: !!projectId, details: !!contactId };
+    // messages = the ONE conversation with this client (project msgs + support), shown
+    // whenever we can tie the record to a project or a customer.
+    const sections = { overview: !!customerSiteId, messages: !!(projectId || clientId), deal: !!dealId, delivery: !!projectId, details: !!contactId };
     const default_tab = projectId ? 'delivery' : (dealId ? 'deal' : (customerSiteId ? 'overview' : 'details'));
     // canonical addressing: the most-stable key that exists (customer site → deal → contact)
     const canonical = customerSiteId ? { key: 'client', value: customerSiteId } : (dealId ? { key: 'deal', value: dealId } : { key: 'contact', value: contactId });
