@@ -273,9 +273,8 @@ async function openProject(id){
           <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share a file</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
           <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
           ${STUDIO?`<div class="sec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>
-          <div class="sec"><h3>Support</h3><div id="supList" class="mut">Loading…</div></div>
-          <div class="sec"><h3 id="genHead">General messages</h3><div id="genList" class="mut">Loading…</div></div>`:''}
-          <div class="sec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
+          <div class="sec"><h3>Support requests</h3><div id="supList" class="mut">Loading…</div><div id="genList" class="mut"></div></div>`:''}
+          <div class="sec msgs"><h3>General messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
         </div>
       </div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
