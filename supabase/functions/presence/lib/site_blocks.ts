@@ -97,6 +97,28 @@ function parseLook(raw: unknown): BlockLook | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+// ── Wave-1 G4: per-block STYLE VARIANTS (Adobe's Style System, translated to the
+// curated philosophy). Each entry lists the NON-DEFAULT variants a block type may
+// take — 1-2 curated alternate looks rendered by THIS engine, on-brand across every
+// template. The default look has no name in storage: absent `variant` = the current
+// render, so every existing site stays byte-identical. Unknown values are dropped
+// at validation (→ default), never stored; the render branches only on these
+// enumerated strings, so a variant can never emit arbitrary markup/CSS. The
+// matching rules live in BLOCK_CSS, namespaced .v-<variant>. ──
+export const BLOCK_VARIANTS: Record<string, readonly string[]> = {
+  reviews_wall: ['quotes', 'strip'],   // testimonials: card grid (default) | big pull-quotes | compact band
+  accordion: ['two-column'],           // faq-style: accordion (default) | open Q&A grid
+  cta: ['card'],                       // banner (default) | boxed, centered card
+  pricing: ['list'],                   // tier cards (default) | atelier-style name—rule—price rows
+  gallery: ['masonry', 'filmstrip'],   // grid (default) | CSS-columns masonry | horizontal filmstrip
+};
+function parseVariant(type: string, raw: unknown): string | undefined {
+  const v = (raw && typeof raw === 'object') ? (raw as { variant?: unknown }).variant : undefined;
+  if (typeof v !== 'string') return undefined;
+  const allowed = BLOCK_VARIANTS[type];
+  return allowed && allowed.includes(v) ? v : undefined;
+}
+
 // ── Stored (pre-resolution) shapes for media blocks — carry media by ID; the
 //    serializer's resolveBlockMedia() turns IDs into MediaRefs (reusing ref()). ──
 interface StoredTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media_id?: string }> }
@@ -125,7 +147,8 @@ interface StoredDownload { type: 'download'; title?: string; file_id?: string; l
 // Same distributive WithLook as render_types: the owner-chosen per-section style
 // (Phase T-STYLE) rides on the stored block, orthogonal to its content. Phase EXP:
 // it ALSO carries the optional auto-expiring window (show_from / show_until).
-type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string } : never;
+// Wave-1 G4: and the optional, enumerated style `variant` (BLOCK_VARIANTS above).
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string; variant?: string } : never;
 export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
@@ -452,6 +475,10 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
     if (block) {
       const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
       if (look) (block as any).look = look;
+      // Wave-1 G4: attach the validated style variant (or nothing — the default look
+      // stores NO variant key, so a default block stays byte-identical in storage).
+      const variant = parseVariant(type, b);
+      if (variant) (block as any).variant = variant;
       // Phase EXP: attach the normalized auto-expiring window (or nothing). Parsing
       // is clockless — WHEN it shows is decided at render against snapshot.created_at.
       const win = parseWindow(b);
@@ -485,6 +512,7 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
     ...(b.look ? { look: b.look } : {}),
     ...((b as any).show_from ? { show_from: (b as any).show_from } : {}),
     ...((b as any).show_until ? { show_until: (b as any).show_until } : {}),
+    ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
   });
   for (const b of blocks) {
     switch (b.type) {
@@ -816,8 +844,15 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         ld = { '@context': 'https://schema.org', '@type': 'HowTo', name: b.title || 'How it works', step: b.steps.map((st, i) => ({ '@type': 'HowToStep', position: i + 1, name: st.step, text: st.detail || st.step })) };
         break;
       case 'pricing':
-        html = `<section class="block wrap block-pricing">${h2(b.title, 'Pricing')}<div class="cards">${b.tiers.map((tr) =>
-          `<div class="card price-tier"><div class="nm">${esc(tr.name)}</div>${tr.price_text ? `<div class="pr">${esc(tr.price_text)}</div>` : ''}${tr.features.length ? `<ul class="tier-feats">${tr.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>`;
+        if (b.variant === 'list') {
+          // Wave-1 G4 variant: atelier-style price rows — name, a quiet dotted
+          // rule, price; features as a muted line beneath. Same data, same schema.
+          html = `<section class="block wrap block-pricing v-list">${h2(b.title, 'Pricing')}<div class="price-list">${b.tiers.map((tr) =>
+            `<div class="pl-row"><div class="pl-head"><span class="pl-name">${esc(tr.name)}</span><span class="pl-rule" aria-hidden="true"></span>${tr.price_text ? `<span class="pl-price">${esc(tr.price_text)}</span>` : ''}</div>${tr.features.length ? `<p class="pl-feats">${tr.features.map((f) => esc(f)).join(' · ')}</p>` : ''}</div>`).join('')}</div></section>`;
+        } else {
+          html = `<section class="block wrap block-pricing">${h2(b.title, 'Pricing')}<div class="cards">${b.tiers.map((tr) =>
+            `<div class="card price-tier"><div class="nm">${esc(tr.name)}</div>${tr.price_text ? `<div class="pr">${esc(tr.price_text)}</div>` : ''}${tr.features.length ? `<ul class="tier-feats">${tr.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>`;
+        }
         ld = { '@context': 'https://schema.org', '@type': 'ItemList', name: b.title || 'Pricing', itemListElement: b.tiers.map((tr, i) => {
           const price = numericPrice(tr.price_text);
           return { '@type': 'ListItem', position: i + 1, item: { '@type': 'Offer', name: tr.name, ...(price ? { price, priceCurrency: 'USD' } : {}), ...(tr.features.length ? { description: tr.features.join('; ') } : {}) } };
@@ -832,13 +867,23 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         break;
       case 'cta': {
         const href = b.url ? safeHref(b.url) : null;
-        html = `<section class="block alt block-cta"><div class="wrap cta-inner"><p class="cta-text">${esc(b.text)}</p>${href ? `<a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Get started')}</a>` : ''}</div></section>`;
+        // Wave-1 G4 variant 'card': the same content in a boxed, centered card —
+        // the .v-card class switches the layout (rules in BLOCK_CSS); the default
+        // ('banner') emits no class, so existing markup stays byte-identical.
+        const vc = b.variant === 'card' ? ' v-card' : '';
+        html = `<section class="block alt block-cta${vc}"><div class="wrap cta-inner"><p class="cta-text">${esc(b.text)}</p>${href ? `<a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Get started')}</a>` : ''}</div></section>`;
         break;
       }
-      case 'gallery':
-        html = `<section class="block wrap block-gallery">${h2(b.title, 'Gallery')}<div class="gallery">${b.images.map((m) =>
+      case 'gallery': {
+        // Wave-1 G4 variants: 'masonry' (CSS columns, natural heights) and
+        // 'filmstrip' (one horizontal, swipeable row). Same figures either way —
+        // only the section's .v-<variant> class changes (rules in BLOCK_CSS);
+        // the default ('grid') emits no class → byte-identical markup.
+        const vg = b.variant === 'masonry' ? ' v-masonry' : b.variant === 'filmstrip' ? ' v-filmstrip' : '';
+        html = `<section class="block wrap block-gallery${vg}">${h2(b.title, 'Gallery')}<div class="gallery">${b.images.map((m) =>
           `<figure class="ga">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}${m.alt ? `<figcaption>${esc(m.alt)}</figcaption>` : ''}</figure>`).join('')}</div></section>`;
         break;
+      }
       case 'before_after':
         html = `<section class="block alt block-ba"><div class="wrap">${h2(b.title, 'Before &amp; after')}${b.items.map((it) =>
           `<div class="ba-pair">${['Before', 'After'].map((lab, k) => { const m = k ? it.after : it.before; return `<figure class="ba-fig"><span class="ba-lab">${lab}</span>${blockImg(m, esc, attr, '(max-width:640px) 100vw, 340px')}</figure>`; }).join('')}${it.caption ? `<p class="ba-cap">${esc(it.caption)}</p>` : ''}</div>`).join('')}</div></section>`;
@@ -928,8 +973,15 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         break;
       }
       case 'accordion': {   // native <details>/<summary> — keyboard + a11y for free, zero JS
-        const rows = b.items.map((it) => `<details class="acc-item"><summary>${esc(it.summary)}</summary>${it.body ? `<div class="prose">${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
-        html = `<section class="block wrap block-accordion">${h2(b.title, 'More information')}<div class="accordion">${rows}</div></section>`;
+        if (b.variant === 'two-column') {
+          // Wave-1 G4 variant: an OPEN Q&A grid (two columns ≥620px, stacks on
+          // phones) — every answer visible, real headings, still zero JS.
+          const rows = b.items.map((it) => `<div class="qa-item"><h3 class="qa-q">${esc(it.summary)}</h3>${it.body ? `<div class="prose">${renderMarkdown(it.body)}</div>` : ''}</div>`).join('');
+          html = `<section class="block wrap block-accordion v-two-column">${h2(b.title, 'More information')}<div class="qa-grid">${rows}</div></section>`;
+        } else {
+          const rows = b.items.map((it) => `<details class="acc-item"><summary>${esc(it.summary)}</summary>${it.body ? `<div class="prose">${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
+          html = `<section class="block wrap block-accordion">${h2(b.title, 'More information')}<div class="accordion">${rows}</div></section>`;
+        }
         break;
       }
       case 'tabs': {   // tabbed panels — ZERO JS (CSS radio pattern): keyboard-operable,
@@ -1019,7 +1071,29 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
             `<blockquote class="rw-body"><p>${esc(r.body)}</p></blockquote>` +
             `<figcaption class="rw-author">${esc(r.author)}${when}</figcaption>${reply}</figure>`;
         }).join('');
-        html = `<section class="block alt block-reviews-wall"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-grid">${cards}</div></div></section>`;
+        // Wave-1 G4 variants — same honest data, a different curated presentation:
+        // 'quotes' = large centered serif pull-quotes (one per row); 'strip' = the
+        // SAME cards in one compact, horizontally-scrolling band. Default ('cards')
+        // keeps the original grid byte-identically. Schema is unchanged either way
+        // (reviewsSchema reads the block data, not the markup).
+        if (b.variant === 'quotes') {
+          const quotes = b.reviews.map((r) => {
+            const full = Math.min(5, Math.max(0, Math.round(r.rating)));
+            const stars = '★'.repeat(full) + '☆'.repeat(5 - full);
+            const when = r.date ? `<time class="rw-date" datetime="${attr(r.date)}">${esc(r.date)}</time>` : '';
+            const reply = r.reply
+              ? `<div class="rw-reply"><p class="rw-reply-lbl">Response from the owner</p><p class="rw-reply-body">${esc(r.reply)}</p></div>`
+              : '';
+            return `<figure class="rw-quote"><p class="rw-stars" aria-label="${attr(r.rating + ' out of 5')}">${stars}</p>` +
+              `<blockquote class="rw-quote-body"><p>${esc(r.body)}</p></blockquote>` +
+              `<figcaption class="rw-quote-author">${esc(r.author)}${when}</figcaption>${reply}</figure>`;
+          }).join('');
+          html = `<section class="block alt block-reviews-wall v-quotes"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-quotes">${quotes}</div></div></section>`;
+        } else if (b.variant === 'strip') {
+          html = `<section class="block alt block-reviews-wall v-strip"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-strip">${cards}</div></div></section>`;
+        } else {
+          html = `<section class="block alt block-reviews-wall"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-grid">${cards}</div></div></section>`;
+        }
         break;
       }
       case 'columns': {   // Layout Container — a responsive grid that stacks < 620px
@@ -1417,4 +1491,45 @@ table.site-table tbody tr:last-child td{border-bottom:none}
 .block-spotlight .sp-eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.78rem;font-weight:700;color:var(--accent);margin:0 0 8px}
 .block-spotlight h2{margin:0}
 .block-spotlight .sp-body{margin-top:10px;color:var(--soft)}
-.block-spotlight .sp-cta{margin-top:18px}`;
+.block-spotlight .sp-cta{margin-top:18px}
+/* ── Wave-1 G4 · per-block STYLE VARIANTS (Adobe Style System, curated). Classes
+   are enumerated in BLOCK_VARIANTS; a block with no variant gets NO class, so none
+   of these rules can touch a default section. Token-driven (--accent/--line/--wash/
+   --ink/--soft/--font-display), so every variant stays on-brand on all templates. */
+/* CTA 'card' — boxed + centered. .block.block-cta.v-card (0,3,0) outranks the
+   template's .block.alt band; BLOCK_CSS is appended after it, same trick as
+   .block--bg-plain. */
+.block.block-cta.v-card{background:none;border-top:0;border-bottom:0}
+.block-cta.v-card .cta-inner{flex-direction:column;text-align:center;gap:16px;background:var(--wash,rgba(0,0,0,.04));border:1px solid var(--line);border-radius:16px;padding:36px 28px;max-width:640px;margin:0 auto}
+/* Gallery 'masonry' — CSS columns; images keep their natural heights (no crop). */
+.block-gallery.v-masonry .gallery{display:block;columns:3 220px;column-gap:12px}
+.block-gallery.v-masonry .gallery .ga{break-inside:avoid;margin:0 0 12px}
+.block-gallery.v-masonry .gallery .ga img{aspect-ratio:auto;height:auto}
+/* Gallery 'filmstrip' — one horizontal, swipe/keyboard-scrollable row. */
+.block-gallery.v-filmstrip .gallery{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+.block-gallery.v-filmstrip .gallery .ga{flex:0 0 auto;width:min(70vw,320px);scroll-snap-align:start}
+/* Accordion 'two-column' — an open Q&A grid (answers always visible, zero JS). */
+.block-accordion.v-two-column .qa-grid{display:grid;grid-template-columns:1fr;gap:22px 36px;margin-top:8px}
+@media(min-width:620px){.block-accordion.v-two-column .qa-grid{grid-template-columns:1fr 1fr}}
+.block-accordion.v-two-column .qa-q{margin:0 0 6px;font-size:1.02rem}
+.block-accordion.v-two-column .qa-item .prose{color:var(--soft);max-width:none}
+/* Pricing 'list' — atelier-style rows: name, a quiet dotted rule, price. */
+.block-pricing.v-list .price-list{margin-top:8px;max-width:720px}
+.block-pricing.v-list .pl-row{padding:14px 0;border-bottom:1px solid var(--line)}
+.block-pricing.v-list .pl-row:last-child{border-bottom:none}
+.block-pricing.v-list .pl-head{display:flex;align-items:baseline;gap:12px}
+.block-pricing.v-list .pl-name{font-weight:700}
+.block-pricing.v-list .pl-rule{flex:1;border-bottom:1px dotted var(--line);align-self:center;min-width:24px}
+.block-pricing.v-list .pl-price{font-weight:700;color:var(--accent-dark,var(--accent));white-space:nowrap}
+.block-pricing.v-list .pl-feats{margin:6px 0 0;color:var(--soft);font-size:.92rem}
+/* Reviews wall 'quotes' — large, centered pull-quotes in the display face. */
+.block-reviews-wall.v-quotes .rw-quotes{max-width:720px;margin:18px auto 0;display:flex;flex-direction:column;gap:36px}
+.block-reviews-wall.v-quotes .rw-quote{margin:0;text-align:center}
+.block-reviews-wall.v-quotes .rw-quote .rw-stars{margin:0 0 10px;letter-spacing:3px}
+.block-reviews-wall.v-quotes .rw-quote-body{margin:0;border:0;padding:0;font-family:var(--font-display,Georgia,'Times New Roman',serif);font-size:1.3rem;line-height:1.55;font-style:italic;color:var(--ink)}
+.block-reviews-wall.v-quotes .rw-quote-body p{margin:0}
+.block-reviews-wall.v-quotes .rw-quote-author{margin-top:12px;font-weight:700;font-size:.92rem;display:inline-flex;align-items:baseline;gap:10px}
+.block-reviews-wall.v-quotes .rw-reply{text-align:left;max-width:480px;margin-left:auto;margin-right:auto}
+/* Reviews wall 'strip' — the same cards in one compact scrolling band. */
+.block-reviews-wall.v-strip .rw-strip{display:flex;gap:14px;overflow-x:auto;margin-top:18px;padding-bottom:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.block-reviews-wall.v-strip .rw-card{flex:0 0 auto;width:min(78vw,300px);scroll-snap-align:start}`;

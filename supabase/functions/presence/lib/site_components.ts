@@ -22,6 +22,10 @@ export interface ComponentField {
   repeatable?: boolean;         // a list of this field/group
   aiAssist?: boolean;           // the writer can draft this (still approval-first)
   max?: number;                 // length or count cap
+  /** for 'enum' fields: the allowed values, default first. For the `variant` field
+   *  (Wave-1 G4 style variants) the FIRST option is the default look and is stored
+   *  as ABSENT (no `variant` key) — mirrors lib/site_blocks.ts BLOCK_VARIANTS. */
+  options?: string[];
 }
 export interface ComponentDef {
   key: string;
@@ -52,25 +56,25 @@ export const COMPONENTS: ComponentDef[] = [
   { key: 'features', label: 'Features / Highlights', category: 'content', purpose: 'A few reasons to choose you.',
     fields: [t('items', 'list', { repeatable: true, aiAssist: true }), t('icon', 'enum')], schema: null, a11y: 'list semantics', seo: 'supporting keywords', industries: ['*'] },
   { key: 'pricing', label: 'Pricing / Packages', category: 'commerce', purpose: 'Tiers or packages.',
-    fields: [t('tiers', 'list', { repeatable: true }), t('price_text', 'text'), t('features', 'list', { repeatable: true }), t('cta_url', 'url')], schema: 'Offer', a11y: 'table or list, not color-only emphasis', seo: 'Offer/PriceSpecification', industries: ['professional', 'fitness', 'salon', 'home_services', 'generic'] },
+    fields: [t('tiers', 'list', { repeatable: true }), t('price_text', 'text'), t('features', 'list', { repeatable: true }), t('cta_url', 'url'), t('variant', 'enum', { options: ['cards', 'list'] })], schema: 'Offer', a11y: 'table or list, not color-only emphasis', seo: 'Offer/PriceSpecification', industries: ['professional', 'fitness', 'salon', 'home_services', 'generic'] },
   { key: 'testimonials', label: 'Testimonials', category: 'proof', purpose: 'Customers in their own words.',
     fields: [t('quote', 'richtext', { required: true }), t('author', 'text', { required: true }), t('source', 'text'), t('date', 'text')], schema: 'Review', a11y: 'blockquote + cite', seo: 'Review schema', industries: ['*'] },
   { key: 'reviews', label: 'Aggregate Reviews', category: 'proof', purpose: 'A star rating summary (from connected sources).',
     fields: [t('rating', 'number'), t('count', 'number'), t('source', 'text')], schema: 'AggregateRating', a11y: 'rating announced as text, not stars alone', seo: 'AggregateRating (rich result)', industries: ['*'] },
   { key: 'reviews_wall', label: 'Reviews wall (native)', category: 'proof', purpose: 'Show real, owner-approved customer reviews you collect on your own site — with honest star ratings for rich results.',
-    fields: [t('title', 'text')], schema: 'Review + AggregateRating', a11y: 'each rating announced as text; owner reply labelled', seo: 'Review + AggregateRating (rich result, honest counts)', industries: ['*'] },
+    fields: [t('title', 'text'), t('variant', 'enum', { options: ['cards', 'quotes', 'strip'] })], schema: 'Review + AggregateRating', a11y: 'each rating announced as text; owner reply labelled', seo: 'Review + AggregateRating (rich result, honest counts)', industries: ['*'] },
   { key: 'faq', label: 'FAQ', category: 'content', purpose: 'Answers to common questions.',
     fields: [t('question', 'text', { required: true, repeatable: true, aiAssist: true }), t('answer', 'richtext', { required: true, aiAssist: true })], schema: 'FAQPage', a11y: 'accessible disclosure or plain headings', seo: 'FAQPage (rich result)', industries: ['*'] },
   { key: 'team', label: 'Team', category: 'content', purpose: 'The people behind the business.',
     fields: [t('name', 'text', { required: true, repeatable: true }), t('role', 'text'), t('bio', 'richtext', { aiAssist: true }), t('image', 'image')], schema: 'Person', a11y: 'alt text = name + role', seo: 'Person schema', industries: ['professional', 'law', 'medical', 'salon', 'real_estate'] },
   { key: 'gallery', label: 'Gallery', category: 'media', purpose: 'Photos of your work or space.',
-    fields: [t('images', 'image', { repeatable: true, required: true })], schema: 'ImageObject', a11y: 'meaningful alt text per image, not decorative', seo: 'ImageObject', industries: ['*'] },
+    fields: [t('images', 'image', { repeatable: true, required: true }), t('variant', 'enum', { options: ['grid', 'masonry', 'filmstrip'] })], schema: 'ImageObject', a11y: 'meaningful alt text per image, not decorative', seo: 'ImageObject', industries: ['*'] },
   { key: 'before_after', label: 'Before / After', category: 'media', purpose: 'Show the transformation.',
     fields: [t('before', 'image', { required: true }), t('after', 'image', { required: true }), t('caption', 'text')], schema: 'ImageObject', a11y: 'labelled before/after, alt text on both', seo: 'ImageObject', industries: ['home_services', 'salon', 'cleaning', 'landscaping', 'medical'] },
   { key: 'process', label: 'Process / Timeline', category: 'content', purpose: 'How working with you goes, step by step.',
     fields: [t('step', 'text', { required: true, repeatable: true, aiAssist: true }), t('detail', 'richtext', { aiAssist: true })], schema: 'HowTo', a11y: 'ordered list semantics', seo: 'HowTo', industries: ['home_services', 'professional', 'contractor'] },
   { key: 'cta', label: 'Call to Action', category: 'header', purpose: 'A focused prompt to act.',
-    fields: [t('text', 'text', { required: true, aiAssist: true }), t('button', 'text'), t('url', 'url')], schema: null, a11y: 'real link/button, visible focus', seo: 'internal linking', industries: ['*'] },
+    fields: [t('text', 'text', { required: true, aiAssist: true }), t('button', 'text'), t('url', 'url'), t('variant', 'enum', { options: ['banner', 'card'] })], schema: null, a11y: 'real link/button, visible focus', seo: 'internal linking', industries: ['*'] },
   { key: 'lead_form', label: 'Lead / Contact Form', category: 'contact', purpose: 'Capture enquiries (feeds Leads + CRM).',
     fields: [t('fields', 'enum', { repeatable: true }), t('intro', 'text', { aiAssist: true })], schema: 'ContactPoint', a11y: 'labels + error text tied to inputs; keyboard complete', seo: 'ContactPoint', industries: ['*'] },
   { key: 'newsletter', label: 'Newsletter', category: 'contact', purpose: 'Email sign-up — a link out to your newsletter provider\'s page (no third-party form embedded).',
@@ -119,7 +123,7 @@ export const COMPONENTS: ComponentDef[] = [
   { key: 'image_text', label: 'Image + text', category: 'content', purpose: 'An image beside a block of words — stacks on mobile.',
     fields: [t('image', 'image'), t('body', 'richtext', { aiAssist: true, max: 2000 }), t('side', 'enum'), t('button', 'text')], schema: null, a11y: 'reading order sound when stacked; image has alt', seo: 'supporting copy + imagery', industries: ['*'] },
   { key: 'accordion', label: 'Accordion (expandable)', category: 'content', purpose: 'Expandable panels for longer details, one at a time.',
-    fields: [t('summary', 'text', { required: true, repeatable: true, max: 120 }), t('body', 'richtext', { aiAssist: true, max: 1500 })], schema: null, a11y: 'native details/summary — keyboard + screen-reader ready, no JS', seo: 'scannable content', industries: ['*'] },
+    fields: [t('summary', 'text', { required: true, repeatable: true, max: 120 }), t('body', 'richtext', { aiAssist: true, max: 1500 }), t('variant', 'enum', { options: ['accordion', 'two-column'] })], schema: null, a11y: 'native details/summary — keyboard + screen-reader ready, no JS (the two-column variant shows open Q&A headings)', seo: 'scannable content', industries: ['*'] },
   { key: 'tabs', label: 'Tabs', category: 'content', purpose: 'Tabbed panels — related content grouped behind a row of tabs.',
     fields: [t('label', 'text', { required: true, repeatable: true, max: 40 }), t('body', 'richtext', { aiAssist: true, max: 1500 }), t('image', 'image')], schema: null, a11y: 'zero-JS CSS radio tabs — keyboard-operable (arrow keys), stacks on phones', seo: 'grouped scannable content', industries: ['*'] },
   { key: 'carousel', label: 'Carousel', category: 'media', purpose: 'A swipeable slideshow of images with optional captions.',

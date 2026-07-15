@@ -233,8 +233,12 @@ export interface BlockLook {
  *  preserving the `type` discriminant (so `switch (b.type)` narrowing keeps working).
  *  Also carries the optional auto-expiring window (Phase EXP: show_from / show_until,
  *  canonical ISO instants) — the render omits a section outside its window at
- *  snapshot.created_at; a section with no window renders exactly as before. */
-type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string } : never;
+ *  snapshot.created_at; a section with no window renders exactly as before.
+ *  Wave-1 G4 (Adobe Style System, curated): `variant` is an optional, per-type
+ *  enumerated STYLE VARIANT (see lib/site_blocks.ts BLOCK_VARIANTS) — a curated
+ *  alternate look for the same content. Absent = the current default look, so a
+ *  block with no variant renders byte-identically to before. */
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string; variant?: string } : never;
 export type SiteBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | SiteBlockTeam | SiteBlockProcess
   | SiteBlockPricing | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner

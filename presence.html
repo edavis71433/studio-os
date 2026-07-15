@@ -5316,7 +5316,25 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
+// Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
+// by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
+// re-validates, unknown values fall back to the default). The default is stored as
+// NO `variant` key, so untouched sections stay byte-identical.
+const BLOCK_VARIANT_OPTS = {
+  reviews_wall: [["Cards", ""], ["Big quotes", "quotes"], ["Compact strip", "strip"]],
+  accordion: [["Accordion", ""], ["Open Q&A columns", "two-column"]],
+  cta: [["Banner", ""], ["Card", "card"]],
+  pricing: [["Cards", ""], ["Price list", "list"]],
+  gallery: [["Grid", ""], ["Masonry", "masonry"], ["Filmstrip", "filmstrip"]],
+};
+// A "Style" pill row inside the block editor (reuses the Design Studio pillRow).
+// Writes block.variant into the working copy — saved by the existing "Save sections".
+function blockVariantRow(idx, blk, sub) {
+  const opts = BLOCK_VARIANT_OPTS[blk && blk.type]; if (!opts) return;
+  pillRow(sub, "Style", opts, (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1],
+    (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); });
+}
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
 // no CSS. Lives INSIDE the block you're already editing (no separate panel). The
 // options are enumerated; the server re-validates and only known values are stored.
@@ -5686,6 +5704,8 @@ function renderBlocksCard() {
       sub.appendChild(aiField(ta, {}));
       sub.appendChild(el("div", "hint", def.hint));
     }
+    // Wave-1 G4: the "Style" pill row — only for block types with curated variants.
+    blockVariantRow(idx, blk, sub);
     // Phase T-STYLE: the shared "Look of this section" options — every content
     // section, but not the presentational divider or the auto-built table of contents.
     if (!def.dividerSimple && !def.tocSimple) blockLookRow(idx, blk, sub);

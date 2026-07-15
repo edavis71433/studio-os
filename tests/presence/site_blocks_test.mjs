@@ -4,7 +4,7 @@
 // coerces + dedupes; rendering is deterministic, escaped, JS-free, emits correct
 // schema.org + a11y; the engine only realizes blocks the catalog declares; and the
 // business-classic template surfaces them (and stays byte-stable with none).
-import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES, BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES, BLOCK_CSS, BLOCK_VARIANTS } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { COMPONENTS } from '../../supabase/functions/presence/lib/site_components.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 import { brandTint } from '../../supabase/functions/presence/lib/palettes.ts';
@@ -428,6 +428,54 @@ const ctx = { esc, attr, safeHref };
   const tooLight = brandTint('#ffffff');   // a pathological, ultra-light accent
   ok('palettes.brandTint: a too-light accent falls back to a neutral (not white) contrast-safe wash', tooLight !== '#ffffff' && contrastRatio('#1c2430', tooLight) >= 4.5);
   ok('palettes.brandTint: deterministic (same accent → same tint)', brandTint('#23635a') === brandTint('#23635a'));
+}
+
+// ═══ 10. per-block STYLE VARIANTS (Wave-1 G4) — enumerated curated looks ═══
+{
+  const G = '11111111-1111-1111-1111-111111111111';
+  const REF = () => ({ alt: 'Our work', variants: { w800: '/img/a-800.webp' }, width: 800, height: 600 });
+  const RW = { reviewsWall: { items: [{ author: 'Dana K.', rating: 5, body: 'Spotless work.' }], aggregate: { count: 1, average: 5 } } };
+
+  // — validation: enumerated per type; unknown / off-type / default-name → dropped —
+  ok('variant: allowed values survive validation; the default stores NO variant key', validateBlocks([{ type: 'cta', text: 'Go', variant: 'card' }])[0].variant === 'card' && !('variant' in validateBlocks([{ type: 'cta', text: 'Go' }])[0]));
+  ok('variant: unknown / default-name / off-type values are dropped (→ default look)', validateBlocks([
+    { type: 'cta', text: 'Go', variant: 'sparkly' }, { type: 'gallery', image_ids: [G], variant: 'grid' }, { type: 'stats', items: [{ value: '1', label: 'x' }], variant: 'quotes' },
+  ]).every((b) => !('variant' in b)));
+  ok('variant: rides resolveBlockMedia rebuilds (stored → resolved)', resolveBlockMedia(validateBlocks([{ type: 'gallery', variant: 'masonry', image_ids: [G] }]), REF)[0].variant === 'masonry');
+  ok('variant: BLOCK_VARIANTS lists only realized, catalog-declared types with enum options', Object.keys(BLOCK_VARIANTS).every((t) => {
+    const f = COMPONENTS.find((c) => c.key === t)?.fields.find((f) => f.key === 'variant');
+    return REALIZED_BLOCK_TYPES.includes(t) && f && f.type === 'enum' && Array.isArray(f.options) && BLOCK_VARIANTS[t].every((v) => f.options.includes(v));
+  }));
+
+  // — render: each variant emits its v-<variant> class; the default emits none —
+  ok('cta card / pricing list / accordion two-column render their variant markup', (() => {
+    const r = renderSiteBlocks(validateBlocks([
+      { type: 'cta', text: 'Go', variant: 'card' },
+      { type: 'pricing', variant: 'list', tiers: [{ name: 'Cut', price_text: '$85', features: ['Wash'] }] },
+      { type: 'accordion', variant: 'two-column', items: [{ summary: 'Q?', body: 'A.' }] },
+    ]), ctx);
+    return r[0].html.includes('block-cta v-card') && r[1].html.includes('block-pricing v-list') && r[1].html.includes('pl-price">$85')
+      && r[2].html.includes('qa-grid') && r[2].html.includes('<h3 class="qa-q">Q?</h3>') && !r[2].html.includes('<details');
+  })());
+  ok('gallery masonry/filmstrip + reviews_wall quotes/strip render their variant containers', (() => {
+    const g = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', variant: 'masonry', image_ids: [G] }, { type: 'gallery', variant: 'filmstrip', image_ids: [G] }]), REF), ctx);
+    const q = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'reviews_wall', variant: 'quotes' }]), () => null, RW), ctx)[0].html;
+    const s = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'reviews_wall', variant: 'strip' }]), () => null, RW), ctx)[0].html;
+    return g[0].html.includes('v-masonry') && g[1].html.includes('v-filmstrip') && q.includes('rw-quotes') && q.includes('rw-quote-body') && s.includes('rw-strip') && !s.includes('rw-grid');
+  })());
+  ok('no variant → no v- class anywhere (default look byte-identical)', renderSiteBlocks(resolveBlockMedia(validateBlocks([
+    { type: 'cta', text: 'Go' }, { type: 'pricing', tiers: [{ name: 'A' }] }, { type: 'accordion', items: [{ summary: 'Q', body: 'A' }] }, { type: 'gallery', image_ids: [G] }, { type: 'reviews_wall' },
+  ]), REF, RW), ctx).every((b) => !/\bv-[a-z-]+/.test(b.html)));
+  ok('variant is presentation only — pricing list keeps the same Offer schema', renderSiteBlocks(validateBlocks([{ type: 'pricing', variant: 'list', tiers: [{ name: 'Cut', price_text: '$85', features: [] }] }]), ctx)[0].ld.itemListElement[0].item.price === '85');
+  ok('hostile content in variant branches stays escaped', (() => {
+    const r = renderSiteBlocks(validateBlocks([
+      { type: 'accordion', variant: 'two-column', items: [{ summary: '<script>alert(1)</script>', body: '<img src=x onerror=alert(1)>' }] },
+      { type: 'pricing', variant: 'list', tiers: [{ name: '<script>alert(1)</script>', price_text: '" onmouseover="alert(1)', features: [] }] },
+      { type: 'cta', text: '<script>alert(1)</script>', variant: 'card', url: 'javascript:alert(1)' },
+    ]), ctx);
+    return r.every((b) => !/<script>alert|<img\s+src=x|onmouseover="alert|href="javascript:/i.test(b.html) && b.html.includes('&lt;'));
+  })());
+  ok('variant CSS shipped, namespaced .v-<variant>', ['.block-cta.v-card', '.block-gallery.v-masonry', '.block-gallery.v-filmstrip', '.block-accordion.v-two-column', '.block-pricing.v-list', '.block-reviews-wall.v-quotes', '.block-reviews-wall.v-strip'].every((sel) => BLOCK_CSS.includes(sel)));
 }
 
 const passed = results.filter((r) => r.p).length;

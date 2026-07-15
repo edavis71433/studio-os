@@ -63,6 +63,7 @@ export function resolveLinkedBlocks(rawBlocks: unknown, lookup: (id: string) => 
     if (b.look !== undefined) resolved.look = b.look;
     if (b.show_from !== undefined) resolved.show_from = b.show_from;
     if (b.show_until !== undefined) resolved.show_until = b.show_until;
+    if ((b as { variant?: unknown }).variant !== undefined) resolved.variant = (b as { variant?: unknown }).variant;   // Wave-1 G4: per-placement style variant overrides the payload's
     out.push(resolved);
   }
   return out;
