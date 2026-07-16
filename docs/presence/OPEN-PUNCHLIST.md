@@ -139,8 +139,11 @@ screenshots → Eric approves → merge.
 GET /crm/activity (3e37023, approved by Eric "Continue"; merged to main;
 deploy #13 = functions + frontend). 28 review findings fixed + authorization
 pass clean; e2e 167/0. NOW: slice 2 — studio Inbox split view +
-presence_thread_reads (migration 0113 — needs Eric to paste the SQL pack when
-ready).
+presence_thread_reads. **Migration 0113 APPLIED by Eric 2026-07-16 ("sql
+done")** — ahead of the slice-2 merge (additive; the live function ignores the
+table until slice 2 deploys). Slice 2 itself: implemented, PRE-APPROVED by
+Eric ("Approved"), adversarial review in flight → fix → gates → merge +
+deploy #14.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
