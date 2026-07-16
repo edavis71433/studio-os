@@ -135,6 +135,13 @@ inbox split view → rosters/pipeline → portal shell → portal messages →
 inbound email → nav context bar), each with adversarial review + before/after
 screenshots → Eric approves → merge.
 
+**Slice 1 SHIPPED 2026-07-16** — Client Record as a Lightning record page +
+GET /crm/activity (3e37023, approved by Eric "Continue"; merged to main;
+deploy #13 = functions + frontend). 28 review findings fixed + authorization
+pass clean; e2e 167/0. NOW: slice 2 — studio Inbox split view +
+presence_thread_reads (migration 0113 — needs Eric to paste the SQL pack when
+ready).
+
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
