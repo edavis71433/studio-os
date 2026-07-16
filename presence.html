@@ -1364,8 +1364,10 @@ async function api(method, route, body) {
   }
   // after a successful write our held hash is stale (the draft moved); mark it
   // unknown until the next /changes refresh restores it (prevents self-conflicts
-  // during a rapid burst of the SAME user's edits).
-  if (mut) S.draftHash = null;
+  // during a rapid burst of the SAME user's edits). The stashed 409 provenance
+  // is stale too — OUR write is now the newest edit, so the "Last edit" line
+  // must not keep attributing the draft to someone else.
+  if (mut) { S.draftHash = null; S.lastChange = null; }
   return j;
 }
 async function apiHtml(route) {
@@ -3927,19 +3929,21 @@ function eeInjectChrome(doc, main) {
 // the single publish door) — openRitual({schedule:true}) scrolls to and opens the
 // G5 schedule block once it renders. Plain calls (and the button's click Event)
 // leave the flag off.
-let RITUAL_TO_SCHEDULE = false;
 function openRitual(opts) {
-  RITUAL_TO_SCHEDULE = !!(opts && opts.schedule === true);
+  // threaded as a PARAMETER, not module state: a one-shot flag could be consumed
+  // by a stale in-flight loadRitual (open → Escape → reopen) or leak armed when
+  // the /changes read fails. (#btnPublish passes its click Event — the === true
+  // guard keeps that falsy.)
   lastFocus = document.activeElement;
   $("ritualWrap").classList.add("on"); document.body.style.overflow = "hidden";
   $("btnRitualBack").focus();
-  loadRitual();
+  loadRitual(!!(opts && opts.schedule === true));
   if (window.ddsHint) setTimeout(() => window.ddsHint("publish-atomic", "Publishing goes live all at once — never halfway — and every version is kept, so anything can come back."), 400);
 }
 function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);
 $("btnPublish").addEventListener("click", openRitual);
-async function loadRitual() {
+async function loadRitual(toSchedule) {
   $("ritTitle").textContent = "One moment.";
   $("ritSub").textContent = "Reading over your draft…";
   $("ritBody").innerHTML = `<div class="shimmer"></div>`; $("ritBlockers").innerHTML = ""; $("ritActions").innerHTML = "";
@@ -3985,7 +3989,7 @@ async function loadRitual() {
       acts.appendChild(promise);
     }
     // G5: pending scheduled changes (+ "publish later" when publishable)
-    renderRitualSchedule(acts, c.blockers === 0 && (c.count > 0 || c.first_publish));
+    renderRitualSchedule(acts, c.blockers === 0 && (c.count > 0 || c.first_publish), toSchedule === true);
   } catch (err) {
     $("ritSub").textContent = nice(err);
   }
@@ -4090,10 +4094,9 @@ function dtLocalDefault(hoursFromNow) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function parseDtLocal(v) { if (!v) return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
-async function renderRitualSchedule(host, publishable) {
+async function renderRitualSchedule(host, publishable, toSchedule) {
   const wrap = el("div"); wrap.id = "ritSchedule"; wrap.style.cssText = "margin-top:26px;text-align:center";
   host.appendChild(wrap);
-  const toSchedule = RITUAL_TO_SCHEDULE; RITUAL_TO_SCHEDULE = false;   // consume the Page ▾ deep-link
   // pending scheduled changes (list + cancel) — honest view of what will happen on its own
   let pending = [];
   try { pending = ((await api("GET", "/schedule")).data || {}).scheduled || []; } catch (_) { /* keep the ritual calm */ }
@@ -4114,7 +4117,19 @@ async function renderRitualSchedule(host, publishable) {
     });
     wrap.appendChild(box);
   }
-  if (!publishable) { if (toSchedule && pending.length) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} } return; }
+  if (!publishable) {
+    // the Page ▾ deep-link must always land SOMEWHERE honest: with nothing
+    // pending and nothing publishable, say why the picker isn't here instead
+    // of silently dropping the user into a generic ritual.
+    if (toSchedule && !pending.length) {
+      wrap.appendChild(Object.assign(el("div", "hint", S.changes && S.changes.blockers > 0
+        ? "Scheduling opens once the item above is taken care of."
+        : "Nothing is scheduled, and there's nothing new to publish — make an edit first, then pick a time here."),
+        { style: "max-width:380px;margin:0 auto" }));
+    }
+    if (toSchedule) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} }
+    return;
+  }
   const open = el("button", "textact", "Publish later — pick a time…"); open.type = "button";
   wrap.appendChild(open);
   open.addEventListener("click", () => {
@@ -4178,9 +4193,11 @@ async function renderRitualSchedule(host, publishable) {
 /* ── G6: share the draft — one tap mints a signed, expiring, read-only link to
    the current draft (captured into the private preview through the one preview
    machinery) and copies it. No sign-in needed to view; it expires on its own. ── */
+let SHARE_DRAFT_BUSY = false;   // slice B: the dc-bar button is gone — this guard is the double-fire protection now
 async function shareDraftLink() {
-  const b = $("btnShareDraft");
-  if (b) { b.disabled = true; b.textContent = "Preparing link…"; }
+  if (SHARE_DRAFT_BUSY) return;
+  SHARE_DRAFT_BUSY = true;
+  toast("Preparing your draft link…");   // the menu closes on click — say work is happening
   try {
     const r = (await api("POST", "/preview/share-link", { capture: true, ttl_seconds: 7 * 86400 })).data;
     const until = r.expires_at ? new Date(r.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
@@ -4189,7 +4206,7 @@ async function shareDraftLink() {
     if (copied) toast(`Draft link copied — read-only, works until ${until}. Text it to anyone.`);
     else { window.prompt(`Your read-only draft link (works until ${until}) — copy it:`, r.url); }
   } catch (err) { toast(nice(err), true); }
-  if (b) { b.disabled = false; b.textContent = "🔗 Share draft"; }
+  SHARE_DRAFT_BUSY = false;
 }
 
 /* ── Slice B (builder redesign §2.2b, AC-5): the Page Information menu — ONE
@@ -4202,12 +4219,14 @@ async function shareDraftLink() {
 let PI_OPEN = null;
 function dcRelTime(iso) {
   const t = Date.parse(iso || ""); if (!Number.isFinite(t)) return "";
-  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  // floor, not round: "1 hour ago" must not become "2 hours ago" at 90 minutes,
+  // and an edit made this morning must not read "yesterday" at 23.5 hours.
+  const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
   if (mins < 1) return "just now";
   if (mins < 60) return mins + " min ago";
-  const hrs = Math.round(mins / 60);
+  const hrs = Math.floor(mins / 60);
   if (hrs < 24) return hrs + (hrs === 1 ? " hour ago" : " hours ago");
-  const days = Math.round(hrs / 24);
+  const days = Math.floor(hrs / 24);
   return days === 1 ? "yesterday" : new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 function closePageInfoMenu(refocus) {
@@ -4227,7 +4246,12 @@ function togglePageInfoMenu() {
   const lc = S.lastChange || null;
   if (lc && (lc.actor_kind || lc.at)) {
     const when = lc.at ? dcRelTime(lc.at) : "";
-    m.appendChild(el("div", "pi-prov", "Last edit: " + lcWho(lc) + (when ? " · " + when : "")));
+    const provText = "Last edit: " + lcWho(lc) + (when ? " · " + when : "");
+    // a role=menu may only contain menuitems — the passive line rides the menu's
+    // accessible NAME instead, and the visual div is hidden from the tree.
+    m.setAttribute("aria-label", "Page information — " + provText);
+    const prov = el("div", "pi-prov", provText); prov.setAttribute("aria-hidden", "true");
+    m.appendChild(prov);
   }
   const mi = (label, fn, opts) => {
     const b = el("button", "pp-pop-item" + (opts && opts.danger ? " danger" : ""), label);
@@ -4240,19 +4264,26 @@ function togglePageInfoMenu() {
   mi("Publish now…", () => openRitual(), { id: "piPublishNow", title: "Review every change, then put it live — the same door as the Publish button" });
   mi("Publish later / scheduled changes…", () => openRitual({ schedule: true }), { id: "piPublishLater", title: "Pick a time — your changes go live on their own; see or cancel anything already scheduled" });
   mi("Share a draft link…", () => shareDraftLink(), { id: "piShareDraft", title: "Copy a private, expiring link to this draft — no sign-in needed to view" });
-  // Take offline / bring back (G10) — needs the live state, read from the SAME
-  // /preview/status History uses. Until it answers, the item waits quietly;
-  // a never-published site has nothing to take offline, so the item leaves.
-  const offBtn = el("button", "pp-pop-item", "Take offline / bring back…"); offBtn.type = "button"; offBtn.setAttribute("role", "menuitem"); offBtn.id = "piOffline"; offBtn.disabled = true;
-  m.appendChild(offBtn);
-  api("GET", "/preview/status").then((r) => {
+  // Take offline / bring back (G10) — state from the SAME /preview/status
+  // History uses, cached in S.previewStatus so reopens paint instantly, then
+  // revalidated in the background. A fetch failure must NOT hide the item —
+  // after the hard move this menu is the action's ONLY home; it degrades to a
+  // disabled, honest label instead. Never-published sites hide it (nothing to
+  // take offline), and revalidation can bring it back.
+  let offAction = null;
+  const offBtn = mi("Take offline / bring back…", () => { if (offAction) offAction(); }, { id: "piOffline" });
+  offBtn.disabled = true;
+  const setOffState = (live) => {
     if (!PI_OPEN || PI_OPEN.menu !== m) return;
-    const live = (r.data && r.data.live) || {};
-    if (!live.published) { offBtn.remove(); return; }
-    offBtn.disabled = false;
-    if (live.offline_since) { offBtn.textContent = "Bring my site back online"; offBtn.addEventListener("click", () => { closePageInfoMenu(); siteBringOnline(); }); }
-    else { offBtn.textContent = "Take site offline…"; offBtn.classList.add("danger"); offBtn.addEventListener("click", () => { closePageInfoMenu(); siteTakeOffline(); }); }
-  }).catch(() => { if (PI_OPEN && PI_OPEN.menu === m) offBtn.remove(); });
+    if (!live || !live.published) { offBtn.hidden = true; return; }
+    offBtn.hidden = false; offBtn.disabled = false;
+    if (live.offline_since) { offBtn.textContent = "Bring my site back online"; offBtn.classList.remove("danger"); offAction = siteBringOnline; }
+    else { offBtn.textContent = "Take site offline…"; offBtn.classList.add("danger"); offAction = siteTakeOffline; }
+  };
+  if (S.previewStatus) setOffState(S.previewStatus.live);
+  api("GET", "/preview/status")
+    .then((r) => { S.previewStatus = r.data || null; setOffState(r.data && r.data.live); })
+    .catch(() => { if (PI_OPEN && PI_OPEN.menu === m && offBtn.disabled && !offBtn.hidden) offBtn.textContent = "Offline controls — couldn’t check just now"; });
   // Page properties — the SAME items (and functions) the ⋯ menus offer, for the
   // page open on the canvas. The ⋯ on pills/tree rows stays (it acts on ANY page).
   const propLabel = () => "Page properties: " + dcPageTitle(DC_PAGE) + " ";
@@ -4279,7 +4310,20 @@ function togglePageInfoMenu() {
   }
   btn.setAttribute("aria-expanded", "true");
   const onDown = (e) => { if (!m.contains(e.target) && !btn.contains(e.target)) closePageInfoMenu(false); };
-  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closePageInfoMenu(); } };
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closePageInfoMenu(); return; }
+    if (e.key === "Tab") { closePageInfoMenu(false); return; }   // menu convention: Tab leaves — close, let focus move on
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
+      const items = Array.from(m.querySelectorAll('[role="menuitem"]')).filter((it) => !it.disabled && !it.hidden && it.offsetParent !== null);
+      if (!items.length) return;
+      e.preventDefault();
+      const i = items.indexOf(document.activeElement);
+      const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1
+        : e.key === "ArrowDown" ? (i < 0 ? 0 : (i + 1) % items.length)
+        : (i <= 0 ? items.length - 1 : i - 1);
+      items[next].focus();
+    }
+  };
   document.addEventListener("mousedown", onDown, true);
   document.addEventListener("keydown", onKey, true);
   PI_OPEN = { menu: m, onDown, onKey };
@@ -4531,6 +4575,7 @@ async function renderPreviewPanel() {
   const box = $("previewBox"); if (!box) return;
   let st = null;
   try { st = (await api("GET", "/preview/status")).data; } catch (_) { box.innerHTML = ""; return; }
+  S.previewStatus = st;   // shared cache — the Page ▾ menu renders its offline item from this
   box.innerHTML = "";
   const card = el("div", "field"); card.style.marginBottom = "18px";
   card.appendChild(el("label", null, "Draft · Preview · Live"));
@@ -4538,11 +4583,14 @@ async function renderPreviewPanel() {
   const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px";
   const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
   const dc = st.draft.unpublished_changes || 0;
+  // one offline label, used by the Live card AND the status row below — the
+  // same wording must never drift two lines apart in the same panel
+  const offLabel = st.live.offline_since ? "⏸ Offline since " + new Date(st.live.offline_since).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "";
   grid.appendChild(stateCard("Draft", [dc + " unpublished change" + (dc === 1 ? "" : "s")]));
   grid.appendChild(stateCard("Preview", st.preview.exists ? ["Updated " + new Date(st.preview.updated_at).toLocaleString(), st.preview.has_password ? "🔒 Password-protected" : "🔗 Open link"] : ["Not created yet"]));
   grid.appendChild(stateCard("Live", st.live.published
     ? (st.live.offline_since
-      ? ["⏸ Offline since " + new Date(st.live.offline_since).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }), "Visitors see a “temporarily offline” page"]
+      ? [offLabel, "Visitors see a “temporarily offline” page"]
       : ["Published " + new Date(st.live.last_published_at).toLocaleDateString(), st.live.summary || ""])
     : ["Not live yet"]));
   card.appendChild(grid);
@@ -4567,23 +4615,31 @@ async function renderPreviewPanel() {
   if (st.live.published && st.live.offline_since) {
     const offRow = el("div"); offRow.id = "offlineStatusRow";
     offRow.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px dashed var(--line,#e5e5e5);font-size:12.5px;color:var(--ink-2,#666)";
-    offRow.textContent = "⏸ Offline since " + new Date(st.live.offline_since).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) + " — visitors see a “temporarily offline” page; everything is kept.";
+    offRow.textContent = offLabel + " — visitors see a “temporarily offline” page; everything is kept.";
     card.appendChild(offRow);
   }
   box.appendChild(card);
 }
 // ── G10 actions (slice B home: the Page ▾ menu) — the SAME confirm flow and the
 // SAME POST /site/offline · /site/online routes the History row used; History
-// now only reports the state (read-only line above). ──
+// now only reports the state (read-only line above). One shared choreography:
+// call → toast → invalidate the Page ▾ status cache → refresh History only if
+// it's actually on screen (loadHistory rebuilds it from scratch on open anyway).
+async function siteSetState(path, okMsg) {
+  try {
+    await api("POST", path); toast(okMsg);
+    S.previewStatus = null;
+    const hv = $("view-history"); if (hv && hv.classList.contains("on")) renderPreviewPanel();
+    scheduleChangesRefresh();
+  } catch (err) { toast(nice(err), true); }
+}
 async function siteTakeOffline() {
   const name = (S.identity && S.identity.business_name) || "your site";
   if (!confirm(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring my site back online”) restores everything.`)) return;
-  try { await api("POST", "/site/offline"); toast("Your site is offline. Publish, or use “Bring my site back online”, to return."); renderPreviewPanel(); scheduleChangesRefresh(); }
-  catch (err) { toast(nice(err), true); }
+  return siteSetState("/site/offline", "Your site is offline. Publish, or use “Bring my site back online”, to return.");
 }
 async function siteBringOnline() {
-  try { await api("POST", "/site/online"); toast("Bringing your site back — this usually takes under a minute"); renderPreviewPanel(); scheduleChangesRefresh(); }
-  catch (err) { toast(nice(err), true); }
+  return siteSetState("/site/online", "Bringing your site back — this usually takes under a minute");
 }
 // ── Checkpoints — name + save the current draft as a safety point ────────────
 // Reuses the named-snapshot substrate (checkpoints are stored like launches);
@@ -5878,8 +5934,17 @@ async function dcDeletePage(slug) {
   const all = dcPagesArr(); const at = all.findIndex((x) => x.slug === slug);
   const removed = all[at];
   const pages = all.filter((x) => x.slug !== slug);
+  // take the page's search-appearance entries with it (same "page:<slug>" keys
+  // dcRenamePage migrates) — orphaned entries would silently noindex a FUTURE
+  // page that reuses this slug, and they count against the publish cap.
+  const body = { pages };
+  const dkey = "page:" + slug;
+  const pseo = (S.settings && S.settings.page_seo) || {};
+  if (pseo[dkey]) { const map = { ...pseo }; delete map[dkey]; body.page_seo = map; }
+  const nix = (S.settings && S.settings.pages_noindex) || [];
+  if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
   try {
-    const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages };
+    const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, pages };
     if (DC_PAGE === slug) { DC_PAGE = ""; dcResetHistory(); BLOCKS_WORK = currentBlocks(); }
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     // G7: an honest Undo — we still hold the full page (it lives in the draft

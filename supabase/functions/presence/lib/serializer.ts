@@ -238,7 +238,10 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       ...(customNav.length ? { nav: customNav } : {}),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Phase SD: per-page search visibility + overrides
-      pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 12) : [],
+      // cap must cover the worst case: 5 built-in pages + up to 20 builder pages
+      // ("page:<slug>" keys, writable per-page since slice B) — a 12-entry slice
+      // silently un-hid pages the owner explicitly hid.
+      pages_noindex: Array.isArray(settings.pages_noindex) ? settings.pages_noindex.map(String).slice(0, 32) : [],
       page_seo: resolvePageSeoShare(settings.page_seo, ref),
       // Phase Z: ownership-verification tokens (emitted as meta tags when set)
       ...(String(settings.google_site_verification || '').trim() || String(settings.bing_site_verification || '').trim()

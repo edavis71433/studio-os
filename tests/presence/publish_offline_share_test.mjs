@@ -118,7 +118,7 @@ const SITE_B = '22222222-2222-4222-8222-222222222222';
   ok('apply pack: docs/presence/APPLY-0111-prod.sql matches the house pattern', /APPLY PACK · migration 0111/.test(read('docs/presence/APPLY-0111-prod.sql')));
 
   const html = read('presence.html');
-  ok('UI: Share draft affordance mints a captured, expiring link', /btnShareDraft/.test(html) && /\/preview\/share-link", \{ capture: true, ttl_seconds: 7 \* 86400 \}/.test(html));
+  ok('UI: Share draft affordance mints a captured, expiring link', /piShareDraft/.test(html) && /Share a draft link/.test(html) && /\/preview\/share-link", \{ capture: true, ttl_seconds: 7 \* 86400 \}/.test(html));
   ok('UI: publish ritual gains Publish later + pending list + cancel', /Publish later — pick a time…/.test(html) && /\/schedule\/\$\{s\.id\}\/cancel/.test(html));
   ok('UI: the optional unpublish-at leg schedules kind=offline', /kind: "offline"/.test(html));
   ok('UI: Take site offline has a scary-clear confirm', /Take \$\{name\} OFFLINE now\?/.test(html) && /Nothing is deleted/.test(html));
