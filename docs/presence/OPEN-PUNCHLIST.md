@@ -140,10 +140,12 @@ GET /crm/activity (3e37023, approved by Eric "Continue"; merged to main;
 deploy #13 = functions + frontend). 28 review findings fixed + authorization
 pass clean; e2e 167/0. NOW: slice 2 — studio Inbox split view +
 presence_thread_reads. **Migration 0113 APPLIED by Eric 2026-07-16 ("sql
-done")** — ahead of the slice-2 merge (additive; the live function ignores the
-table until slice 2 deploys). Slice 2 itself: implemented, PRE-APPROVED by
-Eric ("Approved"), adversarial review in flight → fix → gates → merge +
-deploy #14.
+done")**. **Slice 2 SHIPPED 2026-07-16** — Inbox split view + real per-thread
+unread (cd0cc0f; pre-approved "Approved" + "this is grreat approved"; 21
+review findings fixed; e2e 204/0; deploy #14 green — functions + frontend
+live; 0113 already applied so unread dots are real from day one). NOW:
+slice 3 — rosters as list views + pipeline Path/Board⇄Table (frontend-only,
+in progress). Then slices 4–5 (client portal), 6 (inbound email), 7 (nav).
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
