@@ -102,6 +102,9 @@ function defaults(): Record<string, Json> {
       { id: 't2', at: '2026-07-05T00:00:00Z', kind: 'publish', audience: 'shared', title: 'Published the site' },
     ], is_studio_view: true } },
     '/crm/notes': { data: { notes: [], can_write_internal: true } },
+    // client.html iterates this as an array (ensureSnaps); the generic {data:{}}
+    // fallback would throw mid-render and strand the "Needs you" skeleton.
+    '/client/projects': { data: [] },
     '/crm/profile': { data: { profile: { business_name: 'Marlow’s Kitchen', health: 'healthy', live: true }, summary: 'Marlow’s Kitchen’s website is live.', is_studio_view: true, last_activity_at: '2026-07-07T00:00:00Z' } },
   };
 }
@@ -118,6 +121,16 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
 
   // seed the session before any page script runs
   await page.addInitScript((s) => { (window as unknown as { __E2E_SESSION: unknown }).__E2E_SESSION = s; }, session);
+
+  // the shell's first-login tour auto-opens (aria-modal, intercepts clicks —
+  // reliably so at phone widths) whenever 'dds-toured:<role>' is absent. No spec
+  // exercises the tour; mark it seen for every persona the fixtures use so page
+  // tests stay deterministic. A future tour spec should clear its own key.
+  await page.addInitScript(() => {
+    for (const role of ['business_owner', 'client_reviewer', 'member']) {
+      try { localStorage.setItem('dds-toured:' + role, '1'); } catch { /* storage may be denied */ }
+    }
+  });
 
   // serve the supabase-js request with our stub (fully offline) — matches both
   // the historical CDN URL and the self-hosted /vendor/ copy (#169 vendoring)

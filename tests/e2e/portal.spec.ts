@@ -11,7 +11,7 @@ const REVIEWER_CTX = { data: {
 } };
 
 test.describe('Client portal', () => {
-  test('mirrors "needs you": attention-aware heading + approvals section', async ({ page }) => {
+  test('Home mirrors "needs you": approval card with actions + recent updates', async ({ page }) => {
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,
       '/portal/feed': { data: { role: 'client_reviewer',
@@ -20,9 +20,11 @@ test.describe('Client portal', () => {
         last_published: { created_at: '2026-07-05T00:00:00Z', completed_at: '2026-07-05T00:00:00Z' } } },
     } });
     await page.goto('/client.html');
-    await expect(page.getByText('One thing needs your OK — no rush.')).toBeVisible();
-    await expect(page.getByText('Waiting for your OK')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Protect your email' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Not yet' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent updates' })).toBeVisible();
     await expect(page.getByText('Your new hours are live')).toBeVisible();
   });
 
@@ -44,7 +46,8 @@ test.describe('Client portal', () => {
       '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
     } });
     await page.goto('/client.html');
-    await expect(page.getByText('You’re all caught up — nothing needs you right now.')).toBeVisible();
+    await expect(page.getByText('You’re all caught up.')).toBeVisible();
+    await expect(page.getByText('Nothing needs you right now — we’ll flag anything here the moment it does.')).toBeVisible();
   });
 
   test('an owner landing here is pointed back to the full workspace', async ({ page }) => {

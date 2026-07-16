@@ -21,8 +21,13 @@ test.describe('Today', () => {
     await installApp(page);
     await page.goto('/today.html');
     // the coach line is secondary context now — it lives inside the collapsed
-    // "More about your business" disclosure; open it first.
-    await page.locator('details.more > summary').click();
+    // "More about your business" disclosure; open it first. At phone widths the
+    // one-time page hint floats over it and auto-scroll parks it under the fixed
+    // bottom bar — dismiss the hint and center it before clicking.
+    await page.locator('.dds-hint').getByRole('button', { name: 'Got it' }).click();
+    const summary = page.locator('details.more > summary');
+    await summary.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await summary.click();
     await expect(page.getByText('One thing could help.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/leads.html');
   });
@@ -31,8 +36,11 @@ test.describe('Today', () => {
     await installApp(page);
     await page.goto('/today.html');
     // the journey strip lives inside the collapsed "More about your business"
-    // disclosure; open it first.
-    await page.locator('details.more > summary').click();
+    // disclosure; open it first (same phone-width hint + fixed-bar dance as PT-2C).
+    await page.locator('.dds-hint').getByRole('button', { name: 'Got it' }).click();
+    const summary = page.locator('details.more > summary');
+    await summary.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await summary.click();
     await expect(page.getByText('Your journey')).toBeVisible();
     // appears twice by design: the celebration line + the milestone row
     await expect(page.getByText('Your website went live for the first time.').first()).toBeVisible();
@@ -108,7 +116,9 @@ test.describe('Today', () => {
     await page.goto('/today.html');
     await expect(page.getByText('Welcome to Studio OS')).toBeVisible();
     await expect(page.getByText(/daily updates/)).toBeVisible(); // a gained feature, named (v1.0 outcome language)
-    await page.getByRole('button', { name: 'Got it' }).click();
+    // #orientDone, not a bare name query: the page hint's dismiss button is
+    // also accessibly named "Got it" (its visible text — WCAG 2.5.3).
+    await page.locator('#orientDone').click();
     await expect(page.getByText('Welcome to Studio OS')).toHaveCount(0);
     // and it does not return on reload (localStorage was advanced)
     await page.reload();

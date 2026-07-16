@@ -597,7 +597,9 @@
   function markHint(k) { try { var s = hintsSeen(); s[k] = 1; localStorage.setItem('dds-hints', JSON.stringify(s)); } catch (_) { /* */ } }
   function attachDismiss(node, key) {
     var x = document.createElement('button');
-    x.className = 'x'; x.type = 'button'; x.setAttribute('aria-label', 'Dismiss tip'); x.textContent = 'Got it';
+    // no aria-label: the visible text IS the accessible name (WCAG 2.5.3 —
+    // an aria-label here would make "Got it" unmatchable by voice control).
+    x.className = 'x'; x.type = 'button'; x.textContent = 'Got it';
     x.addEventListener('click', function () { markHint(key); node.classList.remove('show'); setTimeout(function () { node.remove(); }, 200); });
     node.appendChild(x);
     requestAnimationFrame(function () { node.classList.add('show'); });

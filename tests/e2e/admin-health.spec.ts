@@ -15,7 +15,7 @@ test.describe('Admin Health Center', () => {
     await installApp(page, { api: { '/admin/health-center': HC } });
     await page.goto('/admin-health.html');
     await expect(page.getByText('Some areas need a look.')).toBeVisible();
-    await expect(page.getByText('Billing')).toBeVisible();
+    await expect(page.getByText('Billing', { exact: true })).toBeVisible();
     await expect(page.getByText('a restore drill hasn’t been confirmed yet.')).toBeVisible();
     await expect(page.locator('.area')).toHaveCount(5);
     await expect(page.locator('.area.off')).toContainText('AI'); // unconfigured reads "off", not broken
