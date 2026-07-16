@@ -241,3 +241,100 @@ CAP is account-first — the closer match to our portal.
 *Pending: the SLDS/Lightning deep-research synthesis (running) and the
 backend data-model inventory (running). Companion doc:
 docs/design/crm-portal-inventory.md (our own code, mapped).*
+
+## 11. SLDS component anatomy — deep-research synthesis (verified, 2026-07-16)
+
+Deep-research pass (100 agents: fan-out search → fetch → 3-vote adversarial
+verification per claim; 25 claims survived, 0 refuted). Evidence is the official
+SLDS blueprints themselves — salesforce-ux/design-system GitHub + versioned npm
+tarballs — corroborated by help.salesforce.com/Trailhead. This is the exact,
+buildable anatomy for the five signature Lightning surfaces.
+
+### 11.1 Activity Timeline (→ Customers/Deals record history, on-record Messages)
+- Exactly FOUR activity types: **task, call (log_a_call), email, event** — each
+  with a type-colored vertical connector line (design token per type) and a
+  matching object icon with a white border ring sitting ON the line.
+- Rows are **expandable** (`slds-timeline__item_expandable` / `__item_details` /
+  `slds-is-open`, aria-expanded/aria-hidden contract; title can be the toggle).
+- Right-aligned actions container per row: timestamp (`10:00am | 3/23/17`) + a
+  "More Options" overflow menu. Natural-language actor lines: "You logged a call
+  with Adam Chan", "You emailed Lea Chan", "You created an event with Aida Lee
+  and 5 others".
+- Designed for TWO widths: full main-page area OR the narrow right sidebar (the
+  "timeline in the right rail" record layout).
+- **Email threads inline**: the expanded email row renders From Address / To
+  Address / Text Body fields inside the timeline row (help.salesforce.com
+  corroborates: "The Text Body field on sent emails always appears in the
+  details section"). Event rows expand to Location + Attendees ("Jason Dewar
+  (Organizer) + 5 others").
+- xx-small utility-icon status badges on rows: Has attachments · Group email ·
+  Recurring Task · Public sharing.
+
+### 11.2 Path — the pipeline chevron (→ Deals)
+- Horizontal chevron steps (`slds-path__item`) with generated state classes
+  `slds-is-{current|active|complete|incomplete}` plus dedicated terminal
+  **won**/**lost** states; complete stages get an x-small check inside the chevron.
+- Right side: "Stage: {name}" label + a brand-colored **"Mark Status as
+  Complete"** button that flips to **"Mark as Current Stage"** when a non-current
+  stage is selected.
+- A trigger expands the coaching panel (`slds-path__coach`) with exactly two
+  sections: **"Key Fields This Stage"** (with Edit) + **"Guidance for Success"**.
+- A11y: with coaching = tabset semantics; without = horizontal listbox with
+  arrow-key movement.
+
+### 11.3 Split View (→ the Inbox / console screens)
+- Purpose (verbatim): "navigate between records in a list while staying on the
+  same screen" — list pane + reading/workspace pane.
+- Four canonical states are FIRST-CLASS: Selected Item · Overflow · **Unread
+  Items** · **Collapsed Panel**. Unread rows: dot indicator
+  (`abbr.slds-indicator_unread`, "Unread Item") + `slds-is-unread` row class.
+  Collapse toggle flips between "Open Split View"/"Close Split View".
+- List-pane header checklist: object icon + list-view name as dropdown button
+  ("My Leads ▾") · meta line "42 items • Updated just now" · More Actions ·
+  display-toggle · Refresh · sort header ("Sorted by: Lead Score - Descending").
+- Rows: compact TWO-LINE entries, four truncated fields (name+score /
+  company+status), demoed at 20rem pane width; ARIA listbox where clicking an
+  option opens the record in a workspace tab (option gets aria-selected).
+
+### 11.4 Docked Composer (→ Gmail-style compose in Messages/Inbox)
+- Persistent, pinned bottom-right (`position:fixed; bottom:0; right:0`);
+  expands (`slds-is-open`, 480px) / collapses to bar height. Header + body +
+  footer + toolbar regions. States: Open/Focused · Closed · Closed/Focused ·
+  Popped out · With overflow menu.
+- Three documented examples matching the record-page composer actions:
+  **Log a task**, **Email Composer** (To/Cc/Bcc combobox · "Enter Subject" ·
+  "Compose Email..." rich-text body · Attach File + Insert Template toolbar ·
+  brand Send button in the footer), **Voice** (ten call states incl. Ringing,
+  Connected, No Answer, Call Logged).
+- Multiple composers dock side-by-side; overflow pill with numeric count when
+  they exceed viewport width; header pop-out promotes to a full modal.
+
+### 11.5 Global Navigation (→ app chrome)
+- Context bar, mandated order: **primary region** (App Launcher waffle + App
+  Name) then **secondary region** (object tabs). Tabs are text link OR text
+  link + dropdown-caret button (the per-tab recents/actions menu).
+- The App Launcher is explicitly CLICK-invoked (the one nav element that never
+  opens on hover).
+- Console workspace tabs have SEVEN feedback states: active · unsaved · unread ·
+  warning · error · success · pinned — with aria-live announcements for the
+  notification states ("New activity in Tab: Chat - Customer").
+
+### 11.6 Signature-element priority (what reads as "Salesforce" at a glance)
+1. Path chevron + Mark-Complete + coaching panel (Deals).
+2. Right-rail activity timeline: type-colored icons on a connector line,
+   expandable rows, "You emailed…" actor lines (Customers, record Messages).
+3. Split View with unread dots + collapsible list pane (Inbox).
+4. Bottom Docked Composer (email/tasks/calls).
+5. Context bar: waffle + app name + object tabs with carets.
+
+### 11.7 Caveats / gaps (for the spec to fill from §1–§10 instead)
+- NOT verified by this pass (no surviving claims): the record-page highlights
+  panel + Activity/Chatter/Details/Related tab set (covered in §1 from the link
+  crawls), "Upcoming & Overdue" vs month-grouped timeline sections + filter
+  dropdown, Messaging Sessions chat UI, Kanban↔table toggle, global search
+  typeahead, the notes/history/phone utility bar.
+- Evidence is component blueprints + docs text, not product screenshots — it
+  nails ANATOMY, not default record-page composition.
+- Version-scoped: timeline anatomy from SLDS 2.6.1 (component now named
+  "Timeline" on current site, same anatomy on master), Split View from Winter
+  '20 (2.10.x), Path from Spring '20 (2.11.6).
