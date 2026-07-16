@@ -92,6 +92,17 @@ now Adobe-informed: side panel (blocks/files/content-tree tabs), editor modes in
 Annotate + Timewarp candidates, Page Information menu. Workflows: route-for-review UX
 on top of the existing approvals + launches machinery.
 
+**Delivery status 2026-07-16 (deploys #8–#11, all green):** G11 section comments
+end-to-end (migration 0112 applied prod+staging) · G18 zoom+captions · G27 overrides
+end-to-end (backend + "Style this section" popover; second design-doc decisions:
+3 aspect presets · 12 elements/4 canvases caps · brand shades + Custom… hex ·
+Apply-Brand clears colors only) · G25 freeform backend slice 1 (editor slice pending;
+freeform = a section TYPE, templates/columns stay — Eric confirmed) · G5/G6/G7/G9/G10
+publish-pipeline upgrades. NOW: increment 6 builder redesign (spec in
+docs/design/builder-redesign-increment-6.md; before/after screenshots to Eric before
+merge). Then: G13 in-place editing → freeform editor → G12+G34 → S-finishers →
+G33/G14/G35.
+
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
