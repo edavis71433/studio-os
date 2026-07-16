@@ -77,7 +77,14 @@ export interface SnapshotContent {
     page_seo?: Record<string, { title?: string; description?: string; share_title?: string; share_description?: string; share_image?: string }>;
     /** Phase T-BLOCKS: optional structured content blocks the owner turned on and
      *  filled (validated + capped at serialize time). Rendered deterministically as
-     *  home sections; each carries its own schema.org + a11y. Never free-form HTML. */
+     *  home sections; each carries its own schema.org + a11y. Never free-form HTML.
+     *  RECORDED AMENDMENT (G25 reversal, Eric 2026-07-16 — docs/design/
+     *  freeform-canvas-design.md): the `freeform` block type NARROWS this law
+     *  without repealing it — owner-chosen x/y/w/h percentages exist ONLY inside
+     *  that one fenced section type, validated/quantized/clamped by the same
+     *  single boundary (validateBlocks) and rendered as numbers-only inline
+     *  styles. The page remains a structured block list; the output is still
+     *  never free-form HTML, raw CSS, or runtime code. */
     blocks?: SiteBlock[];
     /** Multi-page: owner-created pages, each with its own validated blocks. Rendered
      *  as /{slug}/index.html by the template, sharing its header/nav/footer. Absent
@@ -202,6 +209,29 @@ export interface SiteBlockToc { type: 'toc'; title?: string }
 // Title = a standalone heading + optional subtitle; Link list = a titled list of safe
 // links; Table = a simple data table (header row + body rows, scrolls on small screens);
 // Spotlight = a prominent highlight band (eyebrow + heading + prose + optional button).
+// ── G25 reversal (docs/design/freeform-canvas-design.md): the freeform canvas —
+// drag-anywhere placement fenced INSIDE one section of the structured page flow.
+// A MULTI block (stable per-instance id, like columns/cards). Elements are curated
+// kinds only (slice 1 realizes text/image/button; 'shape' is slice 2); x/y/w/h are
+// section-relative percentages, quantized to 0.5 and containment-clamped at
+// validation; z is normalized dense 1..N; elements are STORED in (y,x) reading
+// order (DOM order = reading order — the phone stack and screen readers follow it;
+// z-index alone carries stacking). `hide_on_phone` is strict-true only (the G18
+// `zoom` posture). Render-facing: an image element's media is already resolved to
+// a MediaRef by the serializer's ref() (the one media pipeline); its stored alt
+// override, when set, arrives folded into that MediaRef.
+export type SiteBlockFreeformAspect = 'banner' | 'standard' | 'tall';   // 3:1 | 2:1 | 4:3 — the 3 enumerated presets (Eric 2026-07-16)
+export interface SiteBlockFreeformElement {
+  id: string;
+  kind: 'text' | 'image' | 'button';
+  x: number; y: number; w: number; h: number;   // % of the canvas box (0.5-quantized, contained)
+  z: number;                                    // stacking order, normalized 1..N at validation
+  hide_on_phone?: true;
+  text?: { body: string; size?: 's' | 'l' | 'xl'; align?: 'center' | 'right' };
+  image?: { image: MediaRef; decorative?: boolean };
+  button?: { label: string; url: string; style: 'primary' | 'outline' };
+}
+export interface SiteBlockFreeform { type: 'freeform'; id: string; title?: string; aspect: SiteBlockFreeformAspect; elements: SiteBlockFreeformElement[] }
 export interface SiteBlockTitle { type: 'title'; title: string; subtitle?: string }
 export interface SiteBlockLinkList { type: 'link_list'; title?: string; links: Array<{ label: string; url: string }> }
 export interface SiteBlockTable { type: 'table'; title?: string; headers: string[]; rows: string[][] }
@@ -252,6 +282,7 @@ export type SiteBlock = WithLook<
   | SiteBlockRichText | SiteBlockImage | SiteBlockImageText | SiteBlockAccordion | SiteBlockTabs | SiteBlockCarousel | SiteBlockProgress | SiteBlockButtons | SiteBlockDivider
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc
   | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
+  | SiteBlockFreeform
   | FormDefinition
 >;
 export type SiteBlockType = SiteBlock['type'];

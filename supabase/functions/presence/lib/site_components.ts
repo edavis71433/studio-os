@@ -157,6 +157,16 @@ export const COMPONENTS: ComponentDef[] = [
     fields: [t('headers', 'list', { repeatable: true, max: 6 }), t('rows', 'list', { required: true, repeatable: true, max: 24 })], schema: null, a11y: 'header cells are <th scope=col>; table scrolls within its own container', seo: 'structured comparison content', industries: ['*'] },
   { key: 'spotlight', label: 'Spotlight', category: 'content', purpose: 'A prominent highlight band — a short eyebrow, a heading, a line or two, and an optional button.',
     fields: [t('eyebrow', 'text', { max: 60 }), t('title', 'text', { required: true, aiAssist: true, max: 120 }), t('body', 'richtext', { aiAssist: true, max: 800 }), t('button', 'text')], schema: null, a11y: 'a real heading + focusable button, centered band', seo: 'a featured message with a clear call to action', industries: ['*'] },
+  // ── G25 reversal (docs/design/freeform-canvas-design.md; Eric 2026-07-16): the
+  // freeform canvas — drag-anywhere placement fenced INSIDE one section of the
+  // structured page flow. Elements are curated kinds with validated, 0.5%-quantized,
+  // containment-clamped coordinates; 12 elements per canvas, 4 canvases per page,
+  // 3 enumerated aspect presets (standard 2:1 default | banner 3:1 | tall 4:3);
+  // phones stack-only, in (y,x) reading order, with per-element hide-on-phone.
+  // Slice 1 realizes text/image/button; 'shape' is slice 2. Multi-instance.
+  { key: 'freeform', label: 'Freeform canvas', category: 'content', purpose: 'Place text, images and buttons anywhere on a fenced canvas — a poster-style section you compose by dragging. Phones see it stacked in reading order.',
+    fields: [t('title', 'text', { max: 80 }), t('aspect', 'enum', { options: ['standard', 'banner', 'tall'] }), t('elements', 'list', { required: true, repeatable: true, max: 12 }), t('kind', 'enum', { options: ['text', 'image', 'button'] }), t('body', 'text', { aiAssist: true, max: 800 }), t('size', 'enum', { options: ['default', 's', 'l', 'xl'] }), t('align', 'enum', { options: ['default', 'center', 'right'] }), t('image', 'image'), t('alt', 'text', { max: 200 }), t('label', 'text', { max: 40 }), t('url', 'url'), t('hide_on_phone', 'boolean')],
+    schema: null, a11y: 'DOM order = (y,x) reading order regardless of z-order; text sizes are clamp()ed with hard floors; images keep alt (or an explicit decorative flag); stacks below 620px', seo: 'a composed visual section; its optional title is a real heading + anchor', industries: ['*'] },
   // Phase FB: the custom form builder — a whitelisted, typed form (contact/quote/
   // application/booking). Full field schema + validation live in lib/forms.ts; the
   // catalog just declares the block so the engine may realize it. Multi-instance.

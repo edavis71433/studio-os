@@ -715,6 +715,246 @@ const ctx = { esc, attr, safeHref };
   })());
 }
 
+// ═══ 13. freeform canvas (G25 reversal, slice 1) — fenced x/y, quantized/clamped, stack-ordered ═══
+{
+  const G = '11111111-1111-1111-1111-111111111111', H = '22222222-2222-2222-2222-222222222222', MISS = '99999999-9999-9999-9999-999999999999';
+  const REF = (id) => id === MISS ? null : { alt: 'A photo', variants: { w400: '/img/a-400.webp', w800: '/img/a-800.webp', w1600: '/img/a-1600.webp' }, width: 800, height: 600 };
+  const FF = (elements, extra = {}) => ({ type: 'freeform', elements, ...extra });
+  const TXT = (body, xtra = {}) => ({ kind: 'text', x: 10, y: 10, w: 20, h: 10, text: { body }, ...xtra });
+
+  // — validation: coordinates are quantized (0.5%), clamped, containment-clamped; junk drops the element —
+  ok('freeform: coordinates quantize to 0.5% (12.34 → 12.5, 12.24 → 12) and clamp (x -5 → 0, y 1e9 → 100)', (() => {
+    const b = validateBlocks([FF([
+      { kind: 'text', x: 12.34, y: 12.24, w: 20, h: 10, text: { body: 'a' } },
+      { kind: 'text', x: -5, y: '1e9', w: 20, h: 10, text: { body: 'b' } },
+    ])])[0];
+    const a = b.elements.find((e) => e.text.body === 'a'), c = b.elements.find((e) => e.text.body === 'b');
+    return a.x === 12.5 && a.y === 12 && c.x === 0 && c.y === 100;
+  })());
+  ok('freeform: w/h floor at 4%, then the containment clamp wins (x=90,w=40 → w=10; y=95,h=30 → h=5)', (() => {
+    const b = validateBlocks([FF([
+      { kind: 'text', x: 90, y: 95, w: 40, h: 30, text: { body: 'a' } },
+      { kind: 'text', x: 10, y: 10, w: 1, h: 2, text: { body: 'b' } },
+    ])])[0];
+    const a = b.elements.find((e) => e.text.body === 'a'), c = b.elements.find((e) => e.text.body === 'b');
+    return a.w === 10 && a.h === 5 && c.w === 4 && c.h === 4;
+  })());
+  ok('freeform: a non-finite coordinate drops the WHOLE element (NaN, strings, objects — position is its substance)', (() => {
+    const b = validateBlocks([FF([
+      TXT('keep'),
+      { kind: 'text', x: 'abc', y: 10, w: 20, h: 10, text: { body: 'dropX' } },
+      { kind: 'text', x: 10, y: NaN, w: 20, h: 10, text: { body: 'dropY' } },
+      { kind: 'text', x: 10, y: 10, w: {}, h: 10, text: { body: 'dropW' } },
+      { kind: 'text', x: 10, y: 10, w: 20, text: { body: 'dropH' } },
+    ])])[0];
+    return b.elements.length === 1 && b.elements[0].text.body === 'keep';
+  })());
+  ok('freeform: unknown kinds drop — including "shape" (slice 2, not realized in slice 1)', (() => {
+    const v = validateBlocks([FF([
+      { kind: 'shape', x: 1, y: 1, w: 10, h: 10, shape: { shape: 'rect', fill: 'accent' } },
+      { kind: 'columns', x: 1, y: 1, w: 10, h: 10 },
+      TXT('only me'),
+    ])]);
+    return v.length === 1 && v[0].elements.length === 1 && v[0].elements[0].kind === 'text';
+  })());
+  ok('freeform: empty payloads drop (text w/o body, image w/o valid uuid, button missing label or url)', (() => {
+    const v = validateBlocks([FF([
+      { kind: 'text', x: 1, y: 1, w: 10, h: 10, text: { body: '   ' } },
+      { kind: 'image', x: 1, y: 1, w: 10, h: 10, image: { image_id: 'not-a-uuid' } },
+      { kind: 'button', x: 1, y: 1, w: 10, h: 10, button: { label: 'Go' } },
+      { kind: 'button', x: 1, y: 1, w: 10, h: 10, button: { url: 'https://ex.com' } },
+    ])]);
+    return v.length === 0;   // nothing valid → the whole block drops (empty-item posture)
+  })());
+  ok('freeform: aspect is enumerated (banner/standard/tall); unknown or absent → standard', (() => {
+    const v = validateBlocks([FF([TXT('a')], { aspect: 'banner' }), FF([TXT('b')], { aspect: 'cinema' }), FF([TXT('c')])]);
+    return v[0].aspect === 'banner' && v[1].aspect === 'standard' && v[2].aspect === 'standard';
+  })());
+  ok('freeform: text size/align are enumerated steps; defaults store NO key; body capped at 800', (() => {
+    const b = validateBlocks([FF([
+      { kind: 'text', x: 1, y: 1, w: 10, h: 10, text: { body: 'x'.repeat(2000), size: 'xl', align: 'center' } },
+      { kind: 'text', x: 1, y: 20, w: 10, h: 10, text: { body: 'plain', size: 'jumbo', align: 'left' } },
+    ])])[0];
+    const a = b.elements[0], c = b.elements[1];
+    return a.text.body.length === 800 && a.text.size === 'xl' && a.text.align === 'center'
+      && !('size' in c.text) && !('align' in c.text);
+  })());
+  ok('freeform: hide_on_phone is strict === true only (the G18 zoom posture)', (() => {
+    const b = validateBlocks([FF([
+      TXT('on', { hide_on_phone: true }), TXT('str', { hide_on_phone: 'yes' }), TXT('num', { hide_on_phone: 1 }),
+    ])])[0];
+    return b.elements.find((e) => e.text.body === 'on').hide_on_phone === true
+      && b.elements.filter((e) => e.text.body !== 'on').every((e) => !('hide_on_phone' in e));
+  })());
+
+  // — caps: 12 elements per canvas, 4 canvases per page (Eric 2026-07-16) —
+  ok('freeform: the 13th element is dropped (12 per canvas)', (() => {
+    const b = validateBlocks([FF(Array.from({ length: 20 }, (_, i) => TXT(`t${i}`, { y: i })))])[0];
+    return b.elements.length === 12;
+  })());
+  ok('freeform: the 5th canvas on a page is dropped (4 per page); other block types still validate after it', (() => {
+    const v = validateBlocks([
+      ...Array.from({ length: 6 }, (_, i) => FF([TXT(`c${i}`)], { id: `c${i}` })),
+      { type: 'features', items: [{ title: 'still here' }] },
+    ]);
+    return v.filter((b) => b.type === 'freeform').length === 4 && v.some((b) => b.type === 'features');
+  })());
+  ok('freeform: an all-invalid canvas is dropped and does NOT consume a page slot', (() => {
+    const v = validateBlocks([FF([{ kind: 'shape', x: 1, y: 1, w: 5, h: 5 }]), ...Array.from({ length: 4 }, (_, i) => FF([TXT(`k${i}`)], { id: `k${i}` }))]);
+    return v.length === 4 && v.every((b) => b.type === 'freeform');
+  })());
+
+  // — z normalization + the reading-order invariant —
+  ok('freeform: z normalizes to dense 1..N (gaps/dupes collapse; ties keep input order)', (() => {
+    const b = validateBlocks([FF([
+      TXT('first-tie', { y: 30, z: 7 }), TXT('second-tie', { y: 20, z: 7 }), TXT('top', { y: 10, z: 40 }), TXT('bottom', { y: 40 }),   // no z → 0 → lowest
+    ])])[0];
+    const zOf = (t) => b.elements.find((e) => e.text.body === t).z;
+    return zOf('bottom') === 1 && zOf('first-tie') === 2 && zOf('second-tie') === 3 && zOf('top') === 4
+      && JSON.stringify(b.elements.map((e) => e.z).sort((a, c) => a - c)) === '[1,2,3,4]';
+  })());
+  ok('freeform: elements are STORED sorted by (y, x) — DOM order = reading order, independent of z and authoring order', (() => {
+    const els = [TXT('C', { y: 30, x: 10, z: 3 }), TXT('B', { y: 10, x: 50, z: 1 }), TXT('A', { y: 10, x: 20, z: 2 })];
+    const b = validateBlocks([FF(els)])[0];
+    return JSON.stringify(b.elements.map((e) => e.text.body)) === '["A","B","C"]';
+  })());
+  ok('freeform: shuffled input → byte-identical storage AND render (the reading-order invariant, end to end)', (() => {
+    const els = [TXT('C', { id: 'c', y: 30, x: 10, z: 3 }), TXT('B', { id: 'b', y: 10, x: 50, z: 1 }), TXT('A', { id: 'a', y: 10, x: 20, z: 2 })];
+    const one = validateBlocks([FF(els, { id: 'p' })]);
+    const two = validateBlocks([FF([els[2], els[0], els[1]], { id: 'p' })]);
+    return JSON.stringify(one) === JSON.stringify(two)
+      && JSON.stringify(renderSiteBlocks(one, ctx)) === JSON.stringify(renderSiteBlocks(two, ctx));
+  })());
+
+  // — multi-instance + fences (NOT_IN_CELL both directions) —
+  ok('freeform: multi-instance with de-collided slugId ids → per-instance render keys block_freeform_<id>', (() => {
+    const v = validateBlocks([FF([TXT('a')], { id: 'Hero Promo!' }), FF([TXT('b')], { id: 'hero_promo' })]);
+    const keys = renderSiteBlocks(v, ctx).map((r) => r.key);
+    return v[0].id === 'hero_promo' && v[1].id !== v[0].id && keys[0] === 'block_freeform_hero_promo' && keys[1] !== keys[0] && keys.every((k) => k.startsWith('block_freeform_'));
+  })());
+  ok('freeform: never nests in a columns cell (NOT_IN_CELL) — and no block nests inside a canvas (curated kinds only)', (() => {
+    const col = validateBlocks([{ type: 'columns', columns: [{ body: 'keep', block: FF([TXT('smuggled')]) }] }])[0];
+    return col && !('block' in col.columns[0]) && col.columns[0].body === 'keep';
+  })());
+
+  // — resolution: the one media pipeline; unresolvable image → element dropped —
+  ok('freeform: image elements resolve ids→MediaRef; an unresolvable image drops its element, others survive', (() => {
+    const r = resolveBlockMedia(validateBlocks([FF([
+      { kind: 'image', x: 1, y: 1, w: 20, h: 20, image: { image_id: G } },
+      { kind: 'image', x: 1, y: 30, w: 20, h: 20, image: { image_id: MISS } },
+      TXT('words', { y: 60 }),
+    ])]), REF)[0];
+    return r.elements.length === 2 && r.elements[0].image.image.variants.w800 === '/img/a-800.webp' && r.elements[1].text.body === 'words';
+  })());
+  ok('freeform: a canvas whose every element resolves to nothing is dropped (never an empty section)', resolveBlockMedia(validateBlocks([FF([{ kind: 'image', x: 1, y: 1, w: 20, h: 20, image: { image_id: MISS } }])]), REF).length === 0);
+  ok('freeform: an element alt override folds into the resolved MediaRef; decorative renders alt="" + role="presentation"', (() => {
+    const r = resolveBlockMedia(validateBlocks([FF([
+      { kind: 'image', x: 1, y: 1, w: 20, h: 20, image: { image_id: G, alt: 'Storefront at dusk' } },
+      { kind: 'image', x: 1, y: 50, w: 20, h: 20, image: { image_id: H, decorative: true } },
+    ])]), REF);
+    const html = renderSiteBlocks(r, ctx)[0].html;
+    return r[0].elements[0].image.image.alt === 'Storefront at dusk' && html.includes('alt="Storefront at dusk"') && html.includes('alt="" role="presentation"');
+  })());
+  ok('freeform: the per-section look rides the resolve rebuild (tinted canvas section)', (() => {
+    const r = resolveBlockMedia(validateBlocks([FF([{ kind: 'image', x: 1, y: 1, w: 20, h: 20, image: { image_id: G } }], { look: { background: 'tinted' } })]), REF);
+    return r[0].look.background === 'tinted' && renderSiteBlocks(r, ctx)[0].html.includes('block--bg-tint');
+  })());
+  ok('freeform: a linked placement rides through resolveLinkedBlocks + validateBlocks untouched (no special-casing)', (() => {
+    const payload = FF([TXT('Linked copy')], { id: 'promo' });
+    const v = validateBlocks(resolveLinkedBlocks([{ type: 'linked', ref: G }], () => payload));
+    return v.length === 1 && v[0].type === 'freeform' && v[0].elements[0].text.body === 'Linked copy';
+  })());
+
+  // — render: numbers-only inline styles through attr(); enumerated classes; zero JS —
+  const rich = validateBlocks([FF([
+    { id: 'headline', kind: 'text', x: 12.5, y: 10, w: 40, h: 22, z: 2, text: { body: 'Summer sale', size: 'xl', align: 'center' } },
+    { id: 'pic', kind: 'image', x: 60, y: 5, w: 35, h: 80, z: 1, image: { image_id: G }, hide_on_phone: true },
+    { id: 'cta', kind: 'button', x: 10, y: 70, w: 24, h: 12, z: 3, button: { label: 'Book now', url: 'https://ex.com/book', style: 'outline' } },
+  ], { id: 'promo', title: 'Promo', aspect: 'banner' })]);
+  const richHtml = renderSiteBlocks(resolveBlockMedia(rich, REF), ctx)[0].html;
+  ok('freeform: section + canvas markup (block-freeform, ff-canvas ff-aspect-banner, h2 + anchor from the title)', richHtml.includes('<section id="promo" class="block wrap block-freeform"><h2>Promo</h2>') && richHtml.includes('<div class="ff-canvas ff-aspect-banner">'));
+  ok('freeform: every element positions via a numbers-only style attr (fixed printer: 12.5 prints "12.5", integers bare)', richHtml.includes('style="left:12.5%;top:10%;width:40%;height:22%;z-index:2"') && richHtml.includes('style="left:60%;top:5%;width:35%;height:80%;z-index:1"') && richHtml.includes('style="left:10%;top:70%;width:24%;height:12%;z-index:3"'));
+  ok('freeform: text renders enumerated classes (ff-size-xl, ff-align-center) with the body escaped via esc()', richHtml.includes('class="ff-el ff-text ff-size-xl ff-align-center"') && richHtml.includes('>Summer sale</div>'));
+  ok('freeform: the image goes through blockImg (AVIF+WebP picture, lazy) with sizes derived from its clamped w', richHtml.includes('<div class="ff-el ff-image ff-hide-phone"') && richHtml.includes('<picture><source type="image/avif"') && richHtml.includes('sizes="(max-width:620px) 100vw, 35vw"') && richHtml.includes('loading="lazy"'));
+  ok('freeform: the button is a real template .btn anchor via safeHref (+ btn-outline), rel=noopener', richHtml.includes('<a class="ff-el btn btn-outline" href="https://ex.com/book" rel="noopener"') && richHtml.includes('>Book now</a>'));
+  ok('freeform: DOM order in the markup is the (y,x) reading order (image y5 → headline y10 → button y70), not z-order', (() => {
+    const i1 = richHtml.indexOf('ff-image'), i2 = richHtml.indexOf('Summer sale'), i3 = richHtml.indexOf('Book now');
+    return i1 > -1 && i1 < i2 && i2 < i3;
+  })());
+  ok('freeform: hide_on_phone marks ONLY its element (one ff-hide-phone class in the canvas)', (richHtml.match(/ff-hide-phone/g) || []).length === 1);
+  ok('freeform: focal point rides into the canvas image (object-position via blockImg)', (() => {
+    const FREF = () => ({ alt: 'F', variants: { w800: '/i/f-800.webp' }, width: 8, height: 6, focal: { x: 30, y: 70 } });
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([FF([{ kind: 'image', x: 1, y: 1, w: 20, h: 20, image: { image_id: G } }])]), FREF), ctx)[0].html;
+    return r.includes('object-position:30% 70%');
+  })());
+  ok('freeform: title is optional — untitled canvas renders no <h2> (title-optional anchor contract)', (() => {
+    const r = renderSiteBlocks(validateBlocks([FF([TXT('no heading here')])]), ctx)[0].html;
+    return !r.includes('<h2>') && r.includes('block-freeform');
+  })());
+  ok('freeform: zero JavaScript emitted (no <script>, no handlers)', !/<script|onclick=|onerror=/i.test(richHtml));
+  ok('freeform: render-twice determinism (same input → identical output)', (() => {
+    const mk = () => JSON.stringify(renderSiteBlocks(resolveBlockMedia(validateBlocks([FF([
+      { id: 'a', kind: 'text', x: 12.5, y: 10, w: 40.5, h: 22, z: 2, text: { body: 'det' } },
+      { id: 'b', kind: 'image', x: 60, y: 5, w: 35, h: 80, z: 1, image: { image_id: G } },
+    ], { id: 'd' })]), REF), ctx));
+    return mk() === mk();
+  })());
+
+  // — hostile: escaped text/labels; unsafe URLs dropped; numbers can't break the style attr —
+  ok('freeform: hostile text/alt/label are escaped, never live markup', (() => {
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([FF([
+      { kind: 'text', x: 1, y: 1, w: 20, h: 10, text: { body: '<script>alert(1)</script>' } },
+      { kind: 'image', x: 1, y: 20, w: 20, h: 20, image: { image_id: G, alt: '"><img src=x onerror=alert(1)>' } },
+      { kind: 'button', x: 1, y: 50, w: 20, h: 10, button: { label: '<script>x</script>', url: 'https://ok.example' } },
+    ])]), REF), ctx)[0].html;
+    // no live injected tag; the alt payload survives ONLY in its fully-escaped form
+    // (quote + angles neutralized, so the onerror can never leave the quoted attr)
+    return !/<script>alert|<img\s+src=x/.test(r) && r.includes('&lt;script&gt;')
+      && r.includes('alt="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"');
+  })());
+  ok('freeform: a javascript: button URL is refused by safeHref — the element simply does not render', (() => {
+    const r = renderSiteBlocks(validateBlocks([FF([
+      { kind: 'button', x: 1, y: 1, w: 20, h: 10, button: { label: 'Evil', url: 'javascript:alert(1)' } },
+      TXT('survivor', { y: 50 }),
+    ])]), ctx)[0].html;
+    return !r.includes('javascript:') && !r.includes('Evil') && r.includes('survivor');
+  })());
+  ok('freeform: hostile "numbers" cannot reach the style attribute (injection strings are non-finite → element dropped)', (() => {
+    const v = validateBlocks([FF([
+      { kind: 'text', x: '12;background:url(//evil.example)', y: 1, w: 20, h: 10, text: { body: 'inj' } },
+      { kind: 'text', x: { toString: () => '1;url(//evil.example)' }, y: 1, w: 20, h: 10, text: { body: 'obj' } },
+      TXT('clean'),
+    ])]);
+    const r = renderSiteBlocks(v, ctx)[0].html;
+    return v[0].elements.length === 1 && !/url\(|evil\.example/.test(r) && [...r.matchAll(/style="([^"]*)"/g)].every((m) => /^left:[\d.]+%;top:[\d.]+%;width:[\d.]+%;height:[\d.]+%;z-index:\d+$/.test(m[1]));
+  })());
+
+  // — absent-block identity: a page without a canvas carries NO freeform markup (line-466 posture) —
+  ok('freeform: absent → no ff- class / block-freeform anywhere; default sections byte-identical', (() => {
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([
+      { type: 'features', items: [{ title: 'A' }] }, { type: 'cta', text: 'Go' }, { type: 'gallery', image_ids: [G] },
+    ]), REF), ctx);
+    return r.every((b) => !/\bff-|block-freeform/.test(b.html)) && r[0].html.includes('class="block wrap block-features"');
+  })());
+
+  // — CSS + catalog contract —
+  ok('freeform CSS: the 3 enumerated aspect presets + the fenced relative canvas', BLOCK_CSS.includes('.ff-canvas{position:relative') && BLOCK_CSS.includes('.ff-aspect-banner{aspect-ratio:3/1}') && BLOCK_CSS.includes('.ff-aspect-standard{aspect-ratio:2/1}') && BLOCK_CSS.includes('.ff-aspect-tall{aspect-ratio:4/3}'));
+  ok('freeform CSS: text size steps are clamp()ed with hard floors (~15px minimum body copy)', BLOCK_CSS.includes('.ff-text{font-size:clamp(1rem,2vw,1.2rem)') && BLOCK_CSS.includes('.ff-text.ff-size-s{font-size:clamp(.95rem,1.6vw,1.05rem)}') && BLOCK_CSS.includes('.ff-text.ff-size-l{font-size:clamp(1.2rem,3vw,1.7rem)}') && BLOCK_CSS.includes('.ff-text.ff-size-xl{font-size:clamp(1.5rem,4.2vw,2.4rem)}'));
+  ok('freeform CSS: ONE static rule flips the canvas to flow below 620px (stack in DOM order; !important beats inline w/h)', BLOCK_CSS.includes('@media(max-width:620px){.ff-canvas{aspect-ratio:auto}.ff-canvas .ff-el{position:static;width:auto!important;height:auto!important;margin:12px 0}'));
+  ok('freeform CSS: hide-on-phone rule lives ONLY under the 620px query (the block--hide-mobile pattern)', (() => {
+    const occurrences = BLOCK_CSS.split('.ff-hide-phone').length - 1;
+    return occurrences === 1 && /@media\(max-width:620px\)\{[^\n]*\.ff-canvas \.ff-hide-phone\{display:none!important\}/.test(BLOCK_CSS);
+  })());
+  ok('freeform: catalog-declared AND realized; the catalog enums agree with the validator (aspects, kinds, 12-element cap)', (() => {
+    const c = COMPONENTS.find((x) => x.key === 'freeform');
+    const aspect = c && c.fields.find((f) => f.key === 'aspect'), kind = c && c.fields.find((f) => f.key === 'kind'), els = c && c.fields.find((f) => f.key === 'elements');
+    return !!c && REALIZED_BLOCK_TYPES.includes('freeform')
+      && aspect && JSON.stringify(aspect.options) === JSON.stringify(['standard', 'banner', 'tall'])   // first = default, stored as 'standard'
+      && kind && JSON.stringify(kind.options) === JSON.stringify(['text', 'image', 'button'])          // slice 1: no 'shape'
+      && els && els.max === 12;
+  })());
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SITE BLOCKS: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

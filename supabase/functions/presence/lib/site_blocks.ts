@@ -7,6 +7,12 @@
 //
 // Constitution-safe: these are CHOSEN-AND-FILLED structured blocks (typed fields →
 // deterministic render), never free-form layout or runtime code. Text-only in v1.
+// RECORDED AMENDMENT (G25 reversal, Eric 2026-07-16 — docs/design/
+// freeform-canvas-design.md): the `freeform` block NARROWS that law without
+// repealing it — owner-chosen x/y/w/h exists ONLY inside that one fenced section
+// type, validated/quantized/clamped by this same single boundary and rendered as
+// numbers-only inline styles; the page stays a structured block list and the
+// output is still never free-form HTML or runtime code.
 // Pure: no I/O, no clock, no randomness. The catalog (COMPONENTS) is the authority
 // for which block types exist; the test suite asserts this file only realizes keys
 // that the catalog declares.
@@ -21,6 +27,7 @@ import type {
   SiteBlockProgress,
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
   SiteBlockTitle, SiteBlockLinkList, SiteBlockTable, SiteBlockSpotlight,
+  SiteBlockFreeform, SiteBlockFreeformAspect, SiteBlockFreeformElement,
   BlockLook,
 } from './render_types.ts';
 import { renderMarkdown } from './markdown.ts';
@@ -39,13 +46,14 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'form',
   'columns', 'cards', 'download', 'toc',
   'title', 'link_list', 'table', 'spotlight',
+  'freeform',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too.
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24, freeformElements: 12, freeformSections: 4 };
 // Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
 // snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
 const clampSpan = (v: unknown): number | undefined => {
@@ -55,11 +63,21 @@ const clampSpan = (v: unknown): number | undefined => {
 const clampPct = (v: unknown): number => {
   const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
 };
+// G25 freeform: a canvas coordinate — finite-checked like clampSpan, QUANTIZED to
+// 0.5% (deterministic Math.round(v*2)/2 — the editor's snap grid is the same
+// arithmetic), then clamped to its range. Non-finite → undefined and the CALLER
+// drops the whole element (stricter than focal's omit-the-style, because position
+// is the element's substance — design doc §2.3).
+const ffCoord = (v: unknown, min: number, max: number): number | undefined => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(max, Math.max(min, Math.round(n * 2) / 2));
+};
 // MULTI = types that carry a stable per-instance id (needed to address their nested
 // content), so their render key is block_<type>_<id>. Every OTHER type may now also
 // repeat freely (a real builder lets you stack several text boxes, feature grids,
 // image+text rows…); duplicates are de-collided by a numeric render-key suffix.
-const MULTI = new Set<string>(['form', 'columns', 'cards']);
+const MULTI = new Set<string>(['form', 'columns', 'cards', 'freeform']);
 // The few types that are genuinely one-per-page — a second one would be nonsense or
 // duplicate a page-wide singleton (the on-this-page contents list; the reviews wall
 // that also feeds the page's single AggregateRating schema node). Only THESE dedupe.
@@ -67,7 +85,10 @@ const SINGLETON = new Set<string>(['toc', 'reviews_wall']);
 // #184: types that may NOT be nested inside a column cell — the containers/multi blocks
 // (which would allow container-in-container / id-collision) and the page-level toc.
 // Everything else (text AND media: image, video, gallery, carousel, …) is allowed.
-const NOT_IN_CELL = new Set<string>(['columns', 'cards', 'form', 'toc']);
+// G25: `freeform` joins the set BOTH directions — a canvas never nests inside a
+// columns cell, and no block ever nests inside a canvas (its elements are the
+// curated kinds only; there is no container channel — design doc §2/§7).
+const NOT_IN_CELL = new Set<string>(['columns', 'cards', 'form', 'toc', 'freeform']);
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 // Prose sanitizer: like s() but PRESERVES newlines (markdown structure) — collapses
@@ -186,6 +207,21 @@ interface StoredImageText { type: 'image_text'; title?: string; image_id?: strin
 interface StoredColumns { type: 'columns'; id: string; title?: string; columns: Array<{ body: string; image_id?: string; button?: { label: string; url: string }; span?: number; block?: StoredBlock }> }
 interface StoredCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image_id?: string; link?: string }> }
 interface StoredTabs { type: 'tabs'; title?: string; tabs: Array<{ label: string; body: string; image_id?: string }> }
+// G25 reversal · the freeform canvas, stored shape (docs/design/freeform-canvas-design.md
+// §2). MULTI (stable slugId id, like columns/cards). Elements carry media by ID
+// (resolved by resolveBlockMedia through the one ref() pipeline). x/y/w/h are
+// already quantized (0.5%) + containment-clamped, z is dense 1..N, and the array
+// is stored in (y,x) reading order — validateBlocks guarantees all three.
+interface StoredFreeformElement {
+  id: string;
+  kind: 'text' | 'image' | 'button';
+  x: number; y: number; w: number; h: number; z: number;
+  hide_on_phone?: true;
+  text?: { body: string; size?: 's' | 'l' | 'xl'; align?: 'center' | 'right' };
+  image?: { image_id: string; alt?: string; decorative?: boolean };
+  button?: { label: string; url: string; style: 'primary' | 'outline' };
+}
+interface StoredFreeform { type: 'freeform'; id: string; title?: string; aspect: SiteBlockFreeformAspect; elements: StoredFreeformElement[] }
 interface StoredCarousel { type: 'carousel'; title?: string; slides: Array<{ image_id: string; caption?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 // Same distributive WithLook as render_types: the owner-chosen per-section style
@@ -203,6 +239,7 @@ export type StoredBlock = WithLook<
   | SiteBlockRichText | StoredImage | StoredImageText | SiteBlockAccordion | StoredTabs | StoredCarousel | SiteBlockProgress | SiteBlockButtons | SiteBlockDivider
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
   | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
+  | StoredFreeform
   | FormDefinition
 >;
 
@@ -218,7 +255,7 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
   const seen = new Set<string>();
   // Per-type id registries for the MULTI blocks — each instance gets a unique id so
   // its render key (block_<type>_<id>) + storage never collide with a sibling.
-  const idsByType: Record<string, Set<string>> = { form: new Set(), columns: new Set(), cards: new Set() };
+  const idsByType: Record<string, Set<string>> = { form: new Set(), columns: new Set(), cards: new Set(), freeform: new Set() };
   const uniqueId = (t: string, rawId: unknown, fallback: string): string => {
     let id = slugId(rawId) || fallback;
     const set = idsByType[t];
@@ -531,6 +568,77 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         }
         break;
       }
+      case 'freeform': {   // G25 reversal: drag-anywhere INSIDE one fenced canvas —
+        // x/y exists only here, validated/quantized/clamped by this same boundary
+        // (docs/design/freeform-canvas-design.md §2). Slice 1 realizes the
+        // text/image/button kinds; 'shape' is slice 2, so it drops like any
+        // unknown kind. Caps per Eric (2026-07-16): 12 elements per canvas,
+        // 4 canvases per page (and the page's MAX_BLOCKS still applies).
+        if (idsByType.freeform.size >= CAP.freeformSections) break;   // 5th canvas → dropped
+        const rawAspect = (b as any).aspect;
+        const aspect: SiteBlockFreeformAspect = rawAspect === 'banner' || rawAspect === 'tall' ? rawAspect : 'standard';   // enumerated; unknown → 'standard'
+        const seenEl = new Set<string>();
+        const els: Array<StoredFreeformElement & { _z?: number }> = [];
+        for (const e of arr((b as any).elements)) {
+          if (els.length >= CAP.freeformElements) break;   // 13th element → dropped
+          if (!e || typeof e !== 'object') continue;
+          // Coordinates: % of the canvas, 0.5-quantized, clamped (x,y ∈ 0..100;
+          // w,h ∈ 4..100). ANY non-finite coordinate drops the element outright.
+          const x = ffCoord(e.x, 0, 100), y = ffCoord(e.y, 0, 100);
+          let w = ffCoord(e.w, 4, 100), h = ffCoord(e.h, 4, 100);
+          if (x === undefined || y === undefined || w === undefined || h === undefined) continue;
+          // Containment clamp — an element can never overflow its section.
+          w = Math.min(w, 100 - x); h = Math.min(h, 100 - y);
+          // Exactly one per-kind payload, reusing the existing primitives; an
+          // empty payload drops the element (the features empty-item posture).
+          let el: (StoredFreeformElement & { _z?: number }) | null = null;
+          const kind = String(e.kind || '');
+          if (kind === 'text') {
+            const body = ml(e.text?.body, 800);   // short display copy; richtext (4000) stays the prose tool
+            if (body) {
+              const text: NonNullable<StoredFreeformElement['text']> = { body };
+              const sz = e.text?.size; if (sz === 's' || sz === 'l' || sz === 'xl') text.size = sz;   // enumerated steps; default stores no key
+              const al = e.text?.align; if (al === 'center' || al === 'right') text.align = al;
+              el = { id: '', kind: 'text', x, y, w, h, z: 0, text };
+            }
+          } else if (kind === 'image') {
+            const image_id = uid(e.image?.image_id);
+            if (image_id) {
+              const image: NonNullable<StoredFreeformElement['image']> = { image_id };
+              const alt = s(e.image?.alt, 200); if (alt) image.alt = alt;
+              if (e.image?.decorative === true) image.decorative = true;   // a11y: alt="" + role="presentation" at render
+              el = { id: '', kind: 'image', x, y, w, h, z: 0, image };
+            }
+          } else if (kind === 'button') {
+            const label = s(e.button?.label, 40), url = s(e.button?.url, 300);   // url validated by safeHref at render
+            if (label && url) el = { id: '', kind: 'button', x, y, w, h, z: 0, button: { label, url, style: e.button?.style === 'outline' ? 'outline' : 'primary' } };
+          }
+          if (!el) continue;
+          // Element id: slugId, unique within the section (like the MULTI blocks).
+          let eid = slugId(e.id) || `e${els.length + 1}`;
+          while (seenEl.has(eid)) eid = `${eid}_${els.length + 1}`;
+          seenEl.add(eid); el.id = eid;
+          el._z = Number.isFinite(Number(e.z)) ? Number(e.z) : 0;   // raw z, for normalization below
+          if (e.hide_on_phone === true) el.hide_on_phone = true;    // strict === true only (the G18 zoom posture)
+          els.push(el);
+        }
+        if (els.length) {
+          // z normalization: stable-sort by stored z (ties keep input order),
+          // reassign dense 1..N — stored z is always bounded, never free numbers.
+          els.map((el, i) => ({ el, i }))
+            .sort((a, b2) => (a.el._z! - b2.el._z!) || (a.i - b2.i))
+            .forEach(({ el }, i) => { el.z = i + 1; delete el._z; });
+          // Reading order (a validation INVARIANT): elements are stored — and
+          // therefore rendered — sorted by (y, x) ascending, so DOM order = visual
+          // reading order and the ≤620px stack reads top-left → bottom-right.
+          // z-index alone carries stacking; sort order and stack order stay independent.
+          const elements: StoredFreeformElement[] = els.map((el, i) => ({ el, i }))
+            .sort((a, b2) => (a.el.y - b2.el.y) || (a.el.x - b2.el.x) || (a.i - b2.i))
+            .map(({ el }) => el);
+          block = { type: 'freeform', id: uniqueId('freeform', (b as any).id, 'freeform'), title, aspect, elements } as StoredFreeform;
+        }
+        break;
+      }
     }
     if (block) {
       const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
@@ -669,6 +777,28 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       case 'image_text': {   // prose keeps the block valuable even if the image can't resolve
         const image = b.image_id ? ref(b.image_id) : null;
         if (image || b.body) out.push({ type: 'image_text', title: b.title, image, body: b.body, side: b.side, button: b.button, ...lk(b) });
+        break;
+      }
+      case 'freeform': {   // G25: each image element resolves through the SAME ref()
+        // (one media pipeline — variants/manifest registration automatic); an element
+        // whose image can't resolve is DROPPED (the `image` block posture: its media
+        // is its substance). A stored alt override folds into the resolved MediaRef.
+        // Text/button elements ride through untouched. Nothing left → block dropped.
+        const elements: SiteBlockFreeform['elements'] = [];
+        for (const el of b.elements) {
+          const base = { id: el.id, kind: el.kind, x: el.x, y: el.y, w: el.w, h: el.h, z: el.z, ...(el.hide_on_phone ? { hide_on_phone: true as const } : {}) };
+          if (el.kind === 'image' && el.image) {
+            const m = ref(el.image.image_id);
+            if (!m) continue;
+            const media = el.image.alt ? { ...m, alt: el.image.alt } : m;
+            elements.push({ ...base, kind: 'image', image: { image: media, ...(el.image.decorative ? { decorative: true as const } : {}) } });
+          } else if (el.kind === 'text' && el.text) {
+            elements.push({ ...base, kind: 'text', text: el.text });
+          } else if (el.kind === 'button' && el.button) {
+            elements.push({ ...base, kind: 'button', button: el.button });
+          }
+        }
+        if (elements.length) out.push({ type: 'freeform', id: b.id, title: b.title, aspect: b.aspect, elements, ...lk(b) });
         break;
       }
       default:
@@ -929,6 +1059,17 @@ function applyStyle(html: string, style?: BlockStyle): string {
   if (vars) out = out.replace(/<(section|nav|div) class="block /, `<$1 style="${vars}" class="block `);
   return out;
 }
+
+// ── G25 · the freeform canvas coordinate printer — the validated printer posture
+// (styleVars above): re-verify the shape at print time, belt-and-braces beneath
+// validation, so NOTHING but a clamped, 0.5-quantized number can reach the style
+// attribute (no escaping question can even arise). Fixed formatting — an integer
+// prints "12", a half prints "12.5" (0.5 steps are exact in binary floating
+// point, so toFixed(1) is deterministic) — same input always prints the same bytes. ──
+const ffPct = (n: number): string => {
+  const v = Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n * 2) / 2)) : 0;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+};
 
 // ── Phase BK: the booking widget's first-party enhancer ──────────────────────
 // A minimal, self-contained IIFE (same posture as the form block's inline enhancer:
@@ -1385,6 +1526,36 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         html = `<section class="block wrap block-spotlight"><div class="sp-inner">${eyebrow}<h2>${esc(b.title)}</h2>${body}${btn}</div></section>`;
         break;
       }
+      case 'freeform': {   // G25 reversal · the fenced canvas — absolute position
+        // INSIDE one section, zero JS (docs/design/freeform-canvas-design.md §5).
+        // All variable data is NUMBERS-ONLY inside `style` (clamped + quantized at
+        // validation, re-verified by the ffPct printer), emitted through attr()
+        // exactly like the focal-point precedent; everything else is enumerated
+        // classes (ff-aspect-*/ff-size-*/ff-align-*/ff-hide-phone). DOM order is
+        // the validation-time (y,x) reading order — the ≤620px stack and screen
+        // readers follow it; z-index alone carries stacking. Text through esc();
+        // URLs through safeHref; images through blockImg() (AVIF/WebP, lazy,
+        // focal-aware), sizes derived from the element's clamped width.
+        const els = b.elements.map((el) => {
+          const st = ` style="${attr(`left:${ffPct(el.x)}%;top:${ffPct(el.y)}%;width:${ffPct(el.w)}%;height:${ffPct(el.h)}%;z-index:${Math.min(99, Math.max(1, Math.round(el.z) || 1))}`)}"`;
+          const hide = el.hide_on_phone ? ' ff-hide-phone' : '';
+          if (el.kind === 'text' && el.text) {
+            const size = el.text.size ? ` ff-size-${el.text.size}` : '';
+            const align = el.text.align ? ` ff-align-${el.text.align}` : '';
+            return `<div class="ff-el ff-text${size}${align}${hide}"${st}>${esc(el.text.body)}</div>`;
+          }
+          if (el.kind === 'image' && el.image) {
+            return `<div class="ff-el ff-image${hide}"${st}>${blockImg(el.image.image, esc, attr, `(max-width:620px) 100vw, ${ffPct(el.w)}vw`, el.image.decorative ? { decorative: true } : undefined)}</div>`;
+          }
+          if (el.kind === 'button' && el.button) {
+            const href = safeHref(el.button.url); if (!href) return '';   // unsafe → element dropped
+            return `<a class="ff-el btn${el.button.style === 'outline' ? ' btn-outline' : ''}${hide}" href="${attr(href)}" rel="noopener"${st}>${esc(el.button.label)}</a>`;
+          }
+          return '';
+        }).filter(Boolean);
+        if (els.length) html = `<section class="block wrap block-freeform">${b.title ? h2(b.title, '') : ''}<div class="ff-canvas ff-aspect-${b.aspect}">${els.join('')}</div></section>`;
+        break;
+      }
       case 'toc':   // deferred — rendered after anchors are assigned (needs sibling headings)
         html = '';
         break;
@@ -1437,11 +1608,11 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     // Every rendered block needs a UNIQUE key: the template keys its parts map by it
     // (parts[key] = html) and the section-order/visibility machinery addresses it by
     // it — two blocks sharing a key silently overwrite each other (a dropped second
-    // "rich text"/"features"/etc. would vanish). MULTI blocks (form/columns/cards)
+    // "rich text"/"features"/etc. would vanish). MULTI blocks (form/columns/cards/freeform)
     // key off their stable id; every other type keys off its type, then de-dupes with
     // a numeric suffix so the FIRST instance keeps `block_<type>` (byte-identical to
     // before) and later duplicates get `block_<type>_2`, `_3`, … — all distinct.
-    const baseKey = (b.type === 'form' || b.type === 'columns' || b.type === 'cards')
+    const baseKey = (b.type === 'form' || b.type === 'columns' || b.type === 'cards' || b.type === 'freeform')
       ? `block_${b.type}_${(b as { id: string }).id}`
       : `block_${b.type}`;
     let key = baseKey, n = 2;
@@ -1815,4 +1986,30 @@ table.site-table tbody tr:last-child td{border-bottom:none}
 .block.ov-align-center .svc-grid,.block.ov-align-center .cards,.block.ov-align-center .card-grid,.block.ov-align-center .cols,.block.ov-align-center .accordion,.block.ov-align-center .prose,.block.ov-align-center ul,.block.ov-align-center ol,.block.ov-align-center table,.block.ov-align-center .it-row,.block.ov-align-right .svc-grid,.block.ov-align-right .cards,.block.ov-align-right .card-grid,.block.ov-align-right .cols,.block.ov-align-right .accordion,.block.ov-align-right .prose,.block.ov-align-right ul,.block.ov-align-right ol,.block.ov-align-right table,.block.ov-align-right .it-row{text-align:left}
 .block.ov-align-center .btn-row,.block.ov-align-center .cta-inner{justify-content:center}
 .block.ov-align-left .btn-row,.block.ov-align-left .cta-inner{justify-content:flex-start}
-.block.ov-align-right .btn-row,.block.ov-align-right .cta-inner{justify-content:flex-end}`;
+.block.ov-align-right .btn-row,.block.ov-align-right .cta-inner{justify-content:flex-end}
+/* ── G25 reversal · freeform canvas (docs/design/freeform-canvas-design.md §4-6).
+   One stored layout, two deterministic renders, ZERO JS. ≥621px: the canvas is a
+   fenced position:relative box with an enumerated aspect-ratio preset; each
+   element is absolutely positioned by its validated, quantized, numbers-only
+   inline percentages and scales linearly with viewport width. ≤620px (the block
+   layer's phone boundary): ONE static rule flips the canvas to flow — elements
+   stack in DOM order, which validation guarantees is (y,x) reading order. The
+   flip's width/height need !important to beat the element's inline style (the
+   block--hide-mobile posture); left/top/z-index go inert once position:static.
+   Text steps are clamp()ed with hard floors — nothing the owner does can render
+   body copy below ~15px. Token-driven; no new colors, no external anything. */
+.ff-canvas{position:relative;margin-top:6px}
+.ff-aspect-banner{aspect-ratio:3/1}
+.ff-aspect-standard{aspect-ratio:2/1}
+.ff-aspect-tall{aspect-ratio:4/3}
+.ff-el{position:absolute;margin:0;min-width:0;min-height:0}
+.ff-text{font-size:clamp(1rem,2vw,1.2rem);line-height:1.4;overflow:hidden}
+.ff-text.ff-size-s{font-size:clamp(.95rem,1.6vw,1.05rem)}
+.ff-text.ff-size-l{font-size:clamp(1.2rem,3vw,1.7rem)}
+.ff-text.ff-size-xl{font-size:clamp(1.5rem,4.2vw,2.4rem)}
+.ff-align-center{text-align:center}
+.ff-align-right{text-align:right}
+.ff-image picture,.ff-image img{display:block;width:100%;height:100%}
+.ff-image img{object-fit:cover;border-radius:10px}
+a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center}
+@media(max-width:620px){.ff-canvas{aspect-ratio:auto}.ff-canvas .ff-el{position:static;width:auto!important;height:auto!important;margin:12px 0}.ff-canvas .ff-image img{height:auto}.ff-canvas .ff-hide-phone{display:none!important}}`;
