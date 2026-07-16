@@ -16,6 +16,7 @@ import { snapshotContentUsable } from '../lib/render_types.ts';
 import { injectPreviewBadge, hashPreviewPassword, newPreviewToken, shapePreviewStatus } from '../lib/preview_env.ts';
 import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { signPreviewToken, verifyPreviewToken, previewLinkSecret, clampTtlSeconds } from '../lib/preview_link.ts';
+import { injectFeedbackPanel } from '../lib/section_comments.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -106,7 +107,7 @@ export async function handlePreviewSettings(req: Request, site: SiteRow, princip
 // signed image URLs, link rewrite, badge) are always re-applied → a cache hit
 // never serves an expired signed URL. `linkPfx` keeps in-preview navigation on
 // the same door the visitor arrived through.
-async function renderStagedPreview(req: Request, siteId: string, snapshotId: string, linkPfx: string, cors: Record<string, string>): Promise<Response> {
+async function renderStagedPreview(req: Request, siteId: string, snapshotId: string, linkPfx: string, cors: Record<string, string>, decorate?: (html: string) => string): Promise<Response> {
   const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
   const url = new URL(req.url);
 
@@ -139,6 +140,9 @@ async function renderStagedPreview(req: Request, siteId: string, snapshotId: str
   // noindex + the honest preview badge (the draft watermark)
   html = html!.replace('</head>', `<meta name="robots" content="noindex,nofollow"></head>`);
   html = injectPreviewBadge(html!, hit.businessName || '');
+  // G11: per-door decoration (the signed door adds its "Leave feedback" panel) —
+  // applied after the cache, so a cache hit is decorated per request too.
+  if (decorate) html = decorate(html!);
   return htmlResp(html!);
 }
 
@@ -195,7 +199,12 @@ export async function handleSignedPreview(req: Request, token: string, cors: Rec
   const pv = await svc(`presence_site_preview?site_id=eq.${v.payload.site_id}&select=snapshot_id&limit=1`);
   const snapId = pv.ok && pv.json?.[0]?.snapshot_id;
   if (!snapId) return htmlResp(shell('This preview isn’t available yet.'), 404);
-  return renderStagedPreview(req, v.payload.site_id, snapId, `${fnBase()}/functions/v1/presence/p/s/${token}`, cors);
+  // G11: the shared-draft page carries a "Leave feedback" panel — per-section
+  // comment boxes fed by /p/s/:token/sections and posted to /p/s/:token/comments,
+  // both authorized by THIS same signed token. The opaque door is untouched.
+  const pfx = `${fnBase()}/functions/v1/presence/p/s/${token}`;
+  const page = new URL(req.url).searchParams.get('page') || '/';
+  return renderStagedPreview(req, v.payload.site_id, snapId, pfx, cors, (h) => injectFeedbackPanel(h, { pfx, page }));
 }
 
 // ── POST /preview/share-link — mint a signed, time-limited link (authed) ──────

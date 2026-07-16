@@ -41,6 +41,7 @@ export function featureForRoute(route: string, method: string): EditionFeature |
     case 'brand': case 'writer': case 'editor': case 'review':
     case 'visual': case 'assets': case 'media': case 'stock': case 'content-library':
     case 'offerings': case 'testimonials': case 'faqs': case 'posts':
+    case 'comments':                                     // G11: draft review comments live on the website area
       return 'website';
     case 'site':
       return seg.length > 1 ? 'website' : null;          // /site GET = bootstrap (baseline); /site/template(s) = website

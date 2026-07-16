@@ -71,7 +71,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // others (same net effect as the old per-block try/catch).
   const none = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: null as any });
-  const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ] = await Promise.all([
+  const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ, cmQ] = await Promise.all([
     // agency membership drives the Agency nav section (reviewers never need it)
     role !== 'client_reviewer' ? resolveAgencyMember(jwt).catch(() => null) : Promise.resolve(null),
     // Bridged-customer links (see isManagedClient below). Fired without waiting on
@@ -98,6 +98,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     // FD-N: a client's message — AND their approval decisions / survey answers —
     // must reach the bell/Today, not only the Inbox.
     seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,survey_submitted)&select=created_at,kind,detail,actor_kind&order=created_at.desc&limit=50`).catch(swallow) : none,
+    // G11: open client feedback on the shared draft — one HEAD count (owner
+    // surfaces only; null on any failure, incl. a database without 0112 yet).
+    seesFull ? svcCount(`presence_section_comments?site_id=eq.${site.id}&author_kind=eq.client&status=eq.open&deleted_at=is.null`) : Promise.resolve(0),
   ]);
   const isAgency = !!agencyMember;
 
@@ -148,7 +151,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     // represented by a follow-up notice, so a single lead never stacks two signals.
     const leadFollowups = ((nQ.json as any[]) || []).filter((n) => n.kind === 'lead_followup').length;
     const newEnquiries = Math.max(0, ((eQ.json as any[])?.length || 0) - leadFollowups);
-    attention_count = ((nQ.json as any[])?.length || 0) + (iQ || 0) + (wQ || 0) + filesPending + newEnquiries;
+    attention_count = ((nQ.json as any[])?.length || 0) + (iQ || 0) + (wQ || 0) + filesPending + newEnquiries + (cmQ || 0);
   } catch { /* the badge is best-effort — never block the shell on it */ }
 
   // P2-D: fold service delivery into the ONE attention surface (no second bell).
@@ -226,6 +229,7 @@ const NOTICE_HREF: Record<string, string> = {
   booking_followup: '/presence.html#bookings', // #164: a past appointment needs marking done / no-show
   booking_reminder: '/presence.html#bookings', // #164: silent send-once ledger (dismissed; never shown) — mapped for completeness
   new_review: '/presence.html#reviews',   // a customer left a review → the Reviews desk (approve/hide/reply)
+  client_feedback: '/presence.html#design',   // G11: a client left a note on the shared draft → the builder's Comments panel
   email_auth: '/presence.html#foundations',   // DNS #5: unauthenticated email → the Foundations desk (email/DNS setup)
   apex_drift: '/presence.html#foundations',   // DNS: apex points at the wrong place → Foundations (domain/DNS)
 };
@@ -250,7 +254,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // message events, agency links). Predicates unchanged — a reviewer never
   // fires the studio-only reads. Only genuinely dependent stages (bridge
   // links → unread reads, projects → clients → contacts) stay sequential.
-  const [shares, momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ, bridgeQ, supR, evR, agencyLinksQ] = await Promise.all([
+  const [shares, momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ, bridgeQ, supR, evR, agencyLinksQ, feedbackQ] = await Promise.all([
     loadShares(site.id),
     svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
@@ -272,6 +276,9 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // the Agency–Client Bridge for THIS studio (agency_site_id = my site) — the
     // authoritative "who are my customers" list + project→customer mapping.
     seesFull ? svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`).catch(swallow) : noEnq,
+    // G11: open client feedback on the shared draft (owner-only; one HEAD count;
+    // null on any failure — incl. a database without 0112 yet — so no row shows).
+    seesFull ? svcCount(`presence_section_comments?site_id=eq.${site.id}&author_kind=eq.client&status=eq.open&deleted_at=is.null`) : Promise.resolve(0),
   ]);
   const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
@@ -305,6 +312,17 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,
       body: 'Someone reached out through your website and is waiting to hear back.',
       href: noticeHref('website_enquiry'),
+    });
+
+    // G11: a client left feedback on the shared draft — one synthetic row that
+    // links straight into the builder's Comments panel (Design view). Mirrors
+    // the new-enquiries row: counted live, never stored, gone when resolved.
+    const openFeedback = feedbackQ || 0;
+    if (openFeedback > 0) notices.unshift({
+      id: 'client-feedback', kind: 'client_feedback',
+      headline: openFeedback === 1 ? 'Your client left a note on the draft' : `${openFeedback} notes from your client on the draft`,
+      body: 'Feedback on the shared draft is waiting — read and resolve it in the builder’s Comments panel.',
+      href: noticeHref('client_feedback'),
     });
 
     // FIX 4: a section that BLOCKS publishing (missing required content) should show

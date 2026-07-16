@@ -528,6 +528,29 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-tree-acts button:hover{border-color:var(--line,#ddd);color:var(--plum,#5b3fa0)}
 .dc-tree-acts button:disabled{opacity:.3;cursor:default}
 
+/* G11: per-section review comments — the toggle, the tray badges, the thread panel */
+.dc-actbtn.on{border-color:var(--plum,#5b3fa0);background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0)}
+.cm-badge{flex:0 0 auto;font:inherit;font-size:11px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
+.cm-badge.zero{background:transparent;color:var(--ink-2,#8a8172);border-color:var(--line,#ddd);opacity:0;transition:opacity .12s}
+.dc-tree-row:hover .cm-badge.zero,.dc-tree-row:focus-within .cm-badge.zero{opacity:1}
+.cm-badge:hover{border-color:var(--plum,#5b3fa0);color:#fff;background:var(--plum,#5b3fa0)}
+.cm-badge.zero:hover{color:var(--plum,#5b3fa0);background:var(--wash,#f4f0fb)}
+.cm-item{border:1px solid var(--hair,#e7e0f2);border-radius:10px;padding:9px 11px;margin-top:8px}
+.cm-item.resolved{opacity:.62}
+.cm-who{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-2,#8a8172);text-transform:uppercase;letter-spacing:.03em}
+.cm-who .cm-k{font-weight:800}
+.cm-who .cm-k.client{color:var(--plum,#5b3fa0)}
+.cm-body{font-size:13px;line-height:1.55;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm-itemacts{display:flex;gap:8px;margin-top:6px}
+.cm-itemacts button{font:inherit;font-size:11.5px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
+.cm-itemacts button:hover{color:var(--plum,#5b3fa0)}
+.cm-reply{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid var(--line,#ddd);border-radius:9px;padding:8px;min-height:60px;resize:vertical;margin-top:10px}
+.cm-send{font:inherit;font-size:12.5px;font-weight:700;margin-top:6px;padding:7px 16px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;cursor:pointer}
+.cm-send:disabled{opacity:.5;cursor:default}
+.cm-resolveall{font:inherit;font-size:12px;font-weight:600;margin-top:10px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);cursor:pointer}
+.cm-resolveall:hover{border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)}
+.cm-empty{font-size:12.5px;color:var(--ink-2,#8a8172);line-height:1.55;padding:6px 0}
+
 /* the floating drag "ghost" + the drop-line indicator — BOTH drawn in the PARENT
    document over the iframe (never inside it), so the drop never depends on native
    cross-frame drag-and-drop. List-order only; the line marks a single gap index. */
@@ -848,6 +871,7 @@ body.pd-dragging *{cursor:grabbing !important}
                 <button type="button" class="dc-actbtn" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled>↶ Undo</button>
                 <button type="button" class="dc-actbtn" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button>
                 <button type="button" class="dc-actbtn" id="btnShareDraft" title="Copy a private, expiring link to this draft — no sign-in needed to view">🔗 Share draft</button>
+                <button type="button" class="dc-actbtn" id="btnComments" title="Feedback on this draft — notes from you and your client, section by section" aria-pressed="false">💬 Comments</button>
                 <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Page contents</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
                 <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">☰ Menu</button>
@@ -895,6 +919,13 @@ body.pd-dragging *{cursor:grabbing !important}
               <div id="designGallery" hidden></div>
               <div id="designHost"></div>
             </div>
+          </aside>
+          <!-- G11: per-section review comments — the thread panel (right slide-over,
+               same idiom as Design settings). Opened from a badge in the Page
+               contents tray while the Comments toggle is on. -->
+          <aside id="commentsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="Draft feedback" aria-hidden="true">
+            <div class="dc-panel-head"><span class="dc-panel-t" id="cmPanelTitle">Comments</span><button type="button" class="dc-close" id="btnCommentsClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-scroll" id="cmPanelBody"></div>
           </aside>
           <div class="dc-scrim" id="dcScrim" hidden></div>
         </div>
@@ -4059,6 +4090,158 @@ async function shareDraftLink() {
   if (b) { b.disabled = false; b.textContent = "🔗 Share draft"; }
 }
 
+/* ── G11: per-section review comments — the operator side of the feedback loop.
+   Toggle 💬 Comments → per-section count badges appear in the Page contents
+   tray; click one to read the thread (newest first), reply, resolve, or remove.
+   The client's notes arrive through the shared-draft link (Share draft): the
+   /p/s/:token page carries a "Leave feedback" panel keyed by the SAME stable
+   section ids, so both sides of the conversation land in the same threads. ── */
+let CM_ON = false, CM_THREADS = null, CM_BUSY = false;
+// Mirror of the server's stable section-id scheme (lib/section_comments.ts):
+// type | type#N (Nth same-type block) | type:storedId (multi-instance blocks).
+// Index-aligned with the block list (junk entries map to null, never counted).
+function cmSectionIds(blocks) {
+  const out = [], counts = {};
+  (blocks || []).forEach((b) => {
+    if (!b || typeof b !== "object") { out.push(null); return; }
+    const type = String(b.type || "");
+    if (!/^[a-z0-9_]{1,40}$/.test(type)) { out.push(null); return; }
+    counts[type] = (counts[type] || 0) + 1;
+    const own = typeof b.id === "string" && /^[a-z0-9_-]{1,60}$/i.test(b.id) ? b.id : "";
+    out.push(own ? type + ":" + own : (counts[type] === 1 ? type : type + "#" + counts[type]));
+  });
+  return out;
+}
+function cmThreadFor(slug, bid) { const s = slug || "", b = bid || ""; return (CM_THREADS || []).find((t) => t.page_slug === s && t.block_id === b) || null; }
+function cmOpenFor(slug, bid) { const t = cmThreadFor(slug, bid); return t ? t.open_count : 0; }
+function cmTotalOpen() { return (CM_THREADS || []).reduce((n, t) => n + t.open_count, 0); }
+async function cmLoad() { CM_THREADS = (((await api("GET", "/comments")).data || {}).threads) || []; }
+function cmSyncButton() {
+  const b = $("btnComments"); if (!b) return;
+  const n = CM_ON ? cmTotalOpen() : 0;
+  b.textContent = "💬 Comments" + (CM_ON && n ? " (" + n + ")" : "");
+  b.classList.toggle("on", CM_ON); b.setAttribute("aria-pressed", String(CM_ON));
+}
+async function cmToggle() {
+  if (CM_BUSY) return;
+  if (CM_ON) { CM_ON = false; CM_THREADS = null; cmSyncButton(); closeCommentsPanel(); dcRefreshTree(); return; }
+  CM_BUSY = true;
+  const b = $("btnComments"); if (b) b.textContent = "💬 Loading…";
+  try { await cmLoad(); CM_ON = true; openTrayPanel("contents"); }
+  catch (err) { toast(nice(err), true); }
+  CM_BUSY = false; cmSyncButton();
+}
+// The count badge on a tray row: always visible when a thread has open notes;
+// a quiet hover affordance (💬) otherwise, so a thread can be STARTED anywhere.
+function cmBadge(slug, bid, name) {
+  const n = cmOpenFor(slug, bid);
+  const t = cmThreadFor(slug, bid);
+  const btn = el("button", "cm-badge" + (n ? "" : " zero"), n ? String(n) : "💬");
+  btn.type = "button";
+  btn.title = n ? (n === 1 ? "1 open note here — read & reply" : n + " open notes here — read & reply")
+    : (t && t.comments.length ? "Resolved notes here — read them" : "Leave a note here");
+  btn.setAttribute("aria-label", "Comments: " + name);
+  btn.addEventListener("click", (e) => { e.stopPropagation(); openCommentsThread(slug, bid, name); });
+  return btn;
+}
+// The thread panel — a right slide-over like Design settings, but WITHOUT a
+// scrim so the tray (and its badges) stays reachable while reading threads.
+function closeCommentsPanel() {
+  const p = $("commentsPanel"); if (!p) return;
+  p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+}
+function openCommentsThread(slug, bid, name) {
+  const p = $("commentsPanel"); if (!p) return;
+  closeSettingsPanel();
+  PANEL_LASTFOCUS = document.activeElement;
+  const tt = $("cmPanelTitle"); if (tt) tt.textContent = name;
+  cmRenderThread(slug, bid, name);
+  p.classList.add("on"); p.setAttribute("aria-hidden", "false");
+  setTimeout(() => { try { $("btnCommentsClose").focus(); } catch (_) {} }, 40);
+}
+function cmRenderThread(slug, bid, name) {
+  const host = $("cmPanelBody"); if (!host) return;
+  host.textContent = "";
+  const t = cmThreadFor(slug, bid);
+  const wrap = el("div"); wrap.style.cssText = "padding:12px 14px 22px";
+  wrap.appendChild(el("div", "hint", (bid ? "Notes on this section" : "Notes on the whole page") + " · " + (slug ? "/" + slug + "/" : "home page")));
+  if (!t || !t.comments.length) {
+    wrap.appendChild(el("div", "cm-empty", "No notes here yet. Write the first one below — and when you share the draft link, your client's feedback lands right here, section by section."));
+  } else {
+    if (t.open_count > 0) {
+      const res = el("button", "cm-resolveall", "✓ Resolve this thread (" + t.open_count + ")"); res.type = "button";
+      res.addEventListener("click", () => cmResolveThread(slug, bid, name));
+      wrap.appendChild(res);
+    }
+    t.comments.forEach((c) => wrap.appendChild(cmItem(c, slug, bid, name)));   // already newest-first from the server
+  }
+  const ta = el("textarea", "cm-reply"); ta.maxLength = 2000;
+  ta.placeholder = t && t.comments.length ? "Write a reply…" : "Write a note…";
+  ta.setAttribute("aria-label", "Your note");
+  wrap.appendChild(ta);
+  const sendLabel = t && t.comments.length ? "Reply" : "Add note";
+  const send = el("button", "cm-send", sendLabel); send.type = "button";
+  send.addEventListener("click", async () => {
+    const body = ta.value.trim(); if (!body) { toast("Write a note first.", true); return; }
+    send.disabled = true; send.textContent = "Sending…";
+    try { await api("POST", "/comments", { page_slug: slug || "", block_id: bid || "", body }); await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name); }
+    catch (err) { send.disabled = false; send.textContent = sendLabel; toast(nice(err), true); }
+  });
+  wrap.appendChild(send);
+  host.appendChild(wrap);
+}
+function cmItem(c, slug, bid, name) {
+  const it = el("div", "cm-item" + (c.status === "resolved" ? " resolved" : ""));
+  const who = el("div", "cm-who");
+  who.appendChild(el("span", "cm-k" + (c.author_kind === "client" ? " client" : ""), c.author_kind === "client" ? "Client" : "You"));
+  who.appendChild(el("span", null, new Date(c.created_at).toLocaleString()));
+  if (c.status === "resolved") who.appendChild(el("span", null, "· resolved"));
+  it.appendChild(who);
+  it.appendChild(el("div", "cm-body", c.body));   // textContent — never markup
+  const acts = el("div", "cm-itemacts");
+  if (c.status === "open") {
+    const r = el("button", null, "Resolve"); r.type = "button";
+    r.addEventListener("click", () => cmAct("/comments/" + c.id + "/resolve", slug, bid, name, "Resolved."));
+    acts.appendChild(r);
+  }
+  const d = el("button", null, "Remove"); d.type = "button";
+  d.addEventListener("click", () => cmAct("/comments/" + c.id + "/delete", slug, bid, name, "Removed."));
+  acts.appendChild(d);
+  it.appendChild(acts);
+  return it;
+}
+async function cmAct(path, slug, bid, name, okMsg) {
+  try { await api("POST", path, {}); await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name); toast(okMsg); }
+  catch (err) { toast(nice(err), true); }
+}
+async function cmResolveThread(slug, bid, name) {
+  const t = cmThreadFor(slug, bid); if (!t) return;
+  try {
+    for (const c of t.comments.filter((x) => x.status === "open")) await api("POST", "/comments/" + c.id + "/resolve", {});
+    await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name);
+    toast("Thread resolved.");
+  } catch (err) { toast(nice(err), true); }
+}
+// Threads whose section was later REMOVED from the page still surface (never
+// silently lost) — one calm row per orphaned thread at the end of the tray.
+function cmOrphanRows(host) {
+  if (!CM_ON) return;
+  const ids = cmSectionIds(BLOCKS_WORK || []);
+  (CM_THREADS || []).filter((t) => t.page_slug === (DC_PAGE || "") && t.block_id && ids.indexOf(t.block_id) === -1).forEach((t) => {
+    const row = el("div", "dc-tree-row core under-page");
+    const mn = el("button", "dc-tree-main"); mn.type = "button"; mn.title = "Read this feedback";
+    mn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: "💬" }));
+    const txt = el("span", "dc-tree-txt");
+    txt.appendChild(el("span", "dc-tree-name", "Feedback on a removed section"));
+    txt.appendChild(el("span", "dc-tree-meta", t.block_id));
+    mn.appendChild(txt);
+    mn.addEventListener("click", () => openCommentsThread(DC_PAGE, t.block_id, "Removed section"));
+    row.appendChild(mn);
+    row.appendChild(cmBadge(DC_PAGE, t.block_id, "Removed section"));
+    host.appendChild(row);
+  });
+}
+
 /* ── history journal (identical /publishes + /restore-to-draft) ── */
 // FD-T7: Launches — stage a redesign as a named release, preview/approve, then go
 // live in one step (all through the existing publish pipeline). Live keeps running.
@@ -6995,13 +7178,13 @@ function closeSettingsPanel() {
 }
 function openSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
-  closeTrayPanel();
+  closeTrayPanel(); closeCommentsPanel();
   PANEL_LASTFOCUS = document.activeElement;
   if (sc) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add("on")); }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   setTimeout(() => { try { $("btnSettingsClose").focus(); } catch (_) {} }, 40);
 }
-function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
@@ -7020,11 +7203,12 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); if (PANEL
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
   on("btnNavEdit", dcEditNav);
   on("btnShareDraft", shareDraftLink);
+  on("btnComments", cmToggle); on("btnCommentsClose", closeDesignPanels);   // G11
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const t = $("trayPanel"), s = $("settingsPanel");
-    if ((t && t.classList.contains("on")) || (s && s.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
+    const t = $("trayPanel"), s = $("settingsPanel"), cm = $("commentsPanel");
+    if ((t && t.classList.contains("on")) || (s && s.classList.contains("on")) || (cm && cm.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
   }, true);
 })();
 
@@ -7887,6 +8071,8 @@ function dcPageTreeRow(pg, cur) {
   mn.appendChild(txt);
   mn.addEventListener("click", () => dcSwitchPage(pg.slug));
   row.appendChild(mn);
+  // G11: the whole-page feedback thread rides the page row while Comments is on
+  if (CM_ON) row.appendChild(cmBadge(pg.slug, "", "Whole page — " + pg.title));
   const acts = el("span", "dc-tree-acts");
   const m = el("button", null, "⋯"); m.type = "button"; m.title = pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page";
   m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
@@ -7896,7 +8082,7 @@ function dcPageTreeRow(pg, cur) {
 // The sections of the currently-open page, nested (indented) under its page row.
 function dcTreeSectionRows(host, main) {
   const secs = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
-  if (!secs.length) { host.appendChild(el("div", "dc-tree-empty2", "No sections yet — use ＋ Add section on the canvas.")); return; }
+  if (!secs.length) { host.appendChild(el("div", "dc-tree-empty2", "No sections yet — use ＋ Add section on the canvas.")); cmOrphanRows(host); return; }
   Array.prototype.forEach.call(secs, (el2) => {
     const c = eeClassify(el2);
     const row = dcTreeRow(el2, c); row.classList.add("under-page"); host.appendChild(row);
@@ -7910,6 +8096,7 @@ function dcTreeSectionRows(host, main) {
       }
     }
   });
+  cmOrphanRows(host);   // G11: feedback whose section was removed still surfaces
 }
 // a child row under a container: one column, selectable, with its own settings
 function dcTreeChildRow(colEl, bi, k, span) {
@@ -7952,6 +8139,13 @@ function dcTreeRow(el2, c) {
   mainBtn.appendChild(txt);
   mainBtn.addEventListener("click", () => dcTreeSelect(el2, row));
   row.appendChild(mainBtn);
+  // G11: per-section comment badge (count when open notes exist; quiet 💬 to
+  // start a thread). Block rows only — keyed by the stable section id, so the
+  // thread survives reorders and matches the client's shared-draft feedback.
+  if (CM_ON && isBlock) {
+    const cid = cmSectionIds(BLOCKS_WORK || [])[c.bi];
+    if (cid) row.appendChild(cmBadge(DC_PAGE, cid, name));
+  }
   const acts = el("span", "dc-tree-acts");
   const mkA = (label, title, fn, disabled) => {
     const btn = el("button", null, label); btn.type = "button"; btn.title = title; btn.setAttribute("aria-label", title);

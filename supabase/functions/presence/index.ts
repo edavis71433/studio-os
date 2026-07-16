@@ -59,6 +59,7 @@ import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, h
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
 import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } from './routes/reviews.ts';
+import { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } from './routes/comments.ts';
 import { resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleHelpAsk } from './routes/help.ts';
@@ -211,8 +212,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── M8: the SIGNED, time-limited preview link — pre-auth, authorized ONLY by
   //    a valid unexpired HMAC signature over {site_id, exp}. Matched before the
   //    opaque door (its token carries a '.' + non-hex, so they never collide). ──
+  // ── G11: the shared draft's feedback surface rides the SAME signed token —
+  //    the {id,name} section list + the client comment drop. Matched BEFORE the
+  //    door itself so "/sections" / "/comments" never get swallowed into a
+  //    token (tokens are base64url + '.' + hex — never a '/'). ──
   {
-    const m = route.match(/^\/p\/s\/(.+)$/);
+    let m = route.match(/^\/p\/s\/([^/]+)\/sections$/);
+    if (m && method === 'GET') return handleTokenSections(req, m[1], cors);
+    m = route.match(/^\/p\/s\/([^/]+)\/comments$/);
+    if (m && method === 'POST') return handleTokenComment(req, m[1], cors);
+    m = route.match(/^\/p\/s\/([^/]+)$/);
     if (m && method === 'GET') return handleSignedPreview(req, m[1], cors);
   }
   // ── FD-T20: the PUBLIC, shareable preview URL — pre-auth, authorized by the
@@ -570,6 +579,20 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
   }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
+  // ── G11: per-section review comments on the draft (operator side). Site-scoped
+  //    like the sibling site routes; the reviewer boundary above already refuses a
+  //    client_reviewer (this route is NOT in reviewerAllowed). The client writes
+  //    through the signed share-link door (pre-auth, above). ──
+  if (route === '/comments' && method === 'GET') return handleCommentsList(req, site, cors);
+  if (route === '/comments' && method === 'POST') return handleCommentCreate(req, site, principal, cors);
+  {
+    const m = route.match(/^\/comments\/([0-9a-f-]{36})\/(resolve|delete)$/);
+    if (m && method === 'POST') {
+      return m[2] === 'resolve'
+        ? handleCommentResolve(site, principal, m[1], cors)
+        : handleCommentDelete(site, principal, m[1], cors);
+    }
+  }
   // ── Broadcasts: owner-approved email to a saved segment (compose → preview →
   //    EXPLICITLY send/schedule). Site-scoped + studio-gated by the reviewer
   //    boundary above; dispatch reuses the ONE send path (suppression + one-click
