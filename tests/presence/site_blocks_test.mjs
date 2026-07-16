@@ -478,6 +478,113 @@ const ctx = { esc, attr, safeHref };
   ok('variant CSS shipped, namespaced .v-<variant>', ['.block-cta.v-card', '.block-gallery.v-masonry', '.block-gallery.v-filmstrip', '.block-accordion.v-two-column', '.block-pricing.v-list', '.block-reviews-wall.v-quotes', '.block-reviews-wall.v-strip'].every((sel) => BLOCK_CSS.includes(sel)));
 }
 
+// ═══ 11. gallery media sets + zoom (Wave-2 G18) — captions + :target lightbox ═══
+{
+  const G = '11111111-1111-1111-1111-111111111111', H = '22222222-2222-2222-2222-222222222222', MISS = '99999999-9999-9999-9999-999999999999';
+  const REF = (id) => id === MISS ? null : { alt: 'Our work', variants: { w400: '/img/a-400.webp', w800: '/img/a-800.webp', w1600: '/img/a-1600.webp' }, width: 800, height: 600 };
+
+  // — validation: zoom is strict boolean true; captions index-aligned + capped —
+  ok('zoom: only literal true survives validation (allowlist posture)', (() => {
+    const on = validateBlocks([{ type: 'gallery', image_ids: [G], zoom: true }])[0];
+    const junk = validateBlocks([{ type: 'gallery', image_ids: [G], zoom: 'yes' }, { type: 'gallery', image_ids: [G], zoom: 1 }, { type: 'gallery', image_ids: [G] }]);
+    return on.zoom === true && junk.every((b) => !('zoom' in b));
+  })());
+  ok('captions: stored index-aligned with image_ids; junk ids drop their caption too', (() => {
+    const g = validateBlocks([{ type: 'gallery', image_ids: [G, 'not-a-uuid', H], captions: ['first', 'orphaned', 'third'] }])[0];
+    return g.image_ids.length === 2 && JSON.stringify(g.captions) === JSON.stringify(['first', 'third']);
+  })());
+  ok('captions: length-capped at 160; all-empty captions store NO captions key', (() => {
+    const long = validateBlocks([{ type: 'gallery', image_ids: [G], captions: ['x'.repeat(500)] }])[0];
+    const none = validateBlocks([{ type: 'gallery', image_ids: [G, H], captions: ['', '  '] }])[0];
+    return long.captions[0].length === 160 && !('captions' in none);
+  })());
+
+  // — resolution: zoom + captions ride the rebuild; captions realign on drops —
+  ok('zoom + captions survive resolveBlockMedia; captions realign when an image drops', (() => {
+    const r = resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G, MISS, H], captions: ['one', 'gone', 'three'], zoom: true }]), REF)[0];
+    return r.zoom === true && r.images.length === 2 && JSON.stringify(r.captions) === JSON.stringify(['one', 'three']);
+  })());
+  ok('a gallery without zoom/captions resolves with NEITHER key (absent, not false/[])', (() => {
+    const r = resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G] }]), REF)[0];
+    return !('zoom' in r) && !('captions' in r);
+  })());
+
+  // — render: absent zoom → ZERO output change (golden-provable) —
+  ok('no zoom → no lightbox markup at all; junk zoom renders identical to absent', (() => {
+    const plain = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Work', image_ids: [G, H] }]), REF), ctx)[0].html;
+    const junk = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Work', image_ids: [G, H], zoom: 'yes' }]), REF), ctx)[0].html;
+    return plain === junk && !plain.includes('v-zoom') && !plain.includes('class="lb') && !plain.includes('ga-zoom') && !plain.includes('#lb-')
+      && plain.includes('<figure class="ga"><picture>') && plain.includes('<figcaption>Our work</figcaption>');
+  })());
+  ok('captions without zoom show in the grid figcaption (alt stays the fallback)', (() => {
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G, H], captions: ['Front porch', ''] }]), REF), ctx)[0].html;
+    return r.includes('<figcaption>Front porch</figcaption>') && r.includes('<figcaption>Our work</figcaption>') && !r.includes('v-zoom');
+  })());
+
+  // — render: zoom markup — thumbs are anchors, overlays are :target figures —
+  const zr = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Sets', image_ids: [G, H, G], captions: ['View A', '', 'View C'], zoom: true }]), REF), ctx)[0].html;
+  ok('zoom: section gains v-zoom; each thumb is an anchor to its overlay id', zr.includes('block-gallery v-zoom') && zr.includes('<a class="ga-zoom" href="#lb-0-1"') && zr.includes('href="#lb-0-2"') && zr.includes('href="#lb-0-3"') && (zr.match(/class="ga-zoom"/g) || []).length === 3);
+  ok('zoom: overlays carry stable ids lb-0-<i> + the gallery container id lb-0', zr.includes('<div class="gallery" id="lb-0">') && zr.includes('id="lb-0-1"') && zr.includes('id="lb-0-2"') && zr.includes('id="lb-0-3"'));
+  ok('zoom: close pill + backdrop both link back to the gallery (#lb-0); close is first focusable', (() => {
+    const overlay = zr.slice(zr.indexOf('id="lb-0-1"'));
+    const bg = overlay.indexOf('class="lb-bg" href="#lb-0"'), close = overlay.indexOf('class="lb-close" href="#lb-0"'), frame = overlay.indexOf('lb-frame');
+    return bg > -1 && close > -1 && overlay.includes('tabindex="-1"') && close < frame;   // backdrop is tabindex=-1, close precedes content
+  })());
+  ok('zoom: prev/next wrap around (first prev → last, last next → first)', (() => {
+    const first = zr.slice(zr.indexOf('id="lb-0-1"'), zr.indexOf('id="lb-0-2"'));
+    const last = zr.slice(zr.indexOf('id="lb-0-3"'));
+    return first.includes('class="lb-prev" href="#lb-0-3"') && first.includes('class="lb-next" href="#lb-0-2"')
+      && last.includes('class="lb-prev" href="#lb-0-2"') && last.includes('class="lb-next" href="#lb-0-1"');
+  })());
+  ok('zoom: overlay shows the full-res rendition (w1600 in srcset, sizes 100vw) + counter + caption', (() => {
+    const overlay = zr.slice(zr.indexOf('id="lb-0-1"'), zr.indexOf('id="lb-0-2"'));
+    return overlay.includes('/img/a-1600.webp 1600w') && overlay.includes('sizes="100vw"') && overlay.includes('<span class="lb-count">1 / 3</span>') && overlay.includes('<figcaption class="lb-cap">View A</figcaption>');
+  })());
+  ok('zoom: a single-image gallery renders NO prev/next/counter', (() => {
+    const one = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G], zoom: true }]), REF), ctx)[0].html;
+    return one.includes('v-zoom') && one.includes('id="lb-0-1"') && !one.includes('lb-prev') && !one.includes('lb-next') && !one.includes('lb-count');
+  })());
+  ok('zoom: focal point rides into the overlay image (object-position from blockImg)', (() => {
+    const FREF = () => ({ alt: 'Focal', variants: { w400: '/i/f-400.webp', w800: '/i/f-800.webp', w1600: '/i/f-1600.webp' }, width: 800, height: 600, focal: { x: 30, y: 70 } });
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G], zoom: true }]), FREF), ctx)[0].html;
+    return r.slice(r.indexOf('lb-frame')).includes('object-position:30% 70%');
+  })());
+
+  // — determinism + id stability —
+  ok('zoom: ids are stable + deterministic (same input → identical output, twice)', (() => {
+    const mk = () => JSON.stringify(renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G, H], zoom: true }, { type: 'gallery', image_ids: [H], zoom: true }]), REF), ctx));
+    return mk() === mk();
+  })());
+  ok('zoom: two zoom galleries on one page get distinct id namespaces (lb-0 / lb-1)', (() => {
+    const two = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G], zoom: true }, { type: 'gallery', image_ids: [H], zoom: true }]), REF), ctx);
+    return two[0].html.includes('id="lb-0"') && two[1].html.includes('id="lb-1"') && two[1].html.includes('href="#lb-1-1"') && !two[1].html.includes('id="lb-0-1"');
+  })());
+  ok('zoom composes with layout variants (masonry keeps v-masonry AND v-zoom)', (() => {
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', variant: 'masonry', image_ids: [G], zoom: true }]), REF), ctx)[0].html;
+    return r.includes('block-gallery v-masonry v-zoom');
+  })());
+
+  // — hostile: alt/caption escaped everywhere; every lightbox anchor is a #fragment —
+  ok('zoom: hostile alt + caption are escaped in thumbs, aria-labels and overlays', (() => {
+    const EVIL = () => ({ alt: '"><script>alert(1)</script>', variants: { w800: '/i/e-800.webp' }, width: 8, height: 6 });
+    const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G, H], captions: ['<img src=x onerror=alert(1)>', '" onmouseover="alert(1)'], zoom: true }]), EVIL), ctx)[0].html;
+    return !/<script>alert|<img\s+src=x|" onmouseover="alert\(1\)"/.test(r) && r.includes('&lt;img') && r.includes('&quot;&gt;&lt;script&gt;');
+  })());
+  ok('zoom: all lightbox anchors are same-page fragments (no scheme smuggling)', (() => {
+    const hrefs = [...zr.matchAll(/class="(?:ga-zoom|lb-bg|lb-close|lb-prev|lb-next)" href="([^"]*)"/g)].map((m) => m[1]);
+    return hrefs.length === 3 + 3 * 4 && hrefs.every((h) => /^#lb-0(-\d+)?$/.test(h));
+  })());
+  ok('zoom emits ZERO JavaScript (platform law: no <script>, no handlers)', !/<script|onclick=|onerror=/i.test(zr));
+
+  // — CSS + catalog contract —
+  ok('zoom CSS shipped: :target reveal, 48px close, focus styles, reduced-motion guard', BLOCK_CSS.includes('.lb:target{display:flex}') && BLOCK_CSS.includes('.block-gallery.v-zoom .ga-zoom') && /\.lb-close\{[^}]*min-height:48px/.test(BLOCK_CSS) && BLOCK_CSS.includes('.lb a:focus-visible{outline:3px solid var(--accent)') && /@media\(prefers-reduced-motion:no-preference\)\{\.lb:target \.lb-frame\{animation/.test(BLOCK_CSS));
+  ok('catalog: gallery declares the caption (repeatable text) + zoom (boolean) fields', (() => {
+    const g = COMPONENTS.find((c) => c.key === 'gallery');
+    const cap = g.fields.find((f) => f.key === 'caption'), z = g.fields.find((f) => f.key === 'zoom');
+    return cap && cap.type === 'text' && cap.repeatable === true && z && z.type === 'boolean';
+  })());
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SITE BLOCKS: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

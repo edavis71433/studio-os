@@ -122,7 +122,11 @@ function parseVariant(type: string, raw: unknown): string | undefined {
 // ── Stored (pre-resolution) shapes for media blocks — carry media by ID; the
 //    serializer's resolveBlockMedia() turns IDs into MediaRefs (reusing ref()). ──
 interface StoredTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media_id?: string }> }
-interface StoredGallery { type: 'gallery'; title?: string; image_ids: string[] }
+// Wave-2 G18 (DM-7/DM-11): a gallery may carry per-image captions (index-aligned
+// with image_ids — a media-set's per-view label) and an opt-in `zoom` flag that
+// turns on the zero-JS :target lightbox. Both are additive: absent → the stored
+// shape and the render are byte-identical to before this feature.
+interface StoredGallery { type: 'gallery'; title?: string; image_ids: string[]; captions?: string[]; zoom?: true }
 interface StoredBeforeAfter { type: 'before_after'; title?: string; items: Array<{ before_id: string; after_id: string; caption?: string }> }
 interface StoredVideo { type: 'video'; title?: string; url: string; caption?: string; poster_id?: string }
 interface StoredPartners { type: 'partners'; title?: string; image_ids: string[] }
@@ -237,8 +241,23 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
         break;
       }
       case 'gallery': {
-        const image_ids = arr((b as any).image_ids).map(uid).filter(Boolean).slice(0, CAP.gallery);
-        if (image_ids.length) block = { type: 'gallery', title, image_ids };
+        // Wave-2 G18: captions ride index-aligned with the RAW image_ids list, so a
+        // dropped junk id drops its caption too (alignment survives the uid filter).
+        const rawIds = arr((b as any).image_ids);
+        const rawCaps = arr((b as any).captions);
+        const image_ids: string[] = [], captions: string[] = [];
+        rawIds.forEach((v, i) => {
+          const id = uid(v);
+          if (!id || image_ids.length >= CAP.gallery) return;
+          image_ids.push(id); captions.push(s(rawCaps[i], 160));
+        });
+        if (image_ids.length) {
+          block = { type: 'gallery', title, image_ids };
+          if (captions.some(Boolean)) (block as StoredGallery).captions = captions;
+          // zoom: strict boolean true only (same allowlist posture as `variant` —
+          // anything else is dropped, so existing sites store/render byte-identically).
+          if ((b as any).zoom === true) (block as StoredGallery).zoom = true;
+        }
         break;
       }
       case 'before_after': {
@@ -520,8 +539,16 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
         out.push({ type: 'team', title: b.title, members: b.members.map((m) => ({ name: m.name, role: m.role, bio: m.bio, media: m.media_id ? ref(m.media_id) : null })), ...lk(b) });
         break;
       case 'gallery': {
-        const images = b.image_ids.map((id) => ref(id)).filter((x): x is MediaRef => !!x);
-        if (images.length) out.push({ type: 'gallery', title: b.title, images, ...lk(b) });
+        // Wave-2 G18: captions stay index-aligned as unresolvable images drop out;
+        // zoom rides the rebuild like look/variant. Both absent → identical output.
+        const images: MediaRef[] = [], captions: string[] = [];
+        b.image_ids.forEach((id, i) => {
+          const m = ref(id); if (!m) return;
+          images.push(m); captions.push(b.captions?.[i] || '');
+        });
+        if (images.length) out.push({ type: 'gallery', title: b.title, images,
+          ...(captions.some(Boolean) ? { captions } : {}),
+          ...(b.zoom ? { zoom: true as const } : {}), ...lk(b) } as SiteBlock);
         break;
       }
       case 'before_after': {
@@ -817,6 +844,12 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   const built: Array<{ b: SiteBlock; html: string; ld?: object }> = [];
   const h2 = (t: string | undefined, fallback: string) => `<h2>${esc(t || fallback)}</h2>`;
   let tabsSeq = 0;   // per-page counter → each tabs block gets a unique radio-group name
+  // Wave-2 G18: per-page counter → each ZOOM gallery gets its own lightbox id
+  // namespace (lb-0, lb-1, …). Same per-call posture as tabsSeq: deterministic for
+  // a given page's block list. (Known shared limit with tabs: a zoom gallery nested
+  // inside a columns cell re-enters renderSiteBlocks and restarts the counter, so a
+  // page mixing a TOP-LEVEL zoom gallery with a NESTED one could collide ids.)
+  let zoomSeq = 0;
 
   for (const b of blocks || []) {
     // Phase EXP: auto-expiring content — a section outside its window at the publish
@@ -880,8 +913,45 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         // only the section's .v-<variant> class changes (rules in BLOCK_CSS);
         // the default ('grid') emits no class → byte-identical markup.
         const vg = b.variant === 'masonry' ? ' v-masonry' : b.variant === 'filmstrip' ? ' v-filmstrip' : '';
-        html = `<section class="block wrap block-gallery${vg}">${h2(b.title, 'Gallery')}<div class="gallery">${b.images.map((m) =>
-          `<figure class="ga">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}${m.alt ? `<figcaption>${esc(m.alt)}</figcaption>` : ''}</figure>`).join('')}</div></section>`;
+        // Wave-2 G18 (DM-11): per-image captions + the opt-in ZERO-JS tap-to-zoom
+        // lightbox. `zoom` is a FIELD, not a variant, so it composes with every
+        // layout (grid/masonry/filmstrip). Absent (every existing site) → the
+        // original markup, byte-identical. The lightbox is the CSS :target
+        // technique: each thumb is an anchor to a hidden full-screen <figure
+        // id="lb-<n>-<i>"> showing the full-resolution rendition (blockImg with
+        // sizes 100vw → browsers pick w1600; focal rides along); close links (the
+        // big ✕ pill AND the backdrop itself) target the gallery container
+        // (#lb-<n>) so the page returns to the grid; prev/next anchors wrap
+        // around. All anchors are focusable with visible focus styles; the close
+        // pill is the FIRST focusable inside the overlay (one Tab reaches it).
+        // HONEST LIMIT: without JavaScript there is no Escape-key close and no
+        // focus trap — the close affordance is large (48px pill, top corner) and
+        // the whole backdrop closes; documented in BLOCK_CSS too.
+        const caps = (b as { captions?: string[] }).captions || [];
+        const capOf = (m: MediaRef, i: number) => caps[i] || m.alt || '';
+        if ((b as { zoom?: true }).zoom) {
+          const gid = `lb-${zoomSeq++}`;
+          const n = b.images.length;
+          const thumbs = b.images.map((m, i) => {
+            const cap = capOf(m, i);
+            return `<figure class="ga"><a class="ga-zoom" href="#${gid}-${i + 1}" aria-label="${attr(cap ? `View larger: ${cap}` : `View image ${i + 1} larger`)}">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}</a>${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
+          }).join('');
+          const overlays = b.images.map((m, i) => {
+            const cap = capOf(m, i);
+            const prev = i === 0 ? n : i, next = i === n - 1 ? 1 : i + 2;   // wrap around
+            return `<figure class="lb" id="${gid}-${i + 1}" aria-label="${attr(`Image ${i + 1} of ${n}${cap ? `: ${cap}` : ''}`)}">` +
+              `<a class="lb-bg" href="#${gid}" aria-hidden="true" tabindex="-1"></a>` +
+              `<a class="lb-close" href="#${gid}" aria-label="Close and return to the gallery">✕<span class="lb-close-t">Close</span></a>` +
+              `<span class="lb-frame">${blockImg(m, esc, attr, '100vw')}</span>` +
+              (cap ? `<figcaption class="lb-cap">${esc(cap)}</figcaption>` : '') +
+              (n > 1 ? `<span class="lb-count">${i + 1} / ${n}</span><a class="lb-prev" href="#${gid}-${prev}" aria-label="Previous image">‹</a><a class="lb-next" href="#${gid}-${next}" aria-label="Next image">›</a>` : '') +
+              `</figure>`;
+          }).join('');
+          html = `<section class="block wrap block-gallery${vg} v-zoom">${h2(b.title, 'Gallery')}<div class="gallery" id="${gid}">${thumbs}</div>${overlays}</section>`;
+        } else {
+          html = `<section class="block wrap block-gallery${vg}">${h2(b.title, 'Gallery')}<div class="gallery">${b.images.map((m, i) =>
+            `<figure class="ga">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}${capOf(m, i) ? `<figcaption>${esc(capOf(m, i))}</figcaption>` : ''}</figure>`).join('')}</div></section>`;
+        }
         break;
       }
       case 'before_after':
@@ -1532,4 +1602,32 @@ table.site-table tbody tr:last-child td{border-bottom:none}
 .block-reviews-wall.v-quotes .rw-reply{text-align:left;max-width:480px;margin-left:auto;margin-right:auto}
 /* Reviews wall 'strip' — the same cards in one compact scrolling band. */
 .block-reviews-wall.v-strip .rw-strip{display:flex;gap:14px;overflow-x:auto;margin-top:18px;padding-bottom:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
-.block-reviews-wall.v-strip .rw-card{flex:0 0 auto;width:min(78vw,300px);scroll-snap-align:start}`;
+.block-reviews-wall.v-strip .rw-card{flex:0 0 auto;width:min(78vw,300px);scroll-snap-align:start}
+/* ── Wave-2 G18 · gallery tap-to-zoom lightbox — the CSS :target technique, ZERO
+   JS (platform law: blocks emit no scripts). Additive .v-zoom composes with any
+   gallery layout (grid/masonry/filmstrip). The overlay is position:fixed with its
+   OWN deliberate scrim/ink (same posture as .v-play/.ba-lab overlay chrome) so it
+   reads identically on all 8 template families; interactive states use the brand
+   --accent token. HONEST LIMIT: no JS means no Escape-key close and no focus trap
+   — mitigations: a large (48px) labelled close pill, first in the overlay's tab
+   order, plus the entire backdrop is a close link. Motion only under
+   prefers-reduced-motion:no-preference. */
+.block-gallery.v-zoom .ga-zoom{display:block;color:inherit;text-decoration:none;cursor:zoom-in;border-radius:10px}
+.block-gallery.v-zoom .ga-zoom:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.lb{display:none;position:fixed;inset:0;z-index:9999;margin:0;padding:20px;background:rgba(12,10,16,.93);flex-direction:column;align-items:center;justify-content:center}
+.lb:target{display:flex}
+.lb-bg{position:absolute;inset:0;cursor:zoom-out}
+.lb-frame{position:relative;display:flex;align-items:center;justify-content:center;max-width:min(1600px,100%)}
+.lb-frame picture,.lb-frame img{display:block;max-width:100%;max-height:76vh}
+.lb-frame img{width:auto;height:auto;object-fit:contain;border-radius:8px}
+.lb-cap{position:relative;margin-top:14px;color:#fff;text-align:center;font-size:.95rem;max-width:70ch}
+.lb-count{position:relative;margin-top:8px;color:rgba(255,255,255,.72);font-size:.8rem;letter-spacing:.08em}
+.lb-close{position:absolute;top:16px;right:16px;display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:10px 20px;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font-weight:700;font-size:1rem;text-decoration:none}
+.lb-close:hover{background:rgba(255,255,255,.3)}
+.lb-prev,.lb-next{position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:1.7rem;line-height:1;text-decoration:none}
+.lb-prev{left:14px}.lb-next{right:14px}
+.lb-prev:hover,.lb-next:hover{background:rgba(255,255,255,.3)}
+.lb a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media(max-width:640px){.lb{padding:12px}.lb-close{top:10px;right:10px}.lb-prev{left:6px}.lb-next{right:6px}}
+@media(prefers-reduced-motion:no-preference){.lb:target .lb-frame{animation:lb-zoom .16s ease-out}}
+@keyframes lb-zoom{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}`;

@@ -68,7 +68,10 @@ export const COMPONENTS: ComponentDef[] = [
   { key: 'team', label: 'Team', category: 'content', purpose: 'The people behind the business.',
     fields: [t('name', 'text', { required: true, repeatable: true }), t('role', 'text'), t('bio', 'richtext', { aiAssist: true }), t('image', 'image')], schema: 'Person', a11y: 'alt text = name + role', seo: 'Person schema', industries: ['professional', 'law', 'medical', 'salon', 'real_estate'] },
   { key: 'gallery', label: 'Gallery', category: 'media', purpose: 'Photos of your work or space.',
-    fields: [t('images', 'image', { repeatable: true, required: true }), t('variant', 'enum', { options: ['grid', 'masonry', 'filmstrip'] })], schema: 'ImageObject', a11y: 'meaningful alt text per image, not decorative', seo: 'ImageObject', industries: ['*'] },
+    // Wave-2 G18 (DM-7/DM-11): `caption` = optional per-image label (index-aligned
+    // with images; a media-set's per-view text); `zoom` = opt-in tap-to-zoom
+    // lightbox (zero-JS :target overlay), composing with every layout variant.
+    fields: [t('images', 'image', { repeatable: true, required: true }), t('caption', 'text', { repeatable: true, max: 160 }), t('zoom', 'boolean'), t('variant', 'enum', { options: ['grid', 'masonry', 'filmstrip'] })], schema: 'ImageObject', a11y: 'meaningful alt text per image, not decorative; lightbox anchors focusable with visible focus + large labelled close', seo: 'ImageObject', industries: ['*'] },
   { key: 'before_after', label: 'Before / After', category: 'media', purpose: 'Show the transformation.',
     fields: [t('before', 'image', { required: true }), t('after', 'image', { required: true }), t('caption', 'text')], schema: 'ImageObject', a11y: 'labelled before/after, alt text on both', seo: 'ImageObject', industries: ['home_services', 'salon', 'cleaning', 'landscaping', 'medical'] },
   { key: 'process', label: 'Process / Timeline', category: 'content', purpose: 'How working with you goes, step by step.',
