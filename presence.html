@@ -3483,17 +3483,19 @@ function renderNotes(notes) {
 }
 function renderRecent() {
   const c = S.changes;
-  const hasAny = c && c.changes.length && !(S.health && S.health.first_run);
+  // Guard c.changes like renderBizWaiting does — a /changes answer without a
+  // changes[] list must render "nothing recent", never throw mid-paint.
+  const hasAny = (c?.changes || []).length && !(S.health && S.health.first_run);
   $("recentWrap").hidden = !hasAny;
   const list = $("recentList"); list.innerHTML = "";
   if (!hasAny) return;
-  c.changes.slice(0, 8).forEach((ch) => {
+  (c?.changes || []).slice(0, 8).forEach((ch) => {
     const row = el("div", "jrow");
     row.appendChild(el("span", "jsec", sectionWord(ch.section)));
     row.appendChild(el("span", null, ch.sentence));
     list.appendChild(row);
   });
-  if (c.changes.length > 8) list.appendChild(el("div", "more", `…and ${c.changes.length - 8} more — the publish page reads out everything.`));
+  if ((c?.changes || []).length > 8) list.appendChild(el("div", "more", `…and ${(c?.changes || []).length - 8} more — the publish page reads out everything.`));
 }
 const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "kind words", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
 function renderPublishButton() {
@@ -5831,7 +5833,7 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
 // Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
 // by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
 // re-validates, unknown values fall back to the default). The default is stored as
@@ -5879,11 +5881,177 @@ function blockLookRow(idx, blk, sub) {
   const commit = () => {
     const look = {};
     Object.keys(selects).forEach((k) => { const v = selects[k].value; if (v) look[k] = v; });
-    BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], look: Object.keys(look).length ? look : undefined };
+    const b = { ...BLOCKS_WORK[idx], look: Object.keys(look).length ? look : undefined };
+    // G27 mutual exclusion (one background owner at a time — the server drops
+    // look.background whenever style.bg_color is present): choosing a background
+    // band here clears the custom style background (and its contrast ack, since
+    // that's a color change), then redraws so the style row tells the truth.
+    if (look.background && b.style && b.style.bg_color) {
+      const s = { ...b.style }; delete s.bg_color; delete s.contrast_ack;
+      if (Object.keys(s).length) b.style = s; else delete b.style;
+      BLOCKS_WORK[idx] = b; renderBlocksCard(); return;
+    }
+    BLOCKS_WORK[idx] = b;
   };
   Object.values(selects).forEach((se) => se.addEventListener("change", commit));
   det.appendChild(row);
   det.appendChild(el("div", "hint", "Optional — give this section a soft background, make it full-width, or change its spacing. It stays readable and accessible on every screen."));
+  sub.appendChild(det);
+}
+// ── G27 reversal · per-element style overrides — "Style this section" ────────
+// (docs/design/per-element-overrides-design.md §5-6). Writes the block's optional
+// `style` object into BLOCKS_WORK; the server re-validates via parseStyle
+// (deny-by-default: 6-hex colors, the site's TWO faces only, exact enumerations,
+// contrast_ack strict-true). Keys are deleted when back at default and the whole
+// object is deleted when empty, so an untouched section stays byte-identical.
+// Saved by the existing "Save sections" → PUT /settings path — no new endpoint.
+// Client color math: a small port of brand_kit.ts mix/luminance/contrastRatio
+// (same WCAG formulas, so editor and server can never disagree).
+function ovRgb(hex) { const h = hex.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+function ovMix(a, b, t) { const A = ovRgb(a), B = ovRgb(b); return "#" + A.map((v, i) => Math.max(0, Math.min(255, Math.round(v + (B[i] - v) * t))).toString(16).padStart(2, "0")).join(""); }
+function ovLum(hex) { const f = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); }; const [r, g, b] = ovRgb(hex); return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); }
+function ovContrast(a, b) { const la = ovLum(a), lb = ovLum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); }
+// The brand_kit readableOnWhiteText loop, generalized to any pair: darken `color`
+// in fixed 0.08 steps until it reads against `against` (caps at 20 steps).
+function ovDarkenUntil(color, against, min) { let c = color; for (let i = 0; i < 20 && ovContrast(against, c) < min; i++) c = ovMix(c, "#000000", 0.08); return c; }
+// Curated brand shades first, free hex behind "Custom…" (Eric, 2026-07-16):
+// client-side mix() tints/shades of the site accent + neutrals, per well.
+function ovShades(key) {
+  const T = DESIGN_TOKENS || {};
+  const acc = normHexJs(T.accent) || "#5b3fa0";
+  const ink = normHexJs(T.ink) || "#1d1c22";
+  let list;
+  if (key === "text_color") list = [ink, ovMix(acc, "#000000", 0.55), ovMix(acc, "#000000", 0.3), acc, "#ffffff"];
+  else if (key === "bg_color") list = ["#ffffff", ovMix(acc, "#ffffff", 0.92), ovMix(acc, "#ffffff", 0.8), ovMix(ink, "#ffffff", 0.94), ovMix(acc, "#000000", 0.45)];
+  else list = [acc, ovMix(acc, "#000000", 0.16), ovMix(acc, "#000000", 0.32), ovMix(acc, "#ffffff", 0.3)];
+  return list.filter((h, i) => list.indexOf(h) === i);
+}
+// The governing contrast pairs (§5): text_color × effective background (bg_color
+// if set, else the site's bg token, else white — advisory, stated in the copy),
+// and white × accent (buttons render white text on the accent).
+function ovStylePairs(st) {
+  const pairs = [];
+  if (!st) return pairs;
+  const effBg = st.bg_color || normHexJs((DESIGN_TOKENS || {}).bg || "") || "#ffffff";
+  if (st.text_color) pairs.push({ key: "text_color", name: "Text", color: st.text_color, fixAgainst: effBg, siteBg: !st.bg_color, ratio: ovContrast(st.text_color, effBg) });
+  if (st.accent) pairs.push({ key: "accent", name: "Buttons", color: st.accent, fixAgainst: "#ffffff", siteBg: false, ratio: ovContrast("#ffffff", st.accent) });
+  return pairs;
+}
+// §5 ACK FLOW — ONE extra confirm at "Save sections" when any section still has a
+// failing, un-acknowledged pair. Confirming records contrast_ack: true on those
+// blocks (cleared again by any later color change, so the check re-arms); cancel
+// returns to the editor with nothing saved. Never a hard block, per Eric.
+function ovConfirmContrastAck() {
+  const failing = [];
+  const names = [];
+  BLOCKS_WORK.forEach((b, i) => {
+    const st = b && b.style; if (!st || st.contrast_ack === true) return;
+    const bad = ovStylePairs(st).filter((p) => p.ratio < 4.5);
+    if (!bad.length) return;
+    failing.push(i);
+    bad.forEach((p) => names.push("section " + (i + 1) + " — " + (p.key === "accent" ? "white button text on your accent" : "text on its background") + " is contrast " + p.ratio.toFixed(1) + " (needs 4.5)"));
+  });
+  if (!failing.length) return true;
+  if (!confirm("This text may be unreadable for many visitors — " + names.join("; ") + ". Use it anyway?")) return false;
+  failing.forEach((i) => { BLOCKS_WORK[i] = { ...BLOCKS_WORK[i], style: { ...BLOCKS_WORK[i].style, contrast_ack: true } }; });
+  return true;
+}
+// Remember which section's style popover the owner opened, so the full redraw
+// after every pick doesn't collapse it under them.
+let OV_STYLE_OPEN = null;
+function blockStyleRow(idx, blk, sub) {
+  const st = (BLOCKS_WORK[idx] && BLOCKS_WORK[idx].style) || {};
+  const chosen = ["text_color", "bg_color", "accent", "font", "size", "align"].some((k) => st[k]);
+  const det = el("details"); det.style.cssText = "margin-top:8px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
+  det.open = chosen || OV_STYLE_OPEN === idx;
+  det.addEventListener("toggle", () => { if (det.open) OV_STYLE_OPEN = idx; else if (OV_STYLE_OPEN === idx) OV_STYLE_OPEN = null; });
+  const sum = el("summary", null, "Style this section" + (chosen ? "  ·  customised" : "  ·  optional"));
+  sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478)";
+  det.appendChild(sum);
+  // One writer: patch keys in (empty string = back to default → key deleted); an
+  // empty object is deleted whole. A color change clears contrast_ack (§5) and a
+  // custom background evicts the look's background band (§3 mutual exclusion).
+  const setStyle = (patch, colorChange) => {
+    const b = { ...BLOCKS_WORK[idx] };
+    const s = { ...(b.style || {}) };
+    Object.keys(patch).forEach((k) => { if (patch[k]) s[k] = patch[k]; else delete s[k]; });
+    if (colorChange) delete s.contrast_ack;
+    if (patch.bg_color && b.look && b.look.background) {
+      const lk = { ...b.look }; delete lk.background;
+      if (Object.keys(lk).length) b.look = lk; else delete b.look;
+    }
+    if (Object.keys(s).length) b.style = s; else delete b.style;
+    BLOCKS_WORK[idx] = b;
+    renderBlocksCard();
+  };
+  // Enumerated picks — pillRows; the FIRST option is the default, stored as ABSENT
+  // (the BLOCK_STYLE_FIELDS convention, matching parseStyle exactly).
+  pillRow(det, "Font", [["Default", ""], ["Heading face", "display"], ["Body face", "body"]],
+    (o) => String(st.font || "") === o[1], (o) => setStyle({ font: o[1] }));
+  pillRow(det, "Text size", [["Smaller", "s"], ["Normal", ""], ["Larger", "l"], ["Extra large", "xl"]],
+    (o) => String(st.size || "") === o[1], (o) => setStyle({ size: o[1] }));
+  pillRow(det, "Alignment", [["Default", ""], ["Left", "left"], ["Centered", "center"], ["Right", "right"]],
+    (o) => String(st.align || "") === o[1], (o) => setStyle({ align: o[1] }));
+  // Three color wells — curated brand shades first, the Brand-Kit color-input+hex
+  // pair behind "Custom…", and a "Default" clear chip each.
+  const well = (label, key) => {
+    const cur = st[key] || "";
+    const shades = ovShades(key);
+    const wrap = el("div"); wrap.style.cssText = "margin-top:12px";
+    wrap.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
+    const row = el("div"); row.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;align-items:center";
+    const pillCss = (on) => "font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "#5b3fa0" : "var(--line,#ddd)") + ";background:" + (on ? "#faf7ff" : "transparent");
+    const dflt = el("button", null, "Default" + (cur ? "" : " ✓")); dflt.type = "button"; dflt.style.cssText = pillCss(!cur);
+    dflt.addEventListener("click", () => setStyle({ [key]: "" }, true));
+    row.appendChild(dflt);
+    shades.forEach((h) => {
+      const on = cur === h;
+      const b = el("button"); b.type = "button"; b.title = h;
+      b.setAttribute("aria-label", label + " " + h + (on ? " (chosen)" : ""));
+      b.style.cssText = "width:26px;height:26px;border-radius:50%;cursor:pointer;background:" + h + ";border:2px solid " + (on ? "#5b3fa0" : "rgba(0,0,0,.18)");
+      b.addEventListener("click", () => setStyle({ [key]: h }, true));
+      row.appendChild(b);
+    });
+    const isCustom = !!cur && !shades.includes(cur);
+    const cust = el("button", null, "Custom…" + (isCustom ? " ✓" : "")); cust.type = "button"; cust.style.cssText = pillCss(isCustom);
+    row.appendChild(cust);
+    wrap.appendChild(row);
+    const pairRow = el("div"); pairRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:8px";
+    pairRow.hidden = !isCustom;
+    const colorInput = el("input"); colorInput.type = "color"; colorInput.value = cur || shades[0]; colorInput.style.cssText = "width:44px;height:32px;border:1px solid var(--line,#ddd);border-radius:8px;background:none;cursor:pointer";
+    const hexInput = el("input"); hexInput.type = "text"; hexInput.value = isCustom ? cur : ""; hexInput.placeholder = "#8c3b2e"; hexInput.style.cssText = "width:110px;padding:7px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
+    colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; });
+    colorInput.addEventListener("change", () => setStyle({ [key]: colorInput.value }, true));
+    hexInput.addEventListener("change", () => { const h = normHexJs(hexInput.value); if (h) setStyle({ [key]: h }, true); });
+    pairRow.append(colorInput, hexInput);
+    cust.addEventListener("click", () => { pairRow.hidden = !pairRow.hidden; if (!pairRow.hidden) hexInput.focus(); });
+    wrap.appendChild(pairRow);
+    det.appendChild(wrap);
+  };
+  well("Text", "text_color");
+  well("Background", "bg_color");
+  well("Accent", "accent");
+  // LIVE CONTRAST (§5) — a chip per governing pair, with the one-tap fix beside a
+  // failing one. Recomputed on every redraw (every pick redraws), so it's live.
+  const pairs = ovStylePairs(st);
+  if (pairs.length) {
+    const crow = el("div"); crow.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px";
+    pairs.forEach((p) => {
+      const pass = p.ratio >= 4.5;
+      const chip = el("span", null, p.name + " · Contrast " + p.ratio.toFixed(1) + (pass ? " — passes" : " — hard to read (needs 4.5)"));
+      chip.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:#eaf7ee;color:#1c6b34" : "background:#fdecea;color:#8a2a20");
+      crow.appendChild(chip);
+      if (!pass) {
+        const fix = el("button", null, "Darken until readable"); fix.type = "button";
+        fix.style.cssText = "font:inherit;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid #8a2a20;background:transparent;color:#8a2a20;cursor:pointer";
+        fix.addEventListener("click", () => setStyle({ [p.key]: ovDarkenUntil(p.color, p.fixAgainst, 4.5) }, true));
+        crow.appendChild(fix);
+      }
+    });
+    det.appendChild(crow);
+    if (pairs.some((p) => p.siteBg)) det.appendChild(Object.assign(el("div", "hint", "Text is checked against your page background."), { style: "margin-top:4px" }));
+  }
+  det.appendChild(el("div", "hint", "Optional — give just this section its own colors, face, size or alignment. Everything else keeps your site's overall design."));
   sub.appendChild(det);
 }
 // Phase EXP: auto-expiring content — an optional "Show this from / until" window on
@@ -6224,6 +6392,8 @@ function renderBlocksCard() {
     // Phase T-STYLE: the shared "Look of this section" options — every content
     // section, but not the presentational divider or the auto-built table of contents.
     if (!def.dividerSimple && !def.tocSimple) blockLookRow(idx, blk, sub);
+    // G27: the per-element style overrides popover — same sections as the look row.
+    if (!def.dividerSimple && !def.tocSimple) blockStyleRow(idx, blk, sub);
     // Phase EXP: the shared "Show this only for a while" window — same set of sections
     // (a spacer/auto TOC has nothing to schedule).
     if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, sub);
@@ -6377,7 +6547,9 @@ function renderBlocksCard() {
   const saveRow = el("div"); saveRow.style.cssText = "margin-top:14px;display:flex;gap:10px;align-items:center";
   const save = el("button", null, "Save sections"); save.type = "button";
   save.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
-  save.addEventListener("click", saveBlocks);
+  // G27 §5: a failing, un-acknowledged contrast pair gets ONE extra confirm here
+  // (confirming records contrast_ack on the block; cancel = nothing saved).
+  save.addEventListener("click", () => { if (ovConfirmContrastAck()) saveBlocks(); });
   saveRow.appendChild(save);
   saveRow.appendChild(el("span", "hint", "Empty sections won’t appear on your site."));
   card.appendChild(saveRow);
@@ -6494,20 +6666,49 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
   if (def.mediaKind === "gallery") {
+    // Wave-2 G18: only the gallery block carries per-image captions + the zoom
+    // lightbox — partners shares this picker but stores neither key.
+    const isGallery = def.type === "gallery";
     const ids = Array.isArray(blk.image_ids) ? blk.image_ids : [];
     const grid = el("div"); grid.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px";
     ids.forEach((id, k) => {
+      const cell = el("div"); cell.style.cssText = "display:flex;flex-direction:column;gap:4px;width:96px";
       const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
       chip.appendChild(mediaThumb(id));
       const x = el("button", null, "×"); x.type = "button"; x.title = "Remove";
       x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#a3423a;color:#fff;cursor:pointer;font-size:13px;line-height:1";
-      x.addEventListener("click", () => { commitTitle(); blk.image_ids.splice(k, 1); renderBlocksCard(); });
-      chip.appendChild(x); grid.appendChild(chip);
+      // captions[] stays INDEX-ALIGNED with image_ids — a removed photo takes its
+      // caption with it (the server re-validates the same alignment).
+      x.addEventListener("click", () => { commitTitle(); blk.image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
+      chip.appendChild(x); cell.appendChild(chip);
+      if (isGallery) {
+        const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
+        cap.value = (Array.isArray(blk.captions) && blk.captions[k]) || "";
+        cap.style.cssText = "width:100%;padding:5px 6px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:11.5px;box-sizing:border-box";
+        cap.addEventListener("change", () => {
+          // write through BLOCKS_WORK[idx] (not the render-time blk) — a heading
+          // edit replaces the block object, and captions must land on the live one
+          const cur = BLOCKS_WORK[idx];
+          const caps = ids.map((_, i) => (i === k ? cap.value.trim().slice(0, 160) : ((Array.isArray(cur.captions) && cur.captions[i]) || "")));
+          if (caps.some(Boolean)) cur.captions = caps; else delete cur.captions;   // all-empty stores NO key
+        });
+        cell.appendChild(cap);
+      }
+      grid.appendChild(cell);
     });
     sub.appendChild(grid);
     const add = el("button", null, "+ Add photo"); add.type = "button"; add.style.cssText = miniBtn;
     add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].image_ids = BLOCKS_WORK[idx].image_ids || []).push(id); renderBlocksCard(); } }); });
     sub.appendChild(add);
+    if (isGallery) {
+      // G18 (DM-11): the opt-in, zero-JS tap-to-zoom lightbox — a FIELD, not a
+      // variant, so it composes with grid/masonry/filmstrip. Writes zoom: true /
+      // removes the key (absent = off, byte-identical), the variant-pill pattern.
+      pillRow(sub, "Tap to zoom", [["Off", ""], ["On", "1"]],
+        (o) => (BLOCKS_WORK[idx] && BLOCKS_WORK[idx].zoom === true ? "1" : "") === o[1],
+        (o) => { commitTitle(); const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.zoom = true; else delete b.zoom; BLOCKS_WORK[idx] = b; renderBlocksCard(); });
+      sub.appendChild(el("div", "hint", "On: visitors can tap any photo to see it larger — works on every phone, no app, even with scripts off."));
+    }
   } else if (def.mediaKind === "video") {
     const url = el("input"); url.type = "text"; url.placeholder = "Video link (YouTube, Vimeo…)"; url.value = blk.url || ""; url.style.cssText = inputCss;
     const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = blk.caption || ""; cap.style.cssText = inputCss;

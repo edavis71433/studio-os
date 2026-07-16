@@ -448,6 +448,9 @@
     if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
     if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
     if (help && help.classList.contains('open')) { closeHelp(); var b3 = document.getElementById('dds-help'); if (b3) b3.focus(); }
+    // ⌘K palette too — its input handles Escape while focused, but the dialog must
+    // also close when focus is elsewhere (closePalette returns focus to its trigger).
+    if (pal && pal.classList.contains('open')) closePalette();
   });
 
   // ── Web Push opt-in (notifications when the app is closed) ──────────────────
