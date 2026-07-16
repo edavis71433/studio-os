@@ -1,8 +1,7 @@
 # CRM + Client Portal — Current-State Code Inventory
 
 *2026-07-16 · Read-only audit feeding the Salesforce-style redesign spec.
-Companion: docs/design/salesforce-reference.md (the target). Data-model
-inventory appended when it lands.*
+Companion: docs/design/salesforce-reference.md (the target). All three parts complete.*
 
 ---
 
@@ -344,3 +343,147 @@ Route table: index.ts:765-798 (`/client/*`), :801-810 (`/portal/*`). Notificatio
 | No direct Salesforce analog | Project drill-in (milestone timeline, approvals with decided history + content-hash versioning, client to-dos, uploads, per-project chat, surveys); booking wizard; signed-token one-tap approvals & draft section comments | These are the portal's differentiators to preserve in the redesign |
 
 Persona note for the design doc: the reviewer/managed-client split is a SERVER boundary (`reviewerAllowed`, workspace.ts:30-43), not a UI switch — any redesigned page must degrade for a reviewer who can only read `/portal/context|feed` and POST the four decide routes. Per docs/presence/OPEN-PUNCHLIST.md:130-135, portal redesign increments 1–2 are shipped and increment 3 is approval-flow polish; the CLIENT-PORTAL-VISIBILITY-MODEL doc (docs/presence/CLIENT-PORTAL-VISIBILITY-MODEL.md:60-99) records the still-open gaps: per-item Presence visibility and a read-only stakeholder role.
+
+
+---
+
+# PART 3 — MESSAGING + CRM DATA MODEL (backend)
+
+All reading is done. Here is the full inventory.
+
+---
+
+# Studio OS — Messaging + CRM Data Model Inventory (backend, read-only)
+
+Scope: `supabase/functions/presence/` routes + lib and `supabase/migrations/*.sql`. All paths below are relative to `/home/user/studio-os/`.
+
+---
+
+## 1. Entity Map (plain-English ERD)
+
+### 1.1 Identity / tenancy spine
+
+| Table | Defined | Key fields | Role |
+|---|---|---|---|
+| `clients` | `supabase/migrations/0000_baseline.sql:566` | `id, name, email, contact_email, contact_id → contacts.id`, Stripe cols, legacy contract cols | The **global customer/account record** (one per billed business). No `auth_user_id` column — auth identity lives on the linked contact. |
+| `contacts` (legacy, global) | `0000_baseline.sql:644` | `id, name, email, auth_user_id, stage` | Legacy pre-presence contact; today its main live role is `clients.contact_id → contacts.auth_user_id`, the key that ties a signed-in customer to their `clients` row (used everywhere requester identity is resolved, e.g. `routes/crm.ts:59-68`, `routes/project_comms.ts:94-104`). |
+| `presence_sites` | 0015/0018 | `id, client_id, status, edition …` | The tenant unit. **Everything CRM/messaging is `site_id`-scoped.** An agency's own site is the "agency site"; a converted customer gets their own site. |
+| `presence_service_links` — **the Agency–Client Bridge** | `0079_p2d_agency_client_bridge.sql:12` | `agency_site_id, project_id (UNIQUE), customer_client_id, customer_site_id, deal_id, status ∈ active/ended` | The tenant-safe join: delivery data lives on the **agency** site; the customer reaches it only through this link. Helpers in `lib/service_bridge.ts:75-99` (`linksForCustomer`, `linkForCustomerProject`, `linkForCustomerVia`). |
+| `presence_customer_agency` | 0080 | PK `customer_client_id → agency_site_id` | "One primary agency per customer" constraint, enforced in `ensureBridge` (`lib/service_bridge.ts:20-32`). |
+
+### 1.2 Sales CRM chain (pre-sale, lives on the agency site)
+
+```
+presence_form_submissions ─(source_submission_id)→ presence_deals ─(contact_id)→ presence_contacts
+                                                        │
+              ┌─ presence_deal_events   (system events + logged activities, one table)
+              ├─ presence_deal_tasks    (to-dos, 0108)
+              ├─ presence_proposals ──→ presence_contracts
+              ├─ presence_invoices     (deal_id / customer_client_id)
+              └─ convert → clients.id (converted_client_id UNIQUE)
+                         + presence_sites (converted_site_id)
+                         + presence_projects (created_project_id UNIQUE)
+                         + presence_service_links (bridge)
+```
+
+| Table | Defined | Key fields |
+|---|---|---|
+| `presence_contacts` | `0074_p2c_sales_lifecycle.sql:14` | `site_id, name, email (unique per site+lower(email)), phone, company, notes, custom jsonb` (values bag, `0097_contact_custom_fields.sql:13`; field *definitions* live in a reserved `presence_sales_templates` row `__crm_contact_fields__`, `routes/sales.ts:49-54`) |
+| `presence_deals` | `0074:34` | `site_id, contact_id, title, stage ∈ lead/qualified/proposal/contract/won/lost, source, source_submission_id, expected_value_cents, expected_close, next_step, next_step_at` (0089), `converted_client_id (UNIQUE), converted_site_id, converted_at, created_project_id (UNIQUE, 0075:117)` |
+| `presence_deal_events` | `0074:67` | `deal_id, site_id, kind ∈ created/stage_change/note/proposal_sent/proposal_decided/contract_sent/contract_signed/converted` (+`invoice_sent`,`invoice_paid` added in `0088_notice_kinds.sql:37`), `from_stage, to_stage, detail jsonb, actor, actor_kind, created_at`. **Doubles as the manual-activity store** (see §3). |
+| `presence_deal_tasks` | `0108_deal_tasks.sql:7` | `site_id, deal_id, title, due_date, status open/done, completed_at, deleted_at`. CRUD at `routes/sales.ts:308-335`; deploy-order-tolerant (empty list pre-0108). |
+| `presence_proposals` | `0074:84` | `deal_id, line_items jsonb, subtotal_cents, status draft/sent/accepted/declined, version, share_token`; + `first_viewed_at, expires_at` (`0107_proposal_tracking.sql:7-8`, Salesforce open-tracking parity). |
+| `presence_contracts` | `0074:109` | `deal_id, proposal_id, body, content_hash, status draft/sent/signed/voided, signer_*, signed_evidence jsonb` |
+| `presence_invoices` | `0086_presence_invoices.sql:14` | `site_id (agency), deal_id, customer_client_id, amount_cents, purpose service/deposit, status open/paid/void, stripe_url` |
+| `presence_form_submissions` | `0050_presence_commercial_v1.sql:29` | `site_id, form_kind contact/quote/booking, name, email, message, status new/read/archived/converted (0085), spam, ip_hash` — the website-enquiry inbox and the CRM lead source. |
+
+### 1.3 Delivery chain (post-sale, lives on the agency site)
+
+| Table | Defined | Key fields |
+|---|---|---|
+| `presence_projects` | `0075_p2d_service_delivery.sql:17` | `site_id, client_id → clients, deal_id, name, status active/on_hold/complete/archived, client_visible` |
+| `presence_milestones` / `presence_tasks` | `0075:45` / `0075:66` | tasks: `client_visible (default false), client_action_required, assigned_to, due_date` |
+| `presence_project_events` | `0075:96` | `project_id, site_id, kind` (check extended in `0077:40` and `0078:81` to include `message, deliverable_added, approval_requested, approval_decided, survey_*, support_opened, support_message, support_resolved`), `detail jsonb, actor, actor_kind, client_visible, created_at`. **The ONE activity log** — notifications are a view over it. |
+| `presence_deliverables` / `presence_approvals` | `0076:9` / `0076:31` | files & sign-offs, both `client_visible`-gated |
+| `presence_surveys` / `presence_survey_responses` | `0078:8` / `0078:24` | one submitted response per (survey, respondent) via partial unique index |
+
+### 1.4 Conversation ownership
+
+- **A project conversation is owned by the agency site** (`presence_project_messages.site_id = agency site`); the customer reaches it through the bridge (`routes/client_delivery.ts:222-242`).
+- **A support request is owned by `(site_id, requester)`**: `requester` is a plain text reader key = `principal.userId || email` (`routes/service_intake.ts:39`, `129`). The client sees only rows where `requester = readerKey(principal)` (`service_intake.ts:145`, `client_delivery.ts:446`). There is **no FK from support requests to clients/contacts** — identity is re-derived by matching auth-uuid/email keys (`routes/crm.ts:59-68`, `project_comms.ts:94-104`, `workspace.ts:402-416`). This string-keyed identity is the single most fragile join in the model.
+- **`/crm/record` is the resolver** that stitches contact → deal → client → customer site → project into one identity tuple (`routes/crm.ts:218-308`), because "one relationship is physically split across four tables" (its own comment, crm.ts:208).
+
+---
+
+## 2. Every message channel
+
+| # | Channel | Store | Written by | Read by | Merged into |
+|---|---|---|---|---|---|
+| 1 | **Project thread** (audience `internal` \| `client`) | `presence_project_messages` (`0077:9`) | Studio: `routes/project_comms.ts:38-66` (POST `/projects/:id/messages`); Client: `routes/client_delivery.ts:222-242` (POST `/client/projects/:id/messages`, forced `audience='client'`) | Same two routes (GET); client never sees `audience=internal` (`project_comms.ts:33`) | Emits a `kind='message'` project event (`project_comms.ts:50`, `client_delivery.ts:240`); merged into **/crm/messages**, **/notifications**, **/portal/feed** `client_messages`; studio→client posts also emit a throttled email via `emailBridgedCustomer` (`project_comms.ts:55-65`) |
+| 2 | **Support threads** | `presence_support_requests` + `presence_support_messages` (`0078:44,66`) | Client door: `client_delivery.ts:401-483` (`/client/support*`, writes onto the **agency** site); studio door: `service_intake.ts:106-207` (`/support*`, triage/resolve/reply); auto-ack emails at `service_intake.ts:21-31` and `client_delivery.ts:439-440` | Studio list `/support`; client list `/client/support`; per-customer project-less list `/projects/:id/client-messages` (`project_comms.ts:80-108`) | Project-linked ones emit `support_opened/support_message/support_resolved` project events; **project-less ones emit no event** and are grafted into notifications by a second query (`project_comms.ts:127,139`); merged into `/crm/messages`, `/portal/feed`, both notification feeds; resolve offers CSAT (`service_intake.ts:183`) |
+| 3 | **Logged activities** (call/email/meeting/dated note) | `presence_deal_events` rows with `kind='note'`, `detail={activity_kind, body, occurred_at}` — **no dedicated table** (`crm/deal_activity.ts:6-17`) | POST `/sales/deals/:id/activity` (`routes/sales.ts:487-505`) | Deal timeline (`sales.ts:441-442` via `mergeDealTimeline`), contact detail (`crm/contact_detail.ts`), "last contacted" on pipeline cards (`sales.ts:354-369`) | Merged into `/crm/messages` as `kind:'activity'` (`crm.ts:176-188`) |
+| 4 | **Section comments** (draft feedback) | `presence_section_comments` (`0112:9`) | Operator: `/comments` (authed, `routes/comments.ts:60-80`); Client: `/p/s/:token/comments` — **pre-auth, signed preview token**, rate-limited, capped at 200 open (`comments.ts:152-188`); panel injected into the shared draft (`lib/section_comments.ts:155-241`) | Operator `/comments` list grouped into threads (`comments.ts:42-57`) | Open-count feeds the bell badge + a synthetic `client_feedback` notice (`workspace.ts:103, 281, 320-326`); **not** merged into /crm/messages |
+| 5 | **Relationship notes** | `presence_relationship_notes` (`0048:9`), `audience internal/shared` | `/crm/notes` (`crm.ts:335-360`) | `/crm/notes`, `/crm/timeline` (audience-filtered, `crm/store.ts:55-58`) | Client Relationship Center timeline only |
+| 6 | **Website enquiries** | `presence_form_submissions` (`0050:29`) | Public form collector | Leads inbox (`/forms/inbox`), CRM timeline `mapLead` (`crm/contract.ts:91-95`), attention center (`attention.ts:39`) | The deal's originating enquiry is merged into `/crm/messages` as `kind:'enquiry'` (`crm.ts:157-163`) |
+| 7 | **Broadcast emails** (outbound marketing) | `presence_broadcasts` + `presence_broadcast_sends` (`0098:17,46`) | Broadcast composer/sweep | Send log | Sends matched by client email are merged into `/crm/messages` as `kind:'broadcast'` (`crm.ts:189-199`) |
+| 8 | **Bookings** | `presence_appointments` (`0099:72`) | Public booking door | Bookings desk | Matched by customer email into `/crm/messages` as `kind:'booking'` (`crm.ts:164-174`) |
+| 9 | **Notifications (in-app)** | **No store** — derived: `presence_project_events` + `presence_support_requests` + per-reader `presence_activity_reads` last-seen mark (`0077:28`) | Read routes only; `/notifications/read` upserts last-seen (`project_comms.ts:145-149`; client variant `client_delivery.ts:324-353` with reader key `client:<client_id>`) | Studio: `/notifications` (`project_comms.ts:111-143`); client: `/client/notifications` | Pure mapping in `lib/notifications.ts` (labels/hrefs/isRead) |
+| 10 | **Bell badge / inbox feed** | Derived | — | `/portal/context` `attention_count` (`workspace.ts:141-181`) and `/portal/feed` notices + `client_messages` (`workspace.ts:241-433`) | Aggregates notices (`presence_plan_notices`, `0037:54`), approvals, enquiries, support, message events, section comments |
+| 11 | **Web push** | `presence_push_subscriptions` (`0090:7`) | `/push/subscribe|unsubscribe` (`routes/push.ts:10-39`) | `pushToSite` sender (`push.ts:43-64`, RFC 8291/8292 impl in `lib/webpush.ts`) | Fired from notice/attention paths; prune-at-5-failures contract |
+| 12 | **Transactional email (outbound only)** | none (Resend API) | `sendEmail` in `commerce/account.ts:105-129`; bridge nudges `lib/service_bridge.ts:105-140`; support acks; sales send/sign links | — | — |
+
+**Aggregate read surfaces:** `/crm/messages` (channels 1,2,3,6,7,8 → one chronological thread per client, `crm.ts:95-205`); `/notifications` + `/client/notifications` (channels 1,2 via events); `/portal/feed` (channels 2,4,6 + notices + approvals); `/attention` (attention.ts, customer-facing); `/website-timeline` (`routes/timeline.ts`) and `/crm/timeline` (`crm/store.ts:47-70`) mix site-ops events with lead/notes signals.
+
+---
+
+## 3. Activity model vs Salesforce (Task / Event / EmailMessage on WhoId/WhatId)
+
+**What Salesforce does:** one polymorphic Activity object (Task/Event/EmailMessage) attached to a person (`WhoId` → Contact/Lead) and/or a thing (`WhatId` → Opportunity/Account/Case), rendering as one timeline on every related record.
+
+**What exists here (the pieces of that):**
+- Typed manual activities exist — but only **deal-scoped**: `kind='note'` rows in `presence_deal_events` with `detail.activity_kind ∈ call/email/meeting/note` and a back-datable `occurred_at` (`crm/deal_activity.ts:6-58`, write at `sales.ts:487-505`). The file itself says "Salesforce Activities parity" for deal tasks (`0108:2`, `sales.ts:305`).
+- A per-deal merged timeline (activities + system events, one table, ordered by effective time) — `mergeDealTimeline` (`crm/deal_activity.ts:134-138`).
+- A per-contact roll-up across that contact's deals — `composeContactDetail` (`crm/contact_detail.ts:52-90`).
+- A per-client merged conversation assembled **at read time** from six channels — `/crm/messages` (`crm.ts:95-205`). This is the Salesforce-style timeline, but computed by fan-out queries + email-string identity joins on every request, not stored.
+- To-dos: `presence_deal_tasks` (deal-scoped) and `presence_tasks` (project-scoped) are **two disjoint task systems** with different schemas; nothing unifies "my tasks across the funnel".
+
+**What's missing for the Salesforce shape:**
+1. **No polymorphic anchor (`WhoId`/`WhatId`).** Every event table is hard-scoped to exactly one parent: `presence_deal_events.deal_id`, `presence_project_events.project_id`. An activity can't attach to a contact, client, or support case; contact timelines only work via `contacts→deals→deal_events`. A pre-deal contact and a converted client have no place to log a call.
+2. **No unified persisted timeline.** The per-client thread exists only as the `/crm/messages` read-time merge; each of its six channels is "best-effort — one failing read never blanks the conversation, it just omits that channel" (`crm.ts:104`). There is no `activity` table with `(site_id, who_id, what_id, type, occurred_at)`.
+3. **No first-class person key.** Identity across channels is reconstructed from `requester`/`customer_email` strings (`customerRequesterKeys`, `crm.ts:54-68`). Salesforce's Contact-as-WhoId is what makes its timeline cheap; here two casings of an email are already special-cased (`crm.ts:66`).
+4. **No inbound email capture — verified.** Outbound only: `sendEmail` posts to `https://api.resend.com/emails` (`commerce/account.ts:105-129`); there is no inbound webhook, IMAP, or reply-parsing route anywhere in `functions/presence/` (grep for inbound/imap/reply-to finds none). The legacy `clever-api/index.ts:7906` states it explicitly: pulling replies in "requires a Resend Inbound webhook (a config step, tracked separately)" — i.e. known, not built. A logged "email" activity is a hand-typed note; the client's actual email reply never enters the system. Salesforce's `EmailMessage` equivalent does not exist.
+5. **No cross-entity task view** (deal tasks vs project tasks vs `next_step` string are three parallel "what's next" mechanisms: `0089`, `0108`, `0075:66`).
+
+**What a unification could reuse:** the event-ledger pattern is already uniform (deal_events and project_events share a shape — `0075:96` says "copy of the deal-events shape"); the audience/`client_visible` discriminator is consistent; `/crm/record` already computes the canonical identity tuple that a `who_id` column would persist.
+
+---
+
+## 4. Same data rendered in multiple places (and known divergences)
+
+| Data | Surfaces | Divergences noted in code |
+|---|---|---|
+| Project client-thread messages | Studio project page (`/projects/:id/messages`), client portal (`/client/projects/:id/messages`), Client Record Messages tab (`/crm/messages`), notifications, portal-feed `client_messages` | `/crm/messages` spans **all** linked projects (`crm.ts:124-125`); the project routes show one. Notification hrefs fork by audience: studio → `/crm.html?project=…&tab=messages`, client → `/projects/:id#messages` — comment "#181: for the STUDIO, a client message belongs on the Client Record… client.html's deep-link parser depends on it" (`project_comms.ts:131-135`). |
+| Support requests | Studio `/support` list, client `/client/support`, per-project `client-messages`, `/crm/messages`, both notification feeds, Inbox (`/portal/feed`), roster open-support counts (`client_delivery.ts:493-533`) | "W5 (3rd copy): the /support#… page doesn't exist" — support notification links had to be re-pointed per audience (`project_comms.ts:136-139`) while `lib/notifications.ts:28-34` still emits the project-anchored `#support-…` convention for clients. Project-less requests emit no project event, so they ride a **separate** query into notifications (`project_comms.ts:127`). Inbox rows are deliberately *not* cleared by the last-seen mark, unlike the bell (`workspace.ts:368-371`). |
+| Unread state | Bell badge (`/portal/context`), notifications list, client portal | Three reader keys share one `presence_activity_reads` table: studio = `userId||email` (`project_comms.ts:19`), customer = `client:<client_id>` (`client_delivery.ts:335,351`) — the same human on two sides has two read cursors. Studio self-ring is prevented only by `detail.from='client'` stamped exclusively by the client door (`client_delivery.ts:34-40`, `workspace.ts:163-167`), because `actor_kind` can't distinguish owner from customer (both `'client'`). |
+| New website enquiry | Attention center, bell/portal-feed synthetic notice, leads inbox, CRM timeline, deal's `/crm/messages` enquiry row | Dedupe against the `lead_followup` cron notice is done **twice**, independently, in context and feed (`workspace.ts:150-154`, `308-315`); inbox.html additionally filters the aggregate kind to avoid double listing (comment at `workspace.ts:306`). |
+| Client health/profile | `/crm/profile` (relationship center) vs Client Record overview | Overview tab only enabled when a real customer site exists — "otherwise it would run against the operator's own site (the old crm.html landmine)" (`crm.ts:276-279`). |
+| Client "conversation ownership" split | Reply target logic | The one composer picks: project thread if any, else newest **open** support thread (`reply_support_to`, `crm.ts:149-151, 201`) — so studio replies to the same client land in different stores depending on state. |
+| Deal timeline | Pipeline drawer (`timeline` from `/sales/deals/:id`), contact detail, `/crm/messages` activity rows | Server labels deliberately mirror `pipeline.html`'s `evtLabel` "so the merged server timeline reads identically to the legacy History strip" (`crm/deal_activity.ts:76-78`) — a duplication kept in sync by hand. |
+
+---
+
+## 5. Constraints a redesign must respect
+
+1. **Deny-all RLS + function mediation is the default.** Every CRM/messaging table enables RLS with **no policies** ("deny-all; function-mediated") — `0048:25`, `0074:31,64,81,106,132`, `0075`, `0077`, `0078`, `0079:30`, `0086`, `0098`, `0108:20`, `0112:27`. All access goes through the edge function's service role (`lib/db.ts svc()` → PostgREST). Exceptions with real policies use `my_presence_site_ids()` (`0015:66-103`; membership-based, granted to `authenticated` only), e.g. `presence_plan_notices` client-read (`0037:69-75`). `0106` closes stragglers and forces `security_invoker` on views. Any new table must ship RLS-on, policy-less, service-role-mediated unless there's an explicit client-read case.
+2. **Tenant scoping is `site_id` in every WHERE, plus the bridge for cross-tenant reach.** No handler reads a delivery/support/message row without `site_id=eq.<agency site>`; customer access must first prove `presence_service_links` (`linkForCustomerProject` / `linkForCustomerVia`, `lib/service_bridge.ts:83-99`). The reviewer boundary is a route allowlist, not UI (`reviewerAllowed`, `workspace.ts:30-43`), and `/client/*` deliberately bypasses reviewer roles in favor of bridge scoping (comment at `workspace.ts:32-37`).
+3. **Signed-token doors for unauthenticated access.** Pattern: HMAC over base64url payload with embedded `site_id` + `exp`, timing-safe compare, fail-closed (missing secret → 404; expired → 410). Instances: sales accept/sign links (`sales.ts:66-84`), Document of Record tokens (`docLink`, `sales.ts:86-96`; client portal reuse `client_delivery.ts:154-158`), preview/share-link comments (`comments.ts:115-129`). Public token writes are rate-limited per IP+site (`rateAllow`, `comments.ts:157`) with a hard abuse backstop (`MAX_OPEN_CLIENT_COMMENTS`, `lib/section_comments.ts:40`).
+4. **Deny-by-default validation idioms** (uniform across routes): UUID regex gate before any id is interpolated; `clean()` control-char strip + length cap on every string; PostgREST filter-grammar neutralization on search input (`.replace(/[(),*"\\]/g,' ')`, `sales.ts:116`, `service_intake.ts:111`); bounded `clampLimit/clampOffset`; enum guards (`isStage`, `isSupportStatus`, `isAudience`) with explicit transition tables (`canSupportTransition`, `canTransition`); optimistic-concurrency guards pinning prior status in the WHERE (`service_intake.ts:176`, `sales.ts:518`); idempotency by unique index (converted_client_id, created_project_id, survey responses, broadcast sends).
+5. **"One log, derived views" doctrine.** Notifications must never become a second store (`0077:3-5`, `lib/notifications.ts:1-4`); attention/CRM/inbox are pure projections over existing tables (`lib/attention_center.ts:8-12`, `crm/store.ts:1-4`). Pure logic lives in importable, test-isolated modules (`crm/contract.ts`, `crm/deal_activity.ts`, `lib/section_comments.ts`) — a redesign should keep the pure/impure split.
+6. **Deploy-order tolerance.** Code ships ahead of migrations and must degrade: fallback selects for 0089/0107 columns (`sales.ts:346-351, 429-431, 458-463`), empty-list degradation for 0108/0112 (`sales.ts:311`, `comments.ts:51-53`), best-effort channel reads that omit rather than fail (`crm.ts:104`).
+7. **Side-channel obligations on message writes.** A studio→client message must also reach email (throttled 15-min window, `project_comms.ts:51-65`); new tickets auto-ack (`service_intake.ts:21-31`); bridge emails are `critical: true` (survive marketing opt-out, `service_bridge.ts:118-120`); push is strictly best-effort with the prune-at-5 contract (`push.ts:43-64`). Redesigned channels must preserve these or the delivery loop stalls.
+8. **Audience separation is column-level, enforced server-side**: `audience internal/client` (messages), `client_visible` (events/tasks/deliverables/approvals), `audience internal/shared` (notes), and the `detail.from='client'` stamp whose only writer is the client door (`client_delivery.ts:34-40`) — any new event writer must keep that invariant or studio bells will ring on the studio's own actions.
+
+### Biggest structural facts for the redesign
+- The "client 360" already exists as **read-time composition** (`/crm/record` + `/crm/messages`); persisting it means introducing the missing `who_id` (person) key and a unified activity table — the event-ledger shape to copy is already standardized (`presence_deal_events` ≡ `presence_project_events`).
+- Identity is the weak joint: `requester`/email string keys instead of FKs (support, bookings, broadcasts, activity reads).
+- Inbound email does not exist anywhere in the platform; every "email" in the timeline is either outbound (Resend) or a hand-logged note.
