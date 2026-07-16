@@ -359,7 +359,13 @@ with the cms/shell spec run plus a light+dark screenshot set attached to the PR 
 
 ---
 
-## Open questions for Eric (≤3)
+## Open questions for Eric (≤3) — ANSWERED (Eric, 2026-07-16)
+
+**Decisions: (1) canvas surround goes DARK in dark mode** with the §1.4 framed-boundary
+treatment · **(2) HARD MOVE** into Page Information (no transition aliases; History keeps the
+read-only offline status line) · **(3) KEEP BOTH** preview homes — in-canvas Preview and the
+proofing desk stay separate surfaces with separate jobs. The questions below are preserved
+as asked, for the record.
 
 1. **Preview mode vs "See your site":** slice D keeps both — in-canvas Preview for the current
    page, the dark proofing desk for full-site Draft/Live walks and `#lookSeg` template try-on. Is
