@@ -103,6 +103,17 @@ docs/design/builder-redesign-increment-6.md; before/after screenshots to Eric be
 merge). Then: G13 in-place editing → freeform editor → G12+G34 → S-finishers →
 G33/G14/G35.
 
+## 🎯 CRM REDESIGN DIRECTIVE (Eric, 2026-07-16 — do not lose to compaction)
+
+**"Be very aggressive on the redesign. Especially the messages. I wanted to look
+just like salesforce."** Slots after increment 6 (builder slices C/D), BEFORE the
+Adobe Wave 2 items. Method: deep Salesforce Lightning UI research (real screenshots
++ docs — no guessing, per his messaging rule), then an aggressive spec with his
+decision points, then slices with before/after screenshots for approval. The
+Jul-14/15 Salesforce-parity work (one-thread-per-client record, activity model,
+highlights panel, global search, AR view, deal to-dos 0107/0108) is the FLOOR,
+not the target — the target is Salesforce-grade look and organization end to end.
+
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
