@@ -106,13 +106,19 @@ G33/G14/G35.
 ## 🎯 CRM REDESIGN DIRECTIVE (Eric, 2026-07-16 — do not lose to compaction)
 
 **"Be very aggressive on the redesign. Especially the messages. I wanted to look
-just like salesforce."** Slots after increment 6 (builder slices C/D), BEFORE the
-Adobe Wave 2 items. Method: deep Salesforce Lightning UI research (real screenshots
-+ docs — no guessing, per his messaging rule), then an aggressive spec with his
-decision points, then slices with before/after screenshots for approval. The
-Jul-14/15 Salesforce-parity work (one-thread-per-client record, activity model,
-highlights panel, global search, AR view, deal to-dos 0107/0108) is the FLOOR,
-not the target — the target is Salesforce-grade look and organization end to end.
+just like salesforce."** Scope EXPANDED (Eric, same day): **the CRM AND the client
+portal, redesigned together as one combined Salesforce-style effort** ("do both
+simultaneously if you can"). Order is explicit: **"finish the redesign of the
+Adobe part and then we can move onto the CRM and the client portal. One thing at
+a time."** → increment 6 slices C+D complete FIRST, then CRM+portal, then the
+Adobe Wave 2 features. Method: deep Salesforce Lightning UI research (running —
+real docs/screenshots/SLDS component anatomy; no guessing, per his messaging
+rule), then an aggressive combined spec with his decision points, then slices
+with before/after screenshots for approval. Eric offered more links/references
+on request. The Jul-14/15 Salesforce-parity work (one-thread-per-client record,
+activity model, highlights panel, global search, AR view, deal to-dos 0107/0108)
+is the FLOOR, not the target — Salesforce-grade look and organization end to
+end, on both sides of the product.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
