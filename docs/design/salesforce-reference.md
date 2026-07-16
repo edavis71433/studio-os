@@ -171,6 +171,35 @@ The composition grammar of every Salesforce record screen:
 
 ---
 
-*Pending sections: s2-labs CRM-basics tutorial series, the official Customer
-Account Portal pages help-doc family, and the SLDS/Lightning deep-research
-synthesis. Appended on completion.*
+## 9. Working-level detail (s2-labs tutorial-series crawl)
+
+- **List-view screen controls** (the browse surface): view-name dropdown +
+  pin-as-default, gear menu (create/clone/share views, choose columns),
+  slide-out FILTER panel, slide-out CHART panel (list → totals/percentages),
+  display switcher table ⇄ Kanban ⇄ split view, inline cell editing
+  (pencil = editable, lock = not), New button.
+- **Stage History**: changing Stage/Amount/Probability/Close Date appends to a
+  built-in audit related list — the deal's paper trail as UI.
+- **Reports**: Tabular (flat), Summary (grouped subtotals — the workhorse),
+  Matrix (rows × columns), Joined. **Dashboards**: up to 20 components fed by
+  Summary/Matrix reports, explicit Refresh (as-of-last-run data).
+- **Case intake**: Email-to-Case, Web-to-Case (site form → case), phone;
+  assignment rules route to QUEUES (shared inboxes of unassigned records);
+  auto-response acknowledgment emails; SLA escalation. Case requireds:
+  Status (New/Working/Escalated/Closed), Origin, Priority.
+- **Home components** (composable per role): performance chart, Assistant
+  (up to 10 prioritized "needs attention" items), Key Deals mini-list,
+  Today's Tasks/Events, Recent Records.
+- **Compact layout reuse**: the same key-field strip powers the desktop
+  highlights panel, mobile record cards, and hover preview cards.
+- Chrome extras: favorites star (bookmark any record/list/report),
+  notifications bell, gear → Setup, avatar menu.
+- **Chatter is internal-only** discussion on a record, deliberately separate
+  from the customer-facing activity timeline — matches our internal-notes
+  vs client-visible split.
+
+---
+
+*Pending sections: the official Customer Account Portal pages help-doc family
+and the SLDS/Lightning deep-research synthesis. Appended on completion.
+Companion doc: docs/design/crm-portal-inventory.md (our own code, mapped).*
