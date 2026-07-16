@@ -146,6 +146,31 @@ The composition grammar of every Salesforce record screen:
 
 ---
 
-*Pending sections: salesforceben product walkthrough, s2-labs CRM-basics
-tutorial series, the official Customer Account Portal pages help-doc family,
-and the SLDS/Lightning deep-research synthesis. Appended on completion.*
+## 8. Additional anatomy (salesforceben walkthrough crawl)
+
+- **Home page** (the CRM's landing surface): a quarterly performance chart
+  (progress toward goal), an **Assistant** (an action list of things to do
+  today), recent records, configurable dashboard/report cards. SMB Starter
+  adds recommended-action cards + a guided-setup Guidance Center.
+- **App Launcher**: waffle/grid icon at the far left of the nav; overlay to
+  browse/search all apps and switch context.
+- **List views**: pinned views, inline cell editing, a slide-out filter panel
+  on the right, and an optional chart panel summarizing the list.
+- **Case Feed** (console center column): one chronological compiled feed of
+  call logs, texts, emails, and status changes, with the reply composer
+  ("publisher") at top — the service twin of the activity timeline.
+- **Experience Builder page model**: a page = theme regions (header, footer,
+  nav menu, search, profile menu) wrapping a content area of drag-in
+  components (record lists, record detail, case-create form, article search,
+  CMS blocks). **Audiences** show/hide components per user group; **branding
+  sets** can re-theme per audience — maps directly onto our per-plan/persona
+  portal rendering.
+- **Terminology owners recognize**: Lead → Convert → Contact + Account (+
+  Opportunity); Pipeline/Stage; Case; Activity (task/call/event); List view;
+  Record page; Knowledge article; Dashboard/Report; Portal.
+
+---
+
+*Pending sections: s2-labs CRM-basics tutorial series, the official Customer
+Account Portal pages help-doc family, and the SLDS/Lightning deep-research
+synthesis. Appended on completion.*
