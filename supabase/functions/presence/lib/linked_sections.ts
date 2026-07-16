@@ -25,6 +25,7 @@ export interface LinkedBlock {
   look?: unknown;              // optional per-placement overrides (parsed downstream
   show_from?: unknown;         // by validateBlocks' parseLook / parseWindow — same
   show_until?: unknown;        // enumerated-only gates as any other block)
+  style?: unknown;             // G27: per-placement style override (parsed downstream by parseStyle)
 }
 
 /** Is this raw block a link to a library item? (type 'linked' + a UUID ref). */
@@ -82,6 +83,7 @@ export function resolveLinkedBlocks(rawBlocks: unknown, lookup: (id: string) => 
     if (!payload || typeof payload !== 'object') continue;   // deleted/missing → drop (graceful)
     const resolved: Record<string, unknown> = { ...(payload as Record<string, unknown>) };
     if (b.look !== undefined) resolved.look = b.look;
+    if (b.style !== undefined) resolved.style = b.style;   // G27: per-placement style override overrides the payload's (content stays single-source)
     if (b.show_from !== undefined) resolved.show_from = b.show_from;
     if (b.show_until !== undefined) resolved.show_until = b.show_until;
     if ((b as { variant?: unknown }).variant !== undefined) resolved.variant = (b as { variant?: unknown }).variant;   // Wave-1 G4: per-placement style variant overrides the payload's

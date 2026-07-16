@@ -27,6 +27,7 @@ import { renderMarkdown } from './markdown.ts';
 import { normalizeFormDefinition, renderForm, type FormDefinition } from './forms.ts';
 import { brandTint } from './palettes.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
+import { normHex, darken, contrastRatio } from './brand_kit.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -119,6 +120,45 @@ function parseVariant(type: string, raw: unknown): string | undefined {
   return allowed && allowed.includes(v) ? v : undefined;
 }
 
+// ── G27 reversal · per-element STYLE OVERRIDES (slice 1) ─────────────────────
+// A block instance's optional `style` object — owner-chosen per-section colors,
+// face, size step, and alignment: the recorded, warned exception to the
+// contrast-by-construction defaults (docs/design/per-element-overrides-design.md;
+// Eric: "ship with contrast warnings, not blocks"). Validated EXACTLY like theme
+// tokens (devmode.ts validateThemeTokens): a deny-by-default allowlist with a
+// per-key value shape — unknown keys dropped, malformed values dropped, and an
+// absent/empty object stores NO key at all, so a default block renders
+// byte-identically (golden-provable). Colors normalize to lowercase 6-hex via
+// the brand_kit normHex idiom; `font` can only name the site's TWO faces (the
+// font_display/font_body token slots — no third font can enter); `contrast_ack`
+// is strict-true only (the G18 `zoom` posture): the stored record that a failing
+// contrast warning was seen and deliberately overridden. Bounded by construction
+// (7 known keys). Rendering is the HYBRID scheme — see applyStyle below.
+export interface BlockStyle {
+  text_color?: string;                    // '#rrggbb' → --ov-ink custom property
+  bg_color?: string;                      // '#rrggbb' → --ov-bg (mutually exclusive with look.background)
+  accent?: string;                        // '#rrggbb' → --ov-accent (+ derived --ov-accent-dark)
+  font?: 'display' | 'body';              // the site's two faces only → class ov-font-*
+  size?: 's' | 'l' | 'xl';                // one step down, one/two up → class ov-size-*
+  align?: 'left' | 'center' | 'right';    // → class ov-align-* (supersedes look.align's single 'center')
+  contrast_ack?: true;                    // not rendered — the audit record of an overridden warning
+}
+function parseStyle(raw: unknown): BlockStyle | undefined {
+  const st = (raw && typeof raw === 'object') ? (raw as { style?: unknown }).style : undefined;
+  if (!st || typeof st !== 'object') return undefined;
+  const s = st as Record<string, unknown>;
+  const out: BlockStyle = {};
+  const hex = (v: unknown): string | null => (typeof v === 'string' ? normHex(v) : null);
+  const tc = hex(s.text_color); if (tc) out.text_color = tc;
+  const bg = hex(s.bg_color); if (bg) out.bg_color = bg;
+  const ac = hex(s.accent); if (ac) out.accent = ac;
+  if (s.font === 'display' || s.font === 'body') out.font = s.font;
+  if (s.size === 's' || s.size === 'l' || s.size === 'xl') out.size = s.size;
+  if (s.align === 'left' || s.align === 'center' || s.align === 'right') out.align = s.align;
+  if (s.contrast_ack === true) out.contrast_ack = true;
+  return Object.keys(out).length ? out : undefined;
+}
+
 // ── Stored (pre-resolution) shapes for media blocks — carry media by ID; the
 //    serializer's resolveBlockMedia() turns IDs into MediaRefs (reusing ref()). ──
 interface StoredTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media_id?: string }> }
@@ -152,7 +192,8 @@ interface StoredDownload { type: 'download'; title?: string; file_id?: string; l
 // (Phase T-STYLE) rides on the stored block, orthogonal to its content. Phase EXP:
 // it ALSO carries the optional auto-expiring window (show_from / show_until).
 // Wave-1 G4: and the optional, enumerated style `variant` (BLOCK_VARIANTS above).
-type WithLook<T> = T extends unknown ? T & { look?: BlockLook; show_from?: string; show_until?: string; variant?: string } : never;
+// G27: and the optional per-element `style` override object (BlockStyle above).
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook; style?: BlockStyle; show_from?: string; show_until?: string; variant?: string } : never;
 export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
@@ -493,7 +534,19 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
     }
     if (block) {
       const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
-      if (look) (block as any).look = look;
+      // G27: attach the validated per-element style override (or nothing). Precedence
+      // rule (VALIDATED, not just rendered): style.bg_color and look.background are
+      // mutually exclusive — the look bands force light text for contrast
+      // (BLOCK_CSS .block--bg-accent/dark), and layering a custom palette over that
+      // machinery would silently defeat both systems. When both arrive,
+      // style.bg_color wins and look.background is dropped here; the rest of the
+      // look (width/spacing/hideOn/…) still composes.
+      const style = parseStyle(b);
+      if (style) (block as any).style = style;
+      if (look) {
+        if (style?.bg_color) delete look.background;
+        if (Object.keys(look).length) (block as any).look = look;
+      }
       // Wave-1 G4: attach the validated style variant (or nothing — the default look
       // stores NO variant key, so a default block stays byte-identical in storage).
       const variant = parseVariant(type, b);
@@ -529,6 +582,7 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
   // media block (team/gallery/image/columns/cards/…) keeps its show_from/show_until.
   const lk = (b: StoredBlock) => ({
     ...(b.look ? { look: b.look } : {}),
+    ...(b.style ? { style: b.style } : {}),   // G27: the per-element style override rides the rebuild too
     ...((b as any).show_from ? { show_from: (b as any).show_from } : {}),
     ...((b as any).show_until ? { show_until: (b as any).show_until } : {}),
     ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
@@ -621,6 +675,35 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
         out.push(b);
     }
   }
+  return out;
+}
+
+// ── G27 · server-side contrast recomputation (design doc §3/§5). NEVER a hard
+// block, per Eric ("ship with contrast warnings, not blocks"): a failing pair
+// still validates, stores, and publishes — this pure helper is what the save
+// response and the publish-time warnings channel (manifest validation.warnings
+// precedent + the site-health rail) cite, so an ignored warning stays visible,
+// not buried. A pair the owner acknowledged (contrast_ack) is STILL reported,
+// flagged `acknowledged`, for the "kept" wording ("1 section has a contrast
+// warning you chose to keep") — owner-only surfacing per Eric's decision. Uses
+// the SAME WCAG math the Brand Kit derivation uses (brand_kit.contrastRatio),
+// so the server and the editor's client port can never disagree. Pure.
+export interface BlockStyleContrastWarning {
+  index: number;          // position in the validated block list
+  type: string;           // block type, for the warning sentence
+  ratio: number;          // rounded to 1 decimal (the "Contrast 2.8" chip number)
+  text_color: string;
+  bg_color: string;
+  acknowledged: boolean;  // contrast_ack === true was stored with the pair
+}
+export function styleContrastWarnings(blocks: StoredBlock[], min = 4.5): BlockStyleContrastWarning[] {
+  const out: BlockStyleContrastWarning[] = [];
+  blocks.forEach((b, index) => {
+    const st = b.style;
+    if (!st?.text_color || !st.bg_color) return;   // the governing pair needs both ends stored
+    const ratio = Math.round(contrastRatio(st.text_color, st.bg_color) * 10) / 10;
+    if (ratio < min) out.push({ index, type: b.type, ratio, text_color: st.text_color, bg_color: st.bg_color, acknowledged: st.contrast_ack === true });
+  });
   return out;
 }
 
@@ -794,6 +877,57 @@ function applyLook(html: string, look?: BlockLook): string {
   const cls = lookClasses(look);
   if (!cls || !html) return html;
   return html.replace('class="block ', `class="block ${cls} `);
+}
+
+// ── G27 · per-element style overrides → the HYBRID render (design doc §4). The
+// enumerated keys (font/size/align — plus WHICH colors are present) become
+// static, pre-enumerated classes, exactly the lookClasses mechanism. The
+// unbounded values (owner-picked hex) ride as SCOPED CUSTOM PROPERTIES in the
+// section tag's style attribute — the focal-point precedent for owner data in a
+// style attr (blockImg above) — printed in a FIXED key order by a
+// validated-shape-only printer, so output is deterministic and nothing that
+// isn't lowercase 6-hex can ever reach the attribute. ALL matching rules live
+// statically in BLOCK_CSS (one-time CSS churn, like G4); after that, content
+// changes never touch CSS — per-block styling lives entirely in the HTML like
+// every other block field. A block with no `style` emits no class and no style
+// attribute: byte-identical, golden-provable. ──
+const OV_HEX = /^#[0-9a-f]{6}$/;
+function styleClasses(st: BlockStyle): string {
+  const c: string[] = [];
+  if (st.text_color) c.push('ov-ink');
+  if (st.bg_color) c.push('ov-bg');
+  if (st.accent) c.push('ov-accent');
+  if (st.font === 'display') c.push('ov-font-display');
+  else if (st.font === 'body') c.push('ov-font-body');
+  if (st.size === 's' || st.size === 'l' || st.size === 'xl') c.push(`ov-size-${st.size}`);
+  if (st.align === 'left' || st.align === 'center' || st.align === 'right') c.push(`ov-align-${st.align}`);
+  return c.join(' ');
+}
+/** The scoped custom properties, fixed order (ink, bg, accent, accent-dark).
+ *  Values print ONLY when they re-verify as normalized 6-hex — belt-and-braces
+ *  beneath parseStyle, so the style attribute is hex-only by construction (no
+ *  escaping question can even arise). --ov-accent-dark is DERIVED here with the
+ *  deterministic darken() — the same 0.16 step deriveBrandTokens uses for the
+ *  site-wide accent_dark — never stored and never accepted from input. */
+function styleVars(st: BlockStyle): string {
+  const p: string[] = [];
+  if (st.text_color && OV_HEX.test(st.text_color)) p.push(`--ov-ink:${st.text_color}`);
+  if (st.bg_color && OV_HEX.test(st.bg_color)) p.push(`--ov-bg:${st.bg_color}`);
+  if (st.accent && OV_HEX.test(st.accent)) p.push(`--ov-accent:${st.accent}`, `--ov-accent-dark:${darken(st.accent, 0.16)}`);
+  return p.join(';');
+}
+/** Inject the ov-* classes + scoped custom properties into a rendered block's
+ *  root tag (first occurrence — the outer section; a nested cell block was
+ *  already styled by its own recursive render). No-op with no style set, so the
+ *  default render is untouched. `contrast_ack` deliberately renders nothing. */
+function applyStyle(html: string, style?: BlockStyle): string {
+  if (!style || !html) return html;
+  let out = html;
+  const cls = styleClasses(style);
+  if (cls) out = out.replace('class="block ', `class="block ${cls} `);
+  const vars = styleVars(style);
+  if (vars) out = out.replace(/<(section|nav|div) class="block /, `<$1 style="${vars}" class="block `);
+  return out;
 }
 
 // ── Phase BK: the booking widget's first-party enhancer ──────────────────────
@@ -1267,7 +1401,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       const href = safeHref(b.url);
       html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment')}${b.text ? `<p class="appt-text">${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    built.push({ b, html: applyLook(html, (b as { look?: BlockLook }).look), ld });
+    built.push({ b, html: applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style), ld });
   }
 
   // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
@@ -1291,8 +1425,8 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     if (e.b.type !== 'toc') continue;
     if (!tocEntries.length) { e.html = ''; continue; }
     const title = (e.b as SiteBlockToc).title || 'On this page';
-    e.html = applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2>${esc(title)}</h2><ol class="toc">${
-      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`, (e.b as { look?: BlockLook }).look);
+    e.html = applyStyle(applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2>${esc(title)}</h2><ol class="toc">${
+      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`, (e.b as { look?: BlockLook }).look), (e.b as { style?: BlockStyle }).style);
   }
 
   const out: RenderedBlock[] = [];
@@ -1630,4 +1764,55 @@ table.site-table tbody tr:last-child td{border-bottom:none}
 .lb a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 @media(max-width:640px){.lb{padding:12px}.lb-close{top:10px;right:10px}.lb-prev{left:6px}.lb-next{right:6px}}
 @media(prefers-reduced-motion:no-preference){.lb:target .lb-frame{animation:lb-zoom .16s ease-out}}
-@keyframes lb-zoom{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}`;
+@keyframes lb-zoom{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+/* ── G27 · per-element style overrides (docs/design/per-element-overrides-design.md).
+   HYBRID: the owner's unbounded values (validated 6-hex only) arrive as scoped
+   custom properties in the section's style attribute (--ov-ink/--ov-bg/--ov-accent/
+   --ov-accent-dark); every RULE below is static and enumerated, so per-block styling
+   lives entirely in the HTML and content changes never touch this CSS again. A block
+   with no style gets NO ov-* class, so none of these rules can reach a default
+   section. These colors deliberately override contrast-by-construction (Eric's G27
+   reversal) — recorded + warned (styleContrastWarnings), never hard-blocked. */
+/* text: same forced-inheritance list as the accent/dark bands above, so the owner's
+   ink governs ALL the section's text — which is exactly the pair the contrast
+   warning checked. .block.ov-ink (0,2,0) sits after the band rules, so an explicit
+   text pick wins over a band's forced light text. */
+.block.ov-ink{color:var(--ov-ink)}
+.block.ov-ink :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
+/* background: .block.ov-bg ties .block.alt's (0,2,0) and wins by source order (the
+   .block--bg-plain trick); border resets match block--bg-plain. Never stacks with a
+   look band — validateBlocks drops look.background when style.bg_color arrives. */
+.block.ov-bg{background:var(--ov-bg);border-top:0;border-bottom:0}
+/* accent: re-map the token vocabulary INSIDE the section. Everything a block renders
+   reads var(--accent)/var(--accent-dark,…) — buttons, links, stars, process counters,
+   progress fills, icons, focus rings — so one remap restyles them all, identically
+   across all 8 template families. Custom properties inherit downward, which is the
+   point; a NESTED styled section always sets-or-resets its own --ov-* inline, so an
+   inner override never leaks out and an outer one is cleanly shadowed. */
+.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent))}
+/* font: a pick between the site's TWO faces only (the font_display/font_body token
+   slots). Fallback stacks follow the .rw-quote-body precedent: the token when set,
+   a face-appropriate system stack when not. The :is() list out-ranks the templates'
+   own heading/.nm face rules (0,3,0 vs 0,2,0). */
+.block.ov-font-display,.block.ov-font-display :is(h1,h2,h3,h4,h5,h6,.nm){font-family:var(--font-display,Georgia,'Times New Roman',serif)}
+.block.ov-font-body,.block.ov-font-body :is(h1,h2,h3,h4,h5,h6,.nm){font-family:var(--font-body,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif)}
+/* size: three enumerated steps (one down, one/two up), FLOORED — the down step can
+   never take body copy below ~15px (the freeform-canvas §6 floor posture). Headings
+   re-scale in em so the whole section steps together (template headings are
+   rem-sized and would otherwise ignore the section's base step). */
+.block.ov-size-s{font-size:max(.92em,.95rem)}
+.block.ov-size-l{font-size:1.15em}
+.block.ov-size-xl{font-size:1.35em}
+.block.ov-size-s h2,.block.ov-size-l h2,.block.ov-size-xl h2{font-size:1.5em}
+.block.ov-size-s h3,.block.ov-size-l h3,.block.ov-size-xl h3{font-size:1.15em}
+/* align: supersedes look.align's single 'center' by specificity + source order
+   ((0,2,0) after .block--align-center's (0,1,0)); the SAME guarded child-reset keeps
+   structured content (grids, lists, tables, prose bodies) left-aligned so it never
+   turns ragged; button rows follow the chosen edge. */
+.block.ov-align-left{text-align:left}
+.block.ov-align-center{text-align:center}
+.block.ov-align-right{text-align:right}
+.block.ov-align-center .svc-grid,.block.ov-align-center .cards,.block.ov-align-center .card-grid,.block.ov-align-center .cols,.block.ov-align-center .accordion,.block.ov-align-center .prose,.block.ov-align-center ul,.block.ov-align-center ol,.block.ov-align-center table,.block.ov-align-center .it-row,.block.ov-align-right .svc-grid,.block.ov-align-right .cards,.block.ov-align-right .card-grid,.block.ov-align-right .cols,.block.ov-align-right .accordion,.block.ov-align-right .prose,.block.ov-align-right ul,.block.ov-align-right ol,.block.ov-align-right table,.block.ov-align-right .it-row{text-align:left}
+.block.ov-align-center .btn-row,.block.ov-align-center .cta-inner{justify-content:center}
+.block.ov-align-left .btn-row,.block.ov-align-left .cta-inner{justify-content:flex-start}
+.block.ov-align-right .btn-row,.block.ov-align-right .cta-inner{justify-content:flex-end}`;

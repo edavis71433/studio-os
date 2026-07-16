@@ -14,7 +14,7 @@
 //
 // Pure + testable. The render engine and the SDK both read this catalog.
 
-export type FieldType = 'text' | 'richtext' | 'url' | 'email' | 'phone' | 'image' | 'number' | 'time' | 'list' | 'enum' | 'boolean';
+export type FieldType = 'text' | 'richtext' | 'url' | 'email' | 'phone' | 'image' | 'number' | 'time' | 'list' | 'enum' | 'boolean' | 'color';
 export interface ComponentField {
   key: string;
   type: FieldType;
@@ -163,6 +163,27 @@ export const COMPONENTS: ComponentDef[] = [
   { key: 'form', label: 'Custom form', category: 'content', purpose: 'Build any form from typed fields — contact, quote, application, booking.',
     fields: [t('fields', 'list', { required: true, repeatable: true }), t('rules', 'list', { repeatable: true }), t('confirmation_text', 'text'), t('redirect_url', 'url'), t('submit_label', 'text')],
     schema: null, a11y: 'labels tied to inputs, required announced, fieldset/legend for groups; works with JS off', seo: 'ContactPoint intent', industries: ['*'] },
+];
+
+// ── G27 reversal · the per-element `style` OVERRIDE object — ONE shared, bounded
+// field set available on every placed block, deliberately NOT per-component fields
+// (one override system, never two — constitution Section 7; nested/inner-item
+// styling in later slices attaches this same object one level deeper). Validation
+// is lib/site_blocks.ts parseStyle (deny-by-default allowlist: 6-hex colors via the
+// normHex idiom, `font` limited to the site's two faces, exact enumerations,
+// contrast_ack strict-true); THIS is the field metadata the editor + SDK read.
+// Convention matches `variant`: for enum fields the FIRST option is the default and
+// is stored as ABSENT (no key). `color` fields render as curated brand shades with
+// a 'Custom…' hex well behind them (Eric, 2026-07-16). contrast_ack is written only
+// by the editor's warn-confirm flow — never a directly exposed control.
+export const BLOCK_STYLE_FIELDS: ComponentField[] = [
+  t('text_color', 'color'),
+  t('bg_color', 'color'),      // mutually exclusive with look.background (bg_color wins)
+  t('accent', 'color'),        // per-block accent: buttons/links/icons/stars inside this section
+  t('font', 'enum', { options: ['default', 'display', 'body'] }),
+  t('size', 'enum', { options: ['default', 's', 'l', 'xl'] }),
+  t('align', 'enum', { options: ['default', 'left', 'center', 'right'] }),
+  t('contrast_ack', 'boolean'),
 ];
 
 export function componentByKey(key: string): ComponentDef | null { return COMPONENTS.find((c) => c.key === key) || null; }

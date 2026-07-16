@@ -4,11 +4,12 @@
 // coerces + dedupes; rendering is deterministic, escaped, JS-free, emits correct
 // schema.org + a11y; the engine only realizes blocks the catalog declares; and the
 // business-classic template surfaces them (and stays byte-stable with none).
-import { validateBlocks, resolveBlockMedia, renderSiteBlocks, REALIZED_BLOCK_TYPES, BLOCK_CSS, BLOCK_VARIANTS } from '../../supabase/functions/presence/lib/site_blocks.ts';
-import { COMPONENTS } from '../../supabase/functions/presence/lib/site_components.ts';
+import { validateBlocks, resolveBlockMedia, renderSiteBlocks, styleContrastWarnings, REALIZED_BLOCK_TYPES, BLOCK_CSS, BLOCK_VARIANTS } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { COMPONENTS, BLOCK_STYLE_FIELDS } from '../../supabase/functions/presence/lib/site_components.ts';
+import { resolveLinkedBlocks } from '../../supabase/functions/presence/lib/linked_sections.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 import { brandTint } from '../../supabase/functions/presence/lib/palettes.ts';
-import { contrastRatio } from '../../supabase/functions/presence/lib/brand_kit.ts';
+import { contrastRatio, darken } from '../../supabase/functions/presence/lib/brand_kit.ts';
 import { render as businessClassic } from '../../supabase/functions/presence/templates/business-classic/1.0.0/render.ts';
 import manifest from '../../supabase/functions/presence/templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
 import fixture from '../../supabase/functions/presence/templates/business-classic/1.0.0/fixture.json' with { type: 'json' };
@@ -582,6 +583,135 @@ const ctx = { esc, attr, safeHref };
     const g = COMPONENTS.find((c) => c.key === 'gallery');
     const cap = g.fields.find((f) => f.key === 'caption'), z = g.fields.find((f) => f.key === 'zoom');
     return cap && cap.type === 'text' && cap.repeatable === true && z && z.type === 'boolean';
+  })());
+}
+
+// ═══ 12. per-element style overrides (G27 reversal) — allowlist, hybrid render, exclusion ═══
+{
+  const G = '11111111-1111-1111-1111-111111111111';
+  const REF = () => ({ alt: 'A photo', variants: { w800: '/img/a-800.webp' }, width: 800, height: 600 });
+  const F = (style) => ({ type: 'features', title: 'Why', items: [{ title: 'Fast' }], ...(style !== undefined ? { style } : {}) });
+
+  // — validation: deny-by-default allowlist (the validateThemeTokens posture on a block) —
+  const full = validateBlocks([F({ text_color: '#332211', bg_color: '#FAF6EE', accent: '#0a5a4a', font: 'display', size: 'xl', align: 'right', contrast_ack: true })])[0];
+  ok('style: all seven allowlisted keys validate + store (hex normalized lowercase)',
+    JSON.stringify(full.style) === JSON.stringify({ text_color: '#332211', bg_color: '#faf6ee', accent: '#0a5a4a', font: 'display', size: 'xl', align: 'right', contrast_ack: true }));
+  ok('style: 3-hex and missing-# normalize via the normHex idiom', (() => {
+    const st = validateBlocks([F({ text_color: '#ABC', bg_color: 'aabbcc' })])[0].style;
+    return st.text_color === '#aabbcc' && st.bg_color === '#aabbcc';
+  })());
+  ok('style: junk keys + junk values are ALL dropped (no style key survives)', (() => {
+    const b = validateBlocks([F({ text_color: '#gggggg', bg_color: 'red', accent: 'url(https://evil.example)', font: 'comic-sans', size: 'xxl', align: 'justify', margin: '40px', custom_css: '*{display:none}', contrast_ack: 'true' })])[0];
+    return !('style' in b);
+  })());
+  ok('style: partial — only the valid keys survive (enum typo dropped beside a good hex)',
+    JSON.stringify(validateBlocks([F({ text_color: '#123456', font: 'wingdings', size: 'l' })])[0].style) === JSON.stringify({ text_color: '#123456', size: 'l' }));
+  ok('style: contrast_ack is strict-true only (the G18 zoom posture)', (() => {
+    const kept = validateBlocks([F({ contrast_ack: true })])[0];
+    const dropped = validateBlocks([F({ contrast_ack: 'true' }), F({ contrast_ack: 1 })]);
+    return kept.style.contrast_ack === true && dropped.every((b) => !('style' in b));
+  })());
+  ok('style: a non-object / absent style leaves the block untouched', !('style' in validateBlocks([F('loud')])[0]) && !('style' in validateBlocks([F(undefined)])[0]));
+
+  // — precedence: style.bg_color and look.background are mutually exclusive (validated) —
+  ok('style: bg_color wins — look.background dropped at validation, the rest of the look kept', (() => {
+    const b = validateBlocks([{ ...F({ bg_color: '#111111' }), look: { background: 'accent', spacing: 'roomy' } }])[0];
+    return b.style.bg_color === '#111111' && b.look && !('background' in b.look) && b.look.spacing === 'roomy';
+  })());
+  ok('style: bg_color vs an all-background look — the whole look key disappears (never an empty object)', (() => {
+    const b = validateBlocks([{ ...F({ bg_color: '#111111' }), look: { background: 'dark' } }])[0];
+    return !('look' in b) && b.style.bg_color === '#111111';
+  })());
+  ok('style: without bg_color the look band is untouched (colors compose with looks)', (() => {
+    const b = validateBlocks([{ ...F({ text_color: '#ffffff' }), look: { background: 'dark' } }])[0];
+    return b.look.background === 'dark' && b.style.text_color === '#ffffff';
+  })());
+
+  // — render: HYBRID — colors as scoped --ov-* custom properties, enumerations as classes —
+  const styled = renderSiteBlocks(validateBlocks([F({ text_color: '#332211', bg_color: '#faf6ee', accent: '#0a5a4a', font: 'body', size: 's', align: 'center' })]), ctx)[0].html;
+  ok('style: the section carries every ov-* class', styled.includes('ov-ink') && styled.includes('ov-bg') && styled.includes('ov-accent') && styled.includes('ov-font-body') && styled.includes('ov-size-s') && styled.includes('ov-align-center'));
+  ok('style: colors ride ONE style attribute in fixed key order (ink, bg, accent, accent-dark)',
+    styled.includes('style="--ov-ink:#332211;--ov-bg:#faf6ee;--ov-accent:#0a5a4a;--ov-accent-dark:'));
+  ok('style: --ov-accent-dark is DERIVED deterministically (darken(accent,.16), the deriveBrandTokens step — never stored, never accepted from input)', (() => {
+    const stored = validateBlocks([F({ accent: '#0a5a4a', accent_dark: '#ff0000' })])[0].style;   // forged input key is dropped
+    return styled.includes(`--ov-accent-dark:${darken('#0a5a4a', 0.16)}`) && !('accent_dark' in stored);
+  })());
+  ok('style: contrast_ack renders NOTHING (byte-identical with or without the ack)', (() => {
+    const withAck = renderSiteBlocks(validateBlocks([F({ text_color: '#111111', contrast_ack: true })]), ctx)[0].html;
+    const noAck = renderSiteBlocks(validateBlocks([F({ text_color: '#111111' })]), ctx)[0].html;
+    return withAck === noAck && !withAck.includes('ack');
+  })());
+  ok('style: color-only → no enum class; enum-only → classes but NO style attribute', (() => {
+    const colorOnly = renderSiteBlocks(validateBlocks([F({ accent: '#0a5a4a' })]), ctx)[0].html;
+    const enumOnly = renderSiteBlocks(validateBlocks([F({ size: 'l', align: 'left' })]), ctx)[0].html;
+    return colorOnly.includes('ov-accent') && !colorOnly.includes('ov-size') && !colorOnly.includes('ov-font') && !colorOnly.includes('ov-align')
+      && enumOnly.includes('ov-size-l') && enumOnly.includes('ov-align-left') && !enumOnly.includes('--ov-') && !enumOnly.includes('style="');
+  })());
+
+  // — absent-identity: no style ⇒ byte-identical output (golden-provable) —
+  const defHtml = renderSiteBlocks(validateBlocks([F(undefined)]), ctx)[0].html;
+  ok('style: absent → byte-identical (no ov- class, no --ov- var, no style attr, page structure unchanged)',
+    !defHtml.includes('ov-') && !defHtml.includes('--ov-') && !defHtml.includes('style="') && defHtml.includes('class="block wrap block-features"'));
+  ok('style: an all-junk style renders byte-identical to no style at all',
+    renderSiteBlocks(validateBlocks([F({ background: 'tinted', color: 'red', padding: '4px' })]), ctx)[0].html === defHtml);
+  ok('style: render-twice determinism (same input → identical output)', (() => {
+    const mk = () => JSON.stringify(renderSiteBlocks(validateBlocks([F({ text_color: '#101010', accent: '#0a5a4a', size: 'xl' })]), ctx));
+    return mk() === mk();
+  })());
+
+  // — hostile: values can't escape the style attribute (validated-shape-only printer) —
+  ok('style: hostile values are dropped, never printed (the attr stays hex-only)', (() => {
+    const r = renderSiteBlocks(validateBlocks([F({ text_color: '#111111"><script>alert(1)</script>', bg_color: 'expression(alert(1))', accent: '#123456;background:url(//evil.example)' })]), ctx)[0].html;
+    return !r.includes('--ov-') && !/<script>alert|url\(|expression\(/.test(r);
+  })());
+
+  // — carries: resolveBlockMedia rebuild + linked-section per-placement override —
+  ok('style: survives resolveBlockMedia (media-block rebuild carries it, like look/variant)', (() => {
+    const r = resolveBlockMedia(validateBlocks([{ type: 'image', image_id: G, style: { text_color: '#222222', size: 'l' } }]), REF)[0];
+    return JSON.stringify(r.style) === JSON.stringify({ text_color: '#222222', size: 'l' });
+  })());
+  ok('style: a linked placement rides the payload style through — and can override it per-placement', (() => {
+    const payload = { type: 'features', items: [{ title: 'A' }], style: { accent: '#0a5a4a' } };
+    const lookup = () => payload;
+    const ridden = resolveLinkedBlocks([{ type: 'linked', ref: G }], lookup)[0];
+    const overridden = resolveLinkedBlocks([{ type: 'linked', ref: G, style: { accent: '#aa1100' } }], lookup)[0];
+    return ridden.style.accent === '#0a5a4a' && overridden.style.accent === '#aa1100';
+  })());
+
+  // — server-side contrast recomputation: warn + record, NEVER hard-block —
+  ok('style: a failing un-acked pair still VALIDATES + STORES, and emits a warning', (() => {
+    const blocks = validateBlocks([F({ text_color: '#cccccc', bg_color: '#ffffff' })]);
+    const w = styleContrastWarnings(blocks);
+    return blocks.length === 1 && !!blocks[0].style && w.length === 1 && w[0].ratio < 4.5 && w[0].acknowledged === false && w[0].type === 'features' && w[0].index === 0;
+  })());
+  ok('style: an acked failing pair still reports, flagged acknowledged (the "kept" wording)', (() => {
+    const w = styleContrastWarnings(validateBlocks([F({ text_color: '#cccccc', bg_color: '#ffffff', contrast_ack: true })]));
+    return w.length === 1 && w[0].acknowledged === true;
+  })());
+  ok('style: a passing pair / a single color emits no warning',
+    styleContrastWarnings(validateBlocks([F({ text_color: '#111111', bg_color: '#ffffff' }), F({ text_color: '#cccccc' })])).length === 0);
+  ok('style: warning math IS brand_kit.contrastRatio (server + editor client port can never disagree)',
+    styleContrastWarnings(validateBlocks([F({ text_color: '#777777', bg_color: '#888888' })]))[0].ratio === Math.round(contrastRatio('#777777', '#888888') * 10) / 10);
+
+  // — BLOCK_CSS: every rule is static (one CSS churn); classes/vars are the only per-block surface —
+  ok('style CSS: static ov-* rules shipped once in BLOCK_CSS', BLOCK_CSS.includes('.block.ov-ink{color:var(--ov-ink)}')
+    && BLOCK_CSS.includes('.block.ov-bg{background:var(--ov-bg)') && BLOCK_CSS.includes('.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent))}')
+    && BLOCK_CSS.includes('.block.ov-font-display') && BLOCK_CSS.includes('.block.ov-font-body') && BLOCK_CSS.includes('.block.ov-size-xl{font-size:1.35em}') && BLOCK_CSS.includes('.block.ov-align-right{text-align:right}'));
+  ok('style CSS: ink forces the same child-inheritance list the accent/dark bands use',
+    /\.block\.ov-ink :is\(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,\.nm,\.pr,\.ds,\.stat-v,\.stat-l,summary\)\{color:inherit\}/.test(BLOCK_CSS));
+  ok('style CSS: the size down-step is floored (body copy can never go unreadable)', BLOCK_CSS.includes('.block.ov-size-s{font-size:max(.92em,.95rem)}'));
+  ok('style CSS: align keeps the guarded child-reset so structured content never turns ragged',
+    BLOCK_CSS.includes('.block.ov-align-center .svc-grid') && BLOCK_CSS.includes('.block.ov-align-right .prose') && BLOCK_CSS.includes('.block.ov-align-right .btn-row,.block.ov-align-right .cta-inner{justify-content:flex-end}'));
+
+  // — catalog: the shared field metadata agrees with the validator —
+  ok('style: catalog BLOCK_STYLE_FIELDS matches the parseStyle allowlist (keys + enum options)', (() => {
+    const keys = BLOCK_STYLE_FIELDS.map((f) => f.key);
+    const enumOf = (k) => BLOCK_STYLE_FIELDS.find((f) => f.key === k).options.slice(1);   // first option = default, stored as absent
+    return JSON.stringify(keys) === JSON.stringify(['text_color', 'bg_color', 'accent', 'font', 'size', 'align', 'contrast_ack'])
+      && JSON.stringify(enumOf('font')) === JSON.stringify(['display', 'body'])
+      && JSON.stringify(enumOf('size')) === JSON.stringify(['s', 'l', 'xl'])
+      && JSON.stringify(enumOf('align')) === JSON.stringify(['left', 'center', 'right'])
+      && BLOCK_STYLE_FIELDS.every((f) => f.type === 'color' || f.type === 'enum' || f.type === 'boolean');
   })());
 }
 
