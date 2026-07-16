@@ -588,6 +588,10 @@ h5.rune .whisper.ok{color:var(--sage)}
 /* Slice C: tree rows drag to reorder (pd-* engine) — block + column rows only */
 .dc-tree-row.block .dc-tree-main,.dc-tree-row.child .dc-tree-main{cursor:grab;touch-action:pan-y}
 body.pd-dragging .dc-tree-main{cursor:grabbing}
+/* the ⠿ drag handle: touch drags start HERE (touch-action:none, like the canvas
+   grip) so the row itself keeps pan-y and the tree still scrolls under a thumb */
+.dc-tree-grab{flex:0 0 auto;border:none;background:none;color:var(--soft,#a39cb2);font:inherit;font-size:11px;line-height:1;padding:8px 0 8px 7px;cursor:grab;touch-action:none;user-select:none}
+body.pd-dragging .dc-tree-grab{cursor:grabbing}
 
 /* Slice C — the Files tab (#tabFiles): a compact, panel-scoped asset browser.
    Existing classes only: .flchip chips, .tray-search, .mediagrid/.mcell thumbs. */
@@ -1495,6 +1499,7 @@ function openSheet(id) {
 }
 function closeSheet(id) {
   $(id).classList.remove("on");
+  if (id === "pickerScrim") pickerCb = null;   // a closed picker is never armed — no stale pick can land later (callers snapshot the cb first)
   if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; }
 }
 document.querySelectorAll(".scrim").forEach((s) => {
@@ -2606,7 +2611,7 @@ async function loadMedia() {
   // FL_load is NOT awaited: callers like importStockToBlock await loadMedia only
   // for S.media (the block thumbnail); the library grid refresh rides behind it
   // and never rejects (FL_load handles its own failures).
-  try { const r = await api("GET", "/media"); S.media = r.data || []; FL_load(); }
+  try { const r = await api("GET", "/media"); S.media = r.data || []; PF_S.key = null; PF_S.allow = null; FL_load(); }   // PF cache invalidated — uploads/deletes repaint the panel Files tab
   catch (err) { toast(nice(err), true); }
 }
 
@@ -3306,7 +3311,7 @@ function openPicker(onPick) {
   pickerShowTab("mine");   // "Your photos" is always the default when the picker opens
   openSheet("pickerScrim");
 }
-$("btnPickNone").addEventListener("click", () => { closeSheet("pickerScrim"); if (pickerCb) pickerCb(null); });
+$("btnPickNone").addEventListener("click", () => { const cb = pickerCb; closeSheet("pickerScrim"); if (cb) cb(null); });
 
 /* ── FD-T10 in-builder Stock Library: search Pexels + import into Files without
  *    leaving the builder. Reuses the SAME endpoints as files.html's Stock Library
@@ -3371,8 +3376,8 @@ async function importStockToBlock(im, cell) {
     if (!mid) throw new Error("That photo couldn’t be added — please try another.");
     await loadMedia();   // refresh S.media so the block preview thumbnail resolves for the new id
     toast("Added to your Files");
-    closeSheet("pickerScrim");
-    if (pickerCb) pickerCb(mid);
+    const cb = pickerCb; closeSheet("pickerScrim");
+    if (cb) cb(mid);
   } catch (err) {
     cell.style.opacity = ""; badge.remove(); delete cell.dataset.busy;
     if (err && err.status === 503) { PICK_STOCK.state = "off"; renderPickerStock(); }
@@ -7952,20 +7957,26 @@ function trayItem(d) {
 // (FL_COLS chip defs, the /assets query shape) but never touches FL_S — which owns
 // #mediaGrid via FL_takeover — and its thumbnails render through
 // renderMediaGrid(grid, false, onPick), the exact contract the pickers use.
-const PF_CHIPS = ["all", "photos", "brand", "stock"];   // the spec's chip subset of FL_COLS
-const PF_S = { col: "all", q: "", seq: 0, built: false, stock: { state: null, results: [] } };
-let PF_LAST_CELL = null;   // the thumbnail that was clicked — anchors the offer popover
+const PF_CHIPS = ["all", "brand", "stock"];   // the panel is image-only, so a separate Photos chip would equal All
+const PF_S = { col: "all", seq: 0, key: null, allow: null, stock: { state: null, results: [] } };
+const PF_CAP = 60;   // the panel grid stays light — the full Files view carries the rest
+function pfQ() { const s = $("pfSearch"); return s ? s.value : ""; }   // the search box IS the query state
+// ONE owner for the stock-vs-library dispatch. paintOnly = the tab-switch path:
+// repaint stock from its cached results instead of re-searching the provider.
+function pfRefresh(paintOnly) {
+  if (PF_S.col === "stock") { paintOnly ? pfRenderStock() : pfLoadStock(); return; }
+  pfLoad();   // repaints from its query cache when nothing changed
+}
 function mountPanelFiles() {
   const host = $("designFilesWrap"); if (!host) return;
-  if (!PF_S.built) {
-    PF_S.built = true;
+  if (!host.querySelector(".pf-chips")) {
     host.textContent = "";
     const bar = el("div", "flchips pf-chips");
     PF_CHIPS.forEach((key) => {
       const def = FL_COLS.find((x) => x.key === key) || { key, label: key };
-      const b = el("button", "flchip" + (PF_S.col === key ? " on" : ""), def.label);
+      const b = el("button", "flchip" + (PF_S.col === key ? " on" : ""), key === "all" ? "All photos" : def.label);
       b.type = "button"; b.dataset.col = key;
-      b.addEventListener("click", () => { if (PF_S.col === key) return; PF_S.col = key; pfPaintChips(); PF_S.col === "stock" ? pfLoadStock() : pfLoad(); });
+      b.addEventListener("click", () => { if (PF_S.col === key) return; PF_S.col = key; pfPaintChips(); pfRefresh(); });
       bar.appendChild(b);
     });
     host.appendChild(bar);
@@ -7973,12 +7984,11 @@ function mountPanelFiles() {
     const search = el("input", "tray-search"); search.type = "search"; search.id = "pfSearch";
     search.placeholder = "Search your files…"; search.setAttribute("aria-label", "Search your files");
     let t = null;
-    search.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { PF_S.q = search.value; PF_S.col === "stock" ? pfLoadStock() : pfLoad(); }, 280); });
-    search.addEventListener("keydown", (e) => { if (e.key === "Enter" && PF_S.col === "stock") { e.preventDefault(); PF_S.q = search.value; pfLoadStock(); } });
+    search.addEventListener("input", () => { clearTimeout(t); t = setTimeout(pfRefresh, 280); });
+    search.addEventListener("keydown", (e) => { if (e.key === "Enter" && PF_S.col === "stock") { e.preventDefault(); pfRefresh(); } });
     sw.appendChild(search); host.appendChild(sw);
     const body = el("div", "pf-body");
     const grid = el("div", "mediagrid"); grid.id = "panelFilesGrid";
-    grid.addEventListener("click", (e) => { const c = e.target.closest(".mcell"); if (c) PF_LAST_CELL = c; }, true);
     body.appendChild(grid);
     body.appendChild(el("div", "pf-note", "Click a photo to use it — it fills the image slot you're picking for, or becomes a new photo section. You can also drag one onto the canvas."));
     host.appendChild(body);
@@ -7988,7 +7998,7 @@ function mountPanelFiles() {
     link.addEventListener("click", () => { closeDesignPanels(); go("media"); });
     foot.appendChild(link); host.appendChild(foot);
   }
-  PF_S.col === "stock" ? pfRenderStock() : pfLoad();
+  pfRefresh(true);
 }
 function pfPaintChips() {
   const host = $("designFilesWrap"); if (!host) return;
@@ -8000,15 +8010,17 @@ function pfQstr() {
   const c = FL_COLS.find((x) => x.key === PF_S.col) || FL_COLS[0];
   const p = new URLSearchParams();
   Object.entries(c.f || {}).forEach(([k, v]) => p.set(k, v));
-  if (PF_S.q.trim()) p.set("q", PF_S.q.trim());
+  if (pfQ().trim()) p.set("q", pfQ().trim());
   p.set("limit", "300");
   return p.toString();
 }
 async function pfLoad() {
   const grid = $("panelFilesGrid"); if (!grid) return;
+  const key = PF_S.col + "\n" + pfQ().trim();
+  if (PF_S.key === key) { pfPaint(grid, PF_S.allow); return; }   // unchanged query (a tab switch) → repaint from cache, no refetch
   const seq = ++PF_S.seq;
-  let allow = null;   // null = unfiltered (All/Photos, no search): S.media as-is
-  if (PF_S.col === "brand" || PF_S.q.trim()) {
+  let allow = null;   // null = unfiltered (All photos, no search): S.media as-is
+  if (PF_S.col === "brand" || pfQ().trim()) {
     try {
       const r = await api("GET", "/assets?" + pfQstr());
       if (seq !== PF_S.seq) return;   // a newer chip/search won the race
@@ -8016,23 +8028,33 @@ async function pfLoad() {
     } catch (_) { allow = null; }     // /assets unavailable → degrade to the full grid
   }
   if (seq !== PF_S.seq) return;
-  pfPaint(grid, allow);
+  PF_S.key = key; PF_S.allow = allow;
+  pfPaint(grid, allow, seq);
 }
-function pfPaint(grid, allow) {
-  renderMediaGrid(grid, false, pfPick);   // the pickers' exact contract (manage=false + onPick)
-  // cells are 1:1 with S.media (renderMediaGrid order); apply the panel-scoped
-  // filter and wire drag-to-canvas without touching renderMediaGrid itself.
-  const cells = grid.querySelectorAll(".mcell");
-  const kill = [];
-  (S.media || []).forEach((m, i) => {
-    const c = cells[i]; if (!c) return;
-    if (allow && !allow.has(String(m.id))) { kill.push(c); return; }
+// Paint ONLY the allowed image items through the shared per-cell builder — no
+// index coupling with renderMediaGrid, no churn of hundreds of doomed cells.
+function pfPaint(grid, allow, seq) {
+  if (seq !== undefined && seq !== PF_S.seq) return;   // a stale loader never paints…
+  if (PF_S.col === "stock") return;                    // …and never clobbers the stock pane
+  grid.innerHTML = "";
+  // the panel is image-only, honestly: /media can carry documents too — mirror
+  // FL_load's client-side kind filter so a PDF can never ride in as a "photo section"
+  const imgs = (S.media || []).filter((m) => (m.kind == null || m.kind === "image") && (!allow || allow.has(String(m.id))));
+  if (!imgs.length) {
+    grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">${pfQ().trim() ? "No files match that search." : ((S.media || []).length ? "Nothing in this collection yet." : "No photographs in the collection yet.")}</p>`;
+    return;
+  }
+  imgs.slice(0, PF_CAP).forEach((m) => {
+    const c = mediaCell(grid, m, false, pfPick);   // the pickers' exact per-cell contract
+    c.dataset.mid = String(m.id);                  // anchors the offer popover to THIS photo
     // drag a thumbnail onto the canvas → a new photo section at that gap (pd engine)
     c.addEventListener("pointerdown", (e) => pdStart(e, { kind: "media", mediaId: m.id, label: m.alt_text || "Photo", icon: "🖼" }, c));
+    grid.appendChild(c);
   });
-  kill.forEach((c) => c.remove());
-  if ((S.media || []).length && !grid.querySelector(".mcell")) {
-    grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">${PF_S.q.trim() ? "No files match that search." : "Nothing in this collection yet."}</p>`;
+  if (imgs.length > PF_CAP) {
+    const more = el("div", "pf-note", "Showing " + PF_CAP + " — refine your search or Open Files →");
+    more.style.gridColumn = "1/-1";
+    grid.appendChild(more);
   }
 }
 // One pick, two landings: an ARMED image slot (the picker flow is live) fills via
@@ -8040,7 +8062,7 @@ function pfPaint(grid, allow) {
 function pfPick(id) {
   if (pdConsumeClick()) return;   // the click that follows a real drag
   const sc = $("pickerScrim");
-  if (pickerCb && sc && sc.classList.contains("on")) { closeSheet("pickerScrim"); pickerCb(id); return; }
+  if (pickerCb && sc && sc.classList.contains("on")) { const cb = pickerCb; closeSheet("pickerScrim"); cb(id); return; }
   pfOfferAdd(id);
 }
 let PF_OFFER = null;
@@ -8059,7 +8081,10 @@ function pfOfferAdd(id) {
   add.addEventListener("click", () => { pfCloseOffer(); pfInsertImageAt(id, (BLOCKS_WORK || []).length); });
   m.appendChild(add);
   document.body.appendChild(m);
-  const anchor = (PF_LAST_CELL && PF_LAST_CELL.isConnected) ? PF_LAST_CELL : $("panelFilesGrid");
+  // anchor to the clicked thumbnail via its data-mid stamp (no last-clicked global)
+  const grid = $("panelFilesGrid");
+  let anchor = grid;
+  if (grid) Array.prototype.forEach.call(grid.querySelectorAll(".mcell[data-mid]"), (c) => { if (c.dataset.mid === String(id)) anchor = c; });
   const r = anchor ? anchor.getBoundingClientRect() : { bottom: 120, left: 40 };
   m.style.cssText = "position:fixed;z-index:300;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px";
   m.style.top = Math.max(8, Math.min(r.bottom + 4, window.innerHeight - m.offsetHeight - 8)) + "px";
@@ -8073,26 +8098,30 @@ function pfOfferAdd(id) {
 function pfInsertImageAt(mediaId, at) {
   const def = BLOCK_DEFS.find((x) => x.type === "image"); if (!def) return;
   dcCaptureScroll();
-  const i = Math.max(0, Math.min(at, (BLOCKS_WORK || []).length));   // addBlockAt's clamp
-  addBlockAt(def, at);
+  const i = addBlockAt(def, at);   // the index addBlockAt ACTUALLY used — never a copied clamp
   if (BLOCKS_WORK[i]) BLOCKS_WORK[i].image_id = mediaId;
   saveBlocks();
 }
 // The Stock chip — the SAME endpoints as the Files view + picker stock tabs
 // (GET /stock/search, POST /stock/import), panel-scoped state, same landing as pfPick.
 async function pfLoadStock() {
-  PF_S.stock.state = "loading"; pfRenderStock();
+  const seq = ++PF_S.seq;   // stock competes in the SAME race as the library loads
+  PF_S.stock.state = "loading"; pfRenderStock(seq);
   try {
-    const r = await api("GET", "/stock/search?q=" + encodeURIComponent(PF_S.q || "") + "&page=1");
+    const r = await api("GET", "/stock/search?q=" + encodeURIComponent(pfQ() || "") + "&page=1");
+    if (seq !== PF_S.seq) return;   // a newer chip/search won the race
     PF_S.stock.results = ((r || {}).data || {}).images || [];
     PF_S.stock.state = "ok";
   } catch (err) {
+    if (seq !== PF_S.seq) return;
     if (err && err.status === 503) { PF_S.stock.state = "off"; }
     else { PF_S.stock.results = []; PF_S.stock.state = "ok"; toast(nice(err), true); }
   }
-  pfRenderStock();
+  pfRenderStock(seq);
 }
-function pfRenderStock() {
+function pfRenderStock(seq) {
+  if (seq !== undefined && seq !== PF_S.seq) return;   // a stale loader never paints…
+  if (PF_S.col !== "stock") return;                    // …and never clobbers the library grid
   const grid = $("panelFilesGrid"); if (!grid) return;
   const st = PF_S.stock;
   if (st.state === "off") { grid.innerHTML = `<div class="pf-note" style="grid-column:1/-1">Stock photos aren’t turned on yet. Add a Pexels key to search professional royalty-free photos.</div>`; return; }
@@ -8117,8 +8146,9 @@ async function pfImportStock(im, cell) {
     const mid = r && r.data && r.data.media_id;
     if (!mid) throw new Error("That photo couldn’t be added — please try another.");
     await loadMedia();   // refresh S.media so thumbnails resolve for the new id
+    cell.style.opacity = ""; badge.textContent = "Added ✓"; delete cell.dataset.busy;   // reset like FL_addStock — never a stuck "Adding…"
+    cell.dataset.mid = String(mid);   // the offer popover anchors here
     toast("Added to your Files");
-    PF_LAST_CELL = cell;
     pfPick(mid);         // same landing: armed slot fills, else offer a photo section
   } catch (err) {
     cell.style.opacity = ""; badge.remove(); delete cell.dataset.busy;
@@ -8134,20 +8164,29 @@ async function pfImportStock(im, cell) {
 // This is the arrows' model (adjacent swap) generalised to any target; the ↑/↓
 // buttons remain as the keyboard-accessible fallback. No x/y, no overlap ever.
 function dndDropIndex(from, gap) { return gap > from ? gap - 1 : gap; }   // PURE — tested by extraction
+// PURE list-move shared by every reorder commit (top-level sections + columns):
+// remove at `from`, re-insert at the dndDropIndex-resolved slot. Returns false for
+// out-of-range or a drop back onto its own slot, so callers can skip save/render.
+function spliceMove(arr, from, gap) {
+  if (from == null || from < 0 || from >= arr.length) return false;
+  const to = dndDropIndex(from, gap);
+  if (to === from) return false;
+  const [x] = arr.splice(from, 1);
+  arr.splice(to, 0, x);
+  return true;
+}
 function addBlockAt(d, at) {
   const blk = emptyBlock(d);   // REUSE the exact block factory the click path uses
   const i = Math.max(0, Math.min(at, BLOCKS_WORK.length));
   BLOCKS_WORK.splice(i, 0, blk);
   BLOCK_FOCUS = i; DC_FOCUS_BI = i;   // canvas will scroll to + flash this new section after reload
   renderBlocksCard();
+  return i;   // the index it ACTUALLY used — callers stamp the new block via this, never a re-derived clamp
 }
 function moveBlockTo(from, gap) {
-  if (from == null || from < 0 || from >= BLOCKS_WORK.length) return;
-  const to = dndDropIndex(from, gap);
-  if (to === from) return;
-  const [b] = BLOCKS_WORK.splice(from, 1);
-  BLOCKS_WORK.splice(to, 0, b);
+  if (!spliceMove(BLOCKS_WORK, from, gap)) return false;
   renderBlocksCard();
+  return true;
 }
 function blkGap(i) {
   const g = el("div", "blk-gap"); g.dataset.gap = String(i);
@@ -8190,13 +8229,28 @@ function pdPickGap(gaps, cy) {
 function pdStart(e, spec, sourceEl) {
   if (PDRAG) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;   // primary button / touch / pen only
+  const ps = $("pickerScrim");
+  if (ps && ps.classList.contains("on")) return;   // never reorder under an ARMED picker — a pick must land on live indices
   PDRAG = Object.assign({ sourceEl: sourceEl, pointerId: e.pointerId, iframeLocal: !!spec.iframeLocal,
     startX: e.clientX, startY: e.clientY, begun: false, lastGap: null, ghost: null }, spec);
   try { sourceEl.setPointerCapture(e.pointerId); } catch (_) {}
   sourceEl.addEventListener("pointermove", pdMove);
   sourceEl.addEventListener("pointerup", pdEnd);
   sourceEl.addEventListener("pointercancel", pdCancel);
+  window.addEventListener("keydown", pdKeydown, true);   // the drag claims Escape while it's live
 }
+// Escape CANCELS an active drag — on window capture so it runs BEFORE the panel-close
+// Escape handler (the panel stays open, nothing commits). Removed in pdFinish.
+function pdKeydown(e) {
+  if (e.key !== "Escape" || !PDRAG) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  pdFinish(false);
+}
+// BACKSTOP: if the captured source is torn out of the DOM mid-drag (a rebuild) or
+// the OS cancels the pointer, its capture events stop arriving — catch the document-
+// level lostpointercapture/pointercancel and cancel, so PDRAG can never wedge shut.
+document.addEventListener("lostpointercapture", (e) => { if (PDRAG && e.pointerId === PDRAG.pointerId) pdFinish(false); }, true);
+document.addEventListener("pointercancel", (e) => { if (PDRAG && e.pointerId === PDRAG.pointerId) pdFinish(false); }, true);
 // translate the pointer to PARENT-document viewport coords (a move grip lives INSIDE
 // the iframe, so its clientX/Y are iframe-local and need the frame offset added).
 function pdParentXY(e) {
@@ -8207,11 +8261,13 @@ function pdParentXY(e) {
 function pdBegin() {
   PDRAG.begun = true;
   document.body.classList.add("pd-dragging");
-  // dragging a NEW section in from the palette (or a photo from the Files tab) →
-  // tuck the rail away so the whole canvas is a visible drop surface (the captured
-  // source stays in the DOM, so the drag keeps receiving move/up even with the
-  // panel hidden). Tree-row moves keep the panel open — the tree IS the drop zone.
-  if (PDRAG.kind === "new" || PDRAG.kind === "media") closeTrayPanel();
+  // dragging a NEW section in from the palette → tuck the rail away so the whole
+  // canvas is a visible drop surface (the captured source stays in the DOM, so the
+  // drag keeps receiving move/up even with the panel hidden). A Files-tab photo
+  // keeps the panel until the pointer actually LEAVES it (see pdMove) — a jitter
+  // inside the panel stays an honest click. Tree-row moves keep the panel open —
+  // the tree IS the drop zone.
+  if (PDRAG.kind === "new") { closeTrayPanel(); PDRAG.closedPanel = true; }
   const g = el("div", "pd-ghost");
   g.appendChild(Object.assign(el("span", "pd-ico"), { textContent: PDRAG.icon || "▧" }));
   g.appendChild(el("span", null, (PDRAG.kind === "move" ? "Move: " : "") + (PDRAG.label || "Section")));
@@ -8261,15 +8317,19 @@ function pdMove(e) {
   if (e.cancelable) e.preventDefault();
   const p = pdParentXY(e);
   if (PDRAG.ghost) { PDRAG.ghost.style.left = p.x + "px"; PDRAG.ghost.style.top = p.y + "px"; }
-  // Slice C: rows dragged in the CONTENT TREE track the tree's own gaps — the same
-  // single-gap list-index model. A top-level row carried out of the panel falls
-  // through to the standard canvas tracking below (same index space, same commit).
-  if (PDRAG.zone === "tree" || PDRAG.zone === "treecol") {
-    const host = $("designTreeList");
-    const hr = host && host.getBoundingClientRect();
-    const inPanel = hr && p.x >= hr.left - 24 && p.x <= hr.right + 24 && p.y >= hr.top - 40 && p.y <= hr.bottom + 40;
-    if (inPanel || PDRAG.zone === "treecol") { pdTreeTrack(p); return; }
+  // a Files-tab photo drag closes the panel the FIRST time it leaves the panel rect;
+  // until then the panel stays put (and pdFinish won't insert — see leftPanel).
+  if (PDRAG.kind === "media" && !PDRAG.leftPanel) {
+    const tp = $("trayPanel"); const tr = tp && tp.getBoundingClientRect();
+    if (!tr || p.x < tr.left || p.x > tr.right || p.y < tr.top || p.y > tr.bottom) {
+      PDRAG.leftPanel = true; PDRAG.closedPanel = true; closeTrayPanel();
+    }
   }
+  // Slice C: rows dragged in the CONTENT TREE track the tree's own gaps — the same
+  // single-gap list-index model. pdTreeTrack OWNS the panel bounds: it returns true
+  // when it claimed the point; a top-level row carried out of the panel falls
+  // through to the standard canvas tracking below (same index space, same commit).
+  if ((PDRAG.zone === "tree" || PDRAG.zone === "treecol") && pdTreeTrack(p)) return;
   const info = pdGaps(); const line = document.getElementById("pdDropLine");
   if (!info) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
   const fr = info.fr;
@@ -8312,15 +8372,21 @@ function pdTreeGaps() {
   gaps.push({ gap: total, y: last.bottom, left: last.left, width: last.width });
   return { gaps, host };
 }
+// Owns the tree-panel bounds (ONE rect read, one margin constant — pdMove routes on
+// the return): true = this drag's point is the tree's to handle. A "treecol" drag
+// always stays here (columns never drop on the canvas); a top-level "tree" row
+// outside the panel returns false and falls through to canvas tracking.
+const PD_TREE_MX = 24, PD_TREE_MY = 40;
 function pdTreeTrack(p) {
   const line = document.getElementById("pdDropLine");
+  const host = $("designTreeList");
+  const hr = host && host.getBoundingClientRect();
+  const inPanel = !!hr && p.x >= hr.left - PD_TREE_MX && p.x <= hr.right + PD_TREE_MX &&
+    p.y >= hr.top - PD_TREE_MY && p.y <= hr.bottom + PD_TREE_MY;
+  if (!inPanel && PDRAG.zone !== "treecol") return false;
   dcHiliteInsert(null);   // a canvas drop-zone highlight never lingers over a tree drag
-  const info = pdTreeGaps();
-  if (!info) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
-  const hr = info.host.getBoundingClientRect();
-  const inX = p.x >= hr.left - 24 && p.x <= hr.right + 24;
-  const inY = p.y >= hr.top - 40 && p.y <= hr.bottom + 40;
-  if (!inX || !inY) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
+  const info = inPanel ? pdTreeGaps() : null;
+  if (!info) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return true; }
   const cy = Math.max(hr.top, Math.min(p.y, hr.bottom));
   const gap = pdPickGap(info.gaps, cy);   // the SAME single-gap resolver as the canvas
   const chosen = info.gaps.find((g) => g.gap === gap) || info.gaps[0];
@@ -8331,6 +8397,7 @@ function pdTreeTrack(p) {
     line.style.width = Math.max(0, chosen.width) + "px";
     line.style.top = Math.max(hr.top + 2, Math.min(chosen.y, hr.bottom - 2)) + "px";
   }
+  return true;
 }
 function pdFinish(commit) {
   if (!PDRAG) return;
@@ -8339,19 +8406,26 @@ function pdFinish(commit) {
   drag.sourceEl.removeEventListener("pointermove", pdMove);
   drag.sourceEl.removeEventListener("pointerup", pdEnd);
   drag.sourceEl.removeEventListener("pointercancel", pdCancel);
+  window.removeEventListener("keydown", pdKeydown, true);
   document.body.classList.remove("pd-dragging");
   if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
   const line = document.getElementById("pdDropLine"); if (line) line.style.display = "none";
   dcHiliteInsert(null);
   if (!drag.begun) return;               // never crossed the threshold → treat as a click
-  PD_JUST_DRAGGED = true;                // swallow the click that follows a real drag…
-  setTimeout(() => { PD_JUST_DRAGGED = false; }, 350);   // …but self-clear if none fires
   closeInsertMenu();
+  let committed = false;                 // did the drop actually change anything?
   if (commit && drag.lastGap != null) {  // a single resolved list index — never x/y
-    if (drag.kind === "new") dcAddAt(drag.type, drag.lastGap);
-    else if (drag.kind === "move") dcMove(drag.from, drag.lastGap);        // canvas + tree share this commit
-    else if (drag.kind === "movecol") dcMoveCol(drag.bi, drag.from, drag.lastGap);   // columns within a container
-    else if (drag.kind === "media") pfInsertImageAt(drag.mediaId, drag.lastGap);     // Files-tab thumb → photo section
+    if (drag.kind === "new") { dcAddAt(drag.type, drag.lastGap); committed = true; }
+    else if (drag.kind === "move") committed = dcMove(drag.from, drag.lastGap) === true;        // canvas + tree share this commit
+    else if (drag.kind === "movecol") committed = dcMoveCol(drag.bi, drag.from, drag.lastGap) === true;   // columns within a container
+    else if (drag.kind === "media" && drag.leftPanel) { pfInsertImageAt(drag.mediaId, drag.lastGap); committed = true; }   // Files-tab thumb → photo section (never from inside the panel)
+  }
+  // swallow the follow-up click only when the drag DID something (or closed the
+  // panel out from under the pointer) — a canceled/no-op jitter stays an honest
+  // click: tree rows still select, thumbnails still pick.
+  if (committed || drag.closedPanel) {
+    PD_JUST_DRAGGED = true;
+    setTimeout(() => { PD_JUST_DRAGGED = false; }, 350);   // self-clear if no click fires
   }
 }
 function pdEnd(e) { pdFinish(true); }
@@ -8479,20 +8553,34 @@ function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.default
 // the load handler re-injects the chrome and restores scroll. Same auto-save the
 // modal proof's eeMoveBlock already uses — nothing goes live until Publish.
 function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type); if (!def) return; dcCaptureScroll(); addBlockAt(def, gap); if (MEDIA_FILL_TYPES.has(type)) { const bi = DC_FOCUS_BI; DC_FOCUS_BI = null; eeEditBlock(bi); } else { saveBlocks(); } }
-function dcMove(from, gap) { dcCaptureScroll(); moveBlockTo(from, gap); saveBlocks(); }
-// Slice C: reorder one COLUMN inside its container — the same single-gap list
-// semantics as top-level moves (dndDropIndex), never x/y; saves like dcMove.
-// The column object moves whole (span, image, nested component all ride along).
-function dcMoveCol(bi, from, gap) {
-  const b = (BLOCKS_WORK || [])[bi]; if (!b || !Array.isArray(b.columns)) return;
-  if (from == null || from < 0 || from >= b.columns.length) return;
-  const to = dndDropIndex(from, gap);
-  if (to === from) return;
+function dcMove(from, gap) {
   dcCaptureScroll();
-  const [c] = b.columns.splice(from, 1);
-  b.columns.splice(to, 0, c);
-  renderBlocksCard();
+  if (!moveBlockTo(from, gap)) return false;   // dropped back onto its own slot → no save, no reload
+  // BLOCKS_WORK just changed under the tree's feet: shift the canvas id→index map by
+  // the same permutation, then rebuild the tree NOW — its data-bi stamps and
+  // pointerdown closures must match BLOCKS_WORK even if the save/reload never lands.
+  const to = dndDropIndex(from, gap);
+  Object.keys(EE_IDMAP).forEach((id) => {
+    let bi = EE_IDMAP[id];
+    if (bi === from) bi = to;
+    else { if (bi > from) bi -= 1; if (bi >= to) bi += 1; }
+    EE_IDMAP[id] = bi;
+  });
+  dcRefreshTree();
   saveBlocks();
+  return true;
+}
+// Slice C: reorder one COLUMN inside its container — the same single-gap list
+// semantics as top-level moves (spliceMove/dndDropIndex), never x/y; saves like
+// dcMove. The column object moves whole (span, image, nested component ride along).
+function dcMoveCol(bi, from, gap) {
+  const b = (BLOCKS_WORK || [])[bi]; if (!b || !Array.isArray(b.columns)) return false;
+  if (!spliceMove(b.columns, from, gap)) return false;
+  dcCaptureScroll();
+  renderBlocksCard();
+  dcRefreshTree();   // fresh data-k stamps + widths immediately, not only after the reload
+  saveBlocks();
+  return true;
 }
 function dcDuplicate(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
@@ -8833,6 +8921,9 @@ function dcRefreshTree() { const doc = dcFrameDoc(); const main = doc && doc.get
 // open it; click a section to jump to it on the canvas.
 function dcBuildTree(main) {
   const host = $("designTreeList"); if (!host) return;
+  // rebuilding wipes the rows — if one is mid-drag its captured source would detach
+  // and the pointerup could never land (PDRAG wedged shut): cancel that drag first.
+  if (PDRAG && (PDRAG.zone === "tree" || PDRAG.zone === "treecol")) pdFinish(false);
   host.textContent = "";
   host.appendChild(el("div", "dc-tree-hd", "Pages · click one to edit it"));
   dcPageList().forEach((pg) => {
@@ -8883,19 +8974,30 @@ function dcTreeSectionRows(host, main) {
   });
   cmOrphanRows(host);   // G11: feedback whose section was removed still surfaces
 }
+// the quiet ⠿ drag handle on tree rows: touch-action:none (like the canvas grip)
+// so touch drags actually drag instead of panning; any pointer type starts here.
+// Pointer-only by design — keyboard reordering stays on the rows' ↑/↓ buttons.
+function dcTreeGrab(spec) {
+  const g = el("button", "dc-tree-grab", "⠿"); g.type = "button"; g.tabIndex = -1;
+  g.title = "Drag to reorder"; g.setAttribute("aria-hidden", "true");
+  g.addEventListener("pointerdown", (e) => pdStart(e, spec, g));
+  return g;
+}
 // a child row under a container: one column, selectable, with its own settings.
 // Slice C: drag a column row to reorder it WITHIN its container (pd engine,
 // zone "treecol" — per-container list order only, never x/y).
 function dcTreeChildRow(colEl, bi, k, span) {
   const row = el("div", "dc-tree-row child");
   row.dataset.colof = String(bi); row.dataset.k = String(k);
+  const dragSpec = { kind: "movecol", bi: bi, from: k, zone: "treecol", label: "Column " + (k + 1), icon: "▯" };
+  row.appendChild(dcTreeGrab(dragSpec));   // touch drags start on the ⠿ handle; the row keeps pan-y
   const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this column on the page — drag to reorder the columns";
   mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: "▯" }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", "Column " + (k + 1)));
   txt.appendChild(el("span", "dc-tree-meta", "width " + (span || "?") + "/12"));
   mainBtn.appendChild(txt);
-  mainBtn.addEventListener("pointerdown", (e) => pdStart(e, { kind: "movecol", bi: bi, from: k, zone: "treecol", label: "Column " + (k + 1), icon: "▯" }, mainBtn));
+  mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
   mainBtn.addEventListener("click", () => {
     if (pdConsumeClick()) return;   // the click that follows a real drag
     try { colEl.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {}
@@ -8922,6 +9024,12 @@ function dcTreeRow(el2, c) {
   const icon = isBlock ? (TRAY_TYPE_ICON[b.type] || "▧") : "◫";
   const row = el("div", "dc-tree-row " + (isBlock ? "block" : "core"));
   if (isBlock) row.dataset.bi = String(c.bi);   // slice C: pdTreeGaps reads these
+  // Slice C: drag a section row to reorder — the SAME pd engine + dcMove commit
+  // as dragging the section on the canvas (single-gap list index, never x/y).
+  // Touch drags start on the ⠿ handle (touch-action:none, like the canvas grip);
+  // the row keeps pan-y so the tree scrolls, and drags from it are mouse-only.
+  const dragSpec = isBlock ? { kind: "move", from: c.bi, zone: "tree", label: name, icon: icon } : null;
+  if (isBlock) row.appendChild(dcTreeGrab(dragSpec));
   const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button";
   mainBtn.title = isBlock ? "Select this on the page — drag to reorder your sections" : "Select this on the page";
   mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: icon }));
@@ -8929,9 +9037,7 @@ function dcTreeRow(el2, c) {
   txt.appendChild(el("span", "dc-tree-name", name));
   txt.appendChild(el("span", "dc-tree-meta", meta));
   mainBtn.appendChild(txt);
-  // Slice C: drag a section row to reorder — the SAME pd engine + dcMove commit
-  // as dragging the section on the canvas (single-gap list index, never x/y).
-  if (isBlock) mainBtn.addEventListener("pointerdown", (e) => pdStart(e, { kind: "move", from: c.bi, zone: "tree", label: name, icon: icon }, mainBtn));
+  if (isBlock) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
   mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(el2, row); });
   row.appendChild(mainBtn);
   // G11: per-section comment badge (count when open notes exist; quiet 💬 to
