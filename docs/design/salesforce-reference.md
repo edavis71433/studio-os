@@ -200,6 +200,44 @@ The composition grammar of every Salesforce record screen:
 
 ---
 
-*Pending sections: the official Customer Account Portal pages help-doc family
-and the SLDS/Lightning deep-research synthesis. Appended on completion.
-Companion doc: docs/design/crm-portal-inventory.md (our own code, mapped).*
+## 10. Customer Account Portal — the official page/component inventory
+
+*(Help-doc family crawl. Direct fetches were bot-blocked; page table is
+high-confidence reconstruction cross-checked against verified fragments —
+flagged where not live-verified.)*
+
+**Shipped pages** (the template's page menu): Home (Tile Menu + optional Hero,
+Search or CTA type) · **Account Management** (the signature page — hosts the
+Member Profile component: "all their account information and settings in one
+convenient place") · Contact Support (case form with deflection) · Record
+List / Record Detail / Related Record List / Create Record (generic
+object pages — My Cases, Orders, Invoices all render through these) ·
+Article Detail + Topic Detail (knowledge) · Search results · Feed
+Detail/Messages · User Profile + User Settings · Error · the Login family
+(Login, Register, Forgot Password — brandable to match).
+
+**Verified components**:
+- **Tile Menu** — the hallmark: a nav menu rendered as image tiles; each tile
+  can target a site page, a Salesforce OBJECT (cases, orders, contracts,
+  dashboards, tasks…), an external URL, or a global action.
+- **Member Profile** — consolidated account info + settings, configurable tabs.
+- **User Profile Menu** — avatar dropdown: go to profile, OPEN A CASE, locale
+  & email-notification settings, log out.
+- Mobile profile page collapses to four tabs: Feed / Cases / Details / Related.
+
+**Branding controls**: theme panel (fonts/colors/images; header+hero+footer as
+shared theme regions), **Branding Sets assignable per audience** (different
+look per customer segment), page variations per audience, prebuilt themes,
+CSS escape hatch, brandable login pages.
+
+**Positioning** (Salesforce's own words): "a secure and completely private
+place for your customers" — see and pay invoices, update account info, search
+knowledge; login-based, record-centric, "structured self-service and account
+transparency." The discussions-first sibling is the Customer Service template;
+CAP is account-first — the closer match to our portal.
+
+---
+
+*Pending: the SLDS/Lightning deep-research synthesis (running) and the
+backend data-model inventory (running). Companion doc:
+docs/design/crm-portal-inventory.md (our own code, mapped).*
