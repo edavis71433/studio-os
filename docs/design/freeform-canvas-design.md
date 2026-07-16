@@ -366,3 +366,7 @@ phone stack will sometimes surprise owners whose design depends on overlap
 3. **Phone behavior**: stack-only in v1 (proposed), or should an owner be able
    to opt a section into "shrink the whole composition instead of stacking"
    (readable only for image/shape-dominant art, hence not the default)?
+
+
+---
+**DECISIONS (Eric, 2026-07-16):** 3 enumerated aspect presets for v1 · caps confirmed (12 elements/canvas, 4 canvases/page) · phones stack-only in v1 (opt-in shrink deferred).

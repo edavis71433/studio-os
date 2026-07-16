@@ -259,3 +259,7 @@ is set (stated in the UI copy — advisory, not certification).
 3. **Warning visibility to clients/reviewers**: should the recorded
    contrast-ack surface in the approval flow (the reviewer sees "owner kept a
    low-contrast style"), or stay owner-only in the health rail?
+
+
+---
+**DECISIONS (Eric, 2026-07-16):** curated brand shades + 'Custom…' hex behind them · Apply-Brand 'Clear styling' removes colors only (font/size/align kept; 'Keep' remains default) · contrast_ack stays owner-only (health rail), not surfaced to reviewers, revisit later.
