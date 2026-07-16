@@ -550,7 +550,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .tray-item.pd-source{opacity:.5}
 .tray-empty{font-size:12px;color:var(--ink-2);padding:8px 2px}
 
-/* left-rail tabs: [ Contents | ＋ Add section ] — AEM's Content Tree + Components */
+/* left-rail tabs: [ Blocks | Files | Content tree ] — AEM's Components + Assets + Content Tree */
 .dc-tabs{display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--hair);flex:0 0 auto}
 .dc-tab{font:inherit;font-size:12.5px;font-weight:600;padding:8px 12px;border:none;border-bottom:2px solid transparent;background:none;color:var(--ink-2,#8a8172);cursor:pointer;border-radius:8px 8px 0 0}
 .dc-tab.on{color:var(--plum,#5b3fa0);border-bottom-color:var(--plum,#5b3fa0)}
@@ -585,6 +585,20 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-tree-acts button{font:inherit;font-size:12px;width:27px;height:27px;border-radius:7px;border:1px solid transparent;background:none;color:var(--ink-2,#8a8172);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .dc-tree-acts button:hover{border-color:var(--line,#ddd);color:var(--plum,#5b3fa0)}
 .dc-tree-acts button:disabled{opacity:.3;cursor:default}
+/* Slice C: tree rows drag to reorder (pd-* engine) — block + column rows only */
+.dc-tree-row.block .dc-tree-main,.dc-tree-row.child .dc-tree-main{cursor:grab;touch-action:pan-y}
+body.pd-dragging .dc-tree-main{cursor:grabbing}
+
+/* Slice C — the Files tab (#tabFiles): a compact, panel-scoped asset browser.
+   Existing classes only: .flchip chips, .tray-search, .mediagrid/.mcell thumbs. */
+#designFilesWrap{display:flex;flex-direction:column;overflow:hidden}
+#designFilesWrap[hidden]{display:none}
+.pf-chips{padding:12px 14px 0}
+.pf-search{padding:0 14px}
+.pf-body{flex:1;min-height:0;overflow:auto;padding:0 14px 10px}
+#panelFilesGrid.mediagrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.pf-note{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;margin-top:8px}
+.pf-foot{flex:0 0 auto;border-top:1px solid var(--hair);padding:10px 14px;background:var(--sheet,#fff)}
 
 /* G11: per-section review comments — the toggle, the tray badges, the thread panel */
 .dc-actbtn.on{border-color:var(--plum,#5b3fa0);background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0)}
@@ -957,7 +971,7 @@ body.pd-dragging *{cursor:grabbing !important}
                 <button type="button" class="dc-actbtn" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled>↶ Undo</button>
                 <button type="button" class="dc-actbtn" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button>
                 <button type="button" class="dc-actbtn" id="btnComments" title="Feedback on this draft — notes from you and your client, section by section" aria-pressed="false">💬 Comments</button>
-                <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Page contents</button>
+                <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Content tree</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
                 <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">☰ Menu</button>
                 <button type="button" class="dc-actbtn" id="btnSettingsOpen" aria-haspopup="dialog" aria-controls="settingsPanel">Design settings</button>
@@ -982,16 +996,20 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="hint" style="margin-top:8px">✓ Your website adapts to phones automatically — every section stays readable and in the right order on any screen. A live proof of your draft; drag the frame’s bottom-right corner to make it taller.</div>
             </div>
           </div>
-          <!-- on-demand ADD-BLOCK tray (left slide-over, no scrim so the canvas stays a
-               drop target); #designTray keeps its id so the engine mounts into it -->
-          <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Page contents and sections" aria-hidden="true">
+          <!-- on-demand three-tab side panel (left slide-over, no scrim so the canvas
+               stays a drop target). Slice C (AC-1/AC-2): Blocks (the add-section
+               catalog, #designTray) · Files (NEW — a compact asset browser) · Content
+               tree (the page tree, #designTreeList). Mount ids are unchanged. -->
+          <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Blocks, files and content tree" aria-hidden="true">
             <div class="dc-panel-head"><span class="dc-panel-t">Your website</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Collapse this panel" title="Collapse (gives the canvas full width)">◀ Collapse</button></div>
             <div class="dc-tabs" role="tablist" aria-label="Page rail">
-              <button type="button" class="dc-tab on" id="tabContents" role="tab" aria-selected="true" data-tab="contents">Contents</button>
-              <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">＋ Add section</button>
+              <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">Blocks</button>
+              <button type="button" class="dc-tab" id="tabFiles" role="tab" aria-selected="false" data-tab="files">Files</button>
+              <button type="button" class="dc-tab on" id="tabContents" role="tab" aria-selected="true" data-tab="contents">Content tree</button>
             </div>
-            <div id="designTreeWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabContents"><div id="designTreeList"></div></div>
             <div id="designTray" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabAdd" hidden></div>
+            <div id="designFilesWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabFiles" hidden></div>
+            <div id="designTreeWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabContents"><div id="designTreeList"></div></div>
           </aside>
           <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
                into #designHost, id preserved -->
@@ -1006,8 +1024,8 @@ body.pd-dragging *{cursor:grabbing !important}
             </div>
           </aside>
           <!-- G11: per-section review comments — the thread panel (right slide-over,
-               same idiom as Design settings). Opened from a badge in the Page
-               contents tray while the Comments toggle is on. -->
+               same idiom as Design settings). Opened from a badge in the Content
+               tree while the Comments toggle is on. -->
           <aside id="commentsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="Draft feedback" aria-hidden="true">
             <div class="dc-panel-head"><span class="dc-panel-t" id="cmPanelTitle">Comments</span><button type="button" class="dc-close" id="btnCommentsClose" aria-label="Close">✕</button></div>
             <div class="dc-panel-scroll" id="cmPanelBody"></div>
@@ -4361,7 +4379,7 @@ function openPageSearchPanel() {
 }
 
 /* ── G11: per-section review comments — the operator side of the feedback loop.
-   Toggle 💬 Comments → per-section count badges appear in the Page contents
+   Toggle 💬 Comments → per-section count badges appear in the Content tree
    tray; click one to read the thread (newest first), reply, resolve, or remove.
    The client's notes arrive through the shared-draft link (Share draft): the
    /p/s/:token page carries a "Leave feedback" panel keyed by the SAME stable
@@ -7654,29 +7672,39 @@ function closeTrayPanel() {
   const p = $("trayPanel"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
 }
-// The left rail has two tabs — Contents (the page's component tree) and Add
-// section (the palette) — mirroring AEM's Content Tree + Components rails.
+// Slice C: the left rail has THREE tabs — Blocks (the add-section palette),
+// Files (a compact asset browser) and Content tree (the page's component tree) —
+// mirroring AEM's Components + Assets + Content Tree rails.
+function dcRailTabName(name) { return (name === "add" || name === "files") ? name : "contents"; }
 function dcRailTab(name) {
-  DC_RAIL_TAB = (name === "add") ? "add" : "contents";
-  const add = DC_RAIL_TAB === "add";
-  const tc = $("tabContents"), ta = $("tabAdd"), pc = $("designTreeWrap"), pa = $("designTray");
-  if (tc) { tc.classList.toggle("on", !add); tc.setAttribute("aria-selected", String(!add)); }
-  if (ta) { ta.classList.toggle("on", add); ta.setAttribute("aria-selected", String(add)); }
-  if (pc) pc.hidden = add;
-  if (pa) pa.hidden = !add;
-  if (add) mountBlockTray(); else dcRefreshTree();
+  DC_RAIL_TAB = dcRailTabName(name);
+  [["add", $("tabAdd"), $("designTray")],
+   ["files", $("tabFiles"), $("designFilesWrap")],
+   ["contents", $("tabContents"), $("designTreeWrap")]].forEach(([key, tab, panel]) => {
+    const on = DC_RAIL_TAB === key;
+    if (tab) { tab.classList.toggle("on", on); tab.setAttribute("aria-selected", String(on)); }
+    if (panel) panel.hidden = !on;
+  });
+  if (DC_RAIL_TAB === "add") mountBlockTray();
+  else if (DC_RAIL_TAB === "files") mountPanelFiles();
+  else dcRefreshTree();
 }
 function openTrayPanel(tab) {
   const p = $("trayPanel"); if (!p) return;
   closeSettingsPanel();
   PANEL_LASTFOCUS = document.activeElement;
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
-  dcRailTab(tab === "add" ? "add" : "contents");
-  setTimeout(() => { try { (tab === "add" ? (p.querySelector(".tray-search") || $("tabAdd")) : $("tabContents")).focus(); } catch (_) {} }, 40);
+  const want = dcRailTabName(tab);
+  dcRailTab(want);
+  setTimeout(() => { try {
+    (want === "add" ? (p.querySelector("#designTray .tray-search") || $("tabAdd"))
+      : want === "files" ? ($("pfSearch") || $("tabFiles"))
+      : $("tabContents")).focus();
+  } catch (_) {} }, 40);
 }
 // clicking a rail launcher again (same tab) closes it — a clear toggle
 function toggleTray(tab) {
-  const p = $("trayPanel"); const want = tab === "add" ? "add" : "contents";
+  const p = $("trayPanel"); const want = dcRailTabName(tab);
   if (p && p.classList.contains("on") && DC_RAIL_TAB === want) { closeDesignPanels(); return; }
   openTrayPanel(want);
 }
@@ -7708,7 +7736,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   });
   on("btnContentsOpen", () => toggleTray("contents"));
   on("btnTrayOpen", () => toggleTray("add")); on("btnAddFab", () => openTrayPanel("add")); on("btnTrayClose", closeDesignPanels);
-  on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add"));
+  on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add")); on("tabFiles", () => dcRailTab("files"));
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
   on("btnNavEdit", dcEditNav);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
@@ -7919,6 +7947,186 @@ function trayItem(d) {
   return b;
 }
 
+// ── Slice C (AC-2): the Files tab — a compact asset browser IN the panel ───────
+// PANEL-SCOPED state only: PF_S is this tab's own. It reuses the FL_ *ideas*
+// (FL_COLS chip defs, the /assets query shape) but never touches FL_S — which owns
+// #mediaGrid via FL_takeover — and its thumbnails render through
+// renderMediaGrid(grid, false, onPick), the exact contract the pickers use.
+const PF_CHIPS = ["all", "photos", "brand", "stock"];   // the spec's chip subset of FL_COLS
+const PF_S = { col: "all", q: "", seq: 0, built: false, stock: { state: null, results: [] } };
+let PF_LAST_CELL = null;   // the thumbnail that was clicked — anchors the offer popover
+function mountPanelFiles() {
+  const host = $("designFilesWrap"); if (!host) return;
+  if (!PF_S.built) {
+    PF_S.built = true;
+    host.textContent = "";
+    const bar = el("div", "flchips pf-chips");
+    PF_CHIPS.forEach((key) => {
+      const def = FL_COLS.find((x) => x.key === key) || { key, label: key };
+      const b = el("button", "flchip" + (PF_S.col === key ? " on" : ""), def.label);
+      b.type = "button"; b.dataset.col = key;
+      b.addEventListener("click", () => { if (PF_S.col === key) return; PF_S.col = key; pfPaintChips(); PF_S.col === "stock" ? pfLoadStock() : pfLoad(); });
+      bar.appendChild(b);
+    });
+    host.appendChild(bar);
+    const sw = el("div", "pf-search");
+    const search = el("input", "tray-search"); search.type = "search"; search.id = "pfSearch";
+    search.placeholder = "Search your files…"; search.setAttribute("aria-label", "Search your files");
+    let t = null;
+    search.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { PF_S.q = search.value; PF_S.col === "stock" ? pfLoadStock() : pfLoad(); }, 280); });
+    search.addEventListener("keydown", (e) => { if (e.key === "Enter" && PF_S.col === "stock") { e.preventDefault(); PF_S.q = search.value; pfLoadStock(); } });
+    sw.appendChild(search); host.appendChild(sw);
+    const body = el("div", "pf-body");
+    const grid = el("div", "mediagrid"); grid.id = "panelFilesGrid";
+    grid.addEventListener("click", (e) => { const c = e.target.closest(".mcell"); if (c) PF_LAST_CELL = c; }, true);
+    body.appendChild(grid);
+    body.appendChild(el("div", "pf-note", "Click a photo to use it — it fills the image slot you're picking for, or becomes a new photo section. You can also drag one onto the canvas."));
+    host.appendChild(body);
+    const foot = el("div", "pf-foot");
+    const link = el("button", "textact", "Open Files →"); link.type = "button";
+    link.title = "The full Files library — versions, where-used, crops";
+    link.addEventListener("click", () => { closeDesignPanels(); go("media"); });
+    foot.appendChild(link); host.appendChild(foot);
+  }
+  PF_S.col === "stock" ? pfRenderStock() : pfLoad();
+}
+function pfPaintChips() {
+  const host = $("designFilesWrap"); if (!host) return;
+  host.querySelectorAll(".flchip").forEach((b) => b.classList.toggle("on", b.dataset.col === PF_S.col));
+}
+// Chips/search narrow the grid via the SAME /assets query shape FL_qstr builds —
+// but against PF_S, so the Files view's own state (FL_S) is never repointed.
+function pfQstr() {
+  const c = FL_COLS.find((x) => x.key === PF_S.col) || FL_COLS[0];
+  const p = new URLSearchParams();
+  Object.entries(c.f || {}).forEach(([k, v]) => p.set(k, v));
+  if (PF_S.q.trim()) p.set("q", PF_S.q.trim());
+  p.set("limit", "300");
+  return p.toString();
+}
+async function pfLoad() {
+  const grid = $("panelFilesGrid"); if (!grid) return;
+  const seq = ++PF_S.seq;
+  let allow = null;   // null = unfiltered (All/Photos, no search): S.media as-is
+  if (PF_S.col === "brand" || PF_S.q.trim()) {
+    try {
+      const r = await api("GET", "/assets?" + pfQstr());
+      if (seq !== PF_S.seq) return;   // a newer chip/search won the race
+      allow = new Set((((r || {}).data || {}).assets || []).filter((a) => a.kind === "image").map((a) => String(a.id)));
+    } catch (_) { allow = null; }     // /assets unavailable → degrade to the full grid
+  }
+  if (seq !== PF_S.seq) return;
+  pfPaint(grid, allow);
+}
+function pfPaint(grid, allow) {
+  renderMediaGrid(grid, false, pfPick);   // the pickers' exact contract (manage=false + onPick)
+  // cells are 1:1 with S.media (renderMediaGrid order); apply the panel-scoped
+  // filter and wire drag-to-canvas without touching renderMediaGrid itself.
+  const cells = grid.querySelectorAll(".mcell");
+  const kill = [];
+  (S.media || []).forEach((m, i) => {
+    const c = cells[i]; if (!c) return;
+    if (allow && !allow.has(String(m.id))) { kill.push(c); return; }
+    // drag a thumbnail onto the canvas → a new photo section at that gap (pd engine)
+    c.addEventListener("pointerdown", (e) => pdStart(e, { kind: "media", mediaId: m.id, label: m.alt_text || "Photo", icon: "🖼" }, c));
+  });
+  kill.forEach((c) => c.remove());
+  if ((S.media || []).length && !grid.querySelector(".mcell")) {
+    grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">${PF_S.q.trim() ? "No files match that search." : "Nothing in this collection yet."}</p>`;
+  }
+}
+// One pick, two landings: an ARMED image slot (the picker flow is live) fills via
+// the exact path #pickerGrid's onPick uses; otherwise offer a new photo section.
+function pfPick(id) {
+  if (pdConsumeClick()) return;   // the click that follows a real drag
+  const sc = $("pickerScrim");
+  if (pickerCb && sc && sc.classList.contains("on")) { closeSheet("pickerScrim"); pickerCb(id); return; }
+  pfOfferAdd(id);
+}
+let PF_OFFER = null;
+function pfCloseOffer() {
+  if (!PF_OFFER) return;
+  PF_OFFER.remove(); PF_OFFER = null;
+  document.removeEventListener("mousedown", pfOfferOff, true);
+  document.removeEventListener("keydown", pfOfferKey, true);
+}
+function pfOfferOff(e) { if (PF_OFFER && !PF_OFFER.contains(e.target)) pfCloseOffer(); }
+function pfOfferKey(e) { if (e.key === "Escape") { e.stopPropagation(); pfCloseOffer(); } }
+function pfOfferAdd(id) {
+  pfCloseOffer();
+  const m = el("div", "pp-pop"); m.id = "pfOfferPop"; m.setAttribute("role", "menu"); m.setAttribute("aria-label", "Use this photo");
+  const add = el("button", "pp-pop-item", "＋ Add as a new photo section"); add.type = "button"; add.setAttribute("role", "menuitem");
+  add.addEventListener("click", () => { pfCloseOffer(); pfInsertImageAt(id, (BLOCKS_WORK || []).length); });
+  m.appendChild(add);
+  document.body.appendChild(m);
+  const anchor = (PF_LAST_CELL && PF_LAST_CELL.isConnected) ? PF_LAST_CELL : $("panelFilesGrid");
+  const r = anchor ? anchor.getBoundingClientRect() : { bottom: 120, left: 40 };
+  m.style.cssText = "position:fixed;z-index:300;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px";
+  m.style.top = Math.max(8, Math.min(r.bottom + 4, window.innerHeight - m.offsetHeight - 8)) + "px";
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
+  PF_OFFER = m;
+  document.addEventListener("keydown", pfOfferKey, true);
+  setTimeout(() => { document.addEventListener("mousedown", pfOfferOff, true); try { add.focus(); } catch (_) {} }, 0);
+}
+// Insert an image section carrying this media id — the EXISTING block-insert path
+// (addBlockAt + saveBlocks); the photo rides in, so no empty slot needs arming.
+function pfInsertImageAt(mediaId, at) {
+  const def = BLOCK_DEFS.find((x) => x.type === "image"); if (!def) return;
+  dcCaptureScroll();
+  const i = Math.max(0, Math.min(at, (BLOCKS_WORK || []).length));   // addBlockAt's clamp
+  addBlockAt(def, at);
+  if (BLOCKS_WORK[i]) BLOCKS_WORK[i].image_id = mediaId;
+  saveBlocks();
+}
+// The Stock chip — the SAME endpoints as the Files view + picker stock tabs
+// (GET /stock/search, POST /stock/import), panel-scoped state, same landing as pfPick.
+async function pfLoadStock() {
+  PF_S.stock.state = "loading"; pfRenderStock();
+  try {
+    const r = await api("GET", "/stock/search?q=" + encodeURIComponent(PF_S.q || "") + "&page=1");
+    PF_S.stock.results = ((r || {}).data || {}).images || [];
+    PF_S.stock.state = "ok";
+  } catch (err) {
+    if (err && err.status === 503) { PF_S.stock.state = "off"; }
+    else { PF_S.stock.results = []; PF_S.stock.state = "ok"; toast(nice(err), true); }
+  }
+  pfRenderStock();
+}
+function pfRenderStock() {
+  const grid = $("panelFilesGrid"); if (!grid) return;
+  const st = PF_S.stock;
+  if (st.state === "off") { grid.innerHTML = `<div class="pf-note" style="grid-column:1/-1">Stock photos aren’t turned on yet. Add a Pexels key to search professional royalty-free photos.</div>`; return; }
+  if (st.state === "loading") { grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">Searching…</p>`; return; }
+  if (st.state == null) { grid.innerHTML = `<div class="pf-note" style="grid-column:1/-1">Search above for professional royalty-free photos — try “office”, “coffee”, “salon”…</div>`; return; }
+  if (!st.results.length) { grid.innerHTML = `<div class="pf-note" style="grid-column:1/-1">No matches — try another word.</div>`; return; }
+  grid.innerHTML = "";
+  st.results.forEach((im) => {
+    const cell = el("button", "mcell"); cell.type = "button";
+    cell.setAttribute("aria-label", "Use this stock photo" + (im.credit ? " by " + im.credit : ""));
+    const img = el("img"); img.src = im.thumb; img.alt = im.alt || ""; img.loading = "lazy"; cell.appendChild(img);
+    if (im.credit) cell.appendChild(el("span", "alt", im.credit));
+    cell.addEventListener("click", () => pfImportStock(im, cell));
+    grid.appendChild(cell);
+  });
+}
+async function pfImportStock(im, cell) {
+  if (cell.dataset.busy) return; cell.dataset.busy = "1"; cell.style.opacity = ".5";
+  const badge = el("span", "badge", "Adding…"); cell.appendChild(badge);
+  try {
+    const r = await api("POST", "/stock/import", { stock_id: im.id, alt_text: im.alt, credit: im.credit || "" });
+    const mid = r && r.data && r.data.media_id;
+    if (!mid) throw new Error("That photo couldn’t be added — please try another.");
+    await loadMedia();   // refresh S.media so thumbnails resolve for the new id
+    toast("Added to your Files");
+    PF_LAST_CELL = cell;
+    pfPick(mid);         // same landing: armed slot fills, else offer a photo section
+  } catch (err) {
+    cell.style.opacity = ""; badge.remove(); delete cell.dataset.busy;
+    if (err && err.status === 503) { PF_S.stock.state = "off"; pfRenderStock(); }
+    else toast(nice(err), true);
+  }
+}
+
 // ── #4 — the block list model (list-order only) + Notion "+" insert gaps ────────
 // A gap at index i means "insert before block i" (a trailing gap = append):
 //   new  → splice emptyBlock(def) at i   (same object the click path builds)
@@ -7999,10 +8207,11 @@ function pdParentXY(e) {
 function pdBegin() {
   PDRAG.begun = true;
   document.body.classList.add("pd-dragging");
-  // dragging a NEW section in from the palette → tuck the rail away so the whole
-  // canvas is a visible drop surface (the captured source stays in the DOM, so the
-  // drag keeps receiving move/up even with the panel hidden).
-  if (PDRAG.kind === "new") closeTrayPanel();
+  // dragging a NEW section in from the palette (or a photo from the Files tab) →
+  // tuck the rail away so the whole canvas is a visible drop surface (the captured
+  // source stays in the DOM, so the drag keeps receiving move/up even with the
+  // panel hidden). Tree-row moves keep the panel open — the tree IS the drop zone.
+  if (PDRAG.kind === "new" || PDRAG.kind === "media") closeTrayPanel();
   const g = el("div", "pd-ghost");
   g.appendChild(Object.assign(el("span", "pd-ico"), { textContent: PDRAG.icon || "▧" }));
   g.appendChild(el("span", null, (PDRAG.kind === "move" ? "Move: " : "") + (PDRAG.label || "Section")));
@@ -8052,6 +8261,15 @@ function pdMove(e) {
   if (e.cancelable) e.preventDefault();
   const p = pdParentXY(e);
   if (PDRAG.ghost) { PDRAG.ghost.style.left = p.x + "px"; PDRAG.ghost.style.top = p.y + "px"; }
+  // Slice C: rows dragged in the CONTENT TREE track the tree's own gaps — the same
+  // single-gap list-index model. A top-level row carried out of the panel falls
+  // through to the standard canvas tracking below (same index space, same commit).
+  if (PDRAG.zone === "tree" || PDRAG.zone === "treecol") {
+    const host = $("designTreeList");
+    const hr = host && host.getBoundingClientRect();
+    const inPanel = hr && p.x >= hr.left - 24 && p.x <= hr.right + 24 && p.y >= hr.top - 40 && p.y <= hr.bottom + 40;
+    if (inPanel || PDRAG.zone === "treecol") { pdTreeTrack(p); return; }
+  }
   const info = pdGaps(); const line = document.getElementById("pdDropLine");
   if (!info) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
   const fr = info.fr;
@@ -8072,6 +8290,48 @@ function pdMove(e) {
     line.style.top = ly + "px";
   }
 }
+// Slice C: candidate gaps from the CONTENT TREE rows — the exact idea pdGaps()
+// applies to the canvas, read from the tree instead: one "before row" gap per
+// draggable row plus a trailing append gap; each carries a single LIST index.
+// zone "tree" = top-level block rows (gap = the row's bi, trailing = list length);
+// zone "treecol" = one container's column rows (gap = k within blk.columns).
+function pdTreeGaps() {
+  const host = $("designTreeList"); if (!host) return null;
+  const rows = PDRAG.zone === "treecol"
+    ? host.querySelectorAll('.dc-tree-row.child[data-colof="' + PDRAG.bi + '"]')
+    : host.querySelectorAll(".dc-tree-row.block[data-bi]");
+  if (!rows.length) return null;
+  const gaps = [];
+  Array.prototype.forEach.call(rows, (row, i) => {
+    const r = row.getBoundingClientRect();
+    const gap = PDRAG.zone === "treecol" ? i : (parseInt(row.dataset.bi, 10) || 0);
+    gaps.push({ gap, y: r.top, left: r.left, width: r.width });
+  });
+  const last = rows[rows.length - 1].getBoundingClientRect();
+  const total = PDRAG.zone === "treecol" ? rows.length : (BLOCKS_WORK || []).length;
+  gaps.push({ gap: total, y: last.bottom, left: last.left, width: last.width });
+  return { gaps, host };
+}
+function pdTreeTrack(p) {
+  const line = document.getElementById("pdDropLine");
+  dcHiliteInsert(null);   // a canvas drop-zone highlight never lingers over a tree drag
+  const info = pdTreeGaps();
+  if (!info) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
+  const hr = info.host.getBoundingClientRect();
+  const inX = p.x >= hr.left - 24 && p.x <= hr.right + 24;
+  const inY = p.y >= hr.top - 40 && p.y <= hr.bottom + 40;
+  if (!inX || !inY) { PDRAG.lastGap = null; if (line) line.style.display = "none"; return; }
+  const cy = Math.max(hr.top, Math.min(p.y, hr.bottom));
+  const gap = pdPickGap(info.gaps, cy);   // the SAME single-gap resolver as the canvas
+  const chosen = info.gaps.find((g) => g.gap === gap) || info.gaps[0];
+  PDRAG.lastGap = gap;
+  if (line) {
+    line.style.display = "block";
+    line.style.left = chosen.left + "px";
+    line.style.width = Math.max(0, chosen.width) + "px";
+    line.style.top = Math.max(hr.top + 2, Math.min(chosen.y, hr.bottom - 2)) + "px";
+  }
+}
 function pdFinish(commit) {
   if (!PDRAG) return;
   const drag = PDRAG; PDRAG = null;
@@ -8089,7 +8349,9 @@ function pdFinish(commit) {
   closeInsertMenu();
   if (commit && drag.lastGap != null) {  // a single resolved list index — never x/y
     if (drag.kind === "new") dcAddAt(drag.type, drag.lastGap);
-    else if (drag.kind === "move") dcMove(drag.from, drag.lastGap);
+    else if (drag.kind === "move") dcMove(drag.from, drag.lastGap);        // canvas + tree share this commit
+    else if (drag.kind === "movecol") dcMoveCol(drag.bi, drag.from, drag.lastGap);   // columns within a container
+    else if (drag.kind === "media") pfInsertImageAt(drag.mediaId, drag.lastGap);     // Files-tab thumb → photo section
   }
 }
 function pdEnd(e) { pdFinish(true); }
@@ -8218,6 +8480,20 @@ function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.default
 // modal proof's eeMoveBlock already uses — nothing goes live until Publish.
 function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type); if (!def) return; dcCaptureScroll(); addBlockAt(def, gap); if (MEDIA_FILL_TYPES.has(type)) { const bi = DC_FOCUS_BI; DC_FOCUS_BI = null; eeEditBlock(bi); } else { saveBlocks(); } }
 function dcMove(from, gap) { dcCaptureScroll(); moveBlockTo(from, gap); saveBlocks(); }
+// Slice C: reorder one COLUMN inside its container — the same single-gap list
+// semantics as top-level moves (dndDropIndex), never x/y; saves like dcMove.
+// The column object moves whole (span, image, nested component all ride along).
+function dcMoveCol(bi, from, gap) {
+  const b = (BLOCKS_WORK || [])[bi]; if (!b || !Array.isArray(b.columns)) return;
+  if (from == null || from < 0 || from >= b.columns.length) return;
+  const to = dndDropIndex(from, gap);
+  if (to === from) return;
+  dcCaptureScroll();
+  const [c] = b.columns.splice(from, 1);
+  b.columns.splice(to, 0, c);
+  renderBlocksCard();
+  saveBlocks();
+}
 function dcDuplicate(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
@@ -8607,16 +8883,21 @@ function dcTreeSectionRows(host, main) {
   });
   cmOrphanRows(host);   // G11: feedback whose section was removed still surfaces
 }
-// a child row under a container: one column, selectable, with its own settings
+// a child row under a container: one column, selectable, with its own settings.
+// Slice C: drag a column row to reorder it WITHIN its container (pd engine,
+// zone "treecol" — per-container list order only, never x/y).
 function dcTreeChildRow(colEl, bi, k, span) {
   const row = el("div", "dc-tree-row child");
-  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this column on the page";
+  row.dataset.colof = String(bi); row.dataset.k = String(k);
+  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this column on the page — drag to reorder the columns";
   mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: "▯" }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", "Column " + (k + 1)));
   txt.appendChild(el("span", "dc-tree-meta", "width " + (span || "?") + "/12"));
   mainBtn.appendChild(txt);
+  mainBtn.addEventListener("pointerdown", (e) => pdStart(e, { kind: "movecol", bi: bi, from: k, zone: "treecol", label: "Column " + (k + 1), icon: "▯" }, mainBtn));
   mainBtn.addEventListener("click", () => {
+    if (pdConsumeClick()) return;   // the click that follows a real drag
     try { colEl.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {}
     colEl.classList.add("dc-hot"); setTimeout(() => { try { colEl.classList.remove("dc-hot"); } catch (_) {} }, 1300);
     const host = $("designTreeList"); if (host) Array.prototype.forEach.call(host.querySelectorAll(".dc-tree-row.sel"), (n) => n.classList.remove("sel"));
@@ -8640,13 +8921,18 @@ function dcTreeRow(el2, c) {
   const meta = isBlock ? (SECTION_ALIAS[b.type] || b.type || "section") : "built-in section";
   const icon = isBlock ? (TRAY_TYPE_ICON[b.type] || "▧") : "◫";
   const row = el("div", "dc-tree-row " + (isBlock ? "block" : "core"));
-  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this on the page";
+  if (isBlock) row.dataset.bi = String(c.bi);   // slice C: pdTreeGaps reads these
+  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button";
+  mainBtn.title = isBlock ? "Select this on the page — drag to reorder your sections" : "Select this on the page";
   mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: icon }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", name));
   txt.appendChild(el("span", "dc-tree-meta", meta));
   mainBtn.appendChild(txt);
-  mainBtn.addEventListener("click", () => dcTreeSelect(el2, row));
+  // Slice C: drag a section row to reorder — the SAME pd engine + dcMove commit
+  // as dragging the section on the canvas (single-gap list index, never x/y).
+  if (isBlock) mainBtn.addEventListener("pointerdown", (e) => pdStart(e, { kind: "move", from: c.bi, zone: "tree", label: name, icon: icon }, mainBtn));
+  mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(el2, row); });
   row.appendChild(mainBtn);
   // G11: per-section comment badge (count when open notes exist; quiet 💬 to
   // start a thread). Block rows only — keyed by the stable section id, so the
