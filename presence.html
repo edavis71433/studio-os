@@ -474,6 +474,17 @@ h5.rune .whisper.ok{color:var(--sage)}
 .pp-pop-item:hover{background:var(--wash,#f4f0fb)}
 .pp-pop-item.danger{color:var(--clay,#c0392b)}
 .pp-pop-item:disabled{opacity:.4;cursor:default;background:none}
+.pp-pop-item:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:-2px}
+/* Slice B — the Page Information menu (#btnPageInfo → .pi-pop). Same pp-pop item
+   idiom; ≤760px it presents as the bottom sheet the slide-over panels use. */
+.dc-bar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pi-pop{position:fixed;z-index:300;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:12px;box-shadow:0 12px 34px color-mix(in srgb,var(--scrim-ink) 24%,transparent);padding:6px;display:flex;flex-direction:column;min-width:260px;max-width:92vw;max-height:min(72vh,600px);overflow:auto}
+.pi-pop .pi-prov{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;padding:8px 12px;border-bottom:1px solid var(--hair,#eee);margin-bottom:4px}
+.pi-pop .pi-grp{display:flex;flex-direction:column}
+.pi-pop .pi-grp .pp-pop-item{padding-left:26px}
+.pi-pop.sheet{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;border-radius:16px 16px 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px));max-height:82vh}
+.pi-pop.sheet .pp-pop-item{padding:12px 14px;font-size:14px}
+.pi-pop.sheet .pi-grp .pp-pop-item{padding-left:28px}
 .page-pill.hidden-nav .pp-name{opacity:.6}
 /* new-page layout wizard (AEM Create Page) */
 .dc-modal-scrim{position:fixed;inset:0;z-index:400;background:color-mix(in srgb,var(--scrim-ink) 44%,transparent);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -931,16 +942,20 @@ body.pd-dragging *{cursor:grabbing !important}
             <div class="dc-bar">
               <div>
                 <div class="dp-title">Your home page, as it would publish</div>
-                <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
-                  <button type="button" data-dpdev="desktop" class="on" aria-pressed="true">Desktop</button>
-                  <button type="button" data-dpdev="tablet" aria-pressed="false">Tablet</button>
-                  <button type="button" data-dpdev="phone" aria-pressed="false">Phone</button>
+                <div class="dc-bar-left">
+                  <!-- Slice B (AC-5): the Page Information menu — one place for everything
+                       about this page/site. Every entry deep-links to existing machinery. -->
+                  <button type="button" class="dc-actbtn" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false">Page ▾</button>
+                  <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
+                    <button type="button" data-dpdev="desktop" class="on" aria-pressed="true">Desktop</button>
+                    <button type="button" data-dpdev="tablet" aria-pressed="false">Tablet</button>
+                    <button type="button" data-dpdev="phone" aria-pressed="false">Phone</button>
+                  </div>
                 </div>
               </div>
               <div class="dc-bar-acts">
                 <button type="button" class="dc-actbtn" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled>↶ Undo</button>
                 <button type="button" class="dc-actbtn" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button>
-                <button type="button" class="dc-actbtn" id="btnShareDraft" title="Copy a private, expiring link to this draft — no sign-in needed to view">🔗 Share draft</button>
                 <button type="button" class="dc-actbtn" id="btnComments" title="Feedback on this draft — notes from you and your client, section by section" aria-pressed="false">💬 Comments</button>
                 <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Page contents</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
@@ -1310,6 +1325,9 @@ function nice(e) {
 }
 
 /* ── API: identical calls to M7 ── */
+// G7 provenance, one wording: WHO last moved the draft, in plain words. Used by
+// the 409 stale_draft message AND the Page ▾ menu's passive "Last edit" line.
+const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor_kind === "system" ? "an automatic update" : "someone else on your account") : "someone else";
 async function api(method, route, body) {
   if (!navigator.onLine) { const e = new Error("You look offline. Everything you saved is safe — it’ll be here when you’re back."); e.offline = true; throw e; }
   const { data } = await sb.auth.getSession();
@@ -1335,7 +1353,10 @@ async function api(method, route, body) {
       S.draftHash = (j && j.current_hash) || null;
       scheduleChangesRefresh();
       const lc = j.last_change || null;
-      const who = lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor_kind === "system" ? "an automatic update" : "someone else on your account") : "someone else";
+      // slice B: keep the newest provenance we've seen — the Page ▾ menu shows it
+      // as a passive "Last edit" line (display only; the guard stays automatic).
+      if (lc) S.lastChange = lc;
+      const who = lcWho(lc);
       const e = new Error("This site was changed by " + who + " while you had it open — nothing was overwritten. Load the latest, then reapply your change.");
       e.status = 409; e.stale = true; e.lastChange = lc; e.who = who; throw e;
     }
@@ -3902,7 +3923,13 @@ function eeInjectChrome(doc, main) {
 })();
 
 /* ── the publish ritual (identical /changes + /publish + /publishes) ── */
-function openRitual() {
+// Slice B: the Page ▾ menu's "Publish later" deep-links INTO the ritual (it stays
+// the single publish door) — openRitual({schedule:true}) scrolls to and opens the
+// G5 schedule block once it renders. Plain calls (and the button's click Event)
+// leave the flag off.
+let RITUAL_TO_SCHEDULE = false;
+function openRitual(opts) {
+  RITUAL_TO_SCHEDULE = !!(opts && opts.schedule === true);
   lastFocus = document.activeElement;
   $("ritualWrap").classList.add("on"); document.body.style.overflow = "hidden";
   $("btnRitualBack").focus();
@@ -4064,8 +4091,9 @@ function dtLocalDefault(hoursFromNow) {
 }
 function parseDtLocal(v) { if (!v) return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
 async function renderRitualSchedule(host, publishable) {
-  const wrap = el("div"); wrap.style.cssText = "margin-top:26px;text-align:center";
+  const wrap = el("div"); wrap.id = "ritSchedule"; wrap.style.cssText = "margin-top:26px;text-align:center";
   host.appendChild(wrap);
+  const toSchedule = RITUAL_TO_SCHEDULE; RITUAL_TO_SCHEDULE = false;   // consume the Page ▾ deep-link
   // pending scheduled changes (list + cancel) — honest view of what will happen on its own
   let pending = [];
   try { pending = ((await api("GET", "/schedule")).data || {}).scheduled || []; } catch (_) { /* keep the ritual calm */ }
@@ -4086,7 +4114,7 @@ async function renderRitualSchedule(host, publishable) {
     });
     wrap.appendChild(box);
   }
-  if (!publishable) return;
+  if (!publishable) { if (toSchedule && pending.length) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} } return; }
   const open = el("button", "textact", "Publish later — pick a time…"); open.type = "button";
   wrap.appendChild(open);
   open.addEventListener("click", () => {
@@ -4143,6 +4171,8 @@ async function renderRitualSchedule(host, publishable) {
     wrap.appendChild(panel);
     pub.inp.focus();
   });
+  // Page ▾ → "Publish later": land ON the schedule block, panel open, ready to pick
+  if (toSchedule) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} open.click(); }
 }
 
 /* ── G6: share the draft — one tap mints a signed, expiring, read-only link to
@@ -4160,6 +4190,130 @@ async function shareDraftLink() {
     else { window.prompt(`Your read-only draft link (works until ${until}) — copy it:`, r.url); }
   } catch (err) { toast(nice(err), true); }
   if (b) { b.disabled = false; b.textContent = "🔗 Share draft"; }
+}
+
+/* ── Slice B (builder redesign §2.2b, AC-5): the Page Information menu — ONE
+   place for everything about this page/site. Deep-links, not rebuilds: every
+   entry calls machinery that already exists (openRitual, shareDraftLink/G6, the
+   G10 offline routes, the G7 page operations via dcPageMenuItems, the Business
+   search-field builders, openPreview). Hard move (Eric, 2026-07-16): Share draft
+   left the dc-bar, the offline ACTION left History (History keeps a read-only
+   status line), and per-page search fields for pages you build left Business. ── */
+let PI_OPEN = null;
+function dcRelTime(iso) {
+  const t = Date.parse(iso || ""); if (!Number.isFinite(t)) return "";
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + " min ago";
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + (hrs === 1 ? " hour ago" : " hours ago");
+  const days = Math.round(hrs / 24);
+  return days === 1 ? "yesterday" : new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function closePageInfoMenu(refocus) {
+  if (!PI_OPEN) return;
+  document.removeEventListener("mousedown", PI_OPEN.onDown, true);
+  document.removeEventListener("keydown", PI_OPEN.onKey, true);
+  PI_OPEN.menu.remove(); PI_OPEN = null;
+  const b = $("btnPageInfo");
+  if (b) { b.setAttribute("aria-expanded", "false"); if (refocus !== false) { try { b.focus(); } catch (_) {} } }
+}
+function togglePageInfoMenu() {
+  if (PI_OPEN) { closePageInfoMenu(); return; }
+  const btn = $("btnPageInfo"); if (!btn) return;
+  const m = el("div", "pp-pop pi-pop"); m.id = "pageInfoMenu"; m.setAttribute("role", "menu"); m.setAttribute("aria-label", "Page information");
+  // 1. passive provenance — only when the data exists (it rides 409s; the guard
+  //    itself stays optimistic_lock — this SHOWS who moved the draft, no lock UI)
+  const lc = S.lastChange || null;
+  if (lc && (lc.actor_kind || lc.at)) {
+    const when = lc.at ? dcRelTime(lc.at) : "";
+    m.appendChild(el("div", "pi-prov", "Last edit: " + lcWho(lc) + (when ? " · " + when : "")));
+  }
+  const mi = (label, fn, opts) => {
+    const b = el("button", "pp-pop-item" + (opts && opts.danger ? " danger" : ""), label);
+    b.type = "button"; b.setAttribute("role", "menuitem");
+    if (opts && opts.id) b.id = opts.id;
+    if (opts && opts.title) b.title = opts.title;
+    b.addEventListener("click", () => { closePageInfoMenu(); fn(); });
+    m.appendChild(b); return b;
+  };
+  mi("Publish now…", () => openRitual(), { id: "piPublishNow", title: "Review every change, then put it live — the same door as the Publish button" });
+  mi("Publish later / scheduled changes…", () => openRitual({ schedule: true }), { id: "piPublishLater", title: "Pick a time — your changes go live on their own; see or cancel anything already scheduled" });
+  mi("Share a draft link…", () => shareDraftLink(), { id: "piShareDraft", title: "Copy a private, expiring link to this draft — no sign-in needed to view" });
+  // Take offline / bring back (G10) — needs the live state, read from the SAME
+  // /preview/status History uses. Until it answers, the item waits quietly;
+  // a never-published site has nothing to take offline, so the item leaves.
+  const offBtn = el("button", "pp-pop-item", "Take offline / bring back…"); offBtn.type = "button"; offBtn.setAttribute("role", "menuitem"); offBtn.id = "piOffline"; offBtn.disabled = true;
+  m.appendChild(offBtn);
+  api("GET", "/preview/status").then((r) => {
+    if (!PI_OPEN || PI_OPEN.menu !== m) return;
+    const live = (r.data && r.data.live) || {};
+    if (!live.published) { offBtn.remove(); return; }
+    offBtn.disabled = false;
+    if (live.offline_since) { offBtn.textContent = "Bring my site back online"; offBtn.addEventListener("click", () => { closePageInfoMenu(); siteBringOnline(); }); }
+    else { offBtn.textContent = "Take site offline…"; offBtn.classList.add("danger"); offBtn.addEventListener("click", () => { closePageInfoMenu(); siteTakeOffline(); }); }
+  }).catch(() => { if (PI_OPEN && PI_OPEN.menu === m) offBtn.remove(); });
+  // Page properties — the SAME items (and functions) the ⋯ menus offer, for the
+  // page open on the canvas. The ⋯ on pills/tree rows stays (it acts on ANY page).
+  const propLabel = () => "Page properties: " + dcPageTitle(DC_PAGE) + " ";
+  const propBtn = el("button", "pp-pop-item", propLabel() + "▸");
+  propBtn.type = "button"; propBtn.id = "piPageProps"; propBtn.setAttribute("role", "menuitem"); propBtn.setAttribute("aria-expanded", "false");
+  const grp = el("div", "pi-grp"); grp.hidden = true;
+  dcPageMenuItems(DC_PAGE, () => closePageInfoMenu()).forEach((b2) => { b2.setAttribute("role", "menuitem"); grp.appendChild(b2); });
+  propBtn.addEventListener("click", () => {
+    grp.hidden = !grp.hidden;
+    propBtn.setAttribute("aria-expanded", String(!grp.hidden));
+    propBtn.textContent = propLabel() + (grp.hidden ? "▸" : "▾");
+  });
+  m.appendChild(propBtn); m.appendChild(grp);
+  mi("Search & share appearance…", () => openPageSearchPanel(), { id: "piSearchShare", title: "How this page reads on Google and when its link is texted or posted" });
+  mi("View as published", () => openPreview("draft"), { id: "piViewPublished", title: "Read your draft the way visitors will — no editing chrome" });
+  document.body.appendChild(m);
+  // ≤760px: the bottom-sheet presentation the slide-over panels already use
+  if (window.matchMedia && window.matchMedia("(max-width:760px)").matches) {
+    m.classList.add("sheet");
+  } else {
+    const r = btn.getBoundingClientRect();
+    m.style.top = (r.bottom + 6) + "px";
+    m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 12)) + "px";
+  }
+  btn.setAttribute("aria-expanded", "true");
+  const onDown = (e) => { if (!m.contains(e.target) && !btn.contains(e.target)) closePageInfoMenu(false); };
+  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closePageInfoMenu(); } };
+  document.addEventListener("mousedown", onDown, true);
+  document.addEventListener("keydown", onKey, true);
+  PI_OPEN = { menu: m, onDown, onKey };
+  setTimeout(() => { try { const f = m.querySelector(".pp-pop-item:not(:disabled)"); if (f) f.focus(); } catch (_) {} }, 20);
+}
+// The per-page "Search & share appearance" panel — the page_seo override fields
+// + the show-on-Google toggle for the CURRENT page, in a small sheet. The field
+// builders are the SAME ones the Business card uses (seoNoindexRow/seoFieldsBox).
+function openPageSearchPanel() {
+  const slug = DC_PAGE;
+  const title = dcPageTitle(slug);
+  const scrim = el("div", "dc-modal-scrim"); scrim.id = "pageSearchPanel";
+  const box = el("div", "dc-modal");
+  box.appendChild(el("h3", "dc-modal-h", "Search & share appearance"));
+  box.appendChild(el("p", "dc-modal-sub", slug
+    ? "How “" + title + "” reads in search results and when its link is texted or posted. Blank fields use the good defaults; changes apply when you publish."
+    : "Your home page reads from your site-wide search headline and description — those live in Business, with the rest of your business facts. It always shows on Google, and its share appearance follows the same wording."));
+  if (slug) {
+    const key = "page:" + slug;
+    box.appendChild(seoNoindexRow(key, title, "Show this page on Google"));
+    box.appendChild(el("div", "hint", "Hiding it keeps the page on your website — it just stops appearing in search results."));
+    box.appendChild(seoFieldsBox(key, title, false));
+  }
+  const done = el("button", "dc-modal-cancel", "Done"); done.type = "button";
+  box.appendChild(done); scrim.appendChild(box); document.body.appendChild(scrim);
+  const cleanup = () => {
+    scrim.remove(); document.removeEventListener("keydown", onKey, true);
+    const b = $("btnPageInfo"); if (b) { try { b.focus(); } catch (_) {} }
+  };
+  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cleanup(); } };
+  document.addEventListener("keydown", onKey, true);
+  done.addEventListener("click", cleanup);
+  scrim.addEventListener("click", (e) => { if (e.target === scrim) cleanup(); });
+  setTimeout(() => { try { (box.querySelector("input,select") || done).focus(); } catch (_) {} }, 30);
 }
 
 /* ── G11: per-section review comments — the operator side of the feedback loop.
@@ -4406,29 +4560,30 @@ async function renderPreviewPanel() {
     mk("Promote to Live", () => { if (confirm("Promote the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Promoting to Live — this usually takes under a minute"); }, true);
   }
   card.appendChild(acts);
-  // ── G10: take offline / bring back — the reversible holding-page veil ──
-  if (st.live.published) {
-    const offRow = el("div"); offRow.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px dashed var(--line,#e5e5e5);display:flex;gap:10px;align-items:center;flex-wrap:wrap";
-    if (st.live.offline_since) {
-      offRow.appendChild(Object.assign(el("div", null, "Your site is offline. Everything is kept — bring it back whenever you like."), { style: "font-size:12.5px;color:var(--ink-2,#666);flex:1;min-width:200px" }));
-      const back = el("button", null, "Bring my site back online"); back.type = "button";
-      back.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);font-weight:600";
-      back.addEventListener("click", () => act("/site/online", "Bringing your site back — this usually takes under a minute"));
-      offRow.appendChild(back);
-    } else {
-      offRow.appendChild(Object.assign(el("div", null, "Need to disappear for a while? Going offline shows visitors a simple “temporarily offline” page — nothing is deleted."), { style: "font-size:12.5px;color:var(--ink-2,#666);flex:1;min-width:200px" }));
-      const off = el("button", null, "Take site offline"); off.type = "button";
-      off.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:1px solid var(--clay,#a3423a);background:transparent;color:var(--clay,#a3423a);font-weight:600";
-      off.addEventListener("click", () => {
-        const name = (S.identity && S.identity.business_name) || "your site";
-        if (!confirm(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring my site back online”) restores everything.`)) return;
-        act("/site/offline", "Your site is offline. Publish, or use “Bring my site back online”, to return.");
-      });
-      offRow.appendChild(off);
-    }
+  // ── G10 → slice B (hard move): the take-offline / bring-back ACTION now lives
+  // in the Page ▾ menu (siteTakeOffline/siteBringOnline below). The version
+  // journal keeps a read-only status line — site-level state still belongs in
+  // History as information. While the site is live, nothing shows here.
+  if (st.live.published && st.live.offline_since) {
+    const offRow = el("div"); offRow.id = "offlineStatusRow";
+    offRow.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px dashed var(--line,#e5e5e5);font-size:12.5px;color:var(--ink-2,#666)";
+    offRow.textContent = "⏸ Offline since " + new Date(st.live.offline_since).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) + " — visitors see a “temporarily offline” page; everything is kept.";
     card.appendChild(offRow);
   }
   box.appendChild(card);
+}
+// ── G10 actions (slice B home: the Page ▾ menu) — the SAME confirm flow and the
+// SAME POST /site/offline · /site/online routes the History row used; History
+// now only reports the state (read-only line above). ──
+async function siteTakeOffline() {
+  const name = (S.identity && S.identity.business_name) || "your site";
+  if (!confirm(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring my site back online”) restores everything.`)) return;
+  try { await api("POST", "/site/offline"); toast("Your site is offline. Publish, or use “Bring my site back online”, to return."); renderPreviewPanel(); scheduleChangesRefresh(); }
+  catch (err) { toast(nice(err), true); }
+}
+async function siteBringOnline() {
+  try { await api("POST", "/site/online"); toast("Bringing your site back — this usually takes under a minute"); renderPreviewPanel(); scheduleChangesRefresh(); }
+  catch (err) { toast(nice(err), true); }
 }
 // ── Checkpoints — name + save the current draft as a safety point ────────────
 // Reuses the named-snapshot substrate (checkpoints are stored like launches);
@@ -4771,6 +4926,56 @@ function mountDeletionCard() {
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──
 const PAGE_DEFS = [ ["offerings", "Your offerings page"], ["about", "About"], ["faq", "Questions"], ["updates", "Updates"], ["contact", "Contact"] ];
+// ── Shared per-page search/share builders (slice B) — ONE implementation, two
+// homes: the Business card below uses them for the BUILT-IN pages (which the
+// canvas can't open), and the Page ▾ menu's "Search & share appearance" panel
+// uses them for the page that's open on the canvas ("page:<slug>" keys). ──
+// The show-on-Google toggle: one pages_noindex entry (checked = shows).
+function seoNoindexRow(key, pageName, rowLabel) {
+  const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 0";
+  const cb = el("input"); cb.type = "checkbox"; cb.id = "nx-" + key.replace(/[^a-z0-9_-]/gi, "-");
+  cb.checked = !new Set((S.settings && S.settings.pages_noindex) || []).has(key);
+  cb.addEventListener("change", async () => {
+    const nh = new Set((S.settings && S.settings.pages_noindex) || []);
+    cb.checked ? nh.delete(key) : nh.add(key);
+    try { const r = await api("PUT", "/settings", { pages_noindex: [...nh] }); S.settings = r.data || { ...S.settings, pages_noindex: [...nh] }; toast(cb.checked ? pageName + " will show on Google — publish to apply" : pageName + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
+    catch (err) { toast(nice(err), true); cb.checked = !cb.checked; }
+  });
+  const lb = el("label", null, rowLabel || pageName); lb.setAttribute("for", cb.id); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
+  rowEl.append(cb, lb); return rowEl;
+}
+// One page's search wording + share appearance (page_seo overrides): search
+// headline/description, share (og/twitter) headline/description, share image.
+function seoFieldsBox(key, label, showLabel) {
+  const cur = ((S.settings && S.settings.page_seo) || {})[key] || {};
+  const box = el("div"); box.style.cssText = "margin:8px 0 12px";
+  if (showLabel !== false) box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:3px" }));
+  const ti = el("input"); ti.type = "text"; ti.maxLength = 60; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
+  const di = el("input"); di.type = "text"; di.maxLength = 160; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
+  const sti = el("input"); sti.type = "text"; sti.maxLength = 60; sti.placeholder = "Share headline — when texted or posted (blank = the search headline)"; sti.value = cur.share_title || "";
+  const sdi = el("input"); sdi.type = "text"; sdi.maxLength = 160; sdi.placeholder = "Share description (blank = the search description)"; sdi.value = cur.share_description || "";
+  const sim = el("select"); sim.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--bg,#fff);color:inherit";
+  sim.setAttribute("aria-label", "Share image for " + label);
+  const noneOpt = el("option", null, "Share image: your site’s usual one"); noneOpt.value = ""; sim.appendChild(noneOpt);
+  (S.media || []).filter((m) => m.thumb).forEach((m) => { const o = el("option", null, "Share image: " + (m.alt_text || "photo").slice(0, 60)); o.value = m.id; sim.appendChild(o); });
+  sim.value = cur.share_image || "";
+  if (sim.value !== (cur.share_image || "")) sim.value = "";   // the stored photo is gone → fall back
+  [ti, di, sti, sdi].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
+  const save = async () => {
+    const map = { ...((S.settings && S.settings.page_seo) || {}) };
+    const entry = {};
+    if (ti.value.trim()) entry.title = ti.value.trim();
+    if (di.value.trim()) entry.description = di.value.trim();
+    if (sti.value.trim()) entry.share_title = sti.value.trim();
+    if (sdi.value.trim()) entry.share_description = sdi.value.trim();
+    if (sim.value) entry.share_image = sim.value;
+    if (!Object.keys(entry).length) delete map[key]; else map[key] = entry;
+    try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Saved — publish to apply"); scheduleChangesRefresh(); }
+    catch (err) { toast(nice(err), true); }
+  };
+  [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
+  box.append(ti, di, sti, sdi, sim); return box;
+}
 async function mountSearchCard() {
   const host = $("view-business"); if (!host || $("searchCard")) return;
   const card = el("div", "field"); card.id = "searchCard"; card.style.marginTop = "18px";
@@ -4796,58 +5001,15 @@ async function mountSearchCard() {
   // 2. page visibility toggles
   const sec = el("div", null, ""); sec.style.cssText = "margin-top:12px";
   sec.appendChild(Object.assign(el("div", null, "Which pages should show up on Google?"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
-  const hidden = new Set((S.settings && S.settings.pages_noindex) || []);
-  PAGE_DEFS.forEach(([key, label]) => {
-    const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 0";
-    const cb = el("input"); cb.type = "checkbox"; cb.id = "nx-" + key; cb.checked = !hidden.has(key);
-    cb.addEventListener("change", async () => {
-      const nh = new Set((S.settings && S.settings.pages_noindex) || []);
-      cb.checked ? nh.delete(key) : nh.add(key);
-      try { const r = await api("PUT", "/settings", { pages_noindex: [...nh] }); S.settings = r.data || { ...S.settings, pages_noindex: [...nh] }; toast(cb.checked ? label + " will show on Google — publish to apply" : label + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
-      catch (err) { toast(nice(err), true); cb.checked = !cb.checked; }
-    });
-    const lb = el("label", null, label); lb.setAttribute("for", "nx-" + key); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
-    rowEl.append(cb, lb); sec.appendChild(rowEl);
-  });
+  PAGE_DEFS.forEach(([key, label]) => sec.appendChild(seoNoindexRow(key, label)));
   sec.appendChild(el("div", "hint", "Your home page always shows. Hiding a page keeps it on your site — it just stops appearing in search results."));
   card.appendChild(sec);
-  // 3. per-page search wording + share appearance (page_seo overrides).
-  // G7: covers the owner's OWN pages too (key "page:<slug>"), and each page gains
-  // optional SHARE fields — the og:/twitter: title, description and image used when
-  // the page is texted or posted. Blank = the good default (the search wording).
+  // 3. per-page search wording + share appearance (page_seo overrides) for the
+  // BUILT-IN pages only. Slice B hard move: the pages YOU build ("page:<slug>")
+  // are tuned from the canvas — Page ▾ → Search & share appearance.
   const ov = el("details"); ov.style.cssText = "margin-top:10px";
-  ov.appendChild(Object.assign(el("summary", null, "Fine-tune how each page reads in search results and when shared (optional)"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
-  const seoDefs = PAGE_DEFS.concat(dcPagesArr().map((p) => ["page:" + p.slug, (p.title || p.slug) + " (your page)"]));
-  seoDefs.forEach(([key, label]) => {
-    const cur = ((S.settings && S.settings.page_seo) || {})[key] || {};
-    const box = el("div"); box.style.cssText = "margin:8px 0 12px";
-    box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:3px" }));
-    const ti = el("input"); ti.type = "text"; ti.maxLength = 60; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
-    const di = el("input"); di.type = "text"; di.maxLength = 160; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
-    const sti = el("input"); sti.type = "text"; sti.maxLength = 60; sti.placeholder = "Share headline — when texted or posted (blank = the search headline)"; sti.value = cur.share_title || "";
-    const sdi = el("input"); sdi.type = "text"; sdi.maxLength = 160; sdi.placeholder = "Share description (blank = the search description)"; sdi.value = cur.share_description || "";
-    const sim = el("select"); sim.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--bg,#fff);color:inherit";
-    sim.setAttribute("aria-label", "Share image for " + label);
-    const noneOpt = el("option", null, "Share image: your site’s usual one"); noneOpt.value = ""; sim.appendChild(noneOpt);
-    (S.media || []).filter((m) => m.thumb).forEach((m) => { const o = el("option", null, "Share image: " + (m.alt_text || "photo").slice(0, 60)); o.value = m.id; sim.appendChild(o); });
-    sim.value = cur.share_image || "";
-    if (sim.value !== (cur.share_image || "")) sim.value = "";   // the stored photo is gone → fall back
-    [ti, di, sti, sdi].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
-    const save = async () => {
-      const map = { ...((S.settings && S.settings.page_seo) || {}) };
-      const entry = {};
-      if (ti.value.trim()) entry.title = ti.value.trim();
-      if (di.value.trim()) entry.description = di.value.trim();
-      if (sti.value.trim()) entry.share_title = sti.value.trim();
-      if (sdi.value.trim()) entry.share_description = sdi.value.trim();
-      if (sim.value) entry.share_image = sim.value;
-      if (!Object.keys(entry).length) delete map[key]; else map[key] = entry;
-      try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Saved — publish to apply"); scheduleChangesRefresh(); }
-      catch (err) { toast(nice(err), true); }
-    };
-    [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
-    box.append(ti, di, sti, sdi, sim); ov.appendChild(box);
-  });
+  ov.appendChild(Object.assign(el("summary", null, "Fine-tune how each built-in page reads in search results and when shared (optional)"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
+  PAGE_DEFS.forEach(([key, label]) => ov.appendChild(seoFieldsBox(key, label)));
   card.appendChild(ov);
   // 4. redirects manager (moved a page? send visitors to the new spot)
   const rd = el("details"); rd.style.cssText = "margin-top:8px";
@@ -5600,24 +5762,35 @@ async function dcSaveNav(nav) {
     toast(clean.length ? "Menu saved — publish to update your live site" : "Menu reset to automatic");
   } catch (err) { toast(nice(err), true); }
 }
-function dcPageMenu(slug, anchor) {
+// The page-operation items, SHARED: the ⋯ menus (page pills + tree rows) and the
+// Page ▾ menu's "Page properties" group build from this one list, so the two
+// homes can never drift. Every action is the existing G7 function; `close`
+// dismisses the host menu before the action runs.
+function dcPageMenuItems(slug, close) {
   const isHome = !slug;
   const p = isHome ? null : dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
-  const m = el("div", "pp-pop");
+  const items = [];
+  const mk = (label, fn, o) => {
+    const b = el("button", "pp-pop-item" + (o && o.danger ? " danger" : ""), label); b.type = "button";
+    if (o && o.disabled) b.disabled = true; else b.addEventListener("click", () => { close(); fn(); });
+    items.push(b);
+  };
   if (!isHome) {
-    const rn = el("button", "pp-pop-item", "Rename"); rn.type = "button"; rn.addEventListener("click", () => { m.remove(); dcRenamePage(slug); });
-    const nv = el("button", "pp-pop-item", (p && p.hideNav) ? "Show in menu" : "Hide from menu"); nv.type = "button"; nv.addEventListener("click", () => { m.remove(); dcTogglePageNav(slug); });
-    const ml = el("button", "pp-pop-item", "Move left"); ml.type = "button"; if (idx <= 0) ml.disabled = true; else ml.addEventListener("click", () => { m.remove(); dcMovePage(slug, -1); });
-    const mr = el("button", "pp-pop-item", "Move right"); mr.type = "button"; if (idx >= last) mr.disabled = true; else mr.addEventListener("click", () => { m.remove(); dcMovePage(slug, 1); });
-    m.append(rn, nv, ml, mr);
+    mk("Rename", () => dcRenamePage(slug));
+    mk((p && p.hideNav) ? "Show in menu" : "Hide from menu", () => dcTogglePageNav(slug));
+    mk("Move left", () => dcMovePage(slug, -1), { disabled: idx <= 0 });
+    mk("Move right", () => dcMovePage(slug, 1), { disabled: idx >= last });
   }
   // G7: duplicate any page (Home too) — a full copy you then edit independently
-  const dp = el("button", "pp-pop-item", "Duplicate page"); dp.type = "button"; dp.addEventListener("click", () => { m.remove(); dcDuplicatePage(slug); });
-  m.appendChild(dp);
+  mk("Duplicate page", () => dcDuplicatePage(slug));
   // Clear the template/sections off the canvas → a blank page (works on Home too)
-  const cl = el("button", "pp-pop-item", "Clear page (start blank)"); cl.type = "button"; cl.addEventListener("click", () => { m.remove(); dcClearPage(slug); });
-  m.appendChild(cl);
-  if (!isHome) { const dl = el("button", "pp-pop-item danger", "Delete page"); dl.type = "button"; dl.addEventListener("click", () => { m.remove(); dcDeletePage(slug); }); m.appendChild(dl); }
+  mk("Clear page (start blank)", () => dcClearPage(slug));
+  if (!isHome) mk("Delete page", () => dcDeletePage(slug), { danger: true });
+  return items;
+}
+function dcPageMenu(slug, anchor) {
+  const m = el("div", "pp-pop");
+  dcPageMenuItems(slug, () => m.remove()).forEach((b) => m.appendChild(b));
   document.body.appendChild(m);
   const r = anchor.getBoundingClientRect();
   m.style.cssText = "position:fixed;z-index:300;top:" + (r.bottom + 4) + "px;left:" + Math.max(8, r.left - 70) + "px;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px";
@@ -7473,7 +7646,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add"));
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
   on("btnNavEdit", dcEditNav);
-  on("btnShareDraft", shareDraftLink);
+  on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   on("btnComments", cmToggle); on("btnCommentsClose", closeDesignPanels);   // G11
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
