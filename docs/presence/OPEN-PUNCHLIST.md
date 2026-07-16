@@ -98,10 +98,12 @@ end-to-end (backend + "Style this section" popover; second design-doc decisions:
 3 aspect presets · 12 elements/4 canvases caps · brand shades + Custom… hex ·
 Apply-Brand clears colors only) · G25 freeform backend slice 1 (editor slice pending;
 freeform = a section TYPE, templates/columns stay — Eric confirmed) · G5/G6/G7/G9/G10
-publish-pipeline upgrades. NOW: increment 6 builder redesign (spec in
-docs/design/builder-redesign-increment-6.md; before/after screenshots to Eric before
-merge). Then: G13 in-place editing → freeform editor → G12+G34 → S-finishers →
-G33/G14/G35.
+publish-pipeline upgrades. ✅ Increment 6 builder redesign COMPLETE 2026-07-16 —
+all four slices approved by Eric and merged to main (A 15f91d2 theme contract ·
+B 736fab7 Page ▾ menu · C 3cac4a3 three-tab panel + tree drag · D 3f2303d modes
+bar Edit/Preview/Comments/Timewarp). NOW: the CRM + client portal Salesforce
+redesign (directive below). Then: G13 in-place editing → freeform editor →
+G12+G34 → S-finishers → G33/G14/G35.
 
 ## 🎯 CRM REDESIGN DIRECTIVE (Eric, 2026-07-16 — do not lose to compaction)
 
