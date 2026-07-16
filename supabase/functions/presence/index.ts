@@ -30,7 +30,7 @@ import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from 
 import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
-import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages } from './routes/project_comms.ts';
+import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
@@ -756,6 +756,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // P2-D-3: notifications (derived from the activity log + a per-reader last-seen)
   if (route === '/notifications' && method === 'GET') return handleNotifications(req, jwt, site, principal, cors);
   if (route === '/notifications/read' && method === 'POST') return handleNotificationsRead(req, jwt, site, principal, cors);
+  // Slice 2 (Inbox split view): per-thread read mark — opening one conversation
+  // clears ITS unread dot only (presence_thread_reads, 0113; tolerant pre-apply).
+  if (route === '/threads/read' && method === 'POST') return handleThreadRead(req, jwt, site, principal, cors);
   // FIX 6: the operator's roster of THIS studio's customers (studio-side; site-scoped
   // to the operator's own site via the Agency–Client Bridge). Powers customers.html.
   if (route === '/studio/customers' && method === 'GET') return handleStudioCustomers(req, jwt, site, principal, cors);

@@ -143,6 +143,11 @@ async function collectClientConversation(u: URL, site: SiteRow): Promise<{
     // every project on this relationship — a multi-project client loses nothing
     const projectIds: string[] = projectId ? [projectId] : [];
     if (clientId) { try { for (const lk of await linksForCustomer(clientId)) { const p = String(lk.project_id || ''); if (p && !projectIds.includes(p)) projectIds.push(p); } } catch { /* additive */ } }
+    // A client_id-only call (the Inbox reading pane) still deserves a reply
+    // target: adopt the first active bridge link's project as the top-level
+    // projectId so reply_to resolves — the same link list the channel reads
+    // below already consume. A caller that DID pass ?project= is untouched.
+    if (!projectId && projectIds.length) projectId = projectIds[0];
     // the deal anchors the enquiry + logged-activity channels; the row also
     // feeds /crm/activity's highlights/upcoming (stage/next_step — tolerant
     // select: those columns land with migration 0089)

@@ -22,6 +22,7 @@ import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
+import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
  *  Everything else in the client gate is 403 for a reviewer — so the simplified
@@ -254,7 +255,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // message events, agency links). Predicates unchanged — a reviewer never
   // fires the studio-only reads. Only genuinely dependent stages (bridge
   // links → unread reads, projects → clients → contacts) stay sequential.
-  const [shares, momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ, bridgeQ, supR, evR, agencyLinksQ, feedbackQ] = await Promise.all([
+  const [shares, momQ, pubQ, infraQ, writeQ, noticeQ, fileQ, enqQ, bridgeQ, supR, evR, agencyLinksQ, feedbackQ, marksQ] = await Promise.all([
     loadShares(site.id),
     svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=id,headline,summary,moment_type,created_at&order=created_at.desc&limit=10`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
@@ -264,11 +265,13 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,storage_path,alt_text,metadata&limit=10`), // DAM-2: files awaiting approval
     // FIX 1: brand-new website enquiries (owner surfaces only) — one synthetic feed
     // row so the bell + Inbox surface them like every other needs-you item.
-    seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`) : noEnq,
+    // Slice 2 widened the select (additive): the same read also feeds the per-lead
+    // `enquiries` rows the Inbox list pane renders — never a second query.
+    seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id,form_kind,name,email,phone,message,status,created_at&order=created_at.desc&limit=50`) : noEnq,
     // bridged-customer links (owner-only; the unread reads that DEPEND on them stay below)
     seesFull && site.client_id ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
     // FIX 5 inputs: open support requests + client message events (owner-only, best-effort)
-    seesFull ? svc(`presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=id,subject,project_id,requester,updated_at&order=updated_at.desc&limit=25`).catch(swallow) : noEnq,
+    seesFull ? svc(`presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=id,subject,status,project_id,requester,created_at,updated_at&order=updated_at.desc&limit=25`).catch(swallow) : noEnq,
     // kind=message events carry detail.from ('client'|'studio') — stamped by the
     // client door — so we can tell whose turn it is without the author_kind
     // ambiguity (a solo owner and their customer are both 'client').
@@ -279,7 +282,13 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // G11: open client feedback on the shared draft (owner-only; one HEAD count;
     // null on any failure — incl. a database without 0112 yet — so no row shows).
     seesFull ? svcCount(`presence_section_comments?site_id=eq.${site.id}&author_kind=eq.client&status=eq.open&deleted_at=is.null`) : Promise.resolve(0),
+    // Slice 2: this reader's per-thread read marks (presence_thread_reads, 0113) —
+    // powers the Inbox's real unread dots. NULL on a pre-0113 database (deploy-order
+    // tolerance): every unread flag below then falls back to the needs-reply heuristic.
+    seesFull ? loadThreadMarks(site.id, String(principal.userId || principal.email || 'anon')).catch(() => null) : Promise.resolve(null),
   ]);
+  const marks = (marksQ as Record<string, string> | null) || null;
+  const markFor = (key: string) => (marks ? (marks[key] ?? null) : null);
   const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
   const showApprovals = visibleTo(role, 'approvals');
@@ -377,9 +386,38 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       // the operator sees who they're talking with even after they've answered. evR is
       // created_at.desc, so the FIRST event seen per project is its latest; `needs_reply`
       // (that latest message came FROM the client) flags the ones still on the studio.
-      const convo = new Map<string, { latest: any; count: number }>();
-      for (const e of ((evR.json as any[]) || [])) { const pid = String(e.project_id || ''); if (!pid) continue; const cur = convo.get(pid); if (cur) cur.count++; else convo.set(pid, { latest: e, count: 1 }); }
+      // latestClient = the newest event stamped from='client' (evR is created_at.desc,
+      // so the first client event seen per project is its latest) — the honest input
+      // to the per-thread unread rule (client activity newer than the reader's mark).
+      const convo = new Map<string, { latest: any; count: number; latestClient: any }>();
+      for (const e of ((evR.json as any[]) || [])) {
+        const pid = String(e.project_id || ''); if (!pid) continue;
+        const fromClient = (e.detail || {}).from === 'client';
+        const cur = convo.get(pid);
+        if (cur) { cur.count++; if (!cur.latestClient && fromClient) cur.latestClient = e; }
+        else convo.set(pid, { latest: e, count: 1, latestClient: fromClient ? e : null });
+      }
       const sup = ((supR.json as any[]) || []);
+      // A support row's honest "latest client activity" = max(the request itself,
+      // its newest CLIENT-authored reply). updated_at can't drive unread: client
+      // replies only INSERT into presence_support_messages (never bump it) while
+      // studio actions DO bump it (triage PATCH, the open→in_progress bump on a
+      // studio reply) — wrong in both directions once a mark exists. ONE batched,
+      // site-scoped messages read; null on failure → the rows below fall back to
+      // the old updated_at behavior rather than failing the feed (best-effort).
+      let supClientAt: Record<string, string> | null = null;
+      if (sup.length) {
+        try {
+          const mr = await svc(`presence_support_messages?site_id=eq.${site.id}&request_id=in.(${sup.map((r) => String(r.id)).join(',')})&deleted_at=is.null&select=request_id,author_kind,created_at&order=created_at.desc&limit=500`);
+          if (mr.ok && Array.isArray(mr.json)) supClientAt = newestClientMessageAt(mr.json as any[]);
+        } catch { supClientAt = null; }
+      }
+      const supLatestClient = (r: any): string => {
+        if (!supClientAt) return String(r.updated_at || '');   // read failed → today's behavior
+        const reply = supClientAt[String(r.id)] || '';
+        const opened = String(r.created_at || '');
+        return reply > opened ? reply : opened;
+      };
       const pids = [...new Set([...sup.filter((r) => r.project_id).map((r) => String(r.project_id)), ...convo.keys()])];
       // project → { name, client_id }. client_id ties a project's messages back to the
       // CUSTOMER so the Inbox can group by client (tenant-safe: the project is fetched
@@ -423,13 +461,42 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       // it to one — a project-scoped request opens its project; a project-less request
       // opens the customer's project when the bridge knows one; only a truly orphaned
       // request (no client, no project) falls back to its standalone conversation page.
-      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
-      for (const [pid, cv] of convo) { const c = clientFor(pid, ''); client_messages.push({ type: 'message', project: projById[pid]?.name || '', client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: (cv.latest.detail || {}).from === 'client', count: cv.count, href: `/crm.html?project=${pid}&tab=messages` }); }
+      // Slice 2 (additive): every row gains a stable thread_key + a real per-thread
+      // `unread` — latest client activity newer than the reader's mark for that key
+      // (threadUnread falls back to the old needs-reply heuristic when no mark exists,
+      // so a pre-0113 database behaves exactly like today). Support rows also carry
+      // their status so the list pane can chip "Support · open" without a second read.
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
+      for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = (cv.latest.detail || {}).from === 'client'; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClient ? String(cv.latestClient.created_at || '') : null, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20);
     } catch { /* best-effort — the inbox still renders without this section */ }
   }
-  return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last, client_messages } }, 200, cors);
+  // Slice 2 (additive): per-lead rows so the Inbox list pane renders its Enquiries
+  // view from this ONE feed call. The synthetic website_enquiry NOTICE above stays —
+  // it is the bell's aggregate; these are the per-item rows (same read, widened
+  // select, no second query). Owner surfaces only; reviewers never see leads.
+  // When the widened submissions read FAILED the key is OMITTED entirely
+  // (undefined → dropped by JSON.stringify): an empty array would read as the
+  // authoritative "no leads" and the Inbox would hide enquiries its own
+  // /forms/inbox fetch still sees. Absent key → the frontend's Array.isArray
+  // gate falls back to that fetch (deploy-order tolerance, both directions).
+  let enquiries: any[] | undefined = [];
+  if (seesFull) {
+    try {
+      enquiries = ((enqQ as any).ok && Array.isArray((enqQ as any).json))
+        ? (((enqQ as any).json) as any[]).map((f) => {
+          const tk = `lead:${f.id}`;
+          return {
+            id: f.id, form_kind: String(f.form_kind || 'contact'), name: String(f.name || ''), email: String(f.email || ''),
+            phone: String(f.phone || ''), message: String(f.message || '').slice(0, 400), status: String(f.status || 'new'),
+            created_at: f.created_at, thread_key: tk, unread: threadUnread(String(f.created_at || ''), markFor(tk), true),
+          };
+        })
+        : undefined;
+    } catch { enquiries = undefined; /* best-effort — the feed still works without the rows */ }
+  }
+  return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries } }, 200, cors);
 }
 
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

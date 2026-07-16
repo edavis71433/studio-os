@@ -8,49 +8,154 @@
 <meta name="description" content="Everything that needs you — messages, approvals, and updates — in one place.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically). Same aliasing pattern
+     as crm.html; only the timeline type accents are page-local. */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    /* the timeline type accents — kept in sync with crm.html by hand */
+    --act-message:var(--dds-p,#5b3fa0);--act-call:var(--dds-good,#33664b);--act-task:var(--dds-warn,#775d31);--act-system:var(--dds-faint,#746b8a);
+    --act-email:#31708e;--act-note:#8a5a83;
+  }
+  @media (prefers-color-scheme:dark){:root{--act-email:#85b7cf;--act-note:#c9a3c2}}
+  :root[data-theme="light"]{--act-email:#31708e;--act-note:#8a5a83}
+  :root[data-theme="dark"]{--act-email:#85b7cf;--act-note:#c9a3c2}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:15px;margin:0}
-  h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:30px 0 12px}
-  .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px;display:block;text-decoration:none;color:inherit}
-  .item:hover{border-color:var(--p)}
-  .item.approve{border-left:3px solid var(--p)} .item.lead{border-left:3px solid var(--good)} .item.notice{border-left:3px solid var(--warn)}
-  .item .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-  .item .who{font-weight:600;font-size:15.5px}
-  .item .tag{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--p);background:var(--p-soft)}
-  .item .when{margin-left:auto;font-size:12.5px;color:var(--faint)}
-  .item .body{margin-top:8px;font-size:14.5px;color:var(--soft)}
-  .item .go{margin-top:12px;color:var(--p);font-weight:600;font-size:13.5px}
-  .item.convo{padding:14px 18px}
-  .convo-row{display:flex;align-items:center;gap:13px}
-  .convo .avatar{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--p,#5b3fa0);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;letter-spacing:.02em}
-  .convo-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-  .convo-main .top{display:flex;align-items:center;gap:10px}
-  .convo-main .body{margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .cmbadge{flex:0 0 auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--faint,#948bad);color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
-  .cmbadge.reply{background:var(--warn,#d8b878);color:#3a2f12}
-  .item.convo.needsreply{border-left:3px solid var(--warn,#d8b878)}
-  h2 .cmcount{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;padding:0 7px;margin-left:8px;border-radius:999px;background:var(--p,#5b3fa0);color:#fff;font-size:13px;font-weight:700;vertical-align:middle}
-  .cmbar{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--soft)}
-  .cmbar select{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:13.5px}
-  .cmhead{font-family:var(--serif);font-weight:500;font-size:16px;color:var(--ink);margin:16px 0 8px;text-transform:none;letter-spacing:0}
-  .center{text-align:center;padding:56px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
-  .allclear{background:var(--good-soft);border-color:transparent;color:var(--good);text-align:center;padding:22px}
-  .muted{color:var(--soft);font-size:14.5px}
-  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  :focus-visible{outline:2px solid var(--p);outline-offset:1px;border-radius:4px}
+  a.link{color:var(--p);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
-  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
-  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
-  /* Support toolkit + editors (saved replies, customer FAQ) */
-  .item.tool{border-left:3px solid var(--p)}
-  .toolbtn{margin-top:12px;font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:var(--p);border:none;border-radius:9px;padding:9px 14px;cursor:pointer}
-  .toolbtn:hover{filter:brightness(1.06)}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none !important}}
+
+  /* ── the console: split view ≥760px (list pane · edge toggle · reading pane) ── */
+  .console{display:flex;align-items:stretch;height:calc(100vh - var(--dds-shell-h,54px));overflow:hidden}
+  .lpane{width:24rem;max-width:80vw;flex:0 0 auto;display:flex;flex-direction:column;background:var(--card);border-right:1px solid var(--line)}
+  .console.collapsed .lpane{display:none}
+  .edge{flex:0 0 auto;width:16px;border:none;border-right:1px solid var(--line);background:var(--card);color:var(--faint);cursor:pointer;padding:0;font-size:9px;border-radius:0}
+  .edge:hover{color:var(--p);background:var(--p-soft)}
+  .rpane{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+
+  /* ── list-pane header (SLDS list-view header anatomy, dds skin) ── */
+  .lhead{border-bottom:1px solid var(--line);padding:10px 12px 8px;flex:0 0 auto}
+  .lrow1{display:flex;align-items:center;gap:6px}
+  .obj-ic{width:30px;height:30px;border-radius:9px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:14px;flex:0 0 auto}
+  .viewdd{position:relative;min-width:0;flex:1}
+  #viewBtn{font:inherit;font-weight:700;font-size:15.5px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;max-width:100%}
+  #viewBtn:hover{background:var(--p-soft)}
+  #viewBtn .car{font-size:10px;color:var(--faint)}
+  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:210px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #viewMenu [role=option]:hover{background:var(--p-soft)}
+  #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .ovf{position:relative}
+  #ovfMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:190px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #ovfMenu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #ovfMenu button:hover{background:var(--p-soft)}
+  .lmeta{margin-top:4px;font-size:12px;color:var(--faint)}
+
+  /* ── two-line rows (SLDS split-view listbox idiom) ── */
+  #rows{flex:1;overflow-y:auto;list-style:none;margin:0;padding:0}
+  .row{position:relative;display:flex;align-items:center;gap:9px;padding:11px 12px 11px 20px;border-bottom:1px solid var(--line);cursor:pointer}
+  .row:hover{background:var(--bg)}
+  .row[aria-selected="true"]{background:var(--p-soft);box-shadow:inset 3px 0 0 var(--p)}
+  #rows.kbd .row.kfocus{outline:2px solid var(--p);outline-offset:-2px}
+  .unread-dot{position:absolute;left:6px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--p);text-decoration:none;border:none}
+  .avatar{flex:0 0 auto;width:36px;height:36px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;letter-spacing:.02em}
+  .row.sysrow .avatar{background:var(--bg);color:var(--faint);border:1px solid var(--line);font-size:15px}
+  .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .rtop{display:flex;align-items:baseline;gap:8px}
+  .rname{font-weight:600;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row.unread .rname{font-weight:800}
+  .rwhen{margin-left:auto;flex:0 0 auto;font-size:11.5px;color:var(--faint)}
+  .rprev{display:flex;align-items:center;gap:7px;min-width:0}
+  .rprev .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--soft)}
+  .rchip{flex:0 0 auto;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:1px 7px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .rchip.support{background:var(--warn-soft);color:var(--warn)}
+  .rchip.lead{background:var(--good-soft);color:var(--good)}
+  .cmbadge{flex:0 0 auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--faint);color:#fff;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .row.sysrow{opacity:.72}
+  .row.sysrow.isread .rname{font-weight:400;color:var(--soft)}
+  .lempty{padding:28px 18px;text-align:center;color:var(--soft);font-size:14px}
+
+  /* ── reading pane ── */
+  .phead{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--card)}
+  .phead .avatar{width:40px;height:40px;font-size:14px}
+  .pname{font-family:var(--serif);font-weight:500;font-size:19px;line-height:1.2}
+  .psub{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--soft);margin-top:2px;flex-wrap:wrap}
+  .pchip{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--good-soft);color:var(--good)}
+  .pchip.plain{background:var(--p-soft);color:var(--p)}
+  .pback{display:none;font:inherit;border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;flex:0 0 auto}
+  .pbody{flex:1;overflow-y:auto;padding:16px 18px}
+  .pcomposer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--card);padding:12px 18px}
+  .pcomposer textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;min-height:58px}
+  .pcomposer textarea:focus{outline:none;border-color:var(--p)}
+  .crow{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .crow .spacer{flex:1}
+  button{font-family:inherit;font-size:13.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 14px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
+  a.btnlink{display:inline-block;font-size:13px;font-weight:600;border-radius:999px;border:1px solid var(--p);color:var(--p);padding:6px 13px;text-decoration:none}
+  a.btnlink:hover{background:var(--p-soft)}
+  a.btnlink.primary{background:var(--p);color:#fff}
+  select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:6px 9px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card .who{font-weight:600;font-size:15.5px}
+  .card .body{margin-top:8px;font-size:14.5px;color:var(--soft);white-space:pre-wrap}
+  .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .center{text-align:center;padding:56px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .allclear{background:var(--good-soft);border:1px solid transparent;border-radius:14px;color:var(--good);text-align:center;padding:22px;margin:0 auto;max-width:420px}
+  .allart{font-size:40px;line-height:1;margin-bottom:10px}
+
+  /* support thread bubbles (a back-and-forth is genuinely a chat here) */
+  .bub{max-width:82%;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:9px 13px;font-size:14px;margin:7px 0;white-space:pre-wrap}
+  .bub.studio{margin-left:auto;background:var(--p-soft);border-color:transparent}
+  .bub .bwhen{display:block;font-size:11px;color:var(--faint);margin-top:4px}
+
+  /* ── the timeline — kept in sync with crm.html by hand (.tl-month/.ti blocks) ── */
+  .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
+  .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
+  .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
+  .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
+  .ti:first-of-type:before{top:12px} .ti:last-of-type:before{bottom:auto;height:22px}
+  .ti .ti-icon{position:absolute;left:1px;top:8px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:#fff;box-shadow:0 0 0 3px var(--bg)}
+  .ti.t-message:before{background:color-mix(in srgb,var(--act-message) 35%,transparent)} .ti.t-message .ti-icon{background:var(--act-message)}
+  .ti.t-email:before{background:color-mix(in srgb,var(--act-email) 35%,transparent)} .ti.t-email .ti-icon{background:var(--act-email)}
+  .ti.t-call:before{background:color-mix(in srgb,var(--act-call) 35%,transparent)} .ti.t-call .ti-icon{background:var(--act-call)}
+  .ti.t-task:before{background:color-mix(in srgb,var(--act-task) 35%,transparent)} .ti.t-task .ti-icon{background:var(--act-task)}
+  .ti.t-note:before{background:color-mix(in srgb,var(--act-note) 35%,transparent)} .ti.t-note .ti-icon{background:var(--act-note)}
+  .ti.t-system:before{background:color-mix(in srgb,var(--act-system) 30%,transparent)} .ti.t-system .ti-icon{background:var(--act-system)}
+  .ti-main{flex:1;min-width:0}
+  .ti-head{display:flex;align-items:baseline;gap:7px;width:100%;border:none;background:none;font-family:inherit;font-size:13.5px;color:var(--ink);text-align:left;padding:0;min-width:0}
+  button.ti-head{cursor:pointer;border-radius:0}
+  .ti-title{font-weight:600;min-width:0}
+  .ti-car{color:var(--faint);font-size:10px;flex:0 0 auto}
+  .ti-meta{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
+  .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;margin-top:5px;border-left:2px solid var(--line);padding-left:10px}
+  .ti-when{font-size:11.5px;color:var(--faint);white-space:nowrap;flex:0 0 auto;padding-top:2px}
+
+  /* ── <760px: stacked — list first; picking a row pushes the pane in (D5) ── */
+  @media (max-width:759px){
+    .console{display:block;height:auto;min-height:calc(100vh - var(--dds-shell-h,54px));overflow:visible}
+    .lpane{width:100%;max-width:none;border-right:none}
+    #rows{overflow:visible}
+    .edge{display:none}
+    .rpane{display:none}
+    .console.pane-open .lpane{display:none}
+    .console.pane-open .rpane{display:flex;height:calc(100vh - var(--dds-shell-h,54px) - 72px)}
+    .pback{display:inline-flex}
+  }
+
+  /* Support toolkit editor sheets (Saved replies, Customer FAQ) — unchanged */
   .sheet-back{position:fixed;inset:0;background:rgba(20,15,30,.5);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto;z-index:1000}
   .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:560px;padding:22px;margin:auto}
   .sheet-head{display:flex;align-items:center;gap:10px}
@@ -61,7 +166,7 @@
   .sheet-list{display:flex;flex-direction:column;gap:14px}
   .erow{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
   .erow .mv{display:flex;flex-direction:column;gap:4px}
-  .erow .mv button{width:30px;height:26px;border:1px solid var(--line);background:var(--card);border-radius:7px;cursor:pointer;color:var(--ink);font-size:13px}
+  .erow .mv button{width:30px;height:26px;border:1px solid var(--line);background:var(--card);border-radius:7px;cursor:pointer;color:var(--ink);font-size:13px;padding:0}
   .erow .mv button:disabled{opacity:.35;cursor:default}
   .erow .ef{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
   .fl{display:flex;flex-direction:column;gap:4px}
@@ -81,13 +186,22 @@
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap">
-  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Inbox — everything that needs you, in one calm place.</footer>
-</div>
+<div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 <div id="sheet-host"></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
+// ── The studio Inbox — a split-view console (Salesforce Split View anatomy,  ──
+// dds skin; redesign slice 2). LEFT: one list pane of every conversation that
+// concerns the studio — client messages (grouped one row per client), support
+// threads, website enquiries, approvals — two-line rows with REAL per-thread
+// unread dots (presence_thread_reads via /portal/feed; opening a row clears its
+// dot with POST /threads/read). Fixed views (D3): Everything · Messages · Needs
+// your OK · Enquiries · Support. RIGHT: the reading pane renders the selected
+// conversation IN PLACE — the client's activity timeline + a Message composer
+// (same anatomy as the record page), the approval card with inline Approve/Not
+// yet, the enquiry card with Reply/→Deal/Mark read/Archive, or the support
+// thread with a status control + reply. <760px the panes stack (D5): list
+// first, picking a row pushes the pane in with a back button.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -96,112 +210,519 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
+const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
+const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
 // SC-1: keep the agency drill-in scope on every internal link so a scoped operator
 // stays inside the client they opened.
 function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;const h=href.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c)+(h[1]?'#'+h[1]:'');}
-
 // map a derived notification's source to a real Studio page (deep link resolves)
 function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/([0-9a-f-]{36})/);if(m){const anc=h.split('#')[1];return '/projects.html?project='+m[1]+(anc?'#'+anc:'');}if(h&&h.charAt(0)==='/')return h;return '/today.html';}
-function render(feed,leads,notifs){
-  const approvals=(feed.pending_approvals||[]);
-  // The feed now carries a synthetic 'website_enquiry' aggregate row so the BELL can
-  // surface new leads; the Inbox already lists each lead in its own "New enquiries"
-  // section (from /forms/inbox), so drop the aggregate here to avoid a double listing.
+
+// ── state ─────────────────────────────────────────────────────────────────────
+let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
+let VIEW='everything',SEL='',ACTIVE=-1,COLLAPSED=false;
+// one delegated closer for both header menus (attached ONCE — renderConsole may
+// rebuild the header many times; per-render document listeners would pile up)
+document.addEventListener('click',(e)=>{
+  const vm=$('viewMenu'),vb=$('viewBtn'),om=$('ovfMenu'),ob=$('ovfBtn');
+  if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
+  if(om&&ob&&!om.hidden&&!e.target.closest('.ovf')){om.hidden=true;ob.setAttribute('aria-expanded','false');}
+});
+const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['support','Support']];
+const VIEW_LABEL=Object.fromEntries(VIEWS);
+const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='enquiries'&&it.kind==='lead')||(VIEW==='support'&&it.kind==='support');
+
+// ── build the conversation items from the ONE feed (+ enquiry fallback) ──────
+// Messages from your clients — feed.client_messages, grouped ONE row per client
+// (#181 heritage): the row's thread_key carries the per-thread unread state.
+function buildItems(feed,leads,notifs){
+  const items=[];
+  const clientMsgs=(feed.client_messages||[]);
+  const groups=new Map();   // thread key → {name, rows}
+  for(const c of clientMsgs.filter(x=>x.type==='message')){
+    // NEVER drop a row: a pre-slice-2 function emits unbridged rows with neither
+    // client_id nor thread_key (the old page grouped them as "Other clients").
+    // Fallback chain client_id → thread_key → project_id → one misc bucket; every
+    // key stays inside the /threads/read allowlist charset. Misc rows keep the
+    // heuristic unread + their old href fallback (paneMessage → g.href/projects).
+    const key=c.client_id?('client:'+c.client_id):(c.thread_key||('client:'+(c.project_id||'misc')));
+    if(!groups.has(key))groups.set(key,{name:c.client||'Other clients',rows:[]});
+    groups.get(key).rows.push(c);
+  }
+  for(const [key,g] of groups){
+    const latest=g.rows.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||{};
+    const needs=g.rows.some(r=>r.needs_reply);
+    // real per-thread unread when the feed carries it (slice 2); older function
+    // builds degrade to the needs-reply heuristic (deploy-order tolerance)
+    const unread=g.rows.some(r=>r.unread!=null?!!r.unread:!!r.needs_reply);
+    items.push({kind:'message',id:'msg:'+key,thread_key:key,name:g.name,when:String(latest.created_at||''),
+      preview:needs?'Sent you a message':'You replied — waiting on them',chip:'Message',chipCls:'',
+      unread,needs,count:g.rows.reduce((n,r)=>n+(Number(r.count)||1),0),
+      client_id:String(latest.client_id||''),project_id:String(latest.project_id||''),href:String(latest.href||'')});
+  }
+  for(const c of clientMsgs.filter(x=>x.type==='support')){
+    items.push({kind:'support',id:'sup:'+c.id,support_id:String(c.id||''),thread_key:c.thread_key||('support:'+c.id),
+      name:c.client||'Support request',when:String(c.created_at||''),preview:c.subject||'A support request',
+      chip:'Support'+(c.status?' · '+String(c.status).replace(/_/g,' '):''),chipCls:'support',status:String(c.status||'open'),
+      unread:c.unread!=null?!!c.unread:true,needs:true,client_id:String(c.client_id||''),href:String(c.href||'')});
+  }
+  for(const p of (feed.pending_approvals||[])){
+    items.push({kind:'approval',id:'ok:'+p.id,name:p.title||'A change is ready',when:'',
+      preview:p.summary||'Waiting for your OK',chip:'Needs your OK',chipCls:'',unread:true,needs:true,approval:p});
+  }
+  // enquiries: the feed's per-lead rows (slice 2). An older function build without
+  // feed.enquiries degrades to /forms/inbox 'new' items — same rows, heuristic dots.
+  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status==='new');
+  for(const l of enq){
+    items.push({kind:'lead',id:'lead:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
+      name:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
+      chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:true,needs:true,lead:l});
+  }
+  // sorted by newest first; undated items (approvals) stay on top — they're waiting
+  items.sort((a,b)=>{if(!a.when&&!b.when)return 0;if(!a.when)return -1;if(!b.when)return 1;return b.when.localeCompare(a.when);});
+  return items;
+}
+// The old sections 5–6 (Project activity + Worth a look) fold into `Everything`
+// as dimmed, read-only system rows — clicking deep-links exactly as before.
+function buildSystem(feed,notifs){
+  const rows=[];
+  // The feed carries a synthetic 'website_enquiry' aggregate row for the BELL;
+  // the Inbox lists each lead as its own row, so drop the aggregate here to
+  // avoid a double listing.
   const notices=(feed.notices||[]).filter(n=>n.kind!=='website_enquiry');
   const moments=(feed.moments||[]);
-  const newLeads=(leads||[]).filter(l=>l.status==='new');
-  // FIX 5: client support requests + client project messages, surfaced first-class
-  // (not the dim, auto-read "Project activity" line). Each links to where you reply.
-  const clientMsgs=(feed.client_messages||[]);
-  // Project activity is the studio's OWN worklog (milestones, files, approvals) —
-  // NOT client messages. Support requests and client messages belong to the grouped
-  // "Messages" section above (one row per client), never a flat cross-client list.
-  // Keep recently-read activity VISIBLE (dimmed) — glancing at the Inbox must
-  // never make unhandled items vanish; they just stop counting as new.
-  const activity=(notifs||[]).filter(n=>n.kind!=='support_message'&&n.kind!=='message').slice(0,12);
-  const unreadCount=activity.filter(n=>!n.read).length;
-  const total=approvals.length+clientMsgs.length+notices.length+moments.length+newLeads.length+unreadCount;
-  let h=`<header><h1>Inbox</h1><p class="sub">${total?'Everything that needs you, in one place.':'You’re all caught up.'}</p></header>`;
-  if(!total&&!activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing needs you right now — the platform is watching the rest.</div><p style="text-align:center;margin-top:14px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p>`;h+=toolkit();$('main').innerHTML=h;return;}
-  if(!total&&activity.length){h+=`<div class="allclear" style="margin-top:24px">✓ Nothing new — recent activity is below.</div>`;}
-
-  // Messages from your clients — ONE conversation per client (not a flat list of
-  // every message). Each row shows who's waiting + their most recent message + how
-  // many, and opens THAT client's thread where you reply. This is the "who has
-  // messages" summary Eric asked for; the thread itself lives in their profile.
-  if(clientMsgs.length){
-    const groups=new Map(); // client_id → {name, items, href}
-    for(const c of clientMsgs){const key=c.client_id||'';const nm=c.client||'Other clients';
-      if(!groups.has(key))groups.set(key,{name:nm,items:[],href:''});const g=groups.get(key);g.items.push(c);if(c.href&&!g.href)g.href=c.href;}
-    const glist=[...groups.entries()];
-    // reply-needed clients first, then most-recently-active
-    const needs=(g)=>g.items.some(c=>c.needs_reply||c.type==='support')?1:0;
-    const lastAt=(g)=>g.items.reduce((m,c)=>String(c.created_at||'')>m?String(c.created_at||''):m,'');
-    glist.sort((a,b)=>needs(b[1])-needs(a[1])||lastAt(b[1]).localeCompare(lastAt(a[1])));
-    const waiting=glist.filter(([k,g])=>needs(g)).length;
-    h+=`<h2>Messages <span class="cmcount">${glist.length}</span></h2>`;
-    h+=`<p class="mut" style="margin:-6px 0 12px">${waiting?`${waiting} ${waiting===1?'conversation needs':'conversations need'} a reply.`:'You’re caught up on replies — recent conversations below.'}</p>`;
-    for(const [k,g] of glist){
-      const latest=g.items.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||{};
-      const isSup=latest.type==='support';
-      const reply=needs(g);
-      const preview=isSup?('Support: '+esc(latest.subject||'a request')):(latest.needs_reply?'Sent you a message':'You replied — waiting on them');
-      const n=g.items.length;
-      // #181: a known client's conversation ALWAYS opens on their Client Record
-      // (Messages tab) — never a project page. Unattributed items keep the old path.
-      const href=scoped(k?('/crm.html?client_id='+encodeURIComponent(k)+'&tab=messages'):(g.href||'/projects.html'));
-      const initials=esc((g.name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
-      h+=`<a class="item convo${reply?' needsreply':''}" href="${esc(href)}"><div class="convo-row"><span class="avatar" aria-hidden="true">${initials}</span><span class="convo-main"><span class="top"><span class="who">${esc(g.name)}</span>${latest.created_at?`<span class="when">${esc(when(latest.created_at))}</span>`:''}</span><span class="body">${preview}</span></span>${reply?`<span class="cmbadge reply">Reply</span>`:(n>1?`<span class="cmbadge">${n}</span>`:'')}</div><div class="go">Open conversation →</div></a>`;
-    }
-  }
-
-  if(approvals.length){h+=`<h2>Needs your OK</h2>`;
-    for(const p of approvals){
-      // Infra + connected approvals can be decided RIGHT HERE (mirrors the one-tap
-      // approve spine). File approvals still open the file where you review the swap.
-      const inline=p.decide_path&&p.kind!=='file';
-      if(inline){
-        const bs='font:inherit;font-weight:600;border-radius:999px;padding:7px 15px;cursor:pointer;border:1px solid var(--line)';
-        h+=`<div class="item approve"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go" style="display:flex;gap:8px;margin-top:10px"><button data-fapprove="${esc(p.decide_path)}" style="${bs};background:var(--p,#5b3fa0);color:#fff;border-color:var(--p,#5b3fa0)">Approve</button><button data-fdecline="${esc(p.decide_path)}" style="${bs};background:transparent;color:var(--ink)">Not yet</button></div></div>`;
-      } else {
-        const href=scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations');
-        h+=`<a class="item approve" href="${href}"><div class="top"><span class="tag">Approval</span></div><div class="who" style="margin-top:8px">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}<div class="go">Review &amp; approve →</div></a>`;
-      }
-    }}
-
-  if(newLeads.length){h+=`<h2>New enquiries</h2>`;
-    for(const l of newLeads){const who=esc(l.name||l.email||'Someone');
-      h+=`<a class="item lead" href="${scoped('/leads.html')}"><div class="top"><span class="who">${who}</span><span class="tag" style="color:var(--good);background:var(--good-soft)">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>${l.message?`<div class="body">${esc(l.message)}</div>`:''}<div class="go">Open enquiry →</div></a>`;}}
-
-  if(activity.length){h+=`<h2>Project activity</h2>`;
-    for(const n of activity){h+=`<a class="item" href="${scoped(notifLink(n))}"><div class="top"><span class="who"${n.read?' style="font-weight:400;color:var(--soft)"':''}>${n.read?'✓ ':''}${esc(n.label||'Activity')}</span>${n.created_at?`<span class="when">${esc(when(n.created_at))}</span>`:''}</div><div class="go">Open →</div></a>`;}}
-
-  const worth=[...notices,...moments];
-  if(worth.length){h+=`<h2>Worth a look</h2>`;
-    for(const n of notices){h+=`<a class="item notice" href="${esc(scoped(n.href||'/today.html'))}"><div class="who">${esc(n.headline||'Something needs a look')}</div>${n.body?`<div class="body">${esc(n.body)}</div>`:''}<div class="go">Take care of it →</div></a>`;}
-    for(const m of moments){h+=`<a class="item" href="${esc(scoped('/today.html'))}"><div class="who">${esc(m.headline||'A moment')}</div>${m.summary?`<div class="body">${esc(m.summary)}</div>`:''}<div class="go">Open Today →</div></a>`;}}
-
-  h+=toolkit();
-  $('main').innerHTML=h;
-  // inline approve/decide — the operator acts without leaving the Inbox (the one-tap
-  // approve spine; same decide_path the client uses). Reloads to reflect the result.
-  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){if(window.ddsToast)ddsToast(decision==='approve'?'Approved.':'Set aside — nothing changed.');location.reload();return;}}catch(_){}if(window.ddsToast)ddsToast('That didn’t go through — try again.');btn.disabled=false;};
-  document.querySelectorAll('[data-fapprove]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fapprove'),'approve',b)));
-  document.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
+  // Project activity = the studio's OWN worklog; support/client messages already
+  // have first-class rows above, so they're filtered out here (as before).
+  const activity=(Array.isArray(notifs)?notifs:[]).filter(n=>n.kind!=='support_message'&&n.kind!=='message').slice(0,12);
+  activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:'⚙',label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,href:scoped(notifLink(n))}));
+  for(const n of notices)rows.push({sys:true,id:'sys:not:'+n.id,icon:'👀',label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
+  // moments render ACTIVE (undimmed, no ✓) — the feed only carries the still-open
+  // ones, and the old page listed them as live items; they stay counted in TOTAL.
+  for(const m of moments)rows.push({sys:true,id:'sys:mom:'+m.id,icon:'✨',label:m.headline||'A moment',tag:'Worth a look',when:String(m.created_at||''),read:false,href:scoped('/today.html')});
+  return rows;
 }
-// ── Support toolkit: two owner-managed tools that live right here in the Inbox.
-//   • Saved replies — canned answers you reuse when replying to enquiries.
-//   • Customer FAQ  — common Q&A your clients can read anytime in their portal.
-// Both save only when you press Save; nothing sends or publishes on its own.
-function toolkit(){return `<h2>Your support toolkit</h2>`+
-  `<div class="item tool"><div class="who">Saved replies</div><div class="body">Write your best answers once, then drop them into a reply in one click — no retyping.</div><button class="toolbtn" type="button" onclick="openSaved()">Manage saved replies</button></div>`+
-  `<div class="item tool"><div class="who">Customer FAQ</div><div class="body">Common questions and answers your clients can read anytime in their portal, so they ask you less.</div><button class="toolbtn" type="button" onclick="openFaq()">Edit your FAQ</button></div>`;}
-const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
 
-// ── Editor sheet (shared shell for both tools) ──────────────────────────────
+// ── the console shell ─────────────────────────────────────────────────────────
+function renderConsole(){
+  $('main').innerHTML=`
+  <div class="console${COLLAPSED?' collapsed':''}" id="console">
+    <aside class="lpane" aria-label="Conversation list">
+      <div class="lhead">
+        <div class="lrow1">
+          <span class="obj-ic" aria-hidden="true">📥</span>
+          <div class="viewdd">
+            <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false">${esc(VIEW_LABEL[VIEW])} <span class="car" aria-hidden="true">▾</span></button>
+            <div id="viewMenu" role="listbox" aria-label="Inbox views" hidden></div>
+          </div>
+          <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+          <div class="ovf">
+            <button class="lbtn" id="ovfBtn" aria-haspopup="true" aria-expanded="false" aria-label="More tools" title="More tools">⋯</button>
+            <div id="ovfMenu" hidden>
+              <button type="button" id="ovfSaved">Saved replies</button>
+              <button type="button" id="ovfFaq">Customer FAQ</button>
+            </div>
+          </div>
+        </div>
+        <div class="lmeta" id="lmeta"></div>
+      </div>
+      <ul id="rows" role="listbox" aria-label="Conversations" tabindex="0"></ul>
+    </aside>
+    <button class="edge" id="edgeBtn" aria-expanded="${COLLAPSED?'false':'true'}" aria-label="${COLLAPSED?'Open Split View':'Close Split View'}"><span aria-hidden="true">${COLLAPSED?'▶':'◀'}</span></button>
+    <section class="rpane" id="rpane" aria-label="Conversation"></section>
+  </div>`;
+  // view dropdown
+  const vb=$('viewBtn'),vm=$('viewMenu');
+  vm.innerHTML=VIEWS.map(v=>`<button type="button" role="option" data-view="${v[0]}" aria-selected="${VIEW===v[0]?'true':'false'}">${v[1]}${VIEW===v[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
+  const closeMenu=(m,b)=>{m.hidden=true;b.setAttribute('aria-expanded','false');};
+  // the minimal popup keyboard contract both header menus owe their aria-haspopup:
+  // opening moves focus to the first option; ArrowUp/Down move within; Escape
+  // closes + returns focus to the trigger; Enter activates natively (<button>s).
+  const wireMenuKeys=(m,b)=>m.addEventListener('keydown',(e)=>{
+    const opts=[...m.querySelectorAll('button')];if(!opts.length)return;
+    const i=opts.indexOf(document.activeElement);
+    if(e.key==='Escape'){e.preventDefault();closeMenu(m,b);b.focus();}
+    else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
+    else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+  });
+  const toggleMenu=(m,b)=>{const open=m.hidden;m.hidden=!open;b.setAttribute('aria-expanded',open?'true':'false');if(open){const f=m.querySelector('button');if(f)f.focus();}};
+  vb.addEventListener('click',()=>toggleMenu(vm,vb));
+  wireMenuKeys(vm,vb);
+  vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEW=b.getAttribute('data-view');closeMenu(vm,vb);renderConsole();renderList();renderPane();const nb=$('viewBtn');if(nb)nb.focus();}));
+  // overflow (Saved replies · Customer FAQ — the old toolkit, now one menu)
+  const ob=$('ovfBtn'),om=$('ovfMenu');
+  ob.addEventListener('click',()=>toggleMenu(om,ob));
+  wireMenuKeys(om,ob);
+  $('ovfSaved').addEventListener('click',()=>{closeMenu(om,ob);openSaved();});
+  $('ovfFaq').addEventListener('click',()=>{closeMenu(om,ob);openFaq();});
+  $('refreshBtn').addEventListener('click',()=>refresh());
+  // the collapse toggle (SLDS: "Open Split View" / "Close Split View")
+  $('edgeBtn').addEventListener('click',()=>{COLLAPSED=!COLLAPSED;const c=$('console');c.classList.toggle('collapsed',COLLAPSED);const b=$('edgeBtn');b.setAttribute('aria-expanded',COLLAPSED?'false':'true');b.setAttribute('aria-label',COLLAPSED?'Open Split View':'Close Split View');b.querySelector('span').textContent=COLLAPSED?'▶':'◀';});
+  // keyboard: arrows move the focused row, Enter opens it
+  const rows=$('rows');
+  rows.addEventListener('keydown',(e)=>{
+    const vis=visibleRows();if(!vis.length)return;
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();rows.classList.add('kbd');ACTIVE=e.key==='ArrowDown'?Math.min(ACTIVE+1,vis.length-1):Math.max(ACTIVE-1,0);paintActive();}
+    else if(e.key==='Enter'&&ACTIVE>=0&&vis[ACTIVE]){e.preventDefault();activateRow(vis[ACTIVE]);}
+  });
+}
+function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])];}
+function paintActive(){
+  const rows=$('rows');const vis=visibleRows();
+  rows.querySelectorAll('.row').forEach((el,i)=>el.classList.toggle('kfocus',i===ACTIVE));
+  if(ACTIVE>=0&&vis[ACTIVE]){rows.setAttribute('aria-activedescendant','row-'+cssId(vis[ACTIVE].id));const el=rows.querySelector('.row.kfocus');if(el)el.scrollIntoView({block:'nearest'});}
+}
+const cssId=(s)=>String(s).replace(/[^a-zA-Z0-9_-]/g,'_');
+function activateRow(it){if(it.sys){location.href=it.href||'/today.html';return;}openItem(it.id);}
+
+// ── the list pane rows (two-line, unread dot, channel chip) ──────────────────
+function renderList(){
+  const rows=$('rows');if(!rows)return;
+  const vis=visibleRows();
+  const convs=ITEMS.filter(viewMatch);
+  const need=convs.filter(i=>i.unread||i.needs).length;
+  $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} need${need===1?'s':''} you · Sorted by newest`;
+  if(!vis.length){rows.innerHTML=`<li class="lempty" role="presentation">${VIEW==='everything'&&!TOTAL?'✓ You’re all caught up.':'Nothing here — this view is all clear.'}</li>`;renderPane();return;}
+  let h='';
+  for(const it of vis){
+    if(it.sys){
+      h+=`<li class="row sysrow${it.read?' isread':''}" role="option" id="row-${cssId(it.id)}" data-id="${esc(it.id)}" aria-selected="false">
+        <span class="avatar" aria-hidden="true">${it.icon}</span>
+        <span class="rmain"><span class="rtop"><span class="rname">${it.read?'✓ ':''}${esc(it.label)}</span>${it.when?`<span class="rwhen">${esc(when(it.when))}</span>`:''}</span>
+        <span class="rprev"><span class="rchip">${esc(it.tag)}</span><span class="txt">Opens in its own page →</span></span></span></li>`;
+      continue;
+    }
+    h+=`<li class="row${it.unread?' unread':''}" role="option" id="row-${cssId(it.id)}" data-id="${esc(it.id)}" aria-selected="${SEL===it.id?'true':'false'}">
+      ${it.unread?'<span class="unread-dot" role="img" aria-label="Unread"></span>':''}
+      <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
+      <span class="rmain">
+        <span class="rtop"><span class="rname">${esc(it.name)}</span>${it.when?`<span class="rwhen">${esc(when(it.when))}</span>`:''}</span>
+        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(it.chip)}</span><span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
+      </span></li>`;
+  }
+  rows.innerHTML=h;
+  rows.querySelectorAll('.row').forEach((el,i)=>el.addEventListener('click',()=>{ACTIVE=i;rows.classList.remove('kbd');const it=vis[i];activateRow(it);}));
+}
+
+// ── opening a row: select it, clear ITS dot (optimistic + POST /threads/read) ─
+function openItem(id){
+  const it=ITEMS.find(x=>x.id===id);if(!it)return;
+  SEL=id;
+  it.unread=false;   // the dot clears the moment the conversation opens (optimistic)
+  if(it.thread_key)api('/threads/read','POST',{thread_key:it.thread_key}).catch(()=>{});
+  renderList();
+  renderPane();
+  const c=$('console');if(c)c.classList.add('pane-open');   // <760px: push the pane in
+  focusPane();
+}
+// a11y: opening a conversation must MOVE focus — on mobile the list is hidden and
+// focus would drop to <body> with nothing announced. Mobile (<760px) → the back
+// button; desktop → the pane heading (tabindex=-1: focusable, not in tab order).
+// The pane head renders synchronously, so this runs before the body loads.
+function focusPane(){
+  const back=$('paneBack');
+  if(window.matchMedia('(max-width:759px)').matches&&back){back.focus();return;}
+  const h=document.querySelector('#rpane .pname');
+  if(h){h.setAttribute('tabindex','-1');h.focus();}
+}
+// closing back returns focus to the listbox — the roving ACTIVE row stays intact
+function closePane(){SEL='';const c=$('console');if(c)c.classList.remove('pane-open');renderList();renderPane();const r=$('rows');if(r)r.focus();}
+
+// ── the reading pane ──────────────────────────────────────────────────────────
+function renderPane(){
+  const host=$('rpane');if(!host)return;
+  const it=ITEMS.find(x=>x.id===SEL);
+  if(!it){
+    // ONE chokepoint: no selection → never strand `pane-open` (on mobile the list
+    // is display:none and there's no back button). Covers every SEL-clearing flow
+    // — support resolve/close, lead archive, refresh() pruning a vanished SEL.
+    const c=$('console');if(c)c.classList.remove('pane-open');
+    const anyInView=visibleRows().some(r=>!r.sys);
+    // the GLOBAL all-clear only when the inbox is empty overall; an empty
+    // filtered view gets its own copy (there may be work in other views).
+    host.innerHTML=anyInView
+      ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Pick a conversation</h2><p class="muted">Choose a row on the left — it opens right here.</p></div>`
+      :ITEMS.length
+        ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing in this view</h2><p class="muted">Nothing in this view — check Everything.</p></div>`
+        :`<div class="center" style="margin:auto"><div class="allclear"><div class="allart" aria-hidden="true">🌤</div>✓ Nothing needs you right now — the platform is watching the rest.<p style="margin-top:12px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p></div></div>`;
+    return;
+  }
+  if(it.kind==='message')return void paneMessage(host,it);
+  if(it.kind==='support')return void paneSupport(host,it);
+  if(it.kind==='approval')return void paneApproval(host,it);
+  if(it.kind==='lead')return void paneLead(host,it);
+}
+const paneHead=(it,subHtml)=>`<div class="phead">
+  <button type="button" class="pback" id="paneBack">← Inbox</button>
+  <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
+  <div style="min-width:0"><div class="pname">${esc(it.name)}</div><div class="psub">${subHtml}</div></div>
+</div>`;
+function wireBack(){const b=$('paneBack');if(b)b.addEventListener('click',closePane);}
+
+// ── A client-message row → compact record header + the client's activity
+//    timeline + a Message-only composer (log/task/note stay on the record page).
+//    Data: GET /crm/activity — with slice 1's deploy-order fallback idiom
+//    (route not there yet → compose the same shape from /crm/messages). ──
+let PANE_SEQ=0;   // a stale async pane render must never paint over a newer one
+// refresh() rebuilds the pane and would destroy an in-progress reply — snapshot
+// the composer drafts + focus before the rebuild and restore after the async
+// pane render lands (slice-1's snapComposer pattern, crm.html). The draft is
+// keyed to the SELECTED item so it can never leak into another conversation;
+// successful sends clear their field BEFORE re-rendering, so nothing resurrects.
+const COMPOSER_FIELDS=['msgBody','supBody'];
+let DRAFT=null;   // {sel, vals, focus} — set by refresh(), consumed once by the pane loaders
+function snapComposer(){const s={sel:SEL,vals:{},focus:''};for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}const ae=document.activeElement;if(ae&&COMPOSER_FIELDS.includes(ae.id))s.focus=ae.id;return s;}
+function restoreComposer(it){const s=DRAFT;if(!s||s.sel!==it.id)return;DRAFT=null;for(const id in s.vals){const el=$(id);if(el)el.value=s.vals[id];}if(s.focus){const el=$(s.focus);if(el)el.focus();}}
+async function paneMessage(host,it){
+  const seq=++PANE_SEQ;
+  const recHref=scoped(it.client_id?('/crm.html?client_id='+encodeURIComponent(it.client_id)+'&tab=messages'):(it.href||'/projects.html'));
+  host.innerHTML=paneHead(it,`<span class="pchip">Customer</span><a class="link" href="${esc(recHref)}">Open full record →</a>`)+
+    `<div class="pbody" id="pbody"><div class="spin" role="status" aria-label="Loading conversation"></div></div><div class="pcomposer" id="pcomposer"></div>`;
+  wireBack();
+  // send BOTH keys when we have them: the server derives reply_to from the
+  // project (adopting a bridged one on client_id-only calls), so the composer
+  // opens either way — but the row's own project is the most direct signal.
+  const qs=[];
+  if(it.client_id)qs.push('client_id='+encodeURIComponent(it.client_id));
+  if(it.project_id)qs.push('project='+encodeURIComponent(it.project_id));
+  const q=qs.join('&');
+  if(!q){$('pbody').innerHTML='<p class="muted">This conversation lives on its project page.</p>';return;}
+  let items=null,reply=null,d={};
+  try{
+    const r=await api('/crm/activity?'+q);
+    if(seq!==PANE_SEQ)return;
+    d=(r.ok&&r.body.data)||{};
+    if(r.ok&&Array.isArray(d.items)){items=d.items;reply=d.reply_to||d.reply_support_to||null;}
+    else{ // deploy-order fallback: the function may not carry /crm/activity yet
+      const mr=await api('/crm/messages?'+q);
+      if(seq!==PANE_SEQ)return;
+      if(mr.ok){const md=mr.body.data||{};items=(md.items||[]).map(convItem).filter(Boolean).sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);reply=md.reply_to||md.reply_support_to||null;}
+    }
+  }catch(_){if(seq!==PANE_SEQ)return;}   // a network-level reject lands on the same "couldn't load" branch
+  const pb=$('pbody');if(!pb)return;
+  if(!items){pb.innerHTML='<p class="muted">Couldn’t load this conversation just now — try Refresh.</p>';return;}
+  renderTL(pb,items);
+  const pc=$('pcomposer');
+  if(reply){
+    pc.innerHTML=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">Reply to the client</label>
+      <textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea>
+      <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+    $('msgForm').onsubmit=async(e)=>{
+      e.preventDefault();
+      const ta=$('msgBody');const body=(ta.value||'').trim();if(!body)return;
+      const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+      const rr=await api(reply,'POST',d.reply_to?{body,audience:'client'}:{body});
+      if(rr.ok){ta.value='';toast('Sent.');paneMessage(host,it);}
+      else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
+    };
+  }else{
+    pc.innerHTML='<p class="muted" style="font-size:13px">Replies open once this client has a project or an open support thread.</p>';
+  }
+  restoreComposer(it);   // a refresh() mid-draft puts the reply (and focus) back
+}
+// thin adapter mirroring the server's crm/activity.ts mappers — kept in sync
+// with crm.html by hand (its convItem; only the channels this pane renders)
+function convItem(m){
+  if(!m||!m.created_at)return null;
+  const at=m.created_at,id='conv:'+m.kind+':'+(m.id||''),mine=m.from==='studio',body=m.body||null;
+  if(m.kind==='message')return{id,kind:'message',type:'message',title:mine?'You sent a message':'The client sent a message',body,at,meta:null};
+  if(m.kind==='support')return{id,kind:'support',type:'message',title:(mine?'You':'The client')+' opened a support request'+(m.subject?' — '+m.subject:''),body,at,meta:'Support'+(m.status?' · '+String(m.status).replace(/_/g,' '):'')};
+  if(m.kind==='support_reply')return{id,kind:'support_reply',type:'message',title:mine?'You replied':'The client replied',body,at,meta:'Support'};
+  if(m.kind==='enquiry')return{id,kind:'enquiry',type:'message',title:'The client reached out from your website',body,at,meta:'Website enquiry'};
+  if(m.kind==='booking')return{id,kind:'booking',type:'call',title:m.subject||'The client booked a call',body,at,meta:'Booking'};
+  if(m.kind==='broadcast')return{id,kind:'broadcast',type:'email',title:'You sent a broadcast'+(m.subject?' — '+m.subject:''),body,at,meta:'Broadcast'};
+  if(m.kind==='activity'){
+    const map={call:['call','You logged a call','Logged call'],email:['email','You logged an email','Logged email'],meeting:['call','You logged a meeting','Meeting'],note:['note','You added a note','Note'],proposal_sent:['system','Proposal sent','Deal'],contract_sent:['system','Agreement sent','Deal'],invoice_sent:['system','Invoice sent','Deal']};
+    const t=map[m.activity_kind]||['note','You logged an activity','Activity'];
+    return{id,kind:'activity',type:t[0],title:t[1],body,at,meta:t[2]};
+  }
+  return null;
+}
+// the timeline renderer — kept in sync with crm.html by hand (its
+// renderMergedTimeline: month groups + typed icons on a connector line +
+// expandable rows; no filter chips / notes actions here — record-page only)
+const TYPE_ICON={message:'💬',email:'✉',call:'📞',task:'✓',note:'✐',system:'⚙'};
+const EXPANDED=new Set();
+function renderTL(host,items){
+  if(!items.length){host.innerHTML='<p class="muted" style="font-size:13.5px">Nothing here yet — messages and activity will appear as they happen.</p>';return;}
+  let html='';let curMonth='';
+  for(const it of items){
+    const mk=String(it.at).slice(0,7);
+    if(mk!==curMonth){curMonth=mk;const dt=new Date(mk+'-15T12:00:00Z');html+=`<div class="tl-month">${isNaN(dt)?esc(mk):dt.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>`;}
+    const type=TYPE_ICON[it.type]?it.type:'system';
+    const open=EXPANDED.has(it.id);
+    const meta=it.meta?`<span class="ti-meta">${esc(it.meta)}</span>`:'';
+    const head=it.body
+      ?`<button class="ti-head" data-x="${esc(it.id)}" aria-expanded="${open?'true':'false'}"><span class="ti-car" aria-hidden="true">${open?'▾':'▸'}</span><span class="ti-title">${esc(it.title)}</span>${meta}</button>`
+      :`<div class="ti-head"><span class="ti-title">${esc(it.title)}</span>${meta}</div>`;
+    const bodyHtml=(it.body&&open)?`<div class="ti-body">${esc(it.body)}</div>`:'';
+    html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
+  }
+  host.innerHTML=html;
+  host.querySelectorAll('[data-x]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-x');
+    if(EXPANDED.has(id))EXPANDED.delete(id);else EXPANDED.add(id);
+    renderTL(host,items);
+  }));
+}
+
+// ── A support row → the thread + an honest status control + reply composer ───
+// legal transitions — kept in sync with lib/intake.ts SUPPORT_NEXT by hand
+const SUPPORT_NEXT={open:['in_progress','resolved','closed'],in_progress:['open','resolved','closed'],resolved:['open','closed'],closed:['open']};
+const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',closed:'Closed'};
+async function paneSupport(host,it){
+  const seq=++PANE_SEQ;
+  const recHref=it.client_id?scoped('/crm.html?client_id='+encodeURIComponent(it.client_id)+'&tab=messages'):'';
+  host.innerHTML=paneHead(it,`<span id="paneStatusWrap"></span>${recHref?`<a class="link" href="${esc(recHref)}">Open full record →</a>`:''}`)+
+    `<div class="pbody" id="pbody"><div class="spin" role="status" aria-label="Loading request"></div></div><div class="pcomposer" id="pcomposer"></div>`;
+  wireBack();
+  let r;
+  try{r=await api('/support/'+encodeURIComponent(it.support_id));}
+  catch(_){r={ok:false,body:{}};}   // a network-level reject lands on the same "couldn't load" branch
+  if(seq!==PANE_SEQ)return;
+  const pb=$('pbody');if(!pb)return;
+  if(!r.ok){pb.innerHTML='<p class="muted">Couldn’t load this request just now — try Refresh.</p>';return;}
+  const req=(r.body.data&&r.body.data.request)||{};
+  const msgs=(r.body.data&&r.body.data.messages)||[];
+  // status control: current + only the legal transitions (PATCH /support/:id —
+  // the existing triage route; the server re-checks the ladder)
+  const cur=String(req.status||'open');
+  const opts=[cur,...(SUPPORT_NEXT[cur]||[])];
+  $('paneStatusWrap').innerHTML=`<label for="paneStatus" style="font-size:11px;color:var(--faint)">Status</label> <select id="paneStatus" aria-label="Support request status">${opts.map(s=>`<option value="${esc(s)}"${s===cur?' selected':''}>${esc(SUPPORT_LABEL[s]||s)}</option>`).join('')}</select>`;
+  $('paneStatus').addEventListener('change',async(e)=>{
+    const to=e.target.value;if(to===cur)return;
+    e.target.disabled=true;
+    const pr=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{status:to});
+    if(pr.ok){
+      toast(to==='resolved'?'Resolved — nice work.':'Status updated.');
+      it.status=to;it.chip='Support · '+String(to).replace(/_/g,' ');
+      if(to==='resolved'||to==='closed'){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderList();renderPane();return;}
+      renderList();paneSupport(host,it);
+    }else{toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.');paneSupport(host,it);}
+  });
+  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div></div>`;
+  for(const m of msgs){
+    const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
+    h+=`<div class="bub ${mine?'studio':''}">${esc(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
+  }
+  pb.innerHTML=h;pb.scrollTop=pb.scrollHeight;
+  $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
+    <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
+    <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+  $('supForm').onsubmit=async(e)=>{
+    e.preventDefault();
+    const ta=$('supBody');const body=(ta.value||'').trim();if(!body)return;
+    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+    const rr=await api('/support/'+encodeURIComponent(it.support_id)+'/messages','POST',{body});
+    if(rr.ok){ta.value='';toast('Sent.');paneSupport(host,it);}
+    else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
+  };
+  restoreComposer(it);   // a refresh() mid-draft puts the reply (and focus) back
+}
+
+// ── An approval row → the approval card with inline Approve / Not yet ────────
+// (the one-tap approve spine; same decide_path the client uses). File approvals
+// still open the file where you review the swap.
+function paneApproval(host,it){
+  const p=it.approval||{};
+  const inline=p.decide_path&&p.kind!=='file';
+  host.innerHTML=paneHead(it,`<span class="pchip plain">Needs your OK</span>`)+
+    `<div class="pbody"><div class="card"><div class="who">${esc(p.title||'A change is ready')}</div>${p.summary?`<div class="body">${esc(p.summary)}</div>`:''}
+    <div class="acts">${inline
+      ?`<button class="primary" data-fapprove="${esc(p.decide_path)}">Approve</button><button data-fdecline="${esc(p.decide_path)}">Not yet</button>`
+      :`<a class="btnlink primary" href="${esc(scoped(p.href?p.href:p.kind==='connected'?'/connections.html':'/presence.html#foundations'))}">Review &amp; approve →</a>`}
+    </div></div></div>`;
+  wireBack();
+  // inline approve/decline — the operator acts without leaving the Inbox.
+  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');location.reload();return;}}catch(_){ }toast('That didn’t go through — try again.');btn.disabled=false;};
+  host.querySelectorAll('[data-fapprove]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fapprove'),'approve',b)));
+  host.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
+}
+
+// ── An enquiry row → the lead card: Reply (mailto) · → Deal · Mark read · Archive ─
+function paneLead(host,it){
+  const l=it.lead||{};
+  const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
+  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
+    `<div class="pbody"><div class="card">
+      ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
+      ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
+      <div class="acts">
+        ${l.email?`<a class="btnlink primary" id="leadReply" href="${leadReplyHref(l)}">Reply</a>`:''}
+        <button id="leadDeal" title="Start a deal in your pipeline from this enquiry">→ Deal</button>
+        ${String(l.status||'new')==='new'?`<button id="leadRead">Mark read</button>`:''}
+        <button id="leadArch">Archive</button>
+      </div>
+      <p class="muted" style="margin-top:12px;font-size:12.5px">Replying opens your email app — sending a deal keeps them in your pipeline.</p>
+    </div></div>`;
+  wireBack();
+  const done=(status,removeRow)=>{
+    if(it.lead)it.lead.status=status;
+    if(removeRow){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderPane();}
+    renderList();
+  };
+  const lr=$('leadReply');if(lr)lr.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
+  const mr=$('leadRead');if(mr)mr.addEventListener('click',async()=>{mr.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'});if(r.ok){toast('Marked read.');done('read',false);paneLead(host,it);}else{toast('That didn’t update.');mr.disabled=false;}});
+  const ar=$('leadArch');if(ar)ar.addEventListener('click',async()=>{ar.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'archived'});if(r.ok){toast('Archived.');done('archived',true);}else{toast('That didn’t update.');ar.disabled=false;}});
+  const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
+}
+// Prefill the reply so responding is one tap — kept in sync with leads.html by hand
+function leadReplyHref(l){
+  const kind=l.form_kind==='quote'?'quote request':l.form_kind==='booking'?'booking request':'message';
+  const hi=l.name?`Hi ${l.name.split(' ')[0]},`:'Hi,';
+  const quoted=l.message?`\n\n> ${String(l.message).replace(/\n/g,'\n> ')}`:'';
+  return `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent('Re: your '+kind)}&body=${encodeURIComponent(hi+'\n\nThanks for reaching out.'+quoted+'\n\n')}`;
+}
+// P2-C (Seam 3): promote a captured enquiry into a pipeline deal — no re-typing.
+// Kept in sync with leads.html createDeal by hand; navigates to the new Record.
+async function createDeal(it,btn){
+  const l=it.lead||{};btn.disabled=true;
+  const title=(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
+  try{
+    let contactId=null;
+    if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
+    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:it.lead_id});
+    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));btn.disabled=false;return;}
+    const dealId=d.body&&d.body.data&&d.body.data.id;
+    // reflect converted state locally + suppress navigation on already_converted
+    // (idempotent: the server returns the existing deal on a repeat) — mirrors
+    // leads.html createDeal, this function's declared sync source.
+    l.converted=true;l.deal_id=dealId;if(String(l.status||'new')==='new')l.status='read';
+    it.unread=false;
+    toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.');
+    renderList();renderPane();
+    if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href=scoped('/crm.html?deal='+dealId+'&tab=deal');},800);
+  }catch(_){toast('Couldn’t start that deal.');btn.disabled=false;}
+}
+
+// ── data load / refresh ───────────────────────────────────────────────────────
+async function loadData(){
+  const [feed,leads,notifs]=await Promise.all([api('/portal/feed'),api('/forms/inbox'),api('/notifications?limit=25').catch(()=>({ok:false,body:{}}))]);
+  if(!feed.ok&&!leads.ok)return false;
+  FEED=(feed.ok&&feed.body.data)||{};
+  LEADS=(leads.ok&&leads.body.data&&leads.body.data.submissions)||[];
+  NOTIFS=(notifs.ok&&Array.isArray(notifs.body.data))?notifs.body.data:[];
+  ITEMS=buildItems(FEED,LEADS,NOTIFS);
+  SYSROWS=buildSystem(FEED,NOTIFS);
+  // the meta line's honesty: TOTAL counts what the Everything view actually
+  // RENDERS (conversation items + system rows) — never raw feed rows, which
+  // group and fold differently (one row per client; moments stay counted).
+  TOTAL=ITEMS.length+SYSROWS.length;
+  return true;
+}
+async function refresh(){
+  let ok=false;
+  try{ok=await loadData();}catch(_){ok=false;}   // a network-level reject must still fire the toast
+  if(!ok){toast('Couldn’t refresh just now.');return;}
+  DRAFT=snapComposer();   // an in-progress reply survives the pane rebuild (restored by the pane loaders)
+  if(SEL&&!ITEMS.some(x=>x.id===SEL))SEL='';
+  renderList();renderPane();
+}
+
+// ── Editor sheets (Saved replies · Customer FAQ) — the support toolkit, now in
+//    the list-pane ⋯ menu. Both save only when you press Save. ────────────────
 function sheetKey(e){if(e.key==='Escape')closeSheet();}
 function closeSheet(){const host=$('sheet-host');if(host){host.innerHTML='';host.onclick=null;}document.removeEventListener('keydown',sheetKey);}
 function mountSheet(html){const host=$('sheet-host');host.innerHTML=html;document.addEventListener('keydown',sheetKey);
@@ -290,14 +811,14 @@ async function saveFaq(){
   else if(r.status===503)toast('The FAQ isn’t switched on for this site yet.','err');
   else toast('Couldn’t save just now — try again in a moment.','err');
 }
-function signedOut(){$('main').innerHTML=`<div class="center"><h1>Sign in to see your inbox.</h1><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h1>We couldn’t load your inbox just now.</h1><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
+
+// ── boot ──────────────────────────────────────────────────────────────────────
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your inbox.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your inbox just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 async function load(){
-  const [feed,leads,notifs]=await Promise.all([api('/portal/feed'),api('/forms/inbox'),api('/notifications?limit=25').catch(()=>({ok:false}))]);
-  if(!feed.ok&&!leads.ok){trouble();return;}
-  const f=(feed.ok&&feed.body.data)||{};
-  const l=(leads.ok&&leads.body.data&&leads.body.data.submissions)||[];
-  render(f,l,(notifs.ok&&notifs.body.data)||[]);
+  const ok=await loadData();
+  if(!ok){trouble();return;}
+  renderConsole();renderList();renderPane();
   api('/notifications/read','POST',{}).catch(()=>{});   // opening the Inbox marks activity seen (clears the bell)
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();

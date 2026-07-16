@@ -9,6 +9,7 @@ import { isStudioSide, loadProject, projectEvent } from './projects.ts';
 import { clampLimit, clampOffset } from '../lib/service_delivery.ts';
 import { isAudience, notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { emailBridgedCustomer } from '../lib/service_bridge.ts';
+import { cleanThreadKey, markThreadRead } from '../lib/thread_reads.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -146,4 +147,20 @@ export async function handleNotificationsRead(req: Request, _jwt: string, site: 
   const up = await svc('presence_activity_reads?on_conflict=site_id,reader', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: site.id, reader: readerKey(principal), last_seen_at: nowIso() }) });
   return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
+}
+
+// ═══ PER-THREAD READ MARK (Inbox split view, slice 2 · migration 0113) ════════
+// POST /threads/read { thread_key } — opening a conversation row in the Inbox
+// records THIS reader's last-seen for THAT thread, so its unread dot clears
+// without bulk-clearing anything else (the section-level /notifications/read
+// above stays what it is). thread_key is UUID-free, so it is validated hard
+// (clean + length cap + allowlisted prefix — cleanThreadKey). Deploy-order
+// tolerant: on a pre-0113 database the upsert quietly fails and we still answer
+// 200 { ok:true } — the Inbox keeps its heuristic dots until the table lands.
+export async function handleThreadRead(req: Request, _jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const key = cleanThreadKey(b.thread_key);
+  if (!key) return json({ error: 'validation', message: 'That isn’t a conversation key.' }, 422, cors);
+  await markThreadRead(site.id, readerKey(principal), key);   // best-effort by contract
+  return json({ data: { ok: true } }, 200, cors);
 }

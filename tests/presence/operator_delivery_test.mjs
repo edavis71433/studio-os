@@ -42,13 +42,16 @@ ok('FIXD: a clear "← Back to projects" affordance', /← Back to projects/.tes
 ok('FIXD: all detail sections still present (milestones/tasks/files/approvals/surveys/support/messages)', ['Milestones', 'Tasks', 'Files', 'Approvals', 'Surveys', 'Support', 'Messages'].every((s) => projects.includes('>' + s + ' ') || projects.includes('>' + s + '<') || projects.includes(s)));
 
 // ═══ FIX 5 — client messages first-class in the Inbox + never dropped ═══
-ok('FIX5: the feed builds a client_messages section (studio side only)', /let client_messages/.test(ws) && /return json\(\{ data: \{ role, moments, notices, pending_approvals: pending, last_published: last, client_messages \}/.test(ws));
+ok('FIX5: the feed builds a client_messages section (studio side only)', /let client_messages/.test(ws) && /return json\(\{ data: \{ role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries \}/.test(ws)); // slice 2 extended the feed additively (enquiries rows)
 ok('FIX5: OPEN support requests (incl. project-less) feed the section', /presence_support_requests\?site_id=eq\.\$\{site\.id\}&status=in\.\(open,in_progress\)/.test(ws));
 ok('FIX5: client project messages use the authoritative from=client signal', /\(e\.detail \|\| \{\}\)\.from === 'client'/.test(ws));
 ok('FIX5: section links to where the operator replies (the Client Record / the request)', /\/crm\.html\?project=\$\{/.test(ws) && /\/projects\.html\?support=\$\{r\.id\}/.test(ws));
 ok('FIX5: the section is NOT gated on the per-reader last-seen (not auto-read on open)', !/last_seen|activity_reads/.test(ws.slice(ws.indexOf('let client_messages'))));
 ok('FIX5: inbox renders a prominent "Messages from your clients" section', /Messages from your clients/.test(inbox) && /feed\.client_messages/.test(inbox));
-ok('FIX5: inbox counts client messages toward "needs you" total', /\+clientMsgs\.length/.test(inbox));
+// (slice 2 review F2: the total now counts what the list actually RENDERS — the
+// per-client conversation items built from feed.client_messages, with keyless
+// rows bucketed instead of dropped — so client messages still count, grouped.)
+ok('FIX5: inbox counts client messages toward "needs you" total', /TOTAL=ITEMS\.length\+SYSROWS\.length/.test(inbox) && /clientMsgs\.filter\(x=>x\.type==='message'\)/.test(inbox));
 ok('FIX5: projects.html can open + reply to a project-less request (full-screen)', /function openStudioSupportFull/.test(projects) && /params\.get\('support'\)/.test(projects));
 
 // ═══ BY-CLIENT — Inbox groups client messages by CLIENT (with a dropdown); the
@@ -57,8 +60,11 @@ ok('BYCLIENT: feed enriches each message with the CLIENT id + name', /client_id:
 ok('BYCLIENT: client lookups are BATCHED via the bridge + one clients read (no N+1)', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active&select=project_id,customer_client_id/.test(ws) && /clients\?id=in\.\(\$\{\[\.\.\.clientIds\]\.join\(','\)\}\)/.test(ws));
 ok('BYCLIENT: a project-less request groups by matching its requester → customer', /requesterToClient\[requester\]/.test(ws));
 ok('BYCLIENT: inbox groups the section by client_id', /const key=c\.client_id/.test(inbox) && /groups\.set\(key/.test(inbox));
-ok('BYCLIENT: inbox shows ONE conversation row per client (avatar + name + open)', /class="item convo/.test(inbox) && /class="avatar"/.test(inbox) && /Open conversation/.test(inbox));
-ok('BYCLIENT: each conversation opens that client’s RECORD thread (#181) + shows a message-count badge', /class="cmbadge"/.test(inbox) && /crm\.html\?client_id=/.test(inbox) && /g\.href\|\|/.test(inbox));
+// (slice 2 ported these two: the one-column "Open conversation →" rows became the
+// split view's listbox rows — same guarantees, new anatomy: one option per client
+// with avatar + unread dot, opening IN PLACE with an "Open full record →" jump.)
+ok('BYCLIENT: inbox shows ONE conversation row per client (listbox option + avatar + unread dot)', /role="listbox"/.test(inbox) && /class="avatar"/.test(inbox) && /unread-dot/.test(inbox));
+ok('BYCLIENT: each conversation opens that client’s RECORD (#181) + shows a message-count badge', /class="cmbadge"/.test(inbox) && /crm\.html\?client_id=/.test(inbox) && /Open full record/.test(inbox));
 ok('BYCLIENT: projects.html no longer shows the studio-wide client-messages list', !/loadClientMessages/.test(projects) && !/id="clientMsgs"/.test(projects));
 ok('BYCLIENT: projects.html KEEPS the per-customer general messages inside the delivery view', /loadClientGeneral/.test(projects) && /id="genList"/.test(projects));
 
