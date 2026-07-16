@@ -10,23 +10,66 @@
 <link rel="stylesheet" href="/shell.css">
 <script src="/shell.js" defer></script>
 <style>
-/* ═══ The Client Room · Direction A — paper, ink, one plum accent (M7.5) ═══
-   Room-scoped tokens; the portal's tokens.css is deliberately not loaded.   */
+/* ═══ The builder on the workspace brand (increment 6, slice A) ═══════════════
+   The room's local names are ALIASES onto the shared shell tokens
+   (shell.css:8-23), so the ~330 var(--paper/--ink/--plum…) usages migrate in
+   this one block. The --dds-* values are re-declared here — this <style> loads
+   AFTER shell.css, so the page must carry the full four-block theme contract
+   itself or its light :root would override the shell's dark values. Two page
+   additions the shell lacks: --dds-line-strong and --dds-bad (flagged for
+   promotion into shell.css). */
 :root{
-  --paper:#faf7f0; --sheet:#fffdf8; --ink:#211d19; --ink-2:#6e6659; --hair:#e9e2d4; --hair-2:#ddd3bf;
-  --plum:#5b3fa0; --plum-soft:#efeafa; --sage:#3d7a50; --sage-soft:#e9f2ec; --amber:#b4770a; --clay:#a8523f;
-  --amber-text:#8a5c07; /* AA contrast for small amber text on paper */
+  color-scheme:light;              /* native widget internals (calendar, select arrow) follow the theme */
+  --dds-bg:#faf8f5; --dds-card:#fff; --dds-ink:#1b1525; --dds-soft:#6b6478; --dds-faint:#746b8a; --dds-line:#eee9e0;
+  --dds-line-strong:#ddd6ea; --dds-p:#5b3fa0; --dds-p-soft:#efeafa;
+  --dds-good:#33664b; --dds-good-soft:#e7f1ea; --dds-warn:#775d31; --dds-warn-soft:#f3ead9; --dds-bad:#9a4242;
+  --dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09);
+  /* theme-flipping helpers (dark values in the blocks below) */
+  --fill-ink:#fff;                 /* text on plum/amber solid fills (a11y: dark ink in dark mode, shell.css:182-196) */
+  --plum-deep:#3a2470;             /* deep plum text on tinted chips */
+  --plum-tint:#faf7ff;             /* tinted plum chip/panel background */
+  --plum-line:#d9cef0;             /* plum-cast hairline for tinted panels */
+  --scrim-ink:var(--dds-ink);      /* scrims mix from ink in light, pure black in dark */
+  --seg-chip:var(--dds-card);      /* the device segment's raised "on" chip */
+  --seg-ring:0 1px 4px rgba(0,0,0,.12); /* chip state indicator: soft shadow in light, plum ring in dark (1.4.11) */
+  --dock-bg:var(--dds-ink); --dock-fg:color-mix(in srgb,var(--dds-bg) 78%,transparent);
+  --dock-on-bg:var(--dds-bg); --dock-on-fg:var(--dds-ink); --dock-border:transparent;
+  --dp-owncolors:"";               /* §1.4 dark-only caption suffix on .dp-title */
+  /* the room's historical names — aliases onto the workspace system */
+  --paper:var(--dds-bg); --sheet:var(--dds-card); --ink:var(--dds-ink); --ink-2:var(--dds-soft);
+  --hair:var(--dds-line); --hair-2:var(--dds-line-strong);
+  --plum:var(--dds-p); --plum-soft:var(--dds-p-soft); --sage:var(--dds-good); --sage-soft:var(--dds-good-soft);
+  --amber:var(--dds-warn); --amber-text:var(--dds-warn); --clay:var(--dds-bad);
+  /* bare names the wave-era canvas chrome references as var(--x,fallback) —
+     defined once, half the dc-/cm-/tg-/pd-/tray- chrome snaps onto the brand */
+  --line:var(--dds-line); --wash:var(--dds-p-soft); --card:var(--dds-card); --bg:var(--dds-bg);
+  --muted:var(--dds-faint); --soft:var(--dds-soft); --soft-bg:var(--dds-line);
   --serif:'Fraunces',Georgia,serif; --sans:'Inter',-apple-system,'Segoe UI',sans-serif; --mono:'Geist Mono',ui-monospace,Consolas,monospace;
   --dur:200ms; --ease:cubic-bezier(.32,.72,0,1);
 }
+/* the shell's four-block theme contract: OS preference, then the shell.js
+   theme toggle (data-theme on <html>) wins in both directions */
+@media (prefers-color-scheme:dark){:root{
+  color-scheme:dark;
+  --dds-bg:#171320; --dds-card:#1f1a2b; --dds-ink:#efeaf7; --dds-soft:#a79ebc; --dds-faint:#948bad; --dds-line:#2a2338;
+  --dds-line-strong:#3a3150; --dds-p:#b79ceb; --dds-p-soft:#241d38;
+  --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316; --dds-bad:#e08b83;
+  --dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);
+  --fill-ink:#171320; --plum-deep:#c9b8f0; --plum-tint:#241d38; --plum-line:#443861; --scrim-ink:#000; --seg-chip:#3a3150;
+  --seg-ring:0 0 0 1.5px var(--dds-p);
+  --dock-bg:var(--dds-card); --dock-fg:var(--dds-soft); --dock-on-bg:var(--dds-p-soft); --dock-on-fg:var(--dds-ink); --dock-border:var(--dds-line);
+  --dp-owncolors:" — shown in its own colors";
+}}
+:root[data-theme="light"]{color-scheme:light;--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-line-strong:#ddd6ea;--dds-p:#5b3fa0;--dds-p-soft:#efeafa;--dds-good:#33664b;--dds-good-soft:#e7f1ea;--dds-warn:#775d31;--dds-warn-soft:#f3ead9;--dds-bad:#9a4242;--dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09);--fill-ink:#fff;--plum-deep:#3a2470;--plum-tint:#faf7ff;--plum-line:#d9cef0;--scrim-ink:var(--dds-ink);--seg-chip:var(--dds-card);--seg-ring:0 1px 4px rgba(0,0,0,.12);--dock-bg:var(--dds-ink);--dock-fg:color-mix(in srgb,var(--dds-bg) 78%,transparent);--dock-on-bg:var(--dds-bg);--dock-on-fg:var(--dds-ink);--dock-border:transparent;--dp-owncolors:""}
+:root[data-theme="dark"]{color-scheme:dark;--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#948bad;--dds-line:#2a2338;--dds-line-strong:#3a3150;--dds-p:#b79ceb;--dds-p-soft:#241d38;--dds-good:#8bbf9f;--dds-good-soft:#1f2a24;--dds-warn:#d3ac6e;--dds-warn-soft:#2a2316;--dds-bad:#e08b83;--dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);--fill-ink:#171320;--plum-deep:#c9b8f0;--plum-tint:#241d38;--plum-line:#443861;--scrim-ink:#000;--seg-chip:#3a3150;--seg-ring:0 0 0 1.5px var(--dds-p);--dock-bg:var(--dds-card);--dock-fg:var(--dds-soft);--dock-on-bg:var(--dds-p-soft);--dock-on-fg:var(--dds-ink);--dock-border:var(--dds-line);--dp-owncolors:" — shown in its own colors"}
 @media (prefers-reduced-motion: reduce){ :root{--dur:0ms} *{animation-duration:.001ms !important;transition-duration:.001ms !important} }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{font-family:var(--sans);font-size:14px;line-height:1.65;color:var(--ink);background:var(--paper)}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-input,textarea,select{font:inherit;color:var(--ink)}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--sheet)} /* themed field surface; intentionally-transparent controls override with higher specificity */
 a{color:var(--plum);text-decoration:none}
-::placeholder{color:#b3a892}
+::placeholder{color:var(--dds-faint)}
 :focus-visible{outline:2px solid var(--plum);outline-offset:3px;border-radius:2px}
 [hidden]{display:none !important}
 
@@ -69,7 +112,7 @@ html.dds-has-shell .rail .wordmark{display:none}
 .pillbtn{font-size:13px;font-weight:600;padding:8px 18px;border-radius:100px;border:1px solid var(--hair-2);background:var(--sheet);white-space:nowrap;transition:background var(--dur) var(--ease)}
 .pillbtn:hover{background:var(--plum-soft)}
 .pillbtn.inked{background:var(--ink);border-color:var(--ink);color:var(--paper)}
-.pillbtn.inked:hover{background:#3a332c}
+.pillbtn.inked:hover{background:color-mix(in srgb,var(--dds-ink) 85%,var(--dds-bg))}
 .content{padding:34px 56px 140px;max-width:860px}
 /* the Design builder uses the full available width (canvas stretches to the right,
    with the app sidebar open); tighter side padding so nothing is wasted. */
@@ -100,15 +143,15 @@ h5.rune .whisper.ok{color:var(--sage)}
 .statement .lamp{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:15px;vertical-align:13px}
 .statement .lamp.healthy{background:var(--sage)}
 .statement .lamp.needs_attention{background:var(--amber)}
-.statement .lamp.outdated{background:#9a9080}
+.statement .lamp.outdated{background:var(--dds-faint)}
 .statedetail{color:var(--ink-2);font-size:14px;margin-top:12px;max-width:52ch}
 .factsprose{margin-top:20px;font-size:14.5px;color:var(--ink-2);line-height:2;max-width:56ch}
 .factsprose b{color:var(--ink);font-weight:600}
 .factsprose .ok{color:var(--sage);font-weight:600}
 .factsprose .care{color:var(--amber);font-weight:600}
 .factsprose .dotsep{margin:0 9px;color:var(--hair-2)}
-.letter{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:22px 26px 18px;box-shadow:0 1px 0 rgba(60,45,20,.05);position:relative;margin-bottom:14px;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
-.letter:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(60,45,20,.07)}
+.letter{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:22px 26px 18px;box-shadow:var(--dds-shadow);position:relative;margin-bottom:14px;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.letter:hover{transform:translateY(-1px);box-shadow:var(--dds-shadow),0 3px 8px color-mix(in srgb,var(--scrim-ink) 8%,transparent)}
 .letter.away{opacity:0;transform:translateX(24px)}
 .letter .wax{position:absolute;left:26px;top:-6px;width:12px;height:12px;border-radius:50%}
 .letter .wax.suggestion{background:var(--plum)}
@@ -147,7 +190,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .envelope h2{font-family:var(--serif);font-weight:500;font-size:31px;line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
 .envelope p{color:var(--ink-2);margin-top:12px;font-size:14.5px;max-width:46ch}
 .steps3{margin-top:32px;display:flex;flex-direction:column;gap:10px}
-.step3{display:flex;gap:18px;align-items:center;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 22px;text-align:left;width:100%;box-shadow:0 1px 0 rgba(60,45,20,.05);transition:border-color var(--dur) var(--ease)}
+.step3{display:flex;gap:18px;align-items:center;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 22px;text-align:left;width:100%;box-shadow:var(--dds-shadow);transition:border-color var(--dur) var(--ease)}
 .step3:hover{border-color:var(--hair-2)}
 .step3 .sn{width:30px;height:30px;flex:none;border-radius:50%;border:1.5px solid var(--ink);display:grid;place-items:center;font-family:var(--serif);font-size:14px}
 .step3.done .sn{background:var(--sage);border-color:var(--sage);color:var(--paper)}
@@ -168,7 +211,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .rtbar{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
 .rtbtn{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--ink-2);background:var(--sheet);border:1px solid var(--hair-2);border-radius:6px;padding:4px 9px;line-height:1.4;cursor:pointer;transition:background var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
 .rtbtn:hover{background:var(--plum-soft);color:var(--plum);border-color:var(--plum-soft)}
-.rtbtn:active{background:var(--plum);color:#fff;border-color:var(--plum)}
+.rtbtn:active{background:var(--plum);color:var(--fill-ink,#fff);border-color:var(--plum)}
 .rtbtn .i{font-style:italic}.rtbtn .b{font-weight:800}
 .rthint{font-size:11.5px;color:var(--ink-2);margin:-2px 0 9px;font-family:var(--serif);font-style:italic}
 .field input.mono{font-family:var(--mono);font-size:15px}
@@ -179,7 +222,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .hrow:last-child{border-bottom:0}
 .hrow .day{width:96px;flex:none;font-family:var(--serif);font-size:15px}
 .hrow input[type=time]{border:none;background:transparent;font-family:var(--mono);font-size:13px;color:var(--ink);padding:2px 4px;caret-color:var(--plum)}
-.hrow input[type=time]:disabled{color:#b3a892}
+.hrow input[type=time]:disabled{color:var(--dds-faint)}
 .hrow .to{color:var(--ink-2);font-size:12px}
 .hrow .closedlab{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);margin-left:auto;cursor:pointer}
 .hrow input[type=checkbox]{accent-color:var(--plum)}
@@ -210,7 +253,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .addline:hover{background:var(--plum-soft);border-radius:4px}
 
 /* inline editor (all collections) */
-.editor{margin:6px 0 14px;padding:20px 22px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+.editor{margin:6px 0 14px;padding:20px 22px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;box-shadow:var(--dds-shadow)}
 .editor .erow{display:flex;gap:18px;flex-wrap:wrap}
 .editor .erow .field{flex:1;min-width:180px;margin-bottom:18px}
 .editor .field input[type=text]{font-size:16px}
@@ -236,12 +279,14 @@ h5.rune .whisper.ok{color:var(--sage)}
 .mediagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:22px}
 .mcell{position:relative;border-radius:4px;overflow:hidden;background:var(--sheet);border:1px solid var(--hair);aspect-ratio:1}
 .mcell img{width:100%;height:100%;object-fit:cover;display:block}
-.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:var(--paper);font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:3px 8px;border-radius:100px}
-.mcell .del{position:absolute;right:8px;top:8px;background:rgba(33,29,25,.65);color:var(--paper);border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur) var(--ease);font-size:12px}
+/* photo overlays sit ON photographs — they stay literal dark with literal light
+   text, theme-independent (the §1.2 exception) */
+.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:#fff;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:3px 8px;border-radius:100px}
+.mcell .del{position:absolute;right:8px;top:8px;background:rgba(33,29,25,.65);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur) var(--ease);font-size:12px}
 .mcell:hover .del,.mcell:focus-within .del{opacity:1}
-.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 8px;font-size:11px;color:var(--paper);background:linear-gradient(transparent,rgba(33,29,25,.75))}
+.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 8px;font-size:11px;color:#fff;background:linear-gradient(transparent,rgba(33,29,25,.75))}
 .mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
-.uploadprep{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:20px 24px;margin-top:18px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+.uploadprep{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:20px 24px;margin-top:18px;box-shadow:var(--dds-shadow)}
 /* #180: the full Files library in this view — collections · search · sort · non-image tiles */
 .flbar{display:flex;flex-direction:column;gap:10px;margin-top:18px}
 .flchips{display:flex;gap:6px;flex-wrap:wrap}
@@ -254,9 +299,9 @@ h5.rune .whisper.ok{color:var(--sage)}
 .flrow select{padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:8px;background:var(--sheet);color:var(--ink);cursor:pointer}
 .mcell.fldoc{display:flex;align-items:center;justify-content:center;color:var(--ink-2);text-decoration:none}
 .mcell.fldoc svg{width:32px;height:32px;opacity:.6}
-.mcell .badge.fldocb{background:var(--plum)}
-.mcell .badge.flpend{background:var(--amber)}
-.mcell .fldot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#b3a892;margin-right:5px;vertical-align:1px}
+.mcell .badge.fldocb{background:var(--plum);color:var(--fill-ink,#fff)}
+.mcell .badge.flpend{background:var(--amber);color:var(--fill-ink,#fff)}
+.mcell .fldot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#b3a892;margin-right:5px;vertical-align:1px} /* literal: renders only on the fenced dark photo-caption overlay, like .fldot.on */
 .mcell .fldot.on{background:#8fd0a5}
 /* in-picker source switch: Your photos / Stock photos (FD-T10 in-builder stock) */
 .pickerTabs{display:flex;gap:6px;margin:14px 0 4px;border-bottom:1px solid var(--hair)}
@@ -287,7 +332,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .ritual .blockprose{font-family:var(--serif);font-style:italic;font-size:14.5px;color:var(--amber);margin:24px 0 0;line-height:1.7}
 .ritual .blockprose a{font-style:normal}
 .pubbtn{width:100%;padding:16px;border-radius:100px;background:var(--ink);color:var(--paper);font-size:15px;font-weight:600;border:none;margin-top:34px;transition:background var(--dur) var(--ease)}
-.pubbtn:hover{background:#3a332c}
+.pubbtn:hover{background:color-mix(in srgb,var(--dds-ink) 85%,var(--dds-bg))}
 .notyet{display:block;text-align:center;margin-top:18px;font-size:13px;color:var(--ink-2)}
 .notyet:hover{color:var(--ink)}
 .pipe{margin-top:30px;display:flex;flex-direction:column;gap:9px}
@@ -298,7 +343,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .pipe .run i{border:2px solid var(--plum);border-right-color:transparent;animation:spin 1s linear infinite}
 .pipe .wait i{border:1.5px solid var(--hair-2)}
 @keyframes spin{to{transform:rotate(360deg)}}
-.receipt{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:36px 32px;max-width:400px;margin:48px auto 0;text-align:center;box-shadow:0 2px 0 rgba(60,45,20,.06)}
+.receipt{background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:36px 32px;max-width:400px;margin:48px auto 0;text-align:center;box-shadow:var(--dds-shadow)}
 .receipt{animation:stampin 320ms var(--ease)}
 @keyframes stampin{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 .receipt .stamp{width:46px;height:46px;border-radius:50%;border:2px solid var(--sage);color:var(--sage);display:grid;place-items:center;margin:0 auto;font-size:20px}
@@ -307,32 +352,34 @@ h5.rune .whisper.ok{color:var(--sage)}
 .receipt .rd{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-2);text-transform:uppercase}
 .receipt .rl{font-size:13.5px;color:var(--ink-2);margin-top:16px;font-style:italic;font-family:var(--serif);line-height:1.7}
 
-/* ── the proofing desk ── */
-.stage{position:fixed;inset:0;background:#2a2118;z-index:95;display:none;flex-direction:column}
+/* ── the proofing desk — a photography lightbox: dark ON PURPOSE, in both
+   themes. Retinted from espresso to the brand's dark family (#171320-derived);
+   literals, not tokens, so it never flips. ── */
+.stage{position:fixed;inset:0;background:#171320;z-index:95;display:none;flex-direction:column}
 .stage.on{display:flex}
-.stagebar{flex:none;display:flex;align-items:flex-end;gap:22px;padding:16px 26px 0;color:rgba(255,253,248,.7)}
-.stagebar .back{font-size:13px;color:rgba(255,253,248,.75);padding-bottom:10px}
-.stagebar .back:hover{color:#fffdf8}
+.stagebar{flex:none;display:flex;align-items:flex-end;gap:22px;padding:16px 26px 0;color:rgba(239,234,247,.7)}
+.stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
+.stagebar .back:hover{color:#efeaf7}
 .papertabs{display:flex;gap:4px}
-.papertabs button{padding:8px 20px 10px;border-radius:6px 6px 0 0;background:rgba(255,253,248,.13);color:rgba(255,253,248,.7);font-size:13px;font-weight:600}
-.papertabs button.on{background:#fffdf8;color:var(--ink)}
+.papertabs button{padding:8px 20px 10px;border-radius:6px 6px 0 0;background:rgba(239,234,247,.13);color:rgba(239,234,247,.7);font-size:13px;font-weight:600}
+.papertabs button.on{background:#faf8f5;color:#1b1525}
 .pagewords{display:flex;gap:16px;font-size:12.5px;padding-bottom:10px;flex-wrap:wrap}
-.pagewords button{color:rgba(255,253,248,.55)}
-.pagewords button.on{color:#fffdf8;font-weight:600;border-bottom:1px solid rgba(255,253,248,.5)}
+.pagewords button{color:rgba(239,234,247,.55)}
+.pagewords button.on{color:#efeaf7;font-weight:600;border-bottom:1px solid rgba(239,234,247,.5)}
 .stagebar .grow{flex:1}
 .deskseg{display:flex;gap:12px;font-size:12.5px;padding-bottom:10px}
-.deskseg button{color:rgba(255,253,248,.55)}
-.deskseg button.on{color:#fffdf8;font-weight:600}
+.deskseg button{color:rgba(239,234,247,.55)}
+.deskseg button.on{color:#efeaf7;font-weight:600}
 .stagewrap{flex:1;display:grid;place-items:center;overflow:auto;padding:0 26px 26px;min-height:0}
 .proof{background:#fff;border-radius:0 6px 6px 6px;box-shadow:0 30px 80px rgba(0,0,0,.5);width:100%;height:100%;transition:width var(--dur) var(--ease)}
 .proof.phone{width:390px;max-width:100%}
 .proof iframe{width:100%;height:100%;border:none;border-radius:0 6px 6px 6px}
 
 /* ── overlays as letters ── */
-.scrim{position:fixed;inset:0;background:rgba(33,29,25,.42);z-index:80;display:none;align-items:flex-end;justify-content:center}
+.scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--scrim-ink) 42%,transparent);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
 @media(min-width:761px){.scrim{align-items:center}}
-.sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:4px 4px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:34px 36px 28px;box-shadow:0 24px 70px rgba(33,29,25,.35)}
+.sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:4px 4px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:34px 36px 28px;box-shadow:var(--dds-shadow),0 24px 70px color-mix(in srgb,var(--scrim-ink) 30%,transparent)}
 @media(min-width:761px){.sheetcard{border-radius:4px}}
 .sheetcard h2{font-family:var(--serif);font-weight:500;font-size:23px;margin-bottom:8px}
 .sheetcard .sub{color:var(--ink-2);font-size:13.5px}
@@ -342,7 +389,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 /* toasts */
 .toasts{position:fixed;bottom:calc(84px + 16px);left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
 @media(min-width:761px){.toasts{bottom:28px}}
-.toast{background:var(--ink);color:var(--paper);padding:11px 20px;border-radius:100px;font-size:13px;box-shadow:0 14px 44px rgba(33,29,25,.3);max-width:88vw}
+.toast{background:var(--ink);color:var(--paper);padding:11px 20px;border-radius:100px;font-size:13px;box-shadow:var(--dds-shadow);max-width:88vw}
 .toast.bad{background:var(--clay)}
 
 /* empty / loading / gate */
@@ -355,7 +402,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .shimmer{height:1.5px;background:linear-gradient(90deg,var(--hair),var(--plum),var(--hair));background-size:200% 100%;animation:sh 1.6s linear infinite;max-width:260px;margin-top:14px}
 @keyframes sh{to{background-position:-200% 0}}
 .gate{min-height:100vh;display:grid;place-items:center;padding:24px}
-.gate .card{max-width:430px;text-align:center;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:52px 44px;box-shadow:0 2px 0 rgba(60,45,20,.06)}
+.gate .card{max-width:430px;text-align:center;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:52px 44px;box-shadow:var(--dds-shadow)}
 .gate h1{font-family:var(--serif);font-weight:500;font-size:25px;line-height:1.25;margin-bottom:12px}
 .gate p{color:var(--ink-2);margin-bottom:26px;font-size:14px}
 
@@ -373,11 +420,11 @@ h5.rune .whisper.ok{color:var(--sage)}
 .tg-head .tg-h{font-weight:600;font-size:16px}
 .tg-head .hint{margin-top:2px}
 .tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:22px}
-.tg-card{border:2px solid var(--hair,rgba(0,0,0,.12));border-radius:16px;overflow:hidden;background:var(--sheet,#fff);box-shadow:0 4px 16px rgba(60,45,20,.08);display:flex;flex-direction:column}
+.tg-card{border:2px solid var(--hair,rgba(0,0,0,.12));border-radius:16px;overflow:hidden;background:var(--sheet,#fff);box-shadow:var(--dds-shadow);display:flex;flex-direction:column}
 .tg-card.on{border-color:var(--plum,#5b3fa0);box-shadow:0 10px 32px rgba(91,63,160,.20)}
 .tg-shot{position:relative;height:430px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
 .tg-shot iframe{position:absolute;top:0;left:0;width:294%;height:294%;transform:scale(.34);transform-origin:0 0;border:none;pointer-events:none;display:block}
-.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:#fff;font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
    nothing real to render), so the card always shows a designed page, never a name
    on white. A representative sample only; switching template keeps your real words. */
@@ -399,7 +446,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .tg-name{font-weight:600;font-size:16px}
 .tg-tag{font-size:12px;color:var(--ink-2,#8a8172)}
 .tg-act{margin-top:13px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.tg-start{font:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;cursor:pointer}
+.tg-start{font:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
 .tg-start.current{background:transparent;color:var(--plum,#5b3fa0);cursor:default}
 .tg-second{font:inherit;font-size:12.5px;padding:6px 2px;background:none;border:none;color:var(--plum,#5b3fa0);cursor:pointer;text-decoration:underline}
 
@@ -417,7 +464,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .pages-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .page-pill{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:600;padding:7px 13px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink-2,#8a8172);cursor:pointer}
 .page-pill:hover{border-color:var(--plum,#5b3fa0)}
-.page-pill.on{background:var(--plum,#5b3fa0);color:#fff;border-color:var(--plum,#5b3fa0)}
+.page-pill.on{background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-color:var(--plum,#5b3fa0)}
 .page-pill .pp-menu{opacity:.75;font-weight:700;line-height:1;padding:0 3px;border-radius:6px}
 .page-pill .pp-menu:hover{opacity:1;background:rgba(120,120,120,.18)}
 .page-pill.on .pp-menu:hover{background:rgba(255,255,255,.28)}
@@ -425,11 +472,11 @@ h5.rune .whisper.ok{color:var(--sage)}
 .page-add:hover{background:var(--wash,#f4f0fb)}
 .pp-pop-item{font:inherit;font-size:13px;text-align:left;padding:9px 12px;border:none;background:none;cursor:pointer;border-radius:8px;color:var(--ink,#1b1525)}
 .pp-pop-item:hover{background:var(--wash,#f4f0fb)}
-.pp-pop-item.danger{color:#c0392b}
+.pp-pop-item.danger{color:var(--clay,#c0392b)}
 .pp-pop-item:disabled{opacity:.4;cursor:default;background:none}
 .page-pill.hidden-nav .pp-name{opacity:.6}
 /* new-page layout wizard (AEM Create Page) */
-.dc-modal-scrim{position:fixed;inset:0;z-index:400;background:rgba(20,16,28,.44);display:flex;align-items:center;justify-content:center;padding:20px}
+.dc-modal-scrim{position:fixed;inset:0;z-index:400;background:color-mix(in srgb,var(--scrim-ink) 44%,transparent);display:flex;align-items:center;justify-content:center;padding:20px}
 .dc-modal{background:var(--sheet,#fff);border-radius:16px;max-width:600px;width:100%;max-height:86vh;overflow:auto;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
 .dc-modal-h{font-size:18px;font-weight:700;margin:0 0 4px}
 .dc-modal-sub{font-size:13px;color:var(--ink-2,#8a8172);margin:0 0 16px;line-height:1.5}
@@ -441,15 +488,15 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-modal-cancel{margin-top:16px;font:inherit;font-size:13px;font-weight:600;padding:8px 18px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer}
 @media(max-width:560px){.dc-layout-grid{grid-template-columns:1fr}}
 .dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
-.dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff}
+.dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff)}
 /* the prominent floating "add section" affordance over the canvas */
-.dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:14px;font-weight:700;padding:13px 22px;border-radius:999px;border:none;background:var(--plum,#5b3fa0);color:#fff;cursor:pointer;box-shadow:0 10px 30px rgba(91,63,160,.42);display:inline-flex;align-items:center;gap:8px}
+.dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:14px;font-weight:700;padding:13px 22px;border-radius:999px;border:none;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;box-shadow:0 10px 30px rgba(91,63,160,.42);display:inline-flex;align-items:center;gap:8px}
 .dc-fab:hover{filter:brightness(1.06)}
 .dc-fab:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px rgba(91,63,160,.4)}
 
 /* on-demand slide-over panels (tray = left, settings = right). Kept in the DOM but
    parked off-screen when closed (visibility:hidden removes them from the tab order). */
-.dc-slideover{position:fixed;top:0;bottom:0;z-index:82;width:360px;max-width:88vw;background:var(--sheet,#fff);display:flex;flex-direction:column;visibility:hidden;box-shadow:0 0 44px rgba(33,29,25,.30);transition:transform var(--dur,.28s) var(--ease,ease),visibility 0s linear var(--dur,.28s)}
+.dc-slideover{position:fixed;top:0;bottom:0;z-index:82;width:360px;max-width:88vw;background:var(--sheet,#fff);display:flex;flex-direction:column;visibility:hidden;box-shadow:0 0 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transition:transform var(--dur,.28s) var(--ease,ease),visibility 0s linear var(--dur,.28s)}
 .dc-slideover.on{visibility:visible;transition:transform var(--dur,.28s) var(--ease,ease),visibility 0s}
 .dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
 .dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
@@ -471,11 +518,11 @@ h5.rune .whisper.ok{color:var(--sage)}
 #designTray{flex:1;min-height:0;overflow:auto;padding:14px 16px 20px}
 .dc-panel-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 #designHost{padding:16px 16px 24px}
-#designHost .field{min-width:0;max-width:none;margin-bottom:18px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:0 1px 0 rgba(60,45,20,.05)}
+#designHost .field{min-width:0;max-width:none;margin-bottom:18px;background:var(--sheet);border:1px solid var(--hair);border-radius:4px;padding:18px 20px;box-shadow:var(--dds-shadow)}
 #designHost #brandKitCard{order:-1}
 /* the settings panel gets a dimming scrim (editing focus); the tray does NOT, so the
    canvas stays visible as the drop target while dragging a section onto it. */
-.dc-scrim{position:fixed;inset:0;z-index:78;background:rgba(20,16,28,.34);opacity:0;pointer-events:none;transition:opacity var(--dur,.28s) var(--ease,ease)}
+.dc-scrim{position:fixed;inset:0;z-index:78;background:color-mix(in srgb,var(--scrim-ink) 34%,transparent);opacity:0;pointer-events:none;transition:opacity var(--dur,.28s) var(--ease,ease)}
 .dc-scrim.on{opacity:1;pointer-events:auto}
 
 .tray-h{font-weight:600;font-size:13.5px;margin-bottom:4px}
@@ -518,7 +565,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .dc-tree-row.child .dc-tree-name{font-weight:500;font-size:12.5px}
 .dc-tree-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;font:inherit;text-align:left;background:none;border:none;color:inherit;cursor:pointer;padding:7px 8px;border-radius:8px}
 .dc-tree-ico{flex:0 0 auto;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--wash,#f2eefb);border-radius:7px}
-.dc-tree-row.core .dc-tree-ico{background:#eee7de}
+.dc-tree-row.core .dc-tree-ico{background:var(--dds-warn-soft)}
 .dc-tree-txt{min-width:0}
 .dc-tree-name{display:block;font-weight:600;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dc-tree-meta{display:block;font-size:10px;color:var(--ink-2,#8a8172);line-height:1.3;text-transform:uppercase;letter-spacing:.03em}
@@ -530,10 +577,10 @@ h5.rune .whisper.ok{color:var(--sage)}
 
 /* G11: per-section review comments — the toggle, the tray badges, the thread panel */
 .dc-actbtn.on{border-color:var(--plum,#5b3fa0);background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0)}
-.cm-badge{flex:0 0 auto;font:inherit;font-size:11px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
+.cm-badge{flex:0 0 auto;font:inherit;font-size:11px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
 .cm-badge.zero{background:transparent;color:var(--ink-2,#8a8172);border-color:var(--line,#ddd);opacity:0;transition:opacity .12s}
 .dc-tree-row:hover .cm-badge.zero,.dc-tree-row:focus-within .cm-badge.zero{opacity:1}
-.cm-badge:hover{border-color:var(--plum,#5b3fa0);color:#fff;background:var(--plum,#5b3fa0)}
+.cm-badge:hover{border-color:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);background:var(--plum,#5b3fa0)}
 .cm-badge.zero:hover{color:var(--plum,#5b3fa0);background:var(--wash,#f4f0fb)}
 .cm-item{border:1px solid var(--hair,#e7e0f2);border-radius:10px;padding:9px 11px;margin-top:8px}
 .cm-item.resolved{opacity:.62}
@@ -545,7 +592,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .cm-itemacts button{font:inherit;font-size:11.5px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
 .cm-itemacts button:hover{color:var(--plum,#5b3fa0)}
 .cm-reply{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid var(--line,#ddd);border-radius:9px;padding:8px;min-height:60px;resize:vertical;margin-top:10px}
-.cm-send{font:inherit;font-size:12.5px;font-weight:700;margin-top:6px;padding:7px 16px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;cursor:pointer}
+.cm-send{font:inherit;font-size:12.5px;font-weight:700;margin-top:6px;padding:7px 16px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
 .cm-send:disabled{opacity:.5;cursor:default}
 .cm-resolveall{font:inherit;font-size:12px;font-weight:600;margin-top:10px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);cursor:pointer}
 .cm-resolveall:hover{border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)}
@@ -554,7 +601,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 /* the floating drag "ghost" + the drop-line indicator — BOTH drawn in the PARENT
    document over the iframe (never inside it), so the drop never depends on native
    cross-frame drag-and-drop. List-order only; the line marks a single gap index. */
-.pd-ghost{position:fixed;z-index:2147483600;pointer-events:none;display:flex;align-items:center;gap:7px;font:inherit;font-size:12.5px;font-weight:600;color:#fff;background:var(--plum,#5b3fa0);border-radius:9px;padding:8px 12px;box-shadow:0 10px 30px rgba(33,29,25,.42);transform:translate(10px,10px);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-ghost{position:fixed;z-index:2147483600;pointer-events:none;display:flex;align-items:center;gap:7px;font:inherit;font-size:12.5px;font-weight:600;color:var(--fill-ink,#fff);background:var(--plum,#5b3fa0);border-radius:9px;padding:8px 12px;box-shadow:0 10px 30px color-mix(in srgb,var(--scrim-ink) 42%,transparent);transform:translate(10px,10px);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pd-ghost .pd-ico{font-size:14px}
 .pd-dropline{position:fixed;z-index:2147483500;pointer-events:none;height:0;border-top:4px solid var(--plum,#5b3fa0);border-radius:2px;box-shadow:0 0 0 3px rgba(91,63,160,.18)}
 .pd-dropline::before{content:"";position:absolute;left:-5px;top:-7px;width:10px;height:10px;border-radius:50%;background:var(--plum,#5b3fa0)}
@@ -565,17 +612,24 @@ body.pd-dragging *{cursor:grabbing !important}
 .blk-gap{position:relative;height:12px;margin:2px 0;display:flex;align-items:center;justify-content:center}
 .blk-gap .blk-plus{opacity:0;transition:opacity .12s;font:inherit;font-size:12px;line-height:1;width:22px;height:22px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .blk-gap:hover .blk-plus,.blk-gap:focus-within .blk-plus{opacity:1}
-.blk-insertmenu{position:absolute;z-index:200;width:300px;max-width:92vw;max-height:60vh;overflow:auto;background:var(--sheet,#fff);border:1px solid var(--hair,#ddd);border-radius:12px;box-shadow:0 18px 50px rgba(33,29,25,.28);padding:12px}
+.blk-insertmenu{position:absolute;z-index:200;width:300px;max-width:92vw;max-height:60vh;overflow:auto;background:var(--sheet,#fff);border:1px solid var(--hair,#ddd);border-radius:12px;box-shadow:0 18px 50px color-mix(in srgb,var(--scrim-ink) 28%,transparent);padding:12px}
 
 /* #5 — big device toggle + a CANVAS that dominates the screen */
 .dp-title{font-size:12px;font-weight:600;margin-bottom:8px}
+/* §1.4: in dark mode the caption says why the frame stays light — one line of
+   honesty about the site keeping its own (published) colors */
+.dp-title::after{content:var(--dp-owncolors,"");font-weight:500;color:var(--dds-soft)}
 .dpdevseg{display:inline-flex;gap:2px;background:var(--wash,#efece7);border-radius:999px;padding:4px}
 .dpdevseg button{font:inherit;font-size:13px;font-weight:600;padding:8px 18px;border-radius:999px;border:none;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
-.dpdevseg button.on{background:var(--sheet,#fff);color:var(--ink,#1b1525);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.dpdevseg button.on{background:var(--seg-chip,var(--sheet,#fff));color:var(--ink,#1b1525);box-shadow:var(--seg-ring,0 1px 4px rgba(0,0,0,.12))}
 .dpdevseg button:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 #designPreviewWrap{position:relative}
-.dp-stage{display:flex;justify-content:center}
-.dp-frame{position:relative;width:100%;height:calc(100vh - 210px);min-height:460px;max-height:88vh;resize:vertical;overflow:hidden;border:1px solid var(--hair-2);border-radius:12px;background:#fff;box-shadow:0 6px 24px rgba(60,45,20,.08);transition:width var(--dur,.3s) var(--ease,ease)}
+/* §1.4 the preview-iframe boundary: the site inside is light BY DESIGN (it shows
+   exactly what publishes — never filtered or re-themed). The frame is an object
+   sitting ON the workspace: --dds-line border, a slightly stronger shadow, and a
+   --dds-bg letterbox, so in dark mode it reads as a paper page on a dark desk. */
+.dp-stage{display:flex;justify-content:center;background:var(--dds-bg)}
+.dp-frame{position:relative;width:100%;height:calc(100vh - 210px);min-height:460px;max-height:88vh;resize:vertical;overflow:hidden;border:1px solid var(--dds-line);border-radius:12px;background:#fff;box-shadow:var(--dds-shadow),0 14px 44px color-mix(in srgb,var(--scrim-ink) 12%,transparent);transition:width var(--dur,.3s) var(--ease,ease)}
 .dp-frame iframe{width:100%;height:100%;border:none;border-radius:12px;display:block;pointer-events:none}
 /* AEM-style live canvas: once editing chrome is injected the preview becomes the
    editor itself — interactive. The bottom padding leaves the vertical-resize grip
@@ -594,15 +648,15 @@ body.pd-dragging *{cursor:grabbing !important}
   .dp-frame{height:calc(100vh - 240px)}
 }
 @media(max-width:760px){
-  .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:16px 16px 0 0;border:none;box-shadow:0 -8px 44px rgba(33,29,25,.30);transform:translateY(103%)}
+  .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:16px 16px 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
   .dc-slideover.on{transform:translateY(0)}
   .dc-fab{right:14px;bottom:14px;padding:11px 18px;font-size:13px}
 }
 
 /* ── mobile: the dock ── */
-.dock{display:none;position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:rgba(33,29,25,.95);border-radius:100px;padding:6px;z-index:60;box-shadow:0 14px 44px rgba(33,29,25,.35)}
-.dock button{flex:1;text-align:center;font-size:12px;font-weight:600;padding:15px 0;border-radius:100px;color:#cfc7b8;white-space:nowrap}
-.dock button.on{background:var(--paper);color:var(--ink)}
+.dock{display:none;position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--dock-bg);border:1px solid var(--dock-border);border-radius:100px;padding:6px;z-index:60;box-shadow:var(--dds-shadow)}
+.dock button{flex:1;text-align:center;font-size:12px;font-weight:600;padding:15px 0;border-radius:100px;color:var(--dock-fg);white-space:nowrap}
+.dock button.on{background:var(--dock-on-bg);color:var(--dock-on-fg)}
 @media(max-width:760px){
   .rail{display:none}
   .dock{display:flex}
@@ -630,8 +684,24 @@ body.pd-dragging *{cursor:grabbing !important}
   .menuhead .ctl button{padding:6px 12px}
   .mcell .del{opacity:1}
 }
-/* keyboard focus on paper tabs & desk words stays visible against espresso */
-.papertabs button:focus-visible,.pagewords button:focus-visible,.deskseg button:focus-visible,.stagebar .back:focus-visible{outline-color:#fffdf8}
+/* keyboard focus on paper tabs & desk words stays visible against the dark desk */
+.papertabs button:focus-visible,.pagewords button:focus-visible,.deskseg button:focus-visible,.stagebar .back:focus-visible{outline-color:#efeaf7}
+
+/* §1.3 row 10, .dds-hint interplay: shell.css fills the hint with var(--dds-ink)
+   — which is LIGHT in dark mode — but hardcodes #fff text (white-on-white).
+   Page-scoped correction; the real fix belongs in shell.css (flagged). */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .dds-hint{color:#171320}
+  :root:not([data-theme="light"]) .dds-hint a{color:#3a2470}
+  :root:not([data-theme="light"]) .dds-hint .x{background:rgba(23,19,32,.12);color:#171320}
+  :root:not([data-theme="light"]) .dds-hint .x:hover{background:rgba(23,19,32,.22)}
+  :root:not([data-theme="light"]) .dds-hint .x:focus-visible{outline-color:#171320}
+}
+:root[data-theme="dark"] .dds-hint{color:#171320}
+:root[data-theme="dark"] .dds-hint a{color:#3a2470}
+:root[data-theme="dark"] .dds-hint .x{background:rgba(23,19,32,.12);color:#171320}
+:root[data-theme="dark"] .dds-hint .x:hover{background:rgba(23,19,32,.22)}
+:root[data-theme="dark"] .dds-hint .x:focus-visible{outline-color:#171320}
 </style>
 </head>
 <body>
@@ -1051,7 +1121,7 @@ body.pd-dragging *{cursor:grabbing !important}
     </div>
     <div class="pagewords" id="lookSeg" aria-label="Try another look"></div>
     <div class="grow"></div>
-    <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(255,253,248,.55);padding-bottom:11px" class="deskprivacy">A private proof — only you can see it.</span>
+    <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(239,234,247,.55);padding-bottom:11px" class="deskprivacy">A private proof — only you can see it.</span>
     <div class="deskseg" id="devSeg">
       <button data-dev="desktop" class="on">Desk</button>
       <button data-dev="mobile">Phone</button>
@@ -1096,7 +1166,7 @@ function askText(title, opts) {
     inp.style.cssText = "width:100%;font:inherit;font-size:16px;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:9px;outline:none;box-sizing:border-box"; form.appendChild(inp);
     const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:14px";
     const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer";
-    const ok = el("button", null, opts.ok || "Save"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer";
+    const ok = el("button", null, opts.ok || "Save"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-radius:999px;padding:8px 16px;cursor:pointer";
     row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
     let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
     cancel.addEventListener("click", () => finish(null));
@@ -1139,7 +1209,7 @@ function toastAction(msg, label, fn, ms) {
   t.style.cssText = "display:flex;gap:12px;align-items:center;pointer-events:auto";
   t.appendChild(el("span", null, msg));
   const b = el("button", null, label); b.type = "button";
-  b.style.cssText = "font:inherit;font-size:12.5px;font-weight:700;padding:4px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.75);background:transparent;color:inherit;cursor:pointer;white-space:nowrap";
+  b.style.cssText = "font:inherit;font-size:12.5px;font-weight:700;padding:4px 12px;border-radius:999px;border:1px solid color-mix(in srgb,currentColor 75%,transparent);background:transparent;color:inherit;cursor:pointer;white-space:nowrap";
   b.addEventListener("click", () => { t.remove(); fn(); });
   t.appendChild(b);
   $("toasts").appendChild(t);
@@ -2195,7 +2265,7 @@ function renderFoundations(f, plans, launch, dom) {
     // No domain yet — the branching intro, plain language, two clear choices.
     domCard.appendChild(stepLine("Right now your site is at a temporary address. Want it on your own domain (like yourbusiness.com)?"));
     const choose = el("div", "doa"); choose.style.cssText = "gap:8px;margin-top:8px;flex-wrap:wrap";
-    const haveBtn = el("button", "textact", "I already have a domain"); haveBtn.style.cssText = "border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;border-radius:999px;padding:7px 14px;font:inherit;font-weight:600;cursor:pointer";
+    const haveBtn = el("button", "textact", "I already have a domain"); haveBtn.style.cssText = "border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);border-radius:999px;padding:7px 14px;font:inherit;font-weight:600;cursor:pointer";
     const needBtn = el("button", "textact", "I need to get one"); needBtn.style.cssText = "border:1px solid var(--line,#ddd);background:transparent;border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer";
     choose.appendChild(haveBtn); choose.appendChild(needBtn); domCard.appendChild(choose);
 
@@ -2689,7 +2759,7 @@ const BK_DAYS = [[1,"Monday"],[2,"Tuesday"],[3,"Wednesday"],[4,"Thursday"],[5,"F
 const BK_INTERVALS = [10,15,20,30,45,60,90,120];
 const BK_TZS = ["America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","Europe/London","Australia/Sydney"];
 const BK_ICSS = "width:100%;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;box-sizing:border-box";
-const BK_BTN = "padding:7px 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:#fff;font:inherit;font-size:13px;cursor:pointer";
+const BK_BTN = "padding:7px 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:var(--sheet,#fff);font:inherit;font-size:13px;cursor:pointer";
 let BK = { settings: null, types: [] };
 async function loadBookings() {
   const wrap = $("bookingsWrap"); if (!wrap) return;
@@ -2785,7 +2855,7 @@ function renderBookings(wrap, appts) {
   const ac = el("input"); ac.type = "checkbox"; ac.className = "bk-autoconfirm"; ac.checked = !!s.auto_confirm; ac.style.width = "auto";
   acWrap.append(ac, el("span", null, "Confirm bookings automatically (otherwise they wait for your OK)"));
   c2.appendChild(acWrap);
-  const saveBtn = el("button", null, "Save booking settings"); saveBtn.style.cssText = "margin-top:16px;padding:9px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;font:inherit;font-size:14px;cursor:pointer";
+  const saveBtn = el("button", null, "Save booking settings"); saveBtn.style.cssText = "margin-top:16px;padding:9px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font:inherit;font-size:14px;cursor:pointer";
   saveBtn.addEventListener("click", async () => {
     saveBtn.disabled = true;
     try { const payload = bkGatherSettings(wrap); await api("PUT", "/bookings/settings", payload); BK.settings = { ...BK.settings, ...payload }; toast("Booking settings saved"); }
@@ -2818,7 +2888,7 @@ function bkServiceRow(t) {
   info.appendChild(el("div", null, t.name)).style.cssText = "font-weight:600";
   info.appendChild(el("div", "hint", meta)).style.margin = "2px 0 0";
   const edit = el("button", null, "Edit"); edit.style.cssText = BK_BTN;
-  const del = el("button", null, "Remove"); del.style.cssText = BK_BTN + ";color:#b42318";
+  const del = el("button", null, "Remove"); del.style.cssText = BK_BTN + ";color:var(--clay,#b42318)";
   edit.addEventListener("click", () => row.replaceWith(bkServiceForm(t)));
   del.addEventListener("click", async () => {
     if (!confirm("Remove “" + t.name + "”? Existing appointments keep their details.")) return;
@@ -2833,7 +2903,7 @@ function bkServiceForm(t) {
   const dur = el("input"); dur.type = "number"; dur.min = 5; dur.max = 480; dur.placeholder = "Duration (minutes)"; dur.value = (t && t.duration_min) || 30; dur.style.cssText = BK_ICSS;
   const price = el("input"); price.type = "text"; price.placeholder = "Price (optional) — e.g. 40"; price.value = (t && t.price_cents != null) ? (t.price_cents / 100) : ""; price.style.cssText = BK_ICSS;
   const desc = el("input"); desc.type = "text"; desc.placeholder = "Short description (optional)"; desc.value = (t && t.description) || ""; desc.style.cssText = BK_ICSS;
-  const save = el("button", null, t && t.id ? "Save" : "Add service"); save.style.cssText = "padding:8px 16px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;font:inherit;cursor:pointer;justify-self:start";
+  const save = el("button", null, t && t.id ? "Save" : "Add service"); save.style.cssText = "padding:8px 16px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font:inherit;cursor:pointer;justify-self:start";
   save.addEventListener("click", async () => {
     const body = { name: name.value.trim(), duration_min: +dur.value || 30, description: desc.value.trim() };
     const p = parseFloat(price.value); if (isFinite(p) && p >= 0) body.price_cents = Math.round(p * 100);
@@ -2861,14 +2931,14 @@ function bkApptRow(a) {
   info.appendChild(el("div", "hint", who)).style.margin = "2px 0 0";
   if (a.note) info.appendChild(el("div", "hint", "“" + a.note + "”")).style.margin = "2px 0 0";
   const badge = el("span", null, a.status === "pending" ? "Waiting for you" : a.status === "confirmed" ? "Confirmed" : a.status);
-  badge.style.cssText = "font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;" + (a.status === "pending" ? "background:#fef3c7;color:#92400e" : a.status === "confirmed" ? "background:#dcfce7;color:#166534" : "background:#eee;color:#555");
+  badge.style.cssText = "font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;" + (a.status === "pending" ? "background:var(--dds-warn-soft,#fef3c7);color:var(--dds-warn,#92400e)" : a.status === "confirmed" ? "background:var(--sage-soft,#dcfce7);color:var(--sage,#166534)" : "background:color-mix(in srgb,var(--ink,#1b1525) 8%,transparent);color:var(--soft,#555)");
   const acts = el("div"); acts.style.cssText = "display:flex;gap:8px";
   if (a.status === "pending") {
     const conf = el("button", null, "Confirm"); conf.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
     conf.addEventListener("click", async () => { conf.disabled = true; try { await api("POST", "/bookings/appointments/" + a.id + "/confirm"); toast("Confirmed — the customer was emailed"); loadBookings(); } catch (err) { toast(nice(err), true); conf.disabled = false; } });
     acts.appendChild(conf);
   }
-  const canc = el("button", null, "Cancel"); canc.style.cssText = BK_BTN + ";color:#b42318";
+  const canc = el("button", null, "Cancel"); canc.style.cssText = BK_BTN + ";color:var(--clay,#b42318)";
   canc.addEventListener("click", async () => { if (!confirm("Cancel this booking? The customer will be emailed.")) return; canc.disabled = true; try { await api("POST", "/bookings/appointments/" + a.id + "/cancel", {}); toast("Canceled — the customer was emailed"); loadBookings(); } catch (err) { toast(nice(err), true); canc.disabled = false; } });
   acts.appendChild(canc);
   row.append(info, badge, acts); return row;
@@ -2914,7 +2984,7 @@ function renderReviews(wrap, data) {
   const rowA = el("div"); rowA.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap";
   const em = el("input"); em.type = "email"; em.placeholder = "Customer email"; em.style.cssText = RV_ICSS;
   const nm = el("input"); nm.type = "text"; nm.placeholder = "Their name (optional)"; nm.style.cssText = RV_ICSS;
-  const ask = el("button", null, "Send request"); ask.style.cssText = "padding:10px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:#fff;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap";
+  const ask = el("button", null, "Send request"); ask.style.cssText = "padding:10px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font:inherit;font-size:14px;cursor:pointer;white-space:nowrap";
   ask.addEventListener("click", async () => {
     const email = em.value.trim(); if (!email) { toast("Add the customer's email", true); return; }
     ask.disabled = true;
@@ -2960,8 +3030,8 @@ function rvRow(r) {
   head.appendChild(who);
   if (r.created_at) { const d = el("span", "hint", String(r.created_at).slice(0, 10)); d.style.cssText = "font-size:12px;color:var(--soft,#888)"; head.appendChild(d); }
   row.appendChild(head);
-  if (r.body) { const q = el("p", null, "“" + r.body + "”"); q.style.cssText = "margin:8px 0 0;color:#3d3646;font-size:14px;line-height:1.5"; row.appendChild(q); }
-  if (r.owner_reply) { const rp = el("p", null, "You replied: " + r.owner_reply); rp.style.cssText = "margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--plum,#5b3fa0);color:#6b6478;font-size:13px;background:#faf9fc"; row.appendChild(rp); }
+  if (r.body) { const q = el("p", null, "“" + r.body + "”"); q.style.cssText = "margin:8px 0 0;color:var(--ink,#3d3646);font-size:14px;line-height:1.5"; row.appendChild(q); }
+  if (r.owner_reply) { const rp = el("p", null, "You replied: " + r.owner_reply); rp.style.cssText = "margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--plum,#5b3fa0);color:var(--soft,#6b6478);font-size:13px;background:var(--bg,#faf9fc)"; row.appendChild(rp); }
   const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:10px";
   if (r.status !== "approved") {
     const ap = el("button", null, "Approve & show"); ap.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
@@ -2999,7 +3069,7 @@ async function loadAssetHealth() {
   if (count("duplicate")) bits.push(count("duplicate") + " look like duplicates");
   const attn = bits.length > 0;
   host.hidden = false;
-  host.style.cssText = "margin:2px 0 8px;padding:10px 16px;border-radius:11px;font-size:13.5px;border:1px solid " + (attn ? "#ecd9c6" : "#d6e8dc") + ";background:" + (attn ? "#fdf8f1" : "#f4faf6") + ";color:#3d4a42";
+  host.style.cssText = "margin:2px 0 8px;padding:10px 16px;border-radius:11px;font-size:13.5px;border:1px solid " + (attn ? "color-mix(in srgb,var(--amber,#775d31) 35%,transparent)" : "color-mix(in srgb,var(--sage,#33664b) 30%,transparent)") + ";background:" + (attn ? "var(--dds-warn-soft,#fdf8f1)" : "var(--sage-soft,#f4faf6)") + ";color:var(--ink,#3d4a42)";
   host.textContent = attn ? ("Your library: " + bits.join(" · ") + ".") : "✓ Your library looks healthy — everything described and in good shape.";
 }
 function renderMediaGrid(grid, manage, onPick) {
@@ -3029,7 +3099,7 @@ function mediaCell(grid, m, manage, onPick) {
       const on = S.settings && S.settings[field] === m.id;
       const b = el("button", null, on ? onLabel + " ✓" : offLabel);
       b.type = "button";
-      b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--accent, #8c3b2e)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--accent, #8c3b2e)" : "transparent") + ";color:" + (on ? "#fff" : "inherit") + ";cursor:pointer";
+      b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--plum,#5b3fa0)" : "transparent") + ";color:" + (on ? "var(--fill-ink,#fff)" : "inherit") + ";cursor:pointer";
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
         try {
@@ -3077,7 +3147,7 @@ function mediaCell(grid, m, manage, onPick) {
     const ai = el("button", null, "✦ Suggest with AI");
     ai.type = "button";
     ai.title = "Let AI propose a description, a few tags, and a caption — you approve or edit before anything saves";
-    ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid #cfc2ee;background:rgba(91,63,160,.06);color:#5b3fa0;cursor:pointer";
+    ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--plum-line,#cfc2ee);background:color-mix(in srgb,var(--plum,#5b3fa0) 6%,transparent);color:var(--plum,#5b3fa0);cursor:pointer";
     ai.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (cell.querySelector(".aisuggest")) return;
@@ -3102,7 +3172,7 @@ function mediaCell(grid, m, manage, onPick) {
         const dot = el("button", null, "");
         dot.type = "button"; dot.title = "Focus: " + nm; dot.setAttribute("aria-label", "Focus point: " + nm);
         const cur = (m.focal_x === x && m.focal_y === y);
-        dot.style.cssText = "width:28px;height:22px;border-radius:5px;cursor:pointer;border:1px solid var(--line,#ccc);background:" + (cur ? "#5b3fa0" : "rgba(0,0,0,.06)");
+        dot.style.cssText = "width:28px;height:22px;border-radius:5px;cursor:pointer;border:1px solid var(--line,#ccc);background:" + (cur ? "var(--plum,#5b3fa0)" : "color-mix(in srgb,var(--ink,#1b1525) 8%,transparent)");
         dot.addEventListener("click", async () => {
           try { await api("PUT", `/media/${m.id}`, { focal_x: x, focal_y: y }); m.focal_x = x; m.focal_y = y; g.remove(); toast("Focus set — publish to apply"); scheduleChangesRefresh(); }
           catch (err) { toast(nice(err), true); }
@@ -3129,7 +3199,7 @@ function mediaCell(grid, m, manage, onPick) {
 function showSuggest(cell, m, grid, p) {
   const prev = cell.querySelector(".aisuggest"); if (prev) prev.remove();
   const panel = el("div", "aisuggest");
-  panel.style.cssText = "margin-top:8px;padding:11px 12px;border:1px solid #d8cef0;background:rgba(91,63,160,.05);border-radius:10px;font-size:12px";
+  panel.style.cssText = "margin-top:8px;padding:11px 12px;border:1px solid var(--plum-line,#d8cef0);background:color-mix(in srgb,var(--plum,#5b3fa0) 5%,transparent);border-radius:10px;font-size:12px";
   const note = el("div", null, "A suggestion — edit anything. Nothing saves until you accept.");
   note.style.cssText = "color:var(--ink-2);margin-bottom:9px;font-family:var(--serif);font-style:italic";
   panel.appendChild(note);
@@ -3580,8 +3650,8 @@ async function mountLookSeg() {
       + '<span style="display:block;margin-top:9px;font-family:' + sw.font + ';color:' + sw.ink + ';font-size:20px;font-weight:600;line-height:1">Aa</span>'
       + '<span style="display:block;margin-top:7px;height:3px;width:70%;background:rgba(0,0,0,.14);border-radius:2px"></span>'
       + '<span style="display:block;margin-top:4px;height:3px;width:52%;background:rgba(0,0,0,.1);border-radius:2px"></span></span>'
-      + '<span style="display:block;padding:9px 13px 11px"><span style="display:block;font-weight:600;font-size:13.5px;color:var(--ink,#1b1525)">' + String(t.name) + (active ? " ✓" : "") + '</span>'
-      + '<span style="display:block;font-size:11px;color:var(--muted,#8a8172);margin-top:2px">' + sw.tag + '</span></span>';
+      + '<span style="display:block;padding:9px 13px 11px"><span style="display:block;font-weight:600;font-size:13.5px;color:#1b1525">' + String(t.name) + (active ? " ✓" : "") + '</span>'
+      + '<span style="display:block;font-size:11px;color:#6b6478;margin-top:2px">' + sw.tag + '</span></span>';
     card.addEventListener("click", () => { PV.template = t.slug === LOOKS.current.slug ? "" : t.slug; mountLookSeg(); loadPreview(); });
     cards.appendChild(card);
   });
@@ -3969,7 +4039,7 @@ function showReceipt(firstPublish) {
     const see = document.createElement("a");
     see.href = liveUrl; see.target = "_blank"; see.rel = "noopener";
     see.textContent = "See your live site →";
-    see.style.cssText = "display:inline-block;margin-top:26px;margin-right:10px;background:var(--plum,#5b3fa0);color:#fff;font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none";
+    see.style.cssText = "display:inline-block;margin-top:26px;margin-right:10px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none";
     $("ritActions").appendChild(see);
     const cp = el("button", "notyet", "Copy the link");
     cp.style.marginTop = "26px"; cp.style.marginRight = "10px";
@@ -4047,7 +4117,7 @@ async function renderRitualSchedule(host, publishable) {
     });
     const btns = el("div"); btns.style.cssText = "display:flex;gap:8px;margin-top:14px";
     const okb = el("button", null, "Schedule it"); okb.type = "button";
-    okb.style.cssText = "font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;font-weight:600";
+    okb.style.cssText = "font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);font-weight:600";
     const nob = el("button", null, "Never mind"); nob.type = "button";
     nob.style.cssText = "font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
     nob.addEventListener("click", () => panel.remove());
@@ -4272,7 +4342,7 @@ async function renderLaunches() {
     top.appendChild(Object.assign(el("span", null, l.status_label + (l.scheduled_for ? " · " + new Date(l.scheduled_for).toLocaleString() : "")), { style: "font-size:12px;color:var(--soft,#666)" }));
     row.appendChild(top);
     const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
+    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
     mk("Preview", () => openLaunchPreview(l.id));
     if (l.status === "draft") mk("Approve", () => act(`/launches/${l.id}/decide`, "Approved", { decision: "approve" }), true);
     if (l.status === "draft" || l.status === "approved") mk("Update from draft", () => act(`/launches/${l.id}/recapture`, "Refreshed from your current draft"));
@@ -4287,7 +4357,7 @@ async function renderLaunches() {
         const d = new Date(Date.now() + 86400000); d.setHours(9, 0, 0, 0);   // default: tomorrow 9:00 local
         inp.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         inp.style.cssText = "font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--line,#ddd)";
-        const ok = el("button", null, "Confirm"); ok.type = "button"; ok.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470";
+        const ok = el("button", null, "Confirm"); ok.type = "button"; ok.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)";
         const no = el("button", null, "Cancel"); no.type = "button"; no.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
         ok.addEventListener("click", () => { const v = inp.value; if (!v) { toast("Pick a date and time.", true); return; } const dt = new Date(v); if (isNaN(dt.getTime())) { toast("Couldn’t read that time.", true); return; } if (dt.getTime() <= Date.now()) { toast("Pick a time in the future.", true); return; } act(`/launches/${l.id}/schedule`, "Scheduled", { scheduled_for: dt.toISOString() }); });
         no.addEventListener("click", () => wrap.remove());
@@ -4323,7 +4393,7 @@ async function renderPreviewPanel() {
     : ["Not live yet"]));
   card.appendChild(grid);
   const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:12px";
-  const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
+  const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
   const act = async (path, okMsg, body) => { try { await api("POST", path, body || {}); toast(okMsg); renderPreviewPanel(); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } };
   mk("Update preview from draft", () => act("/preview/publish", "Preview updated — share it or promote when ready"), true);
   if (st.preview.exists) {
@@ -4342,13 +4412,13 @@ async function renderPreviewPanel() {
     if (st.live.offline_since) {
       offRow.appendChild(Object.assign(el("div", null, "Your site is offline. Everything is kept — bring it back whenever you like."), { style: "font-size:12.5px;color:var(--ink-2,#666);flex:1;min-width:200px" }));
       const back = el("button", null, "Bring my site back online"); back.type = "button";
-      back.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;font-weight:600";
+      back.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);font-weight:600";
       back.addEventListener("click", () => act("/site/online", "Bringing your site back — this usually takes under a minute"));
       offRow.appendChild(back);
     } else {
       offRow.appendChild(Object.assign(el("div", null, "Need to disappear for a while? Going offline shows visitors a simple “temporarily offline” page — nothing is deleted."), { style: "font-size:12.5px;color:var(--ink-2,#666);flex:1;min-width:200px" }));
       const off = el("button", null, "Take site offline"); off.type = "button";
-      off.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:1px solid #a3423a;background:transparent;color:#a3423a;font-weight:600";
+      off.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:1px solid var(--clay,#a3423a);background:transparent;color:var(--clay,#a3423a);font-weight:600";
       off.addEventListener("click", () => {
         const name = (S.identity && S.identity.business_name) || "your site";
         if (!confirm(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring my site back online”) restores everything.`)) return;
@@ -4389,7 +4459,7 @@ async function renderCheckpoints() {
     top.appendChild(Object.assign(el("span", null, "saved " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")), { style: "font-size:12px;color:var(--soft,#666)" }));
     row.appendChild(top);
     const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid #5b3fa0;background:#faf7ff;color:#3a2470" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
+    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
     mk("Look", () => openLaunchPreview(c.id));
     mk("Bring into draft", async () => {
       if (!confirm("Bring checkpoint “" + c.name + "” into your draft? Today’s draft is set aside as a safety copy.")) return;
@@ -4448,7 +4518,7 @@ function renderVersionTools() {
     rowc.appendChild(Object.assign(el("span", null, "From"), { style: "font-size:12.5px" })); rowc.appendChild(from);
     rowc.appendChild(Object.assign(el("span", null, "to"), { style: "font-size:12.5px" })); rowc.appendChild(to);
     const go = el("button", null, "Compare"); go.type = "button";
-    go.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;cursor:pointer;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470";
+    go.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)";
     rowc.appendChild(go); cmp.appendChild(rowc);
     const out = el("div"); out.style.cssText = "margin-top:10px"; cmp.appendChild(out);
     go.addEventListener("click", async () => {
@@ -4643,7 +4713,7 @@ async function mountBillingCard() {
   card.appendChild(line);
   if (s.can_manage_billing) {
     const b = el("button", null, (s.status === "paused" || s.status === "lapsed") ? "Update payment" : "Manage billing");
-    b.type = "button"; b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--accent,#5b3fa0);color:var(--accent,#5b3fa0);background:transparent;cursor:pointer";
+    b.type = "button"; b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);color:var(--plum,#5b3fa0);background:transparent;cursor:pointer";
     b.addEventListener("click", async () => {
       b.disabled = true; const t = b.textContent; b.textContent = "Opening…";
       try { const r = await api("POST", "/commerce/portal", {}); if (r.data && r.data.url) location.href = r.data.url; else { toast("Billing management isn’t available right now.", true); b.disabled = false; b.textContent = t; } }
@@ -4667,7 +4737,7 @@ async function mountBillingCard() {
       (losses ? ` Heads up: it switches off ${losses} — ask us about keeping both.` : "");
     const a = document.createElement("a");
     a.href = "mailto:support@davisdigitalstudio.com?subject=" + encodeURIComponent("Upgrading to " + S.upsell.name);
-    a.textContent = " Ask about upgrading →"; a.style.color = "var(--accent,#5b3fa0)";
+    a.textContent = " Ask about upgrading →"; a.style.color = "var(--plum,#5b3fa0)";
     u.appendChild(a);
     card.appendChild(u);
   }
@@ -4681,11 +4751,11 @@ function mountDeletionCard() {
   const p = el("p", "hint", "This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first — that door stays open until deletion.");
   const b = el("button", null, "Request deletion");
   b.type = "button";
-  b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid #b3261e;color:#b3261e;background:transparent;cursor:pointer";
+  b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--clay,#b3261e);color:var(--clay,#b3261e);background:transparent;cursor:pointer";
   // Shown after a request is recorded — the cancel affordance the copy promises.
   const cancelBtn = el("button", null, "Cancel deletion request");
   cancelBtn.type = "button"; cancelBtn.hidden = true;
-  cancelBtn.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;margin-left:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--accent,#5b3fa0);color:var(--accent,#5b3fa0);background:transparent;cursor:pointer";
+  cancelBtn.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;margin-left:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);color:var(--plum,#5b3fa0);background:transparent;cursor:pointer";
   const showRequested = (days) => { b.disabled = true; b.textContent = days ? `Scheduled — completes in ${days} day${days === 1 ? "" : "s"}` : "Request recorded — check your email"; cancelBtn.hidden = false; };
   b.addEventListener("click", async () => {
     if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Are you sure? Click again to confirm"; setTimeout(() => { delete b.dataset.armed; b.textContent = "Request deletion"; }, 6000); return; }
@@ -4907,7 +4977,7 @@ function pillRow(host, label, opts, isOn, onPick) {
     const on = isOn(o);
     const b = el("button", null, "");
     b.type = "button";
-    b.style.cssText = "display:flex;align-items:center;gap:6px;font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "#5b3fa0" : "var(--line,#ddd)") + ";background:" + (on ? "#faf7ff" : "transparent");
+    b.style.cssText = "display:flex;align-items:center;gap:6px;font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line,#ddd)") + ";background:" + (on ? "var(--plum-tint,#faf7ff)" : "transparent");
     if (o.accent !== undefined) { const dot = el("span"); dot.style.cssText = "width:13px;height:13px;border-radius:50%;display:inline-block;background:" + (o.accent || "linear-gradient(135deg,#8c3b2e,#23635a)") + ";border:1px solid rgba(0,0,0,.15)"; b.appendChild(dot); }
     b.appendChild(document.createTextNode((o.name || o[0]) + (on ? " ✓" : "")));
     b.addEventListener("click", () => onPick(o));
@@ -4956,7 +5026,7 @@ async function mountBrandKitCard() {
   pillRow(card, "Corners", CORNER_OPTS, (o) => String(st.corner) === o[1], (o) => { st.corner = o[1]; });
   // apply
   const apply = el("button", null, "Build & apply brand kit"); apply.type = "button";
-  apply.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:14px;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  apply.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:14px;padding:8px 16px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
   apply.addEventListener("click", async () => {
     const brand_kit = { logo_media_id: st.logo_media_id, primary: st.primary, heading_font: st.heading_font || undefined, body_font: st.body_font || undefined, corner: st.corner };
     try {
@@ -4975,7 +5045,7 @@ async function mountBrandKitCard() {
   if (kit) {
     const row2 = el("div"); row2.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px";
     const applySaved = el("button", null, "Apply my brand"); applySaved.type = "button";
-    applySaved.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;cursor:pointer";
+    applySaved.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer";
     applySaved.title = "One tap: re-apply your saved brand to the whole site — colours, type and corners";
     row2.appendChild(applySaved);
     row2.appendChild(el("span", "hint", "Re-applies your saved brand to the whole site in one tap."));
@@ -5004,7 +5074,7 @@ function renderBrandImageryReport(host, d) {
   host.innerHTML = "";
   const im = (d && d.imagery) || {}; const list = im.recolorable || [];
   if (!list.length && !im.not_recolorable_count) return;
-  const box = el("div"); box.style.cssText = "margin-top:10px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:10px;padding:10px 12px";
+  const box = el("div"); box.style.cssText = "margin-top:10px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:10px;padding:10px 12px";
   box.appendChild(Object.assign(el("div", null, "Your images, on-brand"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
   if (list.length) {
     box.appendChild(el("div", "hint", "These AI-made images can be re-created in your brand palette — each comes back as options to review and approve in the Visual Studio."));
@@ -5014,7 +5084,7 @@ function renderBrandImageryReport(host, d) {
       const lbl = el("span", null, (it.alt_text || it.brief || "AI-made image").slice(0, 70));
       lbl.style.cssText = "flex:1;min-width:120px;font-size:12.5px";
       const b = el("button", null, "Re-create in my palette"); b.type = "button";
-      b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid #5b3fa0;background:transparent;color:#3a2470;cursor:pointer";
+      b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:transparent;color:var(--plum-deep,#3a2470);cursor:pointer";
       b.addEventListener("click", async () => {
         b.disabled = true; b.textContent = "Making options…";
         try {
@@ -5026,7 +5096,7 @@ function renderBrandImageryReport(host, d) {
       rowEl.append(lbl, b); box.appendChild(rowEl);
     });
     const lk = el("a", null, "Open the Visual Studio to review →");
-    lk.href = "/visual-studio.html"; lk.style.cssText = "font-size:12.5px;color:var(--accent,#5b3fa0);font-weight:600;text-decoration:none";
+    lk.href = "/visual-studio.html"; lk.style.cssText = "font-size:12.5px;color:var(--plum,#5b3fa0);font-weight:600;text-decoration:none";
     box.appendChild(lk);
   }
   if (im.not_recolorable_count) {
@@ -5081,7 +5151,7 @@ async function mountDesignCard() {
       const rowEl = el("div"); rowEl.style.cssText = "margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
       rowEl.appendChild(el("span", "hint", "Suggested for your kind of business: " + p.name + " + " + t.name + "."));
       const b = el("button", null, "Apply suggestion");
-      b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;cursor:pointer";
+      b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);cursor:pointer";
       b.addEventListener("click", () => saveTokens({ ...p.tokens, ...t.tokens }, p.name + " + " + t.name));
       rowEl.appendChild(b);
       card.appendChild(rowEl);
@@ -5119,7 +5189,7 @@ async function mountDevCssCard() {
 
   const wrap = el("details", "field"); wrap.id = "devCssCard"; wrap.style.marginTop = "18px";
   const sum = el("summary", null, "Custom CSS (advanced)");
-  sum.style.cssText = "cursor:pointer;font-weight:600;font-size:13px;color:#3a2470;list-style:none;padding:2px 0";
+  sum.style.cssText = "cursor:pointer;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470);list-style:none;padding:2px 0";
   wrap.appendChild(sum);
   wrap.appendChild(el("div", "hint", "Advanced: add your own CSS to fine-tune the look. Styling only — scripts aren’t allowed, so your site stays safe and fast. Changes apply next time you publish."));
 
@@ -5131,7 +5201,7 @@ async function mountDevCssCard() {
 
   const note = el("div", "hint", ""); note.style.marginTop = "8px";
   const save = el("button", null, "Save custom CSS"); save.type = "button";
-  save.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:12px;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  save.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:12px;padding:8px 16px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
   save.addEventListener("click", async () => {
     save.disabled = true;
     try {
@@ -5310,9 +5380,9 @@ async function clUpdateSource(idx) {
 function renderLinkedChip(blk, idx, card) {
   const miniBtn = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const item = clItemById(blk.ref);
-  const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid #d9cef0;border-radius:12px;padding:12px 14px;margin-top:10px;background:#faf7ff";
+  const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid var(--plum-line,#d9cef0);border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--plum-tint,#faf7ff)";
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-  const nm = el("div", null, "🔗 Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:#3a2470";
+  const nm = el("div", null, "🔗 Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
   const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
@@ -5328,7 +5398,7 @@ function renderLinkedChip(blk, idx, card) {
   const typeName = item ? ((BLOCK_DEFS.find((d) => d.type === (item.block && item.block.type)) || {}).name || "") : "";
   sub.appendChild(el("div", "hint", "Linked" + (typeName ? " " + typeName.toLowerCase() : "") + " — edits to the saved section update everywhere it’s linked. Edit the saved section to change it in every spot, or make it independent to edit just this one."));
   const row = el("div"); row.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-  const edit = el("button", null, "Edit the saved section"); edit.type = "button"; edit.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
+  const edit = el("button", null, "Edit the saved section"); edit.type = "button"; edit.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum-deep,#3a2470);cursor:pointer";
   edit.disabled = !item;
   edit.addEventListener("click", () => {
     const it = clItemById(blk.ref); if (!it || !it.block) { toast("Loading the saved section…"); return; }
@@ -5470,7 +5540,7 @@ function dcEditNav() {
   const right = el("div"); right.style.cssText = "display:flex;gap:8px";
   const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", cleanup);
   const save = el("button", null, "Save menu"); save.type = "button";
-  save.style.cssText = "padding:9px 18px;border:none;border-radius:8px;background:#5b3fa0;color:#fff;font-weight:700;cursor:pointer;font:inherit";
+  save.style.cssText = "padding:9px 18px;border:none;border-radius:8px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-weight:700;cursor:pointer;font:inherit";
   save.addEventListener("click", async () => { await dcSaveNav(NAV_WORK); cleanup(); });
   right.append(cancel, save); foot.append(reset, right); box.appendChild(foot);
   scrim.appendChild(box); document.body.appendChild(scrim);
@@ -5499,7 +5569,7 @@ function dcEditNav() {
     const arr = isChild ? NAV_WORK[parentIdx].children : NAV_WORK;
     const up = el("button", null, "↑"); up.type = "button"; up.title = "Move up"; up.style.cssText = NAV_MINI;
     const dn = el("button", null, "↓"); dn.type = "button"; dn.title = "Move down"; dn.style.cssText = NAV_MINI;
-    const del = el("button", null, "✕"); del.type = "button"; del.title = "Remove"; del.style.cssText = NAV_MINI + ";color:#c0392b";
+    const del = el("button", null, "✕"); del.type = "button"; del.title = "Remove"; del.style.cssText = NAV_MINI + ";color:var(--clay,#c0392b)";
     up.addEventListener("click", () => { if (i > 0) { const t = arr[i - 1]; arr[i - 1] = arr[i]; arr[i] = t; renderRows(); } });
     dn.addEventListener("click", () => { if (i < arr.length - 1) { const t = arr[i + 1]; arr[i + 1] = arr[i]; arr[i] = t; renderRows(); } });
     del.addEventListener("click", () => { arr.splice(i, 1); renderRows(); });
@@ -6000,7 +6070,7 @@ function blockStyleRow(idx, blk, sub) {
     const wrap = el("div"); wrap.style.cssText = "margin-top:12px";
     wrap.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
     const row = el("div"); row.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;align-items:center";
-    const pillCss = (on) => "font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "#5b3fa0" : "var(--line,#ddd)") + ";background:" + (on ? "#faf7ff" : "transparent");
+    const pillCss = (on) => "font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;cursor:pointer;border:2px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line,#ddd)") + ";background:" + (on ? "var(--plum-tint,#faf7ff)" : "transparent");
     const dflt = el("button", null, "Default" + (cur ? "" : " ✓")); dflt.type = "button"; dflt.style.cssText = pillCss(!cur);
     dflt.addEventListener("click", () => setStyle({ [key]: "" }, true));
     row.appendChild(dflt);
@@ -6008,7 +6078,7 @@ function blockStyleRow(idx, blk, sub) {
       const on = cur === h;
       const b = el("button"); b.type = "button"; b.title = h;
       b.setAttribute("aria-label", label + " " + h + (on ? " (chosen)" : ""));
-      b.style.cssText = "width:26px;height:26px;border-radius:50%;cursor:pointer;background:" + h + ";border:2px solid " + (on ? "#5b3fa0" : "rgba(0,0,0,.18)");
+      b.style.cssText = "width:26px;height:26px;border-radius:50%;cursor:pointer;background:" + h + ";border:2px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--hair-2,rgba(0,0,0,.18))");
       b.addEventListener("click", () => setStyle({ [key]: h }, true));
       row.appendChild(b);
     });
@@ -6069,10 +6139,10 @@ function blockWindowRow(idx, blk, sub) {
   if (set) det.open = true;
   // A small state chip so the owner sees at a glance what's scheduled or expired.
   let chip = "", chipCss = "";
-  if (from && from > today) { chip = "Scheduled — starts " + from; chipCss = "background:#fff4e0;color:#8a5a00"; }
-  else if (until && until < today) { chip = "Expired — ended " + until; chipCss = "background:#efeef2;color:#6b6478"; }
-  else if (until) { chip = "Showing until " + until; chipCss = "background:#eaf7ee;color:#1c6b34"; }
-  else if (from) { chip = "Showing since " + from; chipCss = "background:#eaf7ee;color:#1c6b34"; }
+  if (from && from > today) { chip = "Scheduled — starts " + from; chipCss = "background:var(--dds-warn-soft,#fff4e0);color:var(--dds-warn,#8a5a00)"; }
+  else if (until && until < today) { chip = "Expired — ended " + until; chipCss = "background:color-mix(in srgb,var(--ink,#1b1525) 7%,transparent);color:var(--soft,#6b6478)"; }
+  else if (until) { chip = "Showing until " + until; chipCss = "background:var(--sage-soft,#eaf7ee);color:var(--sage,#1c6b34)"; }
+  else if (from) { chip = "Showing since " + from; chipCss = "background:var(--sage-soft,#eaf7ee);color:var(--sage,#1c6b34)"; }
   const sum = el("summary");
   sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478);display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   sum.appendChild(document.createTextNode("Show this only for a while" + (set ? "" : "  ·  optional")));
@@ -6119,8 +6189,8 @@ function renderBlocksCard() {
   if (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.starters) && BLOCK_SUGGEST.starters.length) {
     const recKey = BLOCK_SUGGEST.recommendedStarter;
     const empty = !BLOCKS_WORK.length;
-    const panel = el("div"); panel.style.cssText = "margin-top:12px;padding:14px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:12px";
-    panel.appendChild(Object.assign(el("div", null, "Start from a layout"), { style: "font-weight:600;font-size:13px;color:#3a2470" }));
+    const panel = el("div"); panel.style.cssText = "margin-top:12px;padding:14px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:12px";
+    panel.appendChild(Object.assign(el("div", null, "Start from a layout"), { style: "font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)" }));
     panel.appendChild(el("div", "hint", empty
       ? "New here? Pick a ready-made layout — a full set of sections, already filled with guiding text you just edit. Nothing blank to stare at."
       : "Pick a ready-made layout to replace your sections with a filled-in starting point you can edit. We’ll ask before replacing anything."));
@@ -6130,8 +6200,8 @@ function renderBlocksCard() {
     ordered.forEach((st) => {
       const isRec = st.key === recKey;
       const b = el("button"); b.type = "button";
-      b.style.cssText = "text-align:left;font:inherit;padding:10px 12px;border-radius:10px;border:" + (isRec ? "2px solid #5b3fa0" : "1px solid var(--line,#ddd)") + ";background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0";
-      b.appendChild(Object.assign(el("div", null, (isRec ? "✨ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:#3a2470" : "") }));
+      b.style.cssText = "text-align:left;font:inherit;padding:10px 12px;border-radius:10px;border:" + (isRec ? "2px solid var(--plum,#5b3fa0)" : "1px solid var(--line,#ddd)") + ";background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0";
+      b.appendChild(Object.assign(el("div", null, (isRec ? "✨ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:var(--plum-deep,#3a2470)" : "") }));
       b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:11px;color:var(--soft,#888);line-height:1.4" }));
       const n = Array.isArray(st.blocks) ? st.blocks.length : 0;
       b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:10.5px;color:var(--soft,#a99);margin-top:2px" }));
@@ -6164,11 +6234,11 @@ function renderBlocksCard() {
     // toolbar for a clear "update everywhere" flow so it can't be mistaken for a
     // normal, page-only edit.
     if (blk._clEdit) {
-      sub.style.borderColor = "#d9cef0"; sub.style.background = "#faf7ff";
+      sub.style.borderColor = "var(--plum-line,#d9cef0)"; sub.style.background = "var(--plum-tint,#faf7ff)";
       head.textContent = "";
       const it = clItemById(blk._clEdit);
-      const lbl = el("div", null, "Editing saved section" + (it ? " · " + it.name : "")); lbl.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:#3a2470";
-      const upd = el("button", null, "Update everywhere"); upd.type = "button"; upd.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+      const lbl = el("div", null, "Editing saved section" + (it ? " · " + it.name : "")); lbl.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
+      const upd = el("button", null, "Update everywhere"); upd.type = "button"; upd.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
       const cxl = el("button", null, "Cancel"); cxl.type = "button"; cxl.style.cssText = miniBtn;
       upd.addEventListener("click", () => clUpdateSource(idx));
       cxl.addEventListener("click", () => { BLOCKS_WORK[idx] = { type: "linked", ref: blk._clEdit }; renderBlocksCard(); });
@@ -6449,15 +6519,15 @@ function renderBlocksCard() {
     }
     const recSet = new Set(recTypes);
     if (recTypes.length) {
-      const wrap = el("div"); wrap.style.cssText = "margin-top:12px;padding:12px 14px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:12px";
-      wrap.appendChild(Object.assign(el("div", null, "✨ Recommended for you"), { style: "font-weight:600;font-size:12.5px;color:#3a2470" }));
+      const wrap = el("div"); wrap.style.cssText = "margin-top:12px;padding:12px 14px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:12px";
+      wrap.appendChild(Object.assign(el("div", null, "✨ Recommended for you"), { style: "font-weight:600;font-size:12.5px;color:var(--plum-deep,#3a2470)" }));
       wrap.appendChild(el("div", "hint", BLOCK_SUGGEST.note || "A good fit for your kind of business."));
       const grid = groupGrid();
       recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) grid.appendChild(addBtn(d)); });
       wrap.appendChild(grid);
       if (recTypes.length > 1) {
         const all = el("button", null, "Add all recommended"); all.type = "button";
-        all.style.cssText = "font:inherit;font-size:12px;margin-top:10px;padding:6px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#fff;color:#3a2470;cursor:pointer";
+        all.style.cssText = "font:inherit;font-size:12px;margin-top:10px;padding:6px 13px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum-deep,#3a2470);cursor:pointer";
         all.addEventListener("click", () => { dcCaptureScroll(); let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) { BLOCK_FOCUS = firstAt; DC_FOCUS_BI = firstAt; } saveBlocks(); });   /* recommended set is content blocks — safe to save + render */
         wrap.appendChild(all);
       }
@@ -6521,15 +6591,15 @@ function renderBlocksCard() {
           if (used.length) {
             const uc = el("button", null, "used on " + used.length + " page" + (used.length === 1 ? "" : "s")); uc.type = "button";
             uc.title = "Show which pages link this saved section";
-            uc.style.cssText = "font:inherit;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid #d9cef0;background:#faf7ff;color:#3a2470;cursor:pointer";
+            uc.style.cssText = "font:inherit;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
             const usedLine = el("div", "hint", "Linked on: " + used.map((u) => u.title).join(", ") + " — editing the saved section changes it everywhere it’s linked.");
             usedLine.style.cssText = "margin-top:5px;font-size:11.5px"; usedLine.hidden = true;
             uc.addEventListener("click", () => { usedLine.hidden = !usedLine.hidden; });
             row.appendChild(uc); wrap.appendChild(row); wrap.appendChild(usedLine);
           } else wrap.appendChild(row);
-          const ins = el("button", null, "Insert a copy"); ins.type = "button"; ins.title = "An independent copy you edit on its own"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid #5b3fa0;background:transparent;color:#3a2470;cursor:pointer";
+          const ins = el("button", null, "Insert a copy"); ins.type = "button"; ins.title = "An independent copy you edit on its own"; ins.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:transparent;color:var(--plum-deep,#3a2470);cursor:pointer";
           ins.addEventListener("click", () => clInsert(it.block));
-          const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+          const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
           lnk.addEventListener("click", () => clInsertLink(it));
           const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
           del.addEventListener("click", async () => {
@@ -6546,7 +6616,7 @@ function renderBlocksCard() {
   }
   const saveRow = el("div"); saveRow.style.cssText = "margin-top:14px;display:flex;gap:10px;align-items:center";
   const save = el("button", null, "Save sections"); save.type = "button";
-  save.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  save.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
   // G27 §5: a failing, un-acknowledged contrast pair gets ONE extra confirm here
   // (confirming records contrast_ack on the block; cancel = nothing saved).
   save.addEventListener("click", () => { if (ovConfirmContrastAck()) saveBlocks(); });
@@ -6571,13 +6641,13 @@ const AI_REWRITE_COUNT = 3;
 function aiField(inputEl, opts) {
   opts = opts || {};
   const label = opts.field || "";
-  const miniPill = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line,#ddd);background:#fff;cursor:pointer";
-  const usePill = "font:inherit;font-size:12px;font-weight:600;padding:4px 13px;border-radius:999px;border:2px solid #5b3fa0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  const miniPill = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);cursor:pointer";
+  const usePill = "font:inherit;font-size:12px;font-weight:600;padding:4px 13px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
   const wrap = el("div"); wrap.style.cssText = "margin:0 0 8px";
   const trigger = el("button", null, "✦ Write with AI"); trigger.type = "button"; trigger.title = "Draft or improve this text — you approve before anything changes";
-  trigger.style.cssText = "font:inherit;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid #d9cef0;background:#faf7ff;color:#3a2470;cursor:pointer";
+  trigger.style.cssText = "font:inherit;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
   wrap.appendChild(trigger);
-  const panel = el("div"); panel.hidden = true; panel.style.cssText = "margin-top:8px;border:1px solid #e6ddf5;background:#faf7ff;border-radius:10px;padding:10px 12px";
+  const panel = el("div"); panel.hidden = true; panel.style.cssText = "margin-top:8px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:10px;padding:10px 12px";
   wrap.appendChild(panel);
   const curText = () => (inputEl.value || "").trim();
   const place = (t) => {
@@ -6607,7 +6677,7 @@ function aiField(inputEl, opts) {
     const many = options.length > 1;
     panel.appendChild(Object.assign(el("div", "hint", many ? "Pick the one that reads right — nothing changes until you use one:" : "A draft — nothing changes until you use it:"), { style: "margin:0 0 6px" }));
     options.forEach((text, i) => {
-      const box = el("div"); box.style.cssText = "white-space:pre-wrap;font-size:13px;line-height:1.5;background:#fff;border:1px solid #e6ddf5;border-radius:8px;padding:8px 10px;max-height:180px;overflow:auto" + (i ? ";margin-top:8px" : ""); box.textContent = text;
+      const box = el("div"); box.style.cssText = "white-space:pre-wrap;font-size:13px;line-height:1.5;background:var(--sheet,#fff);border:1px solid var(--plum-line,#e6ddf5);border-radius:8px;padding:8px 10px;max-height:180px;overflow:auto" + (i ? ";margin-top:8px" : ""); box.textContent = text;
       const use = el("button", null, many ? "Use this one" : "Use it"); use.type = "button"; use.style.cssText = usePill + ";margin-top:6px";
       use.addEventListener("click", () => { place(text); panel.hidden = true; panel.innerHTML = ""; toast("Placed in your draft — publish when it reads right"); });
       panel.append(box, use);
@@ -6676,7 +6746,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
       chip.appendChild(mediaThumb(id));
       const x = el("button", null, "×"); x.type = "button"; x.title = "Remove";
-      x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#a3423a;color:#fff;cursor:pointer;font-size:13px;line-height:1";
+      x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--clay,#a3423a);color:var(--fill-ink,#fff);cursor:pointer;font-size:13px;line-height:1";
       // captions[] stays INDEX-ALIGNED with image_ids — a removed photo takes its
       // caption with it (the server re-validates the same alignment).
       x.addEventListener("click", () => { commitTitle(); blk.image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
@@ -7199,7 +7269,7 @@ function renderFormsCard() {
 
     // smart rules (optional) — the whitelisted conditional logic
     const rulesBox = el("details"); rulesBox.style.cssText = "margin-top:10px";
-    const rsum = el("summary", null, "Smart rules (optional) — show/hide fields based on answers"); rsum.style.cssText = "cursor:pointer;font-size:12.5px;font-weight:600;color:#3a2470";
+    const rsum = el("summary", null, "Smart rules (optional) — show/hide fields based on answers"); rsum.style.cssText = "cursor:pointer;font-size:12.5px;font-weight:600;color:var(--plum-deep,#3a2470)";
     rulesBox.appendChild(rsum);
     const fieldOpts = form.fields.filter((f) => f.key).map((f) => [f.key, f.label || f.key]);
     (form.rules || []).forEach((rule, ri) => {
@@ -7255,7 +7325,7 @@ function renderFormsCard() {
   card.appendChild(addWrap);
 
   const save = el("button", null, "Save forms"); save.type = "button";
-  save.style.cssText = "margin-top:14px;font:inherit;font-weight:600;font-size:13px;padding:8px 18px;border-radius:999px;border:none;background:#5b3fa0;color:#fff;cursor:pointer";
+  save.style.cssText = "margin-top:14px;font:inherit;font-weight:600;font-size:13px;padding:8px 18px;border-radius:999px;border:none;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer";
   save.addEventListener("click", saveForms);
   card.appendChild(save);
 }
@@ -8495,8 +8565,8 @@ async function renderPlanNotice() {
   if (!host) return;
   const act = NOTICE_ACTION[n.kind] || { label: "See plans", href: "pricing.html" };
   const card = el("div", "deskopt");
-  card.style.borderColor = "#d9cbf3";
-  card.style.background = "#faf7ff";
+  card.style.borderColor = "var(--plum-line,#d9cbf3)";
+  card.style.background = "var(--plum-tint,#faf7ff)";
   card.appendChild(el("div", "dol", n.headline));
   card.appendChild(el("div", "dop", n.body));
   const acts = el("div", "doa");
@@ -8524,7 +8594,7 @@ async function renderFirstRun() {
   wrap.innerHTML = ""; wrap.hidden = false;
 
   const card = el("div", "deskopt");
-  card.style.borderColor = "#d9cbf3";
+  card.style.borderColor = "var(--plum-line,#d9cbf3)";
   const head = el("div", "dol", "Welcome — let’s get you set up");
   card.appendChild(head);
   card.appendChild(el("div", "dop", `A few calm steps. ${fr.done} of ${fr.total} done — do them in any order, or come back later.`));
@@ -8532,10 +8602,10 @@ async function renderFirstRun() {
   const viewFor = { details: "business", brand: "business", domain: "business", publish: "today", connect: "today", observe: "today" };
   for (const s of (fr.steps || [])) {
     const row = el("div", "deskopt");
-    row.style.margin = "8px 0 0"; row.style.background = s.done ? "#f4fbf6" : "#fff";
+    row.style.margin = "8px 0 0"; row.style.background = s.done ? "var(--sage-soft,#f4fbf6)" : "var(--sheet,#fff)";
     row.style.cursor = s.done ? "default" : "pointer";
     const t = el("div", "dop", (s.done ? "✓ " : "○ ") + s.title);
-    t.style.fontWeight = "550"; t.style.color = s.done ? "#2e7d52" : "#1a1523";
+    t.style.fontWeight = "550"; t.style.color = s.done ? "var(--sage,#2e7d52)" : "var(--ink,#1a1523)";
     row.appendChild(t);
     if (!s.done) {
       row.appendChild(el("p", "aihint", s.hint));
