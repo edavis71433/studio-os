@@ -267,6 +267,16 @@ tolerance, `detail.from='client'` audience invariant.
 5. **Slice 5 — portal Messages split view** (shares slice-2 components).
 6. **Slice 6 — inbound email** (if D1 approved; can run parallel to 4–5).
 7. **Slice 7 — nav context bar** (both shells) + polish sweep.
+8. **Slice 8 — CRM analytics dashboard** (added at Eric's request 2026-07-16,
+   "yes please"): the Salesforce Reports & Dashboards treatment for the studio
+   side — a dashboard page with pipeline-by-stage over time, win-rate and
+   deal-velocity trends, revenue vs. outstanding (AR), activity volume
+   (calls/emails/messages logged), lead sources → conversion. Data largely
+   exists (presence_deals/deal_events/invoices/form_submissions + /sales/summary);
+   expect one additive summary route, zero schema change. Before building:
+   a focused research pass on Lightning dashboard/report anatomy (the §11
+   deep-research didn't cover Reports & Dashboards) + mockup pictures with
+   decision points to Eric, same as the main spec. Runs LAST, after slice 7.
 
 Mockups accompany this spec as pictures (record page · studio inbox · portal
 project page) so the layout choices are visual, not prose.

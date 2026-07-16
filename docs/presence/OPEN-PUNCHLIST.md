@@ -145,7 +145,9 @@ unread (cd0cc0f; pre-approved "Approved" + "this is grreat approved"; 21
 review findings fixed; e2e 204/0; deploy #14 green — functions + frontend
 live; 0113 already applied so unread dots are real from day one). NOW:
 slice 3 — rosters as list views + pipeline Path/Board⇄Table (frontend-only,
-in progress). Then slices 4–5 (client portal), 6 (inbound email), 7 (nav).
+in progress). Then slices 4–5 (client portal), 6 (inbound email), 7 (nav),
+**8 (CRM analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec
+§7.8; research + mockups + his decision points before code, runs last).**
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
