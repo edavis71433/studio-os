@@ -652,6 +652,30 @@ body.pd-dragging *{cursor:grabbing !important}
 .dpdevseg button{font:inherit;font-size:13px;font-weight:600;padding:8px 18px;border-radius:999px;border:none;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
 .dpdevseg button.on{background:var(--seg-chip,var(--sheet,#fff));color:var(--ink,#1b1525);box-shadow:var(--seg-ring,0 1px 4px rgba(0,0,0,.12))}
 .dpdevseg button:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+/* Slice D (AC-4): the modes bar — Edit · Preview · Comments · Timewarp. The SAME
+   segment idiom as the device toggle (.dpdevseg + a sibling class, so #dpDevSeg's
+   own rules never change); the two stay orthogonal — device = viewport emulation
+   of the frame, mode = what interaction the canvas offers. Session state only. */
+.dcmodeseg button{padding:8px 14px}
+/* Preview / Timewarp: the same frame with ALL editing chrome withheld — the
+   injector is never called, the FAB hides, and the page scrolls like a visitor's
+   (link/submit navigation is guarded inside the document, dcGuardViewNav). */
+.dp-frame.dc-view iframe{pointer-events:auto}
+#designCanvas.dc-mode-view .dc-fab{display:none}
+/* …and the toolbar's editing actions withdraw too (Undo/Redo, Content tree,
+   Add section, Menu, Design settings): a mode that promises no editing chrome
+   must not leave buttons that mutate the draft with zero visible feedback.
+   Page ▾ stays — publishing/sharing after a read-through is a viewing act. */
+#designCanvas.dc-mode-view .dc-bar-acts{display:none}
+/* Timewarp's compact inline bar above the canvas: date → the EXISTING
+   GET /publishes/timewarp machinery; the banner + "Back to today" live here */
+.dc-twbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:9px 14px;border:1px solid var(--line,#ddd);border-radius:12px;background:var(--wash,#f4f0fb)}
+.dc-twbar[hidden]{display:none}   /* the flex rule must never beat the hidden attribute (same guard as #designFilesWrap) */
+.dc-twbar label{font-size:12.5px;font-weight:600;color:var(--ink,#1b1525)}
+.dc-twbar input[type="date"]{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--sheet,#fff);color:var(--ink,#1b1525)}
+.dc-twbar input[type="date"]:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+.dc-twmsg{font-size:12.5px;font-weight:600;color:var(--plum,#5b3fa0)}
+.dc-twbar .dc-actbtn{margin-left:auto}
 #designPreviewWrap{position:relative}
 /* §1.4 the preview-iframe boundary: the site inside is light BY DESIGN (it shows
    exactly what publishes — never filtered or re-themed). The frame is an object
@@ -680,6 +704,10 @@ body.pd-dragging *{cursor:grabbing !important}
   .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:16px 16px 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
   .dc-slideover.on{transform:translateY(0)}
   .dc-fab{right:14px;bottom:14px;padding:11px 18px;font-size:13px}
+  /* Slice D: the mode segment mirrors #dpDevSeg's mobile presentation — a compact
+     full-width segment row above the canvas (the dc-bar already wraps) */
+  .dcmodeseg{display:flex;width:100%}
+  .dcmodeseg button{flex:1 1 auto;padding:8px 4px;font-size:12px}
 }
 
 /* ── mobile: the dock ── */
@@ -964,6 +992,17 @@ body.pd-dragging *{cursor:grabbing !important}
                   <!-- Slice B (AC-5): the Page Information menu — one place for everything
                        about this page/site. Every entry deep-links to existing machinery. -->
                   <button type="button" class="dc-actbtn" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false">Page ▾</button>
+                  <!-- Slice D (AC-4): the modes bar. Edit = today's canvas; Preview =
+                       the same frame, all editing chrome withheld; Comments = the G11
+                       toggle RE-HOMED (same #btnComments id, exact cmToggle machinery);
+                       Timewarp = History's GET /publishes/timewarp, in-canvas, read-only.
+                       Orthogonal to the device segment below (device = viewport). -->
+                  <div id="dcModeSeg" class="dpdevseg dcmodeseg" role="group" aria-label="Canvas mode">
+                    <button type="button" data-dcmode="edit" class="on" aria-pressed="true" title="Build this page — edit, arrange and add sections">Edit</button>
+                    <button type="button" data-dcmode="preview" aria-pressed="false" title="Read your page like a visitor, right here — no editing chrome">Preview</button>
+                    <button type="button" data-dcmode="comments" id="btnComments" aria-pressed="false" title="Feedback on this draft — notes from you and your client, section by section">💬 Comments</button>
+                    <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked on any past date">Timewarp</button>
+                  </div>
                   <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
                     <button type="button" data-dpdev="desktop" class="on" aria-pressed="true">Desktop</button>
                     <button type="button" data-dpdev="tablet" aria-pressed="false">Tablet</button>
@@ -974,12 +1013,21 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="dc-bar-acts">
                 <button type="button" class="dc-actbtn" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled>↶ Undo</button>
                 <button type="button" class="dc-actbtn" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button>
-                <button type="button" class="dc-actbtn" id="btnComments" title="Feedback on this draft — notes from you and your client, section by section" aria-pressed="false">💬 Comments</button>
+                <!-- Slice D: #btnComments moved into the mode segment (hard move, slice-B precedent) -->
                 <button type="button" class="dc-actbtn" id="btnContentsOpen" aria-haspopup="dialog" aria-controls="trayPanel">☰ Content tree</button>
                 <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-haspopup="dialog" aria-controls="trayPanel">＋ Add section</button>
                 <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">☰ Menu</button>
                 <button type="button" class="dc-actbtn" id="btnSettingsOpen" aria-haspopup="dialog" aria-controls="settingsPanel">Design settings</button>
               </div>
+            </div>
+            <!-- Slice D: Timewarp's inline bar — the EXISTING GET /publishes/timewarp
+                 machinery (History's version tools, same fetch shape), rendered into
+                 the canvas frame read-only. "Back to today" exits to Edit. -->
+            <div id="dcTwBar" class="dc-twbar" hidden>
+              <label for="dcTwDate">Your site as it looked on…</label>
+              <input type="date" id="dcTwDate" aria-label="Date to look back to">
+              <span class="dc-twmsg" id="dcTwMsg" role="status"></span>
+              <button type="button" class="dc-actbtn" id="dcTwBack">Back to today</button>
             </div>
             <div id="designPreviewWrap">
               <div class="dp-stage" id="dpStage">
@@ -4389,7 +4437,7 @@ function openPageSearchPanel() {
    The client's notes arrive through the shared-draft link (Share draft): the
    /p/s/:token page carries a "Leave feedback" panel keyed by the SAME stable
    section ids, so both sides of the conversation land in the same threads. ── */
-let CM_ON = false, CM_THREADS = null, CM_BUSY = false;
+let CM_ON = false, CM_THREADS = null, CM_BUSY = false, CM_PENDING = null;
 // Mirror of the server's stable section-id scheme (lib/section_comments.ts):
 // type | type#N (Nth same-type block) | type:storedId (multi-instance blocks).
 // Index-aligned with the block list (junk entries map to null, never counted).
@@ -4412,17 +4460,23 @@ async function cmLoad() { CM_THREADS = (((await api("GET", "/comments")).data ||
 function cmSyncButton() {
   const b = $("btnComments"); if (!b) return;
   const n = CM_ON ? cmTotalOpen() : 0;
+  // The label (and its open-note count) only — the segment button's on/aria-pressed
+  // state has exactly ONE writer, dcModeSync, so the two can never disagree.
   b.textContent = "💬 Comments" + (CM_ON && n ? " (" + n + ")" : "");
-  b.classList.toggle("on", CM_ON); b.setAttribute("aria-pressed", String(CM_ON));
 }
-async function cmToggle() {
-  if (CM_BUSY) return;
+function cmToggle() {
+  if (CM_BUSY) return CM_PENDING;   // a load is already in flight — join it, never a silent no-op
   if (CM_ON) { CM_ON = false; CM_THREADS = null; cmSyncButton(); closeCommentsPanel(); dcRefreshTree(); return; }
   CM_BUSY = true;
   const b = $("btnComments"); if (b) b.textContent = "💬 Loading…";
-  try { await cmLoad(); CM_ON = true; openTrayPanel("contents"); }
-  catch (err) { toast(nice(err), true); }
-  CM_BUSY = false; cmSyncButton();
+  CM_PENDING = (async () => {
+    try {
+      await cmLoad(); CM_ON = true;
+      if (DC_MODE === "comments") openTrayPanel("contents");   // …unless the user already moved on mid-load
+    } catch (err) { toast(nice(err), true); }
+    CM_BUSY = false; CM_PENDING = null; cmSyncButton();
+  })();
+  return CM_PENDING;
 }
 // The count badge on a tray row: always visible when a thread has open notes;
 // a quiet hover affordance (💬) otherwise, so a thread can be STARTED anywhere.
@@ -5687,6 +5741,10 @@ function renderPagesBar() {
 function dcSwitchPage(slug) {
   slug = slug || "";
   if (slug === DC_PAGE) return;
+  // Slice D (least-code choice): a page switch leaves Timewarp — the banner's
+  // date claim must never sit over a freshly-loaded draft. Preview simply stays
+  // on: the new page loads chrome-free, which is exactly what Preview means.
+  if (DC_MODE === "timewarp") dcSetMode("edit");
   DC_PAGE = slug; dcResetHistory();
   BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null;
   renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7666,6 +7724,100 @@ async function mountLookCard() {
   });
 })();
 
+// ── Slice D (AC-4) — the modes bar: Edit · Preview · Comments · Timewarp ─────
+// One segmented control (#dcModeSeg), the same idiom as the device segment and
+// fully ORTHOGONAL to it (device = viewport emulation, mode = interaction).
+// Mode is page-session state — never persisted. Edit is today's canvas exactly;
+// Preview is the same current-page frame with every piece of editing chrome
+// withheld (the injector is simply not called on load — no toolbar, no insert
+// gaps, no FAB); Comments is the G11 toggle RE-HOMED (the exact cmToggle()
+// ON/OFF paths — byte-identical machinery, new position, label stays
+// "Comments"); Timewarp reuses History's GET /publishes/timewarp + the same
+// /preview?publish_id= render, read-only, with an in-canvas banner. Zero
+// backend change. Same-mode clicks are no-ops — except Comments, which keeps its
+// G11 toggle memory: clicking it while on returns to Edit (the OFF path).
+let DC_MODE = "edit";
+let DC_TW_LOADED = false;   // a past version is on the canvas — draft refreshes must not repaint over it
+let DC_TW_SEQ = 0;          // orphans in-flight Timewarp lookups (a newer pick, or leaving the mode)
+function dcModeSync() {
+  const seg = $("dcModeSeg");
+  if (seg) seg.querySelectorAll("button").forEach((b) => {
+    const on = b.dataset.dcmode === DC_MODE;
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+  });
+  const canvas = $("designCanvas");
+  if (canvas) canvas.classList.toggle("dc-mode-view", DC_MODE === "preview" || DC_MODE === "timewarp");
+  const tw = $("dcTwBar"); if (tw) tw.hidden = DC_MODE !== "timewarp";
+}
+async function dcSetMode(mode) {
+  mode = ["edit", "preview", "comments", "timewarp"].indexOf(mode) >= 0 ? mode : "edit";
+  if (mode === DC_MODE) { if (mode === "comments") dcSetMode("edit"); return; }   // Comments keeps its G11 toggle-off
+  const prev = DC_MODE;
+  const twWasLoaded = prev === "timewarp" && DC_TW_LOADED;   // captured before the reset just below
+  if (prev === "comments" && CM_ON) cmToggle();   // the exact G11 OFF path (sync branch)
+  if (prev === "timewarp") {
+    DC_TW_LOADED = false; DC_TW_SEQ++;   // a lookup still in flight must not land after we leave
+    const dt = $("dcTwDate"); if (dt) dt.value = "";
+    const msg = $("dcTwMsg"); if (msg) msg.textContent = "";
+  }
+  DC_MODE = mode; dcModeSync();
+  if (mode === "comments") {
+    if (!CM_ON) await cmToggle();   // the G11 ON path — joins an in-flight load rather than no-opping
+    if (DC_MODE !== "comments") { if (CM_ON) cmToggle(); }   // user left while threads loaded — run the OFF path
+    else if (!CM_ON) { DC_MODE = "edit"; dcModeSync(); }     // load failed (cmToggle toasted) — fall back honestly
+  }
+  const wasView = prev === "preview" || prev === "timewarp";
+  const isView = DC_MODE === "preview" || DC_MODE === "timewarp";
+  if (isView) closeDesignPanels();   // view modes read like a visitor — no editing panels over them
+  // Reload the frame only when crossing the editing/viewing boundary (the load
+  // handler injects chrome in Edit/Comments, withholds it in Preview/Timewarp) —
+  // or when leaving a landed Timewarp, whose past render must give way to the draft.
+  if (wasView !== isView || twWasLoaded) refreshDesignPreview();
+}
+// View modes read like a visitor: the page scrolls freely, but links and forms
+// never navigate the canvas away (the same spirit as the stage's link guard).
+function dcGuardViewNav(doc) {
+  try {
+    doc.addEventListener("click", (e) => { const a = e.target && e.target.closest && e.target.closest("a"); if (a) e.preventDefault(); }, true);
+    doc.addEventListener("submit", (e) => e.preventDefault(), true);
+  } catch (_) { /* guard is best-effort; pointer events stay scoped to the frame */ }
+}
+// Timewarp: picking a date calls the EXISTING route History's version tools use
+// (renderVersionTools — identical fetch shape), then renders that kept version
+// through the same /preview?publish_id= query the stage's openPublishPreview
+// path uses — here into the canvas frame, read-only.
+async function dcTimewarpGo() {
+  const dt = $("dcTwDate"); if (!dt || DC_MODE !== "timewarp") return;
+  const msg = $("dcTwMsg");
+  const seq = ++DC_TW_SEQ;   // a newer pick (or leaving the mode) orphans this lookup
+  if (!dt.value) {   // date cleared — stay in Timewarp but hand the canvas back to the draft
+    DC_TW_LOADED = false; if (msg) msg.textContent = ""; refreshDesignPreview(); return;
+  }
+  if (msg) msg.textContent = "Looking back…";
+  try {
+    const d = (await api("GET", `/publishes/timewarp?date=${encodeURIComponent(dt.value)}`)).data;
+    if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;   // superseded while fetching
+    const frame = $("designPreview");
+    if (frame) {
+      const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // the page open on the canvas
+      const html = await apiHtml(`/preview?publish_id=${encodeURIComponent(d.publish_id)}&page=${encodeURIComponent(path)}`);
+      if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
+      frame.srcdoc = html;
+    }
+    DC_TW_LOADED = true;
+    const when = new Date(dt.value + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    // The server knows when the date resolves to the CURRENT live version — say so
+    // (History's Timewarp surfaces the same d.message) instead of claiming history.
+    if (msg) msg.textContent = d.is_current ? (d.message || "That’s how your website looks right now.") : "Your site as it looked on " + when + ".";
+  } catch (err) {
+    if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
+    DC_TW_LOADED = false; dt.value = "";   // cleared, so the SAME date can be re-picked (change wouldn't re-fire)
+    if (msg) msg.textContent = "Couldn’t look back just now — this is today’s draft.";
+    refreshDesignPreview();   // never leave a stale past render sitting under a failed lookup
+    toast(nice(err), true);
+  }
+}
+
 // ── #2 — on-demand panels (canvas-dominant layout) ──────────────────────────
 // The tray and the design settings are NOT permanent rails. Each opens as a
 // slide-over and closes again, so the live canvas keeps the majority of the
@@ -7734,6 +7886,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     const dv = $("view-design"); if (!dv || !dv.classList.contains("on")) return;   // design view only
+    if (DC_MODE === "preview" || DC_MODE === "timewarp") return;   // view modes are read-only — no blind undo
     const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "")) return;   // don't hijack field editing
     const k = (e.key || "").toLowerCase();
     if (k === "z" && !e.shiftKey) { e.preventDefault(); dcUndo(); }
@@ -7745,7 +7898,18 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   on("btnSettingsOpen", openSettingsPanel); on("btnSettingsClose", closeDesignPanels);
   on("btnNavEdit", dcEditNav);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
-  on("btnComments", cmToggle); on("btnCommentsClose", closeDesignPanels);   // G11
+  // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
+  // re-homed — same id, same cmToggle machinery, driven through dcSetMode).
+  const modeSeg = $("dcModeSeg");
+  if (modeSeg) modeSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.dcmode) dcSetMode(b.dataset.dcmode); });
+  on("dcTwBack", () => dcSetMode("edit"));
+  const twd = $("dcTwDate");
+  if (twd) {
+    const today = new Date(), pad = (n) => String(n).padStart(2, "0");
+    twd.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;   // History's Timewarp caps at today too
+    twd.addEventListener("change", dcTimewarpGo);
+  }
+  on("btnCommentsClose", closeDesignPanels);   // G11
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
@@ -8510,8 +8674,15 @@ function dpNote(title, body) {
 }
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
+  // Slice D: a past version is on the canvas (Timewarp) — leave it there until
+  // "Back to today"; the draft repaint happens on the mode change back to Edit.
+  if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
   clearTimeout(designPreviewTimer);
   designPreviewTimer = setTimeout(async () => {
+    // Re-check at fire time AND after the fetch — a Timewarp render may have
+    // landed while this repaint was debouncing or in flight; never paint the
+    // draft over it while the banner still claims a past date.
+    if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
     // ALWAYS render the canvas — even a brand-new draft gets a page to build ON.
     // The render engine returns a valid scaffold (nav · footer · whatever content
     // exists); dcInjectCanvas then lays a big "add your first section" drop zone
@@ -8519,7 +8690,9 @@ function refreshDesignPreview() {
     // build surface, not a dead sheet. No early-return-on-empty any more.
     try {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
-      frame.srcdoc = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
+      const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
+      if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
+      frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) box.hidden = true;
     } catch (_) {
       // the big proof ("See your site") still works — say so rather than staying blank
@@ -9080,10 +9253,20 @@ function dcTreeSelect(el2, row) {
   frame.addEventListener("load", () => {
     let doc; try { doc = frame.contentDocument; } catch (_) { return; }
     if (!doc || !doc.body) return;
+    const wrap = frame.closest(".dp-frame");
+    frame.removeAttribute("aria-hidden");   // the canvas is interactive (Edit) or readable (view modes), not decorative
+    // Slice D: Preview / Timewarp withhold ALL editing chrome — the injector is
+    // simply never called; the page scrolls, links/forms are guarded read-only.
+    // This runs BEFORE the #main check: even a document without the landmark (an
+    // error page, an old kept version) must get the nav guard and the right class.
+    if (DC_MODE === "preview" || DC_MODE === "timewarp") {
+      if (wrap) { wrap.classList.remove("dc-live"); wrap.classList.add("dc-view"); }
+      dcGuardViewNav(doc);
+      return;
+    }
+    if (wrap) { wrap.classList.remove("dc-view"); wrap.classList.add("dc-live"); }
     const main = doc.getElementById("main"); if (!main) return;
     if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
-    const wrap = frame.closest(".dp-frame"); if (wrap) wrap.classList.add("dc-live");
-    frame.removeAttribute("aria-hidden");   // the canvas is now interactive, not decorative
     try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
     // A just-added / dropped / duplicated / pasted section: scroll the canvas to it
     // and flash it, so the change is NEVER invisible (blocks render below the core
