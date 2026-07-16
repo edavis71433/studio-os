@@ -122,6 +122,19 @@ activity model, highlights panel, global search, AR view, deal to-dos 0107/0108)
 is the FLOOR, not the target — Salesforce-grade look and organization end to
 end, on both sides of the product.
 
+**SPEC APPROVED by Eric 2026-07-16 ("looks good continue")** —
+docs/design/crm-portal-salesforce-redesign.md, with the recommended defaults
+on all five decisions: **D1 YES** inbound email via Resend Inbound (slice 6;
+needs Eric's ~15-min Resend dashboard step when it ships) · **D2** Lightning
+anatomy in dds brand (not literal SLDS palette) · **D3** list views v1 =
+columns + sort + filter chips + fixed views (saved views/bulk later) ·
+**D4** timeline stays a read-time merge under one new route (`GET
+/crm/activity`), no persisted activity table yet · **D5** portal Messages
+mobile = stacked split-view panes. Delivery: 7 slices (record page → studio
+inbox split view → rosters/pipeline → portal shell → portal messages →
+inbound email → nav context bar), each with adversarial review + before/after
+screenshots → Eric approves → merge.
+
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
