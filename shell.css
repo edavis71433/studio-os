@@ -7,8 +7,9 @@
    type, spacing and radii live — pages inherit the frame from here). */
 :root{
   --dds-bg:#faf8f5; --dds-card:#fff; --dds-ink:#1b1525; --dds-soft:#6b6478; --dds-faint:#746b8a; --dds-line:#eee9e0;
+  --dds-line-strong:#ddd6ea;
   --dds-p:#5b3fa0; --dds-p-deep:#2a1b4a; --dds-p-soft:#efeafa;
-  --dds-good:#33664b; --dds-good-soft:#e7f1ea; --dds-warn:#775d31; --dds-warn-soft:#f3ead9;
+  --dds-good:#33664b; --dds-good-soft:#e7f1ea; --dds-warn:#775d31; --dds-warn-soft:#f3ead9; --dds-bad:#9a4242;
   --dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09);
   --dds-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --dds-serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -16,11 +17,12 @@
 }
 @media (prefers-color-scheme:dark){:root{
   --dds-bg:#171320; --dds-card:#1f1a2b; --dds-ink:#efeaf7; --dds-soft:#a79ebc; --dds-faint:#948bad; --dds-line:#2a2338;
-  --dds-p:#b79ceb; --dds-p-soft:#241d38; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316;
+  --dds-line-strong:#3a3150;
+  --dds-p:#b79ceb; --dds-p-soft:#241d38; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316; --dds-bad:#e08b83;
   --dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);
 }}
-:root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-p:#5b3fa0;--dds-p-soft:#efeafa}
-:root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#948bad;--dds-line:#2a2338;--dds-p:#b79ceb;--dds-p-soft:#241d38}
+:root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-line-strong:#ddd6ea;--dds-p:#5b3fa0;--dds-p-soft:#efeafa;--dds-bad:#9a4242}
+:root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#948bad;--dds-line:#2a2338;--dds-line-strong:#3a3150;--dds-p:#b79ceb;--dds-p-soft:#241d38;--dds-bad:#e08b83}
 
 /* pages get top-room for the fixed shell once it mounts */
 html.dds-has-shell body{padding-top:var(--dds-shell-h)}
@@ -102,17 +104,24 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
 @media (prefers-reduced-motion:reduce){#dds-shell,.dds-pop,.dds-palette{transition:none}}
 
 /* ── PT-5: contextual onboarding hint (teach in context, dismiss forever) ──── */
+/* The pill is an INVERTED surface (ink fill), so its text/chips use --dds-bg,
+   which flips with the theme — in dark mode the pill is light and the text dark.
+   Hardcoded #fff here was white-on-white in dark mode (fixed 2026-07-16). */
 .dds-hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(8px);max-width:min(560px,92vw);
-  background:var(--dds-ink,#1b1525);color:#fff;padding:12px 16px;border-radius:12px;box-shadow:var(--dds-shadow,0 8px 30px rgba(0,0,0,.2));
+  background:var(--dds-ink,#1b1525);color:var(--dds-bg,#fff);padding:12px 16px;border-radius:12px;box-shadow:var(--dds-shadow,0 8px 30px rgba(0,0,0,.2));
   font-family:var(--dds-sans,system-ui,sans-serif);font-size:14px;line-height:1.45;display:flex;align-items:center;gap:14px;
   opacity:0;transition:opacity .2s ease,transform .2s ease;z-index:60}
 .dds-hint.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .dds-hint a{color:#c9b8f0;font-weight:600;text-decoration:none}
 .dds-hint a:hover{text-decoration:underline}
-.dds-hint .x{flex:0 0 auto;background:rgba(255,255,255,.16);color:#fff;border:none;border-radius:999px;
+.dds-hint .x{flex:0 0 auto;background:color-mix(in srgb,var(--dds-bg,#fff) 16%,transparent);color:var(--dds-bg,#fff);border:none;border-radius:999px;
   padding:6px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s ease}
-.dds-hint .x:hover{background:rgba(255,255,255,.3)}
-.dds-hint .x:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.dds-hint .x:hover{background:color-mix(in srgb,var(--dds-bg,#fff) 30%,transparent)}
+.dds-hint .x:focus-visible{outline:2px solid var(--dds-bg,#fff);outline-offset:2px}
+/* the link color inverts with the pill: light lavender on the dark pill,
+   deep plum on the light (dark-mode) pill */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-hint a{color:#3a2470}}
+:root[data-theme="dark"] .dds-hint a{color:#3a2470}
 
 /* ── PT-4: visual polish — a shared skeleton shimmer for loading states ────── */
 .dds-skeleton{background:linear-gradient(90deg,var(--dds-line,#eee) 25%,rgba(120,120,120,.14) 37%,var(--dds-line,#eee) 63%);
