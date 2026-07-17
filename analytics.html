@@ -116,6 +116,12 @@
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:40}
   .toast.show{opacity:1}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  /* print (restored from the pre-slice-8 page): the noprint chrome hides, cards
+     never break mid-page, and the "Print this summary" button offers the path */
+  .print{margin-top:26px;text-align:center}
+  .print button{background:none;border:1px solid var(--line);border-radius:10px;color:var(--soft);font:inherit;font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer}
+  .print button:hover{border-color:var(--p);color:var(--p)}
+  @media print{.seg,.print,.filters,.noprint,#dds-shell{display:none!important}.wrap{max-width:100%}.card,.pcard{box-shadow:none;break-inside:avoid}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   /* mobile: cards stack — pairs at tablet width, a single column on phones */
@@ -149,6 +155,22 @@ const num=(n)=>(Number(n)||0).toLocaleString();
 const withScope=(href)=>scope()?href+(href.includes('?')?'&':'?')+'client='+encodeURIComponent(scope()):href;
 const PERIODS=[['this_month','This month'],['last_30','Last 30 days'],['quarter','This quarter'],['all','All time']];
 const periodLabel=()=>{const p=PERIODS.find(x=>x[0]===PERIOD);return p?p[1]:'This month';};
+// Truncation honesty (AN-4): a capped read is "the most recent N", so the card
+// says so — a static, esc-safe suffix on the subtitle.
+const based=(sub,flag)=>flag?(sub?sub+' · based on recent activity':'Based on recent activity'):sub;
+// GSC period labeling: Search Console data can lag a month — when the reported
+// period isn't the current calendar month, qualify the number (" · in June").
+// Defensive: a malformed period string yields no qualifier, never a wrong one.
+function gscQual(period){
+  const m=/^(\d{4})-(\d{2})$/.exec(String(period||''));
+  if(!m)return'';
+  const d=new Date();
+  const cur=d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2);
+  if(m[0]===cur)return'';
+  const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const n=names[Number(m[2])-1];
+  return n?' · in '+n:'';
+}
 function asOf(iso){const d=iso?new Date(iso):new Date();const t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const sameDay=d.toDateString()===new Date().toDateString();return (sameDay?'today, ':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+t;}
 function shortDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});}
 
@@ -168,12 +190,12 @@ function emptyState(h,line){
 // weekly line — inline SVG, aria-hidden; the visible numbers live in the caption
 function lineChart(series,color,noun){
   const s=(series||[]).map(v=>Number(v)||0);
-  if(!s.length||!s.some(v=>v>0))return null;
+  if(s.length<2||!s.some(v=>v>0))return null;   // <2 points → the empty state (step math would NaN)
   const W=460,max=Math.max.apply(null,s);
   const step=W/(s.length-1);
   const y=(v)=>Math.round((100-(v/max)*86)*10)/10;
   const pts=s.map((v,i)=>`${Math.round(i*step)},${y(v)}`).join(' ');
-  const lastX=Math.round((s.length-1)*step),lastY=y(s[s.length-1]);
+  const lastX=Math.min(Math.round((s.length-1)*step),W-4),lastY=y(s[s.length-1]);   // inset the dot — never half-clipped at the edge
   const total=s.reduce((a,b)=>a+b,0);
   return `<svg viewBox="0 0 460 120" width="100%" height="130" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <line x1="0" y1="100" x2="460" y2="100" stroke="var(--line)"/>
@@ -208,7 +230,7 @@ function salesBand(d){
   const s=(d&&d.sales)||{};
   let h=`<h2 class="band">Sales</h2>`;
   // KPI: open pipeline
-  h+=card('c3','Open pipeline','',
+  h+=card('c3','Open pipeline',based('',s.truncated_deals),
     s.pipeline?kpi(money(s.pipeline.open.value_cents),`${num(s.pipeline.open.count)} open deal${s.pipeline.open.count===1?'':'s'}`)
       :emptyState('Nothing to count yet','Your open deals will total up here.'),
     ['/pipeline.html','View pipeline']);
@@ -220,10 +242,10 @@ function salesBand(d){
       const hint=(tm.value_cents||lm.value_cents)?(tm.value_cents>lm.value_cents?' · <b class="up">↑ vs last month</b>':tm.value_cents<lm.value_cents?' · <b class="down">↓ vs last month</b>':' · same as last month'):'';
       body=tm.count?kpi(money(tm.value_cents),`${num(tm.count)} deal${tm.count===1?'':'s'}${hint}`):kpi('$0',`none yet${hint}`);
     }else body=emptyState('Nothing to count yet','Deals you win will show up here.');
-    h+=card('c3','Won this month','',body,['/pipeline.html','View won deals']);
+    h+=card('c3','Won this month',based('',s.truncated_deals),body,['/pipeline.html','View won deals']);
   }
   // KPI: new enquiries
-  h+=card('c3','New enquiries','',
+  h+=card('c3','New enquiries',based('',s.truncated_enquiries),
     s.enquiries?kpi(num(s.enquiries.count),s.enquiries.unanswered?`${num(s.enquiries.unanswered)} not yet answered`:'all answered')
       :emptyState('Nothing to count yet','Website enquiries will land here.'),
     ['/leads.html','View enquiries']);
@@ -244,16 +266,18 @@ function salesBand(d){
         return `<div class="fr"><span class="fl">${esc(x.label)}</span><div class="fb" style="width:${pct}%;background:${STAGE_COLOR[x.stage]||'var(--c1)'}" aria-hidden="true"></div><span class="fv">${money(x.value_cents)} · ${num(x.count)}</span></div>`;
       }).join('');
     }else body=emptyState('No open deals','Deals you add to the pipeline will stack up here by stage.');
-    h+=card('c6','Pipeline by stage','Open deal value, stage order',body,['/pipeline.html','View pipeline']);
+    h+=card('c6','Pipeline by stage',based('Open deal value, stage order',s.truncated_deals),body,['/pipeline.html','View pipeline']);
   }
   // line: enquiries over time
-  h+=card('c6','Enquiries over time','Weekly, last 12 weeks',
+  h+=card('c6','Enquiries over time',based('Weekly, last 12 weeks',s.truncated_enquiries),
     (s.enquiries&&lineChart(s.enquiries.weekly,'var(--c1)','enquiries'))||emptyState('No enquiries yet','When people reach out through your website, the trend shows here.'),
     ['/leads.html','View enquiries']);
-  // bar: deal value by stage (+ won this month)
+  // bar: deal value by stage (+ won this month) — same stages guard as the
+  // funnel (a null stages array must render the empty state, never throw
+  // mid-render on a soft refresh)
   {
     let body=null;
-    if(s.pipeline&&s.won){
+    if(s.pipeline&&Array.isArray(s.pipeline.stages)&&s.won){
       const bars=s.pipeline.stages.map(x=>({label:STAGE_SHORT[x.stage]||x.stage,v:x.value_cents,c:STAGE_COLOR[x.stage]||'var(--c1)'}));
       bars.push({label:'Won',v:(s.won.this_month||{}).value_cents||0,c:STAGE_COLOR.won});
       if(bars.some(b=>b.v>0)){
@@ -266,25 +290,28 @@ function salesBand(d){
           }).join('')+`</svg><p class="chartnote">Open ${money(s.pipeline.open.value_cents)} · Won this month ${money((s.won.this_month||{}).value_cents||0)}</p>`;
       }
     }
-    h+=card('c4','Deal value by stage','Open + won this month',body||emptyState('No deal value yet','Give your deals a value and this chart fills in.'),['/pipeline.html','View pipeline']);
+    // widens to c6 when the invoices card is hidden, so the row stays c6+c6
+    h+=card(s.invoices?'c4':'c6','Deal value by stage',based('Open + won this month',s.truncated_deals),body||emptyState('No deal value yet','Give your deals a value and this chart fills in.'),['/pipeline.html','View pipeline']);
   }
   // donut: invoices — HIDDEN entirely when the read isn't available (null)
   if(s.invoices){
     const iv=s.invoices;
     const any=iv.paid_count||iv.sent_count||iv.overdue_count;
+    // the outstanding total lives in the (aria-hidden) donut hole AND as real
+    // text below the legend — never SVG-only
     const body=any?donut(
       [{v:iv.paid_cents,c:'var(--good)'},{v:iv.sent_cents,c:'var(--c2)'},{v:iv.overdue_cents,c:'var(--bad)'}],
       money(iv.outstanding_cents),'outstanding',
       [{c:'var(--good)',text:`Paid · ${money(iv.paid_cents)}`},{c:'var(--c2)',text:`Sent · ${money(iv.sent_cents)}`},{c:'var(--bad)',text:`Overdue · ${money(iv.overdue_cents)}`}]
-    ):emptyState('No invoices yet','Invoices you send from a deal will total up here.');
-    h+=card('c4','Invoices',periodLabel(),body,['/pipeline.html','View invoices']);
+    )+`<p class="chartnote">Outstanding · ${money(iv.outstanding_cents)}</p>`:emptyState('No invoices yet','Invoices you send from a deal will total up here.');
+    h+=card('c4','Invoices',based(periodLabel(),s.truncated_invoices),body,['/pipeline.html','View invoices']);
   }
   // table: recent wins
   {
     const rows=(s.recent_wins||[]);
     const body=rows.length?`<table><caption>Recent wins — deal, value, closed date</caption><thead><tr><th scope="col">Deal</th><th class="r" scope="col">Value</th><th class="r" scope="col">Closed</th></tr></thead><tbody>${rows.map(w=>`<tr><td>${esc(w.title)}</td><td class="r">${money(w.value_cents)}</td><td class="r">${esc(shortDate(w.closed_at))}</td></tr>`).join('')}</tbody></table>`
       :emptyState('No wins yet','Deals you win in the next 90 days will be listed here.');
-    h+=card(s.invoices?'c4':'c6','Recent wins','Last 90 days',body,['/pipeline.html','View won deals']);
+    h+=card(s.invoices?'c4':'c6','Recent wins',based('Last 90 days',s.truncated_deals),body,['/pipeline.html','View won deals']);
   }
   return h;
 }

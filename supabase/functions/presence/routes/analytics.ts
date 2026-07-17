@@ -40,11 +40,16 @@ import type { SiteRow } from '../lib/site.ts';
 
 /** Read the Google Search Console metrics that already live in the shared `signals`
  *  table (source='gsc', keyed by client_id). No new store, no ingestion — reuse.
- *  Returns hasData:false honestly when there's none (the state everywhere today). */
-export async function readGsc(clientId: string | null | undefined): Promise<GscMetrics> {
-  const empty: GscMetrics = { impressions: 0, clicks: 0, priorImpressions: null, priorClicks: null, ctr: null, position: null, period: '', hasData: false, totalImpressions: 0, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null };
+ *  Returns hasData:false honestly when there's none (the state everywhere today).
+ *  `ok:false` marks a FAILED read (transient signals-table trouble) — distinct
+ *  from "genuinely no data", so consumers never show a connect-CTA to a
+ *  connected user just because one read hiccuped. */
+export type GscRead = GscMetrics & { ok: boolean };
+export async function readGsc(clientId: string | null | undefined): Promise<GscRead> {
+  const empty: GscRead = { impressions: 0, clicks: 0, priorImpressions: null, priorClicks: null, ctr: null, position: null, period: '', hasData: false, totalImpressions: 0, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null, ok: true };
   if (!clientId) return empty;
   const r = await svc(`signals?client_id=eq.${encodeURIComponent(clientId)}&source=eq.gsc&select=metric,value,period&order=period.desc&limit=48`);
+  if (!(r as any).ok) return { ...empty, ok: false };
   const rows = Array.isArray((r as any).json) ? (r as any).json : [];
   if (!rows.length) return empty;
   const periodsAsc = ([...new Set(rows.map((x: any) => String(x.period)))] as string[]).sort();
@@ -62,6 +67,7 @@ export async function readGsc(clientId: string | null | undefined): Promise<GscM
     period: cur, hasData: true,
     totalImpressions: sum('search_impressions'), totalClicks: sum('search_clicks'),
     firstImpressionAt: firstWith('search_impressions'), firstSearchClickAt: firstWith('search_clicks'),
+    ok: true,
   };
 }
 
@@ -349,11 +355,15 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
 
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+  // TRUTHFULNESS (AN-4, like loadVisits above): every capped read is ORDERED
+  // newest-first, so hitting a cap means "the most recent N" — a deterministic,
+  // honest subset — and the per-section truncated_* flags below let the page
+  // say so instead of presenting a silent undercount as the whole story.
   const [dealsR, subsR, supR, invR, visitsR, gsc] = await Promise.all([
-    safe(svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=2000`)),
+    safe(svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`)),
     safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
-    safe(svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&limit=1000`)),
+    safe(svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
     safe(readGsc(site.client_id)),
   ]);
@@ -383,7 +393,12 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const visits = okRows(visitsR) as VisitRow[] | null;
   let traffic: unknown = null;
   if (visits) {
-    const agg = aggregateVisits(visits, nowMs, days);
+    // EXACT calendar boundary: aggregateVisits rebuilds its window as
+    // nowMs − days·DAY, which (days being a ceil) can bleed up to ~24h of the
+    // prior period into "This month" — worst on the 1st. Intersect with the
+    // true period start first; the days arg then only bounds, never widens.
+    const periodRows = visits.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= startMs; });
+    const agg = aggregateVisits(periodRows, nowMs, days);
     traffic = {
       visitors: agg.visitors, pageviews: agg.pageviews,
       actions: agg.events.phone + agg.events.email + agg.events.cta,
@@ -391,10 +406,14 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       top_sources: sourceShares(agg.topSources, agg.visitors),
       weekly: weeklyVisitors(visits, nowMs),
       has_data: agg.hasData,
+      truncated: visits.length >= 5000,
     };
   }
+  // search: null = genuinely not connected; { unavailable: true } = the signals
+  // read failed (the page must NOT show the connect CTA for a hiccup — AN-4).
   let search: unknown = null;
-  if (gsc && gsc.hasData) {
+  if (!gsc || !gsc.ok) search = { unavailable: true };
+  else if (gsc.hasData) {
     const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
     search = {
       clicks: gsc.clicks, impressions: gsc.impressions, period: gsc.period,
@@ -405,7 +424,12 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   return json({ data: {
     period,
     generated_at: nowIso,
-    sales: { pipeline, won, enquiries, support, invoices, recent_wins },
+    sales: {
+      pipeline, won, enquiries, support, invoices, recent_wins,
+      truncated_deals: !!deals && deals.length >= 2000,
+      truncated_invoices: !!invs && invs.length >= 1000,
+      truncated_enquiries: !!subs && subs.length >= 1000,
+    },
     website: { traffic, search },
   } }, 200, cors);
 }

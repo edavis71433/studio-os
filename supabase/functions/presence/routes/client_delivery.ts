@@ -550,7 +550,11 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
   const vRows = (visitsR && (visitsR as { ok?: boolean }).ok && Array.isArray((visitsR as { json?: unknown }).json))
     ? (visitsR as { json: VisitRow[] }).json : null;
   if (vRows) {
-    const agg = aggregateVisits(vRows, nowMs, days);
+    // EXACT calendar boundary (same fix as handleAnalyticsDashboard): intersect
+    // with the true month start before aggregating, so the ceil'd days window
+    // never bleeds prior-month rows into "this month" (worst on the 1st).
+    const periodRows = vRows.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= startMs; });
+    const agg = aggregateVisits(periodRows, nowMs, days);
     const sources = sourceShares(agg.topSources, agg.visitors);   // already ≤5, largest first
     month = {
       visitors: agg.visitors, pageviews: agg.pageviews,
@@ -560,13 +564,18 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
       top_pages: agg.topPages,                // ≤5
       sources,
       has_data: agg.hasData,
+      truncated: vRows.length >= 5000,        // hit the fetch cap → "based on recent activity"
     };
   }
+  // search: null = genuinely not connected; { unavailable: true } = the signals
+  // read failed — the portal drops the Google tile/section silently either way,
+  // but the states stay distinguishable (and mirror the studio dashboard's).
   let search: unknown = null;
-  if (gsc && gsc.hasData) {
+  if (!gsc || !gsc.ok) search = { unavailable: true };
+  else if (gsc.hasData) {
     const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
     search = {
-      clicks: gsc.clicks, impressions: gsc.impressions,
+      clicks: gsc.clicks, impressions: gsc.impressions, period: gsc.period,   // period: same string the studio shows
       top_terms: (terms?.queries || []).map((q: any) => ({ term: String(q.key || ''), clicks: Number(q.clicks) || 0, impressions: Number(q.impressions) || 0 })),   // ≤5
     };
   }

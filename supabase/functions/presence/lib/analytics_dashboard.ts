@@ -56,16 +56,19 @@ export function weeklyBuckets(timestamps: Array<string | null | undefined>, nowM
 }
 
 /** Distinct visitors per 7-day bucket (pageview rows only — matches
- *  aggregateVisits' definition of a visitor). Oldest first. */
+ *  aggregateVisits' definition of a visitor). Oldest first. Rows WITHOUT a
+ *  visitor_hash are skipped, exactly like the headline visitors KPI (counting
+ *  each hashless row as its own "visitor" would inflate the weekly buckets
+ *  above the headline number). */
 export function weeklyVisitors(rows: Array<{ ts?: string; kind?: string; visitor_hash?: string }>, nowMs: number, weeks = DASH_WEEKS): number[] {
   const sets: Array<Set<string>> = Array.from({ length: weeks }, () => new Set());
   for (const r of rows || []) {
-    if (!r || r.kind !== 'pageview') continue;
+    if (!r || r.kind !== 'pageview' || !r.visitor_hash) continue;
     const ms = Date.parse(String(r.ts || ''));
     if (Number.isNaN(ms)) continue;
     const back = nowMs - ms;
     if (back < 0 || back >= weeks * 7 * DAY) continue;
-    sets[weeks - 1 - Math.floor(back / (7 * DAY))].add(r.visitor_hash || String(ms));
+    sets[weeks - 1 - Math.floor(back / (7 * DAY))].add(r.visitor_hash);
   }
   return sets.map((s) => s.size);
 }
