@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
@@ -523,5 +524,161 @@ test.describe('Client portal — Messages split view', () => {
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.getByText('Your studio will reach you here. Messaging opens up once they’ve set up your account.')).toBeVisible();
     expect(listCalls).toHaveLength(0);
+  });
+});
+
+// ── slice 8b: the "Your website" card on Home ────────────────────────────────
+// Plain-English site stats between the "Needs you" queue and the project cards:
+// a bolded lead sentence built from real numbers, a soft sparkline, mini stat
+// tiles, and an in-place "See the full picture →" disclosure. Honest
+// degradation: no GSC → no Google tile/section; zero visitors → a gentle
+// "ready to be found" state; unpublished / 404 (older function build) → no card.
+const WS_STATS = { data: { published: true,
+  month: {
+    visitors: 214, pageviews: 380, actions: 11,
+    top_source: { source: 'Google', visits: 88, share: 41 },
+    weekly: [3, 2, 4, 3, 6, 5, 8, 7, 12, 10, 14, 16],
+    top_pages: [{ path: '/', views: 120 }, { path: '/our-services', views: 64 }, { path: '/contact', views: 41 }],
+    sources: [{ source: 'Google', visits: 88, share: 41 }, { source: 'Direct', visits: 60, share: 28 }, { source: 'Instagram', visits: 30, share: 14 }],
+    has_data: true,
+  },
+  search: { clicks: 38, impressions: 900, top_terms: [
+    { term: 'wedding photographer austin', clicks: 12, impressions: 300 },
+    { term: 'family photos near me', clicks: 6, impressions: 210 },
+  ] },
+} };
+const WS_API = { ...CLIENT_API, '/client/website-stats': WS_STATS };
+
+test.describe('Client portal — the "Your website" card', () => {
+  test('renders between "Needs you" and the projects: sentence numbers, sparkline, three tiles', async ({ page }) => {
+    await installApp(page, { api: WS_API });
+    await page.goto('/client.html');
+    // placement: the card slot is the very next section after the needs queue
+    const card = page.locator('#home-needs + #home-website .wscard');
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
+    // the lead sentence carries the real numbers, bolded
+    await expect(card.locator('.wslead b').nth(0)).toHaveText('214 people');
+    await expect(card.locator('.wslead b').nth(1)).toHaveText('11 of them reached out');
+    await expect(card.locator('.wslead b').nth(2)).toHaveText('Google');
+    // three mini tiles (the Google one exists because GSC data does)
+    const tiles = card.locator('.wsmini .m');
+    await expect(tiles).toHaveCount(3);
+    await expect(tiles.nth(0)).toContainText('214');
+    await expect(tiles.nth(0)).toContainText('visitors this month');
+    await expect(tiles.nth(1)).toContainText('11');
+    await expect(tiles.nth(1)).toContainText('reached out or booked');
+    await expect(tiles.nth(2)).toContainText('38');
+    await expect(tiles.nth(2)).toContainText('clicks from Google search');
+    // the sparkline is decorative; its values are present as text
+    await expect(card.locator('svg.wsspark').first()).toHaveAttribute('aria-hidden', 'true');
+    await expect(card.locator('.sr-only').first()).toContainText('3, 2, 4, 3, 6, 5, 8, 7, 12, 10, 14, 16');
+    // the privacy line — verified against the collector (cookie-less, DNT, daily hash)
+    await expect(card.locator('.wspriv')).toHaveText('Counted privately — no cookies, no tracking of individual people.');
+    // the breakdown is closed by default
+    await expect(card.locator('#wsfull')).toBeHidden();
+  });
+
+  test('"See the full picture →" grows the same card in place, with sane focus + aria-expanded', async ({ page }) => {
+    await installApp(page, { api: WS_API });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    const btn = card.locator('#wsmore');   // by id — its accessible name flips to "Show less" when open
+    await expect(btn).toHaveText('See the full picture →');
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await btn.click();
+    // same card, expanded in place — no navigation, no new view
+    await expect(card.locator('#wsfull')).toBeVisible();
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
+    await expect(btn).toHaveText('Show less');
+    await expect(btn).toBeFocused();   // focus never jumps or drops to <body>
+    // the friendly breakdown: pages · sources (with %) · Google search terms
+    await expect(card.getByRole('heading', { name: 'Visitors, week by week' })).toBeVisible();
+    await expect(card.getByRole('heading', { name: 'Your most-visited pages' })).toBeVisible();
+    await expect(card.getByText('Home page')).toBeVisible();
+    await expect(card.getByText('120 views')).toBeVisible();
+    await expect(card.getByText('Our services')).toBeVisible();
+    await expect(card.getByRole('heading', { name: 'Where people came from' })).toBeVisible();
+    await expect(card.getByText('41%')).toBeVisible();
+    await expect(card.getByText('Straight to your site')).toBeVisible();   // 'Direct', in plain English
+    await expect(card.getByRole('heading', { name: 'What people searched on Google' })).toBeVisible();
+    await expect(card.getByText('“wedding photographer austin”')).toBeVisible();
+    await expect(card.getByText('12 clicks')).toBeVisible();
+    // and it closes again, focus intact
+    await btn.click();
+    await expect(card.locator('#wsfull')).toBeHidden();
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await expect(btn).toHaveText('See the full picture →');
+    await expect(btn).toBeFocused();
+  });
+
+  test('no GSC → the Google tile and search section are dropped (no fake zeros)', async ({ page }) => {
+    const noGsc = JSON.parse(JSON.stringify(WS_STATS));
+    noGsc.data.search = null;
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': noGsc } });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.wsmini .m')).toHaveCount(2);
+    await expect(card.getByText('clicks from Google search')).toHaveCount(0);
+    await card.getByRole('button', { name: 'See the full picture →' }).click();
+    await expect(card.getByRole('heading', { name: 'What people searched on Google' })).toHaveCount(0);
+    await expect(card.getByRole('heading', { name: 'Where people came from' })).toBeVisible();
+  });
+
+  test('zero visitors → the gentle "ready to be found" state, never "0 people"', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: true,
+      month: { visitors: 0, pageviews: 0, actions: 0, top_source: null, weekly: [0,0,0,0,0,0,0,0,0,0,0,0], top_pages: [], sources: [], has_data: false }, search: null } } } });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await expect(card.getByRole('heading', { name: 'Your website is ready to be found.' })).toBeVisible();
+    await expect(card.getByText('Stats will appear here as people visit')).toBeVisible();
+    await expect(card.getByText('0 people')).toHaveCount(0);
+    await expect(card.locator('.wsmini')).toHaveCount(0);   // no zero-stuffed tiles
+    await expect(card.getByRole('button', { name: 'See the full picture →' })).toHaveCount(0);
+  });
+
+  test('route 404 (older function build) → no card, and Home still works', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/website-stats', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    await page.goto('/client.html');
+    // the rest of Home renders normally…
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await expect(page.locator('#needs-body .qcard')).toBeVisible();
+    // …and the website slot stays silently hidden (no error card)
+    await expect(page.locator('#home-website')).toBeHidden();
+    await expect(page.locator('.wscard')).toHaveCount(0);
+  });
+
+  test('unpublished site → the card is hidden entirely', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: false, month: null, search: null } } } });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await expect(page.locator('#home-website')).toBeHidden();
+    await expect(page.locator('.wscard')).toHaveCount(0);
+  });
+
+  test('mobile: the card renders and the tiles stack without horizontal scroll', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the stacked-tiles check is the <720px contract');
+    await installApp(page, { api: WS_API });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.wsmini .m')).toHaveCount(3);
+    // no horizontal overflow from the card or its sparkline
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('no serious/critical axe violations with the card expanded', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: WS_API });
+    await page.goto('/client.html');
+    await page.locator('#home-website').getByRole('button', { name: 'See the full picture →' }).click();
+    await expect(page.locator('#wsfull')).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
   });
 });
