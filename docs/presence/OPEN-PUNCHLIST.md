@@ -144,10 +144,14 @@ done")**. **Slice 2 SHIPPED 2026-07-16** — Inbox split view + real per-thread
 unread (cd0cc0f; pre-approved "Approved" + "this is grreat approved"; 21
 review findings fixed; e2e 204/0; deploy #14 green — functions + frontend
 live; 0113 already applied so unread dots are real from day one). NOW:
-slice 3 — rosters as list views + pipeline Path/Board⇄Table (frontend-only,
-in progress). Then slices 4–5 (client portal), 6 (inbound email), 7 (nav),
-**8 (CRM analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec
-§7.8; research + mockups + his decision points before code, runs last).**
+**Slice 3 SHIPPED 2026-07-17** — rosters as list views + pipeline Path/
+Board⇄Table/record header (362e00f; approved "go ahead"; 20 review findings
+fixed; e2e 258/0; frontend-only → Netlify). NOW: slice 4 — client portal
+(context bar, Home queue + project cards w/ mini Path, project drill-in as a
+record page; in progress). Then 5 (portal Messages split view), 6 (inbound
+email), 7 (nav), **8 (CRM analytics dashboard — ADDED by Eric 2026-07-16
+"yes please"; spec §7.8; research + mockups + decision points before code,
+runs last).**
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
