@@ -59,6 +59,47 @@
   }
   function flatten(nav) { var o = []; (nav || []).forEach(function (s) { (s.items || []).forEach(function (i) { o.push({ label: i.label, href: i.href, section: s.label, desc: i.desc || "" }); }); }); return o; }
 
+  // ── recent records (slice 7): the last ~5 records the operator opened, cached
+  // locally for the Customers caret's "Recent" group. Written from (1) a ⌘K
+  // record selection and (2) a crm.html record open (trackCrmRecent below).
+  // hrefs are full record URLs (identity params included) — rendered as-is,
+  // never re-scoped by withScope.
+  var RECENTS_KEY = 'dds-recent-records';
+  function readRecents() {
+    try {
+      var a = JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
+      return Array.isArray(a) ? a.filter(function (r) { return r && r.label && r.href; }).slice(0, 5) : [];
+    } catch (_) { return []; }
+  }
+  function pushRecent(label, href) {
+    label = String(label == null ? '' : label).trim(); href = String(href == null ? '' : href);
+    if (!label || href.charAt(0) !== '/') return;
+    try {
+      var list = readRecents().filter(function (r) { return r.href !== href; });
+      list.unshift({ label: label, href: href, at: Date.now() });
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(list.slice(0, 5)));
+    } catch (_) { /* private mode: recents are a nicety, never load-bearing */ }
+  }
+  // crm.html renders the record name into #pagehead (renderShell) — poll for it
+  // once per record-open and cache {name, canonical record URL}. Read-only; no
+  // crm.html change needed. 'Client' is renderShell's placeholder name — skip it.
+  function trackCrmRecent() {
+    if (normalizePath(location.pathname) !== '/crm') return;
+    var keep = [];
+    try {
+      var p = new URLSearchParams(location.search);
+      ['client', 'client_id', 'deal', 'contact', 'project'].forEach(function (k) { var v = p.get(k); if (v) keep.push(k + '=' + encodeURIComponent(v)); });
+    } catch (_) { return; }
+    if (!keep.length) return;
+    var href = '/crm.html?' + keep.join('&'), tries = 0;
+    (function poll() {
+      var h = document.getElementById('pagehead');
+      var t = h && h.textContent ? h.textContent.trim() : '';
+      if (t && t !== 'Client') { pushRecent(t, href); return; }
+      if (++tries < 25) setTimeout(poll, 400);
+    })();
+  }
+
   // ── supabase (reuse the portal session) ──
   function ensureSupabase() {
     return new Promise(function (resolve) {
@@ -134,6 +175,13 @@
   function render() {
     var nav = (CTX && CTX.nav) || [];
     var activeKey = activeItemKey(location.pathname, nav);
+    // Slice 7 (context bar): crm.html is never IN the nav (records open from
+    // rosters/⌘K), but a record page is Customers work — keep the Customers
+    // item lit so the flat bar never reads "nowhere". Local presentation fix;
+    // the pure activeItemKey mirror of lib/shell.ts stays byte-identical.
+    if (!activeKey && normalizePath(location.pathname) === '/crm') {
+      nav.forEach(function (s) { if (s.key === 'customers' && s.items && s.items.length) activeKey = s.items[0].key; });
+    }
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
     // Architecture v1.0: the primary bar is outcomes only; utility sections
     // (Connections, Settings, Help) render in the profile/overflow menu.
@@ -142,16 +190,38 @@
     var ctxLabel = brandCtxLabel(nav, activeKey);
     var att = (CTX && CTX.attention_count) || 0;   // Phase FLOW: bell badge from context (no extra request)
 
+    // ── Lightning context bar (salesforce-reference §11.5): each nav SECTION is
+    // ONE flat item. Single-link sections render as a plain link (aria-current
+    // marks the active page — nav landmark semantics, not a tablist); multi-item
+    // sections render label + caret and open their dropdown on CLICK (never
+    // hover), with the slice-2 popup contract (Escape/arrows/outside-click).
     var navHtml = primary.map(function (sec) {
       var single = sec.items.length === 1;
-      var open = false;
       var isActive = sec.items.some(function (i) { return i.key === activeKey; });
       if (single) {
         var it = sec.items[0];
-        return '<div class="sec' + (isActive ? ' active' : '') + '"><button data-href="' + esc(withScope(it.href)) + '">' + esc(sec.label) + '</button></div>';
+        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (isActive ? ' aria-current="page"' : '') + '>' + esc(sec.label) + '</a></div>';
       }
-      var items = sec.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('');
-      return '<div class="sec' + (isActive ? ' active' : '') + '"><button data-sec="' + esc(sec.key) + '">' + esc(sec.label) + ' ▾</button><div class="menu">' + items + '</div></div>';
+      var items = sec.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('');
+      // The Customers caret also lists RECENT RECORDS (⌘K/crm.html opens,
+      // localStorage-cached — see pushRecent) + quick actions. Recents hrefs are
+      // full record URLs (they already carry their identity params), so they are
+      // NOT re-scoped; nav links keep going through withScope.
+      if (sec.key === 'customers') {
+        var recents = readRecents();
+        if (recents.length) {
+          items += '<div class="grp">Recent</div>' + recents.map(function (r) {
+            return '<a class="rec" href="' + esc(r.href) + '">' + esc(r.label) + '</a>';
+          }).join('');
+        }
+        // "+ New deal" links plain /pipeline.html — pipeline.html has no ?new=1
+        // handling today (verified), so the link opens the pipeline where the
+        // + New deal button sits, rather than carrying a dead parameter.
+        items += '<div class="grp">Quick actions</div>' +
+          '<a class="qa" href="' + esc(withScope('/pipeline.html')) + '">+ New deal</a>' +
+          '<a class="qa" href="' + esc(withScope('/contacts.html')) + '">+ Contact</a>';
+      }
+      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (isActive ? ' aria-current="true"' : '') + '>' + esc(sec.label) + ' <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + items + '</div></div>';
     }).join('');
 
     // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
@@ -161,7 +231,10 @@
       : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
 
     root.innerHTML =
-      '<button class="dds-ic dds-burger" id="dds-burger" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer">☰</button>' +
+      // The App Launcher waffle (the burger's successor at EVERY width): CLICK-
+      // invoked only (§11.5 — the one nav element that never opens on hover);
+      // its panel is the full grouped destination list the burger sheet held.
+      '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
       brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
@@ -194,23 +267,34 @@
     document.body.appendChild(bar);
     var mb = document.getElementById('dds-mbar-menu');
     if (mb) mb.addEventListener('click', function (e) {
-      e.stopPropagation(); toggleDrawer(nav);
+      e.stopPropagation(); toggleDrawer(nav, 'dds-mbar-menu');
       var open = drawer && drawer.classList.contains('open');
       mb.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
 
   function wire(nav) {
-    // section dropdowns
+    // section dropdowns — click-invoked (never hover), slice-2 popup contract:
+    // opening focuses the first item, arrows move, Escape closes back to the
+    // trigger, outside clicks close via the document-level listener below.
     root.querySelectorAll('.dds-nav .sec > button[data-sec]').forEach(function (b) {
       b.addEventListener('click', function (e) {
         e.stopPropagation();
         var sec = b.parentNode; var wasOpen = sec.classList.contains('open');
-        closeMenus(); if (!wasOpen) sec.classList.add('open');
+        closeMenus(); closeDrawer();
+        if (!wasOpen) {
+          sec.classList.add('open'); b.setAttribute('aria-expanded', 'true');
+          var f = sec.querySelector('.menu a'); if (f) f.focus();
+        }
       });
-    });
-    root.querySelectorAll('.dds-nav .sec > button[data-href]').forEach(function (b) {
-      b.addEventListener('click', function () { location.href = b.getAttribute('data-href'); });
+      var menu = b.parentNode.querySelector('.menu');
+      if (menu) menu.addEventListener('keydown', function (e) {
+        var links = [].slice.call(menu.querySelectorAll('a'));
+        var i = links.indexOf(document.activeElement);
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenus(); b.focus(); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); if (links.length) links[Math.min(i + 1, links.length - 1)].focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); if (links.length) links[Math.max(i - 1, 0)].focus(); }
+      });
     });
     document.addEventListener('click', closeMenus);
     // search
@@ -225,10 +309,18 @@
     // stays a real fallback to the full Help page if JS is off.
     var helpTrig = document.getElementById('dds-help');
     if (helpTrig) helpTrig.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); toggleHelp(); });
-    // burger
-    document.getElementById('dds-burger').addEventListener('click', function (e) { e.stopPropagation(); toggleDrawer(nav); });
+    // waffle App Launcher — CLICK-invoked; the panel is the drawer element
+    document.getElementById('dds-waffle').addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); toggleDrawer(nav, 'dds-waffle'); });
+    // create the (closed) panel now so aria-controls="dds-drawer" always
+    // references a real element, not a lazily-created one
+    ensureDrawer();
   }
-  function closeMenus() { root.querySelectorAll('.dds-nav .sec.open').forEach(function (s) { s.classList.remove('open'); }); }
+  function closeMenus() {
+    root.querySelectorAll('.dds-nav .sec.open').forEach(function (s) {
+      s.classList.remove('open');
+      var b = s.querySelector('button[data-sec]'); if (b) b.setAttribute('aria-expanded', 'false');
+    });
+  }
 
   // ── command palette ──
   var pal;
@@ -236,12 +328,20 @@
     if (!pal) {
       pal = el('<div class="dds-palette"><div class="box" role="dialog" aria-modal="true" aria-label="Search Studio OS"><input placeholder="Search Studio OS…" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="dds-pal-list" aria-autocomplete="list"><div class="results" id="dds-pal-list" role="listbox" aria-label="Results"></div></div></div>');
       document.body.appendChild(pal);
-      pal.addEventListener('click', function (e) { if (e.target === pal) closePalette(); });
+      pal.addEventListener('click', function (e) {
+        if (e.target === pal) return closePalette();
+        // a record selection feeds the Customers caret's "Recent" group
+        var a = e.target && e.target.closest ? e.target.closest('a.res[data-rec-label]') : null;
+        if (a) pushRecent(a.getAttribute('data-rec-label'), a.getAttribute('data-rec-href'));
+      });
       pal.querySelector('input').addEventListener('input', function (e) { paintResults(e.target.value); });
       pal.querySelector('input').addEventListener('keydown', function (e) {
         var sel = pal.querySelector('.res.sel');
         if (e.key === 'Escape') return closePalette();
-        if (e.key === 'Enter' && sel) { location.href = sel.getAttribute('href'); }
+        if (e.key === 'Enter' && sel) {
+          if (sel.hasAttribute('data-rec-label')) pushRecent(sel.getAttribute('data-rec-label'), sel.getAttribute('data-rec-href'));
+          location.href = sel.getAttribute('href');
+        }
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault(); var all = [].slice.call(pal.querySelectorAll('.res')); if (!all.length) return;
           var i = all.indexOf(sel); i = e.key === 'ArrowDown' ? Math.min(all.length - 1, i + 1) : Math.max(0, i - 1);
@@ -286,7 +386,7 @@
         if (!recs.length && !files.length) { if (!have) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
         var n = (navHtml.match(/id="dds-res-/g) || []).length;
         var extra = '';
-        recs.forEach(function (rec) { var sel = !have && !extra; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope(rec.href)) + '">' + esc(rec.label) + '<span class="s">' + esc(rec.sub || 'Record') + '</span></a>'; n++; });
+        recs.forEach(function (rec) { var sel = !have && !extra; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" data-rec-label="' + esc(rec.label) + '" data-rec-href="' + esc(rec.href) + '" href="' + esc(withScope(rec.href)) + '">' + esc(rec.label) + '<span class="s">' + esc(rec.sub || 'Record') + '</span></a>'; n++; });
         files.forEach(function (a) { var sel = !have && !extra; var sub = a.in_use ? 'Files · on your site' : 'Files'; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>'; n++; });
         cur.innerHTML = navHtml + extra;
         var inpF = pal.querySelector('input'); var firstSel = cur.querySelector('.res.sel');
@@ -445,6 +545,10 @@
   // focus to its trigger so a keyboard user isn't stranded.
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    // an open context-bar dropdown closes back to its trigger even when focus
+    // wandered outside the menu (the menu's own keydown handles the inside case)
+    var openSec = root && root.querySelector ? root.querySelector('.dds-nav .sec.open') : null;
+    if (openSec) { var sb0 = openSec.querySelector('button[data-sec]'); closeMenus(); if (sb0) sb0.focus(); }
     if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
     if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
     if (help && help.classList.contains('open')) { closeHelp(); var b3 = document.getElementById('dds-help'); if (b3) b3.focus(); }
@@ -493,28 +597,54 @@
     }).catch(function () { window.ddsToast && window.ddsToast('Couldn’t change notifications just now.', 'err'); });
   }
 
-  // ── mobile drawer ──
-  var drawer;
+  // ── the App Launcher panel (also the mobile nav sheet) ──────────────────────
+  // ONE element serves both: ≥761px it is the waffle's click-invoked popover
+  // (every destination grouped by section — the burger's old mega-list, so the
+  // flat bar can show fewer top-level entries with nothing lost); ≤760px it is
+  // the same full-screen sheet the burger opened, now opened by the waffle or
+  // the bottom bar's Menu — a 1:1 capability replacement.
+  var drawer, drawerOpener = '';
+  function ensureDrawer() {
+    if (drawer) return;
+    drawer = el('<div class="dds-drawer" id="dds-drawer" role="navigation" aria-label="Workspace menu"></div>');
+    // clicks INSIDE the panel (links navigate) must not bubble to the
+    // document-level outside-click closer
+    drawer.addEventListener('click', function (e) { e.stopPropagation(); });
+    // slice-2 popup contract: arrows move between the panel's links
+    drawer.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      var links = [].slice.call(drawer.querySelectorAll('a'));
+      var i = links.indexOf(document.activeElement);
+      e.preventDefault();
+      if (links.length) links[e.key === 'ArrowDown' ? Math.min(i + 1, links.length - 1) : Math.max(i - 1, 0)].focus();
+    });
+    document.body.appendChild(drawer);
+  }
   function closeDrawer() {
     if (drawer && drawer.classList.contains('open')) {
       drawer.classList.remove('open');
-      setExpanded('dds-burger', false); setExpanded('dds-mbar-menu', false);
+      setExpanded('dds-waffle', false); setExpanded('dds-mbar-menu', false);
     }
   }
-  // Escape closes the drawer and returns focus to the burger (WCAG 1.4.13)
+  // Escape closes the panel and returns focus to whichever control opened it
+  // (waffle or the mobile Menu) — WCAG 1.4.13 / the slice-2 popup contract.
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape' || !drawer || !drawer.classList.contains('open')) return;
-    closeDrawer(); var b = document.getElementById('dds-burger'); if (b) b.focus();
+    closeDrawer(); var b = document.getElementById(drawerOpener || 'dds-waffle'); if (b) b.focus();
   });
-  function toggleDrawer(nav) {
+  // outside click closes the open panel (the waffle/Menu triggers stopPropagation)
+  document.addEventListener('click', closeDrawer);
+  function toggleDrawer(nav, openerId) {
     if (drawer && drawer.classList.contains('open')) { closeDrawer(); return; }
+    drawerOpener = openerId || 'dds-waffle';
     var activeKey = activeItemKey(location.pathname, nav);
     var html = (nav || []).map(function (s) {
-      return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '">' + esc(i.label) + '</a>'; }).join('') + '</div>';
+      return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
-    if (!drawer) { drawer = el('<div class="dds-drawer" id="dds-drawer" role="navigation" aria-label="Workspace menu"></div>'); document.body.appendChild(drawer); }
+    ensureDrawer();
     drawer.innerHTML = html; drawer.classList.add('open');
-    setExpanded('dds-burger', true); setExpanded('dds-mbar-menu', true);
+    setExpanded('dds-waffle', true); setExpanded('dds-mbar-menu', true);
+    var f = drawer.querySelector('a'); if (f) f.focus();
   }
 
   // ── SC-1 (global): carry the agency drill-in scope on EVERY static app link ──
@@ -650,7 +780,7 @@
       ];
     }
     return [
-      { sel: ['.dds-nav .sec > button[data-href^="/today"]', '#dds-mbar a[href^="/today"]'], title: 'Today', text: 'This is Today — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
+      { sel: ['.dds-nav .sec > [data-href^="/today"]', '#dds-mbar a[href^="/today"]'], title: 'Today', text: 'This is Today — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
       { sel: ['.dds-nav .sec > button[data-sec="website"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives in this group — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
       { sel: ['.dds-nav .sec > button[data-sec="customers"]'], title: 'Customers', text: 'Enquiries, contacts, and your pipeline — the people side of your business, all in one place.' },
       { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
@@ -875,6 +1005,7 @@
         api('/portal/context').then(function (r) {
           if (!r.ok || !r.body || !r.body.data) { minimalShell(); return; }
           CTX = r.body.data; render();
+          try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
           // PERF: /portal/context is the single most expensive boot read (~17
           // queries incl. 3× auth). The shell already fetched it — publish it so
           // a page can reuse it instead of firing an identical second request.

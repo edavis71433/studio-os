@@ -31,9 +31,10 @@ test.describe('Accessibility', () => {
     await page.goto('/today.html');
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
-    // the Menu control (burger) is CSS-hidden at desktop widths (the full nav
-    // shows instead) — assert it still carries its accessible name.
-    await expect(page.locator('#dds-burger')).toHaveAttribute('aria-label', 'Menu');
+    // the App Launcher waffle (slice 7: the burger's successor) shows at every
+    // width and carries its accessible name.
+    await expect(page.locator('#dds-waffle')).toHaveAttribute('aria-label', 'App Launcher');
+    await expect(page.getByRole('button', { name: 'App Launcher' })).toBeVisible();
     await expect(page.getByLabel('Search')).toBeVisible();
   });
 

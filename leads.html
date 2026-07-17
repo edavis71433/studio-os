@@ -19,9 +19,18 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
   .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:15px;margin:0}
-  .filters{display:flex;gap:8px;margin:22px 0 6px}
+  /* ── list-view header (SLDS list-view anatomy, dds skin) — slice 7 polish:
+        the same .lhead/.lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html/
+        contacts.html/inbox.html, header ONLY (the card feed stays — it's a
+        triage queue, not a roster). ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin:14px 0 0}
+  .lrow1{display:flex;align-items:center;gap:10px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .filters{display:flex;gap:8px;margin:16px 0 6px}
   .filters button{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;padding:6px 13px;cursor:pointer}
   .filters button.on{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
   .lead{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
@@ -66,7 +75,8 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",ALL=[],FILTER='open';
+let TOKEN="",ALL=[],FILTER='open',LOADED_AT=Date.now();
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
@@ -78,7 +88,14 @@ function render(){
   const unread=ALL.filter(l=>l.status==='new').length;
   const rows=ALL.filter(l=>FILTER==='open'?l.status!=='archived':FILTER==='new'?l.status==='new':true);
   let h=`<div class="rolebadge">● Website enquiries</div>
-    <header><h1 id="pagehead" tabindex="-1">Website enquiries</h1><p class="sub">${unread?unread+' new · ':''}Everyone who reached out through your website.</p></header>
+    <header class="lhead">
+      <div class="lrow1">
+        <span class="obj-ic" aria-hidden="true">📥</span>
+        <h1 id="pagehead" tabindex="-1">Website enquiries</h1>
+        <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      </div>
+      <div class="lmeta">${ALL.length} enquir${ALL.length===1?'y':'ies'}${unread?` · ${unread} new`:''} · ${esc(updatedLabel())}</div>
+    </header>
     <div class="filters" role="tablist" aria-label="Filter enquiries">
       <button role="tab" aria-selected="${FILTER==='open'?'true':'false'}" data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
       <button role="tab" aria-selected="${FILTER==='new'?'true':'false'}" data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
@@ -117,6 +134,9 @@ function wire(){
   // replying to a lead auto-marks it read — no manual bookkeeping
   document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&l.status==='new')setStatus(id,'read',true);}));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
+  // list-view refresh (slice 7 header polish) — re-load, then return focus to the
+  // control (the rosters' pattern); a failed refresh toasts, never an unhandled reject
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.')));
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
 }
 async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();
@@ -142,7 +162,7 @@ async function createDeal(id){
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
-async function load(){const r=await api('/forms/inbox');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Enquiries live in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}ALL=(r.body.data&&r.body.data.submissions)||[];render();}
+async function load(){const r=await api('/forms/inbox');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Enquiries live in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}ALL=(r.body.data&&r.body.data.submissions)||[];LOADED_AT=Date.now();render();}
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>
 </body>
