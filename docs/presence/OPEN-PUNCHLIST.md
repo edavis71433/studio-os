@@ -160,17 +160,27 @@ rebuilt TWICE after container resets wiped uncommitted work — now committed
 per-checkpoint; 37 findings fixed across two adversarial reviews incl. a
 critical forged-Authentication-Results bypass; behavior change: studio
 support replies now email email-native clients; e2e 321/0; deploy #16).
-🔑 **NEEDS ERIC to activate**: (1) APPLY-0114-prod.sql — TWO steps, run
-STEP 1 then STEP 2 separately (STEP 2 is CONCURRENTLY, must not be in a
-transaction); (2) Resend dashboard per docs/presence/INBOUND-EMAIL-SETUP.md
-(inbound domain MX + route → webhook, DKIM/SPF so Resend stamps a verdict,
-secrets RESEND_INBOUND_SECRET + RESEND_INBOUND_DOMAIN). Dormant + fail-closed
-until then. NOW: slice 7 — nav context bar both shells + polish. (Old slice-6
-note superseded; needs Eric's ~15-min Resend dashboard
-step + RESEND_INBOUND_SECRET AFTER it merges — runbook will be at
-docs/presence/INBOUND-EMAIL-SETUP.md). Then 7 (nav context bar both shells),
-**8 (CRM analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec
-§7.8; research + mockups + decision points before code, runs last).**
+🔑 **NEEDS ERIC to activate**: (1) APPLY-0114-prod.sql — Eric's 2026-07-17
+run hit ERROR 25001 (the Supabase SQL Editor wraps every run in a
+transaction, which rejects CONCURRENTLY); the pack was REWRITTEN (a37ad4f)
+as one plain idempotent run — paste the whole current file once, then the
+verify select should return both index names; (2) Resend dashboard per
+docs/presence/INBOUND-EMAIL-SETUP.md (inbound domain MX + route → webhook,
+DKIM/SPF so Resend stamps a verdict, secrets RESEND_INBOUND_SECRET +
+RESEND_INBOUND_DOMAIN). Dormant + fail-closed until then.
+**Slice 7 SHIPPED 2026-07-17** — studio shell context bar: waffle App
+Launcher replacing the burger (same #dds-drawer sheet on mobile, 3-col
+popover on desktop), flat nav items with click-invoked caret dropdowns,
+Customers caret = Recent records (localStorage, written by ⌘K + crm.html
+opens) + quick actions, active underline with /crm.html→Customers fallback,
+leads.html list-view header (a455222 + review fixes 9926614/bfd82f2;
+pre-approved "ho ahead"/"go"; 26 findings across 3 reviewers → fixed incl.
+recents×scope-carry wrong-tenant rewrite, javascript:/protocol-relative href
+guards, recents cleared on sign-out, layer mutual exclusion, honest
+aria-current, focus-out closure, forced-colors waffle glyph, leads soft
+refresh; e2e 348/0; frontend+docs only → Netlify). Remaining: **8 (CRM
+analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec §7.8;
+research + mockups + decision points before code, runs last).**
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
