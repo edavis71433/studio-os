@@ -57,9 +57,54 @@ function unreadKeysFrom(notifs){
     // default drops detail.task_id), so the honest granularity is PROJECT-level:
     // an unread client_action for project P lights P's to-do rows.
     if(n.kind==='client_action'){const p=href.match(/\/projects\/([a-z0-9-]+)/i);if(p)keys.add('todos-'+p[1]);}
+    // slice 5 (Messages split view): per-conversation unread dots. A 'message'
+    // notification lights its PROJECT's thread row (href '/projects/<id>#messages');
+    // a 'support_message' one lights its REQUEST's row (hrefs carry the id as
+    // '?support=<id>' — the derived support rows — or '#support-<id>' — project
+    // events). Kind-gated so e.g. '#messages' anchors on other kinds add nothing.
+    if(n.kind==='message'){const pm=href.match(/\/projects\/([a-z0-9-]+)#messages/i);if(pm)keys.add('msgs-'+pm[1]);}
+    if(n.kind==='support_message'){const sm=href.match(/[?&]support=([a-z0-9-]+)/i)||href.match(/#support-([a-z0-9-]+)/i);if(sm)keys.add('support-'+sm[1]);}
   }
   return keys;
 }
+function convRows(projects,support,latest){
+  const names={};for(const p of (projects||[]))if(p&&p.id)names[p.id]=p.name;
+  const rows=[];
+  for(const p of (projects||[])){
+    if(!p||!p.id)continue;
+    const fetched=Object.prototype.hasOwnProperty.call(latest||{},p.id);
+    const lm=fetched?(latest||{})[p.id]:null;
+    rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:p.name||'Project',when:(lm&&lm.created_at)||'',
+      preview:lm?(lm.body||''):(fetched?'No messages yet — say hello any time.':'Open this conversation'),
+      unfetched:!fetched,chip:'Message',chipCls:'',unreadKey:'msgs-'+p.id});
+  }
+  for(const rq of (support||[])){
+    if(!rq||!rq.id)continue;
+    const status=String(rq.status||'open');
+    // recency prefers last_activity_at (new function builds — replies only INSERT
+    // and never bump updated_at) with the updated_at fallback for old builds.
+    rows.push({id:'sup:'+rq.id,kind:'support',sid:rq.id,pid:rq.project_id||'',title:rq.subject||'Support request',
+      when:rq.last_activity_at||rq.updated_at||'',preview:rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio',
+      chip:'Support · '+status.replace(/_/g,' '),chipCls:'support',status,unreadKey:'support-'+rq.id});
+  }
+  rows.sort(convCompare);
+  return rows;
+}
+// newest activity first; among rows with no timestamp, fetched (confirmed-empty)
+// rows come before unfetched ones — an unfetched row makes no recency claim.
+function convCompare(a,b){const w=String(b.when).localeCompare(String(a.when));if(w)return w;return (a.unfetched?1:0)-(b.unfetched?1:0);}
+function supportThreadItems(rq,msgs){
+  const items=[];
+  if(rq&&rq.body&&rq.created_at)items.push({type:'message',title:'You opened this request',body:rq.body,at:rq.created_at});
+  for(const m of (msgs||[])){
+    if(!m||!m.created_at)continue;
+    const mine=(m.from==='client'||m.from==='studio')?m.from==='client':!(m.author_kind==='staff'||m.author_kind==='system');
+    items.push({type:'message',title:mine?'You replied':'Your studio replied',body:m.body||'',at:m.created_at});
+  }
+  items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
+  return items;
+}
+function subjectFromMessage(v){return (String(v==null?'':v).split('\n')[0]||'').slice(0,60)||'New message';}
 function msgFromMap(events){
   const map={};
   for(const e of (events||[])){const dd=(e&&e.kind==='message'&&e.detail)||null;if(dd&&dd.message_id&&(dd.from==='studio'||dd.from==='client'))map[dd.message_id]=dd.from;}
@@ -212,6 +257,87 @@ ok('unread: read + null notifications add nothing',
   !KEYS.has('approval-a2') && KEYS.size===4 && unreadKeysFrom(null).size===0);
 ok('unread: a read client_action adds no project key',
   !unreadKeysFrom([{kind:'client_action',href:`/projects/${PIDX}`,read:true}]).has('todos-'+PIDX));
+
+// ═══ unreadKeysFrom — slice 5's per-conversation keys (Messages split view) ═══
+const MKEYS=unreadKeysFrom([
+  {kind:'message',href:`/projects/${PIDX}#messages`,read:false},
+  {kind:'support_message',href:'/client.html?support=s-gen',read:false},
+  {kind:'support_message',href:`/projects/${PIDX}#support-s-prj`,read:false},
+  {kind:'message',href:`/projects/${PIDX}#messages`,read:true},
+  {kind:'deliverable_added',href:`/projects/${PIDX}#messages`,read:false},   // wrong kind — no key
+]);
+ok('unread: a message notification lights its project thread row',
+  MKEYS.has('msgs-'+PIDX));
+ok('unread: support_message lights its request row from either href shape',
+  MKEYS.has('support-s-gen') && MKEYS.has('support-s-prj'));
+ok('unread: the conversation keys are kind-gated and skip read items',
+  MKEYS.size===3);
+
+// ═══ convRows — the Messages tab's conversation list ═══
+// `latest` semantics: a message = fetched with messages; null = fetched, thread
+// CONFIRMED empty; key absent = unfetched (beyond the preview cap / fetch failed).
+const CPROJ=[{id:'p1',name:'Website redesign'},{id:'p2',name:'Brand refresh'},{id:'p3',name:'Retainer'},null];
+const CSUP=[
+  {id:'s1',subject:'Logo tweak',status:'open',project_id:null,updated_at:'2026-07-06T00:00:00Z'},
+  {id:'s2',subject:'Copy fixes',status:'in_progress',project_id:'p1',updated_at:'2026-07-08T00:00:00Z'},
+  null,{},
+];
+const CROWS=convRows(CPROJ,CSUP,{p1:{created_at:'2026-07-07T00:00:00Z',body:'Welcome aboard!'},p2:null});
+ok('conv: one row per project + one per support request; null/id-less entries skipped',
+  CROWS.length===5);
+ok('conv: sorted newest-activity first; timestamp-less rows sink — fetched-empty before unfetched',
+  JSON.stringify(CROWS.map(r=>r.id))===JSON.stringify(['sup:s2','proj:p1','sup:s1','proj:p2','proj:p3']));
+ok('conv: a project row carries the latest message as preview + its recency + a Message chip',
+  (()=>{const r=CROWS.find(x=>x.id==='proj:p1');return r.title==='Website redesign'&&r.preview==='Welcome aboard!'&&r.when==='2026-07-07T00:00:00Z'&&r.chip==='Message'&&r.unreadKey==='msgs-p1';})());
+ok('conv: only a FETCHED-and-empty thread claims "No messages yet"',
+  (()=>{const r=CROWS.find(x=>x.id==='proj:p2');return r.preview==='No messages yet — say hello any time.'&&r.when===''&&r.unfetched===false;})());
+ok('conv: an unfetched row (beyond the cap / failed fetch) gets the neutral preview, claims nothing',
+  (()=>{const r=CROWS.find(x=>x.id==='proj:p3');return r.preview==='Open this conversation'&&r.when===''&&r.unfetched===true;})());
+ok('conv: a support chip carries the status with underscores humanized',
+  (()=>{const r=CROWS.find(x=>x.id==='sup:s2');return r.chip==='Support · in progress'&&r.chipCls==='support'&&r.unreadKey==='support-s2';})());
+ok('conv: project-scoped support previews its project name; general previews the studio line',
+  CROWS.find(x=>x.id==='sup:s2').preview==='Website redesign'
+  && CROWS.find(x=>x.id==='sup:s1').preview==='A conversation with your studio');
+ok('conv: support recency prefers last_activity_at (replies never bump updated_at) over updated_at',
+  convRows([],[{id:'s9',subject:'X',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z',last_activity_at:'2026-07-09T00:00:00Z'}],{})[0].when==='2026-07-09T00:00:00Z'
+  && convRows([],[{id:'s9',subject:'X',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z'}],{})[0].when==='2026-07-01T00:00:00Z');
+ok('conv: empty/null inputs → no rows (no crash)', convRows(null,null,null).length===0);
+
+// ═══ supportThreadItems — attribution: server `from` field first, author_kind fallback ═══
+const STI=supportThreadItems(
+  {body:'Could we nudge the logo left?',created_at:'2026-07-05T00:00:00Z',status:'open'},
+  [
+    {body:'On it — new version tomorrow.',author_kind:'staff',created_at:'2026-07-06T00:00:00Z'},
+    {body:'Thanks!',author_kind:'client',created_at:'2026-07-07T00:00:00Z'},
+    {body:'ghost',author_kind:'client'},   // no created_at → skipped
+  ]);
+ok('support thread: the request body is always the requester\'s ("You opened this request")',
+  STI.some(i=>i.title==='You opened this request'&&i.body==='Could we nudge the logo left?'));
+ok('support thread: staff/system replies attribute to the studio; other kinds to you',
+  STI.some(i=>i.title==='Your studio replied'&&i.body==='On it — new version tomorrow.')
+  && STI.some(i=>i.title==='You replied'&&i.body==='Thanks!'));
+ok('support thread: newest first; dateless replies are skipped',
+  STI.length===3 && STI[0].body==='Thanks!' && STI[2].title==='You opened this request');
+ok('support thread: a body-less request adds no item; empty msgs fine',
+  supportThreadItems({created_at:'2026-07-05T00:00:00Z'},[]).length===0
+  && supportThreadItems(null,null).length===0);
+ok('support thread: the server’s from field wins over author_kind (the operator IS kind client)',
+  (()=>{const it=supportThreadItems({body:'b',created_at:'2026-07-01T00:00:00Z'},[
+    {body:'from the studio',author_kind:'client',from:'studio',created_at:'2026-07-02T00:00:00Z'},
+    {body:'from me',author_kind:'client',from:'client',created_at:'2026-07-03T00:00:00Z'},
+    {body:'old build',author_kind:'staff',created_at:'2026-07-04T00:00:00Z'},
+  ]);return it.some(i=>i.title==='Your studio replied'&&i.body==='from the studio')
+    &&it.some(i=>i.title==='You replied'&&i.body==='from me')
+    &&it.some(i=>i.title==='Your studio replied'&&i.body==='old build');})());
+ok('support thread: an unrecognized from falls back to the author_kind heuristic',
+  supportThreadItems(null,[{body:'x',author_kind:'staff',from:'bogus',created_at:'2026-07-02T00:00:00Z'}])[0].title==='Your studio replied'
+  && supportThreadItems(null,[{body:'y',author_kind:'client',from:'bogus',created_at:'2026-07-02T00:00:00Z'}])[0].title==='You replied');
+
+// ═══ subjectFromMessage — the general composer's first-line-subject rule ═══
+ok('subject: the first line becomes the subject',
+  subjectFromMessage('Logo question\nWhere is the source file?')==='Logo question');
+ok('subject: capped at 60 chars', subjectFromMessage('x'.repeat(80)).length===60);
+ok('subject: empty → "New message"', subjectFromMessage('')==='New message' && subjectFromMessage(null)==='New message');
 
 // ═══ msgFromMap + projMsgItem — event-map attribution (author_kind can’t tell sides) ═══
 const EVMAP=msgFromMap([

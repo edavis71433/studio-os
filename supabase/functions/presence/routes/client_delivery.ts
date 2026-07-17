@@ -336,7 +336,16 @@ export async function handleClientNotifications(req: Request, site: SiteRow, pri
   ]);
   const lastSeen = rows(seenR)[0]?.last_seen_at || null;
   const items = [
-    ...rows(evR).map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: notifHref(e.kind, e.project_id, e.detail || {}), created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
+    // The reader's OWN message sends (kind='message' events stamped
+    // detail.from='client' by the client door, the only writer of that stamp)
+    // are not news TO them — deriving them lit false "the studio replied" dots
+    // after every reload. Only that pairing is excluded; other own-action kinds
+    // keep their existing derivations.
+    ...rows(evR).filter((e) => !(e.kind === 'message' && (e.detail || {}).from === 'client'))
+      .map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: notifHref(e.kind, e.project_id, e.detail || {}), created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
+    // Residual gap (named, accepted): these derived support rows key on the
+    // caller's OWN requests' updated_at — a request the client just opened can
+    // still self-notify here until the bell's read cursor passes it.
     ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${clean(r.subject, 60)}`, href: `/client.html?support=${r.id}`, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
   ].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit);
   return json({ data: items, unread_count: items.filter((i) => !i.read).length }, 200, cors);
@@ -407,7 +416,27 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   if (req.method === 'GET') {
     const u = new URL(req.url);
     const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,updated_at&order=updated_at.desc&limit=${clampLimit(u.searchParams.get('limit'))}&offset=${clampOffset(u.searchParams.get('offset'))}`);
-    return r.ok ? json({ data: rows(r) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
+    if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
+    const list = rows(r);
+    // Additive `last_activity_at` = max(updated_at, the newest reply's created_at):
+    // replies only INSERT into presence_support_messages and never bump the
+    // request's updated_at, so sorting on updated_at misses every reply after the
+    // first (the studio side fixed the same gap in workspace.ts, slice 2). ONE
+    // batched, site-scoped read for the listed request ids; strictly best-effort —
+    // on any failure the field is simply omitted and the portal falls back to
+    // updated_at (deploy-order tolerant in both directions: old portals ignore
+    // the extra field, new portals tolerate its absence).
+    if (list.length) {
+      try {
+        const mr = await svc(`presence_support_messages?site_id=eq.${s}&request_id=in.(${list.map((x) => String(x.id)).join(',')})&deleted_at=is.null&select=request_id,created_at&order=created_at.desc&limit=300`);
+        if (mr.ok && Array.isArray(mr.json)) {
+          const newest: Record<string, string> = {};
+          for (const m of mr.json as any[]) { const rid = String(m.request_id || ''); if (rid && !newest[rid]) newest[rid] = String(m.created_at || ''); } // created_at.desc → first seen per request is its newest
+          for (const row of list) { const n = newest[String(row.id)] || ''; const upd = String(row.updated_at || ''); row.last_activity_at = n > upd ? n : upd; }
+        }
+      } catch { /* omit the field — callers fall back to updated_at */ }
+    }
+    return json({ data: list }, 200, cors);
   }
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const subject = clean(b.subject, 200);
@@ -457,7 +486,14 @@ export async function handleClientSupportOne(req: Request, site: SiteRow, princi
   const reqRow = await clientSupportRow(me, s, id, principal);
   if (!reqRow) return json({ error: 'not_found' }, 404, cors);
   if (req.method === 'GET') {
-    const msgs = rows(await svc(`presence_support_messages?request_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&select=id,body,author_kind,created_at&order=created_at.asc&limit=200`));
+    // author_kind can't tell the studio from the requester (BOTH resolve to
+    // principal.kind 'client'; only platform staff are 'staff'/'system'), so read
+    // the stored `author` key and derive an additive `from` per message: 'client'
+    // = the request's own requester, 'studio' = anyone else. The raw author key
+    // (a user id / email) is NOT echoed — only the derived side. Old portal
+    // builds simply ignore `from` (additive, deploy-order tolerant both ways).
+    const msgs = rows(await svc(`presence_support_messages?request_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&select=id,body,author,author_kind,created_at&order=created_at.asc&limit=200`))
+      .map(({ author, ...m }) => ({ ...m, from: author === reqRow.requester ? 'client' : 'studio' }));
     return json({ data: { request: reqRow, messages: msgs } }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);

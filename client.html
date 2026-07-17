@@ -166,27 +166,78 @@
   .qrow.unread h3::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--p);margin-right:8px;vertical-align:middle}
   .qact{flex:0 0 auto;display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;padding-top:2px}
   .qact button{font-size:12.5px;padding:6px 13px}
-  /* ── the project activity timeline (type-colored connector + icon rings) ──
-     scoped under #ptl: the tab bar's icon spans also use class "ti" (mobile nav,
-     untouched by this slice) — unscoped rules would draw connector lines there. */
-  #ptl .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:16px 0 2px;display:flex;align-items:center;gap:8px}
-  #ptl .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
-  #ptl .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
-  #ptl .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
+  /* ── the activity timeline (type-colored connector + icon rings) — scoped
+     under .tlhost (stamped on the drill-in's #ptl AND the Messages pane's
+     thread): the tab bar's icon spans also use class "ti" (mobile nav,
+     untouched) — unscoped rules would draw connector lines there. */
+  .tlhost .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:16px 0 2px;display:flex;align-items:center;gap:8px}
+  .tlhost .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
+  .tlhost .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
+  .tlhost .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
   /* connector trims target classes STAMPED at render time — .tl-month is also a
      div, so the structural :first-of-type/:last-of-type could never match here. */
-  #ptl .ti.ti-first:before{top:12px} #ptl .ti.ti-last:before{bottom:auto;height:22px}
-  #ptl .ti .ti-icon{position:absolute;left:1px;top:8px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--on-p);box-shadow:0 0 0 3px var(--card)}
-  #ptl .ti.t-message:before{background:color-mix(in srgb,var(--p) 35%,transparent)} #ptl .ti.t-message .ti-icon{background:var(--p)}
-  #ptl .ti.t-task:before{background:color-mix(in srgb,var(--warn) 35%,transparent)} #ptl .ti.t-task .ti-icon{background:var(--warn)}
-  #ptl .ti.t-file:before{background:color-mix(in srgb,var(--act-file) 35%,transparent)} #ptl .ti.t-file .ti-icon{background:var(--act-file)}
-  #ptl .ti.t-approve:before{background:color-mix(in srgb,var(--good) 35%,transparent)} #ptl .ti.t-approve .ti-icon{background:var(--good)}
-  #ptl .ti.t-note:before{background:color-mix(in srgb,var(--act-note) 35%,transparent)} #ptl .ti.t-note .ti-icon{background:var(--act-note)}
-  #ptl .ti.t-system:before{background:color-mix(in srgb,var(--faint) 30%,transparent)} #ptl .ti.t-system .ti-icon{background:var(--faint)}
-  #ptl .ti-main{flex:1;min-width:0}
-  #ptl .ti-title{font-weight:600;font-size:13.5px;color:var(--ink)}
-  #ptl .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;border-left:2px solid var(--line);padding-left:10px}
-  #ptl .ti-when{font-size:11.5px;color:var(--faint);white-space:nowrap;flex:0 0 auto;padding-top:2px}
+  .tlhost .ti.ti-first:before{top:12px} .tlhost .ti.ti-last:before{bottom:auto;height:22px}
+  .tlhost .ti .ti-icon{position:absolute;left:1px;top:8px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--on-p);box-shadow:0 0 0 3px var(--card)}
+  .tlhost .ti.t-message:before{background:color-mix(in srgb,var(--p) 35%,transparent)} .tlhost .ti.t-message .ti-icon{background:var(--p)}
+  .tlhost .ti.t-task:before{background:color-mix(in srgb,var(--warn) 35%,transparent)} .tlhost .ti.t-task .ti-icon{background:var(--warn)}
+  .tlhost .ti.t-file:before{background:color-mix(in srgb,var(--act-file) 35%,transparent)} .tlhost .ti.t-file .ti-icon{background:var(--act-file)}
+  .tlhost .ti.t-approve:before{background:color-mix(in srgb,var(--good) 35%,transparent)} .tlhost .ti.t-approve .ti-icon{background:var(--good)}
+  .tlhost .ti.t-note:before{background:color-mix(in srgb,var(--act-note) 35%,transparent)} .tlhost .ti.t-note .ti-icon{background:var(--act-note)}
+  .tlhost .ti.t-system:before{background:color-mix(in srgb,var(--faint) 30%,transparent)} .tlhost .ti.t-system .ti-icon{background:var(--faint)}
+  .tlhost .ti-main{flex:1;min-width:0}
+  .tlhost .ti-title{font-weight:600;font-size:13.5px;color:var(--ink)}
+  .tlhost .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;border-left:2px solid var(--line);padding-left:10px}
+  .tlhost .ti-when{font-size:11.5px;color:var(--faint);white-space:nowrap;flex:0 0 auto;padding-top:2px}
+  /* ── slice 5: the Messages tab as a split-view console (inbox.html's contract,
+     this page's own tokens + card idiom). ≥720px: list pane (~22rem) · reading
+     pane, one card, panes scroll internally; <720px: stacked — list first, the
+     picked conversation pushes in with a back button (D5). */
+  .mconsole{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-top:10px}
+  .mlist{display:flex;flex-direction:column;min-width:0}
+  .mlhead{padding:16px 16px 10px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .mlrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .mlhead h1{font-family:var(--serif);font-weight:500;font-size:22px;margin:0;letter-spacing:-.01em;flex:1 1 auto;min-width:0}
+  .mnew{flex:0 0 auto;font-size:12.5px;padding:7px 13px}
+  .mlmeta{margin:4px 0 0;font-size:12px;color:var(--faint)}
+  #mrows{list-style:none;margin:0;padding:0;flex:1;overflow-y:auto}
+  .mrow{position:relative;padding:12px 16px 12px 28px;border-top:1px solid var(--line);cursor:pointer}
+  .mrow:first-child{border-top:0}
+  .mrow:hover{background:var(--bg)}
+  .mrow[aria-selected="true"]{background:var(--p-soft);box-shadow:inset 3px 0 0 var(--p)}
+  #mrows.kbd .mrow.kfocus{outline:2px solid var(--p);outline-offset:-2px}
+  .mrow.unread::before{content:"";position:absolute;left:11px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--p)}
+  .mrow .rtop{display:flex;align-items:baseline;gap:8px}
+  .mrow .rname{font-weight:600;font-size:14.5px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mrow.unread .rname{font-weight:750}
+  .mrow .rwhen{margin-left:auto;flex:0 0 auto;font-size:11.5px;color:var(--faint)}
+  .mrow .rprev{display:flex;align-items:center;gap:7px;min-width:0;margin-top:4px}
+  .mrow .kchip{flex:0 0 auto;white-space:nowrap}
+  .mrow .rtxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--soft)}
+  .mempty{padding:24px 16px;color:var(--soft);font-size:14px;text-align:center}
+  .mpane{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .mphead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card);flex:0 0 auto}
+  .mpname{font-family:var(--serif);font-weight:500;font-size:18px;line-height:1.2;min-width:0}
+  .mpsub{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--soft);margin-top:2px}
+  .mpsub .tag{margin-bottom:0}
+  .mback{display:none;flex:0 0 auto;font-size:13px;padding:6px 12px}
+  .mpbody{flex:1;overflow-y:auto;padding:16px 18px;min-height:0}
+  .mpcomposer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--card);padding:12px 16px}
+  .mpcomposer textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:vertical;min-height:52px}
+  .mpcomposer textarea:focus{outline:none;border-color:var(--p)}
+  .kchip.support{background:var(--warn-soft);color:var(--warn)}
+  @media (min-width:720px){
+    body.msgsview .wrap{max-width:1100px}
+    .mconsole{display:flex;align-items:stretch;height:calc(100vh - 190px);min-height:460px}
+    .mlist{flex:0 0 22rem;border-right:1px solid var(--line)}
+    .mpane{flex:1}
+  }
+  @media (max-width:719px){
+    .mconsole{display:block}
+    .mpane{display:none}
+    .mconsole.pane-open .mlist{display:none}
+    .mconsole.pane-open .mpane{display:flex;min-height:70vh}
+    .mback{display:inline-flex}
+  }
   .acard{padding:14px 16px}
   .pcompose{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
   /* ── decision history (already-decided approvals) ── */
@@ -283,9 +334,11 @@ function cycleClientTheme(){let t=clientTheme();t=t===''?'light':t==='light'?'da
 function scrollToSection(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:(matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'),block:'start'});}
 function skeleton(){return'<div class="skel"><div class="l w40"></div><div class="l w80"></div></div><div class="skel"><div class="l w60"></div><div class="l"></div><div class="l w80"></div></div><div class="skel"><div class="l w40"></div><div class="l w60"></div></div>';}
 // Route a notification's href to the right in-portal view (no full navigation).
+// Support links land in the Messages tab's reading pane (slice 5) — the same
+// place the ?support= deep link and the Requests tab's "View & reply" go.
 function navFromHref(href){
   href=String(href||'');
-  const sup=href.match(/support=([0-9a-f-]{8,})/i);if(sup){openSupportThread(sup[1],null);return;}
+  const sup=href.match(/support=([0-9a-f-]{8,})/i);if(sup){openMessagesTo(sup[1]);return;}
   const pm=href.match(/\/projects\/([0-9a-f-]{8,})(#[a-z0-9-]+)?/i);
   if(pm){openProject(pm[1],pm[2]?sectionForAnchor(pm[2]):null);return;}
 }
@@ -297,6 +350,12 @@ function navFromHref(href){
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
 const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},unread:0,notifs:[],billing:null,snaps:null};
 let CURRENT_TAB='home';
+// A monotonically increasing VIEW token: every function that owns a fresh paint
+// of #main bumps it (showTab AND every drill-in open — openProject, support
+// threads, booking, surveys, which never change CURRENT_TAB). Async renderers
+// capture it at entry and re-check before painting, so a late fetch can never
+// clobber a newer view (a CURRENT_TAB check alone misses the drill-ins).
+let VIEW_SEQ=0;
 const TABS=[['home','🏠','Home'],['messages','💬','Messages'],['files','📁','Files'],['invoices','🧾','Invoices'],['requests','✨','Requests'],['help','❓','Help']];
 // The context bar's "app name" is the studio/business identity. The portal's own
 // reads (/portal/context|feed + /client/*) expose no agency branding today — the
@@ -333,9 +392,12 @@ function showNav(){
 }
 function hideNav(){const nav=$('tabnav');if(nav){nav.hidden=true;nav.innerHTML='';}}
 function setActiveTab(tab){const nav=$('tabnav');if(!nav)return;nav.querySelectorAll('.tab').forEach(b=>{if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});}
-// the project record page widens the wrap (two-region body); every other view is narrow
-function setWide(on){try{document.body.classList.toggle('wide',!!on);}catch(_){}}
+// the project record page widens the wrap (two-region body); every other view is
+// narrow. Every view transition passes through here, so it also drops the Messages
+// console's own wrap class (renderMessages re-adds it for the split view).
+function setWide(on){try{document.body.classList.toggle('wide',!!on);document.body.classList.remove('msgsview');}catch(_){}}
 function showTab(tab){
+  VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
   if(tab==='messages')return renderMessages();
   if(tab==='files')return renderFiles();
@@ -438,6 +500,13 @@ function unreadKeysFrom(notifs){
     // default drops detail.task_id), so the honest granularity is PROJECT-level:
     // an unread client_action for project P lights P's to-do rows.
     if(n.kind==='client_action'){const p=href.match(/\/projects\/([a-z0-9-]+)/i);if(p)keys.add('todos-'+p[1]);}
+    // slice 5 (Messages split view): per-conversation unread dots. A 'message'
+    // notification lights its PROJECT's thread row (href '/projects/<id>#messages');
+    // a 'support_message' one lights its REQUEST's row (hrefs carry the id as
+    // '?support=<id>' — the derived support rows — or '#support-<id>' — project
+    // events). Kind-gated so e.g. '#messages' anchors on other kinds add nothing.
+    if(n.kind==='message'){const pm=href.match(/\/projects\/([a-z0-9-]+)#messages/i);if(pm)keys.add('msgs-'+pm[1]);}
+    if(n.kind==='support_message'){const sm=href.match(/[?&]support=([a-z0-9-]+)/i)||href.match(/#support-([a-z0-9-]+)/i);if(sm)keys.add('support-'+sm[1]);}
   }
   return keys;
 }
@@ -505,26 +574,360 @@ async function buildNeedsYou(){
   body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'))));
   body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
 }
-// ── MESSAGES — a top-level destination that works with NO project ──
-async function renderMessages(){
-  $('main').innerHTML=spinnerHtml();
-  const canMessage=PORTAL.persona==='client';
-  let general=[];try{const r=await api('/client/support');general=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id&&!x.project_id);}catch(_){}
-  let html=portalHeader('Messages','Talk to your studio — they usually reply within a day.');
-  html+=`<section id="sec-messages"><h2>Message your studio</h2>`;
-  for(const rq of general){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
-  if(canMessage)html+=`<div class="card"><label for="gmsg" style="display:block;font-weight:600;margin-bottom:6px">${general.length?'Start a new message':'Send your studio a message'}</label><textarea id="gmsg" rows="3" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Type your message…"></textarea><div class="row"><button class="approve" id="gsend">Send</button></div></div>`;
-  else html+=emptyCard('Your studio will reach you here. Messaging opens up once they’ve set up your account.','💬');
-  html+=`</section>`;
-  if(PORTAL.projects.length){
-    html+=`<section><h2>Project conversations</h2>`;
-    for(const p of PORTAL.projects)html+=`<div class="card" role="button" tabindex="0" data-msgproj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p class="muted">Open this project’s message thread →</p></div>`;
-    html+=`</section>`;
+// ── MESSAGES — the split-view console (redesign slice 5; inbox.html's contract
+// in this page's own idiom). LEFT: one listbox row per conversation — each
+// project's message thread + every support request (general AND project-scoped)
+// — two-line rows with a kind/status chip and unread dots derived from the
+// existing notifications read-state. RIGHT: the picked conversation renders in
+// place — a project thread as the slice-4 timeline (msgFromMap attribution) +
+// its composer, or a support thread + reply (read-only once resolved/closed).
+// <720px the panes stack (D5): list first, the pane pushes in with a back
+// button. A reviewer (403 on all /client/*) gets the calm empty state with NO
+// list fetches. Works with NO project (general support threads still list).
+
+// ── pure helpers (mirrored 1:1 in tests/presence/portal_ux_test.mjs) ──
+// The conversation list: one row per project thread + one per support request,
+// sorted newest-activity first (rows with no activity timestamp sink last).
+// `latest` = the preview fan-out's result per project id: a message object
+// (fetched, has messages), null (fetched — the thread is CONFIRMED empty), or
+// the key ABSENT (not fetched: beyond the preview cap, or the fetch failed).
+// Only a fetched-and-empty thread may claim "No messages yet"; unfetched rows
+// get a neutral preview and sort after fetched ones — they can claim nothing.
+function convRows(projects,support,latest){
+  const names={};for(const p of (projects||[]))if(p&&p.id)names[p.id]=p.name;
+  const rows=[];
+  for(const p of (projects||[])){
+    if(!p||!p.id)continue;
+    const fetched=Object.prototype.hasOwnProperty.call(latest||{},p.id);
+    const lm=fetched?(latest||{})[p.id]:null;
+    rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:p.name||'Project',when:(lm&&lm.created_at)||'',
+      preview:lm?(lm.body||''):(fetched?'No messages yet — say hello any time.':'Open this conversation'),
+      unfetched:!fetched,chip:'Message',chipCls:'',unreadKey:'msgs-'+p.id});
   }
-  $('main').innerHTML=html;
-  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
-  document.querySelectorAll('[data-msgproj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-msgproj'),'sec-messages');c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
-  const gs=$('gsend');if(gs)gs.addEventListener('click',async()=>{const v=$('gmsg').value.trim();if(!v){toast('Type a message first.');return;}gs.disabled=true;const subject=(v.split('\n')[0]||'').slice(0,60)||'New message';const r=await api('/client/support','POST',{subject,body:v});if(r.ok&&r.body&&r.body.data&&r.body.data.id){toast('Sent — your studio will get back to you.');renderMessages();}else{toast('That didn’t send.');gs.disabled=false;}});
+  for(const rq of (support||[])){
+    if(!rq||!rq.id)continue;
+    const status=String(rq.status||'open');
+    // recency prefers last_activity_at (new function builds — replies only INSERT
+    // and never bump updated_at) with the updated_at fallback for old builds.
+    rows.push({id:'sup:'+rq.id,kind:'support',sid:rq.id,pid:rq.project_id||'',title:rq.subject||'Support request',
+      when:rq.last_activity_at||rq.updated_at||'',preview:rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio',
+      chip:'Support · '+status.replace(/_/g,' '),chipCls:'support',status,unreadKey:'support-'+rq.id});
+  }
+  rows.sort(convCompare);
+  return rows;
+}
+// newest activity first; among rows with no timestamp, fetched (confirmed-empty)
+// rows come before unfetched ones — an unfetched row makes no recency claim.
+function convCompare(a,b){const w=String(b.when).localeCompare(String(a.when));if(w)return w;return (a.unfetched?1:0)-(b.unfetched?1:0);}
+// Support thread → timeline items. Attribution: new function builds stamp each
+// reply with an additive `from` ('client' = the request's own requester,
+// 'studio' = anyone else) — derived server-side by comparing the stored author
+// to the requester, which author_kind alone can never do (BOTH the studio
+// operator and the customer resolve to principal.kind 'client'; only platform
+// staff are 'staff'/'system'). When `from` is absent (an old function build —
+// deploy-order tolerant) replies fall back to the page's long-standing
+// author_kind heuristic (staff/system → the studio, everything else → you).
+// The request body itself is safely "You" (the route is requester-scoped —
+// the client only ever sees their own).
+function supportThreadItems(rq,msgs){
+  const items=[];
+  if(rq&&rq.body&&rq.created_at)items.push({type:'message',title:'You opened this request',body:rq.body,at:rq.created_at});
+  for(const m of (msgs||[])){
+    if(!m||!m.created_at)continue;
+    const mine=(m.from==='client'||m.from==='studio')?m.from==='client':!(m.author_kind==='staff'||m.author_kind==='system');
+    items.push({type:'message',title:mine?'You replied':'Your studio replied',body:m.body||'',at:m.created_at});
+  }
+  items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
+  return items;
+}
+// The general composer's first-line-subject rule — semantics unchanged from the
+// old Messages tab (60-char cap, 'New message' fallback).
+function subjectFromMessage(v){return (String(v==null?'':v).split('\n')[0]||'').slice(0,60)||'New message';}
+
+// ── the console: state + views ──
+// activeId = the keyboard-active CONVERSATION (tracked by id, never by index —
+// re-sorts and re-renders recompute the index so focus stays on the same row).
+const MC={rows:[],sel:'',compose:false,activeId:'',unread:new Set(),cache:{},seq:0};
+const mid=(s)=>String(s).replace(/[^a-zA-Z0-9_-]/g,'_');
+// route straight into the Messages tab with a support thread opened in its pane
+// (the ?support= deep link, bell items, and the Requests tab's "View & reply").
+function openMessagesTo(sid){CURRENT_TAB='messages';setActiveTab('messages');setWide(false);try{window.scrollTo(0,0);}catch(_){}return renderMessages(sid);}
+async function renderMessages(focusSup){
+  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token
+  MC.sel='';MC.compose=false;MC.activeId='';
+  MC.cache={};   // fresh per tab ENTRY — the bundle/message cache lives for one tab visit
+  const canMessage=PORTAL.persona==='client';
+  if(!canMessage){ // reviewer: /client/* is 403 server-side — the calm empty state, NO list fetches
+    $('main').innerHTML=portalHeader('Messages','Talk to your studio — they usually reply within a day.')+
+      emptyCard('Your studio will reach you here. Messaging opens up once they’ve set up your account.','💬');
+    return;
+  }
+  document.body.classList.add('msgsview');   // the split view earns the wider wrap ≥720px
+  $('main').innerHTML=spinnerHtml();
+  let support=[];try{const r=await api('/client/support');support=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id);}catch(_){}
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch (another tab OR a drill-in) — never paint over the newer view
+  // the newest message per project gives each project row its preview + recency.
+  // DATA CHOICE: limit=1 here — deliberately NOT a full bundle per row; the pane
+  // fetches a project's bundle (for event attribution) only when it's opened.
+  // CAP (honest): only the FIRST 8 projects get a preview fetch (same cap as
+  // ensureSnaps). Rows beyond the cap — and rows whose preview fetch failed —
+  // stay UNFETCHED in `latest` (key absent): convRows gives them a neutral
+  // preview and sorts them after fetched rows, never a false "No messages yet".
+  const latest={};
+  await Promise.all(PORTAL.projects.slice(0,8).map(async(p)=>{try{
+    const r=await api('/client/projects/'+p.id+'/messages?limit=1');
+    if(r&&r.ok){const d=r.body&&r.body.data;latest[p.id]=(Array.isArray(d)?d:[])[0]||null;}   // null = fetched, confirmed empty; a failed fetch leaves the key ABSENT
+  }catch(_){}}));
+  if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
+  MC.rows=convRows(PORTAL.projects,support,latest);
+  MC.unread=unreadKeysFrom(PORTAL.notifs);
+  $('main').innerHTML=
+    `<div class="mconsole" id="mconsole">`+
+      `<aside class="mlist" aria-label="Conversation list">`+
+        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew">Message your studio</button></div><p class="mlmeta" id="mlmeta"></p><p class="mlmeta">Talk to your studio — they usually reply within a day.</p></div>`+
+        `<ul id="mrows" role="listbox" aria-label="Conversations" tabindex="0"></ul>`+
+      `</aside>`+
+      `<section class="mpane" id="mpane" aria-label="Conversation"></section>`+
+    `</div>`;
+  $('mnew').addEventListener('click',openComposePane);
+  // keyboard listbox (inbox.html's contract): arrows rove, Enter AND Space open.
+  // Focusing the listbox with no active row defaults to the selected row (or the
+  // first) so Enter works immediately — no Arrow press required first.
+  const rows=$('mrows');
+  const activeIdx=()=>MC.rows.findIndex(r=>r.id===MC.activeId);
+  const defaultIdx=()=>{const j=MC.rows.findIndex(r=>r.id===MC.sel);return j>=0?j:0;};
+  rows.addEventListener('focus',()=>{if(MC.rows.length&&activeIdx()<0){MC.activeId=MC.rows[defaultIdx()].id;paintMActive();}});
+  rows.addEventListener('keydown',(e)=>{
+    if(!MC.rows.length)return;
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      e.preventDefault();rows.classList.add('kbd');
+      const i=activeIdx();
+      const next=i<0?defaultIdx():(e.key==='ArrowDown'?Math.min(i+1,MC.rows.length-1):Math.max(i-1,0));
+      MC.activeId=MC.rows[next].id;paintMActive();
+    }else if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){
+      e.preventDefault();
+      const i0=activeIdx();const i=i0<0?defaultIdx():i0;
+      if(MC.rows[i]){MC.activeId=MC.rows[i].id;openConv(MC.rows[i].id);}
+    }
+  });
+  renderMRows();
+  if(focusSup&&MC.rows.some(r=>r.id==='sup:'+focusSup))openConv('sup:'+focusSup);
+  else if(focusSup)openSupportThread(focusSup,null);   // an id not in the list (stale link) — the legacy full view degrades gracefully
+  else renderMPane();
+}
+function renderMRows(){
+  const rows=$('mrows');if(!rows)return;
+  const meta=$('mlmeta');if(meta)meta.textContent=`${MC.rows.length} conversation${MC.rows.length===1?'':'s'} · newest first`;
+  if(!MC.rows.length){rows.innerHTML=`<li class="mempty" role="presentation">No conversations yet — “Message your studio” starts one.</li>`;return;}
+  rows.innerHTML=MC.rows.map((r)=>{
+    const unread=MC.unread.has(r.unreadKey);
+    // the dot is a bare pseudo-element — unread rows carry an sr-only "New — "
+    // text alternative (the slice-4 pattern); aria-selected marks the open row.
+    return `<li class="mrow${unread?' unread':''}" id="mrow-${mid(r.id)}" role="option" aria-selected="${MC.sel===r.id?'true':'false'}" data-mrow="${esc(r.id)}">`+
+      `<span class="rtop"><span class="rname">${unread?'<span class="sr-only sr-new">New — </span>':''}${esc(r.title)}</span>${r.when?`<span class="rwhen">${esc(rel(r.when))}</span>`:''}</span>`+
+      `<span class="rprev"><span class="kchip${r.chipCls?' '+r.chipCls:''}">${esc(r.chip)}</span><span class="rtxt">${esc(r.preview)}</span></span></li>`;
+  }).join('');
+  rows.querySelectorAll('.mrow').forEach((el)=>el.addEventListener('click',()=>{MC.activeId=el.getAttribute('data-mrow');rows.classList.remove('kbd');openConv(el.getAttribute('data-mrow'));}));
+  paintMActive();   // innerHTML rebuilds dropped .kfocus + aria-activedescendant — re-apply them
+}
+function paintMActive(){
+  const rows=$('mrows');if(!rows)return;
+  const i=MC.rows.findIndex(r=>r.id===MC.activeId);   // recompute from the id — indexes shift on re-sorts
+  rows.querySelectorAll('.mrow').forEach((el,j)=>el.classList.toggle('kfocus',j===i));
+  if(i>=0){rows.setAttribute('aria-activedescendant','mrow-'+mid(MC.activeId));const el=rows.querySelector('.mrow.kfocus');if(el)el.scrollIntoView({block:'nearest'});}
+  else rows.removeAttribute('aria-activedescendant');
+}
+// one re-sort + repaint after activity bumps a row's `when` — renderMRows ends
+// in paintMActive, which re-finds the active conversation at its new index.
+function resortMRows(){MC.rows.sort(convCompare);renderMRows();}
+// Slice-4's local read-marking, per conversation: the dot clears the moment the
+// thread opens. The matching notifications flip read LOCALLY (so every derived
+// surface — bell panel, Home dots — agrees this session) and the bell badge
+// follows. This stays LOCAL-ONLY on purpose: the server read-state is one
+// all-or-nothing last_seen_at cursor — persisting it from here would mark EVERY
+// notification seen because one thread was opened. The bell open persists the
+// cursor (always, idempotently); per-thread persistence would need new backend.
+function markConvSeen(row){
+  if(!row||!row.unreadKey||!MC.unread.has(row.unreadKey))return;
+  MC.unread.delete(row.unreadKey);
+  let flipped=0;
+  for(const n of (PORTAL.notifs||[])){if(n&&!n.read&&unreadKeysFrom([n]).has(row.unreadKey)){n.read=true;flipped++;}}
+  if(flipped){PORTAL.unread=Math.max(0,(PORTAL.unread||0)-flipped);syncBellBadges();}
+}
+function syncBellBadges(){
+  const label='What’s new'+(PORTAL.unread?` — ${PORTAL.unread} new`:'');
+  document.querySelectorAll('.bell').forEach(el=>el.setAttribute('aria-label',label));
+  document.querySelectorAll('.bell .badge').forEach(b=>{if(PORTAL.unread){b.classList.add('on');b.textContent=PORTAL.unread>9?'9+':String(PORTAL.unread);}else{b.classList.remove('on');b.textContent='';}});
+}
+function openConv(id){
+  const row=MC.rows.find(r=>r.id===id);if(!row)return;
+  MC.sel=id;MC.compose=false;
+  markConvSeen(row);
+  renderMRows();renderMPane();
+  const c=$('mconsole');if(c)c.classList.add('pane-open');   // <720px: push the pane in
+  focusMPane();
+}
+// closing back (mobile) returns focus to the listbox; the roving row stays put
+function closeMPane(){MC.sel='';MC.compose=false;renderMRows();renderMPane();const r=$('mrows');if(r)r.focus();}
+function renderMPane(){
+  const host=$('mpane');if(!host)return;
+  if(MC.compose)return void paneCompose(host);
+  const row=MC.rows.find(r=>r.id===MC.sel);
+  if(!row){
+    const c=$('mconsole');if(c)c.classList.remove('pane-open');   // never strand pane-open with no selection
+    host.innerHTML=MC.rows.length
+      ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">🗂</span><h2>Pick a conversation</h2><p class="muted">Choose one on the left — it opens right here.</p></div>`
+      :`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>No conversations yet</h2><p class="muted">“Message your studio” starts the first one.</p></div>`;
+    return;
+  }
+  if(row.kind==='project')return void paneProject(host,row);
+  paneSupport(host,row);
+}
+// the pane title is the conversation's heading (focusMPane focuses it via
+// tabindex=-1) — real heading semantics so it announces with structure, not
+// as a bare focused div.
+const mpaneHead=(title,subHtml)=>`<div class="mphead"><button type="button" class="mback" id="mback">← Messages</button><div style="min-width:0;flex:1"><div class="mpname" role="heading" aria-level="2">${esc(title)}</div>${subHtml?`<div class="mpsub">${subHtml}</div>`:''}</div></div>`;
+function wireMBack(){const b=$('mback');if(b)b.addEventListener('click',closeMPane);}
+// a11y: opening a conversation must MOVE focus — on mobile the list is hidden
+// and focus would drop to <body>. Mobile → the back button; wider → the pane
+// heading (tabindex=-1: focusable, not in the tab order). The pane head renders
+// synchronously, so this runs before the async body loads.
+function focusMPane(){
+  const b=$('mback');
+  if(window.matchMedia('(max-width:719px)').matches&&b){b.focus();return;}
+  const h=document.querySelector('#mpane .mpname');
+  if(h){h.setAttribute('tabindex','-1');h.focus();}
+}
+// A project conversation: the message thread as slice-4 timeline items.
+// DATA CHOICE (stated): the full bundle is fetched ONCE per project per tab
+// visit (renderMessages clears MC.cache on every entry, and a send deletes the
+// project's entry) — its EVENTS carry the authoritative message attribution for
+// msgFromMap (author_kind can't tell the sides apart) — alongside the message
+// list, then cached. A FAILED bundle fetch is never cached: caching events:[]
+// would lock the attribution to the heuristic until reload; it retries on the
+// next open instead. The drill-in's own PROJ_EVENTS cache belongs to the record
+// page and is left alone.
+async function paneProject(host,row){
+  const seq=++MC.seq;
+  host.innerHTML=mpaneHead(row.title,`<span class="kchip">Message</span><a class="link" href="#" id="mopenproj">Open project →</a>`)+
+    `<div class="mpbody" id="mpbody">${skeleton()}</div><div class="mpcomposer" id="mpcomp"></div>`;
+  wireMBack();
+  const op=$('mopenproj');if(op)op.addEventListener('click',(e)=>{e.preventDefault();openProject(row.pid);});
+  let c=MC.cache[row.pid];
+  if(!c){
+    const [b,m]=await Promise.all([api('/client/projects/'+row.pid).catch(()=>null),api('/client/projects/'+row.pid+'/messages').catch(()=>null)]);
+    if(seq!==MC.seq)return;   // a stale async pane render must never paint over a newer one
+    if(!m||!m.ok){const pb=$('mpbody');if(pb)pb.innerHTML=emptyCard('Couldn’t load this conversation just now — please try again.','💬');return;}
+    const bd=(b&&b.ok&&b.body&&b.body.data)||null;
+    const md=m.body&&m.body.data;   // Array.isArray-guarded: a non-array payload must not throw mid-render
+    c={events:(bd&&Array.isArray(bd.events)?bd.events:[]).slice(),msgs:(Array.isArray(md)?md:[]).slice()};
+    if(bd)MC.cache[row.pid]=c;   // cache ONLY a complete fetch — a failed bundle read retries next open
+  }
+  paintProjThread(c);
+  const pc=$('mpcomp');if(!pc)return;
+  pc.innerHTML=`<textarea id="mmsg" rows="2" aria-label="Message your studio" placeholder="Message your studio…"></textarea><div class="row" style="margin-top:8px"><button class="approve" id="msend">Send</button></div>`;
+  $('msend').addEventListener('click',async()=>{
+    const btn=$('msend'),ta=$('mmsg');const v=(ta.value||'').trim();if(!v)return;
+    btn.disabled=true;
+    // a slow send must never paint into a pane that moved on: capture the pane
+    // token + selection now, re-check before every fresh-DOM paint after awaits.
+    const sendSeq=MC.seq,sendSel=MC.sel;
+    const live=()=>sendSeq===MC.seq&&sendSel===MC.sel;
+    const r=await api('/client/projects/'+row.pid+'/messages','POST',{body:v});   // {body} — the route's contract, unchanged
+    if(r.ok){
+      delete MC.cache[row.pid];   // the cached bundle is stale now — the next open refetches
+      ta.value='';
+      row.when=new Date().toISOString();row.preview=v;row.unfetched=false;
+      resortMRows();   // list data — correct whichever conversation is open now
+      const mr=await api('/client/projects/'+row.pid+'/messages').catch(()=>null);
+      const mrd=(mr&&mr.ok&&mr.body&&mr.body.data)||null;
+      if(Array.isArray(mrd)){c.msgs=mrd.slice();row.when=(c.msgs[0]&&c.msgs[0].created_at)||row.when;resortMRows();}
+      // a failed refetch keeps the msgs we already have — never an error card over a sent thread
+      if(live())paintProjThread(c);   // $('mpbody') is grabbed fresh — only paint if this pane still shows this conversation
+    }else toast('That didn’t send.');
+    btn.disabled=false;
+  });
+}
+function paintProjThread(c){
+  const pb=$('mpbody');if(!pb)return;
+  const fromById=msgFromMap(c.events);
+  const items=[];for(const m of c.msgs){const it=projMsgItem(m,fromById);if(it)items.push(it);}
+  items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
+  pb.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No messages yet — say hello any time.','💬');
+}
+// A support thread: the request body + replies as timeline items, a status
+// chip, and a reply composer unless resolved/closed (read-only lock preserved).
+async function paneSupport(host,row){
+  const seq=++MC.seq;
+  host.innerHTML=mpaneHead(row.title,`<span class="tag" id="msupstatus">${esc(String(row.status||'open').replace(/_/g,' '))}</span>${row.pid&&row.preview?`<span>${esc(row.preview)}</span>`:''}`)+
+    `<div class="mpbody" id="mpbody">${skeleton()}</div><div class="mpcomposer" id="mpcomp"></div>`;
+  wireMBack();
+  let r=null;try{r=await api('/client/support/'+row.sid);}catch(_){}
+  if(seq!==MC.seq)return;
+  const pb=$('mpbody'),pc=$('mpcomp');if(!pb||!pc)return;
+  if(!r||!r.ok){pb.innerHTML=emptyCard('That request isn’t available right now.','💬');pc.innerHTML='';return;}
+  const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
+  const st=$('msupstatus');if(st)st.textContent=String(rq.status||row.status||'open').replace(/_/g,' ');
+  const items=supportThreadItems(rq,msgs);
+  pb.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
+  const resolved=rq.status==='resolved'||rq.status==='closed';
+  if(resolved){pc.innerHTML=`<p class="muted" style="font-size:13px">This request is resolved. Open a new one if you need anything else.</p>`;return;}
+  pc.innerHTML=`<textarea id="smsg" rows="2" aria-label="Add to this request" placeholder="Add to this request…"></textarea><div class="row" style="margin-top:8px"><button class="approve" id="ssend">Send</button></div>`;
+  $('ssend').addEventListener('click',async()=>{
+    const btn=$('ssend'),ta=$('smsg');const v=(ta.value||'').trim();if(!v)return;
+    btn.disabled=true;
+    // capture the pane token + selection: a slow send/refetch must never paint
+    // into a pane showing a different conversation. Success updates THIS thread
+    // in place — never a full paneSupport() re-render, which would bump MC.seq
+    // and make a newly-opened conversation's own fetch discard itself.
+    const sendSeq=MC.seq,sendSel=MC.sel;
+    const live=()=>sendSeq===MC.seq&&sendSel===MC.sel;
+    const rr=await api('/client/support/'+row.sid+'/messages','POST',{body:v});
+    if(!rr.ok){toast('That didn’t send.');btn.disabled=false;return;}
+    ta.value='';
+    row.when=new Date().toISOString();resortMRows();   // list data — correct whichever conversation is open now
+    let fr=null;try{fr=await api('/client/support/'+row.sid);}catch(_){}
+    if(!live()){btn.disabled=false;return;}   // the pane moved on — the list is updated, leave the new pane alone
+    const fd=(fr&&fr.ok&&fr.body&&fr.body.data)||null;
+    if(fd){
+      const rq2=fd.request||{};const msgs2=Array.isArray(fd.messages)?fd.messages:[];
+      row.status=String(rq2.status||row.status||'open');
+      const st2=$('msupstatus');if(st2)st2.textContent=row.status.replace(/_/g,' ');
+      const pb2=$('mpbody');
+      if(pb2){const items2=supportThreadItems(rq2,msgs2);pb2.innerHTML=items2.length?`<div class="tlhost">${tlItemsHtml(items2)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');}
+      if(row.status==='resolved'||row.status==='closed'){const pc2=$('mpcomp');if(pc2)pc2.innerHTML=`<p class="muted" style="font-size:13px">This request is resolved. Open a new one if you need anything else.</p>`;return;}
+    }else{
+      // the reply DID send — a failed refetch keeps the thread we have (no error card, no lost composer)
+      toast('Sent — this thread will catch up shortly.');
+    }
+    btn.disabled=false;
+  });
+}
+// NEW conversation (persona client only): compose in the reading pane — the
+// general composer's contract preserved exactly: the FIRST LINE becomes the
+// subject, POST /client/support {subject, body} (a project-less support thread).
+function openComposePane(){
+  MC.sel='';MC.compose=true;
+  renderMRows();renderMPane();
+  const c=$('mconsole');if(c)c.classList.add('pane-open');
+}
+function paneCompose(host){
+  host.innerHTML=mpaneHead('Message your studio','')+
+    `<div class="mpbody"><div class="card"><label for="gmsg" style="display:block;font-weight:600;margin-bottom:6px">Send your studio a message</label>`+
+    `<textarea id="gmsg" rows="4" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Type your message…"></textarea>`+
+    `<p class="muted" style="font-size:12.5px;margin-top:8px">The first line becomes the subject.</p>`+
+    `<div class="row"><button class="approve" id="gsend">Send</button></div></div></div>`;
+  wireMBack();
+  const gs=$('gsend');
+  gs.addEventListener('click',async()=>{
+    const v=($('gmsg').value||'').trim();if(!v){toast('Type a message first.');return;}
+    gs.disabled=true;
+    const r=await api('/client/support','POST',{subject:subjectFromMessage(v),body:v});
+    if(r.ok&&r.body&&r.body.data&&r.body.data.id){toast('Sent — your studio will get back to you.');renderMessages(r.body.data.id);}
+    else{toast('That didn’t send.');gs.disabled=false;}
+  });
+  if(window.matchMedia('(max-width:719px)').matches){const b=$('mback');if(b)b.focus();}
+  else{const ta=$('gmsg');if(ta)ta.focus();}
 }
 // ── FILES — every shared file, grouped by project ──
 async function renderFiles(){
@@ -609,7 +1012,10 @@ async function renderRequests(){
   const bc=$('bookCall');if(bc)bc.addEventListener('click',openBooking);
   const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null));
   document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-svc');const svc=services.find(x=>x.id===id);if(svc)openServiceRequest(svc);}));
-  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),null)));
+  // "View & reply" opens the thread where conversations now live: the Messages
+  // tab's reading pane (slice 5). The drill-in's Support section keeps
+  // openSupportThread — it stays as the project-scoped fallback view.
+  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openMessagesTo(b.getAttribute('data-sup'))));
 }
 // ── Book a call — self-schedule with the studio via the public /book/* engine ──
 // The #1 forgotten portal gap. Resolves the studio site (/client/book), lists
@@ -619,6 +1025,7 @@ let BOOK={site:'',type:null,slot:'',maxDays:30};
 const bkInput='style="width:100%;box-sizing:border-box;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
 function bookLabel(s){s=String(s);const t=s.indexOf('T')>=0?s.slice(s.indexOf('T')+1):s;return t.slice(0,5);}
 async function openBooking(){
+  VIEW_SEQ++;   // this drill-in owns #main now — a late tab render must not clobber it
   $('main').innerHTML=spinnerHtml();
   const back=`<p><a class="link" href="#" id="bk-back">← Back to requests</a></p>`;
   const backReq=()=>{const b=$('bk-back');if(b)b.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});};
@@ -778,16 +1185,21 @@ function wireBellAt(bellId,panelId){
       panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>{close();navFromHref(b.getAttribute('data-nav'));}));
     }
     panel.hidden=false;bell.setAttribute('aria-expanded','true');
-    if(PORTAL.unread){ // seen now — clear every badge and persist read-state
-      PORTAL.unread=0;
-      PORTAL.notifs.forEach(n=>{if(n)n.read=true;});   // so rebuilt panels + unreadKeysFrom (Home dots) agree all session
-      document.querySelectorAll('.bell .badge').forEach(b=>{b.classList.remove('on');b.textContent='';});
-      document.querySelectorAll('.bell').forEach(el=>el.setAttribute('aria-label','What’s new'));
-      document.querySelectorAll('.nitem.unread').forEach(el=>el.classList.remove('unread'));
-      document.querySelectorAll('.qrow.unread').forEach(el=>el.classList.remove('unread'));   // live Home queue dots
-      document.querySelectorAll('.sr-new').forEach(el=>el.remove());                          // …and their sr-only "New —" text
-      api('/client/notifications/read','POST',{}).catch(()=>{});
-    }
+    // Seen now — ALWAYS clear the derived unread styling AND persist the server
+    // cursor (an idempotent last_seen_at upsert), regardless of the local count:
+    // reading threads in the Messages split view drives PORTAL.unread to 0
+    // locally, and gating this on the count left the server cursor unmoved —
+    // every dot resurrected on reload.
+    PORTAL.unread=0;
+    PORTAL.notifs.forEach(n=>{if(n)n.read=true;});   // so rebuilt panels + unreadKeysFrom (Home dots) agree all session
+    MC.unread=new Set();                             // …and the Messages list's per-conversation dots agree too
+    document.querySelectorAll('.bell .badge').forEach(b=>{b.classList.remove('on');b.textContent='';});
+    document.querySelectorAll('.bell').forEach(el=>el.setAttribute('aria-label','What’s new'));
+    document.querySelectorAll('.nitem.unread').forEach(el=>el.classList.remove('unread'));
+    document.querySelectorAll('.qrow.unread').forEach(el=>el.classList.remove('unread'));   // live Home queue dots
+    document.querySelectorAll('.mrow.unread').forEach(el=>el.classList.remove('unread'));   // live conversation-list dots
+    document.querySelectorAll('.sr-new').forEach(el=>el.remove());                          // …and their sr-only "New —" text
+    api('/client/notifications/read','POST',{}).catch(()=>{});
   };
   bell.addEventListener('click',()=>{panel.hidden?open():close();});
   // Re-renders replace the bell/panel NODES, so the once-bound document listeners
@@ -808,6 +1220,7 @@ function wireBell(){wireBellAt('bell','np');}
 // Below 1000px it stacks to one column with the timeline LAST — actions first.
 let PROJ_EVENTS=[],PROJ_MSGS=[];   // the open project's timeline inputs
 async function openProject(id,focusSection){
+  VIEW_SEQ++;   // this drill-in owns #main now — a late tab render must not clobber it
   setWide(false);
   $('main').innerHTML=skeleton();
   const [d,rep,supRes,msgRes]=await Promise.all([
@@ -869,7 +1282,7 @@ async function openProject(id,focusSection){
   html+=`<div class="card"><p class="muted">${sup.length?'Need something else?':'Have a question for your studio?'} Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
   html+=`</div>`;   // /pleft
   // the activity rail — the project's client-visible timeline, composer below it
-  html+=`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div class="card acard"><div id="ptl"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`;
+  html+=`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div class="card acard"><div id="ptl" class="tlhost"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`;
   $('main').innerHTML=html;
   renderProjTimeline();
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
@@ -898,7 +1311,11 @@ async function openProject(id,focusSection){
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
 }
 // re-fetch the thread and repaint the rail (a sent message appears as a timeline item)
-async function loadThread(id){const r=await api('/client/projects/'+id+'/messages');if(!r.ok)return;/* a failed refetch must not erase the rail — keep the thread we have */PROJ_MSGS=((r.body&&r.body.data)||[]).slice();renderProjTimeline();}
+async function loadThread(id){
+  delete MC.cache[id];   // only reached after a successful send — the Messages pane's cached copy of this conversation is stale now
+  const r=await api('/client/projects/'+id+'/messages');if(!r.ok)return;/* a failed refetch must not erase the rail — keep the thread we have */
+  PROJ_MSGS=((r.body&&r.body.data)||[]).slice();renderProjTimeline();
+}
 // ── the project activity timeline (crm.html's anatomy, the client's palette) ─
 // Bundle events (already filtered client-visible server-side; detail.from ===
 // 'client' marks the client's own actions) merge with the real message thread
@@ -951,6 +1368,20 @@ function projMsgItem(m,fromById){
   const mine=from?from==='client':!(m.author_kind==='staff'||m.author_kind==='system');
   return{type:'message',title:mine?'You sent a message':'Your studio sent a message',body:m.body||'',at:m.created_at};
 }
+// the shared timeline HTML (the drill-in rail + the Messages pane render the
+// same anatomy inside a .tlhost): month headers once the items span more than
+// one month; .ti-first/.ti-last are STAMPED here — month headers are divs too,
+// so the CSS connector trims can't rely on :first-of-type/:last-of-type.
+function tlItemsHtml(items){
+  const monthly=new Set(items.map(i=>String(i.at).slice(0,7))).size>1;
+  let html='',cur='';
+  items.forEach((it,i)=>{
+    if(monthly){const mk=String(it.at).slice(0,7);if(mk!==cur){cur=mk;const dt=new Date(mk+'-15T12:00:00Z');html+=`<div class="tl-month">${isNaN(dt)?esc(mk):dt.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>`;}}
+    const type=PTL_ICON[it.type]?it.type:'system';
+    html+=`<div class="ti t-${type}${i===0?' ti-first':''}${i===items.length-1?' ti-last':''}"><span class="ti-icon" aria-hidden="true">${PTL_ICON[type]}</span><div class="ti-main"><div class="ti-head"><span class="ti-title">${esc(it.title)}</span></div>${it.body?`<div class="ti-body">${esc(it.body)}</div>`:''}</div><span class="ti-when">${esc(rel(it.at))}</span></div>`;
+  });
+  return html;
+}
 function renderProjTimeline(){
   const host=$('ptl');if(!host)return;
   const items=[];
@@ -959,19 +1390,11 @@ function renderProjTimeline(){
   for(const m of PROJ_MSGS){const it=projMsgItem(m,fromById);if(it)items.push(it);}
   items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
   if(!items.length){host.innerHTML=emptyCard('No messages yet — say hello any time.','💬');return;}
-  const monthly=new Set(items.map(i=>String(i.at).slice(0,7))).size>1;
-  let html='',cur='';
-  items.forEach((it,i)=>{
-    if(monthly){const mk=String(it.at).slice(0,7);if(mk!==cur){cur=mk;const dt=new Date(mk+'-15T12:00:00Z');html+=`<div class="tl-month">${isNaN(dt)?esc(mk):dt.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>`;}}
-    const type=PTL_ICON[it.type]?it.type:'system';
-    // .ti-first/.ti-last are stamped here — month headers are divs too, so the
-    // CSS connector trims can't rely on :first-of-type/:last-of-type.
-    html+=`<div class="ti t-${type}${i===0?' ti-first':''}${i===items.length-1?' ti-last':''}"><span class="ti-icon" aria-hidden="true">${PTL_ICON[type]}</span><div class="ti-main"><div class="ti-head"><span class="ti-title">${esc(it.title)}</span></div>${it.body?`<div class="ti-body">${esc(it.body)}</div>`:''}</div><span class="ti-when">${esc(rel(it.at))}</span></div>`;
-  });
-  host.innerHTML=html;
+  host.innerHTML=tlItemsHtml(items);
 }
 // C1: the client's own support thread — see the studio's replies and reply back
 async function openSupportThread(rid,pid){
+  VIEW_SEQ++;   // this drill-in owns #main now — a late tab render must not clobber it
   setWide(false);
   $('main').innerHTML=skeleton();
   const r=await api('/client/support/'+rid);
@@ -990,6 +1413,7 @@ async function openSupportThread(rid,pid){
   if(!resolved){const sbtn=$('ssend');sbtn.addEventListener('click',async()=>{const v=$('smsg').value.trim();if(!v)return;sbtn.disabled=true;const rr=await api('/client/support/'+rid+'/messages','POST',{body:v});if(rr.ok){openSupportThread(rid,pid);}else{toast('That didn’t send.');sbtn.disabled=false;}});}
 }
 async function openSurvey(sid,pid){
+  VIEW_SEQ++;   // this drill-in paints #main on success — a late tab render must not clobber it
   const r=await api('/client/surveys/'+sid);
   if(!r.ok){toast('That survey isn’t available.');return;}   // the current view (often the wide record page) stays intact
   setWide(false);   // only collapse the wide layout once the survey actually renders
@@ -1056,8 +1480,9 @@ async function load(){
   PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
   PORTAL.ready=true;
   showNav();
-  // deep links open the relevant drill-down; the nav stays visible around it
-  if(dsup){await openSupportThread(dsup,null);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
+  // deep links open the relevant drill-down; the nav stays visible around it.
+  // ?support= now opens the Messages tab with that thread in the reading pane.
+  if(dsup){await openMessagesTo(dsup);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   if(deep){await openProject(deep);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   showTab(CURRENT_TAB||'home');
 }

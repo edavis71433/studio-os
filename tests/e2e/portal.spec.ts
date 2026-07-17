@@ -172,6 +172,12 @@ test.describe('Client portal — Home queue + project record page', () => {
 
   test('drill-in: the composer posts the unchanged message body', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
+    // the harness fixture answers ANY method with the GET payload — intercept the
+    // POST explicitly (201 + a realistic created row) so the write is truly mocked
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages`, (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'mg2', body: 'Thanks — looks great!', author_kind: 'client', created_at: '2026-07-08T00:00:00Z' } }) })
+        : route.fallback());
     await page.goto(`/client.html?project=${PID}`);
     await page.locator('#msg').fill('Thanks — looks great!');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/messages`));
@@ -244,5 +250,278 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.locator('.cb-brand')).toBeHidden();
     await expect(page.locator('#navbell')).toBeHidden();
     await expect(page.locator('#bell')).toBeVisible();
+  });
+});
+
+// ── slice 5: the Messages tab as a split-view console ────────────────────────
+// List pane = one listbox row per conversation (project threads + support
+// requests, general AND project-scoped) with chips + unread dots from the
+// notifications read-state; reading pane = the thread as timeline items with
+// the right composer. <720px the panes stack with a back button.
+const SUP_GEN = '22222222-2222-4222-8222-222222222222'; // general (project-less) support thread
+const SUP_PRJ = '33333333-3333-4333-8333-333333333333'; // project-scoped, resolved
+const MSG_API = {
+  ...CLIENT_API,
+  '/client/notifications': { data: [
+    { kind: 'message', label: 'New message', href: `/projects/${PID}#messages`, created_at: '2026-07-07T00:00:00Z', read: false },
+    { kind: 'support_message', label: 'Support: Logo tweak', href: `/client.html?support=${SUP_GEN}`, created_at: '2026-07-06T00:00:00Z', read: false },
+  ], unread_count: 2 },
+  '/client/support': { data: [
+    { id: SUP_GEN, subject: 'Logo tweak', status: 'open', project_id: null, updated_at: '2026-07-06T00:00:00Z' },
+    { id: SUP_PRJ, subject: 'Copy fixes', status: 'resolved', project_id: PID, updated_at: '2026-07-04T00:00:00Z' },
+  ] },
+  [`/client/support/${SUP_GEN}`]: { data: {
+    request: { id: SUP_GEN, subject: 'Logo tweak', body: 'Could we nudge the logo left?', status: 'open', project_id: null, created_at: '2026-07-05T00:00:00Z' },
+    messages: [{ id: 'sm1', body: 'On it — new version tomorrow.', author_kind: 'staff', created_at: '2026-07-06T00:00:00Z' }],
+  } },
+  [`/client/support/${SUP_PRJ}`]: { data: {
+    request: { id: SUP_PRJ, subject: 'Copy fixes', body: 'Some typos on the About page.', status: 'resolved', project_id: PID, created_at: '2026-07-03T00:00:00Z' },
+    messages: [],
+  } },
+};
+const openMessagesTab = async (page: import('@playwright/test').Page) => {
+  await page.locator('#tabnav [data-tab="messages"]').click();
+  await expect(page.locator('#mrows')).toBeVisible();
+};
+
+test.describe('Client portal — Messages split view', () => {
+  test('list pane: two-line rows with chips + unread dots, newest first', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await expect(page.getByText('3 conversations')).toBeVisible();
+    const rows = page.locator('#mrows [role="option"]');
+    await expect(rows).toHaveCount(3);
+    // newest activity first: open support (07-06) · project thread (07-05) · resolved (07-04)
+    await expect(rows.nth(0)).toContainText('Logo tweak');
+    await expect(rows.nth(1)).toContainText('Website redesign');
+    await expect(rows.nth(2)).toContainText('Copy fixes');
+    await expect(rows.nth(0).locator('.kchip')).toHaveText('Support · open');
+    await expect(rows.nth(1).locator('.kchip')).toHaveText('Message');
+    await expect(rows.nth(2).locator('.kchip')).toHaveText('Support · resolved');
+    // the message + support_message notifications light exactly their two rows,
+    // each with the sr-only "New — " text alternative for the dot
+    await expect(page.locator('.mrow.unread')).toHaveCount(2);
+    await expect(page.locator('.mrow.unread .sr-only').first()).toHaveText('New — ');
+  });
+
+  test('opening a conversation selects its row and clears its unread dot', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await expect(page.locator('.mrow.unread')).toHaveCount(2);
+    await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
+    await expect(page.locator('.mrow', { hasText: 'Logo tweak' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.mrow.unread')).toHaveCount(1);
+  });
+
+  test('a project conversation renders the thread as timeline items and the composer POSTs {body}', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    // the harness fixture answers ANY method with the GET payload — intercept the
+    // POST explicitly (201 + a realistic created row) so the write is truly mocked
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages`, (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'mg2', body: 'Thanks — looks great!', author_kind: 'client', created_at: '2026-07-08T00:00:00Z' } }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    // by row id — the resolved support row previews its project name, so a
+    // text match on "Website redesign" would be ambiguous
+    await page.locator(`[data-mrow="proj:${PID}"]`).click();
+    const pane = page.locator('#mpane');
+    await expect(pane.locator('.ti.t-message')).toContainText('Your studio sent a message');
+    await expect(pane.locator('.ti.t-message .ti-body')).toHaveText('Welcome aboard!');
+    await pane.getByLabel('Message your studio').fill('Thanks — looks great!');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/messages`));
+    await pane.getByRole('button', { name: 'Send' }).click();
+    expect((await post).postDataJSON()).toEqual({ body: 'Thanks — looks great!' });
+  });
+
+  test('a support thread shows the request + replies and the reply POSTs', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    // the harness fixture answers ANY method with the GET payload — intercept the
+    // reply POST explicitly (201 + a realistic created row) so the write is truly mocked
+    await page.route(`**/functions/v1/presence/client/support/${SUP_GEN}/messages`, (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'sm2', body: 'Perfect, thank you.', author_kind: 'client', created_at: '2026-07-08T00:00:00Z' } }) })
+        : route.fallback());
+    await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#mpane');
+    await expect(pane.locator('.mpname')).toHaveText('Logo tweak');
+    await expect(pane.locator('#msupstatus')).toHaveText('open');
+    await expect(pane.getByText('You opened this request')).toBeVisible();
+    await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
+    await expect(pane.getByText('Your studio replied')).toBeVisible();
+    await pane.getByLabel('Add to this request').fill('Perfect, thank you.');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/support/${SUP_GEN}/messages`));
+    await pane.getByRole('button', { name: 'Send' }).click();
+    expect((await post).postDataJSON()).toEqual({ body: 'Perfect, thank you.' });
+  });
+
+  test('a resolved support thread is read-only (lock message, no composer)', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.locator('.mrow', { hasText: 'Copy fixes' }).click();
+    const pane = page.locator('#mpane');
+    await expect(pane.getByText('This request is resolved. Open a new one if you need anything else.')).toBeVisible();
+    await expect(pane.locator('textarea')).toHaveCount(0);
+  });
+
+  test('?support= deep link opens that thread in the Messages pane', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.goto(`/client.html?support=${SUP_GEN}`);
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#mpane')).toContainText('Could we nudge the logo left?');
+    await expect(page.locator('.mrow', { hasText: 'Logo tweak' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('"Message your studio" composes in the pane; the first line becomes the subject', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    // the list fixture serves GET /client/support; the POST needs a created id back
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: SUP_GEN } }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.getByRole('button', { name: 'Message your studio' }).click();
+    const pane = page.locator('#mpane');
+    await pane.getByLabel('Message your studio').fill('Logo question\nWhere is the source file?');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
+    await pane.getByRole('button', { name: 'Send' }).click();
+    expect((await post).postDataJSON()).toEqual({ subject: 'Logo question', body: 'Logo question\nWhere is the source file?' });
+    await expect(page.locator('#toast')).toContainText('Sent — your studio will get back to you.');
+  });
+
+  test('compose failure: a 500 keeps the composer usable (toast + re-enabled button)', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed' }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.getByRole('button', { name: 'Message your studio' }).click();
+    const pane = page.locator('#mpane');
+    await pane.getByLabel('Message your studio').fill('Hello?');
+    await pane.getByRole('button', { name: 'Send' }).click();
+    await expect(page.locator('#toast')).toContainText('That didn’t send.');
+    await expect(pane.getByRole('button', { name: 'Send' })).toBeEnabled();
+    await expect(pane.getByLabel('Message your studio')).toHaveValue('Hello?'); // nothing typed is lost
+  });
+
+  test('project send failure: the thread is kept, nothing is erased', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages`, (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed' }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.locator(`[data-mrow="proj:${PID}"]`).click();
+    const pane = page.locator('#mpane');
+    await expect(pane.locator('.ti.t-message .ti-body')).toHaveText('Welcome aboard!');
+    await pane.getByLabel('Message your studio').fill('Anyone there?');
+    await pane.getByRole('button', { name: 'Send' }).click();
+    await expect(page.locator('#toast')).toContainText('That didn’t send.');
+    await expect(pane.locator('.ti.t-message .ti-body')).toHaveText('Welcome aboard!'); // the thread survives
+    await expect(pane.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
+  test('support reply refetch-failure: the reply sends, the thread + composer are kept', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.route(`**/functions/v1/presence/client/support/${SUP_GEN}/messages`, (route) =>
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'sm2', body: 'Perfect, thank you.', author_kind: 'client', created_at: '2026-07-08T00:00:00Z' } }) }));
+    let threadGets = 0;
+    await page.route(`**/functions/v1/presence/client/support/${SUP_GEN}`, (route) => {
+      // first GET (opening the pane) succeeds; the post-reply refetch fails
+      if (route.request().method() === 'GET' && ++threadGets > 1)
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'read_failed' }) });
+      return route.fallback();
+    });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#mpane');
+    await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
+    await pane.getByLabel('Add to this request').fill('Perfect, thank you.');
+    await pane.getByRole('button', { name: 'Send' }).click();
+    await expect(page.locator('#toast')).toContainText('this thread will catch up');
+    // the refetch failed AFTER a successful reply — the thread and composer survive (no error card)
+    await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
+    await expect(pane.getByText('That request isn’t available right now.')).toHaveCount(0);
+    await expect(pane.getByLabel('Add to this request')).toBeVisible();
+    await expect(pane.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
+  test('keyboard: focus + Enter opens the first row, Space opens, the active row survives a send re-sort', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'opening a row moves focus into the stacked pane on mobile');
+    await installApp(page, { api: MSG_API });
+    // stateful message mock: the POSTed reply shows up in subsequent GETs, so the
+    // post-send refetch keeps the project row's recency at the top (like the real API)
+    const MSGS = [{ id: 'mg1', body: 'Welcome aboard!', author_kind: 'staff', created_at: '2026-07-05T00:00:00Z' }];
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages`, (route) => {
+      if (route.request().method() === 'POST') {
+        MSGS.unshift({ id: 'mg2', body: String(route.request().postDataJSON().body || ''), author_kind: 'client', created_at: '2026-07-08T00:00:00Z' });
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: MSGS[0] }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: MSGS }) });
+    });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    const rows = page.locator('#mrows');
+    // Tab-to-focus defaults the active row (no Arrow press needed) — Enter opens it
+    await rows.focus();
+    await expect(rows).toHaveAttribute('aria-activedescendant', /mrow-/);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.mrow', { hasText: 'Logo tweak' })).toHaveAttribute('aria-selected', 'true');
+    // Space opens too: rove to the project row and press Space
+    await rows.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+    await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toHaveAttribute('aria-selected', 'true');
+    // a send re-sorts the list — the active row must still be THIS conversation
+    const pane = page.locator('#mpane');
+    await pane.getByLabel('Message your studio').fill('Ready for round two');
+    await pane.getByRole('button', { name: 'Send' }).click();
+    await expect(page.locator('#mrows [role="option"]').first()).toContainText('Website redesign'); // re-sorted to the top
+    await expect(rows).toHaveAttribute('aria-activedescendant', `mrow-proj_${PID}`);
+    await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toHaveClass(/kfocus/);
+  });
+
+  test('mobile: the panes stack — a row pushes the pane in, the back button returns', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'stacked panes are the <720px contract');
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await expect(page.locator('.mlist')).toBeVisible();
+    await expect(page.locator('#mpane')).toBeHidden();
+    await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
+    await expect(page.locator('.mlist')).toBeHidden();
+    await expect(page.locator('#mpane')).toBeVisible();
+    const back = page.getByRole('button', { name: '← Messages' });
+    await expect(back).toBeVisible();
+    await back.click();
+    await expect(page.locator('.mlist')).toBeVisible();
+    await expect(page.locator('#mpane')).toBeHidden();
+  });
+
+  test('reviewer: the calm empty state, with no list fetches (support OR message fan-out)', async ({ page }) => {
+    const listCalls: string[] = [];
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    page.on('request', (r) => {
+      // the support list AND the per-project ?limit=1 preview fan-out must both stay silent
+      if (r.url().includes('/client/support') || /\/client\/projects\/[^/?]+\/messages/.test(r.url())) listCalls.push(r.url());
+    });
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.getByText('Your studio will reach you here. Messaging opens up once they’ve set up your account.')).toBeVisible();
+    expect(listCalls).toHaveLength(0);
   });
 });
