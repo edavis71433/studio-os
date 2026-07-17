@@ -8,20 +8,60 @@
 <meta name="description" content="Everyone you do business with — in one place.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — same aliasing pattern
+     as crm.html / inbox.html. */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
   /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost),:root:not([data-theme="light"]) .c .acts a.reply{color:#171320}}
   :root[data-theme="dark"] .btn:not(.ghost),:root[data-theme="dark"] .c .acts a.reply{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
-  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:15px;margin:0}
-  .bar{display:flex;gap:8px;margin:22px 0 6px;align-items:center;flex-wrap:wrap}
+  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
+        inbox.html's list-pane header + customers.html by hand ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lrow1{display:flex;align-items:center;gap:6px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .viewdd{position:relative;min-width:0;flex:1}
+  #viewBtn{font:inherit;font-family:var(--serif);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;max-width:100%}
+  #viewBtn:hover{background:var(--p-soft)}
+  #viewBtn .car{font-size:10px;color:var(--faint)}
+  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #viewMenu [role=option]:hover{background:var(--p-soft)}
+  #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  /* ── the table view: sortable columns; scrolls in its OWN container ── */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+  thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  thead th .thb:hover{color:var(--p)}
+  thead th .arrow{font-size:10px;color:var(--p)}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--p-soft)}
+  tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody td .nm{font-weight:600}
+  tbody td a{color:var(--p);text-decoration:none}
+  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .rowact:hover{border-color:var(--p);color:var(--p)}
+  .bar{display:flex;gap:8px;margin:0 0 6px;align-items:center;flex-wrap:wrap}
   .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
   .search:focus{border-color:var(--p)}
   .btn{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--p);background:var(--p);color:#fff;border-radius:999px;padding:9px 15px;cursor:pointer;white-space:nowrap}
@@ -174,22 +214,96 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",ALL=[],Q="";
+let TOKEN="",ALL=[],Q="",LOADED_AT=0;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+// ONE delegated closer for the view menu (attached ONCE — render() rebuilds the
+// header many times; per-render document listeners would pile up): a click
+// outside .viewdd closes the popup — same contract as inbox.html's list-pane
+// closer, kept in sync by hand.
+document.addEventListener('click',(e)=>{
+  const vm=$('viewMenu'),vb=$('viewBtn');
+  if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
+});
+// ── list-view state: fixed views (D3) · display · sort ────────────────────────
+// The list read (GET /sales/contacts) returns id,name,email,phone,company,
+// updated_at — no per-contact deal info, so the spec's "Has open deal" view is
+// DROPPED rather than adding backend; "Recently added" degrades honestly to
+// "Recently updated" (updated_at is the only timestamp in the response).
+const VIEWS=[['all','All contacts'],['recent','Recently updated']];
+const VIEW_LABEL=Object.fromEntries(VIEWS);
+let VIEWNAME='all';
+const RECENT_DAYS=30;
+const viewMatch=(c)=>{
+  if(VIEWNAME==='recent'){const t=Date.parse(c.updated_at||'');return isFinite(t)&&(Date.now()-t)<=RECENT_DAYS*86400000;}
+  return true;
+};
+// Table ⇄ Cards display choice, persisted; small screens default to Cards.
+const DISPLAY_KEY='dds-display:contacts';
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
+  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
+// sortable columns (the fields GET /sales/contacts actually returns)
+const COLS=[
+  ['name','Name',(c)=>String(c.name||'').toLowerCase()],
+  ['company','Company',(c)=>String(c.company||'').toLowerCase()],
+  ['email','Email',(c)=>String(c.email||'').toLowerCase()],
+  ['phone','Phone',(c)=>String(c.phone||'')],
+  ['updated_at','Updated',(c)=>String(c.updated_at||'')],
+];
+let SORT={key:'name',dir:1};
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
-function render(){
+function sortedRows(){
   const q=Q.trim().toLowerCase();
-  const rows=q?ALL.filter(c=>((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)):ALL;
-  let h=`<div class="rolebadge">● Contacts</div>
-    <header><h1>Contacts</h1><p class="sub">${ALL.length?ALL.length+' '+(ALL.length===1?'contact':'contacts')+' · everyone you do business with.':'Everyone you do business with, in one place.'}</p></header>
-    <div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="new">+ Contact</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button></div><div id="csvZone"></div>`;
-  if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
-  else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">No contacts match “${esc(Q)}”.</p>`;}
-  else for(const c of rows){
+  const list=ALL.filter(viewMatch).filter(c=>!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q));
+  const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
+  return list;
+}
+function headerHtml(count){
+  const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  return `<h1 class="sr-only">Contacts</h1><div class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">👤</span>
+      <div class="viewdd">
+        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Contacts view: ${esc(VIEW_LABEL[VIEWNAME])}">${esc(VIEW_LABEL[VIEWNAME])} <span class="car" aria-hidden="true">▾</span></button>
+        <div id="viewMenu" role="listbox" aria-label="Contact views" hidden></div>
+      </div>
+      <div class="seg" role="group" aria-label="Display as">
+        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+        <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
+      </div>
+      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta">${count} contact${count===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+  </div>`;
+}
+function tableHtml(list){
+  const ths=COLS.map(([k,label])=>{
+    const on=SORT.key===k;
+    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+  }).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  const trs=list.map(c=>{
+    const who=esc(c.name||c.email||c.phone||'Contact');
+    const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
+    return `<tr data-open="${esc(c.id)}" tabindex="0" aria-label="Open ${who}">
+      <td><span class="nm">${who}</span></td>
+      <td>${esc(c.company||'—')}</td>
+      <td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>
+      <td>${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:'—'}</td>
+      <td>${esc(relWhen(c.updated_at)||'—')}</td>
+      <td><button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button></td>
+    </tr>`;
+  }).join('');
+  return `<div class="tscroll"><table aria-label="Contacts"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+function cardsHtml(list){
+  let h='';
+  for(const c of list){
     const who=esc(c.name||c.email||c.phone||'Contact');
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
     h+=`<div class="c" role="button" tabindex="0" data-open="${esc(c.id)}" aria-label="Open ${who}">
@@ -200,24 +314,67 @@ function render(){
         <button data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
       </div></div>`;
   }
-  // A search keystroke re-renders the page — if an import panel was open, its
-  // handlers can't survive the innerHTML swap, so say so honestly instead of
-  // leaving a dead-looking panel (or silently vanishing mid-preview).
+  return h;
+}
+function render(){
+  const rows=sortedRows();
+  let h=headerHtml(rows.length)
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="new">+ Contact</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button></div><div id="csvZone"></div>`;
+  if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
+  else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">${Q?'No contacts match “'+esc(Q)+'”.':'Nothing in this view — try “All contacts”.'}</p>`;}
+  else h+=DISPLAY==='table'?tableHtml(rows):cardsHtml(rows);
+  // Any re-render (search, sort, view, display, refresh) must not destroy an
+  // open — or in-flight — CSV import panel: carry the LIVE #csvZone node (its
+  // handlers, file pick, and progress included) across the innerHTML swap. A
+  // finished import empties the zone itself, so nothing sticks around after.
   const zPrev=document.getElementById('csvZone');
-  const zWasOpen=!!(zPrev&&zPrev.innerHTML.trim());
+  const zKeep=!!(zPrev&&zPrev.innerHTML.trim());
   $('main').innerHTML=h;wire();
-  if(zWasOpen){const z=document.getElementById('csvZone');if(z)z.innerHTML='<p class="muted" style="margin:8px 0">Import paused while you searched — tap “Import CSV” to pick your file again.</p>';}
+  if(zKeep){const z=document.getElementById('csvZone');if(z)z.replaceWith(zPrev);}
 }
 function wire(){
   const q=$('q');if(q)q.addEventListener('input',()=>{Q=q.value;const p=q.selectionStart;render();const nq=$('q');if(nq){nq.focus();try{nq.setSelectionRange(p,p);}catch(_){}}});
   const nb=$('new');if(nb)nb.addEventListener('click',openNew);
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
+  // view dropdown (fixed views, D3): listbox popup — opening focuses the first
+  // option; arrows move; Escape closes back to the trigger; Enter activates.
+  // Outside clicks close via the ONE document-level delegated closer above.
+  const vb=$('viewBtn'),vm=$('viewMenu');
+  if(vb&&vm){
+    vm.innerHTML=VIEWS.map(v=>`<button type="button" role="option" data-view="${v[0]}" aria-selected="${VIEWNAME===v[0]?'true':'false'}">${v[1]}${VIEWNAME===v[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
+    const close=()=>{vm.hidden=true;vb.setAttribute('aria-expanded','false');};
+    vb.addEventListener('click',()=>{const open=vm.hidden;vm.hidden=!open;vb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=vm.querySelector('button');if(f)f.focus();}});
+    vm.addEventListener('keydown',(e)=>{
+      const opts=[...vm.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
+      if(e.key==='Escape'){e.preventDefault();close();vb.focus();}
+      else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
+      else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+    });
+    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');render();const nv=$('viewBtn');if(nv)nv.focus();}));
+  }
+  // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
+  // never an unhandled promise; the initial-boot trouble() path is unchanged.
+  // These re-renders also restore focus to their control (the sort handlers' pattern).
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('We couldn’t load your contacts just now.')));
+  const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
+  const dc=$('dispCards');if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
+  // sortable column headers — click toggles asc/desc (aria-sort on the <th>)
+  document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.getAttribute('data-sort');
+    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:k==='updated_at'?-1:1};   // timestamps read newest-first on first click
+    render();
+    const nbtn=document.querySelector('[data-sort="'+k+'"]'); if(nbtn)nbtn.focus();
+  }));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();newDeal(b.getAttribute('data-deal'));}));
-  // Tap a contact card → their detail drawer (deals, activity, last-spoke, fields).
-  // Clicks on the action buttons/links inside .acts don't open the drawer.
+  // Tap a contact card / table row → the unified Client Record (Details tab).
+  // Clicks on action buttons/links inside don't open it.
   document.querySelectorAll('.c[data-open]').forEach(card=>{
     card.addEventListener('click',(e)=>{if(e.target.closest('.acts'))return;openDetail(card.getAttribute('data-open'));});
     card.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.acts')){e.preventDefault();openDetail(card.getAttribute('data-open'));}});
+  });
+  document.querySelectorAll('tr[data-open]').forEach(tr=>{
+    tr.addEventListener('click',(e)=>{if(e.target.closest('a,button'))return;openDetail(tr.getAttribute('data-open'));});
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('a,button')){e.preventDefault();openDetail(tr.getAttribute('data-open'));}});
   });
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
   const ic=$('importCsv');if(ic)ic.addEventListener('click',openImport);
@@ -404,8 +561,11 @@ function relWhen(iso){if(!iso)return '';const then=Date.parse(iso);if(!isFinite(
 async function loadFieldDefs(force){if(FIELD_DEFS.length&&!force)return FIELD_DEFS;try{const r=await api('/sales/contacts/fields');if(r.ok)FIELD_DEFS=(r.body&&r.body.data)||[];}catch(_){}return FIELD_DEFS;}
 // Opening a contact goes to their unified CLIENT RECORD (Details tab) — the whole
 // relationship in one place — rather than a here-only modal with no shareable URL.
+// JS navigation, so it carries any agency drill-in scope itself (shell.js only
+// rewrites <a href> anchors) — same idiom as the deal-open handler below.
 function openDetail(id){
-  location.href='/crm.html?contact='+encodeURIComponent(id)+'&tab=details';
+  const sc=scope();
+  location.href='/crm.html?contact='+encodeURIComponent(id)+'&tab=details'+(sc?'&client='+sc:'');
 }
 function renderDetailView(){
   const d=CUR_DETAIL;if(!d)return;const c=d.contact||{};
@@ -487,7 +647,7 @@ async function load(){
   const r=await api('/sales/contacts?limit=500');
   if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
   if(!r.ok){trouble();return;}
-  ALL=(r.body&&r.body.data)||[];render();
+  ALL=(r.body&&r.body.data)||[];LOADED_AT=Date.now();render();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

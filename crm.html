@@ -67,6 +67,10 @@
   .path button.pstep.current{background:var(--p);color:#fff;cursor:pointer}
   .path button.pstep.current:hover{filter:brightness(1.06)}
   .path button.pstep.lost-terminal{background:var(--warn-soft);color:var(--warn)}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) —
+     same treatment as pipeline.html's Path, kept in sync by hand */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:#171320}}
+  :root[data-theme="dark"] .path button.pstep.current{color:#171320}
   .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
   .path-guide{margin-top:10px;font-size:13.5px;color:var(--soft)}
   .path-guide b{color:var(--ink);font-weight:600}

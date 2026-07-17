@@ -29,6 +29,21 @@ ok('close restores keyboard focus to the card we came from', /document\.querySel
 ok('a11y: an in-view refresh re-lands focus on the deal title', /if\(wasOpen\)\{const t=\$\('dtitle'\);if\(t\)t\.focus\(\)/.test(pipe));
 ok('board: a stage move re-renders the OPEN deal via the panel (not a dialog.open check)', /if\(!\$\('detailWrap'\)\.hidden&&CURRENT_DEAL===id\)openDeal\(id\)/.test(pipe));
 
+// ═══ redesign slice 3: the Path chevron bar replaces the "Move stage" stack ═══
+ok('Path: chevron bar renders in the drawer (pathHost + pstep steps)', /id="pathHost"/.test(pipe) && /data-pstep=/.test(pipe) && /pstep \$\{cls\}/.test(pipe));
+ok('Path: kept in sync with crm.html by hand (the hand-copy contract)', /kept in sync with crm\.html by hand/.test(pipe) && /const PATH_STEPS=\['lead','qualified','proposal','contract'\]/.test(pipe));
+ok('Path: guidance renders BOTH tip and action (the :694 suggested_action bug, fixed)', /esc\(g\.tip\)/.test(pipe) && /esc\(g\.action\)/.test(pipe) && !/g\.suggested_action/.test(pipe));
+ok('Path: forward = "Mark Stage as Complete" via the EXISTING stage POST', /Mark Stage as Complete/.test(pipe) && /\/stage','POST',\{to\}/.test(pipe));
+ok('Path: non-interactive steps leave the tab order (tabindex=-1 + aria-disabled)', /tabindex="-1" aria-disabled="true"/.test(pipe));
+ok('Path: won stays convert-only — contract+signed points at the EXISTING Convert section', /id="pathConvert"/.test(pipe) && /signedNow/.test(pipe));
+ok('Path: won/lost terminal chips render', /terminal-chip won/.test(pipe) && /terminal-chip lost/.test(pipe));
+ok('Path: "Mark as lost" stays the separated quiet action + lost keeps Reopen', /id="markLost"/.test(pipe) && /data-stage="lead">Reopen this deal/.test(pipe));
+
+// ═══ redesign slice 3: List · Board · Table (3-way display, persisted) ═══
+ok('Table: a third display option exists (viewTable + #table container)', /id="viewTable"/.test(pipe) && /<div id="table"/.test(pipe));
+ok('Table: sortable columns with aria-sort; rows open the SAME drawer', /data-tsort/.test(pipe) && /aria-sort=/.test(pipe) && /openDeal\(tr\.getAttribute\('data-id'\)\)/.test(pipe));
+ok('Table: the display choice persists (localStorage), embed exempt', /dds-display:pipeline/.test(pipe) && /if\(!EMBED\)/.test(pipe));
+
 // ═══ every deal-detail section survived the conversion ═══
 for (const [label, needle] of [
   ['Move stage / path guidance', '<h3>Move stage</h3>'],

@@ -8,17 +8,63 @@
 <meta name="description" content="Your customers — everyone you deliver work for, in one list.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — same aliasing pattern
+     as crm.html / inbox.html. */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:720px;margin:0 auto;padding:34px 20px 90px}
-  h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,30px);margin:6px 0 3px}
-  .sub{color:var(--soft);font-size:14.5px;margin:0 0 20px}
-  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:16px}
+  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
+        inbox.html's list-pane header by hand (.lhead/.lrow1/#viewBtn/#viewMenu) ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lrow1{display:flex;align-items:center;gap:6px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .viewdd{position:relative;min-width:0;flex:1}
+  #viewBtn{font:inherit;font-family:var(--serif);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;max-width:100%}
+  #viewBtn:hover{background:var(--p-soft)}
+  #viewBtn .car{font-size:10px;color:var(--faint)}
+  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #viewMenu [role=option]:hover{background:var(--p-soft)}
+  #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+
+  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:14px}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+
+  /* ── the table view: sortable columns; the table scrolls in its OWN container ── */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+  thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  thead th .thb:hover{color:var(--p)}
+  thead th .arrow{font-size:10px;color:var(--p)}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--p-soft)}
+  tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  td .n{font-weight:600}
+  td.num{font-variant-numeric:tabular-nums}
+  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .rowact:hover{border-color:var(--p);color:var(--p)}
+
+  /* ── the card view (today's look, kept for warmth) ── */
   .cust{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:11px}
   .cust:hover{border-color:var(--p)}
   .crow{display:flex;align-items:center;gap:14px}
@@ -44,13 +90,17 @@
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<div class="wrap"><h1 class="sr-only">Customers</h1><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
-// Customers roster (FIX 6): the studio's list of the customers it delivers work
-// for. Fed by /studio/customers (studio-side, tenant-scoped to the operator's own
-// site via the Agency–Client Bridge). "Open" routes to that customer's project
-// delivery view; "Manage their website" is the clearly-secondary website action.
+// Customers roster (FIX 6 → redesign slice 3): the studio's list of the customers
+// it delivers work for, now a real Salesforce-style LIST VIEW — object icon +
+// view-name dropdown with FIXED views (D3: no saved views/bulk), "N customers ·
+// Updated just now" meta, sortable columns, refresh, and a Table ⇄ Cards display
+// toggle (cards = the original look, kept). Fed by /studio/customers (studio-side,
+// tenant-scoped to the operator's own site via the Agency–Client Bridge). "Open"
+// routes to that customer's record; "Manage their website" stays the clearly-
+// secondary website action.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -63,7 +113,44 @@ async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 // keep any agency drill-in scope on internal links
 function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
-let TOKEN="",CUSTOMERS=[];
+let TOKEN="",CUSTOMERS=[],LOADED_AT=0;
+
+// ONE delegated closer for the view menu (attached ONCE — render() rebuilds the
+// header many times; per-render document listeners would pile up): a click
+// outside .viewdd closes the popup — same contract as inbox.html's list-pane
+// closer, kept in sync by hand.
+document.addEventListener('click',(e)=>{
+  const vm=$('viewMenu'),vb=$('viewBtn');
+  if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
+});
+
+// ── list-view state: fixed views (D3) · display · sort · search ──────────────
+const VIEWS=[['all','All customers'],['active','Active'],['attention','Needs attention'],['on_hold','On hold'],['done','Complete / Archived']];
+const VIEW_LABEL=Object.fromEntries(VIEWS);
+let VIEWNAME='all',Q='';
+const viewMatch=(c)=>{
+  const st=String(c.status||'active');
+  if(VIEWNAME==='active')return st==='active';
+  if(VIEWNAME==='attention')return Number(c.open_support||0)>0;
+  if(VIEWNAME==='on_hold')return st==='on_hold';
+  if(VIEWNAME==='done')return st==='complete'||st==='archived';
+  return true;
+};
+// Table ⇄ Cards display choice, persisted; small screens default to Cards.
+const DISPLAY_KEY='dds-display:customers';
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
+  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
+// sortable columns (the fields /studio/customers actually returns)
+const COLS=[
+  ['name','Name',(c)=>String(c.name||'').toLowerCase()],
+  ['email','Email',(c)=>String(c.email||'').toLowerCase()],
+  ['project_count','Projects',(c)=>Number(c.project_count||0)],
+  ['open_support','Waiting',(c)=>Number(c.open_support||0)],
+  ['status','Status',(c)=>String(c.status||'active')],
+];
+let SORT={key:'name',dir:1};
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
 function openCustomer(c){
   if(!c)return;
@@ -77,15 +164,55 @@ function openCustomer(c){
 // "Manage their website" stays the secondary action — the website cockpit, not the record.
 function manageSite(c){ if(c.customer_site_id) location.href='/today.html?client='+encodeURIComponent(c.customer_site_id); }
 
-function render(filter){
-  const q=(filter||'').toLowerCase();
-  const list=CUSTOMERS.filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
-  let h=`<h1>Customers</h1><p class="sub">${CUSTOMERS.length} ${CUSTOMERS.length===1?'customer':'customers'} you deliver work for. Open one to manage their project, messages, files, and approvals.</p>`;
-  h+=`<input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(filter||'')}">`;
-  if(!list.length){
-    h+=`<div class="center"><h2>${CUSTOMERS.length?'No customers match that.':'You haven’t added a customer yet.'}</h2><p class="muted">${CUSTOMERS.length?'Try a different name or email.':'When you convert an enquiry or add a customer, they’ll appear here — with everything you deliver for them in one place.'}</p>${CUSTOMERS.length?'':`<p style="margin-top:18px"><a class="link" href="${esc(scoped('/pipeline.html'))}">Go to your sales pipeline →</a></p>`}</div>`;
-    $('main').innerHTML=h; const s=$('search'); if(s) s.addEventListener('input',()=>render(s.value)); return;
-  }
+function sortedRows(){
+  const q=Q.trim().toLowerCase();
+  const list=CUSTOMERS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
+  const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
+  return list;
+}
+
+function headerHtml(count){
+  const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  return `<div class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">🏢</span>
+      <div class="viewdd">
+        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(VIEW_LABEL[VIEWNAME])}">${esc(VIEW_LABEL[VIEWNAME])} <span class="car" aria-hidden="true">▾</span></button>
+        <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
+      </div>
+      <div class="seg" role="group" aria-label="Display as">
+        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+        <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
+      </div>
+      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta">${count} customer${count===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+  </div>`;
+}
+
+function tableHtml(list){
+  const ths=COLS.map(([k,label])=>{
+    const on=SORT.key===k;
+    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+  }).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  const trs=list.map(c=>{
+    const att=Number(c.open_support||0);
+    const st=String(c.status||'active');
+    return `<tr data-open="${esc(c.client_id)}" tabindex="0" aria-label="Open ${esc(c.name||'Customer')}">
+      <td><span class="n">${esc(c.name||'Customer')}</span></td>
+      <td>${esc(c.email||'—')}</td>
+      <td class="num">${Number(c.project_count||0)}</td>
+      <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
+      <td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>
+      <td>${c.customer_site_id?`<button class="rowact" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="tscroll"><table aria-label="Customers"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+function cardsHtml(list){
+  let h='';
   for(const c of list){
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
@@ -97,27 +224,86 @@ function render(filter){
         <button class="btn" data-open="${esc(c.client_id)}">Open</button>
         ${c.customer_site_id?`<button class="btn ghost" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</div></div>`;
   }
+  return h;
+}
+
+function render(){
+  const list=sortedRows();
+  let h=headerHtml(list.length);
+  h+=`<input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}">`;
+  if(!list.length){
+    h+=`<div class="center"><h2>${CUSTOMERS.length?'No customers match that.':'You haven’t added a customer yet.'}</h2><p class="muted">${CUSTOMERS.length?(Q?'Try a different name or email.':'Nothing in this view — try “All customers”.'):'When you convert an enquiry or add a customer, they’ll appear here — with everything you deliver for them in one place.'}</p>${CUSTOMERS.length?'':`<p style="margin-top:18px"><a class="link" href="${esc(scoped('/pipeline.html'))}">Go to your sales pipeline →</a></p>`}</div>`;
+  }else{
+    h+=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
+  }
   $('main').innerHTML=h;
-  const s=$('search'); if(s) s.addEventListener('input',()=>render(s.value));
+  wire();
+}
+
+function wire(){
+  // search — re-render live, keeping the caret where it was
+  const s=$('search');
+  if(s)s.addEventListener('input',()=>{Q=s.value;const p=s.selectionStart;render();const ns=$('search');if(ns){ns.focus();try{ns.setSelectionRange(p,p);}catch(_){/* */}}});
+  // view dropdown (fixed views, D3): listbox popup — opening focuses the first
+  // option; arrows move; Escape closes back to the trigger; Enter activates.
+  // Outside clicks close via the ONE document-level delegated closer above.
+  const vb=$('viewBtn'),vm=$('viewMenu');
+  if(vb&&vm){
+    vm.innerHTML=VIEWS.map(v=>`<button type="button" role="option" data-view="${v[0]}" aria-selected="${VIEWNAME===v[0]?'true':'false'}">${v[1]}${VIEWNAME===v[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
+    const close=()=>{vm.hidden=true;vb.setAttribute('aria-expanded','false');};
+    vb.addEventListener('click',()=>{const open=vm.hidden;vm.hidden=!open;vb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=vm.querySelector('button');if(f)f.focus();}});
+    vm.addEventListener('keydown',(e)=>{
+      const opts=[...vm.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
+      if(e.key==='Escape'){e.preventDefault();close();vb.focus();}
+      else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
+      else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+    });
+    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');render();const nb=$('viewBtn');if(nb)nb.focus();}));
+  }
+  // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
+  // never an unhandled promise; the initial-boot trouble() path is unchanged.
+  // These re-renders also restore focus to their control (the sort handlers' pattern).
+  const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>{if(window.ddsToast)ddsToast('We couldn’t load your customers just now.','err');}));
+  const dt=$('dispTable'); if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
+  const dc=$('dispCards'); if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
+  // sortable column headers — click toggles asc/desc (aria-sort on the <th>)
+  document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.getAttribute('data-sort');
+    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:1};
+    render();
+    const nb=document.querySelector('[data-sort="'+k+'"]'); if(nb)nb.focus();
+  }));
   const byId={}; CUSTOMERS.forEach(c=>byId[c.client_id]=c);
-  document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openCustomer(byId[b.getAttribute('data-open')])));
-  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',()=>manageSite(byId[b.getAttribute('data-web')])));
+  // cards: explicit Open button; table: the row itself opens (Enter AND Space,
+  // like pipeline's rows — preventDefault keeps Space from scrolling the page)
+  document.querySelectorAll('button[data-open]').forEach(b=>b.addEventListener('click',()=>openCustomer(byId[b.getAttribute('data-open')])));
+  document.querySelectorAll('tr[data-open]').forEach(tr=>{
+    const open=(e)=>{if(e.target.closest('button'))return;openCustomer(byId[tr.getAttribute('data-open')]);};
+    tr.addEventListener('click',open);
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();openCustomer(byId[tr.getAttribute('data-open')]);}});
+  });
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();manageSite(byId[b.getAttribute('data-web')]);}));
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your customers.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function notStudio(){$('main').innerHTML=`<div class="center"><h2>This is your studio’s customer list.</h2><p class="muted">It’s available to your studio team.</p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your customers just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+
+async function load(){
+  const r=await api('/studio/customers');
+  if(r.status===401){signedOut();return;}
+  if(r.status===403){notStudio();return;}
+  if(!r.ok){trouble();return;}
+  CUSTOMERS=Array.isArray(r.body.data)?r.body.data:[];
+  LOADED_AT=Date.now();
+  render();
+}
 
 (async function(){
   try{
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
-    const r=await api('/studio/customers');
-    if(r.status===401){signedOut();return;}
-    if(r.status===403){notStudio();return;}
-    if(!r.ok){trouble();return;}
-    CUSTOMERS=Array.isArray(r.body.data)?r.body.data:[];
-    render('');
+    await load();
   }catch(_){trouble();}
 })();
 </script>

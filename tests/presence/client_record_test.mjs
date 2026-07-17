@@ -46,6 +46,10 @@ const boardNext = (src) => (src.match(/const BOARD_NEXT=\{[^}]+\}/) || [''])[0];
 ok('PATH: BOARD_NEXT is byte-identical to pipeline.html (all six stage keys pinned)', boardNext(crm) !== '' && boardNext(crm) === boardNext(pipeline));
 const stageLabelMap = (src) => (src.match(/const STAGE_LABEL=\{[^}]+\}/) || [''])[0];
 ok('PATH: STAGE_LABEL is byte-identical to pipeline.html', stageLabelMap(crm) !== '' && stageLabelMap(crm) === stageLabelMap(pipeline));
+// BOTH Paths render the guidance strip now, so the hand-copy contract covers it
+// too (nested braces per stage → match through the closing "\n};", not [^}]+)
+const guidanceMap = (src) => (src.match(/const PIPELINE_GUIDANCE=\{[\s\S]*?\n\};/) || [''])[0];
+ok('PATH: PIPELINE_GUIDANCE is byte-identical to pipeline.html', guidanceMap(crm) !== '' && guidanceMap(crm) === guidanceMap(pipeline));
 ok('PATH: guidance renders BOTH tip and action (the pipeline.html:694 bug, fixed here)', /esc\(g\.tip\)/.test(crm) && /esc\(g\.action\)/.test(crm) && !/esc\(g\.suggested_action\)/.test(crm));
 ok('PATH: Mark Stage as Complete advances via the stage route', /Mark Stage as Complete/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
 ok('PATH: won is convert-only — the button becomes a pipeline link', /Convert to customer →/.test(crm) && /signed/.test(crm));
