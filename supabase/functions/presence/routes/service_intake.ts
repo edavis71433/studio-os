@@ -26,7 +26,7 @@ async function ackSupportRequester(siteId: string, toEmail: string, subject: str
     const brand = await loadEmailBrand(siteId);
     await sendEmail(toEmail, subject,
       `<p>Thanks — we've got your request and it's in our queue. Nothing more is needed from you right now; we'll follow up here. You can add details or reply any time from your workspace.</p>`,
-      brand, { critical: true });
+      brand, { critical: true, siteId });
   } catch { /* best-effort — an ack must never block the submission */ }
 }
 import type { SiteRow } from '../lib/site.ts';

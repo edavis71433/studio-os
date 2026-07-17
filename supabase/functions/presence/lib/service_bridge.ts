@@ -117,7 +117,7 @@ export async function emailBridgedCustomer(agencySiteId: string, projectId: stri
     const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html?project=${encodeURIComponent(projectId)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
     // critical: this is the "your project needs you" nudge — an opted-out client's
     // approval/message must still reach them (bounces still suppress).
-    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true });
+    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, siteId: agencySiteId });
   } catch { return false; }
 }
 
@@ -135,6 +135,6 @@ export async function emailCustomerByClient(agencySiteId: string, customerClient
     const { loadEmailBrand } = await import('./email_brand.ts');
     const brand = await loadEmailBrand(agencySiteId);
     const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
-    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true });
+    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, siteId: agencySiteId });
   } catch { return false; }
 }

@@ -77,12 +77,23 @@ export function maskEmail(email: string): string {
   return `${s[0]}***@${s.slice(at + 1)}`;
 }
 
-/** Verify a svix-signed webhook (Resend events). Constant-time comparison.
- *  Returns true only for a fresh (≤5 min), correctly signed payload. */
-export async function verifySvix(id: string, ts: string, sigHeader: string, payload: string, secret: string): Promise<boolean> {
+/** Verify a svix-signed webhook (Resend events + Resend Inbound). Constant-time
+ *  comparison. Returns true only for a fresh (≤5 min), correctly signed payload.
+ *  `nowMs` is injectable so the replay window is unit-testable against a fixed
+ *  clock — it defaults to Date.now() and the existing (5-arg) call sites are
+ *  unaffected. Fails CLOSED on a non-finite timestamp (`Number('')`/`Number('x')`
+ *  → NaN; `Math.abs(NaN) > 300` is `false`, which would otherwise ADMIT a
+ *  header-less/garbage timestamp) and on a secret whose base64 body doesn't
+ *  decode (atob throws on malformed input — a misconfigured secret must reject,
+ *  never 500 the door). */
+export async function verifySvix(id: string, ts: string, sigHeader: string, payload: string, secret: string, nowMs: number = Date.now()): Promise<boolean> {
   if (!id || !ts || !sigHeader || !secret) return false;
-  if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
-  const keyRaw = Uint8Array.from(atob(secret.replace(/^whsec_/, '')), (c) => c.charCodeAt(0));
+  const tsNum = Number(ts);
+  if (!Number.isFinite(tsNum)) return false;                        // fail-closed: NaN/±Infinity timestamp
+  if (Math.abs(nowMs / 1000 - tsNum) > 300) return false;
+  let keyRaw: Uint8Array;
+  try { keyRaw = Uint8Array.from(atob(secret.replace(/^whsec_/, '')), (c) => c.charCodeAt(0)); }
+  catch { return false; }                                           // fail-closed: secret isn't valid base64
   const key = await crypto.subtle.importKey('raw', keyRaw as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${ts}.${payload}`) as unknown as BufferSource);
   const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));

@@ -58,6 +58,16 @@ const core = await import('../../supabase/functions/_shared/email_infra.ts');
   ok('svix: stale timestamp (>5 min) rejected even with a valid signature', !(await core.verifySvix(id, staleTs, `v1,${staleSig}`, payload, secret)));
   ok('svix: multiple space-separated sigs — any valid one passes', await core.verifySvix(id, ts, `v1,WRONG v1,${sig}`, payload, secret));
   ok('svix: missing secret rejected', !(await core.verifySvix(id, ts, `v1,${sig}`, payload, '')));
+
+  // ── injected clock (slice 6: the inbound door replay-tests against a fixed now) ──
+  const fixedTs = '1700000000';
+  const fixedSig = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${fixedTs}.${payload}`)))));
+  ok('svix: injected clock — fresh against the given now verifies', await core.verifySvix(id, fixedTs, `v1,${fixedSig}`, payload, secret, 1700000100_000));
+  ok('svix: injected clock — stale against the given now (>5 min) rejected', !(await core.verifySvix(id, fixedTs, `v1,${fixedSig}`, payload, secret, 1700000400_000)));
+  ok('svix: non-finite timestamp fails CLOSED (NaN would otherwise admit)', !(await core.verifySvix(id, 'not-a-number', `v1,${fixedSig}`, payload, secret, 1700000000_000)));
+  ok('svix: empty timestamp fails closed', !(await core.verifySvix(id, '', `v1,${fixedSig}`, payload, secret, 1700000000_000)));
+  ok('svix: non-base64 secret fails closed (never throws)', !(await core.verifySvix(id, fixedTs, `v1,${fixedSig}`, payload, 'whsec_@@@not-base64@@@', 1700000000_000)));
+  ok('svix: default clock still used when nowMs omitted (existing call sites unchanged)', await core.verifySvix(id, ts, `v1,${sig}`, payload, secret));
 }
 
 // ── log masking ──

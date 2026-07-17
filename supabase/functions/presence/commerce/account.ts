@@ -102,7 +102,10 @@ export async function createContactAndClient(
 // A recovery/verify email link the customer can click. Uses Supabase's own
 // recover endpoint so the link is a real, signed one that lands on
 // set-password.html (the existing flow) — used here as "confirm it's you".
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean }): Promise<boolean> {
+const RESEND_INBOUND_DOMAIN = Deno.env.get('RESEND_INBOUND_DOMAIN') || '';
+const PLATFORM_REPLY_TO = Deno.env.get('PLATFORM_REPLY_TO') || 'eric@davisdigitalstudio.com';
+
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; headers?: Record<string, string> }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
     // Honor the suppression list at the ONE send point. critical:true =
@@ -130,11 +133,20 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       // List-Unsubscribe: RFC 8058 one-click HTTPS endpoint (what Gmail/Yahoo
       // bulk-sender rules actually honor) + mailto fallback. The POST lands on
       // /unsubscribe which writes the ONE suppression store this send checks.
+      // R1 loop-closure: when the caller is SITE mail (a studio↔customer message,
+      // ack, or bridge nudge) AND an inbound domain is configured, the reply-to is
+      // that site's inbound address (<siteId>@<domain>) so a customer's REPLY lands
+      // back on /email/inbound and onto their conversation. Platform mail
+      // (scheduler, deletion, commerce, invites…) never passes siteId and keeps the
+      // human platform reply-to. opts.headers are spread AFTER the List-Unsubscribe
+      // headers (e.g. the inbound ack's Auto-Submitted:auto-replied).
       body: JSON.stringify({
-        from: EMAIL_FROM, to, subject, html: wrapped, text, reply_to: 'eric@davisdigitalstudio.com',
+        from: EMAIL_FROM, to, subject, html: wrapped, text,
+        reply_to: (opts?.siteId && RESEND_INBOUND_DOMAIN) ? `${opts.siteId}@${RESEND_INBOUND_DOMAIN}` : PLATFORM_REPLY_TO,
         headers: {
           'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          ...(opts?.headers || {}),
         },
       }),
     });

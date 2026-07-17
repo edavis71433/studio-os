@@ -195,7 +195,7 @@ export interface BroadcastRow { id: string; site_id: string; subject: string; bo
 
 export interface DispatchDeps extends SendableDeps {
   loadBrand?: (siteId: string) => Promise<EmailBrand>;
-  sendFn?: (to: string, subject: string, html: string, brand?: EmailBrand) => Promise<boolean>;
+  sendFn?: (to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; headers?: Record<string, string> }) => Promise<boolean>;
   // claim a per-recipient send slot: 'inserted' = go ahead, 'duplicate' = already
   // sent (skip — the send-once guard), 'error' = infra failure.
   claimFn?: (broadcastId: string, siteId: string, email: string) => Promise<'inserted' | 'duplicate' | 'error'>;
@@ -251,7 +251,9 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
     const tokens: MergeTokens = { firstName: r.firstName, businessName };
     // sendEmail is the ONE send point: it re-checks suppression and attaches the
     // RFC-8058 one-click List-Unsubscribe header — inherited, never re-implemented.
-    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens), brand);
+    // R1: pass the broadcast's own site so a recipient's REPLY lands on that
+    // site's inbound address (<siteId>@<inbound-domain>) → /email/inbound.
+    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens), brand, { siteId: b.site_id });
     if (ok) sent++;
     else { failed++; await markFailed(b.id, r.email).catch(() => {}); }
   }

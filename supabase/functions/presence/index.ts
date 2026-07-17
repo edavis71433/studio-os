@@ -291,6 +291,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const { handleResendEvents } = await import('./routes/email_infra.ts');
     return handleResendEvents(req);
   }
+  // Inbound email capture (CRM slice 6): a client's email REPLY enters the
+  // platform here. svix-signed like /email/events, gated on RESEND_INBOUND_SECRET
+  // (unset = 404). Pre-auth, tenant-safe (the site id is the recipient's local
+  // part), matched to a KNOWN customer/contact by sender email. Sits BEFORE the
+  // client/staff 401 — the sender has no session.
+  if (route === '/email/inbound' && method === 'POST') {
+    const { handleInboundEmail } = await import('./routes/inbound_email.ts');
+    return handleInboundEmail(req);
+  }
 
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
     return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
