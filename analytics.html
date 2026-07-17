@@ -43,6 +43,7 @@
   .chip .car{color:var(--faint);font-size:10px}
   .chip:hover{border-color:var(--p)}
   .chipmenu{position:absolute;left:0;top:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
+  .chipmenu[hidden]{display:none}
   .chipmenu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;border-radius:8px;cursor:pointer}
   .chipmenu button:hover{background:var(--p-soft)}
   /* ── the 12-column grid + Lightning card chrome ── */
@@ -67,7 +68,7 @@
   /* funnel */
   .fr{display:flex;align-items:center;gap:10px;margin:7px 0}
   .fl{width:104px;font-size:12px;color:var(--soft);text-align:right;flex:none}
-  .fb{height:22px;border-radius:5px;flex:none}
+  .fb{height:22px;border-radius:5px;flex:none;max-width:calc(100% - 200px)}
   .fv{font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
   /* tables */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -239,7 +240,7 @@ function salesBand(d){
       const useCount=!s.pipeline.stages.some(x=>x.value_cents>0);
       const maxC=Math.max.apply(null,s.pipeline.stages.map(x=>Math.max(x.count,1)));
       body=s.pipeline.stages.map(x=>{
-        const pct=Math.max(4,Math.round((useCount?(x.count/maxC):(x.value_cents/maxV))*88));
+        const pct=Math.max(4,Math.round((useCount?(x.count/maxC):(x.value_cents/maxV))*64));
         return `<div class="fr"><span class="fl">${esc(x.label)}</span><div class="fb" style="width:${pct}%;background:${STAGE_COLOR[x.stage]||'var(--c1)'}" aria-hidden="true"></div><span class="fv">${money(x.value_cents)} · ${num(x.count)}</span></div>`;
       }).join('');
     }else body=emptyState('No open deals','Deals you add to the pipeline will stack up here by stage.');
