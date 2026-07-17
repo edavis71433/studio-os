@@ -184,6 +184,19 @@ test.describe('Analytics (Business dashboard)', () => {
     expect(second!.y).toBeGreaterThan(first!.y + first!.height - 2);            // below, not beside
   });
 
+  test('stencil loading shows only when the fetch runs >300ms, then cross-fades to data', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'timing probe once, on desktop');
+    await installApp(page);
+    await page.route('**/functions/v1/presence/analytics/dashboard**', async (route) => {
+      await new Promise((r) => setTimeout(r, 900));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DASH_EMPTY) });
+    });
+    await page.goto('/analytics.html');
+    await expect(page.locator('.st').first()).toBeVisible();     // slow fetch → stencil blocks
+    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    await expect(page.locator('.st')).toHaveCount(0);            // replaced by the real board
+  });
+
   test('no serious/critical axe violations on the dashboard', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
