@@ -68,7 +68,7 @@ import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
 import { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney, handleCoachMemory } from './routes/coach.ts';
-import { handleAnalyticsHome, handleAnalyticsWebsite, handleAnalyticsCustomers, handleAnalyticsSearch, handleAnalyticsPortfolio } from './routes/analytics.ts';
+import { handleAnalyticsHome, handleAnalyticsWebsite, handleAnalyticsCustomers, handleAnalyticsSearch, handleAnalyticsPortfolio, handleAnalyticsDashboard } from './routes/analytics.ts';
 import { handleCollect } from './routes/collect.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
@@ -1002,6 +1002,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/analytics/website' && method === 'GET') return handleAnalyticsWebsite(req, site, cors);
   if (route === '/analytics/customers' && method === 'GET') return handleAnalyticsCustomers(req, site, cors);
   if (route === '/analytics/search' && method === 'GET') return handleAnalyticsSearch(req, site, cors);
+  // Slice 8: the Business dashboard summary (analytics.html's two-band board)
+  if (route === '/analytics/dashboard' && method === 'GET') return handleAnalyticsDashboard(req, site, cors);
 
   // ── M9.5E: the Growth Coach (observes, plans, prepares; never executes) ──
   if (route === '/coach/run' && method === 'POST') return handleCoachRun(site, cors);

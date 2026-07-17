@@ -21,6 +21,11 @@ import {
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
 import { searchInsights, searchNotice, searchHealth, searchMilestones, searchDetailInsights, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
+import { summarizePipeline } from '../lib/sales_lifecycle.ts';
+import {
+  parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors, sourceShares,
+  invoiceBuckets, recentWins, oldestAgeDays, DASH_WEEKS,
+} from '../lib/analytics_dashboard.ts';
 
 /** AN-3.1: top queries + pages for a period (from presence_search_terms). */
 async function readSearchTerms(clientId: string, period: string): Promise<{ queries: any[]; pages: any[] }> {
@@ -323,4 +328,82 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   if (blockedCount) websiteInsights.push({ key: 'plan_blocked', title: 'A subscription needs attention', sentence: `${blockedCount} ${blockedCount === 1 ? 'client’s software subscription is' : 'clients’ software subscriptions are'} paused or ended — editing/publishing is limited until it’s resolved.`, number: blockedCount, tone: 'attention' });
 
   return json({ data: { headline, insights: [...insights, ...searchInsightsAgency, ...websiteInsights], websites, client_count: siteIds.length } }, 200, cors);
+}
+
+// ── Slice 8: GET /analytics/dashboard — the Business dashboard summary ────────
+// ONE read-only aggregate feeding analytics.html's two bands (Sales · Your
+// website). Zero schema change: it reads presence_deals / form_submissions /
+// support_requests / invoices / visits / gsc signals the platform already
+// stores. A dashboard must render PARTIAL data — every aggregate is tolerant:
+// a failed read yields `null` for that widget (the page shows its empty state),
+// never a 500 for the whole board. Pure math lives in lib/analytics_dashboard.ts
+// (+ summarizePipeline in lib/sales_lifecycle.ts) so tests can pin it.
+export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const period = parseDashPeriod(new URL(req.url).searchParams.get('period'));
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.parse(nowIso);
+  const { startMs, days } = dashRange(period, nowMs);
+  // one visits fetch serves the KPIs (period window) AND the 12-week line
+  const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
+
+  const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+  const [dealsR, subsR, supR, invR, visitsR, gsc] = await Promise.all([
+    safe(svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=2000`)),
+    safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
+    safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
+    safe(svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&limit=1000`)),
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+    safe(readGsc(site.client_id)),
+  ]);
+  const okRows = (r: unknown): any[] | null => (r && (r as { ok?: boolean }).ok ? arr(r as { json?: unknown }) : null);
+
+  // ── Sales band ──
+  const deals = okRows(dealsR);
+  let pipeline: unknown = null, won: unknown = null, recent_wins: unknown[] = [];
+  if (deals) {
+    const sum = summarizePipeline(deals, nowIso);
+    pipeline = { open: sum.open, stages: sum.by_stage };
+    won = { this_month: sum.won_month, last_month: summarizePipeline(deals, priorMonthIso(nowMs)).won_month };
+    recent_wins = recentWins(deals, nowMs);
+  }
+  const subs = okRows(subsR);
+  const enquiries = subs ? {
+    count: subs.filter((s) => Date.parse(s.created_at) >= startMs).length,
+    unanswered: subs.filter((s) => s.status === 'new').length,
+    weekly: weeklyBuckets(subs.map((s) => s.created_at), nowMs),
+  } : null;
+  const sup = okRows(supR);
+  const support = sup ? { open: sup.length, oldest_age_days: oldestAgeDays(sup.map((s) => s.created_at), nowMs) } : null;
+  const invs = okRows(invR);
+  const invoices = invs ? invoiceBuckets(invs, nowIso.slice(0, 10), startMs) : null;
+
+  // ── Website band ──
+  const visits = okRows(visitsR) as VisitRow[] | null;
+  let traffic: unknown = null;
+  if (visits) {
+    const agg = aggregateVisits(visits, nowMs, days);
+    traffic = {
+      visitors: agg.visitors, pageviews: agg.pageviews,
+      actions: agg.events.phone + agg.events.email + agg.events.cta,
+      top_pages: agg.topPages,
+      top_sources: sourceShares(agg.topSources, agg.visitors),
+      weekly: weeklyVisitors(visits, nowMs),
+      has_data: agg.hasData,
+    };
+  }
+  let search: unknown = null;
+  if (gsc && gsc.hasData) {
+    const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
+    search = {
+      clicks: gsc.clicks, impressions: gsc.impressions, period: gsc.period,
+      top_terms: (terms?.queries || []).map((q: any) => ({ term: String(q.key || ''), clicks: Number(q.clicks) || 0, impressions: Number(q.impressions) || 0 })),
+    };
+  }
+
+  return json({ data: {
+    period,
+    generated_at: nowIso,
+    sales: { pipeline, won, enquiries, support, invoices, recent_wins },
+    website: { traffic, search },
+  } }, 200, cors);
 }
