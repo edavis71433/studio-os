@@ -269,6 +269,22 @@
   details.faq-item[open]>summary::after{content:"–"}
   .faq-answer{padding:0 18px 15px;color:var(--soft);font-size:14.5px}
   .faq-answer a{color:var(--p)}
+  /* ── slice 8b: the "Your website" card (Home, between "Needs you" and projects) ── */
+  .wscard .wslead{color:var(--soft);font-size:14.5px;line-height:1.55}
+  .wscard .wslead b{color:var(--ink)}
+  .wsspark{display:block;width:100%;height:54px;margin:14px 0 2px}
+  .wsmini{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .wsmini .m{flex:1 1 0;min-width:130px;border:1px solid var(--line);border-radius:12px;padding:10px 13px}
+  .wsmini .n{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;margin:0;color:var(--ink)}
+  .wsmini .l{font-size:11.5px;color:var(--faint);margin:2px 0 0;line-height:1.35}
+  .wsfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap}
+  .wsmore{border:0;background:none;padding:0;color:var(--p);font-size:13px;font-weight:600;cursor:pointer}
+  .wsmore:hover{text-decoration:underline}
+  .wspriv{font-size:11.5px;color:var(--faint)}
+  #wsfull .wsh{font-family:var(--serif);font-weight:500;font-size:16px;color:var(--ink);margin:18px 0 6px}
+  .wslist .wsrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13.5px;padding:7px 0;border-top:1px solid var(--line);color:var(--ink)}
+  .wslist .wsrow:first-child{border-top:0}
+  .wslist .wsrow .wsnum{flex:0 0 auto;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
 </style>
 <script>
 // Self-contained client portal: the operator shell (shell.css/shell.js) is
@@ -325,6 +341,48 @@ function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];co
 function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
 // A friendly first name from the session user, or '' — never guessy.
 function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
+
+// ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
+// tests/presence/client_website_test.mjs; keep both copies in sync). ──
+// hidden = no data / route missing / site not published; empty = published but
+// no visitors yet (a gentle "ready to be found" — never "0 people found you").
+function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m||!(m.visitors>0))return'empty';return'stats';}
+function wsPeople(n){n=Math.max(0,n|0);return n===1?'1 person':n+' people';}
+// The lead sentence, from real numbers: bolded counts, sensible degradation —
+// zero actions drops the reach-out clause; no source drops the arrival clause;
+// 'Direct' reads as plain English, never "arrived from Direct".
+function wsLeadHtml(m){
+  m=m||{};
+  let h='<b>'+esc(wsPeople(m.visitors))+'</b> visited your website this month';
+  const a=Math.max(0,m.actions|0);
+  h+=a>0?' — and <b>'+esc(String(a))+' of them reached out</b>: phone taps, emails and booking requests.':'.';
+  const src=m.top_source&&m.top_source.source?String(m.top_source.source):'';
+  if(src)h+=src==='Direct'?' Most came straight to your website.':' Most arrived from <b>'+esc(src)+'</b>.';
+  return h;
+}
+// The mini stat tiles; the Google tile exists only when Search Console data does.
+function wsTiles(m,search){
+  const v=Math.max(0,(m&&m.visitors)|0),a=Math.max(0,(m&&m.actions)|0);
+  const t=[[String(v),(v===1?'visitor':'visitors')+' this month'],[String(a),'reached out or booked']];
+  if(search&&search.clicks!=null)t.push([String(Math.max(0,search.clicks|0)),'clicks from Google search']);
+  return t;
+}
+// Polyline points for the soft sparkline/line — pure geometry, no DOM. Oldest
+// value left, newest right; a flat/short series (<2 points) draws nothing.
+function wsSparkPoints(weekly,w,h,pad){
+  const a=(weekly||[]).map(n=>Math.max(0,n|0));
+  if(a.length<2)return'';
+  pad=pad==null?6:pad;
+  const max=Math.max(1,Math.max.apply(null,a));
+  const dx=w/(a.length-1);
+  const r=(x)=>Math.round(x*10)/10;
+  return a.map((n,i)=>r(i*dx)+','+r(h-pad-(n/max)*(h-2*pad))).join(' ');
+}
+// A friendly page name from a path ('/' → Home page; '/our-services' → 'Our services').
+function wsPageLabel(p){p=String(p||'');const seg=p.replace(/\/+$/,'').split('/').pop()||'';const t=seg.replace(/\.[a-z0-9]+$/i,'').replace(/[-_]+/g,' ').trim();return t?t.charAt(0).toUpperCase()+t.slice(1):'Home page';}
+function wsSourceLabel(s){s=String(s||'');return s==='Direct'?'Straight to your site':s;}
+function wsCount(n,one,many){n=Math.max(0,n|0);return n+' '+(n===1?one:many);}
+function wsTermLine(t){const c=Math.max(0,(t&&t.clicks)|0),i=Math.max(0,(t&&t.impressions)|0);return c>0?wsCount(c,'click','clicks'):(i===1?'seen once':'seen '+i+' times');}
 
 // Appearance (Light / Dark / System) — self-contained, the client's own choice
 // ("it's their eyes"), stored under the client realm. No operator shell needed.
@@ -519,6 +577,9 @@ function renderHome(){
     `<header><h1>Home</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
   html+=welcomeCardHtml();
   html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
+  // slice 8b: the "Your website" slot — filled by loadWebsiteCard() only when
+  // there are real stats to show (unpublished / 404 / reviewer → stays hidden).
+  html+=`<section id="home-website" hidden></section>`;
   html+=`<section><h2>Your projects</h2>${projectCardsHtml(projects)}</section>`;
   html+=`<section><h2>Recent updates</h2>`;
   const moments=(feed.moments||[]);
@@ -529,6 +590,7 @@ function renderHome(){
   wireWelcome();wireBell();
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
   buildNeedsYou();
+  loadWebsiteCard();
 }
 // Fill glances + mini Paths + the aggregated "Needs you" QUEUE — one list-view
 // card of two-line rows (kind chip · title · context · inline action) from feed
@@ -573,6 +635,66 @@ async function buildNeedsYou(){
   body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
   body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'))));
   body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
+}
+// ── slice 8b: the "Your website" card — plain-English site stats, in place ──
+// The friendly breakdown that "See the full picture →" grows into (same card).
+function wsFullHtml(m,search){
+  let h='';
+  const wk=((m&&m.weekly)||[]).map(n=>Math.max(0,n|0));
+  if(wk.length>1){
+    h+='<h3 class="wsh">Visitors, week by week</h3><p class="muted" style="font-size:12.5px;margin:0 0 4px">The last 12 weeks, oldest to newest.</p>'
+      +'<svg class="wsspark" style="height:72px" viewBox="0 0 520 72" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline fill="none" stroke="var(--p)" stroke-width="2.5" opacity=".85" points="'+wsSparkPoints(wk,520,72,8)+'"/></svg>'
+      +'<span class="sr-only">'+esc('Visitors per week, oldest to newest: '+wk.join(', ')+'.')+'</span>';
+  }
+  const pages=((m&&m.top_pages)||[]).slice(0,5);
+  if(pages.length)h+='<h3 class="wsh">Your most-visited pages</h3><div class="wslist">'+pages.map(p=>'<div class="wsrow"><span>'+esc(wsPageLabel(p.path))+'</span><span class="wsnum">'+esc(wsCount(p.views,'view','views'))+'</span></div>').join('')+'</div>';
+  const srcs=((m&&m.sources)||[]).slice(0,5);
+  if(srcs.length)h+='<h3 class="wsh">Where people came from</h3><div class="wslist">'+srcs.map(s=>'<div class="wsrow"><span>'+esc(wsSourceLabel(s.source))+'</span><span class="wsnum">'+esc(String(Math.max(0,s.share|0)))+'%</span></div>').join('')+'</div>';
+  const terms=((search&&search.top_terms)||[]).slice(0,5);
+  if(terms.length)h+='<h3 class="wsh">What people searched on Google</h3><div class="wslist">'+terms.map(t=>'<div class="wsrow"><span>“'+esc(t.term)+'”</span><span class="wsnum">'+esc(wsTermLine(t))+'</span></div>').join('')+'</div>';
+  return h;
+}
+function wsCardHtml(d){
+  const state=wsCardState(d);
+  if(state==='hidden')return'';
+  const priv='<span class="wspriv">Counted privately — no cookies, no tracking of individual people.</span>';
+  if(state==='empty')return'<div class="card wscard"><span class="tag">Your website</span><h3>Your website is ready to be found.</h3>'
+    +'<p class="wslead">Stats will appear here as people visit — check back soon.</p>'
+    +'<div class="wsfoot">'+priv+'</div></div>';
+  const m=d.month,search=d.search;
+  const wk=(m.weekly||[]).map(n=>Math.max(0,n|0));
+  const pts=wsSparkPoints(wk,520,54,6);
+  const full=wsFullHtml(m,search);
+  return '<div class="card wscard"><span class="tag">Your website</span><h3>People are finding you.</h3>'
+    +'<p class="wslead">'+wsLeadHtml(m)+'</p>'
+    +(pts?'<svg class="wsspark" viewBox="0 0 520 54" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline fill="none" stroke="var(--p)" stroke-width="2.5" opacity=".85" points="'+pts+'"/></svg><span class="sr-only">'+esc('Visitors per week, oldest to newest: '+wk.join(', ')+'.')+'</span>':'')
+    +'<div class="wsmini">'+wsTiles(m,search).map(t=>'<div class="m"><p class="n">'+esc(t[0])+'</p><p class="l">'+esc(t[1])+'</p></div>').join('')+'</div>'
+    +(full?'<div id="wsfull" hidden>'+full+'</div>':'')
+    +'<div class="wsfoot">'+(full?'<button type="button" id="wsmore" class="wsmore" aria-expanded="false" aria-controls="wsfull">See the full picture →</button>':'')+priv+'</div></div>';
+}
+// Deploy-order tolerant: any non-OK read (a 404 from an older function build
+// included) leaves the slot hidden — no error card, no fake zeros. Cached per
+// full load (like billing); a reviewer never fetches (no website of their own).
+async function loadWebsiteCard(){
+  if(PORTAL.persona!=='client')return;
+  if(PORTAL.wstats===undefined){
+    try{const r=await api('/client/website-stats');PORTAL.wstats=(r.ok&&r.body&&r.body.data)||null;}catch(_){PORTAL.wstats=null;}
+  }
+  const host=document.getElementById('home-website');if(!host)return;   // the user moved on mid-fetch
+  const h=wsCardHtml(PORTAL.wstats);
+  if(!h)return;   // hidden state — the slot stays empty
+  host.innerHTML=h;host.hidden=false;
+  const btn=document.getElementById('wsmore');
+  // the disclosure contract (slice 2): the SAME card grows in place; the button
+  // carries aria-expanded/aria-controls and keeps focus across the toggle
+  // (nothing re-renders), so focus never jumps or drops to <body>.
+  if(btn)btn.addEventListener('click',()=>{
+    const full=document.getElementById('wsfull');if(!full)return;
+    const open=btn.getAttribute('aria-expanded')==='true';
+    full.hidden=open;
+    btn.setAttribute('aria-expanded',open?'false':'true');
+    btn.textContent=open?'See the full picture →':'Show less';
+  });
 }
 // ── MESSAGES — the split-view console (redesign slice 5; inbox.html's contract
 // in this page's own idiom). LEFT: one listbox row per conversation — each
@@ -1454,7 +1576,7 @@ function ownerNote(){$('main').innerHTML=`<div class="center"><div class="roleba
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.billing=null;         // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.wstats=undefined;   // fresh per-load caches (a re-load = fresh data)
   const params=new URLSearchParams(location.search);
   const dsup=params.get('support'); const deep=params.get('project');
   // honor a deep link once, then drop it from the URL so any later re-load

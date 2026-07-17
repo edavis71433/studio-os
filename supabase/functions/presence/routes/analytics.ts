@@ -27,8 +27,10 @@ import {
   invoiceBuckets, recentWins, oldestAgeDays, DASH_WEEKS,
 } from '../lib/analytics_dashboard.ts';
 
-/** AN-3.1: top queries + pages for a period (from presence_search_terms). */
-async function readSearchTerms(clientId: string, period: string): Promise<{ queries: any[]; pages: any[] }> {
+/** AN-3.1: top queries + pages for a period (from presence_search_terms).
+ *  Exported so the client portal's website card (client_delivery.ts) reads the
+ *  SAME terms the studio dashboard shows — the numbers must always agree. */
+export async function readSearchTerms(clientId: string, period: string): Promise<{ queries: any[]; pages: any[] }> {
   if (!clientId || !period) return { queries: [], pages: [] };
   const r = await svc(`presence_search_terms?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${encodeURIComponent(period)}&select=dimension,key,clicks,impressions,position&order=clicks.desc&limit=20`);
   const rows = Array.isArray((r as any).json) ? (r as any).json : [];

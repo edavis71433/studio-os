@@ -17,6 +17,9 @@ import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
 import { signDocToken, type DocKind } from '../lib/documents.ts';
 import { linkSecret } from './sales.ts';
+import { readGsc, readSearchTerms } from './analytics.ts';
+import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
+import { dashRange, weeklyVisitors, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -516,6 +519,58 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (reqRow.project_id) await clientEvent(s, reqRow.project_id, 'support_message', principal, { request_id: id });
   return json({ data: rows(ins)[0] }, 201, cors);
+}
+
+// ═══ WEBSITE STATS (slice 8b) — the customer's own website, in plain numbers ═══
+// The portal Home's "Your website" card. Unlike every handler above, this needs
+// NO bridge link: the subject is the caller's OWN site (site.id — the website
+// the first-party collector beacons to), exactly the scope the rest of /client/*
+// resolves from. It reuses the SAME pure helpers + read patterns as the studio's
+// GET /analytics/dashboard (dashRange · aggregateVisits · weeklyVisitors ·
+// sourceShares · readGsc · readSearchTerms) so portal and studio numbers always
+// agree. Digestible subset ONLY — nothing operator-internal (no deals, no
+// invoices, no support queues). Tolerant: a failed read yields null for that
+// section (the card degrades), never a 500; an unpublished site returns
+// published:false and the portal hides the card entirely. Zero schema change.
+export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const published = site.status === 'live' || !!site.last_published_at;
+  if (!published) return json({ data: { published: false, month: null, search: null } }, 200, cors);
+  const statNowIso = nowIso();
+  const nowMs = Date.parse(statNowIso);
+  const { startMs, days } = dashRange('this_month', nowMs);
+  // one visits fetch serves the this-month numbers AND the 12-week line (the
+  // same shape handleAnalyticsDashboard uses)
+  const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
+  const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+  const [visitsR, gsc] = await Promise.all([
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+    safe(readGsc(site.client_id)),
+  ]);
+  let month: unknown = null;
+  const vRows = (visitsR && (visitsR as { ok?: boolean }).ok && Array.isArray((visitsR as { json?: unknown }).json))
+    ? (visitsR as { json: VisitRow[] }).json : null;
+  if (vRows) {
+    const agg = aggregateVisits(vRows, nowMs, days);
+    const sources = sourceShares(agg.topSources, agg.visitors);   // already ≤5, largest first
+    month = {
+      visitors: agg.visitors, pageviews: agg.pageviews,
+      actions: agg.events.phone + agg.events.email + agg.events.cta,
+      top_source: sources[0] || null,
+      weekly: weeklyVisitors(vRows, nowMs),   // 12 buckets, oldest first
+      top_pages: agg.topPages,                // ≤5
+      sources,
+      has_data: agg.hasData,
+    };
+  }
+  let search: unknown = null;
+  if (gsc && gsc.hasData) {
+    const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
+    search = {
+      clicks: gsc.clicks, impressions: gsc.impressions,
+      top_terms: (terms?.queries || []).map((q: any) => ({ term: String(q.key || ''), clicks: Number(q.clicks) || 0, impressions: Number(q.impressions) || 0 })),   // ≤5
+    };
+  }
+  return json({ data: { published: true, month, search } }, 200, cors);
 }
 
 // ═══ STUDIO ROSTER (operator side): THIS studio's customers ═══
