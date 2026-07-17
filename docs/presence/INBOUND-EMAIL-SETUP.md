@@ -112,9 +112,10 @@ supabase secrets set RESEND_INBOUND_DOMAIN=<your-inbound-domain>  --project-ref 
 
 ### 8. Apply migration 0114
 Apply the dedup keys (idempotency for re-delivered webhooks). In Supabase → SQL
-Editor, run **`docs/presence/APPLY-0114-prod.sql`** (two-step: a transactional
-column add, then CONCURRENT index builds — run them in that order; idempotent) on
-each environment. The route degrades gracefully until this is applied (a
+Editor, run **`docs/presence/APPLY-0114-prod.sql`** (single idempotent run —
+plain index builds, since the SQL Editor's implicit transaction rejects
+CONCURRENTLY and the tables are small) on each environment. The route degrades
+gracefully until this is applied (a
 re-delivered email could double-land pre-apply), so code-first / apply-after is
 safe.
 
