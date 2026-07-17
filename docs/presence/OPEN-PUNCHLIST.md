@@ -146,12 +146,15 @@ review findings fixed; e2e 204/0; deploy #14 green — functions + frontend
 live; 0113 already applied so unread dots are real from day one). NOW:
 **Slice 3 SHIPPED 2026-07-17** — rosters as list views + pipeline Path/
 Board⇄Table/record header (362e00f; approved "go ahead"; 20 review findings
-fixed; e2e 258/0; frontend-only → Netlify). NOW: slice 4 — client portal
-(context bar, Home queue + project cards w/ mini Path, project drill-in as a
-record page; in progress). Then 5 (portal Messages split view), 6 (inbound
-email), 7 (nav), **8 (CRM analytics dashboard — ADDED by Eric 2026-07-16
-"yes please"; spec §7.8; research + mockups + decision points before code,
-runs last).**
+fixed; e2e 258/0; frontend-only → Netlify). **Slice 4 SHIPPED 2026-07-17** —
+client portal context bar + Home queue + project record pages (8b13a60;
+approved "approved continue"; 22 review findings fixed incl. the
+message-attribution fix via events detail.from; e2e 285/0; frontend-only →
+Netlify). NOW: slice 5 — portal Messages split view (in progress). Then 6
+(inbound email — Resend Inbound webhook + Eric's ~15-min dashboard step),
+7 (nav context bar both shells), **8 (CRM analytics dashboard — ADDED by Eric
+2026-07-16 "yes please"; spec §7.8; research + mockups + decision points
+before code, runs last).**
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
