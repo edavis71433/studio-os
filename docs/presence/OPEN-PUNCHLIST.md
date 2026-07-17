@@ -150,11 +150,16 @@ fixed; e2e 258/0; frontend-only → Netlify). **Slice 4 SHIPPED 2026-07-17** —
 client portal context bar + Home queue + project record pages (8b13a60;
 approved "approved continue"; 22 review findings fixed incl. the
 message-attribution fix via events detail.from; e2e 285/0; frontend-only →
-Netlify). NOW: slice 5 — portal Messages split view (in progress). Then 6
-(inbound email — Resend Inbound webhook + Eric's ~15-min dashboard step),
-7 (nav context bar both shells), **8 (CRM analytics dashboard — ADDED by Eric
-2026-07-16 "yes please"; spec §7.8; research + mockups + decision points
-before code, runs last).**
+Netlify). **Slice 5 SHIPPED 2026-07-17** — portal Messages split view
+(033f082; approved "Approved"; 24 findings → 13 fixes incl. three additive
+backend upgrades: real support-reply attribution via `from`, support
+last_activity_at recency, own-send notifications excluded; e2e 321/0;
+deploy #15 green — functions + frontend). NOW: slice 6 — inbound email
+(Resend Inbound webhook; in progress; needs Eric's ~15-min Resend dashboard
+step + RESEND_INBOUND_SECRET AFTER it merges — runbook will be at
+docs/presence/INBOUND-EMAIL-SETUP.md). Then 7 (nav context bar both shells),
+**8 (CRM analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec
+§7.8; research + mockups + decision points before code, runs last).**
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
