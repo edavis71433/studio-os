@@ -41,7 +41,7 @@ Common ground that made a shell cheap: all pages already share one auth (`dds-po
 - **Notifications** — a bell that lazily reads `/portal/feed` (pending approvals + moments) — *reuses* the existing "needs a look," not a new system.
 - **Profile / context menu** — signed-in email, role · edition, agency portfolio (if agency), operator/admin tools (if operator), Help, Support, Sign out.
 - **Workspace switcher / agency client switcher / org selector / dev-mode entry** — all expressed *through* buildNav + the context menu (agency portfolio link; developer entry appears in Settings when entitled; operator tools when operator). Adaptation is buildNav's job, not a parallel system.
-- **Mobile** — a hamburger drawer with the same nav.
+- **Mobile** — the waffle App Launcher opens a full-screen sheet with the same nav.
 
 **Removed duplicates:** the three `.appnav` strips (today/connections/visual-studio). **Promoted:** the CRM ("Relationship") into buildNav's Today section — no more doorway-only hidden capability. `presence.html`'s `rooms`/`dock` were **kept** (intentional editor navigation, not cross-workspace chrome).
 
@@ -88,7 +88,7 @@ The shell is built to extend without a nav redesign:
 
 - **Browser:** shipped.
 - **Desktop:** the same fixed top bar + palette is a native-window-friendly pattern; a desktop wrapper hosts the same pages.
-- **Mobile:** the hamburger drawer + responsive bar already carry the full nav; the palette works touch-first.
+- **Mobile:** the waffle App Launcher sheet + responsive bar already carry the full nav; the palette works touch-first.
 
 Because navigation is **data** (buildNav) and the shell is a thin renderer, a future native surface consumes the same `/portal/context.nav` — the IA doesn't get re-authored per platform. (Native packaging itself is out of scope — a later milestone.)
 

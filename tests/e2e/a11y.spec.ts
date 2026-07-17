@@ -26,6 +26,47 @@ test.describe('Accessibility', () => {
     });
   }
 
+  // Slice 7 surfaces get scanned OPEN — a closed popover is display:none and
+  // invisible to axe, so these are the only scans that actually cover them.
+  test('no serious/critical axe violations with the App Launcher panel open (leads.html)', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/leads.html');
+    await page.waitForLoadState('networkidle');
+    await page.locator('#dds-waffle').click();
+    await expect(page.locator('#dds-drawer')).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+  });
+
+  test('no serious/critical axe violations with the Customers dropdown open (leads.html)', async ({ page }) => {
+    // a multi-item Customers section (the real buildNav shape) so the context
+    // bar renders the caret dropdown under test
+    const nav = [
+      { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
+      { key: 'customers', label: 'Customers', items: [
+        { key: 'customers', label: 'Customers', href: '/customers.html' },
+        { key: 'leads', label: 'Enquiries', href: '/leads.html' },
+        { key: 'contacts', label: 'Contacts', href: '/contacts.html' },
+        { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
+      ] },
+      { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
+    ];
+    await installApp(page, { api: { '/portal/context': { data: {
+      site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+      edition_features: ['website', 'forms', 'relationship', 'reports'], is_agency: false, is_operator: false,
+      sees_full_workspace: true, capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html',
+      attention_count: 0, nav,
+    } } } });
+    await page.goto('/leads.html');
+    await page.waitForLoadState('networkidle');
+    await page.locator('.dds-nav .sec > button[data-sec="customers"]').click();
+    await expect(page.locator('.dds-nav .sec.open .menu')).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+  });
+
   test('shell controls carry accessible names', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');

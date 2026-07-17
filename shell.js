@@ -65,15 +65,20 @@
   // hrefs are full record URLs (identity params included) — rendered as-is,
   // never re-scoped by withScope.
   var RECENTS_KEY = 'dds-recent-records';
+  // Strict same-origin-path guard: a single leading '/', NOT '//host' (protocol-
+  // relative) and NOT '/\host' (backslash tricks). Applied on WRITE (pushRecent),
+  // on READ (readRecents — localStorage is user-tamperable/legacy), and in
+  // withScope so no scheme-carrying href ever renders as a live shell link.
+  var SAFE_HREF = /^\/(?![/\\])/;
   function readRecents() {
     try {
       var a = JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
-      return Array.isArray(a) ? a.filter(function (r) { return r && r.label && r.href; }).slice(0, 5) : [];
+      return Array.isArray(a) ? a.filter(function (r) { return r && r.label && typeof r.href === 'string' && SAFE_HREF.test(r.href); }).slice(0, 5) : [];
     } catch (_) { return []; }
   }
   function pushRecent(label, href) {
     label = String(label == null ? '' : label).trim(); href = String(href == null ? '' : href);
-    if (!label || href.charAt(0) !== '/') return;
+    if (!label || !SAFE_HREF.test(href)) return;
     try {
       var list = readRecents().filter(function (r) { return r.href !== href; });
       list.unshift({ label: label, href: href, at: Date.now() });
@@ -116,7 +121,7 @@
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function scopeId() { try { var v = new URLSearchParams(location.search).get('client') || ''; return UUID_RE.test(v) ? v : ''; } catch (_) { return ''; } }
   function withScope(href) {
-    var s = scopeId(); if (!s || !href || href.charAt(0) !== '/') return href;
+    var s = scopeId(); if (!s || !href || !SAFE_HREF.test(href)) return href;
     var hash = '', h = href, hi = h.indexOf('#'); if (hi >= 0) { hash = h.slice(hi); h = h.slice(0, hi); }
     return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(s) + hash;
   }
@@ -165,29 +170,66 @@
   var root, sb, CTX = null, DESTS = [];
   function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
 
-  function brandCtxLabel(nav, activeKey) {
+  function brandCtxLabel(nav, sectionKey) {
     var lbl = '';
-    (nav || []).forEach(function (s) { (s.items || []).forEach(function (i) { if (i.key === activeKey) lbl = s.label; }); });
+    (nav || []).forEach(function (s) { if (s.key === sectionKey) lbl = s.label; });
     return lbl;
   }
 
+  // Section-level active state (the underline) is SEPARATE from item-level
+  // aria-current: a record page (/crm.html) is Customers WORK, so the Customers
+  // section underlines — but no item link gets `here`/aria-current there,
+  // because the operator is not ON any of those pages (screen-reader honesty).
+  function activeSectionKey(nav, itemKey) {
+    var k = null;
+    (nav || []).forEach(function (s) { if ((s.items || []).some(function (i) { return i.key === itemKey; })) k = s.key; });
+    if (!k && normalizePath(location.pathname) === '/crm' && (nav || []).some(function (s) { return s.key === 'customers'; })) k = 'customers';
+    return k;
+  }
+
   var UTILS = [];
+  // The body of a multi-item section's dropdown. Factored out so the Customers
+  // caret can REBUILD it each time it opens (recents re-read from localStorage —
+  // the record you just opened shows up without a reload; cross-tab too).
+  function sectionMenuHtml(sec, activeKey) {
+    var items = sec.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('');
+    // The Customers caret also lists RECENT RECORDS (⌘K/crm.html opens,
+    // localStorage-cached — see pushRecent) + quick actions. Recents hrefs are
+    // full record URLs (they already carry their identity params), so they are
+    // NOT re-scoped; data-noscope keeps carryScopeGlobally's rewrite pass off
+    // them too — a recent must navigate exactly as originally addressed.
+    if (sec.key === 'customers') {
+      var recents = readRecents();
+      if (recents.length) {
+        items += '<div class="grp">Recent</div>' + recents.map(function (r) {
+          return '<a class="rec" data-noscope="1" href="' + esc(r.href) + '">' + esc(r.label) + '</a>';
+        }).join('');
+      }
+      // "+ New deal" links plain /pipeline.html — pipeline.html has no ?new=1
+      // handling today (verified), so the link opens the pipeline where the
+      // + New deal button sits, rather than carrying a dead parameter.
+      items += '<div class="grp">Quick actions</div>' +
+        '<a class="qa" href="' + esc(withScope('/pipeline.html')) + '">+ New deal</a>' +
+        '<a class="qa" href="' + esc(withScope('/contacts.html')) + '">+ Contact</a>';
+    }
+    return items;
+  }
   function render() {
     var nav = (CTX && CTX.nav) || [];
     var activeKey = activeItemKey(location.pathname, nav);
     // Slice 7 (context bar): crm.html is never IN the nav (records open from
-    // rosters/⌘K), but a record page is Customers work — keep the Customers
-    // item lit so the flat bar never reads "nowhere". Local presentation fix;
-    // the pure activeItemKey mirror of lib/shell.ts stays byte-identical.
-    if (!activeKey && normalizePath(location.pathname) === '/crm') {
-      nav.forEach(function (s) { if (s.key === 'customers' && s.items && s.items.length) activeKey = s.items[0].key; });
-    }
+    // rosters/⌘K), but a record page is Customers work — activeSectionKey keeps
+    // the Customers SECTION lit (underline) so the flat bar never reads
+    // "nowhere", while item-level `here`/aria-current stays honest (only a
+    // genuine item href match earns it). The pure activeItemKey mirror of
+    // lib/shell.ts stays byte-identical.
+    var secKey = activeSectionKey(nav, activeKey);
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
     // Architecture v1.0: the primary bar is outcomes only; utility sections
     // (Connections, Settings, Help) render in the profile/overflow menu.
     var primary = nav.filter(function (s) { return !s.utility; });
     UTILS = nav.filter(function (s) { return s.utility; });
-    var ctxLabel = brandCtxLabel(nav, activeKey);
+    var ctxLabel = brandCtxLabel(nav, secKey);
     var att = (CTX && CTX.attention_count) || 0;   // Phase FLOW: bell badge from context (no extra request)
 
     // ── Lightning context bar (salesforce-reference §11.5): each nav SECTION is
@@ -197,31 +239,13 @@
     // hover), with the slice-2 popup contract (Escape/arrows/outside-click).
     var navHtml = primary.map(function (sec) {
       var single = sec.items.length === 1;
-      var isActive = sec.items.some(function (i) { return i.key === activeKey; });
+      var isActive = sec.key === secKey;                                              // section-level: the underline
+      var hasItem = sec.items.some(function (i) { return i.key === activeKey; });     // item-level: a genuine href match
       if (single) {
         var it = sec.items[0];
-        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (isActive ? ' aria-current="page"' : '') + '>' + esc(sec.label) + '</a></div>';
+        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + esc(sec.label) + '</a></div>';
       }
-      var items = sec.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('');
-      // The Customers caret also lists RECENT RECORDS (⌘K/crm.html opens,
-      // localStorage-cached — see pushRecent) + quick actions. Recents hrefs are
-      // full record URLs (they already carry their identity params), so they are
-      // NOT re-scoped; nav links keep going through withScope.
-      if (sec.key === 'customers') {
-        var recents = readRecents();
-        if (recents.length) {
-          items += '<div class="grp">Recent</div>' + recents.map(function (r) {
-            return '<a class="rec" href="' + esc(r.href) + '">' + esc(r.label) + '</a>';
-          }).join('');
-        }
-        // "+ New deal" links plain /pipeline.html — pipeline.html has no ?new=1
-        // handling today (verified), so the link opens the pipeline where the
-        // + New deal button sits, rather than carrying a dead parameter.
-        items += '<div class="grp">Quick actions</div>' +
-          '<a class="qa" href="' + esc(withScope('/pipeline.html')) + '">+ New deal</a>' +
-          '<a class="qa" href="' + esc(withScope('/contacts.html')) + '">+ Contact</a>';
-      }
-      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (isActive ? ' aria-current="true"' : '') + '>' + esc(sec.label) + ' <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + items + '</div></div>';
+      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (hasItem ? ' aria-current="true"' : '') + '>' + esc(sec.label) + ' <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
     }).join('');
 
     // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
@@ -273,21 +297,51 @@
     });
   }
 
+  var docWired = false;   // wire() may run again on a re-render — document-level listeners register ONCE
   function wire(nav) {
     // section dropdowns — click-invoked (never hover), slice-2 popup contract:
-    // opening focuses the first item, arrows move, Escape closes back to the
-    // trigger, outside clicks close via the document-level listener below.
+    // a keyboard invocation focuses the first item (pointer clicks leave focus
+    // on the trigger — menu-button pattern), arrows move, Escape closes back to
+    // the trigger, outside clicks close via the document-level listener below.
     root.querySelectorAll('.dds-nav .sec > button[data-sec]').forEach(function (b) {
+      var sec = b.parentNode;
+      function openSec(focusFirst) {
+        closeAllLayers();
+        // the Customers caret re-reads recents each OPEN — the record you just
+        // opened (this tab or another) appears without a reload
+        if (b.getAttribute('data-sec') === 'customers') {
+          var cs = null; (nav || []).forEach(function (x) { if (x.key === 'customers') cs = x; });
+          var m0 = sec.querySelector('.menu');
+          if (cs && m0) m0.innerHTML = sectionMenuHtml(cs, activeItemKey(location.pathname, nav));
+        }
+        sec.classList.add('open'); b.setAttribute('aria-expanded', 'true');
+        if (focusFirst) { var f = sec.querySelector('.menu a'); if (f) f.focus(); }
+      }
       b.addEventListener('click', function (e) {
         e.stopPropagation();
-        var sec = b.parentNode; var wasOpen = sec.classList.contains('open');
-        closeMenus(); closeDrawer();
-        if (!wasOpen) {
-          sec.classList.add('open'); b.setAttribute('aria-expanded', 'true');
-          var f = sec.querySelector('.menu a'); if (f) f.focus();
-        }
+        var wasOpen = sec.classList.contains('open');
+        closeAllLayers();
+        // e.detail === 0 → keyboard activation (Enter/Space): move focus into the
+        // menu. A pointer click keeps focus on the trigger (menu-button pattern).
+        if (!wasOpen) openSec(e.detail === 0);
       });
-      var menu = b.parentNode.querySelector('.menu');
+      // ArrowDown from the trigger opens the menu (if needed) and enters it
+      b.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        if (!sec.classList.contains('open')) openSec(true);
+        else { var f = sec.querySelector('.menu a'); if (f) f.focus(); }
+      });
+      // focus leaving the section (menu AND trigger) closes it — no stuck-open
+      // panel after Tab-out. Never steals focus back on this path. relatedTarget
+      // is null when focus leaves the document — close then too.
+      sec.addEventListener('focusout', function (e) {
+        if (!sec.classList.contains('open')) return;
+        var to = e.relatedTarget;
+        if (to && sec.contains(to)) return;   // focus moved WITHIN the section — keep open
+        sec.classList.remove('open'); b.setAttribute('aria-expanded', 'false');
+      });
+      var menu = sec.querySelector('.menu');
       if (menu) menu.addEventListener('keydown', function (e) {
         var links = [].slice.call(menu.querySelectorAll('a'));
         var i = links.indexOf(document.activeElement);
@@ -296,12 +350,15 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); if (links.length) links[Math.max(i - 1, 0)].focus(); }
       });
     });
-    document.addEventListener('click', closeMenus);
     // search
     var s = document.getElementById('dds-search');
     s.addEventListener('click', openPalette);
     s.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPalette(); } });
-    document.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); } });
+    if (!docWired) {
+      docWired = true;
+      document.addEventListener('click', closeMenus);
+      document.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); } });
+    }
     // bell + profile
     document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(); });
     document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(); });
@@ -310,21 +367,30 @@
     var helpTrig = document.getElementById('dds-help');
     if (helpTrig) helpTrig.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); toggleHelp(); });
     // waffle App Launcher — CLICK-invoked; the panel is the drawer element
-    document.getElementById('dds-waffle').addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); toggleDrawer(nav, 'dds-waffle'); });
+    document.getElementById('dds-waffle').addEventListener('click', function (e) { e.stopPropagation(); toggleDrawer(nav, 'dds-waffle'); });
     // create the (closed) panel now so aria-controls="dds-drawer" always
     // references a real element, not a lazily-created one
     ensureDrawer();
   }
   function closeMenus() {
+    if (!root || !root.querySelectorAll) return;
     root.querySelectorAll('.dds-nav .sec.open').forEach(function (s) {
       s.classList.remove('open');
       var b = s.querySelector('button[data-sec]'); if (b) b.setAttribute('aria-expanded', 'false');
     });
   }
+  // ── layer mutual exclusion: the shell has five floating layers (section
+  // dropdowns, bell popover, profile menu, help panel, App Launcher drawer).
+  // Opening ANY of them closes all the others — never two at once. (The ⌘K
+  // palette is a modal overlay above them; it closes them on open instead.)
+  function closeAllLayers() {
+    closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer();
+  }
 
   // ── command palette ──
   var pal;
   function openPalette() {
+    closeAllLayers();   // the palette is the front-most layer — no stacking under it
     if (!pal) {
       pal = el('<div class="dds-palette"><div class="box" role="dialog" aria-modal="true" aria-label="Search Studio OS"><input placeholder="Search Studio OS…" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="dds-pal-list" aria-autocomplete="list"><div class="results" id="dds-pal-list" role="listbox" aria-label="Results"></div></div></div>');
       document.body.appendChild(pal);
@@ -402,8 +468,8 @@
   var notif;
   function setExpanded(id, open) { var b = document.getElementById(id); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
   function toggleNotifications() {
-    closeProfile();
     if (notif && notif.classList.contains('open')) { notif.classList.remove('open'); setExpanded('dds-bell', false); return; }
+    closeAllLayers();
     if (!notif) { notif = el('<div class="dds-pop" role="region" aria-label="Notifications"><h4>Needs a look</h4><div class="body"><div class="muted">Loading…</div></div></div>'); document.body.appendChild(notif); notif.addEventListener('click', function (e) { e.stopPropagation(); }); }
     notif.classList.add('open');
     setExpanded('dds-bell', true);
@@ -447,8 +513,8 @@
   var HELP_CHIP = 'font:inherit;font-size:12.5px;margin:3px 4px 0 0;padding:4px 11px;border-radius:999px;border:1px solid var(--dds-line,#ddd);background:transparent;color:inherit;cursor:pointer';
   var HELP_LINK = 'display:inline-block;margin:6px 8px 0 0;font-weight:600;font-size:13px;color:var(--dds-accent,#5b3fa0);text-decoration:none';
   function toggleHelp() {
-    closeNotifications(); closeProfile();
     if (help && help.classList.contains('open')) { closeHelp(); return; }
+    closeAllLayers();
     if (!help) {
       help = el('<div class="dds-pop" role="region" aria-label="Help — how do I…?"><h4>How do I…?</h4>' +
         '<input id="dds-help-q" type="text" placeholder="Ask a question — e.g. change my hours" aria-label="Ask a how-to question" autocomplete="off" style="' + HELP_IN + '">' +
@@ -498,8 +564,8 @@
   // ── profile / context menu (role, edition, agency, sign out) ──
   var prof;
   function toggleProfile() {
-    closeNotifications();
     if (prof && prof.classList.contains('open')) { prof.classList.remove('open'); setExpanded('dds-profile', false); return; }
+    closeAllLayers();
     if (!prof) { prof = el('<div class="dds-pop" role="region" aria-label="Account menu"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); }
     setExpanded('dds-profile', true);
     var email = (sb && sb.__email) || 'Signed in';
@@ -537,7 +603,12 @@
     // Sign out to the RIGHT door: clients back to the client door, everyone else
     // (owners, team, agency) to the Studio OS door.
     var door = ((CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client)) ? '/portal.html' : '/studio.html';
-    if (so) so.addEventListener('click', function (e) { e.preventDefault(); if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door; });
+    if (so) so.addEventListener('click', function (e) {
+      e.preventDefault();
+      // PII: recent-record names must not persist for the next user of a shared machine
+      try { localStorage.removeItem(RECENTS_KEY); } catch (_) { /* */ }
+      if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door;
+    });
   }
   function closeProfile() { if (prof) prof.classList.remove('open'); setExpanded('dds-profile', false); }
   document.addEventListener('click', function () { closeNotifications(); closeProfile(); closeHelp(); });
@@ -618,6 +689,16 @@
       e.preventDefault();
       if (links.length) links[e.key === 'ArrowDown' ? Math.min(i + 1, links.length - 1) : Math.max(i - 1, 0)].focus();
     });
+    // focus Tabbing out of the panel closes it (no stuck-open panel + stale
+    // aria-expanded). Focus is NOT stolen back on this path. relatedTarget is
+    // null when focus leaves the document — close then too; a move INTO the
+    // panel (or onto either trigger — its click handles the toggle) keeps it.
+    drawer.addEventListener('focusout', function (e) {
+      if (!drawer.classList.contains('open')) return;
+      var to = e.relatedTarget;
+      if (to && (drawer.contains(to) || to.id === 'dds-waffle' || to.id === 'dds-mbar-menu')) return;
+      closeDrawer();
+    });
     document.body.appendChild(drawer);
   }
   function closeDrawer() {
@@ -636,10 +717,14 @@
   document.addEventListener('click', closeDrawer);
   function toggleDrawer(nav, openerId) {
     if (drawer && drawer.classList.contains('open')) { closeDrawer(); return; }
+    closeAllLayers();
     drawerOpener = openerId || 'dds-waffle';
     var activeKey = activeItemKey(location.pathname, nav);
+    // same split as the bar: the SECTION marks active (heading emphasis — covers
+    // /crm.html record pages), item aria-current only on a genuine href match
+    var secKey = activeSectionKey(nav, activeKey);
     var html = (nav || []).map(function (s) {
-      return '<div class="g"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
+      return '<div class="g' + (s.key === secKey ? ' active' : '') + '"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
     ensureDrawer();
     drawer.innerHTML = html; drawer.classList.add('open');
@@ -657,7 +742,10 @@
     var s = scopeId(); if (!s) return;
     document.querySelectorAll('a[href^="/"]').forEach(function (a) {
       var h = a.getAttribute('href') || '';
-      if (!APP_PAGES.test(h) || h.indexOf('client=') >= 0) return;
+      // data-noscope: the anchor addresses a specific record exactly as cached
+      // (the Customers caret's recents) — re-scoping it would resolve the record
+      // against the wrong tenant. Skip; a recent navigates as originally stored.
+      if (a.hasAttribute('data-noscope') || !APP_PAGES.test(h) || h.indexOf('client=') >= 0) return;
       a.setAttribute('href', withScope(h));
     });
   }
@@ -783,6 +871,7 @@
       { sel: ['.dds-nav .sec > [data-href^="/today"]', '#dds-mbar a[href^="/today"]'], title: 'Today', text: 'This is Today — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
       { sel: ['.dds-nav .sec > button[data-sec="website"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives in this group — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
       { sel: ['.dds-nav .sec > button[data-sec="customers"]'], title: 'Customers', text: 'Enquiries, contacts, and your pipeline — the people side of your business, all in one place.' },
+      { sel: ['#dds-waffle'], title: 'App Launcher', text: 'Every part of your studio, one tap — the full list of destinations, grouped and always within reach.' },
       { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
       { sel: ['#dds-profile'], title: 'Your account', text: 'Notifications, light or dark appearance, settings, and help live here — and you can take this tour again any time.' }
     ];

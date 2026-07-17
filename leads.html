@@ -94,7 +94,7 @@ function render(){
         <h1 id="pagehead" tabindex="-1">Website enquiries</h1>
         <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
       </div>
-      <div class="lmeta">${ALL.length} enquir${ALL.length===1?'y':'ies'}${unread?` · ${unread} new`:''} · ${esc(updatedLabel())}</div>
+      <div class="lmeta">${rows.length} enquir${rows.length===1?'y':'ies'}${unread?` · ${unread} new`:''} · ${esc(updatedLabel())}</div>
     </header>
     <div class="filters" role="tablist" aria-label="Filter enquiries">
       <button role="tab" aria-selected="${FILTER==='open'?'true':'false'}" data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
@@ -134,10 +134,13 @@ function wire(){
   // replying to a lead auto-marks it read — no manual bookkeeping
   document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&l.status==='new')setStatus(id,'read',true);}));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
-  // list-view refresh (slice 7 header polish) — re-load, then return focus to the
-  // control (the rosters' pattern); a failed refresh toasts, never an unhandled reject
-  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.')));
-  const rt=$('retry');if(rt)rt.addEventListener('click',load);
+  // list-view refresh (slice 7 header polish) — re-load in SOFT mode (a failed
+  // refresh toasts and keeps the current list — never the full-page error that
+  // would destroy the list and the button), then return focus to the control
+  // (the rosters' pattern). NOTE: load must be wrapped, never passed as the
+  // handler — the click event would become its soft flag.
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.')));
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
 }
 async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();
   // a11y: render() rebuilt #main and dropped focus — return it to the same lead's
@@ -161,8 +164,18 @@ async function createDeal(id){
   }catch(_){toast('Couldn’t start that deal.');}
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
-async function load(){const r=await api('/forms/inbox');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Enquiries live in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}ALL=(r.body.data&&r.body.data.submissions)||[];LOADED_AT=Date.now();render();}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
+// soft=true (the refresh button): any failure keeps the current list and toasts —
+// the full-page error screens are for the initial load only.
+async function load(soft){
+  let r; try{r=await api('/forms/inbox');}catch(_){r={ok:false,status:0,body:{}};}
+  if(!r.ok){
+    if(soft){toast('Couldn’t refresh just now.');return;}
+    if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Enquiries live in your studio workspace.</h2></div>`;return;}
+    trouble();return;
+  }
+  ALL=(r.body.data&&r.body.data.submissions)||[];LOADED_AT=Date.now();render();
+}
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>
 </body>

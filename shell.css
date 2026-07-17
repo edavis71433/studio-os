@@ -108,12 +108,22 @@ html.dds-has-shell body{padding-top:var(--dds-shell-h)}
    waffle is nav chrome too — hide it with them so iframes stay clean */
 html.dds-embed .dds-waffle{display:none!important}
 .dds-waffle .wic{display:block;width:17px;height:17px;background-image:radial-gradient(circle at 3px 3px,currentColor 1.7px,transparent 2.05px);background-size:6px 6px}
+/* Windows High Contrast strips CSS background images — without this the waffle
+   is a blank button (the old burger was a text glyph). Draw the grid as a text
+   glyph in currentColor instead; normal-mode visuals are untouched. */
+@media (forced-colors:active){
+  .dds-waffle .wic{background-image:none}
+  .dds-waffle .wic::before{content:"⠿";display:block;font-size:17px;line-height:17px;color:currentColor}
+}
 .dds-drawer{position:fixed;inset:var(--dds-shell-h) 0 0 0;background:var(--dds-bg);z-index:2147482999;padding:16px;overflow:auto;display:none}
 .dds-drawer.open{display:block}
 .dds-drawer .g{margin-bottom:16px}
 .dds-drawer .g .t{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dds-faint);margin:0 0 6px}
 .dds-drawer .g a{display:block;font-size:16px;color:var(--dds-ink);text-decoration:none;padding:11px 8px;border-radius:9px}
 .dds-drawer .g a.here{color:var(--dds-p);font-weight:600;background:var(--dds-p-soft)}
+/* section-level active (same split as the bar): the group heading gets the
+   emphasis on record pages (/crm.html), where no item earns aria-current */
+.dds-drawer .g.active .t{color:var(--dds-p)}
 @media (min-width:761px){
   .dds-drawer{inset:auto;top:calc(var(--dds-shell-h) + 6px);left:12px;width:min(720px,calc(100vw - 24px));
     max-height:calc(100vh - var(--dds-shell-h) - 18px);max-height:calc(100dvh - var(--dds-shell-h) - 18px);
@@ -123,7 +133,7 @@ html.dds-embed .dds-waffle{display:none!important}
   .dds-drawer .g{break-inside:avoid;margin-bottom:14px}
   .dds-drawer .g a{font-size:13.5px;padding:7px 8px}
 }
-@media (max-width:760px){
+@media (max-width:760.98px){
   .dds-nav{display:none}
   .dds-brand .ctx{display:none}
 }
@@ -201,7 +211,7 @@ html.dds-embed .dds-waffle{display:none!important}
 
 /* ── mobile bottom bar (shell.js mountMobileBar) — phones only ── */
 #dds-mbar{display:none}
-@media (max-width:760px){
+@media (max-width:760.98px){
   /* Above the drawer (2147482999) so Menu can CLOSE what it opened; the drawer
      leaves the bottom strip usable. */
   #dds-mbar{position:fixed;bottom:0;left:0;right:0;z-index:2147483000;display:flex;background:var(--dds-card,#fff);border-top:1px solid var(--dds-line,#eee9e0);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 16px rgba(27,21,37,.12)}
@@ -239,7 +249,7 @@ html.dds-embed .dds-waffle{display:none!important}
 
 /* 2) iOS focus-zoom: any sub-16px form control zooms the page on focus. Floor
       every control to 16px on phones — cross-cutting, zero-risk. */
-@media (max-width:760px){
+@media (max-width:760.98px){
   input:not([type=checkbox]):not([type=radio]),textarea,select{ font-size:16px !important; }
 }
 
@@ -257,21 +267,21 @@ html.dds-embed .dds-waffle{display:none!important}
 /* 4) Minimum touch target (WCAG 2.5.8) on phones — one central floor kills the
       ~26–32px offenders across pages. On phones the shell chrome icons
       (bell/profile/help/burger — the most-tapped controls) get the floor too. */
-@media (max-width:760px){
+@media (max-width:760.98px){
   .btn,a.btn,a.act,a.reply,.chip,button.pri,[role="button"]:not(.dds-ic):not(.dds-waffle){ min-height:44px; }
   .dds-ic{ width:44px; height:44px; }
 }
 
 /* 5) Page-local toasts sit behind the mobile bar; lift them centrally (shell.css
       loads only on app pages, so this is scoped to the app). */
-@media (max-width:760px){
+@media (max-width:760.98px){
   .toast{ bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important; }
 }
 
 /* 6) No horizontal scroll at 360px: long unbroken strings (emails, URLs, file
       names) inside content containers must wrap instead of pushing the page
       wide. `anywhere` only breaks when a token would otherwise overflow. */
-@media (max-width:760px){
+@media (max-width:760.98px){
   .card,.item,.lead,.rowitem,.note,.answer,.panel,.client,.ev{ overflow-wrap:anywhere; }
 }
 

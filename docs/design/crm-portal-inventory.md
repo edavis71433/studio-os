@@ -72,7 +72,7 @@ One scrolling column (max-width 680px), sections in a fixed order (`render` `:10
 - Opening the inbox marks notifications read/clears the bell (`:301`).
 
 ### 1g. Shell chrome — `shell.js` (950 lines)
-- Top bar: burger · brand (or scoped breadcrumb "Studio › {client}", `:157-161`) · dropdown nav sections · **Search ⌘K** pill · bell (badge = `attention_count` from `/portal/context`) · help (?) · profile menu (`render` `:134-176`). Mobile bottom bar: Home · Inbox (badge) · Menu (`:180-201`).
+- Top bar: waffle App Launcher · brand (or scoped breadcrumb "Studio › {client}", `:157-161`) · dropdown nav sections · **Search ⌘K** pill · bell (badge = `attention_count` from `/portal/context`) · help (?) · profile menu (`render` `:134-176`). Mobile bottom bar: Home · Inbox (badge) · Menu (`:180-201`).
 - **Command palette / global search** (`:233-299`): filters nav destinations locally; when the query ≥2 chars *and* the nav has a customers section (`hasCrm()` `:299`), it additionally fans out to **`GET /crm/search?q=`** (records) and `GET /assets?q=` (files) — explicitly "the Salesforce global-search pattern" (`:272-274`) — merging record rows (label + sub "Record") and file rows into the same listbox.
 - Bell popover reuses `/portal/feed` (notices, approvals, moments) and footers into the Inbox (`:304-337`).
 - Scope carry (`withScope`, `carryScopeGlobally` `:520-543`) rewrites every app link (incl. `/crm|contacts|pipeline|leads|inbox`) to keep `?client=`.

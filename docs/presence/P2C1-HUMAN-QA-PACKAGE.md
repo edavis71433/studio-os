@@ -60,7 +60,7 @@ Leave it running. It prints:
 |---|---|
 | No horizontal page scroll on any of the 3 pages | Content fits |
 | Cards, dialogs, and inline forms are tappable and fit the width | Usable one-handed |
-| Shell mobile drawer (☰) opens; nav works | Opens, navigable |
+| Shell mobile sheet (waffle App Launcher / bottom-bar Menu) opens; nav works | Opens, navigable |
 
 ### D. Keyboard only (no mouse)
 | Check | Expected |

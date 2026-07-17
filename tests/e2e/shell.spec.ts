@@ -126,15 +126,21 @@ test.describe('Context bar (slice 7)', () => {
     for (const label of ['Today', 'Website', 'Business info', 'Design', 'Publish', 'History', 'Customers', 'Files', 'Visual Studio', 'Analytics', 'Inbox', 'Connections', 'Settings', 'Help']) {
       await expect(panel).toContainText(label);
     }
+    // …and each is a real LINK (anchor with an href), not just text in the panel
+    for (const label of ['Today', 'Website', 'Business info', 'Design', 'Publish', 'History', 'Customers', 'Files', 'Visual Studio', 'Analytics', 'Inbox', 'Connections', 'Settings', 'Help']) {
+      await expect(panel.getByRole('link', { name: label, exact: true })).toHaveAttribute('href', /.+/);
+    }
     // slice-2 popup contract: Escape closes and returns focus to the trigger
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(waffle).toBeFocused();
+    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
     // outside click closes too (a click anywhere that isn't the panel/trigger)
     await waffle.click();
     await expect(panel).toBeVisible();
     await page.evaluate(() => document.body.click());
     await expect(panel).toBeHidden();
+    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('waffle panel links carry the operator drill-in scope', async ({ page }, testInfo) => {
@@ -165,7 +171,9 @@ test.describe('Context bar (slice 7)', () => {
     await btn.click();                                       // CLICK-invoked, never hover
     await expect(menu).toBeVisible();
     await expect(btn).toHaveAttribute('aria-expanded', 'true');
-    await expect(menu.locator('a').first()).toBeFocused();   // opening focuses the first item
+    await expect(btn).toBeFocused();                         // a POINTER click leaves focus on the trigger (menu-button pattern)
+    await page.keyboard.press('ArrowDown');                  // ArrowDown from the trigger enters the menu
+    await expect(menu.locator('a').first()).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(menu.locator('a').nth(1)).toBeFocused();    // arrows move
     await page.keyboard.press('ArrowUp');
@@ -174,10 +182,33 @@ test.describe('Context bar (slice 7)', () => {
     await expect(menu).toBeHidden();
     await expect(btn).toBeFocused();
     await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('Enter');                      // a KEYBOARD invocation moves focus into the menu
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('a').first()).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
     await btn.click();
     await expect(menu).toBeVisible();
     await page.evaluate(() => document.body.click());        // outside click closes
     await expect(menu).toBeHidden();
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('focus Tabbing out of an open dropdown closes it without stealing focus back', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the flat bar is hidden on phones');
+    await installApp(page, { api: { '/portal/context': crmCtx() } });
+    await page.goto('/today.html');
+    const btn = page.locator('.dds-nav .sec > button[data-sec="customers"]');
+    const menu = page.locator('.dds-nav .sec:has(button[data-sec="customers"]) .menu');
+    await btn.click();
+    await page.keyboard.press('ArrowDown');                  // enter the menu…
+    await expect(menu.locator('a').first()).toBeFocused();
+    // …Tab past the last item until focus leaves the section entirely
+    const links = await menu.locator('a').count();
+    for (let i = 0; i < links + 1; i++) await page.keyboard.press('Tab');
+    await expect(menu).toBeHidden();                         // closed on focus-out
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await expect(btn).not.toBeFocused();                     // focus was NOT stolen back
   });
 
   test('the Customers caret lists quick actions (+ New deal → pipeline, + Contact → contacts)', async ({ page }, testInfo) => {
@@ -212,6 +243,11 @@ test.describe('Context bar (slice 7)', () => {
     await installApp(page, { api: {
       '/portal/context': crmCtx(),
       '/crm/search': { data: { results: [{ label: 'Lea Chan', href: '/crm.html?client_id=c-lea', sub: 'Customer' }] } },
+      // the record page renders the SAME name into #pagehead — shell.js's
+      // trackCrmRecent poll (the second recents write path) then agrees with the
+      // palette write byte-for-byte, so the entry is deterministic however the
+      // poll races the assertions below.
+      '/crm/record': { data: { header: { name: 'Lea Chan', status: 'customer' }, sections: { details: true }, identity: {} } },
     } });
     await page.goto('/today.html');
     await expect(page.locator('#dds-search')).toBeVisible();
@@ -230,6 +266,89 @@ test.describe('Context bar (slice 7)', () => {
     const menu = page.locator('.dds-nav .sec:has(button[data-sec="customers"]) .menu');
     await expect(menu).toContainText('Recent');
     await expect(menu.locator('a.rec', { hasText: 'Lea Chan' })).toHaveAttribute('href', '/crm.html?client_id=c-lea');
+  });
+
+  test('a Recent record is exempt from scope-carry — it navigates exactly as stored', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the caret dropdown is a desktop surface');
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: {
+      '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } },
+    } });
+    // an UNSCOPED recent (cached while not drilled in) — must stay unscoped
+    await page.addInitScript(() => localStorage.setItem('dds-recent-records',
+      JSON.stringify([{ label: 'Nina Okafor', href: '/crm.html?contact=7', at: 1 }])));
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await page.locator('.dds-nav .sec > button[data-sec="customers"]').click();
+    const menu = page.locator('.dds-nav .sec:has(button[data-sec="customers"]) .menu');
+    await expect(menu.locator('a.rec', { hasText: 'Nina Okafor' })).toBeVisible();
+    // flush the scope-carry MutationObserver pass (rAF-debounced) before the
+    // exactness assertion — the rewrite, if it ever happened, happens there
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // the recent's href is EXACTLY the stored one — no client= appended…
+    await expect(menu.locator('a.rec', { hasText: 'Nina Okafor' })).toHaveAttribute('href', '/crm.html?contact=7');
+    // …while regular nav links DO carry the drill-in scope
+    await expect(menu.locator('a', { hasText: 'Contacts' }).first()).toHaveAttribute('href', `/contacts.html?client=${CLIENT}`);
+  });
+
+  test('corrupt recents storage (invalid JSON) never breaks the shell or the caret', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the caret dropdown is a desktop surface');
+    await installApp(page, { api: { '/portal/context': crmCtx() } });
+    await page.addInitScript(() => localStorage.setItem('dds-recent-records', 'not json {{{'));
+    await page.goto('/today.html');
+    await page.locator('.dds-nav .sec > button[data-sec="customers"]').click();
+    const menu = page.locator('.dds-nav .sec:has(button[data-sec="customers"]) .menu');
+    await expect(menu).toContainText('Quick actions');       // the menu still opens fine
+    await expect(menu.locator('a.rec')).toHaveCount(0);      // no recent rendered
+  });
+
+  test('a hostile recents entry (javascript: href) is filtered out, never rendered', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the caret dropdown is a desktop surface');
+    await installApp(page, { api: { '/portal/context': crmCtx() } });
+    await page.addInitScript(() => localStorage.setItem('dds-recent-records',
+      JSON.stringify([{ label: 'x', href: 'javascript:alert(1)' }])));
+    await page.goto('/today.html');
+    await page.locator('.dds-nav .sec > button[data-sec="customers"]').click();
+    const menu = page.locator('.dds-nav .sec:has(button[data-sec="customers"]) .menu');
+    await expect(menu).toContainText('Quick actions');
+    await expect(menu.locator('a.rec')).toHaveCount(0);
+    const hrefs = await menu.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href') || ''));
+    expect(hrefs.some((h) => h.trim().toLowerCase().startsWith('javascript:'))).toBe(false);
+  });
+
+  test('sign out clears the cached recent records (PII on shared machines)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'one width is enough for a storage check');
+    await installApp(page);
+    await page.addInitScript(() => localStorage.setItem('dds-recent-records',
+      JSON.stringify([{ label: 'Lea Chan', href: '/crm.html?contact=7', at: 1 }])));
+    await page.goto('/today.html');
+    await page.locator('#dds-profile').click();
+    await page.locator('#dds-signout').click();
+    // the key is removed synchronously in the click handler — and same-origin
+    // storage survives the redirect, so it stays gone on the door page too
+    await page.waitForURL('**/studio.html');
+    expect(await page.evaluate(() => localStorage.getItem('dds-recent-records'))).toBeNull();
+  });
+
+  test('layers are mutually exclusive: opening the bell closes the waffle panel and vice versa', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'desktop layer behaviour');
+    await installApp(page);
+    await page.goto('/today.html');
+    const waffle = page.locator('#dds-waffle');
+    const bell = page.locator('#dds-bell');
+    const panel = page.locator('#dds-drawer');
+    const bellPop = page.locator('.dds-pop[aria-label="Notifications"]');
+    await waffle.click();
+    await expect(panel).toBeVisible();
+    await bell.click();                                      // opening the bell…
+    await expect(panel).toBeHidden();                        // …closes the waffle panel
+    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
+    await expect(bellPop).toBeVisible();
+    await expect(bell).toHaveAttribute('aria-expanded', 'true');
+    await waffle.click();                                    // and vice versa
+    await expect(bellPop).toBeHidden();
+    await expect(bell).toHaveAttribute('aria-expanded', 'false');
+    await expect(panel).toBeVisible();
+    await expect(waffle).toHaveAttribute('aria-expanded', 'true');
   });
 
   test('mobile: the bottom bar is unchanged and the waffle panel is the mobile nav', async ({ page }, testInfo) => {
@@ -252,7 +371,14 @@ test.describe('Context bar (slice 7)', () => {
     for (const label of ['Today', 'Website', 'Business info', 'Customers', 'Files', 'Visual Studio', 'Analytics', 'Inbox', 'Settings', 'Help']) {
       await expect(panel).toContainText(label);
     }
-    // Menu toggles it closed again (aria-expanded tracks)
+    // Escape closes the sheet and hands focus back to the control that opened it
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+    await expect(mbar.locator('#dds-mbar-menu')).toBeFocused();
+    await expect(mbar.locator('#dds-mbar-menu')).toHaveAttribute('aria-expanded', 'false');
+    // Menu toggles it open and closed again (aria-expanded tracks)
+    await mbar.locator('#dds-mbar-menu').click();
+    await expect(panel).toBeVisible();
     await mbar.locator('#dds-mbar-menu').click();
     await expect(panel).toBeHidden();
     // the waffle opens the same panel too
