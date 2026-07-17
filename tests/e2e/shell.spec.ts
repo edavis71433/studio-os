@@ -318,15 +318,23 @@ test.describe('Context bar (slice 7)', () => {
   test('sign out clears the cached recent records (PII on shared machines)', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'one width is enough for a storage check');
     await installApp(page);
-    await page.addInitScript(() => localStorage.setItem('dds-recent-records',
-      JSON.stringify([{ label: 'Lea Chan', href: '/crm.html?contact=7', at: 1 }])));
+    // seed ONCE (init scripts re-run on every navigation — an unguarded seed
+    // would re-plant the key on the post-signout door page and mask the fix)
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('dds-e2e-recents-seeded')) return;
+      sessionStorage.setItem('dds-e2e-recents-seeded', '1');
+      localStorage.setItem('dds-recent-records', JSON.stringify([{ label: 'Lea Chan', href: '/crm.html?contact=7', at: 1 }]));
+    });
     await page.goto('/today.html');
     await page.locator('#dds-profile').click();
     await page.locator('#dds-signout').click();
-    // the key is removed synchronously in the click handler — and same-origin
-    // storage survives the redirect, so it stays gone on the door page too
-    await page.waitForURL('**/studio.html');
-    expect(await page.evaluate(() => localStorage.getItem('dds-recent-records'))).toBeNull();
+    // the key is removed synchronously in the click handler, before the redirect;
+    // same-origin storage survives navigation, so it stays gone despite it. Poll
+    // tolerantly — the sign-out redirect can destroy the evaluation context.
+    await expect.poll(async () => {
+      try { return await page.evaluate(() => localStorage.getItem('dds-recent-records')); }
+      catch { return 'navigating'; }
+    }).toBeNull();
   });
 
   test('layers are mutually exclusive: opening the bell closes the waffle panel and vice versa', async ({ page }, testInfo) => {
