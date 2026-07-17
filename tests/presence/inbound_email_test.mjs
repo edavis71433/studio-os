@@ -53,14 +53,17 @@ ok('headerValues: absent → []', L.headerValues({}, 'nope').length === 0);
 
 // parseAuthResults + senderAuthVerdict (BOTH payload shapes + alignment)
 ok('verdict: DMARC=pass → ok (structured bare string)', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ dmarc: 'pass' }), 'jane@acme.com'); return v.ok && v.verdict === 'dmarc_pass'; })());
-ok('verdict: DMARC=pass via Authentication-Results header stanza', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ headers: { 'Authentication-Results': 'mx; dmarc=pass header.from=acme.com' } }), 'jane@acme.com'); return v.ok && v.verdict === 'dmarc_pass'; })());
+// SA1 (security): a message-borne Authentication-Results header is attacker-controlled
+// and is NEVER trusted for the verdict — a forged `dmarc=pass` stanza must NOT pass.
+ok('SA1: forged Authentication-Results header does NOT produce ok (fail closed → none)', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ headers: { 'Authentication-Results': 'mx; dmarc=pass header.from=acme.com' } }), 'jane@acme.com'); return v.ok === false && v.verdict === 'none'; })());
+ok('SA1: parseAuthResults ignores AR header stanzas entirely (only structured fields)', (() => { const r = L.parseAuthResults({ headers: { 'Authentication-Results': 'mx; spf=pass smtp.mailfrom=acme.com; dkim=pass header.d=acme.com' } }); return r.dmarc === null && r.spf === null && r.dkim.length === 0; })());
 ok('verdict: SPF+DKIM both pass + aligned → ok', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ spf: { result: 'pass', domain: 'acme.com' }, dkim: { result: 'pass', domain: 'acme.com' } }), 'jane@acme.com'); return v.ok && v.verdict === 'spf_dkim_aligned'; })());
 ok('verdict: relaxed/suffix alignment (mail.acme.com ↔ acme.com)', L.senderAuthVerdict(L.parseAuthResults({ spf: { result: 'pass', domain: 'acme.com' }, dkim: { result: 'pass', domain: 'mail.acme.com' } }), 'jane@acme.com').ok === true);
 ok('verdict: SPF pass but DKIM UNALIGNED → not ok', L.senderAuthVerdict(L.parseAuthResults({ spf: { result: 'pass', domain: 'acme.com' }, dkim: { result: 'pass', domain: 'evil.com' } }), 'jane@acme.com').ok === false);
 ok('verdict: SPF pass, DKIM fail → not ok (unaligned)', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ spf: { result: 'pass', domain: 'acme.com' }, dkim: { result: 'fail', domain: 'acme.com' } }), 'jane@acme.com'); return !v.ok && v.verdict === 'unaligned'; })());
 ok('verdict: DMARC=fail names the verdict', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ dmarc: 'fail' }), 'jane@acme.com'); return !v.ok && v.verdict === 'dmarc_fail'; })());
 ok('verdict: NO signal at all → fail closed {ok:false, none}', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({}), 'jane@acme.com'); return !v.ok && v.verdict === 'none'; })());
-ok('verdict: AR header spf+dkim aligned', L.senderAuthVerdict(L.parseAuthResults({ headers: { 'Authentication-Results': 'mx; spf=pass smtp.mailfrom=acme.com; dkim=pass header.d=acme.com' } }), 'jane@acme.com').ok === true);
+ok('SA1: forged AR header spf+dkim stanzas do NOT pass (only structured verdicts count)', L.senderAuthVerdict(L.parseAuthResults({ headers: { 'Authentication-Results': 'mx; spf=pass smtp.mailfrom=acme.com; dkim=pass header.d=acme.com' } }), 'jane@acme.com').ok === false);
 ok('parseAuthResults: {result|status|verdict, domain} object shape', (() => { const r = L.parseAuthResults({ dmarc: { status: 'pass', domain: 'acme.com' } }); return r.dmarc.result === 'pass' && r.dmarc.domain === 'acme.com'; })());
 
 // autoResponderSignal
@@ -100,9 +103,9 @@ ok('selectAppendTarget: newest subject-matching open thread', (() => {
   return t && t.id === 'new';
 })());
 ok('selectAppendTarget: no subject match → null (a new request)', L.selectAppendTarget([{ id: 'a', subject: 'Invoice', created_at: '2026-01-01T00:00:00Z' }], 'Website copy') === null);
-ok('selectAppendTarget: empty email subject → newest open thread', (() => {
-  const t = L.selectAppendTarget([{ id: 'a', subject: 'x', created_at: '2026-01-01T00:00:00Z' }, { id: 'b', subject: 'y', created_at: '2026-05-01T00:00:00Z' }], '');
-  return t && t.id === 'b';
+ok('I3: empty/normalizes-to-empty email subject → null (a NEW request, never buries a thread)', (() => {
+  const threads = [{ id: 'a', subject: 'x', created_at: '2026-01-01T00:00:00Z' }, { id: 'b', subject: 'y', created_at: '2026-05-01T00:00:00Z' }];
+  return L.selectAppendTarget(threads, '') === null && L.selectAppendTarget(threads, '   ') === null && L.selectAppendTarget(threads, 'Re: ') === null;
 })());
 ok('selectAppendTarget: no open threads → null', L.selectAppendTarget([], 'anything') === null);
 
@@ -137,13 +140,14 @@ function installFetch(cfg = {}) {
     if (url.includes('/rpc/rate_hit')) return jr(cfg.rateAllow === false ? false : true);
     if (url.includes('suppressed_emails')) return jr([]);
     if (url.includes('presence_settings') || url.includes('presence_identity')) return jr([]);
+    if (url.includes('/auth/v1/admin/users')) return jr({ users: cfg.authUsers || [] });   // I1: auth-user-by-email lookup
     if (url.includes('external_id=eq.')) return jr(cfg.landed ? [{ id: 'seen' }] : []);   // alreadyLanded (both tables)
-    if (url.includes('clients?or=')) return jr(cfg.clients || []);
+    if (url.includes('clients?or=')) return jr(cfg.clients || [], cfg.clientsStatus || 200);   // SB1: clientsStatus drives a 5xx
     if (url.includes('presence_service_links')) return jr(cfg.links || []);
     if (url.includes('presence_contacts')) return jr(cfg.contacts || []);
     if (url.includes('/contacts?id=eq.')) return jr(cfg.contactAuth || []);
     if (url.includes('presence_sites')) return jr(cfg.site === false ? [] : [{ id: SITE }]);
-    if (url.includes('presence_support_requests') && method === 'GET') return jr(cfg.openThreads || []);
+    if (url.includes('presence_support_requests') && method === 'GET') return jr(cfg.openThreads || [], cfg.openThreadsStatus || 200);   // SC1: openThreadsStatus drives a 5xx
     if (url.includes('presence_support_messages') && method === 'POST') return (cfg.msgInsert || (() => jr([{ id: 'msg_1' }], 201)))(body);
     if (url.includes('presence_support_requests') && method === 'POST') return (cfg.reqInsert || (() => jr([{ id: 'req_1' }], 201)))(body);
     if (url.includes('presence_support_requests') && method === 'PATCH') return jr(null, 204);
@@ -297,6 +301,49 @@ try {
     const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Hard fail' })));
     const reqPosts = calls.filter((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
     ok('route: non-missing-column failure → 502 (Resend retries), key NOT stripped', r.status === 502 && reqPosts.length === 1);
+  }
+
+  // SB1: a 500 on the clients (identity) read → 502, NOT a silent unknown-sender drop
+  {
+    const calls = installFetch({ ...BRIDGED, clientsStatus: 500 });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Identity read flaked' })));
+    ok('SB1: 500 on the clients read → 502 (retry), not an unknown-sender drop', r.status === 502 && !calls.some((c) => c.method === 'POST' && /presence_support/.test(c.url)));
+  }
+
+  // SC1: a 500 on the open-threads read → 502, NOT a silently-opened duplicate new request
+  {
+    const calls = installFetch({ ...BRIDGED, openThreadsStatus: 500 });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Threads read flaked' })));
+    ok('SC1: 500 on the open-threads read → 502 (retry), not a duplicate new request', r.status === 502 && !calls.some((c) => c.method === 'POST' && /presence_support_requests/.test(c.url)));
+  }
+
+  // T2: an insert-time 409 unique-conflict (insertDeduped → {duplicate}) → ack as duplicate, no 502, no double-land
+  {
+    const calls = installFetch({ ...BRIDGED, openThreads: [], reqInsert: () => jr({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409) });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Insert races to a dup' })));
+    const reqPosts = calls.filter((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('T2: insert 409 unique-conflict → 200 ack (duplicate), not 502, single insert attempt', r.status === 200 && reqPosts.length === 1);
+    ok('T2: no auto-ack sent on a duplicate (nothing new landed)', !calls.some((c) => c.url.includes('api.resend.com/emails')));
+  }
+  // T2b: a 409 on an APPEND insert (message table) → ack as duplicate, no 502
+  {
+    const calls = installFetch({ ...BRIDGED, openThreads: [{ id: 'thr_1', subject: 'RE: Website copy', requester: 'auth-123', project_id: null, created_at: '2026-06-01T00:00:00Z' }], msgInsert: () => jr({ code: '23505', message: 'duplicate key' }, 409) });
+    const r = await handleInboundEmail(await sign(emailReceived()));
+    ok('T2b: append insert 409 → 200 ack (duplicate), not 502', r.status === 200);
+  }
+
+  // I1: a bridged client whose contact has NO auth_user_id but who CAN log into the
+  // portal (an auth user exists by email) → requester = that portal uid, so the
+  // email-created thread is visible in their own portal (readerKey = userId).
+  {
+    const calls = installFetch({
+      clients: [{ id: CLIENT_ID_2, email: 'Jane@Acme.com', contact_email: 'Jane@Acme.com', contact_id: null, created_at: '2026-01-01T00:00:00Z' }],
+      links: [{ customer_client_id: CLIENT_ID_2 }], openThreads: [],
+      authUsers: [{ id: 'portal-uid-777', email: 'jane@acme.com' }],
+    });
+    await handleInboundEmail(await sign(emailReceived({ subject: 'Email-login bridged client' })));
+    const reqPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('I1: contact auth_user_id NULL but email-login user exists → requester = portal uid', reqPost && reqPost.body.requester === 'portal-uid-777');
   }
 } finally {
   globalThis.fetch = realFetch;

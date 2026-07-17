@@ -6,11 +6,20 @@
 // tests/presence/inbound_email_test.mjs. The impure route wires these into the
 // PostgREST reads/writes + the branded ack.
 //
-// HONEST CAVEAT on payload shapes: resend.com's Inbound webhook docs are
-// proxy-blocked in this environment, so both the STRUCTURED fields
-// (data.dmarc/spf/dkim, an object OR a bare string) AND the raw
-// `Authentication-Results` header stanzas are parsed defensively — whichever the
-// provider actually sends, the verdict is computed the same way and fails closed.
+// SENDER-AUTH TRUST BOUNDARY (SA1, security-critical): the go/no-go on a sender's
+// authenticity is computed ONLY from the provider's STRUCTURED verdict fields
+// (data.dmarc/spf/dkim — a bare string OR an object). We NEVER parse the message's
+// own `Authentication-Results` header stanzas for the pass/fail decision. Those
+// stanzas travel INSIDE the email body/headers and are attacker-controlled: a
+// spoofer can embed `Authentication-Results: dmarc=pass header.from=acme.com` and,
+// if we trusted it, walk straight through the gate. We cannot distinguish Resend's
+// OWN stamped Authentication-Results from a forged one without an authserv-id
+// allowlist (which the proxy-blocked Inbound docs don't give us), so raw AR headers
+// are treated as untrusted text and never feed the verdict. Consequence: if Resend
+// only ever forwards raw AR headers and supplies no structured verdict, mail FAILS
+// CLOSED (verdict 'none' → drop). The mitigation is the runbook's "configure
+// DKIM/SPF in Resend so it stamps a structured verdict" step — see
+// docs/presence/INBOUND-EMAIL-SETUP.md.
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -145,41 +154,16 @@ function coerceAuthList(v: unknown): AuthResult[] {
   return one ? [one] : [];
 }
 
-/** Parse an `Authentication-Results` header string into method verdicts. Each
- *  `;`-separated stanza carries one method (dmarc/spf/dkim) + its identity tag. */
-function parseAuthHeader(ar: string): ParsedAuth {
-  const res: ParsedAuth = { dmarc: null, spf: null, dkim: [] };
-  for (const st of String(ar).split(';')) {
-    const dm = st.match(/\bdmarc\s*=\s*([a-z]+)/i);
-    if (dm) { res.dmarc = { result: dm[1].toLowerCase(), domain: cleanDomain((st.match(/header\.from\s*=\s*([^\s;()]+)/i) || [])[1] || '') }; continue; }
-    const sp = st.match(/\bspf\s*=\s*([a-z]+)/i);
-    if (sp) {
-      const dom = (st.match(/smtp\.mailfrom\s*=\s*([^\s;()]+)/i) || [])[1] || (st.match(/smtp\.helo\s*=\s*([^\s;()]+)/i) || [])[1] || '';
-      res.spf = { result: sp[1].toLowerCase(), domain: cleanDomain(dom) }; continue;
-    }
-    const dk = st.match(/\bdkim\s*=\s*([a-z]+)/i);
-    if (dk) {
-      const dom = (st.match(/header\.d\s*=\s*([^\s;()]+)/i) || [])[1] || (st.match(/header\.i\s*=\s*@?([^\s;()]+)/i) || [])[1] || '';
-      res.dkim.push({ result: dk[1].toLowerCase(), domain: cleanDomain(dom) }); continue;
-    }
-  }
-  return res;
-}
-
-/** The combined authentication picture from a webhook `data` payload: STRUCTURED
- *  fields (data.dmarc/spf/dkim) preferred, else the `Authentication-Results`
- *  header stanzas — both are parsed because the exact shape Resend Inbound sends
- *  is proxy-undocumented here. Pure. */
+/** The authentication picture from a webhook `data` payload — computed ONLY from
+ *  the provider's STRUCTURED verdict fields (data.dmarc/spf/dkim; each a bare
+ *  string OR an object). SECURITY (SA1): the message's own `Authentication-Results`
+ *  header stanzas are attacker-controlled and are DELIBERATELY NOT parsed here —
+ *  trusting them would let a spoofer stamp their own `dmarc=pass` and bypass the
+ *  gate. If the provider supplies no structured verdict, this returns all-null and
+ *  senderAuthVerdict fails closed ('none' → drop). Pure. */
 export function parseAuthResults(data: unknown): ParsedAuth {
   const d = (data && typeof data === 'object') ? data as any : {};
-  const struct: ParsedAuth = { dmarc: coerceAuth(d.dmarc), spf: coerceAuth(d.spf), dkim: coerceAuthList(d.dkim) };
-  const arHeader = headerValues(d.headers, 'authentication-results').join(' ; ');
-  const fromHeader = arHeader ? parseAuthHeader(arHeader) : { dmarc: null, spf: null, dkim: [] };
-  return {
-    dmarc: struct.dmarc || fromHeader.dmarc,
-    spf: struct.spf || fromHeader.spf,
-    dkim: [...struct.dkim, ...fromHeader.dkim],
-  };
+  return { dmarc: coerceAuth(d.dmarc), spf: coerceAuth(d.spf), dkim: coerceAuthList(d.dkim) };
 }
 
 /** Relaxed/suffix domain alignment. NO Public Suffix List is available here, so
@@ -295,14 +279,21 @@ export function normalizeSubject(subject: unknown): string {
 
 /** Choose which OPEN thread a reply should append to: the NEWEST-by-created_at
  *  thread whose normalized subject equals the email's. No subject match → null (a
- *  new request is opened). An email with an EMPTY subject → the newest open thread
- *  (a bare "reply-all" with the subject stripped). Pure. */
+ *  new request is opened). I3: an email whose subject NORMALIZES TO EMPTY does NOT
+ *  append — appending a subject-less message to whatever thread happens to be
+ *  newest would bury an unrelated topic AND skip the ack. It returns null, so the
+ *  route opens a NEW request (fallback subject "Email from <name>") and acks. We
+ *  only append on a genuine, non-empty normalized-subject match.
+ *  FOLLOW-UP (I4): threading is subject-match only; it ignores In-Reply-To /
+ *  References. True RFC-5322 reference threading needs us to capture OUTBOUND
+ *  Message-Ids first (out of scope for this slice), so the newest-by-created_at
+ *  subject match is the deterministic rule. Pure. */
 export function selectAppendTarget<T extends { subject?: unknown; created_at?: unknown }>(openThreads: T[], subject: unknown): T | null {
   const threads = Array.isArray(openThreads) ? openThreads.slice() : [];
   if (!threads.length) return null;
-  const byNewest = (a: T, b: T) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''));
   const norm = normalizeSubject(subject);
-  if (!norm) return threads.sort(byNewest)[0] || null;
+  if (!norm) return null;   // I3: empty/normalizes-to-empty subject → open a NEW request, never bury a thread
+  const byNewest = (a: T, b: T) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''));
   const matches = threads.filter((t) => normalizeSubject(t.subject) === norm);
   return matches.length ? matches.sort(byNewest)[0] : null;
 }

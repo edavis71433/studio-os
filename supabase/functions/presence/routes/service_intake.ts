@@ -187,6 +187,34 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
+/** I2: when the STUDIO posts a support reply, also notify the requester by EMAIL —
+ *  otherwise an email-NATIVE customer (one who filed via /email/inbound and never
+ *  opens the portal) never learns the studio replied; the loop is half-open. Best-
+ *  effort, mirrors project_comms' bridge-nudge idiom: branded, critical (survives a
+ *  marketing opt-out), throttled (if a studio message on THIS request already went
+ *  out < 15 min ago, the earlier email already carries the thread — don't stack),
+ *  and siteId is passed so reply_to = the site's inbound address (R1: the reply
+ *  lands right back on /email/inbound). The recipient is the request's `requester`
+ *  ONLY when it is an email address — an auth-uid requester means a portal user who
+ *  is reached in-app, so we skip silently (also skip if it can't be resolved).
+ *  Never blocks or fails the reply. `insId` is the just-inserted message, excluded
+ *  from the throttle probe. */
+async function emailStudioSupportReply(site: SiteRow, reqRow: any, body: string, insId: string): Promise<void> {
+  try {
+    const to = String(reqRow?.requester || '').trim();
+    if (!EMAIL_RE.test(to)) return;   // auth-uid requester (portal user) or unresolved → skip silently
+    const prev = rows(await svc(`presence_support_messages?request_id=eq.${reqRow.id}&site_id=eq.${site.id}&deleted_at=is.null&id=neq.${insId}&author_kind=neq.client&select=created_at&order=created_at.desc&limit=1`))[0];
+    if (prev && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000) return;   // throttle
+    const { sendEmail } = await import('../commerce/account.ts');
+    const { loadEmailBrand } = await import('../lib/email_brand.ts');
+    const brand = await loadEmailBrand(site.id);
+    const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+    await sendEmail(to, 'A reply from your studio',
+      `<p>Your studio replied to your message:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote><p>Just reply to this email to continue the conversation.</p>`,
+      brand, { critical: true, siteId: site.id });
+  } catch { /* best-effort — the email must never block or fail the studio reply */ }
+}
+
 export async function handleSupportMessage(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const studio = await isStudioSide(jwt, site, principal);
@@ -203,5 +231,7 @@ export async function handleSupportMessage(req: Request, jwt: string, site: Site
   // a studio reply on an open request bumps it to in_progress (best-effort, guarded)
   if (studio && reqRow.status === 'open') await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}&status=eq.open`, { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) }).catch(() => {});
   if (reqRow.project_id) await projectEvent(site.id, reqRow.project_id, 'support_message', principal, true, { request_id: id });
+  // I2: notify an email-native requester that the studio replied (best-effort, throttled).
+  if (studio) emailStudioSupportReply(site, reqRow, body, String(rows(ins)[0].id)).catch(() => {});
   return json({ data: rows(ins)[0] }, 201, cors);
 }

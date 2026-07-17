@@ -34,6 +34,20 @@ const PLATFORM_REPLY_TO = Deno.env.get('PLATFORM_REPLY_TO') || 'eric@davisdigita
 const nowIso = () => new Date().toISOString();
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 
+/** SB1/SC1: a read whose EMPTINESS drives a DROP or a NEW-vs-APPEND decision must
+ *  NOT collapse a non-ok DB response (a transient 5xx/timeout) to []. A bare rows()
+ *  can't tell "genuinely empty" from "the read failed", so a flaky identity/thread
+ *  read would silently 200-drop a real sender OR open a duplicate thread. okRows()
+ *  throws InfraRead on a non-ok response; the route catches it and returns 502 so
+ *  Resend RETRIES (the message is landable, the failure was infra). A genuinely
+ *  empty ok result returns [] and keeps its normal meaning (drop / new request). */
+class InfraRead extends Error {}
+function okRows(r: { ok?: boolean; json?: unknown }): any[] {
+  if (!r || (r as any).ok === false) throw new InfraRead();
+  return Array.isArray((r as any).json) ? (r as any).json : [];
+}
+const readFailed = () => json({ error: 'read_failed' }, 502);   // landable + infra read failure → Resend retries
+
 /** The webhook ACK. 200 so Resend stops retrying a message we've decided about.
  *  NEVER echoes any payload content back to the caller. */
 const ack = () => new Response(JSON.stringify({ received: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -112,19 +126,21 @@ interface SiteIdentity { kind: 'client' | 'contact'; id: string; contactId: stri
  *  stranger's email). */
 async function matchSiteIdentity(siteId: string, fromEmail: string): Promise<SiteIdentity | null> {
   const enc = encodeURIComponent(fromEmail.toLowerCase());
-  // 1) clients matched by email OR contact_email (ilike over-matches → exact recheck)
-  const clientRows = rows(await svc(`clients?or=(email.ilike.${enc},contact_email.ilike.${enc})&deleted_at=is.null&select=id,email,contact_email,contact_id,created_at&order=created_at.asc,id.asc&limit=25`))
+  // 1) clients matched by email OR contact_email (ilike over-matches → exact recheck).
+  //    SB1: okRows — a non-ok clients read 502s (see okRows), it is NOT read as "no
+  //    such client" (which would silently 200-drop a genuine sender as unknown).
+  const clientRows = okRows(await svc(`clients?or=(email.ilike.${enc},contact_email.ilike.${enc})&deleted_at=is.null&select=id,email,contact_email,contact_id,created_at&order=created_at.asc,id.asc&limit=25`))
     .filter((c) => String(c.email || '').toLowerCase() === fromEmail.toLowerCase() || String(c.contact_email || '').toLowerCase() === fromEmail.toLowerCase());
   const clientIds = clientRows.map((c) => String(c.id)).filter((id) => UUID_RE.test(id));
   if (clientIds.length) {
     // bridged precedence: only a client with an ACTIVE link to THIS agency site is a valid sender here
-    const links = rows(await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&customer_client_id=in.(${clientIds.join(',')})&select=customer_client_id&limit=25`));
+    const links = okRows(await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&customer_client_id=in.(${clientIds.join(',')})&select=customer_client_id&limit=25`));
     const bridged = new Set(links.map((l) => String(l.customer_client_id)));
     const hit = clientRows.find((c) => bridged.has(String(c.id)));
     if (hit) return { kind: 'client', id: String(hit.id), contactId: hit.contact_id ? String(hit.contact_id) : null, emails: [hit.email, hit.contact_email].filter((e) => e && String(e).trim()).map(String), candidates: clientRows.filter((c) => bridged.has(String(c.id))).length };
   }
   // 2) a CRM contact on THIS site (site-scoped), matched the same way
-  const contactRows = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=ilike.${enc}&deleted_at=is.null&select=id,email,created_at&order=created_at.asc,id.asc&limit=25`))
+  const contactRows = okRows(await svc(`presence_contacts?site_id=eq.${siteId}&email=ilike.${enc}&deleted_at=is.null&select=id,email,created_at&order=created_at.asc,id.asc&limit=25`))
     .filter((c) => String(c.email || '').toLowerCase() === fromEmail.toLowerCase());
   if (contactRows.length) {
     const c = contactRows[0];
@@ -148,6 +164,31 @@ async function ackSender(siteId: string, toEmail: string): Promise<void> {
       `<p>Thanks — we’ve got your email and added it to your conversation with us. Nothing more is needed right now; we’ll follow up here.</p>`,
       brand, { critical: true, siteId, headers: { 'Auto-Submitted': 'auto-replied' } });
   } catch { /* an ack must never block or throw */ }
+}
+
+/** I1: resolve a sender's auth (portal) user id from their email — the SAME uid
+ *  their portal session resolves to. An email-authenticated bridged client whose
+ *  linked contact carries NO auth_user_id still logs into the portal via the
+ *  clients.email fallback in _shared/auth.ts (resolvePrincipal → the email-match
+ *  branch returns `{ kind:'client', userId: uid }`), and the portal reads its own
+ *  support with `requester=eq.uid` (client_delivery.ts readerKey = userId||email).
+ *  If the inbound thread were keyed on the email instead, it would be INVISIBLE in
+ *  that customer's own portal. So when the contact link yields no auth id, mirror
+ *  the portal by resolving the auth user by email via the GoTrue admin API (the
+ *  same lookup commerce/deletion.ts uses). '' when no auth user exists at all — a
+ *  true never-logged-in contact has no portal, so the stored-email key is correct.
+ *  Best-effort: never throws (any failure → '' → the email-key fallback). */
+async function authUserIdByEmail(email: string): Promise<string> {
+  try {
+    const SB = Deno.env.get('SUPABASE_URL') || '';
+    const KEY = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!SB || !KEY || !EMAIL_RE.test(String(email))) return '';
+    const uq = await fetch(`${SB}/auth/v1/admin/users?page=1&per_page=10&filter=${encodeURIComponent(email)}`, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+    if (!uq.ok) return '';
+    const users = (await uq.json())?.users || [];
+    const u = Array.isArray(users) ? users.find((x: any) => String(x.email || '').toLowerCase() === email.toLowerCase()) : null;
+    return u?.id ? String(u.id) : '';
+  } catch { return ''; }
 }
 
 export async function handleInboundEmail(req: Request): Promise<Response> {
@@ -198,7 +239,10 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   if (siteAddrs.length > 1) console.warn(`[inbound] ${siteAddrs.length} site-addressed recipients — using the first (I4)`);
   const siteId = siteAddrs[0];
   if (!siteId) return dropAck('no_site_recipient', from_email);
-  const siteRow = rows(await svc(`presence_sites?id=eq.${siteId}&select=id&limit=1`))[0];
+  // SB1: a non-ok site read 502s (retry), never a silent 'unknown_site' drop.
+  let siteRow;
+  try { siteRow = okRows(await svc(`presence_sites?id=eq.${siteId}&select=id&limit=1`))[0]; }
+  catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
   if (!siteRow) return dropAck('unknown_site', from_email);
 
   // (11) per-site rate limit — 30 inbound / 10 min
@@ -213,18 +257,27 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   const externalId = (message_id || `svix:${svixId}`).slice(0, 300);
   if (await alreadyLanded(siteId, externalId)) return dropAck('already_landed', from_email);
 
-  // (14) match the sender to a KNOWN relationship on this site (else spam surface)
-  const match = await matchSiteIdentity(siteId, from_email);
+  // (14) match the sender to a KNOWN relationship on this site (else spam surface).
+  //      SB1: matchSiteIdentity's identity reads use okRows — a transient failure
+  //      there 502s (Resend retries), never a silent 'unknown_sender' spam-drop.
+  let match: SiteIdentity | null;
+  try { match = await matchSiteIdentity(siteId, from_email); }
+  catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
   if (!match) return dropAck('unknown_sender', from_email);
   if (match.candidates > 1) console.warn(`[inbound] ${match.candidates} identity candidates for ${maskEmail(from_email)} — using the first (I2)`);
 
   // (15) requester key (I1) + filter-safe aliases. Prefer the portal readerKey
-  //      (auth user id via the linked contact) so a studio reply + the customer's
-  //      portal + this inbound path all resolve to ONE requester; else the matched
-  //      STORED-casing email (the raw key every channel matches on — lowercasing
-  //      the From would orphan the thread).
+  //      (the auth user id) so a studio reply + the customer's portal + this inbound
+  //      path all resolve to ONE requester. The auth id comes from the linked
+  //      contact; failing that, from the sender's email (authUserIdByEmail — mirrors
+  //      the portal's email-login fallback so an email-authenticated bridged client
+  //      whose contact carries no auth_user_id still sees this thread in their own
+  //      portal). Only a never-logged-in contact (no auth user at all) falls back to
+  //      the matched STORED-casing email (the raw key the studio channels match on —
+  //      lowercasing the From would orphan the thread).
   let authId = '';
   if (match.contactId) { const ct = rows(await svc(`contacts?id=eq.${match.contactId}&select=auth_user_id&limit=1`))[0]; authId = ct?.auth_user_id ? String(ct.auth_user_id) : ''; }
+  if (!authId) authId = await authUserIdByEmail(from_email);   // I1: mirror the portal's email-login uid
   const storedEmail = matchedStoredEmail(from_email, match.emails) || from_email;
   const requesterKey = deriveRequesterKey(authId, storedEmail);
   if (filterSafe(requesterKey) === null) return dropAck('unsafe_requester', from_email);
@@ -234,10 +287,15 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     aliases.push(a);
   }
 
-  // (16) the sender's OPEN threads on this site (any alias key), newest first
-  const openThreads = aliases.length
-    ? rows(await svc(`presence_support_requests?site_id=eq.${siteId}&status=in.(open,in_progress)&deleted_at=is.null&requester=in.(${aliases.map((a) => filterKey(a)).join(',')})&select=id,subject,requester,project_id,created_at&order=created_at.desc&limit=50`))
-    : [];
+  // (16) the sender's OPEN threads on this site (any alias key), newest first.
+  //      SC1: okRows — a non-ok open-threads read 502s (retry) rather than reading
+  //      as "no open threads" and opening a DUPLICATE new request on a live sender.
+  let openThreads;
+  try {
+    openThreads = aliases.length
+      ? okRows(await svc(`presence_support_requests?site_id=eq.${siteId}&status=in.(open,in_progress)&deleted_at=is.null&requester=in.(${aliases.map((a) => filterKey(a)).join(',')})&select=id,subject,requester,project_id,created_at&order=created_at.desc&limit=50`))
+      : [];
+  } catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
 
   // (17) append to the newest subject-matching open thread, else (18) open a new one
   const target = selectAppendTarget(openThreads, subject);
