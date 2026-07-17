@@ -154,8 +154,19 @@ Netlify). **Slice 5 SHIPPED 2026-07-17** — portal Messages split view
 (033f082; approved "Approved"; 24 findings → 13 fixes incl. three additive
 backend upgrades: real support-reply attribution via `from`, support
 last_activity_at recency, own-send notifications excluded; e2e 321/0;
-deploy #15 green — functions + frontend). NOW: slice 6 — inbound email
-(Resend Inbound webhook; in progress; needs Eric's ~15-min Resend dashboard
+deploy #15 green — functions + frontend). **Slice 6 SHIPPED 2026-07-17** —
+inbound email capture, POST /email/inbound (290f04e; approved "do it";
+rebuilt TWICE after container resets wiped uncommitted work — now committed
+per-checkpoint; 37 findings fixed across two adversarial reviews incl. a
+critical forged-Authentication-Results bypass; behavior change: studio
+support replies now email email-native clients; e2e 321/0; deploy #16).
+🔑 **NEEDS ERIC to activate**: (1) APPLY-0114-prod.sql — TWO steps, run
+STEP 1 then STEP 2 separately (STEP 2 is CONCURRENTLY, must not be in a
+transaction); (2) Resend dashboard per docs/presence/INBOUND-EMAIL-SETUP.md
+(inbound domain MX + route → webhook, DKIM/SPF so Resend stamps a verdict,
+secrets RESEND_INBOUND_SECRET + RESEND_INBOUND_DOMAIN). Dormant + fail-closed
+until then. NOW: slice 7 — nav context bar both shells + polish. (Old slice-6
+note superseded; needs Eric's ~15-min Resend dashboard
 step + RESEND_INBOUND_SECRET AFTER it merges — runbook will be at
 docs/presence/INBOUND-EMAIL-SETUP.md). Then 7 (nav context bar both shells),
 **8 (CRM analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec
