@@ -338,3 +338,94 @@ buildable anatomy for the five signature Lightning surfaces.
 - Version-scoped: timeline anatomy from SLDS 2.6.1 (component now named
   "Timeline" on current site, same anatomy on master), Split View from Winter
   '20 (2.10.x), Path from Spring '20 (2.11.6).
+
+## §12 Reports & Dashboards (slice-8 research pass, 2026-07-17)
+
+*Method matches §10–§11: salesforce.com help/Trailhead pages 403 direct fetch —
+facts recovered via search extraction of those pages; SLDS specifics verified
+directly from the salesforce-ux/design-system repo (blueprint SCSS + token YAML
++ docs.mdx). UNVERIFIED flags inline.*
+
+### 12.1 Dashboard page anatomy
+- **Page = header (name + actions + "As of" stamp) + optional filter bar +
+  12-column grid of card-chrome widgets, each fed by exactly one source
+  report.**
+- Header actions: **Refresh** (any viewer), **Subscribe**, Edit, overflow
+  (Save As/Clone/Delete). Refresh model is EXPLICIT STALENESS: "dashboards show
+  data from the last refresh, not real-time"; the "As of" timestamp sits next
+  to Refresh. (Exact label copy UNVERIFIED.)
+- Subscribe = scheduled refresh + emailed HTML snapshot (Daily/Weekly/Monthly;
+  max 5 per user; dashboard filters never applied to the emailed copy).
+- Grid: dashboard property = **12 columns (default) or 9**, full width either
+  way; drag body to move, corners to resize. (Row-height unit UNVERIFIED.)
+- Widget chrome: three text props — **Title, Subtitle, Footer** — plus the
+  **"View Report" link** which opens the source report WITH current dashboard
+  filters applied (Winter '18 RN). Placement bottom-of-card (exact corner
+  UNVERIFIED).
+- Limits: ~20 chart/table components per dashboard; ≤1,000 groupings rendered
+  per component. Theme + palette are DASHBOARD-level (14 palettes; Wildflowers
+  default, Mineral = color-blind-safe); never per-component.
+
+### 12.2 Widget canon (type → verified purpose)
+- **Metric**: "highlight a single value… total closed opportunities for a
+  month, number of new leads" — source report's grand total as a big number
+  under the title; conditional highlighting (breakpoints color the number).
+  (SLDS v1 "Metric Display" type scale UNVERIFIED — page 403.)
+- **Gauge**: "how far you are from reaching a goal" — semicircular arc with
+  colored segment ranges; Show Percentage / Show Total; dynamic variants read
+  target from a report value. Meaningless without a goal number.
+- **Donut**: "proportion of each grouping against the total, but also the
+  total amount itself" — the total renders in the hole. Legend side is fixed
+  per type (not configurable in Lightning; default side UNVERIFIED).
+- **Funnel**: "ordered set… ideal to show the stages of your opportunities" —
+  THE pipeline-by-stage widget, stages top-to-bottom in stage order.
+- **Bar/column**: explicit group axis + measure axis; "Max Values Displayed"
+  caps groups; axis range Automatic or custom min/max. Line: date grouping,
+  cumulative variant.
+- **Lightning table**: ≤200 records × ≤10 columns, any field from the source
+  report type; conditional highlighting; subtotals on first-level groups.
+- **Color assignment**: palette colors are assigned to groupings sequentially
+  IN SORT ORDER — a color is a palette index, not a semantic choice.
+
+### 12.3 Dashboard filters
+- ≤3 filters per dashboard, ≤50 values each; a row of dropdowns under the
+  header applying to EVERY widget via per-report field mapping.
+- Lightning dashboards ALWAYS OPEN UNFILTERED — a filter is a session choice,
+  not saved state. View Report carries active filters into the report run.
+- Exclusions: no formula/bucket fields; joined-report charts unfilterable.
+
+### 12.4 Report run page (for a future "report view" slice)
+- Header = summary-metrics strip ("up to 8 metrics, in report order").
+- Toolbar: chart toggle · slide-out filter panel (chip → edit → Apply) ·
+  Refresh · Edit · menu (Clone/Save/Subscribe/Export).
+- Column-header sort; column menu offers group/summarize/bucket in place.
+- Summary format: group header rows + per-group subtotal row + grand total;
+  footer toggle bar = Row Count / Detail Rows / Subtotals / Grand Total.
+
+### 12.5 SLDS specifics worth copying (repo-verified)
+- **Card chrome**: 1px solid border (border-base), radius 0.25rem, white bg;
+  base CARD_SHADOW none but the oneSalesforce theme overrides to
+  `0 2px 2px 0 rgba(0,0,0,.10)` — flat border + ONE subtle hard shadow.
+  Title 0.875rem, bold in the Lightning theme, flex row (icon+title+actions).
+  Footer 0.8125rem behind a thin top border — exactly the "View Report" strip.
+- **Chart color LOGIC** (guidelines): midtone hues around the wheel, adjacent
+  sequential entries ~180° apart; ONE COLOR = ONE MEANING across every chart
+  on the page; categorical palettes ≈5 entries; ordinal data in linear order.
+  → dds: one ordered categorical ramp from tokens, indexed by sort order;
+  stage colors identical to pipeline.html's Kanban.
+- **Empty state** = Illustration pattern: aria-hidden SVG + REQUIRED heading +
+  optional body + ≤2 CTAs (base 300×200). **Loading** = stencils: only when
+  >300ms, gray layout-shaped blocks, no control placeholders, cross-fade to
+  data with no white flash.
+
+### 12.6 Copy vs skip (v1 assessment)
+COPY: header grammar (title + "As of" + Refresh) · 12-col grid of flat
+bordered cards with View-report footers · widget canon (metric row, funnel,
+donut-with-total, bar, line, one table) · one global filter bar (date range)
+opening unfiltered · stencils + illustration empty states · color discipline.
+SKIP v1: Subscribe/email snapshots, dashboard builder, palette picker,
+dynamic gauges, scatter, matrix/joined reports, per-widget filter mapping.
+REPORT VIEW: dashboard-only is Salesforce-faithful for v1 PROVIDED every
+widget's "View report" footer deep-links to the real run page (pipeline.html,
+leads.html, inbox.html, customers.html) carrying the active date filter; a
+true grouped-table report page is a clean later slice, not a v1 requirement.
