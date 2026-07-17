@@ -317,49 +317,60 @@ function salesBand(d){
 }
 function websiteBand(d){
   const w=(d&&d.website)||{},t=w.traffic,g=w.search;
+  // three honest traffic states: measuring (numbers) · present-but-no-data-yet
+  // (never fake zeros) · read failed (t null — a hiccup, not "not measured")
+  const measuring=!!(t&&t.has_data);
+  const tTrunc=!!(t&&t.truncated);
+  // search: gOk = real numbers; g.unavailable = the read hiccuped (NOT the
+  // connect CTA — the user may well be connected); g null = not connected.
+  const gDown=!!(g&&g.unavailable);
+  const gOk=!!(g&&!g.unavailable);
   let h=`<h2 class="band">Your website</h2>`;
-  h+=card('c3','Visitors','',
-    t?kpi(num(t.visitors),`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`)
-      :emptyState('Not measured yet','Visitor counts appear once your site is collecting them.'),
+  h+=card('c3','Visitors',based('',tTrunc),
+    measuring?kpi(num(t.visitors),`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`)
+      :t?emptyState('Not measured yet','Visitor counts appear once your site is collecting them.')
+      :emptyState('Visitor counts hit a hiccup','Refresh in a moment.'),
     ['/business-insights.html','View website insights']);
-  h+=card('c3','Actions taken','',
-    t?kpi(num(t.actions),'calls, emails & booking taps')
+  h+=card('c3','Actions taken',based('',tTrunc),
+    measuring?kpi(num(t.actions),'calls, emails & booking taps')
       :emptyState('Not measured yet','Calls, emails and booking taps will count up here.'),
     ['/business-insights.html','View website insights']);
   h+=card('c3','Google clicks','',
-    g?kpi(num(g.clicks),`${num(g.impressions)} times seen in search`)
+    gDown?emptyState('Search data is catching its breath','Check back shortly.')
+      :gOk?kpi(num(g.clicks),`${num(g.impressions)} times seen in search${gscQual(g.period)}`)
       :emptyState('Not measured yet','Connect Search Console to see your Google numbers.'),
-    g?['/business-insights.html','View search insights']:['/connections.html','Connect Search Console']);
+    (gOk||gDown)?['/business-insights.html','View search insights']:['/connections.html','Connect Search Console']);
   {
-    const top=t&&(t.top_sources||[])[0];
-    h+=card('c3','Top source','',
+    const top=measuring&&(t.top_sources||[])[0];
+    h+=card('c3','Top source',based('',tTrunc),
       top?kpi(esc(top.source),`${num(top.share)}% of visits`,'small')
         :emptyState('Not measured yet','Where visitors come from shows up here.'),
       ['/business-insights.html','View website insights']);
   }
-  h+=card('c6','Visitors over time','Weekly, last 12 weeks',
-    (t&&lineChart(t.weekly,'var(--c2)','visitors'))||emptyState('No visits yet','Once people start visiting, the trend shows here.'),
+  h+=card('c6','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
+    (measuring&&lineChart(t.weekly,'var(--c2)','visitors'))||emptyState('No visits yet','Once people start visiting, the trend shows here.'),
     ['/business-insights.html','View website insights']);
   {
     let body=null;
-    if(t&&(t.top_sources||[]).length){
+    if(measuring&&(t.top_sources||[]).length){
       const ramp=['var(--c1)','var(--c2)','var(--c3)','var(--c5)','var(--faint)'];
       const segs=t.top_sources.map((s,i)=>({v:s.visits,c:ramp[i]||ramp[4]}));
       body=donut(segs,num(t.visitors),'visitors',t.top_sources.map((s,i)=>({c:ramp[i]||ramp[4],text:`${s.source} · ${num(s.share)}%`})));
     }
-    h+=card('c6','Where visitors come from',periodLabel(),body||emptyState('No visits yet','Your visitor sources will appear here.'),['/business-insights.html','View website insights']);
+    h+=card('c6','Where visitors come from',based(periodLabel(),tTrunc),body||emptyState('No visits yet','Your visitor sources will appear here.'),['/business-insights.html','View website insights']);
   }
   {
-    const rows=(t&&t.top_pages)||[];
+    const rows=(measuring&&t.top_pages)||[];
     const body=rows.length?`<table><caption>Top pages — page and views</caption><thead><tr><th scope="col">Page</th><th class="r" scope="col">Views</th></tr></thead><tbody>${rows.map(p=>`<tr><td>${p.path==='/'?'Home':esc(p.path)}</td><td class="r">${num(p.views)}</td></tr>`).join('')}</tbody></table>`
       :emptyState('No page views yet','Your most-visited pages will be listed here.');
-    h+=card('c6','Top pages',periodLabel(),body,['/business-insights.html','View website insights']);
+    h+=card('c6','Top pages',based(periodLabel(),tTrunc),body,['/business-insights.html','View website insights']);
   }
   {
-    const rows=(g&&g.top_terms)||[];
+    const rows=(gOk&&g.top_terms)||[];
     const body=rows.length?`<table><caption>Google search performance — search term, clicks, times seen</caption><thead><tr><th scope="col">Search</th><th class="r" scope="col">Clicks</th><th class="r" scope="col">Seen</th></tr></thead><tbody>${rows.map(q=>`<tr><td>${esc(q.term)}</td><td class="r">${num(q.clicks)}</td><td class="r">${num(q.impressions)}</td></tr>`).join('')}</tbody></table>`
-      :emptyState(g?'No search terms yet':'Not measured yet',g?'What people search to find you will be listed here.':'Connect Search Console to see what people search to find you.');
-    h+=card('c6','Google search performance','What people searched to find you',body,g?['/business-insights.html','View search insights']:['/connections.html','Connect Search Console']);
+      :gDown?emptyState('Search data is catching its breath','Check back shortly.')
+      :emptyState(gOk?'No search terms yet':'Not measured yet',gOk?'What people search to find you will be listed here.':'Connect Search Console to see what people search to find you.');
+    h+=card('c6','Google search performance','What people searched to find you',body,(gOk||gDown)?['/business-insights.html','View search insights']:['/connections.html','Connect Search Console']);
   }
   return h;
 }
@@ -390,17 +401,30 @@ function wireDash(){
   const toggleMenu=()=>{const open=pm.hidden;pm.hidden=!open;pb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=pm.querySelector('button');if(f)f.focus();}};
   pb.addEventListener('click',toggleMenu);
   // the minimal popup keyboard contract (slice 2): focus first option on open;
-  // arrows move; Escape closes + returns focus; Enter activates natively.
+  // arrows move; Home/End jump; Escape closes + returns focus; Enter activates
+  // natively. Escape works from the CHIP too, and tabbing/clicking beyond the
+  // chip+menu closes it without stealing focus (focusout below).
+  pb.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!pm.hidden){e.preventDefault();closeMenu();}});
   pm.addEventListener('keydown',(e)=>{
     const opts=[...pm.querySelectorAll('button')];if(!opts.length)return;
     const i=opts.indexOf(document.activeElement);
     if(e.key==='Escape'){e.preventDefault();closeMenu();pb.focus();}
     else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
     else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+    else if(e.key==='Home'){e.preventDefault();opts[0].focus();}
+    else if(e.key==='End'){e.preventDefault();opts[opts.length-1].focus();}
   });
+  const filters=pb.closest('.filters');
+  if(filters)filters.addEventListener('focusout',(e)=>{
+    if(pm.hidden)return;
+    const to=e.relatedTarget;
+    if(!to||!filters.contains(to))closeMenu();   // focus left chip+menu → close, no focus steal
+  });
+  // PERIOD is committed only on a successful render (loadDash) — a failed
+  // switch leaves the chip, checkmarks and state exactly as they were.
   pm.querySelectorAll('[data-period]').forEach(b=>b.addEventListener('click',()=>{
-    PERIOD=b.getAttribute('data-period');closeMenu();
-    loadDash(true).then(()=>{const nb=$('periodBtn');if(nb)nb.focus();});
+    closeMenu();
+    loadDash(true,b.getAttribute('data-period')).then(()=>{const nb=$('periodBtn');if(nb)nb.focus();});
   }));
 }
 // one delegated outside-click closer (attached ONCE — renders rebuild the chip)
@@ -436,23 +460,39 @@ function renderPortfolio(d){
   if(!(d.insights||[]).length){h+=`<div class="quiet"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`;}
   h+=(d.insights||[]).map(insightCard).join('');
   h+=`<div class="pcard"><div class="s">Open the Studio to work client by client.</div><a class="go" href="/agency.html">Open Studio →</a></div>`;
+  h+=`<div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
   $('main').innerHTML=h;
 }
 
 // ── load (deploy-order tolerant BOTH ways: a 404 from an old function is a calm
 //    "warming up", never a broken page) ──
-async function loadDash(soft){
+// Request-generation guard: a slow response that resolves after a newer request
+// started is DISCARDED — it can never overwrite the board mislabeled. PERIOD
+// commits only on a successful render (commit-on-success): a failed or stale
+// switch leaves the chip and state untouched, so the next Refresh can't
+// silently swap periods.
+let REQ_SEQ=0;
+async function loadDash(soft,nextPeriod){
+  const period=nextPeriod||PERIOD;
+  const gen=++REQ_SEQ;
   let stencilTimer=null;
   if(!soft)stencilTimer=setTimeout(()=>{if(!DASH)renderStencil();},300);
-  let r; try{r=await api('/analytics/dashboard?period='+encodeURIComponent(PERIOD));}catch(_){r={ok:false,status:0};}
+  let r; try{r=await api('/analytics/dashboard?period='+encodeURIComponent(period));}catch(_){r={ok:false,status:0};}
   if(stencilTimer)clearTimeout(stencilTimer);
+  if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale
   if(!r.ok){
+    if(r.status===401){signedOut();return;}   // session ended mid-visit — not a toast loop
     if(soft&&DASH){toast('Couldn’t refresh just now.');return;}
     if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Analytics lives in your full workspace.</h2></div>`;return;}
     if(r.status===404){warming();return;}
     trouble();return;
   }
-  DASH=r.body.data||{};
+  const data=r.body.data||{};
+  // belt-and-braces: if the server echoes a period, it must be the one we asked
+  // for — otherwise this response can't honestly label the board
+  if(data.period&&data.period!==period)return;
+  PERIOD=period;   // commit only now — render below derives chip/checkmarks from it
+  DASH=data;
   renderDash(DASH);
 }
 async function load(){

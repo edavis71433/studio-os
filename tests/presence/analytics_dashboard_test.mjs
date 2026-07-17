@@ -9,6 +9,7 @@ import {
   parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors,
   sourceShares, invoiceBuckets, recentWins, oldestAgeDays, DASH_WEEKS,
 } from '../../supabase/functions/presence/lib/analytics_dashboard.ts';
+import { aggregateVisits } from '../../supabase/functions/presence/lib/visits.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -69,6 +70,24 @@ eq('priorMonthIso: January → previous December', priorMonthIso(Date.parse('202
   eq('visitors: distinct within a week', w[11], 2);
   eq('visitors: a returning visitor counts per week', w[10], 1);
   eq('visitors: non-pageview kinds never count', weeklyVisitors([{ ts: daysAgo(1), kind: 'cta', visitor_hash: 'z' }], NOW)[11], 0);
+  // hashless rows are SKIPPED — exactly like the headline visitors KPI (counting
+  // each hashless row as its own visitor would inflate the weekly buckets
+  // above the headline number)
+  eq('visitors: hashless rows never count (matches the KPI, no inflation)',
+    weeklyVisitors([{ ts: daysAgo(1), kind: 'pageview' }, { ts: daysAgo(1), kind: 'pageview', visitor_hash: '' }, { ts: daysAgo(1), kind: 'pageview', visitor_hash: 'a' }], NOW)[11], 1);
+}
+
+// ── exact calendar boundary (the route's pre-filter — B2) ──
+// aggregateVisits rebuilds its window as nowMs − days·DAY; with dashRange's
+// ceil'd days that bleeds up to ~24h of the prior period into "This month".
+// The routes intersect the rows with the true startMs FIRST — pinned here.
+{
+  const { startMs, days } = dashRange('this_month', NOW);
+  const mk = (ms, hash) => ({ ts: new Date(ms).toISOString(), kind: 'pageview', path: '/', ref_host: '', utm_source: '', device: '', country: '', visitor_hash: hash });
+  const rows = [mk(startMs - 3600_000, 'before'), mk(startMs + 3600_000, 'after')];   // 1h either side of the month start
+  const periodRows = rows.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= startMs; });
+  eq('boundary: a visit 1h before the month start is excluded by the pre-filter', aggregateVisits(periodRows, NOW, days).visitors, 1);
+  eq('boundary: without the pre-filter the ceil window over-counts (the filter is load-bearing)', aggregateVisits(rows, NOW, days).visitors, 2);
 }
 
 // ── sourceShares ──

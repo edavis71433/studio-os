@@ -344,27 +344,43 @@ function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.na
 
 // ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
 // tests/presence/client_website_test.mjs; keep both copies in sync). ──
-// hidden = no data / route missing / site not published; empty = published but
-// no visitors yet (a gentle "ready to be found" — never "0 people found you").
-function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m||!(m.visitors>0))return'empty';return'stats';}
+// hidden = no data / route missing / site not published / FAILED month read (a
+// transient DB failure must never masquerade as the "ready to be found" story);
+// empty = a SUCCESSFUL read with no visitors yet (gentle — never "0 people").
+function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'hidden';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
 function wsPeople(n){n=Math.max(0,n|0);return n===1?'1 person':n+' people';}
 // The lead sentence, from real numbers: bolded counts, sensible degradation —
-// zero actions drops the reach-out clause; no source drops the arrival clause;
-// 'Direct' reads as plain English, never "arrived from Direct".
+// zero actions drops the brought-in clause; no source drops the arrival clause;
+// 'Direct' reads as plain English, never "arrived from Direct". Actions are
+// EVENTS (phone/email/booking taps), not people — the sentence never claims
+// "N of them" (3 taps from 1 visitor is possible and must still read true).
 function wsLeadHtml(m){
   m=m||{};
   let h='<b>'+esc(wsPeople(m.visitors))+'</b> visited your website this month';
   const a=Math.max(0,m.actions|0);
-  h+=a>0?' — and <b>'+esc(String(a))+' of them reached out</b>: phone taps, emails and booking requests.':'.';
+  h+=a>0?' — and it brought in <b>'+esc(String(a))+(a===1?' tap':' taps')+' to call, email or book</b>.':'.';
   const src=m.top_source&&m.top_source.source?String(m.top_source.source):'';
   if(src)h+=src==='Direct'?' Most came straight to your website.':' Most arrived from <b>'+esc(src)+'</b>.';
   return h;
 }
+// GSC data can lag a month — when the reported period isn't the current
+// calendar month, the Google tile says which month it is (" · in June").
+// Defensive: malformed period → no qualifier, never a wrong one.
+function wsGscQualifier(period,nowMs){
+  const m=/^(\d{4})-(\d{2})$/.exec(String(period||''));
+  if(!m)return'';
+  const d=new Date(nowMs==null?Date.now():nowMs);
+  const cur=d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2);
+  if(m[0]===cur)return'';
+  const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const n=names[Number(m[2])-1];
+  return n?' · in '+n:'';
+}
 // The mini stat tiles; the Google tile exists only when Search Console data does.
 function wsTiles(m,search){
   const v=Math.max(0,(m&&m.visitors)|0),a=Math.max(0,(m&&m.actions)|0);
-  const t=[[String(v),(v===1?'visitor':'visitors')+' this month'],[String(a),'reached out or booked']];
-  if(search&&search.clicks!=null)t.push([String(Math.max(0,search.clicks|0)),'clicks from Google search']);
+  const t=[[String(v),(v===1?'visitor':'visitors')+' this month'],[String(a),(a===1?'tap':'taps')+' to call, email or book']];
+  if(search&&search.clicks!=null)t.push([String(Math.max(0,search.clicks|0)),'clicks from Google search'+wsGscQualifier(search.period)]);
   return t;
 }
 // Polyline points for the soft sparkline/line — pure geometry, no DOM. Oldest
@@ -406,7 +422,7 @@ function navFromHref(href){
 // reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
 // never touch it). Home aggregates ACROSS projects; the other tabs are top-level
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
-const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},unread:0,notifs:[],billing:null,snaps:null};
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},unread:0,notifs:[],billing:null,snaps:null,wstatsFetch:null};
 let CURRENT_TAB='home';
 // A monotonically increasing VIEW token: every function that owns a fresh paint
 // of #main bumps it (showTab AND every drill-in open — openProject, support
@@ -666,7 +682,7 @@ function wsCardHtml(d){
   const pts=wsSparkPoints(wk,520,54,6);
   const full=wsFullHtml(m,search);
   return '<div class="card wscard"><span class="tag">Your website</span><h3>People are finding you.</h3>'
-    +'<p class="wslead">'+wsLeadHtml(m)+'</p>'
+    +'<p class="wslead">'+wsLeadHtml(m)+(m.truncated?' <span class="muted" style="font-size:12px">· based on recent activity</span>':'')+'</p>'
     +(pts?'<svg class="wsspark" viewBox="0 0 520 54" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline fill="none" stroke="var(--p)" stroke-width="2.5" opacity=".85" points="'+pts+'"/></svg><span class="sr-only">'+esc('Visitors per week, oldest to newest: '+wk.join(', ')+'.')+'</span>':'')
     +'<div class="wsmini">'+wsTiles(m,search).map(t=>'<div class="m"><p class="n">'+esc(t[0])+'</p><p class="l">'+esc(t[1])+'</p></div>').join('')+'</div>'
     +(full?'<div id="wsfull" hidden>'+full+'</div>':'')
@@ -675,10 +691,13 @@ function wsCardHtml(d){
 // Deploy-order tolerant: any non-OK read (a 404 from an older function build
 // included) leaves the slot hidden — no error card, no fake zeros. Cached per
 // full load (like billing); a reviewer never fetches (no website of their own).
+// The in-flight promise is cached too, so Home→away→Home never refires a
+// request that's already running (at most one fetch per load).
 async function loadWebsiteCard(){
   if(PORTAL.persona!=='client')return;
   if(PORTAL.wstats===undefined){
-    try{const r=await api('/client/website-stats');PORTAL.wstats=(r.ok&&r.body&&r.body.data)||null;}catch(_){PORTAL.wstats=null;}
+    if(!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>(r.ok&&r.body&&r.body.data)||null).catch(()=>null);
+    PORTAL.wstats=await PORTAL.wstatsFetch;
   }
   const host=document.getElementById('home-website');if(!host)return;   // the user moved on mid-fetch
   const h=wsCardHtml(PORTAL.wstats);
@@ -1576,7 +1595,7 @@ function ownerNote(){$('main').innerHTML=`<div class="center"><div class="roleba
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.wstats=undefined;   // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const params=new URLSearchParams(location.search);
   const dsup=params.get('support'); const deep=params.get('project');
   // honor a deep link once, then drop it from the URL so any later re-load
