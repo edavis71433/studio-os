@@ -15,18 +15,20 @@
     --shadow-lift:0 2px 4px rgba(27,21,37,.05),0 14px 34px rgba(27,21,37,.10);
     --serif:'Fraunces',"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    /* activity-timeline type accents (Salesforce anatomy, portal-local values —
+       same precedent as crm.html's --act-*). Most hues reuse theme tokens that
+       already flip (--p/--warn/--good/--faint); only these two are fixed per theme. */
+    --act-file:#31708e;--act-note:#8a5a83;
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28);--shadow-lift:0 2px 4px rgba(0,0,0,.24),0 14px 34px rgba(0,0,0,.34)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#432e78;--p-soft:#efeafa;--on-p:#fff}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--act-file:#85b7cf;--act-note:#c9a3c2;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28);--shadow-lift:0 2px 4px rgba(0,0,0,.24),0 14px 34px rgba(0,0,0,.34)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#432e78;--p-soft:#efeafa;--on-p:#fff;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--act-file:#31708e;--act-note:#8a5a83}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--act-file:#85b7cf;--act-note:#c9a3c2}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:660px;margin:0 auto;padding:40px 20px 90px}
   .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px;font-family:var(--sans)}
   header h1{font-family:var(--serif);font-weight:500;font-size:clamp(28px,5vw,38px);margin:16px 0 .15em;letter-spacing:-.02em;line-height:1.08}
   header .sub{color:var(--soft);font-size:15px;margin:0}
-  .status{margin-top:22px;padding:14px 18px;background:var(--good-soft);border-radius:14px;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:10px}
-  .status .d{width:8px;height:8px;border-radius:50%;background:var(--good);flex:0 0 auto}
   section{margin-top:34px}
   h2{font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px;transition:border-color .15s,box-shadow .15s,transform .15s}
@@ -51,6 +53,7 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   /* ── UX upgrades: focus, bell/panel, chip-bar, skeletons, welcome ── */
   a:focus-visible,button:focus-visible,[tabindex]:focus-visible,.card[role="button"]:focus-visible,.nitem:focus-visible,.chip:focus-visible{outline:3px solid var(--p);outline-offset:2px;border-radius:12px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .bell{position:relative;width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto;border-radius:999px;background:var(--card);box-shadow:var(--shadow)}
   .bell .badge{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--p);color:var(--on-p);font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
@@ -79,10 +82,12 @@
   @keyframes sh{to{background-position:-200% 0}}
   @media (prefers-reduced-motion:reduce){.spin,.skel .l{animation:none}html{scroll-behavior:auto}}
   html{scroll-behavior:smooth}
-  /* ── persistent portal nav: bottom tab bar (mobile) → top rail (wider) ── */
+  /* ── persistent portal nav: bottom tab bar (mobile) → Salesforce context bar (wider) ── */
   .tabnav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -2px 12px rgba(27,21,37,.07);padding-bottom:env(safe-area-inset-bottom)}
   .tabnav[hidden]{display:none}
-  .tabnav-inner{max-width:660px;margin:0 auto;display:flex;justify-content:space-around}
+  .tabnav-inner{max-width:660px;margin:0 auto;display:flex}
+  .cb-tabs{flex:1 1 auto;min-width:0;display:flex;justify-content:space-around}
+  .cb-brand,.cb-right,.navpanel{display:none}
   .tab{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;border-radius:0;background:transparent;color:var(--soft);padding:8px 2px 9px;font-size:11px;font-weight:600;cursor:pointer;min-height:52px}
   .tab .ti{font-size:19px;line-height:1}
   .tab:hover{color:var(--p)}
@@ -91,32 +96,99 @@
   .toast{z-index:40}
   @media (max-width:719px){.toast{bottom:74px}}
   @media (min-width:720px){
+    /* the context bar (salesforce-reference §11.5): primary region = the studio
+       identity as the "app name", secondary = flat tabs with the active-tab
+       underline, right = bell + account chip. Same DOM as the bottom bar. */
     .tabnav{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line);box-shadow:var(--shadow);padding-bottom:0}
-    .tabnav-inner{justify-content:center;gap:4px}
-    .tab{flex:0 0 auto;flex-direction:row;gap:7px;font-size:13.5px;padding:13px 16px;min-height:0}
+    .tabnav-inner{max-width:none;margin:0;align-items:stretch;position:relative;padding:0 18px;gap:10px}
+    .cb-brand{display:flex;align-items:center;gap:9px;flex:0 0 auto;padding:8px 8px 8px 0}
+    .cb-mark{width:26px;height:26px;border-radius:8px;background:var(--p);color:var(--on-p);display:grid;place-items:center;font-size:13px;flex:0 0 auto}
+    .cb-name{font-family:var(--serif);font-size:15.5px;font-weight:500;color:var(--ink);white-space:nowrap}
+    .cb-tabs{flex:0 1 auto;justify-content:flex-start;gap:2px;overflow-x:auto;scrollbar-width:none}
+    .cb-tabs::-webkit-scrollbar{display:none}
+    .tab{flex:0 0 auto;flex-direction:row;gap:7px;font-size:13.5px;padding:13px 14px;min-height:0;border-bottom:2.5px solid transparent}
     .tab .ti{font-size:15px}
-    .tab{border-radius:999px}
-    .tab[aria-current="page"]{background:var(--p-soft)}
+    .tab[aria-current="page"]{background:transparent;border-bottom-color:var(--p)}
     .tab[aria-current="page"] .ti{background:transparent;padding:0;margin:0}
-    .chipbar{top:56px}
+    .cb-right{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
+    .cb-bell{width:36px;height:36px;font-size:16px;box-shadow:none;border:1px solid var(--line)}
+    .cb-acct{width:32px;height:32px;padding:0;border-radius:50%;background:var(--p-soft);color:var(--p);font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+    .cb-acct:hover{border-color:var(--p);color:var(--p)}
+    .navpanel{display:block;position:absolute;top:calc(100% + 8px);right:14px;width:min(400px,calc(100vw - 28px));margin:0;z-index:35;box-shadow:var(--shadow-lift);max-height:70vh;overflow:auto}
+    .navpanel[hidden]{display:none}
+    .topbar .bell{display:none}   /* at this width the bell lives in the context bar */
+    .chipbar{top:52px}
     section[id^="sec-"],#sec-overview{scroll-margin-top:118px}
   }
   /* ── group heading (Files by project) — normal case, not the uppercase eyebrow ── */
   .grouphd{font-family:var(--serif);font-weight:500;font-size:17px;color:var(--ink);text-transform:none;letter-spacing:0;margin:0 0 12px}
-  /* ── vertical project timeline (milestones) ── */
-  .timeline{list-style:none;margin:0;padding:0}
-  .tl-node{position:relative;padding:0 0 20px 30px}
-  .tl-node::before{content:"";position:absolute;left:8px;top:16px;bottom:-4px;width:2px;background:var(--line)}
-  .tl-node:last-child::before{display:none}
-  .tl-dot{position:absolute;left:2px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--card);border:2px solid var(--line)}
-  .tl-node.done .tl-dot{background:var(--good);border-color:var(--good)}
-  .tl-node.done::before{background:var(--good)}
-  .tl-node.current .tl-dot{background:var(--p);border-color:var(--p);box-shadow:0 0 0 4px var(--p-soft)}
-  .tl-body h3{font-family:var(--serif);font-weight:500;font-size:17px;margin:0;line-height:1.25}
-  .tl-meta{color:var(--soft);font-size:13.5px;margin:2px 0 0}
-  .tl-here{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
-  @media (prefers-reduced-motion:no-preference){.tl-node.current .tl-dot{animation:tlpulse 2.2s ease-in-out infinite}}
-  @keyframes tlpulse{0%,100%{box-shadow:0 0 0 4px var(--p-soft)}50%{box-shadow:0 0 0 7px var(--p-soft)}}
+  /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
+  .tl-here{display:inline-block;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
+  .pathcard{padding:14px 16px}
+  .path{display:flex;min-width:0}
+  .path .pstep{flex:1 1 0;min-width:0;font-size:12px;font-weight:600;padding:8px 15px;background:var(--bg);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
+    clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
+  .path .pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
+  .path .pstep:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,11px 50%);border-radius:0 8px 8px 0}
+  .path .pstep:only-child{clip-path:none;border-radius:8px}   /* a sole milestone: clean rounded rectangle, no notch */
+  .path .pstep.done{background:var(--good-soft);color:var(--good)}
+  .path .pstep.current{background:var(--p);color:var(--on-p)}
+  .path.mini{margin-top:10px}
+  .path.mini .pstep{font-size:10px;padding:4px 10px;letter-spacing:.02em}
+  .path.mini .pstep:first-child{border-radius:6px 0 0 6px}
+  .path.mini .pstep:last-child{border-radius:0 6px 6px 0}
+  .path.mini .pstep:only-child{border-radius:6px}
+  .path-meta{margin:10px 2px 0;font-size:13.5px;color:var(--soft)}
+  .path-meta b{color:var(--ink);font-weight:600}
+  /* ── record header chip + highlights tiles (label-over-value) ── */
+  .phead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .phead h1{margin:0}
+  .statuschip{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:4px 11px;background:var(--p-soft);color:var(--p);flex:0 0 auto}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:18px;box-shadow:var(--shadow)}
+  .hl{background:var(--card);padding:10px 14px;min-width:0}
+  .hl-k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .hl-v{font-family:var(--serif);font-size:17.5px;margin-top:2px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ── two-region record body: actions (left) · activity timeline rail (right) ── */
+  @media (min-width:1000px){
+    body.wide .wrap{max-width:1100px}
+    .pbody{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 22px;align-items:start}
+  }
+  /* ── the "Needs you" queue card + list-view rows (unread dots, kind chips) ── */
+  .qcard{padding:6px 18px}
+  .qrow{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:13px 0;border-top:1px solid var(--line)}
+  .qrow:first-child{border-top:0}
+  .qmain{flex:1 1 220px;min-width:0}
+  .qmain h3{font-family:var(--serif);font-weight:500;font-size:16.5px;margin:4px 0 2px;line-height:1.25;letter-spacing:-.01em}
+  .qmain p{margin:0;color:var(--soft);font-size:13.5px}
+  .kchip{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p)}
+  .kchip.todo{background:var(--warn-soft);color:var(--warn)}
+  .kchip.invoice{background:var(--good-soft);color:var(--good)}
+  .qrow.unread h3::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--p);margin-right:8px;vertical-align:middle}
+  .qact{flex:0 0 auto;display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;padding-top:2px}
+  .qact button{font-size:12.5px;padding:6px 13px}
+  /* ── the project activity timeline (type-colored connector + icon rings) ──
+     scoped under #ptl: the tab bar's icon spans also use class "ti" (mobile nav,
+     untouched by this slice) — unscoped rules would draw connector lines there. */
+  #ptl .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:16px 0 2px;display:flex;align-items:center;gap:8px}
+  #ptl .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
+  #ptl .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
+  #ptl .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
+  /* connector trims target classes STAMPED at render time — .tl-month is also a
+     div, so the structural :first-of-type/:last-of-type could never match here. */
+  #ptl .ti.ti-first:before{top:12px} #ptl .ti.ti-last:before{bottom:auto;height:22px}
+  #ptl .ti .ti-icon{position:absolute;left:1px;top:8px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--on-p);box-shadow:0 0 0 3px var(--card)}
+  #ptl .ti.t-message:before{background:color-mix(in srgb,var(--p) 35%,transparent)} #ptl .ti.t-message .ti-icon{background:var(--p)}
+  #ptl .ti.t-task:before{background:color-mix(in srgb,var(--warn) 35%,transparent)} #ptl .ti.t-task .ti-icon{background:var(--warn)}
+  #ptl .ti.t-file:before{background:color-mix(in srgb,var(--act-file) 35%,transparent)} #ptl .ti.t-file .ti-icon{background:var(--act-file)}
+  #ptl .ti.t-approve:before{background:color-mix(in srgb,var(--good) 35%,transparent)} #ptl .ti.t-approve .ti-icon{background:var(--good)}
+  #ptl .ti.t-note:before{background:color-mix(in srgb,var(--act-note) 35%,transparent)} #ptl .ti.t-note .ti-icon{background:var(--act-note)}
+  #ptl .ti.t-system:before{background:color-mix(in srgb,var(--faint) 30%,transparent)} #ptl .ti.t-system .ti-icon{background:var(--faint)}
+  #ptl .ti-main{flex:1;min-width:0}
+  #ptl .ti-title{font-weight:600;font-size:13.5px;color:var(--ink)}
+  #ptl .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;border-left:2px solid var(--line);padding-left:10px}
+  #ptl .ti-when{font-size:11.5px;color:var(--faint);white-space:nowrap;flex:0 0 auto;padding-top:2px}
+  .acard{padding:14px 16px}
+  .pcompose{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
   /* ── decision history (already-decided approvals) ── */
   .hist{list-style:none;margin:0;padding:0}
   .hist li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
@@ -226,17 +298,45 @@ function navFromHref(href){
 const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},unread:0,notifs:[],billing:null,snaps:null};
 let CURRENT_TAB='home';
 const TABS=[['home','🏠','Home'],['messages','💬','Messages'],['files','📁','Files'],['invoices','🧾','Invoices'],['requests','✨','Requests'],['help','❓','Help']];
+// The context bar's "app name" is the studio/business identity. The portal's own
+// reads (/portal/context|feed + /client/*) expose no agency branding today — the
+// only name in context is the operator drill-in's scope.name, which is the
+// CUSTOMER's name, not the studio's — so this degrades honestly to the generic.
+function studioBrand(){return 'Your studio';}
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
-  nav.innerHTML=`<div class="tabnav-inner">`+TABS.map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')+`</div>`;
+  const acct=(((firstName(USER)||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
+  const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
+  nav.innerHTML=`<div class="tabnav-inner">`+
+    `<span class="cb-brand"><span class="cb-mark" aria-hidden="true">✦</span><span class="cb-name">${esc(studioBrand())}</span></span>`+
+    `<div class="cb-tabs">`+TABS.map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')+`</div>`+
+    `<span class="cb-right">`+
+      `<button id="navbell" class="bell cb-bell" aria-label="What’s new${PORTAL.unread?` — ${PORTAL.unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button>`+
+      `<button id="navacct" class="cb-acct" aria-label="Your account — opens Help" title="Your account">${esc(acct)}</button>`+
+    `</span>`+
+    `<div id="navnp" class="notifpanel navpanel" role="region" aria-label="What’s new" hidden></div>`+
+  `</div>`;
   nav.hidden=false;
-  nav.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
+  const tabs=[...nav.querySelectorAll('.tab')];
+  tabs.forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
+  // page navigation, not tabs: the outer <nav aria-label="Portal sections"> is the
+  // landmark, the buttons are plain (aria-current="page" marks the active one).
+  // Arrow keys move focus between them as a convenience — Tab order works too.
+  nav.querySelector('.cb-tabs').addEventListener('keydown',(e)=>{
+    if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;
+    const i=tabs.indexOf(document.activeElement);if(i<0)return;
+    e.preventDefault();tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length].focus();
+  });
+  const na=$('navacct');if(na)na.addEventListener('click',()=>showTab('help'));
+  wireBellAt('navbell','navnp');
   setActiveTab(CURRENT_TAB);
 }
 function hideNav(){const nav=$('tabnav');if(nav){nav.hidden=true;nav.innerHTML='';}}
 function setActiveTab(tab){const nav=$('tabnav');if(!nav)return;nav.querySelectorAll('.tab').forEach(b=>{if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});}
+// the project record page widens the wrap (two-region body); every other view is narrow
+function setWide(on){try{document.body.classList.toggle('wide',!!on);}catch(_){}}
 function showTab(tab){
-  CURRENT_TAB=tab;setActiveTab(tab);try{window.scrollTo(0,0);}catch(_){}
+  CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
   if(tab==='messages')return renderMessages();
   if(tab==='files')return renderFiles();
   if(tab==='invoices')return renderInvoices();
@@ -261,29 +361,58 @@ async function ensureSnaps(){
   PORTAL.snaps=await Promise.all(list.map(async(p)=>{
     try{const r=await api('/client/projects/'+p.id);const d=(r&&r.body&&r.body.data)||{};const prog=d.progress||{};
       return {id:p.id,name:p.name,pct:prog.pct,total:prog.total,
+        milestones:(d.milestones||[]),
         approvals:(d.approvals||[]).filter(a=>a&&a.status==='pending'),
         todos:(d.tasks||[]).filter(t=>t&&t.client_action_required&&t.status!=='done'),
         surveys:(d.surveys||[]),deliverables:(d.deliverables||[])};
-    }catch(_){return {id:p.id,name:p.name,approvals:[],todos:[],surveys:[],deliverables:[]};}
+    }catch(_){return {id:p.id,name:p.name,milestones:[],approvals:[],todos:[],surveys:[],deliverables:[]};}
   }));
   return PORTAL.snaps;
 }
 // shared deliverable download (Files tab + a project's Files section reuse it)
 async function downloadDeliverable(id){const r=await api('/client/deliverables/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('That file isn’t available.');}
 function wireDownloads(root){(root||document).querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>downloadDeliverable(b.getAttribute('data-dl'))));}
-// vertical timeline over data.milestones (ordered by sort_order server-side):
-// complete → done, the first still-open one → "you are here / Next up", rest upcoming.
-function tlDate(x){const t=Date.parse(x);return isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';}
-function timelineHtml(ms){
-  let firstOpen=true,h='<ol class="timeline">';
-  for(const m of (ms||[])){
-    const done=m.status==='complete';let state,label;
-    if(done){state='done';const w=tlDate(m.completed_at);label='✓ Done'+(w?` · ${w}`:'');}
-    else if(firstOpen){state='current';firstOpen=false;label='Next up'+(m.due_date?` · due ${m.due_date}`:'');}
-    else{state='upcoming';label='Upcoming'+(m.due_date?` · due ${m.due_date}`:'');}
-    h+=`<li class="tl-node ${state}"><span class="tl-dot" aria-hidden="true"></span><div class="tl-body"><h3>${esc(m.title)}</h3><p class="tl-meta">${esc(label)}${state==='current'?'<span class="tl-here">You’re here</span>':''}</p></div></li>`;
-  }
-  return h+'</ol>';
+// ── milestone Path — read-only Lightning chevrons over data.milestones ───────
+// (ordered by sort_order server-side): complete → done ✓, the first still-open
+// one → current ("You're here"), the rest upcoming. Informational only — the
+// chevrons are never interactive (simpler than the studio's Path on purpose).
+function pathSteps(ms){
+  let firstOpen=true;
+  return (ms||[]).filter(m=>m&&m.title).map(m=>{
+    if(m.status==='complete')return{m,state:'done'};
+    if(firstOpen){firstOpen=false;return{m,state:'current'};}
+    return{m,state:'upcoming'};
+  });
+}
+// Per-step date text (F8): the old vertical list showed '✓ Done · Jul 1' and
+// 'due <date>' — the Path keeps that visibility as each chevron's title tooltip
+// and in the aria narration ('Design — done Jul 1' / 'Build — current, due 2026-07-20').
+function pathStepText(s){
+  if(s.state==='done'){const t=Date.parse(s.m.completed_at||'');return'done'+(isFinite(t)?' '+new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'');}
+  return s.state+(s.m.due_date?', due '+s.m.due_date:'');
+}
+// Concise progress phrase for a project card's accessible name (F15): the card
+// is a role="button", so anything not aria-hidden inside it joins its name —
+// the mini Path is decorative there and this short phrase speaks instead.
+function pathSummary(steps){
+  const done=steps.filter(s=>s.state==='done').length;
+  const cur=steps.find(s=>s.state==='current');
+  return `Milestones: ${done} of ${steps.length} complete${cur?`, now at ${cur.m.title}`:''}.`;
+}
+function pathChevrons(steps,mini){
+  const spans=steps.map(s=>`<span class="pstep ${s.state}" title="${esc(`${s.m.title} — ${pathStepText(s)}`)}" aria-hidden="true">${s.state==='done'?'✓ ':''}${esc(s.m.title)}</span>`).join('');
+  if(mini)return `<div class="path mini" aria-hidden="true">${spans}</div>`;   // decorative inside the card button (F15)
+  const label='Milestones: '+steps.map(s=>`${s.m.title} — ${pathStepText(s)}`).join('; ');
+  return `<div class="path" role="img" aria-label="${esc(label)}">${spans}</div>`;
+}
+function miniPathHtml(ms){const steps=pathSteps(ms);return steps.length?pathChevrons(steps,true)+`<span class="sr-only">${esc(pathSummary(steps))}</span>`:'';}
+function milestonePathHtml(ms){
+  const steps=pathSteps(ms);if(!steps.length)return'';
+  const cur=steps.find(s=>s.state==='current');
+  const meta=cur
+    ?`<span class="tl-here">You’re here</span> <b>${esc(cur.m.title)}</b>${cur.m.due_date?` · due ${esc(cur.m.due_date)}`:''}`
+    :`✓ All milestones complete`;
+  return `<section id="sec-milestones"><h2>Milestones</h2><div class="card pathcard">${pathChevrons(steps,false)}<p class="path-meta">${meta}</p></div></section>`;
 }
 async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Noted — your studio has been told. Nothing changed.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
 
@@ -291,8 +420,26 @@ async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api
 function projectCardsHtml(projects){
   if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.','🚀');
   let h='';
-  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
+  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   return h;
+}
+// Which Home queue rows deserve an unread dot — derived purely from the EXISTING
+// notifications read-state (no new backend): an unread notification anchored at
+// an approval / task / a project's surveys marks the matching row as new.
+function unreadKeysFrom(notifs){
+  const keys=new Set();
+  for(const n of (notifs||[])){
+    if(!n||n.read)continue;const href=String(n.href||'');
+    const a=href.match(/#approval-([a-z0-9-]+)/i);if(a)keys.add('approval-'+a[1]);
+    const t=href.match(/#task-([a-z0-9-]+)/i);if(t)keys.add('task-'+t[1]);
+    const sv=href.match(/\/projects\/([a-z0-9-]+)#surveys/i);if(sv)keys.add('surveys-'+sv[1]);
+    // 'client_action' = the studio flagged an EXISTING task as needing the client
+    // (the primary to-do flow). Its href carries NO task anchor (notifHref's
+    // default drops detail.task_id), so the honest granularity is PROJECT-level:
+    // an unread client_action for project P lights P's to-do rows.
+    if(n.kind==='client_action'){const p=href.match(/\/projects\/([a-z0-9-]+)/i);if(p)keys.add('todos-'+p[1]);}
+  }
+  return keys;
 }
 function renderHome(){
   const P=PORTAL,projects=P.projects,feed=P.feed||{};
@@ -307,29 +454,51 @@ function renderHome(){
   html+=`<section><h2>Recent updates</h2>`;
   const moments=(feed.moments||[]);
   if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
-  else for(const m of moments)html+=`<div class="card"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>`;
+  else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><div class="qmain"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div></div>`).join('')}</div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
-  wireWelcome();wireBell(P.notifs,P.unread);
+  wireWelcome();wireBell();
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
   buildNeedsYou();
 }
-// Fill glances + the aggregated "Needs you" list from feed + per-project snapshots
-// + unpaid invoices. Everything here is a clear, single action.
+// Fill glances + mini Paths + the aggregated "Needs you" QUEUE — one list-view
+// card of two-line rows (kind chip · title · context · inline action) from feed
+// + per-project snapshots + unpaid invoices. Everything here is a clear, single
+// action; unread dots come from the existing notifications read-state.
 async function buildNeedsYou(){
   const [snaps,billing]=await Promise.all([ensureSnaps(),ensureBilling()]);
-  for(const s of snaps){const el=document.getElementById('glance-'+s.id);if(!el)continue;const bits=[];const waiting=s.approvals.length+s.todos.length;if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0)bits.push(`<strong style="color:var(--warn)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);el.innerHTML=bits.join(' · ');}
-  const body=document.getElementById('needs-body');if(!body)return;
-  const items=[];
-  for(const p of (PORTAL.feed.pending_approvals||[])){items.push(`<div class="card approve"><span class="tag">${esc(p.kind==='connected'?'Connected':'Change')}</span><h3>${esc(p.title||'A change is ready')}</h3><p>${esc(p.summary||'')}</p><div class="row"><button class="approve" data-approve="${esc(p.decide_path)}">Approve</button><button data-decline="${esc(p.decide_path)}">Not yet</button></div></div>`);}
   for(const s of snaps){
-    for(const a of s.approvals)items.push(`<div class="card approve"><span class="tag">Approval</span><h3>${esc(a.title||'A change is ready')}</h3><p>${esc(s.name)}${a.summary?` · ${esc(a.summary)}`:''}</p><div class="row"><button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals">Review →</button></div></div>`);
-    if(s.todos.length)items.push(`<div class="card"><span class="tag">To-do</span><h3>${s.todos.length} thing${s.todos.length===1?'':'s'} for you</h3><p>${esc(s.name)}</p><div class="row"><button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos">Open →</button></div></div>`);
-    for(const sv of s.surveys)items.push(`<div class="card"><span class="tag">Survey</span><h3>${esc(sv.title||'A quick survey')}</h3><p>${esc(s.name)}</p><div class="row"><button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}">Answer →</button></div></div>`);
+    const el=document.getElementById('glance-'+s.id);
+    if(el){const bits=[];const waiting=s.approvals.length+s.todos.length;if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0)bits.push(`<strong style="color:var(--warn)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);el.innerHTML=bits.join(' · ');}
+    const mp=document.getElementById('mp-'+s.id);
+    if(mp)mp.innerHTML=miniPathHtml(s.milestones);
   }
-  for(const i of unpaidInvoices(billing)){items.push(`<div class="card"><span class="tag">Invoice</span><h3>${esc(i.name||'Invoice')}</h3><p>${i.amount?('$'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(i.due_date)}`:''}</p><div class="row">${i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener">Pay →</a>`:`<button data-tab-go="invoices">View →</button>`}</div></div>`);}
+  const body=document.getElementById('needs-body');if(!body)return;
+  const seen=unreadKeysFrom(PORTAL.notifs);
+  // unread rows carry an sr-only "New — " prefix (the dot is a bare pseudo-element);
+  // action buttons get aria-labels that include the row title so repeated
+  // "Review →" / "Open →" names stay distinguishable to a screen reader.
+  const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
+  const items=[];
+  for(const p of (PORTAL.feed.pending_approvals||[]))
+    items.push(row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
+      `<button class="approve" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`));
+  for(const s of snaps){
+    for(const a of s.approvals)
+      items.push(row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
+        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="Review — ${esc(a.title||'A change is ready')}">Review →</button>`));
+    if(s.todos.length)
+      items.push(row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} thing${s.todos.length===1?'':'s'} for you`,esc(s.name),
+        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open →</button>`));
+    for(const sv of s.surveys)
+      items.push(row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
+        `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`));
+  }
+  for(const i of unpaidInvoices(billing))
+    items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?('$'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(i.due_date)}`:''}`,
+      i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View →</button>`));
   if(!items.length){body.innerHTML=`<div class="card"><p><strong>You’re all caught up.</strong></p><p class="muted" style="margin-top:4px">Nothing needs you right now — we’ll flag anything here the moment it does.</p></div>`;return;}
-  body.innerHTML=items.join('');
+  body.innerHTML=`<div class="card qcard">${items.join('')}</div>`;
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
   body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
@@ -595,49 +764,96 @@ function notifPanelHtml(notifs){
   }
   return h;
 }
-function wireBell(notifs,unread){
-  const bell=$('bell'),panel=$('np');if(!bell||!panel)return;
+// One wiring for BOTH bells (Home's topbar bell on phones; the context bar's
+// bell ≥720px — both exist in the DOM at once, CSS shows exactly one per viewport).
+// Opening either marks everything seen: every badge clears (so the two bells can
+// never disagree) and the read-state persists server-side.
+const BELL_DOC_WIRED=new Set();   // document-level listeners bind ONCE per bell/panel pair
+function wireBellAt(bellId,panelId){
+  const bell=$(bellId),panel=$(panelId);if(!bell||!panel)return;
   let built=false;
   const close=()=>{panel.hidden=true;bell.setAttribute('aria-expanded','false');};
   const open=()=>{
-    if(!built){panel.innerHTML=notifPanelHtml(notifs);built=true;
-      panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>navFromHref(b.getAttribute('data-nav'))));
+    if(!built){panel.innerHTML=notifPanelHtml(PORTAL.notifs);built=true;
+      panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>{close();navFromHref(b.getAttribute('data-nav'));}));
     }
     panel.hidden=false;bell.setAttribute('aria-expanded','true');
-    if(unread){ // seen now — clear the badge and persist read-state
-      const b=bell.querySelector('.badge');if(b){b.classList.remove('on');b.textContent='';}
-      panel.querySelectorAll('.nitem.unread').forEach(el=>el.classList.remove('unread'));
-      unread=0;bell.setAttribute('aria-label','What’s new');
+    if(PORTAL.unread){ // seen now — clear every badge and persist read-state
+      PORTAL.unread=0;
+      PORTAL.notifs.forEach(n=>{if(n)n.read=true;});   // so rebuilt panels + unreadKeysFrom (Home dots) agree all session
+      document.querySelectorAll('.bell .badge').forEach(b=>{b.classList.remove('on');b.textContent='';});
+      document.querySelectorAll('.bell').forEach(el=>el.setAttribute('aria-label','What’s new'));
+      document.querySelectorAll('.nitem.unread').forEach(el=>el.classList.remove('unread'));
+      document.querySelectorAll('.qrow.unread').forEach(el=>el.classList.remove('unread'));   // live Home queue dots
+      document.querySelectorAll('.sr-new').forEach(el=>el.remove());                          // …and their sr-only "New —" text
       api('/client/notifications/read','POST',{}).catch(()=>{});
     }
   };
   bell.addEventListener('click',()=>{panel.hidden?open():close();});
-  document.addEventListener('click',(e)=>{if(!panel.hidden&&!panel.contains(e.target)&&e.target!==bell&&!bell.contains(e.target))close();});
-  document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!panel.hidden){close();bell.focus();}});
+  // Re-renders replace the bell/panel NODES, so the once-bound document listeners
+  // must resolve them by id at event time — never close over this call's elements.
+  if(!BELL_DOC_WIRED.has(panelId)){
+    BELL_DOC_WIRED.add(panelId);
+    const liveClose=()=>{const p=$(panelId),bl=$(bellId);if(p)p.hidden=true;if(bl)bl.setAttribute('aria-expanded','false');return bl;};
+    document.addEventListener('click',(e)=>{const p=$(panelId),bl=$(bellId);if(p&&!p.hidden&&!p.contains(e.target)&&(!bl||(e.target!==bl&&!bl.contains(e.target))))liveClose();});
+    document.addEventListener('keydown',(e)=>{const p=$(panelId);if(e.key==='Escape'&&p&&!p.hidden){const bl=liveClose();if(bl)bl.focus();}});
+  }
 }
+function wireBell(){wireBellAt('bell','np');}
+// ── the project drill-in — the client's record page ─────────────────────────
+// Anatomy (Salesforce record page, portal skin): header (name + status chip) →
+// highlights tiles → milestone Path (read-only chevrons) → two-region body:
+// LEFT the things a client acts on (approvals · decided · to-dos · files ·
+// survey · support), RIGHT the project activity timeline + message composer.
+// Below 1000px it stacks to one column with the timeline LAST — actions first.
+let PROJ_EVENTS=[],PROJ_MSGS=[];   // the open project's timeline inputs
 async function openProject(id,focusSection){
+  setWide(false);
   $('main').innerHTML=skeleton();
-  const [d,rep,supRes]=await Promise.all([api('/client/projects/'+id),api('/client/projects/'+id+'/report').catch(()=>null),api('/client/support').catch(()=>null)]);
+  const [d,rep,supRes,msgRes]=await Promise.all([
+    api('/client/projects/'+id),
+    api('/client/projects/'+id+'/report').catch(()=>null),
+    api('/client/support').catch(()=>null),
+    api('/client/projects/'+id+'/messages').catch(()=>null),
+  ]);
   if(!d.ok){toast('That project isn’t available.');return goHome();}
+  setWide(true);
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
+  PROJ_EVENTS=(data.events||[]).slice();
+  PROJ_MSGS=((msgRes&&msgRes.ok&&msgRes.body&&msgRes.body.data)||[]).slice();
   const hasOverview=!!(s&&s.progress&&s.milestones);
-  let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><h1>${esc(p.name)}</h1><p class="sub">Status: ${esc((p.status||'').replace('_',' '))}</p></header>`;
+  const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
+  const aps=(data.approvals||[]).filter(a=>a.status==='pending');
+  const acts=(data.tasks||[]).filter(t=>t.client_action_required);
+  let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><div class="phead"><h1>${esc(p.name)}</h1><span class="statuschip">${esc((p.status||'').replace('_',' '))}</span></div></header>`;
   // slim sticky chip bar — anchors within this one screen (no new pages); only
   // sections that actually have content get a chip.
   const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true,hasSupport:true});
   if(chips.length>1)html+=`<nav class="chipbar" aria-label="Jump to a section">${chips.map(c=>`<button class="chip" data-chip="${esc(c.id)}">${esc(c.label)}</button>`).join('')}</nav>`;
-  if(hasOverview) html+=`<div class="status" id="sec-overview"><span class="d"></span>${s.progress.pct}% complete · ${s.milestones.complete}/${s.milestones.total} milestones · ${(s.open_client_actions||0)} action${s.open_client_actions===1?'':'s'} for you</div>`;
+  // highlights tiles (label-over-value) — only the facts this project has
+  const prog=(s&&s.progress)||data.progress||null;
+  const msTotals=(s&&s.milestones)||{total:(data.milestones||[]).length,complete:(data.milestones||[]).filter(m=>m&&m.status==='complete').length};
+  const waiting=aps.length+acts.filter(t=>t.status!=='done').length;
+  const files=(data.deliverables||[]).length;
+  const tiles=[];
+  if(prog&&prog.total>0)tiles.push(['Progress',prog.pct+'%']);
+  tiles.push(['Waiting on you',String(waiting)]);
+  if(msTotals.total>0)tiles.push(['Milestones',`${msTotals.complete} of ${msTotals.total}`]);
+  if(files>0)tiles.push(['Files shared',String(files)]);
+  if(p.target_date)tiles.push(['Target date',String(p.target_date)]);
+  html+=`<div class="hl-panel" id="sec-overview" role="group" aria-label="Project highlights">${tiles.map(t=>`<div class="hl"><div class="hl-k">${esc(t[0])}</div><div class="hl-v">${esc(t[1])}</div></div>`).join('')}</div>`;
+  // milestone Path — read-only chevrons (replaces the old vertical list)
+  html+=milestonePathHtml(data.milestones);
+  // two-region body: the client's actions first (left), the timeline as the rail
+  html+=`<div class="pbody"><div class="pleft">`;
   // approvals that need the client — per-kind tag, per-card id (notification
   // anchors emit #approval-<id>), and a helper line so "request changes" is
   // clearly safe. Decided ones form a paper-trail section below.
-  const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
-  const aps=(data.approvals||[]).filter(a=>a.status==='pending');
   if(aps.length){html+=`<section id="sec-approvals"><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   const decided=(data.approvals||[]).filter(a=>a.status==='approved'||a.status==='rejected'||a.status==='changes_requested');
   if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}
   // your tasks
-  const acts=(data.tasks||[]).filter(t=>t.client_action_required);
   if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`}</div>`;}html+=`</section>`;}
   // files
   html+=`<section id="sec-files"><h2>Files</h2>`;
@@ -646,16 +862,16 @@ async function openProject(id,focusSection){
   html+=`<div class="card"><p class="muted" style="margin-bottom:8px">Send your studio a file — a logo, content, or a document.</p><div class="row" style="gap:8px;align-items:center"><input type="file" id="upFile" style="flex:1;min-width:0"><button class="approve" id="upBtn">Upload</button></div></div></section>`;
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
-  // milestones — a real vertical timeline (done / you-are-here / upcoming)
-  if((data.milestones||[]).length){html+=`<section id="sec-milestones"><h2>Project timeline</h2>${timelineHtml(data.milestones)}</section>`;}
-  // messages
-  html+=`<section id="sec-messages"><h2>Messages</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div id="thread"></div><div class="card"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></section>`;
   // support — the client can now SEE their requests + the studio's replies, not just fire one off
   const sup=((supRes&&supRes.body&&supRes.body.data)||[]).filter(r=>!r.project_id||r.project_id===id);
   html+=`<section id="sec-support"><h2>Support</h2>`;
   if(sup.length){for(const rq of sup){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}}
   html+=`<div class="card"><p class="muted">${sup.length?'Need something else?':'Have a question for your studio?'} Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
+  html+=`</div>`;   // /pleft
+  // the activity rail — the project's client-visible timeline, composer below it
+  html+=`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div class="card acard"><div id="ptl"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`;
   $('main').innerHTML=html;
+  renderProjTimeline();
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
   if(focusSection)requestAnimationFrame(()=>scrollToSection(focusSection));
   // decide — surface the server's own sentence on failure (409s carry
@@ -679,12 +895,84 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
   $('newSupport').addEventListener('click',()=>openSupport(id));
-  loadThread(id);
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
 }
-async function loadThread(id){const r=await api('/client/projects/'+id+'/messages');const items=((r.body&&r.body.data)||[]).slice().reverse();$('thread').innerHTML=items.length?`<div class="msgs">${items.map(bubbleHtml).join('')}</div>`:emptyCard('No messages yet — say hello any time.','💬');}
+// re-fetch the thread and repaint the rail (a sent message appears as a timeline item)
+async function loadThread(id){const r=await api('/client/projects/'+id+'/messages');if(!r.ok)return;/* a failed refetch must not erase the rail — keep the thread we have */PROJ_MSGS=((r.body&&r.body.data)||[]).slice();renderProjTimeline();}
+// ── the project activity timeline (crm.html's anatomy, the client's palette) ─
+// Bundle events (already filtered client-visible server-side; detail.from ===
+// 'client' marks the client's own actions) merge with the real message thread
+// into ONE reverse-chronological timeline. kind='message' EVENTS are skipped —
+// the actual messages (with bodies) render instead. Month headers appear once
+// the items span more than one month.
+const PTL_ICON={message:'💬',task:'✓',file:'📎',approve:'👍',note:'✐',system:'⚙'};
+function projEventItem(e){
+  if(!e||!e.created_at||e.kind==='message')return null;
+  const dd=e.detail||{};const mine=dd.from==='client';const t=dd.title?' — '+String(dd.title):'';
+  if(e.kind==='approval_decided'){
+    const word=dd.decision==='approved'?'approved a change':dd.decision==='changes_requested'?'requested changes':dd.decision==='rejected'?'declined a change':'decided an approval';
+    return{type:'approve',title:(mine?'You ':'Someone ')+word,body:null,at:e.created_at};
+  }
+  const M={
+    project_created:['system','Your project began'],
+    status_change:['system','Project status changed'],
+    task_created:['task','A to-do was added'+t],
+    task_status_change:['task','A to-do moved along'+t],
+    task_done:['task',(mine?'You':'Your studio')+' marked a to-do done'+t],
+    milestone_created:['system','A milestone was set'+t],
+    milestone_completed:['approve','Milestone complete'+t],
+    deliverable_added:['file','Your studio shared a file'+t],
+    client_upload:['file','You sent a file'+t],
+    approval_requested:['approve','Your OK was requested'+t],
+    survey_requested:['task','A survey is ready for you'],
+    survey_submitted:['task',(mine?'You':'Someone')+' answered a survey'],
+    support_opened:['message',(mine?'You':'Your studio')+' opened a support request'],
+    support_message:['message','New reply on a support request'],
+    support_resolved:['message','A support request was resolved'],
+    note:['note','A note was shared with you'],
+  };
+  const m=M[e.kind]||['system',String(e.kind||'activity').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase())];
+  return{type:m[0],title:m[1],body:null,at:e.created_at};
+}
+// Message attribution (F1): author_kind CANNOT tell the sides apart — both the
+// studio operator and the customer resolve to principal.kind 'client' (only
+// platform staff are 'staff'). The bundle's kind='message' EVENTS carry the
+// authoritative side ({message_id, from:'studio'|'client'} — written by
+// project_comms.ts / client_delivery.ts), so attribute through that map; the
+// old author_kind heuristic remains only for messages with no matching event.
+function msgFromMap(events){
+  const map={};
+  for(const e of (events||[])){const dd=(e&&e.kind==='message'&&e.detail)||null;if(dd&&dd.message_id&&(dd.from==='studio'||dd.from==='client'))map[dd.message_id]=dd.from;}
+  return map;
+}
+function projMsgItem(m,fromById){
+  if(!m||!m.created_at)return null;
+  const from=fromById?fromById[m.id]:undefined;
+  const mine=from?from==='client':!(m.author_kind==='staff'||m.author_kind==='system');
+  return{type:'message',title:mine?'You sent a message':'Your studio sent a message',body:m.body||'',at:m.created_at};
+}
+function renderProjTimeline(){
+  const host=$('ptl');if(!host)return;
+  const items=[];
+  const fromById=msgFromMap(PROJ_EVENTS);
+  for(const e of PROJ_EVENTS){const it=projEventItem(e);if(it)items.push(it);}
+  for(const m of PROJ_MSGS){const it=projMsgItem(m,fromById);if(it)items.push(it);}
+  items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
+  if(!items.length){host.innerHTML=emptyCard('No messages yet — say hello any time.','💬');return;}
+  const monthly=new Set(items.map(i=>String(i.at).slice(0,7))).size>1;
+  let html='',cur='';
+  items.forEach((it,i)=>{
+    if(monthly){const mk=String(it.at).slice(0,7);if(mk!==cur){cur=mk;const dt=new Date(mk+'-15T12:00:00Z');html+=`<div class="tl-month">${isNaN(dt)?esc(mk):dt.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>`;}}
+    const type=PTL_ICON[it.type]?it.type:'system';
+    // .ti-first/.ti-last are stamped here — month headers are divs too, so the
+    // CSS connector trims can't rely on :first-of-type/:last-of-type.
+    html+=`<div class="ti t-${type}${i===0?' ti-first':''}${i===items.length-1?' ti-last':''}"><span class="ti-icon" aria-hidden="true">${PTL_ICON[type]}</span><div class="ti-main"><div class="ti-head"><span class="ti-title">${esc(it.title)}</span></div>${it.body?`<div class="ti-body">${esc(it.body)}</div>`:''}</div><span class="ti-when">${esc(rel(it.at))}</span></div>`;
+  });
+  host.innerHTML=html;
+}
 // C1: the client's own support thread — see the studio's replies and reply back
 async function openSupportThread(rid,pid){
+  setWide(false);
   $('main').innerHTML=skeleton();
   const r=await api('/client/support/'+rid);
   if(!r.ok){toast('That request isn’t available.');return pid?openProject(pid):goHome();}
@@ -703,7 +991,8 @@ async function openSupportThread(rid,pid){
 }
 async function openSurvey(sid,pid){
   const r=await api('/client/surveys/'+sid);
-  if(!r.ok){toast('That survey isn’t available.');return;}
+  if(!r.ok){toast('That survey isn’t available.');return;}   // the current view (often the wide record page) stays intact
+  setWide(false);   // only collapse the wide layout once the survey actually renders
   const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
   let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>${esc(sv.title||'Survey')}</h1></header><section>`;
   if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
@@ -725,6 +1014,7 @@ async function openSurvey(sid,pid){
   $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
 }
 async function openSupport(pid){
+  setWide(false);
   let html=`<p><a class="link" href="#" id="back">${pid?'← Back to project':'← Back'}</a></p><header><h1>${pid?'Open a support request':'Message your studio'}</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
   $('main').innerHTML=html;
   // No project yet? Back and success return to the client home (load), not a
@@ -739,6 +1029,7 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 function ownerNote(){$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
 async function load(){
+  setWide(false);
   PORTAL.snaps=null;PORTAL.billing=null;         // fresh per-load caches (a re-load = fresh data)
   const params=new URLSearchParams(location.search);
   const dsup=params.get('support'); const deep=params.get('project');
