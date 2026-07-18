@@ -202,10 +202,16 @@ On approval: fast-forward main + deploy.yml (functions + frontend).
 studio projects.html roster → list view + project record page (highlights
 panel, milestones-as-Path, two-column body); build agent running; usual
 pipeline (review → gates → screenshots → Eric approves merge).
-**Slice 10 REQUESTED (Eric 2026-07-18: "we need to redo the 'today' tab" —
-"for both")** — the studio Today tab AND the portal landing/Home get the
-Lightning Home treatment; mockups in progress, approval before build;
-runs after slice 9 to keep one slice in the pipeline at a time.
+**Slice 10 APPROVED (Eric 2026-07-18: "we need to redo the 'today' tab" —
+"for both"; mockups sent same day, approved "those mock ups are great")** —
+studio today.html → Lightning Home (Needs-you action feed with per-row CTAs,
+This-month performance card fed by GET /analytics/dashboard, Today's
+schedule, Recent records from the slice-7 localStorage recents, Waiting on
+clients, calm quiet-state); portal client.html Home → greeting +
+at-a-glance strip (needs OK · messages · due · project status) + Needs-you
+as the same action feed; website card/projects/updates KEPT. Zero new
+backend. Builds right after slice 9 lands (one slice in the pipeline at a
+time); usual review → gates → screenshots → Eric approves merge.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
