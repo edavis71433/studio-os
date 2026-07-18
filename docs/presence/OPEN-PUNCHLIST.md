@@ -178,9 +178,27 @@ pre-approved "ho ahead"/"go"; 26 findings across 3 reviewers → fixed incl.
 recents×scope-carry wrong-tenant rewrite, javascript:/protocol-relative href
 guards, recents cleared on sign-out, layer mutual exclusion, honest
 aria-current, focus-out closure, forced-colors waffle glyph, leads soft
-refresh; e2e 348/0; frontend+docs only → Netlify). Remaining: **8 (CRM
-analytics dashboard — ADDED by Eric 2026-07-16 "yes please"; spec §7.8;
-research + mockups + decision points before code, runs last).**
+refresh; e2e 348/0; frontend+docs only → Netlify).
+**Slice 8 BUILT + VERIFIED 2026-07-17, AWAITING ERIC'S MERGE APPROVAL** —
+Business dashboard (approved from mockups "Build it!" + "I think this is all
+great" for the website band): analytics.html = Lightning dashboard (Sales +
+Your website bands, As-of/Refresh, Period chip; agency portfolio branch
+preserved incl. print) + GET /analytics/dashboard; portal "Your website"
+card on client.html Home (plain-English sentence, in-place full picture,
+privacy line VERIFIED true) + GET /client/website-stats. Zero schema change;
+Service chip honestly omitted (deals carry no service field). Branch commits
+1fc2eb8→450c940; 3-reviewer combined review = 27 findings (0 security),
+all fixed: truncation honesty (ordered reads + flags + "based on recent
+activity"), exact calendar boundaries, GSC stale-period "· in <Month>"
+qualifier + unavailable≠not-connected, stale-response guard +
+commit-on-success period chip, has_data honored (no fake zeros), portal
+sentence honesty (events ≠ people). Gates: e2e 410/0, pure sweep 203/0,
+deno check clean. SURVIVED container reset #4 (fix agent killed by model
+credits mid-batch; audit agent confirmed/completed all 19 directives).
+On approval: fast-forward main + deploy.yml (functions + frontend).
+**Slice 9 PROPOSED (Eric 2026-07-17 "I also want to redo this in projects")**
+— studio projects.html roster → list view + project record page (highlights
+panel, milestones-as-Path, two-column body); mockups sent, awaiting his go.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
