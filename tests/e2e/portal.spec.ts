@@ -531,8 +531,9 @@ test.describe('Client portal — Messages split view', () => {
 // Plain-English site stats between the "Needs you" queue and the project cards:
 // a bolded lead sentence built from real numbers, a soft sparkline, mini stat
 // tiles, and an in-place "See the full picture →" disclosure. Honest
-// degradation: no GSC → no Google tile/section; zero visitors → a gentle
-// "ready to be found" state; unpublished / 404 (older function build) → no card.
+// degradation: no GSC (or a failed GSC read) → no Google tile/section; zero
+// visitors on a SUCCESSFUL read → a gentle "ready to be found" state;
+// unpublished / failed month read / 404 (older function build) → no card.
 const WS_STATS = { data: { published: true,
   month: {
     visitors: 214, pageviews: 380, actions: 11,
@@ -559,7 +560,7 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
     // the lead sentence carries the real numbers, bolded
     await expect(card.locator('.wslead b').nth(0)).toHaveText('214 people');
-    await expect(card.locator('.wslead b').nth(1)).toHaveText('11 of them reached out');
+    await expect(card.locator('.wslead b').nth(1)).toHaveText('11 taps to call, email or book');
     await expect(card.locator('.wslead b').nth(2)).toHaveText('Google');
     // three mini tiles (the Google one exists because GSC data does)
     const tiles = card.locator('.wsmini .m');
@@ -567,7 +568,7 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(tiles.nth(0)).toContainText('214');
     await expect(tiles.nth(0)).toContainText('visitors this month');
     await expect(tiles.nth(1)).toContainText('11');
-    await expect(tiles.nth(1)).toContainText('reached out or booked');
+    await expect(tiles.nth(1)).toContainText('taps to call, email or book');
     await expect(tiles.nth(2)).toContainText('38');
     await expect(tiles.nth(2)).toContainText('clicks from Google search');
     // the sparkline is decorative; its values are present as text
@@ -636,6 +637,55 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(card.getByText('0 people')).toHaveCount(0);
     await expect(card.locator('.wsmini')).toHaveCount(0);   // no zero-stuffed tiles
     await expect(card.getByRole('button', { name: 'See the full picture →' })).toHaveCount(0);
+  });
+
+  test('actions are events, not people: more taps than visitors still reads true', async ({ page }) => {
+    const d = JSON.parse(JSON.stringify(WS_STATS));
+    d.data.month.visitors = 1; d.data.month.actions = 3; d.data.month.top_source = null; d.data.search = null;
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': d } });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await expect(card.locator('.wslead b').nth(0)).toHaveText('1 person');
+    await expect(card.locator('.wslead b').nth(1)).toHaveText('3 taps to call, email or book');
+    // never "3 of them reached out" for 1 person — actions are events, not visitors
+    await expect(card.locator('.wslead')).not.toContainText('of them');
+  });
+
+  test('published but the month read FAILED (month:null) → no card, never the empty story', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: true, month: null, search: null } } } });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // a transient DB failure must never masquerade as "ready to be found"
+    await expect(page.locator('#home-website')).toBeHidden();
+    await expect(page.locator('.wscard')).toHaveCount(0);
+    await expect(page.getByText('ready to be found')).toHaveCount(0);
+  });
+
+  test('a FAILED Search Console read (unavailable) drops the Google tile and section, like not-connected', async ({ page }) => {
+    const d = JSON.parse(JSON.stringify(WS_STATS));
+    d.data.search = { unavailable: true };
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': d } });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.wsmini .m')).toHaveCount(2);
+    await expect(card.getByText('clicks from Google search')).toHaveCount(0);
+    await card.getByRole('button', { name: 'See the full picture →' }).click();
+    await expect(card.getByRole('heading', { name: 'What people searched on Google' })).toHaveCount(0);
+  });
+
+  test('a hostile search term renders as text, never as markup', async ({ page }) => {
+    const d = JSON.parse(JSON.stringify(WS_STATS));
+    d.data.search.top_terms = [{ term: '<img src=x onerror=alert(1)>', clicks: 2, impressions: 9 }];
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': d } });
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await card.getByRole('button', { name: 'See the full picture →' }).click();
+    await expect(card.locator('#wsfull')).toBeVisible();
+    // the term is visible AS TEXT…
+    await expect(card.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
+    // …and no element was ever injected into the breakdown
+    await expect(card.locator('#wsfull img')).toHaveCount(0);
   });
 
   test('route 404 (older function build) → no card, and Home still works', async ({ page }) => {

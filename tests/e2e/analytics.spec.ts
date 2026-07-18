@@ -142,6 +142,8 @@ test.describe('Analytics (Business dashboard)', () => {
     // GSC not connected → honest empty state with a connect path, no invented number
     await expect(page.getByText('Not measured yet').first()).toBeVisible();
     await expect(page.getByText('Connect Search Console to see your Google numbers.')).toBeVisible();
+    // traffic:null is a FAILED read — the visitors card says so, distinctly
+    await expect(page.getByText('Visitor counts hit a hiccup')).toBeVisible();
     // widget empty states are headed (SLDS illustration pattern)
     await expect(page.getByText('No open deals')).toBeVisible();
     await expect(page.getByText('No enquiries yet')).toBeVisible();
@@ -155,6 +157,104 @@ test.describe('Analytics (Business dashboard)', () => {
     await page.goto('/analytics.html');
     await expect(page.getByText('This dashboard is warming up.')).toBeVisible();
     await expect(page.getByText('try again shortly')).toBeVisible();
+  });
+
+  test('a 500 on first load → the trouble state, distinct from 404-warming', async ({ page }) => {
+    await installApp(page);
+    await page.route('**/functions/v1/presence/analytics/dashboard**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/analytics.html');
+    await expect(page.getByText('We couldn’t load your analytics just now.')).toBeVisible();
+    await expect(page.getByText('This dashboard is warming up.')).toHaveCount(0);
+  });
+
+  test('a slow older period response can never overwrite a newer render (stale-race guard)', async ({ page }) => {
+    const DASH_Q = JSON.parse(JSON.stringify(DASH));
+    DASH_Q.data.period = 'quarter';
+    DASH_Q.data.sales.pipeline.open = { count: 4, value_cents: 4440000 };   // $44,400
+    let releaseSlow!: () => void;
+    const slowGate = new Promise<void>((r) => { releaseSlow = r; });
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.route('**/functions/v1/presence/analytics/dashboard**', async (route) => {
+      const period = new URL(route.request().url()).searchParams.get('period');
+      if (period === 'last_30') {   // the OLDER request — held until the newer one has rendered
+        await slowGate;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DASH_30) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(period === 'quarter' ? DASH_Q : DASH) });
+    });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await page.locator('#periodBtn').click();
+    await page.locator('#periodMenu [data-period="last_30"]').click();   // slow (gated)
+    await page.locator('#periodBtn').click();
+    await page.locator('#periodMenu [data-period="quarter"]').click();   // fast, newer
+    await expect(page.getByText('$44,400', { exact: true })).toBeVisible();
+    await expect(page.locator('#periodBtn')).toContainText('This quarter');
+    releaseSlow();   // NOW the stale last_30 response lands — it must be discarded
+    await page.waitForTimeout(250);
+    await expect(page.getByText('$44,400', { exact: true })).toBeVisible();
+    await expect(page.getByText('$99,900', { exact: true })).toHaveCount(0);
+    await expect(page.locator('#periodBtn')).toContainText('This quarter');
+  });
+
+  test('a failed period switch rolls back fully — chip, menu selection and board untouched', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
+      const period = new URL(route.request().url()).searchParams.get('period');
+      if (period === 'last_30') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DASH) });
+    });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await page.locator('#periodBtn').click();
+    await page.locator('#periodMenu [data-period="last_30"]').click();
+    await expect(page.getByText('Couldn’t refresh just now.')).toBeVisible();
+    // the board and the chip stay exactly as they were
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.locator('#periodBtn')).toContainText('This month');
+    // reopened, the menu still marks This month selected — no half-committed checkmark
+    await page.locator('#periodBtn').click();
+    await expect(page.locator('#periodMenu [data-period="this_month"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#periodMenu [data-period="last_30"]')).toHaveAttribute('aria-selected', 'false');
+  });
+
+  test('traffic has_data:false → "Not measured yet" empty states, never zero KPIs', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = { visitors: 0, pageviews: 0, actions: 0, top_pages: [], top_sources: [], weekly: [0,0,0,0,0,0,0,0,0,0,0,0], has_data: false };
+    D.data.website.search = null;
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.getByText('Not measured yet').first()).toBeVisible();
+    await expect(page.getByText('Visitor counts appear once your site is collecting them.')).toBeVisible();
+    // a present-but-empty measurement is NOT a hiccup, and never a fake zero
+    await expect(page.getByText('Visitor counts hit a hiccup')).toHaveCount(0);
+    await expect(page.getByText('0', { exact: true })).toHaveCount(0);
+  });
+
+  test('invoices:null → the deal-value card widens so the Sales row stays 12 columns', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.sales.invoices = null;
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invoices' })).toHaveCount(0);
+    // deal value (c4→c6) + recent wins (c4→c6) = a full 12-column row, no hole
+    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Deal value by stage' }) })).toHaveClass(/\bc6\b/);
+    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Recent wins' }) })).toHaveClass(/\bc6\b/);
+  });
+
+  test('a failed Search Console read → a quiet catching-its-breath state, never the connect CTA', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.search = { unavailable: true };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.getByText('Search data is catching its breath').first()).toBeVisible();
+    // the user may well be connected — a hiccuped read never shows the connect path
+    await expect(page.getByText('Connect Search Console')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
   });
 
   test('forwards the scope header (SC-1) on its dashboard call', async ({ page }) => {
