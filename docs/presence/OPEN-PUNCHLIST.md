@@ -202,6 +202,20 @@ On approval: fast-forward main + deploy.yml (functions + frontend).
 studio projects.html roster → list view + project record page (highlights
 panel, milestones-as-Path, two-column body); build agent running; usual
 pipeline (review → gates → screenshots → Eric approves merge).
+**HOTFIX SHIPPED 2026-07-18** — Documents of Record (proposals/agreements/
+invoices) rendered as raw source: Supabase rewrites GET text/html→text/plain
+on the shared *.supabase.co functions domain BY DESIGN (custom-domain-only
+feature). Fix: doc.html viewer on OUR origin fetches + renders the function's
+HTML; all three minting sites now emit `${SITE_URL}/doc.html?t=<token>`
+(docViewerUrl in routes/sales.ts). ad813d3 → main, deploy #18 SUCCESS.
+Old already-emailed direct links keep degraded behavior until re-sent.
+**Slice 11 QUEUED (Eric 2026-07-18)** — portal Requests tab redesign
+(mockups → approval → build, after slice 10).
+**Slice 12 QUEUED (Eric 2026-07-18)** — portal Files tab redesign + clients
+can share files BACK to the studio (recon: handleClientUploadUrl /
+handleClientUploadCreate routes already exist — surface + UX; mockups →
+approval → build, after slice 11). PR #1 now tracks the redesign branch
+(https://github.com/edavis71433/studio-os/pull/1).
 **Slice 10 APPROVED (Eric 2026-07-18: "we need to redo the 'today' tab" —
 "for both"; mockups sent same day, approved "those mock ups are great")** —
 studio today.html → Lightning Home (Needs-you action feed with per-row CTAs,
