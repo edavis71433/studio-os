@@ -204,6 +204,19 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   ok('ui: a Manage services editor (name+price rows, add/remove) saves via PUT /sales/services', /id="svcDlg"/.test(pipe) && /openManageServices/.test(pipe) && /api\('\/sales\/services','PUT',\{services\}\)/.test(pipe));
 }
 
+// ── document links open through the site-origin viewer (hotfix: *.supabase.co
+//    rewrites GET text/html to text/plain, so a direct function URL shows raw
+//    HTML source; every MINTED link must point at doc.html on OUR origin) ──
+{
+  const doc = read('doc.html');
+  ok('doc-viewer: docViewerUrl mints <SITE_URL>/doc.html?t=<token> (site origin, not the function domain)', /export function docViewerUrl\(token: string\)/.test(sales) && /siteUrl\(\)\}\/doc\.html\?t=\$\{encodeURIComponent\(token\)\}/.test(sales));
+  ok('doc-viewer: NO minted link points at the raw function /sales/doc URL anymore', !/functions\/v1\/presence\/sales\/doc\/\$\{/.test(sales));
+  ok('doc-viewer: emailed docLink and the CRM document-link route both mint via docViewerUrl', (sales.match(/docViewerUrl\(token\)/g) || []).length >= 2);
+  ok('doc-viewer: the raw GET /sales/doc render route STAYS (the viewer fetches it)', /handleSalesDocument\(req, m\[1\], cors\)/.test(idx));
+  ok('doc-viewer: doc.html fetches /sales/doc/<token> bare (public token-gated GET) and document.writes the render', /\/sales\/doc\/'\+encodeURIComponent\(t\)/.test(doc) && /document\.open\(\);document\.write\(html\);document\.close\(\)/.test(doc));
+  ok('doc-viewer: doc.html is unindexable and shows a friendly expiry message on failure', /noindex,nofollow/.test(doc) && /ask your studio for a fresh copy/.test(doc));
+}
+
 // ── dispatch wired (authed + public) ──
 ok('wiring: authed /sales/* dispatched after site resolution', /route === '\/sales\/deals'/.test(idx) && /\\\/sales\\\/deals\\\/.*\\\/convert/.test(idx));
 ok('wiring: PUBLIC token actions dispatched pre-auth', /\\\/sales\\\/proposals\\\/.*\\\/decide/.test(idx) && /\\\/sales\\\/contracts\\\/.*\\\/sign/.test(idx) && /handleSalesPublicView/.test(idx));

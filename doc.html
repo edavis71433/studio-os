@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Document — Studio OS</title>
+<style>
+  /* Minimal standalone shell — the fetched document replaces this page entirely,
+     bringing its own print CSS and toolbar. This styles only the loading/error states. */
+  :root{--bg:#faf8f5;--ink:#1b1525;--soft:#6b6478}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--ink:#efeaf7;--soft:#a79ebc}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .center{max-width:520px;margin:80px auto;padding:0 20px;text-align:center}
+  h1{font-weight:500;font-size:clamp(22px,5vw,28px);margin-bottom:6px}
+  .muted{color:var(--soft);font-size:15px}
+</style>
+</head>
+<body>
+<div class="center" id="state"><p class="muted">Preparing your document…</p></div>
+<script>
+// The Document of Record viewer. Emailed/portal doc links land here with
+// ?t=<signed token>. The document itself is SERVER-RENDERED by the presence
+// function (GET /sales/doc/<token>) — but Supabase's default *.supabase.co
+// domain rewrites GET text/html responses to text/plain, so that URL can't be
+// opened directly in a browser. This page (on our origin) fetches the same
+// route and writes the returned HTML into the document, preserving its inline
+// print CSS and toolbar exactly. The endpoint is token-gated and public — no
+// auth headers needed (the gateway runs with --no-verify-jwt).
+(async function(){
+  var FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
+  var t=new URLSearchParams(location.search).get('t')||'';
+  function fail(){
+    document.getElementById('state').innerHTML='<h1>This document link isn’t working</h1><p class="muted">It may have expired — ask your studio for a fresh copy. Nothing is lost.</p>';
+  }
+  if(!t){fail();return;}
+  try{
+    var r=await fetch(FN+'/sales/doc/'+encodeURIComponent(t));
+    if(!r.ok){fail();return;}
+    var html=await r.text();
+    // Our own first-party server-rendered document (all user data is escaped
+    // server-side); document.write swaps it in wholesale so its print behavior
+    // is byte-identical to the direct render.
+    document.open();document.write(html);document.close();
+  }catch(_){fail();}
+})();
+</script>
+</body>
+</html>

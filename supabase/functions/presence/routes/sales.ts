@@ -62,6 +62,14 @@ const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as 
 const actorOf = (p: Principal) => ({ actor: p.email || p.userId || 'system', actor_kind: p.kind });
 const siteUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+/** Where a Document of Record OPENS: the doc.html viewer on OUR origin — never
+ *  the raw edge-function URL. Supabase's default *.supabase.co domain rewrites
+ *  GET text/html responses to text/plain, so a direct link to the server-
+ *  rendered /sales/doc/<token> route shows raw HTML source in a browser.
+ *  doc.html fetches that same route and renders it. Same SITE_URL env every
+ *  emailed absolute link already uses. The GET route itself stays — the viewer
+ *  (and any previously emailed direct link) still hits it. */
+export function docViewerUrl(token: string): string { return `${siteUrl()}/doc.html?t=${encodeURIComponent(token)}`; }
 
 // ── signed accept/sign links (reuse the house HMAC idiom; new sales scope) ──
 export function linkSecret(): string | null {
@@ -92,7 +100,7 @@ async function docLink(kind: DocKind, id: string, siteId: string): Promise<strin
   const secret = linkSecret();
   if (!secret) return null;
   const token = await signDocToken({ t: 'doc', k: kind, id, site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400 }, secret);
-  return `${fnBase()}/functions/v1/presence/sales/doc/${token}`;
+  return docViewerUrl(token);
 }
 
 // ── deal events (sales audit) + provenance mirror ──
@@ -1288,7 +1296,7 @@ export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: 
   const exists = rows(await svc(`${DOC_TABLE[kind]}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`))[0];
   if (!exists) return json({ error: 'not_found', message: 'That document isn’t here.' }, 404, cors);
   const token = await signDocToken({ t: 'doc', k: kind, id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
-  return json({ url: `${fnBase()}/functions/v1/presence/sales/doc/${token}` }, 200, cors);
+  return json({ url: docViewerUrl(token) }, 200, cors);
 }
 
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══
