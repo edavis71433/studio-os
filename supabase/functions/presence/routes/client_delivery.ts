@@ -16,7 +16,7 @@ import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
 import { signDocToken, type DocKind } from '../lib/documents.ts';
-import { linkSecret } from './sales.ts';
+import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
 import { dashRange, weeklyVisitors, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
@@ -155,7 +155,7 @@ export async function handleClientDocuments(_req: Request, site: SiteRow, _princ
     svc(`presence_contracts?deal_id=in.(${ids})&status=in.(sent,signed)&deleted_at=is.null&select=id,title,status,signed_at,created_at,site_id&order=created_at.desc&limit=100`),
   ]);
   const secret = linkSecret();
-  const mk = async (kind: DocKind, id: string, siteId: string) => secret ? `${fnBase()}/functions/v1/presence/sales/doc/${await signDocToken({ t: 'doc', k: kind, id, site_id: String(siteId), exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
+  const mk = async (kind: DocKind, id: string, siteId: string) => secret ? docViewerUrl(await signDocToken({ t: 'doc', k: kind, id, site_id: String(siteId), exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)) : null;
   const documents: any[] = [];
   for (const p of rows(props)) documents.push({ kind: 'proposal', id: p.id, title: clean(p.title, 200) || 'Proposal', status: p.status, amount: (Number(p.subtotal_cents) || 0) / 100, created_at: p.created_at, view_url: await mk('proposal', p.id, p.site_id) });
   for (const c of rows(cons)) documents.push({ kind: 'contract', id: c.id, title: clean(c.title, 200) || 'Agreement', status: c.status, signed_at: c.signed_at, created_at: c.created_at, view_url: await mk('contract', c.id, c.site_id) });

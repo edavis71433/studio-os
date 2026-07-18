@@ -58,6 +58,10 @@ ok('migration: presence_service_links site-scoped, RLS, UNIQUE(project_id)', /cr
 ok('migration: D3 support recent index added', /presence_support_site_recent_idx/.test(mig));
 ok('migration: rollback present', /drop table if exists public\.presence_service_links;/.test(mig));
 
+// portal document lists mint site-origin viewer links (doc.html), never the raw
+// function URL — the default *.supabase.co domain downgrades text/html to text/plain.
+ok('documents: portal view_url mints via docViewerUrl (site-origin doc.html viewer)', /docViewerUrl\(await signDocToken\(/.test(cd) && !/functions\/v1\/presence\/sales\/doc/.test(cd));
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ CLIENT BRIDGE ROUTES (P2-D hardening): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);
