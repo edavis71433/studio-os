@@ -179,7 +179,9 @@ recents×scope-carry wrong-tenant rewrite, javascript:/protocol-relative href
 guards, recents cleared on sign-out, layer mutual exclusion, honest
 aria-current, focus-out closure, forced-colors waffle glyph, leads soft
 refresh; e2e 348/0; frontend+docs only → Netlify).
-**Slice 8 BUILT + VERIFIED 2026-07-17, AWAITING ERIC'S MERGE APPROVAL** —
+**Slice 8 BUILT + VERIFIED 2026-07-17 — SHIPPED 2026-07-18 (approved via
+question dialog "Merge + deploy now"; merged 280b4bc; deploy #17 SUCCESS —
+functions + frontend live)** —
 Business dashboard (approved from mockups "Build it!" + "I think this is all
 great" for the website band): analytics.html = Lightning dashboard (Sales +
 Your website bands, As-of/Refresh, Period chip; agency portfolio branch
@@ -196,9 +198,14 @@ sentence honesty (events ≠ people). Gates: e2e 410/0, pure sweep 203/0,
 deno check clean. SURVIVED container reset #4 (fix agent killed by model
 credits mid-batch; audit agent confirmed/completed all 19 directives).
 On approval: fast-forward main + deploy.yml (functions + frontend).
-**Slice 9 PROPOSED (Eric 2026-07-17 "I also want to redo this in projects")**
-— studio projects.html roster → list view + project record page (highlights
-panel, milestones-as-Path, two-column body); mockups sent, awaiting his go.
+**Slice 9 APPROVED + BUILDING (Eric: "Build it as mocked", 2026-07-18)** —
+studio projects.html roster → list view + project record page (highlights
+panel, milestones-as-Path, two-column body); build agent running; usual
+pipeline (review → gates → screenshots → Eric approves merge).
+**Slice 10 REQUESTED (Eric 2026-07-18: "we need to redo the 'today' tab" —
+"for both")** — the studio Today tab AND the portal landing/Home get the
+Lightning Home treatment; mockups in progress, approval before build;
+runs after slice 9 to keep one slice in the pipeline at a time.
 
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
