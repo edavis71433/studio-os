@@ -6,7 +6,10 @@
 <title>Projects — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Your customer projects — tasks, milestones, files, messages, and approvals in one place.">
-<!-- P2-D: Service Delivery on the ONE shared shell. Studio manages; a client sees only what's shared. -->
+<!-- P2-D: Service Delivery on the ONE shared shell. Studio manages; a client sees only what's shared.
+     Redesign slice 9: the roster is a Salesforce-style LIST VIEW (shared .lhead anatomy) and the
+     project detail is a Lightning RECORD PAGE (breadcrumb → highlights → milestones-as-Path →
+     two-column body). Zero new backend — every existing capability survives the reorganization. -->
 <link rel="stylesheet" href="/fonts/brand.css">
 <link rel="stylesheet" href="/shell.css">
 <script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('dds-embed');</script>
@@ -15,59 +18,158 @@ html.dds-embed .dds-nav,html.dds-embed .dds-search,html.dds-embed #dds-mbar,html
 html.dds-embed{--dds-shell-h:0px}
 html.dds-embed body{padding-top:0!important;background:transparent}
 html.dds-embed #listWrap{display:none!important}
-html.dds-embed .backbar{display:none!important}
+html.dds-embed .crumbs{display:none!important}
 html.dds-embed #detailWrap{padding-top:0}
 </style>
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f4ecdd;--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d8b878;--warn-soft:#2a2338}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — same aliasing pattern
+     as crm.html / customers.html / inbox.html. */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
   /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}:root:not([data-theme="light"]) .pstep.current{color:#171320}}
   :root[data-theme="dark"] .btn:not(.ghost){color:#171320}
+  :root[data-theme="dark"] .pstep.current{color:#171320}
   *{box-sizing:border-box;margin:0}
-  body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
-  .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
-  h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:4px}
-  .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1020px;margin:0 auto;padding:26px 20px 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+  /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
+        customers.html / contacts.html / leads.html / inbox.html by hand
+        (.lhead/.lrow1/.obj-ic/.lbtn/.lmeta + the Table ⇄ Cards seg) ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lrow1{display:flex;align-items:center;gap:10px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
   .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.ghost:hover{border-color:var(--p);color:var(--p)}
   .btn.sm{font-size:12.5px;padding:6px 10px}
   .btn:disabled{opacity:.5;pointer-events:none}
   .spacer{flex:1}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
+
+  /* ── the roster TABLE: sortable columns; scrolls in its OWN container ── */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+  thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  thead th .thb:hover{color:var(--p)}
+  thead th .arrow{font-size:10px;color:var(--p)}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--p-soft)}
+  tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  td .n{font-weight:600}
+  td.num{font-variant-numeric:tabular-nums}
+  td .mutcell{color:var(--faint)}
+  .pcell{min-width:130px}
+  .pcell .pnum{display:block;font-size:11.5px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+  .prog{height:7px;border-radius:999px;background:var(--line);overflow:hidden}
+  .prog>i{display:block;height:100%;background:var(--p)}
+  .badge{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .badge.wait{color:var(--warn);background:var(--warn-soft)}
+
+  /* ── the card view (the original roster look, kept for small screens) ── */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;box-shadow:var(--shadow)}
   .card:hover{border-color:var(--p)}
   .card .t{font-weight:600}
   .card .m{color:var(--soft);font-size:13px;margin-top:2px}
+  .card .cprog{margin-top:8px;max-width:220px}
   .pill{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .pill.complete{background:var(--good-soft);color:var(--good)}
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
-  .prog{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px}
-  .prog>i{display:block;height:100%;background:var(--p)}
-  /* FIX D: the detail is a full-page in-page view (not a modal). It sits in the
-     normal document flow inside its own .wrap, so the page scrolls naturally. */
-  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow,0 1px 2px rgba(27,21,37,.05));overflow:hidden}
-  .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
-  .dbody{padding:18px 20px}
-  .backbar{padding:14px 16px 0}
-  .backbar .btn{padding:8px 14px}
-  .sec{margin-top:18px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-  .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+
+  /* ── the RECORD PAGE (Lightning anatomy, dds skin — crm.html's patterns) ── */
+  #detailWrap{max-width:1200px;margin:0 auto;padding:20px 20px 90px}
+  .crumbs{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--soft);margin-bottom:12px;flex-wrap:wrap}
+  .crumbs .crumb{font:inherit;border:none;background:none;color:var(--p);font-weight:600;cursor:pointer;padding:2px 4px;border-radius:6px}
+  .crumbs .crumb:hover{background:var(--p-soft)}
+  .crumbs [aria-current="page"]{color:var(--ink);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rhead{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .rhead .obj-ic{width:44px;height:44px;border-radius:12px;font-size:20px;box-shadow:var(--shadow)}
+  .rhead-t{min-width:0;flex:1}
+  .rhead h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,4vw,32px);letter-spacing:-.01em;margin:0;line-height:1.2;overflow-wrap:anywhere}
+  .rec-sub{color:var(--soft);font-size:14px;margin-top:5px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+  .rhead-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  /* Status ▾ dropdown — the slice-2 popup contract (aria-expanded · Escape
+     returns focus · outside click via the ONE document-level delegated closer) */
+  .statusdd{position:relative}
+  #statusMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #statusMenu [role=menuitem]{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #statusMenu [role=menuitem]:hover{background:var(--p-soft)}
+  .car{font-size:10px;color:var(--faint)}
+
+  /* highlights panel: label-over-value tiles */
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
+  .hl{background:var(--card);padding:10px 14px;min-width:0}
+  .hl-k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .hl-v{font-family:var(--serif);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ── the Path = milestones in order (Lightning chevrons, dds skin) ── */
+  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+  .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  ol.path{display:flex;flex:1 1 340px;min-width:0;list-style:none;padding:0;margin:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .pstep{flex:1;min-width:72px;font-size:12.5px;font-weight:600;padding:9px 16px;text-align:center;
+    background:var(--bg);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
+  .pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
+  .pstep:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,11px 50%);border-radius:0 8px 8px 0}
+  .pstep:only-child{clip-path:none;border-radius:8px}
+  .pstep.done{background:var(--good-soft);color:var(--good)}
+  .pstep.current{background:var(--p);color:#fff}
+  .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:4px 12px}
+  .terminal-chip.won{background:var(--good-soft);color:var(--good)}
+
+  /* ── two-column body: related-list cards ── */
+  .dbody{margin-top:18px}
+  .dgrid{display:grid;gap:16px;align-items:start}
+  @media(min-width:900px){.dgrid{grid-template-columns:minmax(0,1fr) 330px}}
+  .dmain{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .dside{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .sec h3{font-size:14.5px;font-weight:700;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .sec h3 .n{color:var(--faint);font-weight:600;font-size:12.5px;margin-left:2px}
+  .subhead{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:14px 0 4px}
+  .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);min-width:0}
   .item:last-child{border-bottom:none}
-  .item .t{font-size:14px}
-  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px}
+  .item .t{font-size:14px;line-height:1.45;overflow-wrap:anywhere;min-width:0}
+  .item .t.donetext{color:var(--faint);text-decoration:line-through}
+  .item .s{color:var(--faint);font-size:12.5px;display:block}
+  .item input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin:0}
+  .titem{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+  .titem:last-child{border-bottom:none}
+  .titem .tmain{flex:1;min-width:0}
+  .titem input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin-top:3px}
+  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px;white-space:nowrap}
   .tag.client{background:var(--p-soft);color:var(--p)}
   .tag.action{background:var(--warn-soft);color:var(--warn)}
-  .tag.overdue{background:#f6dede;color:#9a3b3b}
-  .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
-  .steps{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}
-  .stat{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
-  .stat b{font-variant-numeric:tabular-nums;font-size:20px;font-family:var(--serif);font-weight:500}
-  .stat span{display:block;font-size:12px;color:var(--soft)}
+  .tag.overdue{background:var(--warn-soft);color:var(--bad)}
+  .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .empty{color:var(--soft);font-size:13.5px;padding:6px 0}
+  .linkbtn{font:inherit;font-size:inherit;border:none;background:none;color:var(--p);font-weight:600;cursor:pointer;padding:0;text-decoration:none}
+  .linkbtn:hover{text-decoration:underline}
+
   form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
   input,textarea,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
   textarea{min-height:70px;resize:vertical}
@@ -75,73 +177,30 @@ html.dds-embed #detailWrap{padding-top:0}
   .chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.chk input{width:auto}
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
-  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
-
-  /* ─────────────────────────────────────────────────────────────────────────
-     DETAIL VIEW REDESIGN — "everything is so small" fix.
-     The full-screen project view gets real breathing room: a wider page, a
-     larger type scale, and each section as a roomy card. On wide screens the
-     overview (progress + status) sits in a sticky side column while the working
-     sections (milestones, tasks, files, approvals, surveys, support, messages)
-     flow in the main column. It collapses to one comfortable column on mobile.
-     Everything below is SCOPED to #detailInner so the projects list is untouched.
-     ───────────────────────────────────────────────────────────────────────── */
-  #detailWrap{max-width:1120px}
-  #detailInner .backbar{padding:18px 22px 0}
-  #detailInner .dhead{padding:20px 24px 22px}
-  #detailInner #dtitle{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2}
-  #detailInner .dhead .mut{font-size:14px;margin-top:6px}
-  #detailInner .dbody{padding:22px 24px 28px}
-  /* two-column on wide screens; single column (side first) on smaller ones */
-  .dgrid{display:grid;gap:20px;align-items:start}
-  @media(min-width:900px){.dgrid:not(.nosplit){grid-template-columns:310px minmax(0,1fr)}}
-  .dside{display:flex;flex-direction:column;gap:16px;min-width:0}
-  @media(min-width:900px){.dside{position:sticky;top:14px}}
-  .dmain{display:flex;flex-direction:column;gap:16px;min-width:0}
-  /* every section is now a card that breathes */
-  #detailInner .sec{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
-  #detailInner .sec h3{font-family:var(--serif);font-weight:500;font-size:18px;text-transform:none;letter-spacing:normal;color:var(--ink);margin:0 0 12px;gap:10px}
-  #detailInner .sec h3 .btn{font-size:12.5px}
-  /* overview card: the at-a-glance numbers, enlarged */
-  #detailInner .ov{background:var(--p-soft);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
-  #detailInner .ov .stat{gap:18px 22px;margin:0}
-  #detailInner .ov .stat b{font-size:28px}
-  #detailInner .ov .stat span{font-size:12.5px;margin-top:2px}
-  #detailInner .ov .prog{height:10px;margin-top:14px}
-  /* roomier rows + wrapping so long words never force a sideways scroll */
-  #detailInner .item{padding:11px 0;gap:12px}
-  #detailInner .item .t{font-size:15px;line-height:1.45;overflow-wrap:anywhere}
-  #detailInner .sec .mut{font-size:14px}
-  #detailInner .steps{gap:8px;margin:0}
-  #detailInner .sec .btn.sm{font-size:13px;padding:7px 12px}
-  /* Messages — the studio's main line to the client — reads a touch warmer */
-  #detailInner .sec.msgs{border-color:var(--p);box-shadow:0 1px 3px rgba(91,63,160,.08)}
-  #detailInner .sec.msgs form.mini textarea{min-height:90px}
-  #detailInner .sec.msgs form.mini{background:var(--card)}
-  #detailInner .sec form.mini{margin-top:12px}
-  #detailInner .sec form.mini .btn:not(.ghost){padding:9px 18px}
+  dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);padding:18px 20px}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap" id="listWrap">
-  <h1>Projects</h1>
-  <div class="sub" id="sub">The work you do for your customers — tasks, files, and approvals in one place.</div>
+  <header id="lhead"></header>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by status"></div>
   <div class="bar"><button class="btn" id="newProject" hidden>+ New project</button><span class="spacer"></span></div>
   <!-- Cross-client client messages now live in the Inbox (grouped by client). This
-       page is the projects list + the full-screen delivery view; a customer's own
-       general messages live INSIDE their delivery view (loadClientGeneral). -->
+       page is the projects list view + the project record page; a customer's own
+       general messages live INSIDE their record page (loadClientGeneral). -->
   <div id="list" aria-live="polite"></div>
 </div>
 
-<!-- FIX D: the project detail opens as a FULL-SCREEN in-page view (same tab), not a
-     cramped modal overlay — matching the "editing opens full-screen" preference. -->
+<!-- The project record opens as a FULL-SCREEN in-page view (same tab), not a
+     cramped modal overlay — the list and the record are two panels of ONE page. -->
 <div class="wrap" id="detailWrap" hidden><div id="detailInner"></div></div>
 
 <dialog id="newDlg" aria-label="New project">
-  <form id="newForm" class="dbody" style="max-height:none">
+  <form id="newForm" style="max-height:none">
     <div style="font-family:var(--serif);font-size:20px;margin-bottom:12px">New project</div>
     <label for="np-name">Project name</label>
     <input id="np-name" required maxlength="200" placeholder="e.g. Acme website build" autocomplete="off">
@@ -178,6 +237,7 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
 const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
+const statusLabel=(s)=>String(s||'').replace('_',' ');
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -186,22 +246,190 @@ async function api(path,method,body){
   return b;
 }
 
+// ── roster state: items · per-project report cache · customer-name map ───────
+let ITEMS=[],LOADED_AT=0;
+const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
+let CUSTMAP=null;          // client_id → customer name (studio only), fetched once
+let CUSTTRIED=false;
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
+
+// Table ⇄ Cards display choice, persisted; small screens default to Cards
+// (customers.html's list-view mobile pattern, kept in sync by hand).
+const DISPLAY_KEY='dds-display:projects';
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
+  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}renderRoster();}
+
+// sortable columns — Progress/Open approvals sort on the lazily-fetched report
+// numbers (unknown sorts last, shown as "—"; no fake numbers)
+const COLS=[
+  ['name','Project',(p)=>String(p.name||'').toLowerCase()],
+  ['customer','Customer',(p)=>customerName(p).toLowerCase()],
+  ['status','Status',(p)=>String(p.status||'active')],
+  ['progress','Progress',(p)=>{const r=REPORTS[p.id];return r&&r.progress?Number(r.progress.pct||0):-1;}],
+  ['target_date','Target',(p)=>String(p.target_date||'9999-99-99')],
+  ['approvals','Open approvals',(p)=>{const r=REPORTS[p.id];return r?Number(r.pending_approvals||0):-1;}],
+];
+let SORT={key:'name',dir:1};
+
+function customerName(p){
+  if(!p.client_id)return 'Internal';
+  if(CUSTMAP&&CUSTMAP[p.client_id])return CUSTMAP[p.client_id];
+  return '—';
+}
+
+// ONE delegated closer for this page's popups (attached ONCE — re-renders would
+// pile up per-render document listeners): a click outside .statusdd closes the
+// record page's Status ▾ menu — the slice-2 popup contract, kept in sync by hand.
+document.addEventListener('click',(e)=>{
+  const sm=$('statusMenu'),sbtn=$('statusBtn');
+  if(sm&&sbtn&&!sm.hidden&&!e.target.closest('.statusdd')){sm.hidden=true;sbtn.setAttribute('aria-expanded','false');}
+});
+
 function renderFilters(){
   const opts=[['','All'],...STATUSES.map(s=>[s,s[0].toUpperCase()+s.slice(1).replace('_',' ')])];
   $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" aria-selected="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.status;renderFilters();load();});
 }
 
-async function load(){
-  if(window.ddsSkeleton) window.ddsSkeleton($('list'),4);
+// ── the shared list-view header (.lhead anatomy: 📁 icon · H1 · refresh · meta) ──
+function headerHtml(){
+  const n=ITEMS.length;
+  const active=ITEMS.filter(p=>p.status==='active').length;
+  const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  const mid=FILTER?` · ${esc(statusLabel(FILTER))}`:` · ${active} active`;
+  return `<div class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">📁</span>
+      <h1 id="pagehead" tabindex="-1">Projects</h1>
+      <div class="seg" role="group" aria-label="Display as">
+        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+        <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
+      </div>
+      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta">${n} project${n===1?'':'s'}${mid} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+  </div>`;
+}
+
+function sortedRows(){
+  const list=ITEMS.slice();
+  const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
+  return list;
+}
+
+function progressCell(p){
+  const r=REPORTS[p.id];
+  if(!(r&&r.progress))return '<span class="mutcell">—</span>';
+  const pct=Number(r.progress.pct||0);
+  return `<div class="pcell"><div class="prog" role="img" aria-label="${pct}% complete"><i style="width:${pct}%"></i></div><span class="pnum">${Number(r.progress.done||0)}/${Number(r.progress.total||0)} tasks</span></div>`;
+}
+function approvalsCell(p){
+  const r=REPORTS[p.id];
+  if(!r)return '<span class="mutcell">—</span>';
+  const n=Number(r.pending_approvals||0);
+  return n?`<span class="badge wait">${n} waiting</span>`:'<span class="mutcell">0</span>';
+}
+
+function tableHtml(list){
+  const ths=COLS.map(([k,label])=>{
+    const on=SORT.key===k;
+    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+  }).join('');
+  const trs=list.map(p=>{
+    const st=String(p.status||'active');
+    const cust=customerName(p);
+    return `<tr data-id="${esc(p.id)}" tabindex="0" aria-label="Open ${esc(p.name||'Untitled project')}">
+      <td><span class="n">${esc(p.name||'Untitled project')}</span>${p.client_visible===false?'<span class="tag">internal</span>':''}</td>
+      <td>${cust==='Internal'?'<span class="mutcell">Internal</span>':(cust==='—'?'<span class="mutcell">—</span>':esc(cust))}</td>
+      <td><span class="pill ${esc(st)}">${esc(statusLabel(st))}</span></td>
+      <td>${progressCell(p)}</td>
+      <td class="num">${p.target_date?esc(p.target_date):'<span class="mutcell">—</span>'}</td>
+      <td class="num">${approvalsCell(p)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="tscroll"><table aria-label="Projects"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+function cardsHtml(list){
+  return list.map(p=>{
+    const r=REPORTS[p.id];
+    const cust=customerName(p);
+    const prog=(r&&r.progress&&r.progress.total>0)?`<div class="cprog"><div class="prog"><i style="width:${Number(r.progress.pct||0)}%"></i></div><span class="pnum mut" style="font-size:11.5px">${Number(r.progress.done||0)}/${Number(r.progress.total||0)} tasks</span></div>`:'';
+    return `<div class="card" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Open ${esc(p.name||'Untitled project')}"><div style="min-width:0"><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${cust!=='—'&&cust!=='Internal'?esc(cust)+' · ':''}${p.target_date?('Target '+esc(p.target_date)):'No target date'}${p.client_visible===false?' · internal':''}</div>${prog}</div><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span></div>`;
+  }).join('');
+}
+
+function renderRoster(){
+  $('lhead').innerHTML=headerHtml();
+  const list=sortedRows();
+  if(!list.length){
+    if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
+    else $('list').innerHTML='<p class="mut">No projects yet.</p>';
+  }else{
+    $('list').innerHTML=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
+  }
+  wireRoster();
+}
+
+function wireRoster(){
+  // refresh (soft: a failed refresh toasts and keeps the list) + focus-return
+  const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true)));
+  const dt=$('dispTable'); if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
+  const dc=$('dispCards'); if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
+  // sortable column headers — click toggles asc/desc (aria-sort on the <th>)
+  $('list').querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const k=b.getAttribute('data-sort');
+    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:1};
+    renderRoster();
+    const nb=$('list').querySelector('[data-sort="'+k+'"]'); if(nb)nb.focus();
+  }));
+  // rows open the record (Enter AND Space, like the other rosters)
+  $('list').querySelectorAll('[data-id]').forEach(el=>{
+    const open=(e)=>{if(e.target.closest('button'))return;openProject(el.dataset.id);};
+    el.addEventListener('click',open);
+    el.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();openProject(el.dataset.id);}});
+  });
+}
+
+async function load(soft){
+  if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
     const res=await api('/projects'+(FILTER?('?status='+FILTER):''));
     STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO;
-    const items=res.data||[];
-    if(!items.length){ if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:'No projects yet',body:STUDIO?'Create a project to start managing a customer’s work — tasks, files, and approvals live here.':'Your projects will appear here.',actionLabel:STUDIO?'New project':'',onAction:STUDIO?openNew:null}); else $('list').innerHTML='<p class="mut">No projects yet.</p>'; return; }
-    $('list').innerHTML=items.map(p=>`<div class="card" data-id="${p.id}" tabindex="0" role="button"><div><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${p.target_date?('Target '+esc(p.target_date)):'No target date'}${p.client_visible===false?' · internal':''}</div></div><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span></div>`).join('');
-    $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openProject(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
-  }catch(e){ if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
+    ITEMS=res.data||[]; LOADED_AT=Date.now();
+    renderRoster();
+    // enrichment (existing routes only): customer names once + per-project report
+    // summaries for Progress / Open approvals — cells fill in as they arrive.
+    ensureCustomers().then((changed)=>{if(changed)renderRoster();});
+    ensureReports().then((changed)=>{if(changed)renderRoster();});
+  }catch(e){
+    if(soft)throw e;
+    if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>';
+  }
+}
+
+// customer names come from the existing /studio/customers roster route (studio
+// only) — one cached fetch; a failure degrades to "—", never an error state.
+async function ensureCustomers(){
+  if(!STUDIO||CUSTMAP||CUSTTRIED)return false;
+  CUSTTRIED=true;
+  try{
+    const r=await api('/studio/customers');
+    const map={}; (r.data||[]).forEach(c=>{if(c.client_id&&c.name)map[c.client_id]=c.name;});
+    CUSTMAP=map; return true;
+  }catch(_){return false;}
+}
+// per-project report summaries (the existing /projects/:id/report route) for the
+// Progress + Open approvals columns — parallel, cached, best-effort.
+async function ensureReports(){
+  const ids=ITEMS.map(p=>p.id).filter(id=>id&&!REPORTS[id]).slice(0,60);
+  if(!ids.length)return false;
+  let changed=false;
+  await Promise.allSettled(ids.map(id=>api('/projects/'+id+'/report').then(r=>{const s=r&&r.data&&r.data.summary;if(s){REPORTS[id]=s;changed=true;}}).catch(()=>{})));
+  return changed;
 }
 
 async function loadCustomerOptions(){
@@ -247,47 +475,120 @@ function miniForm(host, fields, onSubmit){
   setTimeout(()=>{const first=f.querySelector('input,textarea,select'); if(first)first.focus();},20);
 }
 
-// FIX D: show/hide the full-screen detail view (in-page, same tab) — the list and
-// the detail are two panels of the ONE page; only one is visible at a time.
+// show/hide the full-screen record view (in-page, same tab) — the list and the
+// record are two panels of the ONE page; only one is visible at a time.
 function showDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(l)l.hidden=true; if(d)d.hidden=false; window.scrollTo(0,0); }
 function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=true; if(l)l.hidden=false; }
-function closeProjectDetail(){ hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():'')); const c=document.querySelector('#list .card'); if(c)c.focus(); }
+function closeProjectDetail(){ hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():'')); const c=document.querySelector('#list [data-id]')||$('pagehead'); if(c)c.focus(); }
+
+// ── the Path = the project's milestones in order (chevron bar) ───────────────
+// Rendered ONLY when the project has milestones; completed steps ✓ tinted, the
+// single current step highlighted (aria-current="step"), future steps muted.
+// Steps are presentational (an <ol>) — the ONE action is the studio-side
+// "Mark Milestone Complete" button, wired to the existing milestone PATCH.
+function pathHtml(milestones){
+  if(!milestones.length)return '';   // no Path when the project has no milestones
+  const curIdx=milestones.findIndex(m=>m.status!=='complete');
+  const steps=milestones.map((m,i)=>{
+    const done=m.status==='complete';
+    const current=i===curIdx;
+    const cls=done?'done':(current?'current':'todo');
+    const state=done?'complete':(current?'current milestone':'upcoming');
+    return `<li class="pstep ${cls}"${current?' aria-current="step"':''} title="${esc(m.title)} — ${state}">${done?'✓ ':''}${esc(m.title)}</li>`;
+  }).join('');
+  let side='';
+  if(curIdx===-1)side='<span class="terminal-chip won">All milestones complete ✓</span>';
+  else if(STUDIO)side=`<button class="btn sm" id="msComplete" data-ms="${esc(milestones[curIdx].id)}">Mark Milestone Complete</button>`;
+  return `<div class="pathcard"><div class="pathrow"><ol class="path" aria-label="Milestones">${steps}</ol><div class="path-side">${side}</div></div></div>`;
+}
+
 async function openProject(id){
   history.replaceState(null,'','?project='+id+(scope()?'&client='+scope():''));
   // a11y: in-view actions re-open the same project to refresh. Remember whether the
-  // detail was already showing so we can restore keyboard focus after the re-render.
+  // record was already showing so we can restore keyboard focus after the re-render.
   const wasOpen=!$('detailWrap').hidden;
-  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
+  $('detailInner').innerHTML='<div class="sec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
     const p=data.project; STUDIO=data.is_studio_view!==false;
-    const rp=rep&&rep.data&&rep.data.summary;
+    const rp=rep&&rep.data&&rep.data.summary; if(rp)REPORTS[id]=rp;
+    if(STUDIO)await ensureCustomers();   // the Customer highlight tile (cached after the first record)
+    const cust=customerName(p);
     const nextP=(P_NEXT[p.status]||[]);
-    const statusBtns=STUDIO?nextP.map(s=>`<button class="btn ghost sm" data-pstatus="${s}">${esc(s.replace('_',' '))}</button>`).join(''):'';
-    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}</div><div class="row2">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="mut">No milestones yet.</div>';
-    const ts=(data.tasks||[]).map(t=>{const d=t.derived||{};return `<div class="item"><div class="t">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(t.status.replace('_',' '))}</span>${STUDIO?(T_NEXT[t.status]||[]).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(s.replace('_',' '))}</button>`).join(''):''}</div></div>`;}).join('')||'<div class="mut">No tasks yet.</div>';
-    const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="mut">No files yet.</div>';
-    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="mut">No approvals yet.</div>';
-    const overviewHtml=rp?`<div class="ov"><div class="stat"><div><b>${rp.progress.pct}%</b><span>${rp.progress.done}/${rp.progress.total} tasks</span></div><div><b>${rp.milestones.complete}/${rp.milestones.total}</b><span>milestones</span></div><div><b>${rp.open_client_actions}</b><span>your actions</span></div><div><b>${rp.pending_approvals}</b><span>to approve</span></div><div><b>${rp.shared_files}</b><span>files</span></div>${rp.csat?`<div><b>${rp.csat.average}★</b><span>CSAT · ${rp.csat.count}</span></div>`:''}</div><div class="prog"><i style="width:${rp.progress.pct}%"></i></div></div>`:'';
-    const statusHtml=(STUDIO&&statusBtns)?`<div class="sec"><h3>Status</h3><div class="steps">${statusBtns}</div></div>`:'';
-    const asideHtml=overviewHtml+statusHtml;
+
+    // ── record header: breadcrumb · 📁 · serif title · status chip · actions ──
+    const statusDd=(STUDIO&&nextP.length)?`<div class="statusdd">
+        <button class="btn ghost sm" id="statusBtn" aria-haspopup="menu" aria-expanded="false">Status <span class="car" aria-hidden="true">▾</span></button>
+        <div id="statusMenu" role="menu" aria-label="Change status" hidden>${nextP.map(s=>`<button role="menuitem" data-pstatus="${s}">Mark ${esc(statusLabel(s))}</button>`).join('')}</div>
+      </div>`:'';
+    const acts=STUDIO?`<div class="rhead-acts">${statusDd}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
+
+    // ── highlights: Customer · Target date · Progress · Waiting on client · Files ──
+    const hl=[
+      ['Customer',esc(cust)],
+      ['Target date',p.target_date?esc(p.target_date):'—'],
+      ['Progress',rp&&rp.progress?`${Number(rp.progress.pct||0)}% <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">· ${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)} tasks</span>`:'—'],
+      ['Waiting on client',rp?String(Number(rp.pending_approvals||0))+(Number(rp.pending_approvals||0)===1?' approval':' approvals'):'—'],
+      ['Files',rp?String(Number(rp.shared_files||0))+' shared':'—'],
+    ];
+    const hlHtml=`<div class="hl-panel">${hl.map(t=>`<div class="hl"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div>`).join('')}</div>`;
+
+    // ── related lists ──
+    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}${m.due_date?`<span class="s">due ${esc(m.due_date)}</span>`:''}</div><div class="row2" style="margin-top:0">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="empty">No milestones yet — map the journey with + Add.</div>';
+    const ts=(data.tasks||[]).map(t=>{
+      const d=t.derived||{}; const done=t.status==='done';
+      const canBox=done||(T_NEXT[t.status]||[]).includes('done');
+      const box=STUDIO?`<input type="checkbox" data-tdone="${t.id}"${done?' checked':''}${canBox?'':' disabled'} aria-label="${canBox?(done?'Reopen':'Mark done')+': '+esc(t.title):esc(t.title)+' is blocked — move it to to-do or in progress first'}">`:'';
+      const others=STUDIO?(T_NEXT[t.status]||[]).filter(s=>s!=='done'&&!(done&&s==='todo')).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(statusLabel(s))}</button>`).join(''):'';
+      return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
+    }).join('')||'<div class="empty">No tasks yet — add the first one.</div>';
+    const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="empty">No files yet — share the first deliverable.</div>';
+    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
+
     $('detailInner').innerHTML=`
-      <div class="backbar"><button class="btn ghost sm" id="closeDetail">← Back to projects</button></div>
-      <div class="dhead"><div><div id="dtitle" tabindex="-1">${esc(p.name)}</div>
-        <div class="mut"><span class="pill ${esc(p.status)}">${esc((p.status||'').replace('_',' '))}</span>${p.target_date?(' · target '+esc(p.target_date)):''}</div></div>${STUDIO?`<button class="btn ghost sm" id="renameProj">Rename</button>`:''}</div>
-      <div class="dbody"><div class="dgrid${asideHtml?'':' nosplit'}">
-        ${asideHtml?`<aside class="dside">${asideHtml}</aside>`:''}
-        <div class="dmain">
-          <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
-          <div class="sec"><h3>Tasks ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
-          <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share a file</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
-          <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
-          ${STUDIO?`<div class="sec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>
-          <div class="sec"><h3>Support requests</h3><div id="supList" class="mut">Loading…</div><div id="genList" class="mut"></div></div>`:''}
-          <div class="sec msgs"><h3>General messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
+      <nav class="crumbs" aria-label="Breadcrumb"><button class="crumb" id="closeDetail">Projects</button><span aria-hidden="true">›</span><span aria-current="page">${esc(p.name)}</span></nav>
+      <div class="rhead">
+        <div class="obj-ic" aria-hidden="true">📁</div>
+        <div class="rhead-t">
+          <h1 id="dtitle" tabindex="-1">${esc(p.name)}</h1>
+          <div class="rec-sub"><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span>${p.client_visible===false?'<span class="tag">internal</span>':''}</div>
         </div>
+        ${acts}
+      </div>
+      ${hlHtml}
+      ${pathHtml(data.milestones||[])}
+      <div class="dbody"><div class="dgrid">
+        <div class="dmain">
+          <div class="sec"><h3>Tasks${rp&&rp.progress?`<span class="n">${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)}</span>`:''} ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
+          <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
+          ${STUDIO?`<div class="sec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>`:''}
+          <div class="sec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
+        </div>
+        <aside class="dside">
+          <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
+          <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
+          ${STUDIO?`<div class="sec"><h3>Support requests</h3><div id="supList" class="mut">Loading…</div><div class="subhead" id="genHead">General messages</div><div id="genList" class="mut"></div></div>`:''}
+        </aside>
       </div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
+
+    // Status ▾ — the popup contract: open focuses the first item, arrows move,
+    // Escape closes back to the trigger; outside clicks close via the ONE
+    // document-level delegated closer above.
+    const sbtn=$('statusBtn'),smenu=$('statusMenu');
+    if(sbtn&&smenu){
+      const close=()=>{smenu.hidden=true;sbtn.setAttribute('aria-expanded','false');};
+      sbtn.addEventListener('click',()=>{const open=smenu.hidden;smenu.hidden=!open;sbtn.setAttribute('aria-expanded',open?'true':'false');if(open){const f=smenu.querySelector('button');if(f)f.focus();}});
+      smenu.addEventListener('keydown',(e)=>{
+        const opts=[...smenu.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
+        if(e.key==='Escape'){e.preventDefault();close();sbtn.focus();}
+        else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
+        else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+      });
+    }
+    // status transitions (the bounded P_NEXT ladder, server re-checked)
+    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
+
     // rename the project (studio only) — wires the existing PATCH /projects/:id
     if(STUDIO&&$('renameProj'))$('renameProj').onclick=()=>{
       const dt=$('dtitle');
@@ -296,13 +597,18 @@ async function openProject(id){
       $('renCancel').onclick=()=>openProject(id);
       $('renSave').onclick=async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.');return;}try{await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');openProject(id);}catch(e){toast(nice(e),true);}};
     };
-    // status
-    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
+    // + Task (highlights action) opens the same add form as the Tasks card
+    const taskForm=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});openProject(id);});
+    if($('addTask'))$('addTask').onclick=taskForm;
+    if($('quickTask'))$('quickTask').onclick=()=>{taskForm();const f=$('tsForm');if(f)f.scrollIntoView({block:'center'});};
     // milestones
     if($('addMs'))$('addMs').onclick=()=>miniForm($('msForm'),[{name:'title',label:'Milestone title'},{name:'due_date',label:'Due date (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/milestones','POST',{title:v.title,due_date:v.due_date||undefined});openProject(id);});
-    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/milestones/'+b.dataset.mdone,'PATCH',{status:'complete'});openProject(id);}catch(e){toast(nice(e),true);}});
-    // tasks
-    if($('addTask'))$('addTask').onclick=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});openProject(id);});
+    const mdone=async(mid)=>{try{await api('/projects/'+id+'/milestones/'+mid,'PATCH',{status:'complete'});toast('Milestone complete');openProject(id);}catch(e){toast(nice(e),true);}};
+    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=()=>mdone(b.dataset.mdone));
+    const mc=$('msComplete'); if(mc)mc.onclick=()=>mdone(mc.dataset.ms);   // the Path action = the current milestone
+    // tasks: checkbox toggles done ⇄ todo (the ladder's legal moves); the small
+    // buttons carry the other transitions (in progress / blocked / back)
+    $('detailInner').querySelectorAll('[data-tdone]').forEach(cb=>cb.onchange=async()=>{cb.disabled=true;try{await api('/projects/'+id+'/tasks/'+cb.dataset.tdone,'PATCH',{status:cb.checked?'done':'todo'});openProject(id);}catch(e){toast(nice(e),true);cb.checked=!cb.checked;cb.disabled=false;}});
     $('detailInner').querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/tasks/'+b.dataset.task,'PATCH',{status:b.dataset.to});openProject(id);}catch(e){toast(nice(e),true);}});
     // deliverables
     if($('addFile'))$('addFile').onclick=()=>shareFile(id);
@@ -313,9 +619,9 @@ async function openProject(id){
     // surveys + support (studio triage/review)
     if($('addSurvey'))$('addSurvey').onclick=()=>miniForm($('svForm'),[{name:'title',label:'Survey title'},{name:'q',label:'A question to ask'}],async v=>{await api('/projects/'+id+'/surveys','POST',{title:v.title,questions:[{label:v.q||'Your feedback',type:'text'}]});loadSurveys(id);});
     loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);loadClientGeneral(id);}
-    // a11y: the re-render replaced whatever control had focus — land on the dialog title
+    // a11y: the re-render replaced whatever control had focus — land on the title
     if(wasOpen){const t=$('dtitle');if(t)t.focus();}
-  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="sec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
 }
 
 async function shareFile(id){
@@ -332,7 +638,7 @@ async function shareFile(id){
 async function loadMessages(id){
   try{
     const {data}=await api('/projects/'+id+'/messages?limit=30');
-    const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
+    const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="empty">No messages yet — say hello.</div>';
     $('msgList').innerHTML=items;
     const host=$('msgForm');
     // per-project id + data-dds-draft: a half-written message survives an accidental close/refresh (shell.js draft preservation)
@@ -340,33 +646,33 @@ async function loadMessages(id){
     const ta=host.querySelector('textarea');
     if(window.ddsDraftRestore)window.ddsDraftRestore(ta);
     host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=ta.value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});if(window.ddsDraftClear)window.ddsDraftClear(ta);loadMessages(id);}catch(err){toast(nice(err),true);}};
-  }catch(e){ $('msgList').innerHTML='<div class="mut">Couldn’t load messages.</div>'; }
+  }catch(e){ $('msgList').innerHTML='<div class="empty">Couldn’t load messages.</div>'; }
 }
 async function loadSurveys(id){
   try{
     const {data}=await api('/projects/'+id+'/surveys'); const items=data||[];
-    $('svList').innerHTML=items.length?items.map(s=>`<div class="item"><div class="t">${esc(s.title)} <span class="tag">${esc(s.status)}</span></div><button class="btn ghost sm" data-sv="${s.id}">Responses</button></div>`).join(''):'<div class="mut">No surveys yet.</div>';
+    $('svList').innerHTML=items.length?items.map(s=>`<div class="item"><div class="t">${esc(s.title)} <span class="tag">${esc(s.status)}</span></div><button class="btn ghost sm" data-sv="${s.id}">Responses</button></div>`).join(''):'<div class="empty">No surveys yet — <button class="linkbtn" id="emptySurvey">send a check-in →</button></div>';
+    const es=$('emptySurvey'); if(es&&$('addSurvey'))es.onclick=()=>$('addSurvey').click();
     $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(nice(e),true);}});
-  }catch(e){ $('svList').innerHTML='<div class="mut">Couldn’t load surveys.</div>'; }
+  }catch(e){ $('svList').innerHTML='<div class="empty">Couldn’t load surveys.</div>'; }
 }
 const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);return d<7?d+'d ago':new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 async function loadSupport(id,focusRid){
   try{
     const {data}=await api('/support'); const items=(data||[]).filter(r=>r.project_id===id);
-    $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="mut">No support requests for this project.</div>';
+    $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2" style="margin-top:0"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="empty">No support requests for this project.</div>';
     $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id,b.dataset.res);}catch(e){toast(nice(e),true);}});
     $('supList').querySelectorAll('[data-sopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.sopen,id));
     // a11y: the list re-render dropped focus — return it to the same request (its
-    // View & reply button survives resolving), or the dialog title if it's gone.
+    // View & reply button survives resolving), or the record title if it's gone.
     if(focusRid){const el=$('supList').querySelector('[data-sopen="'+focusRid+'"]')||$('dtitle');if(el)el.focus();}
-  }catch(e){ $('supList').innerHTML='<div class="mut">Couldn’t load support.</div>'; }
+  }catch(e){ $('supList').innerHTML='<div class="empty">Couldn’t load support.</div>'; }
 }
-// The owner can now READ the request + the client's messages and REPLY — the
-// backend was always there; only the UI (mark-resolved only) was missing.
-// Host-aware: the same conversation UI serves both the project's Support list
-// (host=#supList) and a customer's General messages (host=#genList). `back`
-// returns to whichever list opened it. Handlers are looked up WITHIN the host so
-// two open conversations (one per list) never collide on a shared id.
+// The owner can READ the request + the client's messages and REPLY — host-aware:
+// the same conversation UI serves both the project's Support list (host=#supList)
+// and a customer's General messages (host=#genList). `back` returns to whichever
+// list opened it. Handlers are looked up WITHIN the host so two open
+// conversations (one per list) never collide on a shared id.
 async function openStudioSupport(rid,pid,opts){
   opts=opts||{}; const host=opts.host||$('supList'); const back=opts.back||(()=>loadSupport(pid,rid)); if(!host)return;
   try{
@@ -374,12 +680,12 @@ async function openStudioSupport(rid,pid,opts){
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
-    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
+    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="empty">No messages yet.</div>';
     // Saved replies (service edge #4): the bodies live in a JS map keyed by id so
     // nothing goes into an attribute; the <select> only carries escaped titles.
     const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
     const pickerHtml=replies.length?`<select id="sr-canned-${rid}" aria-label="Insert a saved reply" style="margin-bottom:6px"><option value="">Insert a saved reply…</option>${replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select>`:'';
-    host.innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" data-supback>← All requests</button></div>${rowsHtml}${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" data-supreply><label for="sr-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" data-supres>Resolve</button>':''}</div></form>`}`;
+    host.innerHTML=`<div class="item"><div class="t">${esc(rq.subject||'Support request')} <span class="tag">${esc(rq.status||'open')}</span></div><button class="btn ghost sm" data-supback>← All requests</button></div>${rowsHtml}${resolved?'<div class="empty">This request is resolved.</div>':`<form class="mini" data-supreply><label for="sr-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="sr-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button>${(rq.status!=='resolved'&&rq.status!=='closed')?'<button class="btn ghost sm" type="button" data-supres>Resolve</button>':''}</div></form>`}`;
     host.querySelector('[data-supback]').onclick=()=>back();
     const sta=$('sr-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta); // a half-written reply survives an accidental close/refresh
     const cn=$('sr-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
@@ -389,50 +695,55 @@ async function openStudioSupport(rid,pid,opts){
 }
 
 // FIX B: a customer's GENERAL (project-less) messages, surfaced INSIDE their own
-// delivery view. The owner kept expecting a client's messages "inside the created
-// profile" — this resolves the project → its bridge → the customer (server-side)
-// and lists that customer's project-less requests here, with the same View & reply
-// / Resolve affordance as project Support. The studio-wide "Client messages" list
-// stays too (for requests not yet tied to a customer).
+// record page. The server resolves the project → its bridge → the customer and
+// lists that customer's project-less requests here, with the same View & reply /
+// Resolve affordance as project Support.
 async function loadClientGeneral(id,focusRid){
   const host=$('genList'); if(!host)return;
   try{
     const {data,customer}=await api('/projects/'+id+'/client-messages');
     const items=data||[]; const nm=(customer&&customer.name)?customer.name:'';
     const head=$('genHead'); if(head)head.textContent='General messages'+(nm?' from '+nm:'');
-    if(!items.length){host.innerHTML='<div class="mut">'+(nm?('Nothing from '+esc(nm)+' outside this project yet. '):'')+'Anything this client sends that isn’t tied to a project shows up here.</div>';return;}
-    host.innerHTML=items.map(r=>`<div class="item"><div class="t">${esc(r.subject||'Message')} <span class="tag">${esc(r.status)}</span></div><div class="row2"><button class="btn ghost sm" data-gopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-gres="${r.id}">Resolve</button>`:''}</div></div>`).join('');
+    if(!items.length){host.innerHTML='<div class="empty">'+(nm?('Nothing from '+esc(nm)+' outside this project yet. '):'')+'Anything this client sends that isn’t tied to a project shows up here.</div>';return;}
+    host.innerHTML=items.map(r=>`<div class="item"><div class="t">${esc(r.subject||'Message')} <span class="tag">${esc(r.status)}</span></div><div class="row2" style="margin-top:0"><button class="btn ghost sm" data-gopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-gres="${r.id}">Resolve</button>`:''}</div></div>`).join('');
     host.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.gopen,id,{host,back:()=>loadClientGeneral(id,b.dataset.gopen)}));
     host.querySelectorAll('[data-gres]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.gres,'PATCH',{status:'resolved'});toast('Resolved');loadClientGeneral(id,b.dataset.gres);}catch(e){toast(nice(e),true);}});
     if(focusRid){const el=host.querySelector('[data-gopen="'+focusRid+'"]');if(el)el.focus();}
-  }catch(e){ host.innerHTML='<div class="mut">Couldn’t load general messages.</div>'; }
+  }catch(e){ host.innerHTML='<div class="empty">Couldn’t load general messages.</div>'; }
 }
 
 // A project-less client request, opened as its own full-screen conversation (same
-// full-page treatment as a project) — read the thread and reply, or resolve it.
+// full-page treatment as a project record) — read the thread and reply, or resolve it.
 async function openStudioSupportFull(rid){
   history.replaceState(null,'','?support='+rid+(scope()?'&client='+scope():''));
-  $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
+  $('detailInner').innerHTML='<div class="sec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]);
     const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
-    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="mut">No messages yet.</div>';
+    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="empty">No messages yet.</div>';
     const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
     const pickerHtml=replies.length?`<select id="srf-canned-${rid}" aria-label="Insert a saved reply" style="margin-bottom:6px"><option value="">Insert a saved reply…</option>${replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select>`:'';
-    $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost sm" id="closeDetail">← Back to projects</button></div>
-      <div class="dhead"><div><div style="font-family:var(--serif);font-size:20px" id="dtitle" tabindex="-1">${esc(rq.subject||'Client message')}</div><div class="mut"><span class="pill">${esc(rq.status||'open')}</span> · a general request (not tied to a project)</div></div></div>
-      <div class="dbody"><div class="sec"><h3>Conversation</h3>${rowsHtml}</div>
-      ${resolved?'<div class="mut">This request is resolved.</div>':`<form class="mini" id="srf-reply"><label for="srf-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="srf-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button><button class="btn ghost sm" type="button" id="srf-res">Resolve</button></div></form>`}</div>`;
+    $('detailInner').innerHTML=`
+      <nav class="crumbs" aria-label="Breadcrumb"><button class="crumb" id="closeDetail">Projects</button><span aria-hidden="true">›</span><span aria-current="page">${esc(rq.subject||'Client message')}</span></nav>
+      <div class="rhead">
+        <div class="obj-ic" aria-hidden="true">💬</div>
+        <div class="rhead-t">
+          <h1 id="dtitle" tabindex="-1" style="font-size:clamp(20px,3.4vw,26px)">${esc(rq.subject||'Client message')}</h1>
+          <div class="rec-sub"><span class="pill">${esc(rq.status||'open')}</span><span class="mut">a general request (not tied to a project)</span></div>
+        </div>
+      </div>
+      <div class="dbody"><div class="sec"><h3>Conversation</h3>${rowsHtml}
+      ${resolved?'<div class="empty">This request is resolved.</div>':`<form class="mini" id="srf-reply"><label for="srf-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="srf-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button><button class="btn ghost sm" type="button" id="srf-res">Resolve</button></div></form>`}</div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
     const t=$('dtitle'); if(t)t.focus();
     const sta=$('srf-body-'+rid); if(sta&&window.ddsDraftRestore)window.ddsDraftRestore(sta);
     const cn=$('srf-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
     const rf=$('srf-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupportFull(rid);}catch(err){toast(nice(err),true);}};
     const rb=$('srf-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');closeProjectDetail();}catch(e){toast(nice(e),true);}};
-  }catch(e){ $('detailInner').innerHTML='<div class="dbody"><p class="mut">'+esc(nice(e))+'</p><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="sec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
 }
 
 (async function(){
