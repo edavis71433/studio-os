@@ -209,12 +209,23 @@ feature). Fix: doc.html viewer on OUR origin fetches + renders the function's
 HTML; all three minting sites now emit `${SITE_URL}/doc.html?t=<token>`
 (docViewerUrl in routes/sales.ts). ad813d3 → main, deploy #18 SUCCESS.
 Old already-emailed direct links keep degraded behavior until re-sent.
-**Slice 11 QUEUED (Eric 2026-07-18)** — portal Requests tab redesign
-(mockups → approval → build, after slice 10).
-**Slice 12 QUEUED (Eric 2026-07-18)** — portal Files tab redesign + clients
-can share files BACK to the studio (recon: handleClientUploadUrl /
-handleClientUploadCreate routes already exist — surface + UX; mockups →
-approval → build, after slice 11). PR #1 now tracks the redesign branch
+**Slice 10 SHIPPED 2026-07-19** — Today both sides as Lightning Home
+(studio: Needs-you action feed + This-month card from /analytics/dashboard +
+tz-honest schedule + recents + waiting-on-clients; portal: greeting + honest
+at-a-glance strip + action feed). 33a64e9/d793804 build + b783be1/84a22da
+fixes (19 findings, 61-agent 3-vote review: per-row timezone "today",
+dormant-vs-hiccup schedule split, glance tiles hide on failed reads,
+needs-OK count unified with cards, messages tile counts real messages only,
+real h2/h3 headings, empty-rail collapse). Approved "Merge and build";
+main e055eef→84a22da; frontend-only → Netlify.
+**Slice 11 APPROVED + BUILDING (Eric 2026-07-19 "Merge and build"; mock
+s11-mock.html)** — Requests tab: quick-action tiles, service-catalog card
+grid, requests list view; all existing flows preserved; frontend-only.
+**Slice 12 APPROVED (Eric 2026-07-19 "Merge and build"; mock s12-mock.html)**
+— Files tab redesign + "Share a file with your studio" surfacing the
+EXISTING handleClientUploadUrl/handleClientUploadCreate machinery
+(frontend-only; per-project uploads land as client_visible deliverables
+with a client_upload event). Builds AFTER slice 11 (same file). PR #1 now tracks the redesign branch
 (https://github.com/edavis71433/studio-os/pull/1).
 **Slice 9 SHIPPED 2026-07-19** — studio Projects: roster → sortable list
 view (Project/Customer/Status/Progress/Target/Open approvals, chips kept,
