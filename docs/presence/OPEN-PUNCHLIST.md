@@ -248,6 +248,23 @@ as the same action feed; website card/projects/updates KEPT. Zero new
 backend. Builds right after slice 9 lands (one slice in the pipeline at a
 time); usual review → gates → screenshots → Eric approves merge.
 
+## ✅ SALESFORCE REDESIGN COMPLETE (2026-07-19)
+
+**All 12 slices + the doc-viewer hotfix SHIPPED.** Final merge: slices 11
+(Requests tab — 88b9e35/52f0526) + 12 (Files tab + client→studio sharing —
+c486204/4690f7c/1bb197f incl. server-side upload post-verification) approved
+"Merge it", main 84a22da→1bb197f, deploy #19 (functions + frontend — slice 12
+touched client_delivery.ts). Suite grew 155→744 tests across the effort; every
+slice: build → adversarial review (findings 3-vote/mutation-verified in later
+slices) → fixes → full gates → Eric-approved merge. Survived 6+ container
+resets on durable-commit discipline. PR #1 tracks the branch.
+
+**NEXT (standing plan): Adobe Wave 2** — G13 in-place editing → freeform
+editor → G12+G34 → S-finishers → G33/G14/G35.
+**Still needs Eric**: 0114 SQL re-run (the fixed single-run pack) + Resend
+dashboard setup (inbound email dormant until then) · legal drafts on request ·
+Tier-2/3 verification (staging creds, owner items).
+
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
