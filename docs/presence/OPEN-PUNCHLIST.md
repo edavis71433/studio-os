@@ -216,6 +216,16 @@ can share files BACK to the studio (recon: handleClientUploadUrl /
 handleClientUploadCreate routes already exist — surface + UX; mockups →
 approval → build, after slice 11). PR #1 now tracks the redesign branch
 (https://github.com/edavis71433/studio-os/pull/1).
+**Slice 9 SHIPPED 2026-07-19** — studio Projects: roster → sortable list
+view (Project/Customer/Status/Progress/Target/Open approvals, chips kept,
+cards on mobile) + project record page (breadcrumb, highlights incl. Client
+actions + CSAT when present, milestones-as-Path with mark-complete,
+two-column body; every old capability verified preserved). 890ccae/585b6e2
+build + 81cc940/e055eef review fixes (14 directives incl. the .sec CSS
+bleed that boxed the shell nav, focus-preserving async re-renders, honest
+sort order, real mutation round-trip tests, .lhead anti-drift pin).
+Approved "Merge it"; main ad813d3→e055eef; frontend+tests only → Netlify.
+PR #1 tracks the branch.
 **Slice 10 APPROVED (Eric 2026-07-18: "we need to redo the 'today' tab" —
 "for both"; mockups sent same day, approved "those mock ups are great")** —
 studio today.html → Lightning Home (Needs-you action feed with per-row CTAs,
