@@ -18,7 +18,10 @@ import { planMigration } from '../platform/migration.ts';
 import { planTransferIn, planTransferOut } from '../platform/transfer.ts';
 import { planEmailSetup } from '../platform/email_providers.ts';
 import { diffZones, planDnsRepair } from '../platform/zone.ts';
-import { registrarFor, hostFor } from '../platform/contract.ts';
+import { registrarFor, hostFor, dnsFor } from '../platform/contract.ts';
+import { applyRecords, applyableRecords, mergeDesired } from '../platform/managed_dns.ts';
+import { findHostedZone } from '../lib/route53.ts';
+import type { DnsRecord } from '../platform/dns.ts';
 import { decidePlan, claimApprovedPlan, releaseApprovedPlanClaim } from '../lib/approved_plan.ts';
 import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 import type { InfraPlan } from '../platform/plans.ts';
@@ -192,9 +195,38 @@ export async function applyPlan(site: SiteRow, planId: string, principal: Princi
   if (!claimed) return json({ error: 'in_progress', message: 'This plan is already being applied — nothing is done twice.' }, 409, cors);
   const release = () => releaseApprovedPlanClaim('presence_infra_plans', planId, 'applied_at');
   const host = hostFor('netlify');
-  const steps = plan.steps as Array<{ what: string; automated: boolean; done: boolean }>;
+  const steps = plan.steps as Array<{ what: string; automated: boolean; done: boolean; records?: DnsRecord[] }>;
   const notes: string[] = [];
+
+  // ── D1: when the automatic DNS adapter is active AND this domain's zone is
+  // managed here, a plan's record-carrying steps are APPLIED, not instructed.
+  // The approval machinery above is untouched — this only changes who types.
+  // Guided stays guided when: secrets absent, no managed zone, or a record is
+  // a placeholder (DKIM keys are never invented). Dormant = today's behavior.
+  const DNS_PLAN_KINDS = new Set(['connect_domain', 'email_auth', 'email_setup', 'dns_repair']);
+  let dnsZoneId: string | null = null;
+  let planDomain: string | null = null;
+  if (dnsFor().capabilities.write === 'automatic' && DNS_PLAN_KINDS.has(plan.kind)) {
+    planDomain = await siteDomain(site);
+    if (planDomain) {
+      const z = await findHostedZone(planDomain);
+      dnsZoneId = z.ok && z.zone ? z.zone.id : null;
+    }
+  }
+  const appliedDns: DnsRecord[] = [];
+
   for (const s of steps) {
+    if (!s.automated && dnsZoneId && Array.isArray(s.records) && s.records.length) {
+      const { apply, stillGuided } = applyableRecords(s.records);
+      if (apply.length) {
+        const r = await applyRecords(dnsZoneId, apply, `Studio OS plan: ${String(plan.title).slice(0, 60)}`);
+        if (!r.ok) { await release(); return json({ error: 'apply_failed', message: `The DNS records couldn’t be written: ${r.error || 'provider error'} — the plan stays approved; nothing was half-done.` }, 502, cors); }
+        appliedDns.push(...apply);
+        s.done = true;
+        notes.push(`applied ${apply.length} DNS record${apply.length === 1 ? '' : 's'} through managed DNS${r.merged.length ? ' (SPF merged, not appended)' : ''}${stillGuided.length ? `; ${stillGuided.length} still guided (provider-issued values)` : ''}`);
+        continue;
+      }
+    }
     if (!s.automated) { s.done = true; notes.push(`guided (performed by operator/customer): ${s.what.slice(0, 80)}`); continue; }
     if (plan.kind === 'hosting_restore' && /^Restore deploy/.test(s.what) && site.netlify_site_id) {
       const dep = s.what.match(/deploy ([a-z0-9]+)…/i)?.[1];
@@ -207,6 +239,18 @@ export async function applyPlan(site: SiteRow, planId: string, principal: Princi
       // verification-class automated steps: the evidence pipeline is the verifier
       s.done = true; notes.push(`verification scheduled through the observation run: ${s.what.slice(0, 60)}`);
     }
+  }
+  // write-through: records the plan applied become part of the desired-zone
+  // document, so the existing drift machinery keeps observing them — unchanged.
+  if (appliedDns.length && planDomain) {
+    const zQ = await svc(`presence_dns_zones?site_id=eq.${site.id}&select=records&limit=1`);
+    const merged = mergeDesired(zQ.json?.[0]?.records ?? [], appliedDns, 'platform');
+    await svc(`presence_dns_zones?on_conflict=site_id`, {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ site_id: site.id, domain: planDomain, records: merged }),
+    });
+    await svc('presence_dns_zone_history', { method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ site_id: site.id, records: merged, note: `plan applied: ${String(plan.title).slice(0, 160)}` }) });
   }
   await svc(`presence_infra_plans?id=eq.${planId}`, {
     method: 'PATCH', body: JSON.stringify({ status: 'applied', steps, applied_at: new Date().toISOString() }),

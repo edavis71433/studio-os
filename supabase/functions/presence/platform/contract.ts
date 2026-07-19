@@ -10,6 +10,7 @@
 // 'unsupported'. Adapters never claim what they cannot do — automation where
 // safe, guidance where automation is impossible, reality never hidden.
 import * as netlify from '../lib/netlify.ts';
+import { route53Dns, dnsWriteActive } from './managed_dns.ts';
 
 export type Capability = 'automatic' | 'guided' | 'unsupported';
 
@@ -94,7 +95,13 @@ export const guidedDns: DnsProvider = {
   slug: 'guided', name: 'Your DNS host',
   capabilities: { read: 'automatic', write: 'guided', dnssec: 'guided' },
 };
-export const DNS_PROVIDERS: Record<string, DnsProvider> = { guided: guidedDns };
+export const DNS_PROVIDERS: Record<string, DnsProvider> = { guided: guidedDns, route53: route53Dns };
+
+/** The active DNS adapter — the promise above, kept: when the Route 53
+ *  secrets exist the 'automatic' adapter is selected; absent secrets, the
+ *  platform stays exactly the shipped guided experience. Selection is
+ *  call-time (dormant-until-secrets, the slice-6 pattern). */
+export const dnsFor = (): DnsProvider => (dnsWriteActive() ? route53Dns : guidedDns);
 
 /* ── email authentication ────────────────────────────────────────────────── */
 // Inspection is real (DoH); setup is guided record preparation. A mail

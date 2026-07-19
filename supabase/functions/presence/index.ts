@@ -73,6 +73,7 @@ import { handleCollect } from './routes/collect.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
+import { handleZoneGet, handleZoneCreate, handleZoneDelete, handleZoneRecords } from './routes/zone.ts';
 import { handleExport, handleLaunch, handleDnsGet, handleDnsPut, handleDnsRollback, handleEmailHealth } from './routes/services.ts';
 import { handleImportInventory } from './routes/monitor.ts';
 import { resolveAgencyMember } from './agency/auth.ts';
@@ -938,6 +939,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── M14: Presence Platform Services — ownership, launch, DNS documents, email posture ──
   if (route === '/export' && method === 'GET') return handleExport(site, principal, cors);
   if (route === '/launch' && method === 'GET') return handleLaunch(site, cors);
+  // ── D1: the managed DNS zone lifecycle (one-stop shop). DORMANT + fail-closed
+  //    until the AWS secrets exist (honest 503) — additive next to the guided
+  //    /foundations/dns document editor, which stays exactly as shipped.
+  if (route === '/foundations/zone' && method === 'GET') return handleZoneGet(site, cors);
+  if (route === '/foundations/zone' && method === 'POST') return handleZoneCreate(req, site, principal, cors);
+  if (route === '/foundations/zone' && method === 'DELETE') return handleZoneDelete(req, site, principal, cors);
+  if (route === '/foundations/zone/records' && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+    return handleZoneRecords(req, method, site, principal, cors);
+  }
   if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(jwt, site, cors);
   if (route === '/foundations/dns' && method === 'PUT') return handleDnsPut(req, site, principal, cors);
   if (route === '/foundations/dns/rollback' && method === 'POST') return handleDnsRollback(req, site, principal, cors);
