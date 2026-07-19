@@ -355,25 +355,40 @@ function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.na
 // in tests/presence/today_home_test.mjs; keep both copies in sync). ──
 // Time-of-day greeting, with the client's first name when we truly know it.
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
+// ONE definition of "needs your OK" per project snapshot — pending approvals +
+// to-dos flagged for the client. The glance tile and each project card's
+// "N things need your OK" line both use it, so Home can never show two
+// contradictory counts on the same render.
+function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
 // The strip's inputs, from data Home ALREADY loads (feed + snaps + notifs +
 // billing + projects — zero new reads). due/project are '' /null when their
 // datum is absent so their tiles hide — no fake zeros for missing data.
-function glanceData(feed,snaps,notifs,billing,projects){
-  const needsOk=((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+((s&&s.approvals)||[]).length,0);
-  const newMsgs=(notifs||[]).filter(n=>n&&!n.read&&(n.kind==='message'||n.kind==='support_message')).length;
+// `failed` marks sources whose READ failed (feed/snaps/notifs): a count built
+// on a failed read is null — its tile hides rather than asserting a zero that
+// was never measured (a real, successful zero still renders as 0).
+// "new messages" counts ONLY kind==='message' — a genuine studio message (the
+// server already drops the client's own sends). 'support_message' rows derive
+// from support updated_at, which moves on the client's own filing and on
+// status changes — counting them faked "new messages" that never were.
+function glanceData(feed,snaps,notifs,billing,projects,failed){
+  failed=failed||{};
+  const needsOk=(failed.feed||failed.snaps)?null:((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+snapWaiting(s),0);
+  const newMsgs=failed.notifs?null:(notifs||[]).filter(n=>n&&!n.read&&n.kind==='message').length;
   const dueTotal=unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
   return{needsOk,newMsgs,due:dueTotal>0?'$'+dueTotal.toLocaleString('en-US'):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
 }
-// A tile exists only when its datum does: counts are always real (0 included);
-// "to pay" only when something actually is; the project tile only with a project.
+// A tile exists only when its datum does: counts are always real (0 included;
+// null = the read failed → hidden); "to pay" only when something actually is;
+// the project tile only with a project. No REAL count at all (both count
+// sources failed) → no strip — due/project alone can't carry an honest glance.
 function glanceTiles(g){
   g=g||{};const t=[];
   if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:g.needsOk===1?'needs your OK':'need your OK'});
   if(g.newMsgs!=null)t.push({id:'glance-msgs',n:String(g.newMsgs),l:g.newMsgs===1?'new message':'new messages'});
   if(g.due)t.push({id:'glance-due',n:g.due,l:'to pay'});
   if(g.project)t.push({id:'glance-proj',n:g.project.status,l:g.project.name});
-  return t;
+  return(g.needsOk!=null||g.newMsgs!=null)?t:[];
 }
 
 // ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
@@ -456,7 +471,7 @@ function navFromHref(href){
 // reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
 // never touch it). Home aggregates ACROSS projects; the other tabs are top-level
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
-const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},unread:0,notifs:[],billing:null,snaps:null,wstatsFetch:null};
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,snaps:null,wstatsFetch:null};
 let CURRENT_TAB='home';
 // A monotonically increasing VIEW token: every function that owns a fresh paint
 // of #main bumps it (showTab AND every drill-in open — openProject, support
@@ -529,13 +544,17 @@ async function ensureSnaps(){
   if(PORTAL.snaps)return PORTAL.snaps;
   const list=PORTAL.projects.slice(0,8);
   PORTAL.snaps=await Promise.all(list.map(async(p)=>{
-    try{const r=await api('/client/projects/'+p.id);const d=(r&&r.body&&r.body.data)||{};const prog=d.progress||{};
+    try{const r=await api('/client/projects/'+p.id);
+      if(!r.ok)throw 0;   // an error response is a FAILED read, not an empty project
+      const d=(r&&r.body&&r.body.data)||{};const prog=d.progress||{};
       return {id:p.id,name:p.name,pct:prog.pct,total:prog.total,
         milestones:(d.milestones||[]),
         approvals:(d.approvals||[]).filter(a=>a&&a.status==='pending'),
         todos:(d.tasks||[]).filter(t=>t&&t.client_action_required&&t.status!=='done'),
         surveys:(d.surveys||[]),deliverables:(d.deliverables||[])};
-    }catch(_){return {id:p.id,name:p.name,milestones:[],approvals:[],todos:[],surveys:[],deliverables:[]};}
+    // failed:true so the glance strip can tell "couldn't read" from "genuinely
+    // empty" — its empty arrays keep every other consumer degrading as before
+    }catch(_){return {id:p.id,name:p.name,failed:true,milestones:[],approvals:[],todos:[],surveys:[],deliverables:[]};}
   }));
   return PORTAL.snaps;
 }
@@ -653,15 +672,18 @@ async function buildNeedsYou(){
   const [snaps,billing]=await Promise.all([ensureSnaps(),ensureBilling()]);
   for(const s of snaps){
     const el=document.getElementById('glance-'+s.id);
-    if(el){const bits=[];const waiting=s.approvals.length+s.todos.length;if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0)bits.push(`<strong style="color:var(--warn)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);el.innerHTML=bits.join(' · ');}
+    if(el){const bits=[];const waiting=snapWaiting(s);if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0)bits.push(`<strong style="color:var(--warn)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);el.innerHTML=bits.join(' · ');}
     const mp=document.getElementById('mp-'+s.id);
     if(mp)mp.innerHTML=miniPathHtml(s.milestones);
   }
   // slice 10: the at-a-glance strip — from the same data this queue is built on.
+  // Per-source failure honesty: a tile whose read failed HIDES (never a fake 0).
   const gl=document.getElementById('home-glance');
   if(gl){
-    const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects));
+    const failed={feed:!!PORTAL.feedFailed,notifs:!!PORTAL.notifsFailed,snaps:snaps.some(s=>s&&s.failed)};
+    const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects,failed));
     if(tiles.length){gl.innerHTML=tiles.map(t=>`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;}
+    else gl.hidden=true;
   }
   const body=document.getElementById('needs-body');if(!body)return;
   const seen=unreadKeysFrom(PORTAL.notifs);
@@ -1385,7 +1407,11 @@ function wireBellAt(bellId,panelId){
     document.querySelectorAll('.qrow.unread').forEach(el=>el.classList.remove('unread'));   // live Home queue dots
     document.querySelectorAll('.mrow.unread').forEach(el=>el.classList.remove('unread'));   // live conversation-list dots
     document.querySelectorAll('.sr-new').forEach(el=>el.remove());                          // …and their sr-only "New —" text
-    const gm=document.querySelector('#glance-msgs .gn');if(gm)gm.textContent='0';           // …and the glance strip's messages tile
+    // …and the glance strip's messages tile — re-rendered WHOLE from state so
+    // the number and its pluralized label stay consistent ("0 new messages",
+    // never a frozen "0 new message")
+    const gt=document.getElementById('glance-msgs');
+    if(gt){const z=glanceTiles({newMsgs:0})[0];gt.innerHTML='<div class="gn">'+esc(z.n)+'</div><div class="gl">'+esc(z.l)+'</div>';}
     api('/client/notifications/read','POST',{}).catch(()=>{});
   };
   bell.addEventListener('click',()=>{panel.hidden?open():close();});
@@ -1662,7 +1688,9 @@ async function load(){
   PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
   PORTAL.projects=projects;
   const feed=await api('/portal/feed'); PORTAL.feed=(feed.ok&&feed.body.data)||{};
+  PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   const n=await api('/client/notifications').catch(()=>null); const nb=(n&&n.body)||{};
+  PORTAL.notifsFailed=!(n&&n.ok);   // …nor a failed notifications read as zero messages
   PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
   PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
   PORTAL.ready=true;

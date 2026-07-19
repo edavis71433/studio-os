@@ -91,6 +91,8 @@
   @media (min-width:980px){.wrap{max-width:1120px}}
   .cols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:30px;align-items:start}
   @media (min-width:980px){.cols{grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:26px}}
+  /* every rail card degraded away → no aside, main owns the full row */
+  .cols.norail{grid-template-columns:minmax(0,1fr)}
   .colmain{min-width:0;display:flex;flex-direction:column;gap:18px}
   .colrail{min-width:0;display:flex;flex-direction:column;gap:16px}
   .seclab{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 9px}
@@ -107,7 +109,7 @@
   .fico{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
   .fico.ap{background:var(--accent-soft)}
   .fmain{flex:1 1 auto;min-width:0}
-  .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35}
+  .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
   .fcta{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:6px 13px;white-space:nowrap}
   @media (max-width:600px){.feedcard a.moment.todo{flex-wrap:wrap}.fcta{margin-left:50px}}
@@ -166,7 +168,7 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') } }); return r.ok ? r.json() : Promise.reject(r.status); }
 async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
 
-function greet(){ const h = new Date().getHours(); return h < 12 ? 'Good morning.' : h < 18 ? 'Good afternoon.' : 'Good evening.'; }
+function greet(h){h=h==null?new Date().getHours():h;return h<12?'Good morning.':h<18?'Good afternoon.':'Good evening.';}
 
 // tone → calm styling class (never a score, never a colour alarm)
 function toneClass(t){ if(t==='good_news'||t==='celebration'||t==='celebratory'||t==='reassuring') return 'good'; if(t==='needs_attention'||t==='attentive') return 'attn'; return ''; }
@@ -197,9 +199,13 @@ function monthTrend(s){
   if(!a&&!b)return'';
   return a>b?'Ahead of last month on won work.':a<b?'A quieter month than last, so far.':'Level with last month, so far.';
 }
-// Today's bookings from GET /bookings/appointments — the site's OWN local dates
-// (slot_start_local is stamped in the studio's timezone), active statuses only.
-function todaySlots(list,ymd){return(Array.isArray(list)?list:[]).filter(a=>a&&String(a.slot_start_local||'').slice(0,10)===ymd&&(a.status==='pending'||a.status==='confirmed')).sort((a,b)=>String(a.slot_start_local).localeCompare(String(b.slot_start_local))).slice(0,6);}
+// Today's bookings from GET /bookings/appointments — each row is judged against
+// "today" in ITS OWN site timezone (slot_start_local is stamped in the studio's
+// zone; an agency operator drilled into a client may sit on a different calendar
+// date entirely). Missing/invalid timezone falls back to the browser-local date.
+// Active statuses only.
+function siteYmd(tz,nowMs){if(tz){try{return new Intl.DateTimeFormat('en-CA',{timeZone:String(tz)}).format(new Date(nowMs==null?Date.now():nowMs));}catch(_){/* unknown zone → browser-local */}}return localYmd(nowMs);}
+function todaySlots(list,nowMs){return(Array.isArray(list)?list:[]).filter(a=>a&&String(a.slot_start_local||'').slice(0,10)===siteYmd(a.timezone,nowMs)&&(a.status==='pending'||a.status==='confirmed')).sort((a,b)=>String(a.slot_start_local).localeCompare(String(b.slot_start_local))).slice(0,6);}
 function slotTime(s){const m=/T(\d\d):(\d\d)/.exec(String(s||''));if(!m)return'';let h=+m[1];const ap=h>=12?'pm':'am';h=h%12||12;return h+':'+m[2]+' '+ap;}
 function localYmd(nowMs){const d=new Date(nowMs==null?Date.now():nowMs);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 // Recent records — the slice-7 localStorage cache, read with the SAME strict
@@ -214,7 +220,7 @@ function monthCardHtml(d){
   const tiles=monthTiles(d);
   if(!tiles.length)return'';
   const trend=monthTrend(d&&d.sales);
-  return `<div class="rcard" id="rail-month"><div class="rh">This month</div>`+
+  return `<div class="rcard" id="rail-month"><h2 class="rh">This month</h2>`+
     `<div class="mtiles">${tiles.map(t=>`<div class="mtile"><div class="n">${esc(t[0])}</div><div class="l">${esc(t[1])}</div></div>`).join('')}</div>`+
     (trend?`<p class="trend">${esc(trend)}</p>`:'')+
     `<div class="rfoot"><a class="link" href="${esc(scopeHref('/analytics.html'))}">Dashboard →</a></div></div>`;
@@ -224,20 +230,23 @@ function monthCardHtml(d){
 function recentsCardHtml(){
   const rec=readRecents();
   if(!rec.length)return'';
-  return `<div class="rcard" id="rail-recents"><div class="rh">Recent records</div><div class="rrows">${rec.map(r=>`<a data-noscope="1" href="${esc(r.href)}">${esc(r.label)}</a>`).join('')}</div></div>`;
+  return `<div class="rcard" id="rail-recents"><h2 class="rh">Recent records</h2><div class="rrows">${rec.map(r=>`<a data-noscope="1" href="${esc(r.href)}">${esc(r.label)}</a>`).join('')}</div></div>`;
 }
-// "Today's schedule" — real bookings or an honest line. list === null means the
-// read failed/route missing (say we couldn't check); [] means a confirmed-clear day.
+// "Today's schedule" — real bookings or an honest line. 'dormant' means the
+// route answered 404/403 (bookings aren't in play on this site — no card at
+// all, a dormant feature is not a hiccup); null means a transient failure
+// (5xx/network — say we couldn't check); [] means a confirmed-clear day.
 function scheduleHtml(list){
+  if(list==='dormant')return'';
   let body='';
   if(list===null){
     body='<p class="schedempty">We couldn’t check your bookings just now — nothing’s wrong, try again in a moment.</p>';
   }else{
-    const slots=todaySlots(list,localYmd());
+    const slots=todaySlots(list);
     if(!slots.length)body='<p class="schedempty">Nothing booked for today — the day is yours.</p>';
     else body=slots.map(a=>`<div class="schedrow"><span class="st">${esc(slotTime(a.slot_start_local))}</span><span class="sm"><strong>${esc(a.type_name||'Appointment')}</strong>${a.customer_name?` <span class="who">· ${esc(a.customer_name)}</span>`:''}</span>${a.status==='pending'?'<span class="schip">to confirm</span>':''}</div>`).join('');
   }
-  return `<section class="home-sec" id="today-schedule"><div class="seclab">Today’s schedule</div><div class="rcard">${body}</div></section>`;
+  return `<section class="home-sec" id="today-schedule"><h2 class="seclab">Today’s schedule</h2><div class="rcard">${body}</div></section>`;
 }
 // "Waiting on clients" — approvals the studio has sent that clients haven't
 // decided. Same source the Projects roster uses: GET /projects + each active
@@ -260,8 +269,11 @@ async function waitingCard(){
   if(!rows.length)return;
   rows.sort((a,b)=>b.n-a.n);
   const host=document.getElementById('rail-waiting');if(!host)return;
-  host.innerHTML=`<div class="rcard"><div class="rh">Waiting on clients</div><div class="rrows">${rows.map(w=>`<a href="${esc(scopeHref('/projects.html?project='+encodeURIComponent(w.id)))}">${esc(w.name)}<span class="rn">${w.n===1?'1 approval':w.n+' approvals'}</span></a>`).join('')}</div></div>`;
+  host.innerHTML=`<div class="rcard"><h2 class="rh">Waiting on clients</h2><div class="rrows">${rows.map(w=>`<a href="${esc(scopeHref('/projects.html?project='+encodeURIComponent(w.id)))}">${esc(w.name)}<span class="rn">${w.n===1?'1 approval':w.n+' approvals'}</span></a>`).join('')}</div></div>`;
   host.hidden=false;
+  // the rail may have rendered empty (norail) — this late card revives it
+  const aside=document.getElementById('col-rail');if(aside)aside.hidden=false;
+  const cols=document.getElementById('home-cols');if(cols)cols.classList.remove('norail');
 }
 
 function render(moments, features, feed, ctx, dash, appts){
@@ -298,14 +310,14 @@ function render(moments, features, feed, ctx, dash, appts){
   for(const n of notices){
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref(n.href||'/today.html'))}">
       <span class="fico" aria-hidden="true">${NICON[n.kind]||'🔔'}</span>
-      <span class="fmain"><span class="fhead">${esc(n.headline||'Something needs a look')}</span>${n.body?`<span class="fmeta">${esc(n.body)}</span>`:''}</span>
+      <div class="fmain"><h3 class="fhead">${esc(n.headline||'Something needs a look')}</h3>${n.body?`<span class="fmeta">${esc(n.body)}</span>`:''}</div>
       <span class="fcta">Take care of it →</span></a>`;
   }
   for(const p of approvals){
     const _base = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref(_base))}">
       <span class="fico ap" aria-hidden="true">👍</span>
-      <span class="fmain"><span class="fhead">${esc(p.title||'A change is ready')}</span><span class="fmeta">Waiting for your approval${p.summary?` · ${esc(p.summary)}`:''}</span></span>
+      <div class="fmain"><h3 class="fhead">${esc(p.title||'A change is ready')}</h3><span class="fmeta">Waiting for your approval${p.summary?` · ${esc(p.summary)}`:''}</span></div>
       <span class="fcta">Review &amp; approve →</span></a>`;
   }
   // FIX 3: the bell counts things with no inline row here (client messages, support
@@ -314,12 +326,12 @@ function render(moments, features, feed, ctx, dash, appts){
   if(shown === 0 && bellCount > 0){
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref('/inbox.html'))}">
       <span class="fico" aria-hidden="true">📥</span>
-      <span class="fmain"><span class="fhead">${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</span><span class="fmeta">Messages, approvals and updates that are waiting on you — all in one place.</span></span>
+      <div class="fmain"><h3 class="fhead">${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</h3><span class="fmeta">Messages, approvals and updates that are waiting on you — all in one place.</span></div>
       <span class="fcta">Open your Inbox →</span></a>`;
   }
 
   let main = '';
-  if(feedRows) main += `<section class="home-sec" id="needs-you"><div class="seclab">Needs you</div><div class="feedcard">${feedRows}</div></section>`;
+  if(feedRows) main += `<section class="home-sec" id="needs-you"><h2 class="seclab">Needs you</h2><div class="feedcard">${feedRows}</div></section>`;
 
   if(!items.length && !needs){
     const clearBody = hasWebsite
@@ -354,7 +366,7 @@ function render(moments, features, feed, ctx, dash, appts){
         <div class="answer" id="ans-${esc(m.id)}" aria-live="polite"></div>
       </article>`;
     }
-    main += `<section class="home-sec stack" id="worth-a-look" style="margin-top:0;gap:14px">${needs?'<div class="seclab" style="margin-bottom:-5px">Worth a look</div>':''}${momentsHtml}</section>`;
+    main += `<section class="home-sec stack" id="worth-a-look" style="margin-top:0;gap:14px">${needs?'<h2 class="seclab" style="margin-bottom:-5px">Worth a look</h2>':''}${momentsHtml}</section>`;
   }
 
   // Today's schedule — real bookings, a confirmed-clear day, or an honest "couldn't check"
@@ -367,9 +379,14 @@ function render(moments, features, feed, ctx, dash, appts){
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
 
-  // ── the rail: This month · Recent records · Waiting on clients ──
-  let rail = monthCardHtml(dash) + recentsCardHtml() + '<div id="rail-waiting" hidden></div>';
-  $('main').innerHTML = `<div class="cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance">${rail}</aside></div>`;
+  // ── the rail: This month · Recent records · Waiting on clients. When every
+  // rail card degrades away, the aside is dropped (hidden + a single-column
+  // grid) so main spans the full width instead of leaving a dead ~30% gutter;
+  // a late Waiting-on-clients card revives it (see waitingCard). ──
+  const railCards = monthCardHtml(dash) + recentsCardHtml();
+  const railEmpty = !railCards;
+  const rail = railCards + '<div id="rail-waiting" hidden></div>';
+  $('main').innerHTML = `<div class="cols${railEmpty?' norail':''}" id="home-cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance"${railEmpty?' hidden':''}>${rail}</aside></div>`;
   // "what comes with your business" — the Industry Pack, made invisible. Secondary
   // context, so it opens inside the collapsible "More about your business" below.
   const feats = (features && features.features) || [];
@@ -461,10 +478,10 @@ function trouble(){
       apiGet('/portal/feed').catch(()=>{feedFailed=true;return null;}),
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
       apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
-      apiGet('/bookings/appointments').catch(()=>null),      // "Today's schedule" — an honest line if unreachable
+      apiGet('/bookings/appointments').catch((e)=>e===404||e===403?'dormant':null),   // "Today's schedule" — 404/403 = bookings dormant (no card); else an honest couldn't-check line
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
-    const apptList = (appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null;
+    const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
     render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList);
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
