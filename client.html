@@ -157,6 +157,15 @@
   .qcard{padding:6px 18px}
   .qrow{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:13px 0;border-top:1px solid var(--line)}
   .qrow:first-child{border-top:0}
+  /* slice 10: the action-feed anatomy — a type icon leads each row */
+  .qico{flex:0 0 auto;width:32px;height:32px;border-radius:9px;background:var(--p-soft);display:grid;place-items:center;font-size:14px;align-self:flex-start;margin-top:3px}
+  .qico.todo{background:var(--warn-soft)} .qico.invoice{background:var(--good-soft)}
+  /* slice 10: the at-a-glance strip (Lightning Home highlights, portal skin) */
+  .glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:22px}
+  .glance[hidden]{display:none}
+  .glance .gt{background:var(--card);padding:12px 14px;min-width:0}
+  .glance .gn{font-family:var(--serif);font-size:18.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .glance .gl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .qmain{flex:1 1 220px;min-width:0}
   .qmain h3{font-family:var(--serif);font-weight:500;font-size:16.5px;margin:4px 0 2px;line-height:1.25;letter-spacing:-.01em}
   .qmain p{margin:0;color:var(--soft);font-size:13.5px}
@@ -341,6 +350,31 @@ function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];co
 function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
 // A friendly first name from the session user, or '' — never guessy.
 function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
+
+// ── slice 10: Home greeting + at-a-glance strip — pure helpers (mirrored 1:1
+// in tests/presence/today_home_test.mjs; keep both copies in sync). ──
+// Time-of-day greeting, with the client's first name when we truly know it.
+function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
+// The strip's inputs, from data Home ALREADY loads (feed + snaps + notifs +
+// billing + projects — zero new reads). due/project are '' /null when their
+// datum is absent so their tiles hide — no fake zeros for missing data.
+function glanceData(feed,snaps,notifs,billing,projects){
+  const needsOk=((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+((s&&s.approvals)||[]).length,0);
+  const newMsgs=(notifs||[]).filter(n=>n&&!n.read&&(n.kind==='message'||n.kind==='support_message')).length;
+  const dueTotal=unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
+  const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
+  return{needsOk,newMsgs,due:dueTotal>0?'$'+dueTotal.toLocaleString('en-US'):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
+}
+// A tile exists only when its datum does: counts are always real (0 included);
+// "to pay" only when something actually is; the project tile only with a project.
+function glanceTiles(g){
+  g=g||{};const t=[];
+  if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:g.needsOk===1?'needs your OK':'need your OK'});
+  if(g.newMsgs!=null)t.push({id:'glance-msgs',n:String(g.newMsgs),l:g.newMsgs===1?'new message':'new messages'});
+  if(g.due)t.push({id:'glance-due',n:g.due,l:'to pay'});
+  if(g.project)t.push({id:'glance-proj',n:g.project.status,l:g.project.name});
+  return t;
+}
 
 // ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
 // tests/presence/client_website_test.mjs; keep both copies in sync). ──
@@ -590,8 +624,11 @@ function renderHome(){
   let html=`<div class="topbar"><div class="rolebadge">● ${projects.length?'Your workspace':'Client view'}</div>`+
     `<button id="bell" class="bell" aria-label="What’s new${P.unread?` — ${P.unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button></div>`+
     `<div id="np" class="notifpanel" role="region" aria-label="What’s new" hidden></div>`+
-    `<header><h1>Home</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
+    `<header><h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
   html+=welcomeCardHtml();
+  // slice 10: the at-a-glance strip — filled by buildNeedsYou from data Home
+  // already loads; it stays hidden until at least one tile has a real datum.
+  html+=`<div class="glance" id="home-glance" hidden></div>`;
   html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
   // slice 8b: the "Your website" slot — filled by loadWebsiteCard() only when
   // there are real stats to show (unpublished / 404 / reviewer → stays hidden).
@@ -620,12 +657,20 @@ async function buildNeedsYou(){
     const mp=document.getElementById('mp-'+s.id);
     if(mp)mp.innerHTML=miniPathHtml(s.milestones);
   }
+  // slice 10: the at-a-glance strip — from the same data this queue is built on.
+  const gl=document.getElementById('home-glance');
+  if(gl){
+    const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects));
+    if(tiles.length){gl.innerHTML=tiles.map(t=>`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;}
+  }
   const body=document.getElementById('needs-body');if(!body)return;
   const seen=unreadKeysFrom(PORTAL.notifs);
   // unread rows carry an sr-only "New — " prefix (the dot is a bare pseudo-element);
   // action buttons get aria-labels that include the row title so repeated
-  // "Review →" / "Open →" names stay distinguishable to a screen reader.
-  const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
+  // "Review & approve" / "Open to-dos" names stay distinguishable to a screen
+  // reader. Slice 10: each row leads with a type icon (action-feed anatomy).
+  const QICO={Approval:'👍',Connected:'🔗','To-do':'✅',Survey:'📝',Invoice:'🧾'};
+  const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${QICO[kind]||'🔔'}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
   const items=[];
   for(const p of (PORTAL.feed.pending_approvals||[]))
     items.push(row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
@@ -633,17 +678,17 @@ async function buildNeedsYou(){
   for(const s of snaps){
     for(const a of s.approvals)
       items.push(row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
-        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="Review — ${esc(a.title||'A change is ready')}">Review →</button>`));
+        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="Review &amp; approve — ${esc(a.title||'A change is ready')}">Review &amp; approve</button>`));
     if(s.todos.length)
       items.push(row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} thing${s.todos.length===1?'':'s'} for you`,esc(s.name),
-        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open →</button>`));
+        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`));
     for(const sv of s.surveys)
       items.push(row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
         `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`));
   }
   for(const i of unpaidInvoices(billing))
     items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?('$'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(i.due_date)}`:''}`,
-      i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View →</button>`));
+      i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`));
   if(!items.length){body.innerHTML=`<div class="card"><p><strong>You’re all caught up.</strong></p><p class="muted" style="margin-top:4px">Nothing needs you right now — we’ll flag anything here the moment it does.</p></div>`;return;}
   body.innerHTML=`<div class="card qcard">${items.join('')}</div>`;
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
@@ -1340,6 +1385,7 @@ function wireBellAt(bellId,panelId){
     document.querySelectorAll('.qrow.unread').forEach(el=>el.classList.remove('unread'));   // live Home queue dots
     document.querySelectorAll('.mrow.unread').forEach(el=>el.classList.remove('unread'));   // live conversation-list dots
     document.querySelectorAll('.sr-new').forEach(el=>el.remove());                          // …and their sr-only "New —" text
+    const gm=document.querySelector('#glance-msgs .gn');if(gm)gm.textContent='0';           // …and the glance strip's messages tile
     api('/client/notifications/read','POST',{}).catch(()=>{});
   };
   bell.addEventListener('click',()=>{panel.hidden?open():close();});

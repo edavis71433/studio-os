@@ -65,7 +65,7 @@
   details.more>summary:hover{color:var(--accent)}
   details.more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
   @media (prefers-reduced-motion:reduce){details.more>summary::before{transition:none}}
-  .ask{margin-top:44px;padding-top:28px;border-top:1px solid var(--line)}
+  .ask{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
   .ask h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 4px}
   .ask p{margin:0 0 14px;color:var(--soft);font-size:14px}
   .askbox{display:flex;gap:10px}
@@ -84,6 +84,56 @@
   .appnav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  /* ── slice 10: the Lightning Home layout (Salesforce Home anatomy, dds skin) ──
+     Two regions ≥980px: the main assistant column (Needs-you feed · moments ·
+     Today's schedule · the Concierge) and a rail (This month · Recent records ·
+     Waiting on clients). Below 980px everything stacks, main first. */
+  @media (min-width:980px){.wrap{max-width:1120px}}
+  .cols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:30px;align-items:start}
+  @media (min-width:980px){.cols{grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:26px}}
+  .colmain{min-width:0;display:flex;flex-direction:column;gap:18px}
+  .colrail{min-width:0;display:flex;flex-direction:column;gap:16px}
+  .seclab{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 9px}
+  section.home-sec{margin:0}
+  /* the Needs-you feed: one card, one row per item. Each row KEEPS the
+     .moment.todo identity (attention math + responsive pins), restyled from a
+     standalone card into an action-feed row: icon · headline+meta · one CTA. */
+  .feedcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .feedcard a.moment.todo{display:flex;align-items:center;gap:14px;background:transparent;border:0;border-radius:0;box-shadow:none;padding:14px 18px;border-top:1px solid var(--line);overflow:visible}
+  .feedcard a.moment.todo:first-child{border-top:0}
+  .feedcard a.moment.todo::before{display:none}
+  .feedcard a.moment.todo:hover{background:var(--accent-soft)}
+  .feedcard a.moment.todo:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .fico{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
+  .fico.ap{background:var(--accent-soft)}
+  .fmain{flex:1 1 auto;min-width:0}
+  .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35}
+  .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
+  .fcta{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:6px 13px;white-space:nowrap}
+  @media (max-width:600px){.feedcard a.moment.todo{flex-wrap:wrap}.fcta{margin-left:50px}}
+  .moment.calm.slim{padding:16px 18px}
+  .moment.calm.slim h2{font-size:17px;margin-bottom:2px}
+  .moment.calm.slim p{font-size:13.5px}
+  /* rail + schedule cards */
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px}
+  .rcard .rh{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 12px}
+  .mtiles{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  .mtile .n{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.2}
+  .mtile .l{font-size:11.5px;color:var(--faint);line-height:1.35;margin-top:1px}
+  .trend{margin:12px 0 0;font-size:12.5px;color:var(--soft)}
+  .rfoot{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:13px}
+  .rrows a{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
+  .rrows a:first-child{border-top:0}
+  .rrows a:hover{color:var(--accent)}
+  .rrows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+  .rrows .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap}
+  .schedrow{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+  .schedrow:first-child{border-top:0;padding-top:2px}
+  .schedrow .st{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent);font-size:13px;min-width:64px}
+  .schedrow .sm{flex:1 1 auto;min-width:0;color:var(--ink)}
+  .schedrow .sm .who{color:var(--soft)}
+  .schip{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--warn-soft);color:var(--warn)}
+  .schedempty{margin:0;color:var(--soft);font-size:13.5px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -101,7 +151,8 @@
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
-// ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features.
+// ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features,
+//    /portal/context|feed, /analytics/dashboard, /bookings/appointments, /projects.
 //    No engine, no new system. Calm, plain language; nothing technical.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -120,7 +171,100 @@ function greet(){ const h = new Date().getHours(); return h < 12 ? 'Good morning
 // tone → calm styling class (never a score, never a colour alarm)
 function toneClass(t){ if(t==='good_news'||t==='celebration'||t==='celebratory'||t==='reassuring') return 'good'; if(t==='needs_attention'||t==='attentive') return 'attn'; return ''; }
 
-function render(moments, features, feed, ctx){
+// carry the agency ?client= scope onto every same-origin hub link, so an operator
+// scoped into a client never silently loses that context (one connected system).
+function scopeHref(base){const _c=new URLSearchParams(location.search).get('client');if(!_c||!base||base.charAt(0)!=='/')return base;const h=base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');}
+
+// ── slice 10 pure helpers (mirrored 1:1 in tests/presence/today_home_test.mjs) ──
+// The greeting's date line — "Friday, July 18".
+function dateLine(nowMs){return new Date(nowMs==null?Date.now():nowMs).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
+const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
+// "This month" tiles from GET /analytics/dashboard — a tile exists only when its
+// section does (slice-8 has_data discipline: a null section or has_data:false
+// traffic read never becomes a fake zero; no sections → no card at all).
+function monthTiles(d){
+  d=d||{};const s=d.sales||{};const w=d.website||{};const t=[];
+  if(s.won&&s.won.this_month)t.push([money(s.won.this_month.value_cents),'won this month']);
+  if(s.pipeline&&s.pipeline.open)t.push([money(s.pipeline.open.value_cents),'open pipeline']);
+  if(s.enquiries&&s.enquiries.count!=null)t.push([String(s.enquiries.count),s.enquiries.count===1?'new enquiry':'new enquiries']);
+  if(w.traffic&&w.traffic.has_data!==false&&w.traffic.visitors!=null)t.push([String(w.traffic.visitors),'site visitors']);
+  return t;
+}
+// One calm trend sentence — only when BOTH months are real (never from nulls).
+function monthTrend(s){
+  const won=(s&&s.won)||null;if(!won||!won.this_month||!won.last_month)return'';
+  const a=won.this_month.value_cents||0,b=won.last_month.value_cents||0;
+  if(!a&&!b)return'';
+  return a>b?'Ahead of last month on won work.':a<b?'A quieter month than last, so far.':'Level with last month, so far.';
+}
+// Today's bookings from GET /bookings/appointments — the site's OWN local dates
+// (slot_start_local is stamped in the studio's timezone), active statuses only.
+function todaySlots(list,ymd){return(Array.isArray(list)?list:[]).filter(a=>a&&String(a.slot_start_local||'').slice(0,10)===ymd&&(a.status==='pending'||a.status==='confirmed')).sort((a,b)=>String(a.slot_start_local).localeCompare(String(b.slot_start_local))).slice(0,6);}
+function slotTime(s){const m=/T(\d\d):(\d\d)/.exec(String(s||''));if(!m)return'';let h=+m[1];const ap=h>=12?'pm':'am';h=h%12||12;return h+':'+m[2]+' '+ap;}
+function localYmd(nowMs){const d=new Date(nowMs==null?Date.now():nowMs);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// Recent records — the slice-7 localStorage cache, read with the SAME strict
+// same-origin-path guard shell.js applies (localStorage is user-tamperable).
+function safeRecents(a){return Array.isArray(a)?a.filter(function(r){return r&&r.label&&typeof r.href==='string'&&/^\/(?![/\\])/.test(r.href);}).slice(0,5):[];}
+function readRecents(){try{return safeRecents(JSON.parse(localStorage.getItem('dds-recent-records')||'[]'));}catch(_){return[];}}
+
+// ── the rail cards ───────────────────────────────────────────────────────────
+// "This month" — fed by GET /analytics/dashboard. Deploy-order tolerant: a 404
+// (older function build) or an all-null payload renders NOTHING — never zeros.
+function monthCardHtml(d){
+  const tiles=monthTiles(d);
+  if(!tiles.length)return'';
+  const trend=monthTrend(d&&d.sales);
+  return `<div class="rcard" id="rail-month"><div class="rh">This month</div>`+
+    `<div class="mtiles">${tiles.map(t=>`<div class="mtile"><div class="n">${esc(t[0])}</div><div class="l">${esc(t[1])}</div></div>`).join('')}</div>`+
+    (trend?`<p class="trend">${esc(trend)}</p>`:'')+
+    `<div class="rfoot"><a class="link" href="${esc(scopeHref('/analytics.html'))}">Dashboard →</a></div></div>`;
+}
+// "Recent records" — hrefs render EXACTLY as cached (they already carry their
+// identity params); data-noscope keeps the shell's scope-carry rewrite off them.
+function recentsCardHtml(){
+  const rec=readRecents();
+  if(!rec.length)return'';
+  return `<div class="rcard" id="rail-recents"><div class="rh">Recent records</div><div class="rrows">${rec.map(r=>`<a data-noscope="1" href="${esc(r.href)}">${esc(r.label)}</a>`).join('')}</div></div>`;
+}
+// "Today's schedule" — real bookings or an honest line. list === null means the
+// read failed/route missing (say we couldn't check); [] means a confirmed-clear day.
+function scheduleHtml(list){
+  let body='';
+  if(list===null){
+    body='<p class="schedempty">We couldn’t check your bookings just now — nothing’s wrong, try again in a moment.</p>';
+  }else{
+    const slots=todaySlots(list,localYmd());
+    if(!slots.length)body='<p class="schedempty">Nothing booked for today — the day is yours.</p>';
+    else body=slots.map(a=>`<div class="schedrow"><span class="st">${esc(slotTime(a.slot_start_local))}</span><span class="sm"><strong>${esc(a.type_name||'Appointment')}</strong>${a.customer_name?` <span class="who">· ${esc(a.customer_name)}</span>`:''}</span>${a.status==='pending'?'<span class="schip">to confirm</span>':''}</div>`).join('');
+  }
+  return `<section class="home-sec" id="today-schedule"><div class="seclab">Today’s schedule</div><div class="rcard">${body}</div></section>`;
+}
+// "Waiting on clients" — approvals the studio has sent that clients haven't
+// decided. Same source the Projects roster uses: GET /projects + each active
+// project's /report (summary.pending_approvals), capped like ensureSnaps.
+// Hidden entirely when there are none, or when this edition has no projects.
+async function waitingCard(){
+  let projects=null;
+  try{projects=(await apiGet('/projects')).data;}catch(_){return;}
+  if(!Array.isArray(projects))return;
+  const act=projects.filter(p=>p&&p.id&&p.status!=='complete'&&p.status!=='archived').slice(0,6);
+  if(!act.length)return;
+  const rows=[];
+  await Promise.all(act.map(async(p)=>{
+    try{
+      const r=(await apiGet('/projects/'+p.id+'/report')).data;
+      const n=Number((r&&r.summary&&r.summary.pending_approvals)||0);
+      if(n>0)rows.push({id:p.id,name:p.name||'A project',n});
+    }catch(_){/* a failed report just drops that row */}
+  }));
+  if(!rows.length)return;
+  rows.sort((a,b)=>b.n-a.n);
+  const host=document.getElementById('rail-waiting');if(!host)return;
+  host.innerHTML=`<div class="rcard"><div class="rh">Waiting on clients</div><div class="rrows">${rows.map(w=>`<a href="${esc(scopeHref('/projects.html?project='+encodeURIComponent(w.id)))}">${esc(w.name)}<span class="rn">${w.n===1?'1 approval':w.n+' approvals'}</span></a>`).join('')}</div></div>`;
+  host.hidden=false;
+}
+
+function render(moments, features, feed, ctx, dash, appts){
   $('greeting').textContent = greet();
   const items = (moments||[]).filter(Boolean);
   // PP-5: the empty-state speaks in the language of what this edition actually is.
@@ -131,7 +275,7 @@ function render(moments, features, feed, ctx){
   //    straight through to the page that resolves it. ──────────────────────────
   const notices = (feed && feed.notices) || [];
   const approvals = (feed && feed.pending_approvals) || [];
-  const shown = notices.length + approvals.length;   // needs-you cards we render inline
+  const shown = notices.length + approvals.length;   // needs-you rows we render inline
   // FIX 3: Today and the bell must never disagree on the number. The bell badge is
   // ctx.attention_count, which also counts support requests + unread client messages
   // that have no feed card. Source the subtitle count from it so they always match;
@@ -139,62 +283,67 @@ function render(moments, features, feed, ctx){
   // routes to the Inbox (the full list) rather than a misleading "all clear".
   const bellCount = (ctx && typeof ctx.attention_count === 'number') ? ctx.attention_count : shown;
   const needs = Math.max(shown, bellCount);
-  let html = '';
-  const _scopeHref = (base)=>{const _c=new URLSearchParams(location.search).get('client');if(!_c||!base||base.charAt(0)!=='/')return base;const h=base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');};
+  // header sub: the date, then what — if anything — needs you (Lightning Home greeting)
+  const subBits = [dateLine()];
+  if(needs) subBits.push(needs === 1 ? 'one thing needs you' : `${needs} things need you`);
+  if(items.length) subBits.push(items.length === 1 ? 'one more worth a look' : `${items.length} more worth a look`);
+  if(!needs && !items.length) subBits.push('nothing needs you today');
+  $('sub').textContent = subBits.join(' · ') + '.';
+
+  // ── the Needs-you action feed: one card, one row per item (icon · headline +
+  //    meta · one CTA). Rows keep the .moment.todo identity — the attention
+  //    math (cards === bell badge) is pinned on that class. ──
+  const NICON = { lead_followup:'✉️', message:'💬', support:'💬' };
+  let feedRows = '';
   for(const n of notices){
-    html += `<a class="moment attn todo" href="${esc(_scopeHref(n.href||'/today.html'))}">
-      <span class="tag">Needs you</span>
-      <h2>${esc(n.headline||'Something needs a look')}</h2>
-      ${n.body?`<p>${esc(n.body)}</p>`:''}
-      <div class="row"><span class="golink">Take care of it →</span></div></a>`;
+    feedRows += `<a class="moment attn todo" href="${esc(scopeHref(n.href||'/today.html'))}">
+      <span class="fico" aria-hidden="true">${NICON[n.kind]||'🔔'}</span>
+      <span class="fmain"><span class="fhead">${esc(n.headline||'Something needs a look')}</span>${n.body?`<span class="fmeta">${esc(n.body)}</span>`:''}</span>
+      <span class="fcta">Take care of it →</span></a>`;
   }
   for(const p of approvals){
-    const _c=new URLSearchParams(location.search).get('client');
     const _base = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
-    const href = (_c && _base.charAt(0)==='/') ? (()=>{const h=_base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');})() : _base;
-    html += `<a class="moment attn todo" href="${href}">
-      <span class="tag">Waiting for your approval</span>
-      <h2>${esc(p.title||'A change is ready')}</h2>
-      ${p.summary?`<p>${esc(p.summary)}</p>`:''}
-      <div class="row"><span class="golink">Review &amp; approve →</span></div></a>`;
+    feedRows += `<a class="moment attn todo" href="${esc(scopeHref(_base))}">
+      <span class="fico ap" aria-hidden="true">👍</span>
+      <span class="fmain"><span class="fhead">${esc(p.title||'A change is ready')}</span><span class="fmeta">Waiting for your approval${p.summary?` · ${esc(p.summary)}`:''}</span></span>
+      <span class="fcta">Review &amp; approve →</span></a>`;
   }
-  // FIX 3: the bell counts things with no inline card here (client messages, support
+  // FIX 3: the bell counts things with no inline row here (client messages, support
   // requests). If there's nothing to render but the bell still rings, don't fall
   // through to "all clear" — point to the Inbox where those items actually live.
   if(shown === 0 && bellCount > 0){
-    html += `<a class="moment attn todo" href="${esc(_scopeHref('/inbox.html'))}">
-      <span class="tag">Needs you</span>
-      <h2>${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</h2>
-      <p>Messages, approvals and updates that are waiting on you — all in one place.</p>
-      <div class="row"><span class="golink">Open your Inbox →</span></div></a>`;
+    feedRows += `<a class="moment attn todo" href="${esc(scopeHref('/inbox.html'))}">
+      <span class="fico" aria-hidden="true">📥</span>
+      <span class="fmain"><span class="fhead">${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</span><span class="fmeta">Messages, approvals and updates that are waiting on you — all in one place.</span></span>
+      <span class="fcta">Open your Inbox →</span></a>`;
   }
+
+  let main = '';
+  if(feedRows) main += `<section class="home-sec" id="needs-you"><div class="seclab">Needs you</div><div class="feedcard">${feedRows}</div></section>`;
+
   if(!items.length && !needs){
-    $('sub').textContent = "Nothing needs your attention today.";
     const clearBody = hasWebsite
       ? 'Everything we watch on your website looks good, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.'
       : 'Everything across your business is quiet, and there’s nothing waiting on you today. If something ever deserves a look, it’ll appear here first — calmly, and only then.';
-    // carry the agency ?client= scope onto EVERY hub link, so an operator scoped
-    // into a client never silently loses that context (one connected system).
-    const _sc = new URLSearchParams(location.search).get('client');
-    const _lnk = (href, label) => { let h = href; if(_sc && href.charAt(0)==='/'){ const p = href.split('#'); h = p[0] + (p[0].indexOf('?')>=0?'&':'?') + 'client=' + encodeURIComponent(_sc) + (p[1]?'#'+p[1]:''); } return `<a class="link" href="${h}">${label}</a>`; };
+    const _lnk = (href, label) => `<a class="link" href="${scopeHref(href)}">${label}</a>`;
     const _sep = ' <span style="color:var(--soft)">·</span> ';
     const clearLinks = (hasWebsite
       ? [['/inbox.html','What needs you'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/snapshot-history.html','History'],['/schedule.html','What’s next'],['/analytics.html','Insights'],['/leads.html','Website enquiries']]
       : [['/customers.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
-    html += `<div class="moment calm"><span class="tag">All clear</span>
+    main += `<div class="moment calm"><span class="tag">All clear</span>
       <h2>${hasWebsite ? 'Everything we watch looks good.' : 'Everything’s quiet across your business.'}</h2>
       <p>${clearBody}</p>
       <div class="row">${clearLinks}</div></div>`;
+  } else if(!items.length){
+    // needs exist but nothing more is worth a look — one calm green line, not silence
+    main += `<div class="moment calm slim"><h2>Everything else looks good.</h2><p>Beyond the list above, nothing is waiting on you — anything new lands here first.</p></div>`;
   } else {
-    const parts = [];
-    if(needs) parts.push(needs === 1 ? 'one thing needs you' : `${needs} things need you`);
-    if(items.length) parts.push(items.length === 1 ? 'one more worth a look' : `${items.length} more worth a look`);
-    const s = parts.join(' · '); $('sub').textContent = s.charAt(0).toUpperCase() + s.slice(1) + '.';
+    let momentsHtml = '';
     for(const m of items){
       const cls = toneClass(m.moment_type || m.tone);
       const celebrate = cls === 'good';
-      html += `<article class="moment ${cls}">
+      momentsHtml += `<article class="moment ${cls}">
         ${celebrate ? '<span class="tag">Good news</span>' : ''}
         <h2>${esc(m.headline)}</h2>
         <p>${esc(m.summary)}</p>
@@ -205,15 +354,22 @@ function render(moments, features, feed, ctx){
         <div class="answer" id="ans-${esc(m.id)}" aria-live="polite"></div>
       </article>`;
     }
+    main += `<section class="home-sec stack" id="worth-a-look" style="margin-top:0;gap:14px">${needs?'<div class="seclab" style="margin-bottom:-5px">Worth a look</div>':''}${momentsHtml}</section>`;
   }
-  // the Concierge — a knowledgeable partner, not a chatbot. Stays in the focused
-  // area (right under what needs you) — asking a question is a primary action.
-  html += `<div class="ask"><h3>Have a question about your website?</h3>
+
+  // Today's schedule — real bookings, a confirmed-clear day, or an honest "couldn't check"
+  main += scheduleHtml(appts);
+
+  // the Concierge — a knowledgeable partner, not a chatbot. Stays in the main
+  // column (right under the day) — asking a question is a primary action.
+  main += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
-  // (Navigation to Connections and Visual Studio now lives in the persistent top nav.)
-  $('main').innerHTML = '<div class="stack">' + html + '</div>';   // .stack gives the cards their breathing room
+
+  // ── the rail: This month · Recent records · Waiting on clients ──
+  let rail = monthCardHtml(dash) + recentsCardHtml() + '<div id="rail-waiting" hidden></div>';
+  $('main').innerHTML = `<div class="cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance">${rail}</aside></div>`;
   // "what comes with your business" — the Industry Pack, made invisible. Secondary
   // context, so it opens inside the collapsible "More about your business" below.
   const feats = (features && features.features) || [];
@@ -298,15 +454,18 @@ function trouble(){
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
     let feedFailed = false;
-    const [moments, features, ctx, feed, bridged] = await Promise.all([
+    const [moments, features, ctx, feed, bridged, dash, appts] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       (window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null)),   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
       apiGet('/portal/feed').catch(()=>{feedFailed=true;return null;}),
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
+      apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
+      apiGet('/bookings/appointments').catch(()=>null),      // "Today's schedule" — an honest line if unreachable
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
-    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data);
+    const apptList = (appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null;
+    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList);
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);
@@ -314,6 +473,7 @@ function trouble(){
     planCard(ctx && ctx.data);
     healthLine();
     journeyStrip();
+    waitingCard();
   }catch(_){ trouble(); }
 })();
 
@@ -327,10 +487,10 @@ function studioProjectCard(d){
     if(new URLSearchParams(location.search).get('client')) return;
     const projects = (d && (d.projects || d)) || [];
     if(!Array.isArray(projects) || !projects.length) return;
-    const host = document.getElementById('main') || document.body;
+    const host = document.getElementById('col-main') || document.getElementById('main') || document.body;
     const card = document.createElement('a');
     card.href = '/client.html';
-    card.style.cssText = 'display:block;max-width:860px;margin:18px auto 0;padding:16px 20px;border:1px solid var(--accent-soft,#e5ddf5);border-radius:14px;background:var(--card,#fff);font-size:14px;color:inherit;text-decoration:none';
+    card.style.cssText = 'display:block;padding:16px 20px;border:1px solid var(--accent-soft,#e5ddf5);border-radius:14px;background:var(--card,#fff);font-size:14px;color:inherit;text-decoration:none';
     const live = projects.find(p=>p.status==='active')||projects[0];
     const name = live && (live.title || live.name) || 'Your project';
     card.innerHTML = '<strong>' + esc(name) + '</strong> — your studio is on it. <span style="color:var(--accent,#5b3fa0);font-weight:600">See progress, files, and anything waiting on you →</span>';
