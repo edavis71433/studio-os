@@ -1286,3 +1286,258 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
   });
 });
+
+// ── slice 12: the Files tab redesign ─────────────────────────────────────────
+// A dashed share card ("Share a file with your studio") drives the EXISTING
+// per-project upload backend: POST upload-url → PUT the bytes → POST uploads.
+// Documents and each project's files become list views (icon · title · meta ·
+// chip/action). Client-sent files (the server-stamped 'Uploaded by the client.'
+// note — the payload's only signal) read "Sent to your studio" + a You-shared
+// chip. Failure honesty per read; a reviewer never sees the share card.
+const PID2 = '66666666-6666-4666-8666-666666666666'; // second project (the picker case)
+const FILES_DOCS = { data: { documents: [
+  { kind: 'contract', id: 'c1', title: 'Service agreement', status: 'signed', signed_at: '2026-07-12T00:00:00Z', created_at: '2026-07-02T00:00:00Z', view_url: 'https://docs.example/view/c1' },
+  { kind: 'proposal', id: 'pr1', title: 'Website redesign proposal', status: 'sent', created_at: '2026-07-08T00:00:00Z', view_url: 'https://docs.example/view/pr1' },
+] } };
+const FILES_DELIVERABLES = [
+  { id: 'd1', title: 'Homepage mock v2.pdf', note: 'First look', created_at: '2026-07-15T00:00:00Z' },
+  { id: 'd2', title: 'Brand palette.png', note: '', created_at: '2026-07-12T00:00:00Z' },
+  { id: 'd3', title: 'Kitchen photos.zip', note: 'Uploaded by the client.', created_at: '2026-07-16T00:00:00Z' },
+];
+const filesBundle = (deliverables: unknown[]) => ({ data: {
+  project: { id: PID, name: 'Website redesign', status: 'active' },
+  milestones: [], tasks: [], events: [], deliverables, approvals: [], surveys: [],
+  progress: { total: 0, done: 0, pct: 0 },
+} });
+const FILES_API = {
+  ...CLIENT_API,
+  '/client/documents': FILES_DOCS,
+  [`/client/projects/${PID}`]: filesBundle(FILES_DELIVERABLES),
+};
+const openFilesTab = async (page: import('@playwright/test').Page) => {
+  await page.locator('#tabnav [data-tab="files"]').click();
+  await expect(page.locator('#main').getByRole('heading', { name: 'Files & documents' })).toBeVisible();
+};
+// the three fixture routes behind a share-flow send (upload-url → PUT → uploads)
+const routeUploadBackend = async (page: import('@playwright/test').Page, opts: { afterUpload?: unknown[] } = {}) => {
+  let recorded = false;
+  await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(filesBundle(recorded && opts.afterUpload ? opts.afterUpload : FILES_DELIVERABLES)) }));
+  await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'sites/s/m-new' } }) }));
+  await page.route('https://storage.example/**', (route) => route.fulfill({ status: 200, body: '' }));
+  await page.route('**/functions/v1/presence/client/projects/*/uploads', (route) => {
+    recorded = true;
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) });
+  });
+};
+const SHARE_FILE = { name: 'Team photos.zip', mimeType: 'application/zip', buffer: Buffer.from('zip-bytes') };
+
+test.describe('Client portal — Files tab (slice 12)', () => {
+  test('Documents is a list view: icons, kind · date meta, status chips, View links', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    const docs = page.locator('#fdocs');
+    await expect(docs.locator('.frow')).toHaveCount(2);
+    const signed = docs.locator('.frow', { hasText: 'Service agreement' });
+    await expect(signed.locator('.fmeta')).toHaveText('Agreement · signed July 12');
+    await expect(signed.locator('.fst.sig')).toHaveText('Signed');   // Signed = the good/green chip
+    const prop = docs.locator('.frow', { hasText: 'Website redesign proposal' });
+    await expect(prop.locator('.fmeta')).toHaveText('Proposal · sent July 8');
+    await expect(prop.locator('.fst')).toHaveText('Sent');
+    await expect(prop.locator('.fst.sig')).toHaveCount(0);           // …everything else stays purple
+    // View keeps the existing behavior: the signed doc-viewer URL, new tab, no opener
+    const view = signed.getByRole('link', { name: 'View — Service agreement' });
+    await expect(view).toHaveAttribute('href', 'https://docs.example/view/c1');
+    await expect(view).toHaveAttribute('target', '_blank');
+    await expect(view).toHaveAttribute('rel', 'noopener');
+  });
+
+  test('project files are list rows: type icon, honest meta, You-shared chip on client uploads, Download round-trip', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.addInitScript(() => { (window as any).open = (u: string) => { (window as any).__opened = u; return null; }; });
+    await page.route('**/functions/v1/presence/client/deliverables/d1/download', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { url: 'https://files.example/dl/1', title: 'Homepage mock v2.pdf' } }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Website redesign', exact: true }) });
+    await expect(sec.locator('.frow')).toHaveCount(3);
+    const studio = sec.locator('.frow', { hasText: 'Homepage mock v2.pdf' });
+    await expect(studio.locator('.fmeta')).toHaveText('Shared by your studio · July 15');
+    await expect(studio.locator('.fyou')).toHaveCount(0);
+    // the client's own upload — detected by the server-stamped note — reads the other way
+    const mine = sec.locator('.frow', { hasText: 'Kitchen photos.zip' });
+    await expect(mine.locator('.fmeta')).toHaveText('Sent to your studio · July 16');
+    await expect(mine.locator('.fyou')).toHaveText('You shared');
+    // Download keeps the wireDownloads round-trip: signed URL fetched, then opened
+    await studio.getByRole('button', { name: 'Download — Homepage mock v2.pdf' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__opened)).toBe('https://files.example/dl/1');
+  });
+
+  test('share flow end-to-end (one project): auto-selected, title defaults to the filename, 3-step send, re-render shows the You-shared file', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await routeUploadBackend(page, { afterUpload: [...FILES_DELIVERABLES,
+      { id: 'nd1', title: 'Team photos.zip', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    const share = page.locator('.fshare');
+    await expect(share.getByText('Share a file with your studio')).toBeVisible();
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    // exactly one project → no picker; the optional title defaults to the filename
+    await expect(page.locator('#fsend')).toBeVisible();
+    await expect(page.locator('#fproj')).toHaveCount(0);
+    await expect(page.locator('#ftitle')).toHaveValue('Team photos.zip');
+    const upUrl = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/projects\/[^/]+\/upload-url$/.test(new URL(r.url()).pathname));
+    const put = page.waitForRequest((r) => r.method() === 'PUT' && r.url().startsWith('https://storage.example/up/1'));
+    const rec = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/projects\/[^/]+\/uploads$/.test(new URL(r.url()).pathname));
+    await page.locator('#fgo').click();
+    // step 1: the validated upload-url request carries the real mime/bytes/title
+    expect((await upUrl).postDataJSON()).toEqual({ mime: 'application/zip', bytes: SHARE_FILE.buffer.length, title: 'Team photos.zip' });
+    // step 2: the bytes go to the URL the server returned, typed as the file
+    expect((await put).headers()['content-type']).toBe('application/zip');
+    // step 3: the recording POST ties the media id back
+    expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.zip' });
+    await expect(page.locator('#toast')).toContainText('Sent to your studio');
+    // the re-render shows the new file with its You-shared mark
+    const row = page.locator('.frow', { hasText: 'Team photos.zip' });
+    await expect(row.locator('.fyou')).toHaveText('You shared');
+  });
+
+  test('two projects: the picker chooses which project the file belongs to', async ({ page }) => {
+    await installApp(page, { api: {
+      ...FILES_API,
+      '/client/projects': { data: [
+        { id: PID, name: 'Website redesign', status: 'active' },
+        { id: PID2, name: 'Brand refresh', status: 'active' },
+      ] },
+      [`/client/projects/${PID2}`]: { data: {
+        project: { id: PID2, name: 'Brand refresh', status: 'active' },
+        milestones: [], tasks: [], events: [], deliverables: [], approvals: [], surveys: [], progress: { total: 0, done: 0, pct: 0 },
+      } },
+    } });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'p' } }) }));
+    await page.route('https://storage.example/**', (route) => route.fulfill({ status: 200, body: '' }));
+    await page.route('**/functions/v1/presence/client/projects/*/uploads', (route) =>
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    const sel = page.locator('#fproj');
+    await expect(sel).toBeVisible();
+    await expect(sel.locator('option')).toHaveText(['Website redesign', 'Brand refresh']);
+    await sel.selectOption(PID2);
+    const upUrl = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID2}/upload-url`));
+    await page.locator('#fgo').click();
+    await upUrl;   // the POST went to the PICKED project
+    await expect(page.locator('#toast')).toContainText('Sent to your studio');
+  });
+
+  test('zero projects: the share card is hidden entirely (uploads are project-scoped)', async ({ page }) => {
+    await installApp(page, { api: { ...FILES_API, '/client/projects': { data: [] }, '/client/documents': { data: { documents: [] } } } });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await expect(page.locator('.fshare')).toHaveCount(0);
+    // a genuine empty still gets the friendly empty card
+    await expect(page.getByText('No files yet.', { exact: false })).toBeVisible();
+  });
+
+  test('a 422 from upload-url surfaces the server’s own message and re-enables the button', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+      route.fulfill({ status: 422, contentType: 'application/json',
+        body: JSON.stringify({ error: 'validation', message: 'That file is too big — 25 MB is the limit.' }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('That file is too big — 25 MB is the limit.');
+    await expect(page.locator('#fgo')).toBeEnabled();
+    await expect(page.locator('#fgo')).toHaveText('Send to your studio');
+  });
+
+  test('a failed PUT gets the calm retry toast — never silent', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'p' } }) }));
+    await page.route('https://storage.example/**', (route) => route.fulfill({ status: 500, body: '' }));
+    let recorded = 0;
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/uploads$/.test(new URL(r.url()).pathname)) recorded++; });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('The upload didn’t finish — please try again.');
+    await expect(page.locator('#fgo')).toBeEnabled();
+    expect(recorded).toBe(0);   // a dead PUT never records a phantom file
+  });
+
+  test('reviewer: no share card — the read-only lists render fine', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+      '/client/projects': { data: [] },
+      '/client/documents': FILES_DOCS,
+    } });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await expect(page.locator('.fshare')).toHaveCount(0);
+    await expect(page.locator('#fdocs .frow')).toHaveCount(2);
+    await expect(page.locator('#fdocs .fst.sig')).toHaveText('Signed');
+  });
+
+  test('a 502 on the documents read shows the couldn’t-load line — never "no documents"', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.route('**/functions/v1/presence/client/documents', (route) =>
+      route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await expect(page.getByText('We couldn’t load your documents just now — please try again in a moment.')).toBeVisible();
+    // the project files read succeeded — that section still renders fully
+    await expect(page.locator('.frow', { hasText: 'Homepage mock v2.pdf' })).toBeVisible();
+    await expect(page.getByText('No files yet.', { exact: false })).toHaveCount(0);
+  });
+
+  test('a failed project-bundle read shows that project’s couldn’t-load line — never the empty card', async ({ page }) => {
+    await installApp(page, { api: { ...FILES_API, '/client/documents': { data: { documents: [] } } } });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) =>
+      route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Website redesign', exact: true }) });
+    await expect(sec.getByText('We couldn’t load this project’s files just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('No files yet.', { exact: false })).toHaveCount(0);
+  });
+
+  test('mobile: the share card wraps — the button drops below full-width, rows stay, no horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the wrapped share card is the <560px contract');
+    await installApp(page, { api: FILES_API });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    const text = await page.locator('.fshare-m').boundingBox();
+    const btn = await page.locator('#fchoose').boundingBox();
+    expect(btn!.y).toBeGreaterThan(text!.y + text!.height - 1);   // wrapped below the copy
+    const card = await page.locator('.fshare').boundingBox();
+    expect(btn!.width).toBeGreaterThan(card!.width * 0.8);        // …at full width
+    await expect(page.locator('.frow', { hasText: 'Kitchen photos.zip' })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('no serious/critical axe violations with the share flow open', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: FILES_API });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await expect(page.locator('#fsend')).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
+  });
+});
