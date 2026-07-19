@@ -176,6 +176,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .titem input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin-top:3px}
   .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px;white-space:nowrap}
   .tag.client{background:var(--p-soft);color:var(--p)}
+  .tag.fromclient{background:var(--good-soft);color:var(--good)}
   .tag.action{background:var(--warn-soft);color:var(--warn)}
   .tag.overdue{background:var(--warn-soft);color:var(--bad)}
   .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
@@ -587,7 +588,16 @@ async function openProject(id){
       const others=STUDIO?(T_NEXT[t.status]||[]).filter(s=>s!=='done'&&!(done&&s==='todo')).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(statusLabel(s))}</button>`).join(''):'';
       return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
     }).join('')||'<div class="empty">No tasks yet — add the first one.</div>';
-    const dl=(data.deliverables||[]).map(x=>`<div class="item"><div class="t">${esc(x.title)}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`).join('')||'<div class="empty">No files yet — share the first deliverable.</div>';
+    // Origin honesty (the portal's "You shared" treatment, mirrored): a client
+    // upload is marked by the server-stamped note ('Uploaded by the client.' —
+    // client_delivery.ts handleClientUploadCreate; PREFIX match so a studio
+    // appending to that note keeps the chip) or a future additive
+    // `client_upload` boolean — a "From client" chip + a meta line, so the
+    // studio can tell what the client sent from what it shared.
+    const isClientUpload=(x)=>!!x&&(x.client_upload===true||String(x.note||'').startsWith('Uploaded by the client'));
+    const dl=(data.deliverables||[]).map(x=>{const fromClient=isClientUpload(x);
+      return `<div class="item"><div class="t">${esc(x.title)}${fromClient?'<span class="tag fromclient">From client</span>':''}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}${fromClient?'<span class="s">Uploaded by the client</span>':''}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`;
+    }).join('')||'<div class="empty">No files yet — share the first deliverable.</div>';
     const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
 
     $('detailInner').innerHTML=`

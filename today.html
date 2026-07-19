@@ -567,7 +567,7 @@ async function healthLine(){
   if (!sugg) {
     line.textContent = '✓ ' + (r.headline || 'Everything looks healthy.');
   } else {
-    line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(sugg.href) + '" style="color:var(--accent);font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:var(--muted)">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
+    line.innerHTML = '<strong>' + esc(r.headline) + '</strong> ' + esc(sugg.text) + ' <a href="' + esc(scopeHref(sugg.href)) + '" style="color:var(--accent);font-weight:600">Take a look →</a>' + (r.suggestions.length > 1 ? ' <span style="color:var(--muted)">(+' + (r.suggestions.length - 1) + ' more)</span>' : '');
   }
   host.appendChild(line);
 }

@@ -86,7 +86,7 @@ const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABA
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 function scParam(){const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';}
-function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';return Math.floor(d/7)+' weeks ago';}
+function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
 
 function render(){
@@ -219,11 +219,16 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to sen
 function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button class="primary" onclick="location.reload()" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;}
 
 async function load(){
-  const seg=await api('/broadcasts/segments');
+  // failure honesty: a non-403 failure on EITHER read gets the honest trouble
+  // screen — never a quietly empty "Loading lists…" / no-history render that
+  // masquerades as having nothing to send to.
+  let seg;try{seg=await api('/broadcasts/segments');}catch(_){seg={ok:false,status:0,body:{}};}
   if(seg.status===403){$('main').innerHTML=`<div class="center"><h2>Broadcasts live in your studio workspace.</h2></div>`;return;}
-  if(seg.ok&&seg.body.data)SEGMENTS=seg.body.data.segments||[];
-  const list=await api('/broadcasts');
-  if(list.ok&&list.body.data)BROADCASTS=list.body.data.broadcasts||[];
+  if(!seg.ok){trouble();return;}
+  SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];
+  let list;try{list=await api('/broadcasts');}catch(_){list={ok:false,status:0,body:{}};}
+  if(!list.ok){trouble();return;}
+  BROADCASTS=(list.body.data&&list.body.data.broadcasts)||[];
   render();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();

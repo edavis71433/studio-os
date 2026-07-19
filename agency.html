@@ -153,7 +153,9 @@ function openClient(siteId){
   const c = CLIENTS.find(x=>x.site_id===siteId); if(!c) return;
   // Open the customer's unified CLIENT RECORD (Overview · Deal · Delivery · Details).
   const pid = PROJECT_BY_SITE[siteId];
-  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&tab=delivery'; return; }
+  // SC-1: the project drill-in mints the client site scope like its sibling below —
+  // without it the record page resolves against the agency's own tenant.
+  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&tab=delivery&client=' + encodeURIComponent(siteId); return; }
   location.href = '/crm.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
