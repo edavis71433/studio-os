@@ -277,6 +277,12 @@ outbound email compose → remaining F items as Eric prioritizes. Batch A
 don't wait a week behind features. Then descend D → C → B; E (design-system
 foundations) LAST as its own approved effort. Every batch: usual pipeline
 (build → adversarial review → gates → screenshots → Eric approves merge).
+## 🎨 G13 DECISIONS (Eric 2026-07-19): ship text-blocks first (slice 3 adds
+hero/core); canonical section ids ACCEPTED — "but don't forget about ssl
+certs and all that" → SSL provisioning/renewal is a HARD REQUIREMENT of the
+DNS slices (post-delegation cert re-trigger + status + renewal watch + DS
+pre-check). G13 slice 1 (server stamping) building.
+
 ## 🌐 DNS ONE-STOP SHOP — DECISIONS LOCKED (Eric 2026-07-19)
 
 Spec: docs/design/DNS-ONE-STOP-SHOP.md. Eric chose: **FULL SHOP** (real
