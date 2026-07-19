@@ -34,14 +34,30 @@ ok('nav: Projects is a primary outcome, gated to the relationship area', /single
 ok('slice 9: shared .lhead list-view header — 📁 object icon, #pagehead H1, refresh, meta', /class="lhead"/.test(h) && /class="obj-ic"/.test(h) && /id="pagehead" tabindex="-1"/.test(h) && /id="refreshBtn"/.test(h) && /updatedLabel\(\)/.test(h));
 ok('slice 9: sortable roster table in its own scroll container (aria-sort + th buttons)', /class="tscroll"/.test(h) && /aria-sort=/.test(h) && /data-sort=/.test(h) && /table aria-label="Projects"/.test(h));
 ok('slice 9: Table ⇄ Cards display toggle persisted (customers.html mobile pattern)', /dds-display:projects/.test(h) && /id="dispTable"/.test(h) && /id="dispCards"/.test(h));
-ok('slice 9: roster enrichment uses EXISTING routes only (per-project /report + /studio/customers), no fake numbers', /ensureReports/.test(h) && /ensureCustomers/.test(h) && /\/studio\/customers/.test(h) && /—/.test(h));
+ok('slice 9: roster enrichment uses EXISTING routes only (per-project /report + /studio/customers), no fake numbers', /ensureReports/.test(h) && /ensureCustomers/.test(h) && /\/studio\/customers/.test(h) && /if\(!\(r&&r\.progress\)\)return '<span class="mutcell">—<\/span>'/.test(h));
 ok('slice 9: record page breadcrumb (Projects › name)', /class="crumbs" aria-label="Breadcrumb"/.test(h) && /aria-current="page"/.test(h));
 ok('slice 9: highlights panel tiles (Customer · Target · Progress · Waiting · Files)', /class="hl-panel"/.test(h) && /Waiting on client/.test(h) && /class="hl-k"/.test(h));
 ok('slice 9: the Path IS the milestones — rendered only when milestones exist, single aria-current step', /pathHtml/.test(h) && /if\(!milestones\.length\)return ''/.test(h) && /aria-current="step"/.test(h) && /findIndex\(m=>m\.status!=='complete'\)/.test(h));
 ok('slice 9: the Path action completes the CURRENT milestone via the existing PATCH', /id="msComplete"/.test(h) && /Mark Milestone Complete/.test(h));
-ok('slice 9: Status ▾ popup carries the slice-2 contract (aria-haspopup + aria-expanded + Escape + delegated outside-click closer)', /aria-haspopup="menu"/.test(h) && /id="statusMenu"/.test(h) && /aria-expanded/.test(h) && /closest\('\.statusdd'\)/.test(h));
+ok('slice 9: Status ▾ popup carries the slice-2 contract (aria-haspopup + aria-expanded + Escape + delegated outside-click closer)', /aria-haspopup="menu"/.test(h) && /id="statusMenu"/.test(h) && /aria-expanded/.test(h) && /e\.key==='Escape'/.test(h) && /closest\('\.statusdd'\)/.test(h));
 ok('slice 9: tasks are a checkbox list (done ⇄ todo) that keeps the other ladder moves', /data-tdone=/.test(h) && /checked\?'done':'todo'/.test(h) && /data-task=/.test(h));
 ok('slice 9: friendly empty states (surveys check-in nudge)', /No surveys yet — /.test(h) && /send a check-in →/.test(h) && /No milestones yet/.test(h) && /No tasks yet/.test(h));
+
+// ── anti-drift: the shared list-view anatomy has TEETH ──────────────────────
+// customers.html / contacts.html / projects.html carry the SAME core
+// .lhead/.lrow1/.obj-ic/.lbtn/.lmeta block ("kept in sync by hand" — this pin
+// makes the hand honest). leads.html drifts intentionally (its .lhead margin
+// variant + wider .lrow1 gap) and inbox.html is a narrower pane header — both
+// excluded on purpose.
+const CORE_SELECTORS = ['.lhead', '.lrow1', '.obj-ic', '.lbtn', '.lbtn:hover', '.lmeta'];
+const coreBlock = (src) => CORE_SELECTORS.map((sel) => {
+  const m = src.match(new RegExp('^\\s*' + sel.replace(/[.:]/g, '\\$&') + '\\{[^}]*\\}', 'm'));
+  return m ? m[0].trim() : 'MISSING ' + sel;
+}).join('\n');
+const blocks = { 'customers.html': coreBlock(read('customers.html')), 'contacts.html': coreBlock(read('contacts.html')), 'projects.html': coreBlock(h) };
+const drifted = Object.entries(blocks).filter(([, b]) => b !== blocks['customers.html']).map(([n]) => n);
+ok('anti-drift: core .lhead/.lrow1/.obj-ic/.lbtn/.lmeta CSS identical across customers/contacts/projects', drifted.length === 0,
+  'drifted: ' + drifted.join(', ') + '\n' + Object.entries(blocks).map(([n, b]) => n + ':\n' + b).join('\n\n'));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ PROJECTS UI (P2-D-5 structural → slice 9): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
