@@ -16,8 +16,11 @@
 //   • `type#N`         — the Nth instance of a repeated no-id type ("richtext#2")
 //   • `type:storedId`  — a multi-instance block with its own id ("columns:cols_a")
 //   • ''               — the whole page (block_id null/'' in the table)
-// Deterministic over the page's block list; mirrored client-side in
-// presence.html (cmSectionIds) so the builder and the server always agree.
+// Deterministic over the page's block list. G13: the id computation itself lives
+// in site_blocks.sectionSidsFor — the ONE implementation the render stamps
+// (data-dds-sid) and the /settings section_meta sidecar also use; the old
+// client-side mirror (presence.html cmSectionIds) is retired.
+import { sectionSidsFor } from './site_blocks.ts';
 
 /** Plain-word names per block type — client-facing, NEVER content. Mirrors the
  *  builder's BLOCK_DEFS names, shortened to calm nouns. */
@@ -77,20 +80,18 @@ export function normalizeBlockId(raw: unknown): string | null {
  *  sections route may serve (no titles, no bodies, no media, no field values).
  *  Deterministic; junk entries are skipped, never guessed at. Pure. */
 export function sectionIdsFor(blocks: unknown): Array<{ id: string; name: string }> {
-  const out: Array<{ id: string; name: string }> = [];
+  // Junk entries are skipped BEFORE counting (unchanged behavior); the id
+  // computation over the kept list delegates to the canonical sectionSidsFor.
+  const kept = (Array.isArray(blocks) ? blocks : []).filter((b) =>
+    b && typeof b === 'object' && /^[a-z0-9_]{1,40}$/.test(String((b as Record<string, unknown>).type || '')));
+  const ids = sectionSidsFor(kept);
   const counts: Record<string, number> = {};
-  for (const b of (Array.isArray(blocks) ? blocks : [])) {
-    if (!b || typeof b !== 'object') continue;
+  return kept.map((b, i) => {
     const type = String((b as Record<string, unknown>).type || '');
-    if (!/^[a-z0-9_]{1,40}$/.test(type)) continue;
     const n = (counts[type] = (counts[type] || 0) + 1);
-    const rawId = (b as Record<string, unknown>).id;
-    const own = typeof rawId === 'string' && /^[a-z0-9_-]{1,60}$/i.test(rawId) ? rawId : '';
-    const id = own ? `${type}:${own}` : (n === 1 ? type : `${type}#${n}`);
     const base = SECTION_NAME[type] || type.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
-    out.push({ id, name: n === 1 ? base : `${base} (${n})` });
-  }
-  return out;
+    return { id: ids[i], name: n === 1 ? base : `${base} (${n})` };
+  });
 }
 
 /** The section list for one page of a snapshot's content ('' = home →

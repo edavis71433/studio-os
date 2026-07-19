@@ -103,6 +103,56 @@ const uid = (x: unknown): string => { const v = String(x ?? '').trim(); return U
 // mirrors lib/forms.ts slug(): lowercase, non-alphanumerics → '_', trimmed, capped.
 const slugId = (x: unknown): string => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
 
+// ── G13 · server-stamped section keys (docs/design/G13-INPLACE-EDITING.md §1) ──
+// The G11 comment-id scheme (`type` | `type#N` | `type:storedId`) is THE section
+// identity for the whole editor, canonicalized over the VALIDATED list (Eric's
+// D2 decision). ONE implementation lives here: section_comments.sectionIdsFor
+// delegates its per-entry id computation to sectionSidsFor, validateBlocksWithMap
+// records it for the /settings `section_meta` sidecar, and renderSiteBlocks
+// stamps it as `data-dds-sid` — zero client copies. Sids/keys are recomputed
+// wherever needed, NEVER stored, so snapshot content and draft hashes don't churn.
+/** Canonical section ids for a block list, index-aligned with the input.
+ *  Counting rule (byte-compatible with the original sectionIdsFor): every entry
+ *  increments its type counter; an own storage-safe id yields `type:id`, else
+ *  the first instance is bare `type` and repeats are `type#N`. Pure. */
+export function sectionSidsFor(blocks: ReadonlyArray<unknown>): string[] {
+  const counts: Record<string, number> = {};
+  return blocks.map((b) => {
+    const type = String((b as { type?: unknown } | null)?.type || '');
+    const n = (counts[type] = (counts[type] || 0) + 1);
+    const rawId = (b as { id?: unknown } | null)?.id;
+    const own = typeof rawId === 'string' && /^[a-z0-9_-]{1,60}$/i.test(rawId) ? rawId : '';
+    return own ? `${type}:${own}` : (n === 1 ? type : `${type}#${n}`);
+  });
+}
+/** The base render key of one block — MULTI blocks key off their stable id
+ *  (`block_<type>_<id>`), everything else off its type (`block_<type>`). */
+const renderKeyBase = (b: { type: string; id?: string }): string =>
+  (b.type === 'form' || b.type === 'columns' || b.type === 'cards' || b.type === 'freeform')
+    ? `block_${b.type}_${b.id}`
+    : `block_${b.type}`;
+/** G13: render keys for a block list, index-aligned — the renderSiteBlocks key
+ *  rule (first instance keeps the bare key, duplicates de-dupe `_N`) hoisted so
+ *  it is computable PRE-render for the /settings sidecar. Note the render's own
+ *  key loop still numbers over blocks that actually rendered, so a block that
+ *  renders empty (or is windowed out at the publish clock) can shift a later
+ *  duplicate's `_N` there; sids — not keys — are the canvas join. Pure. */
+export function blockRenderKeys(blocks: ReadonlyArray<{ type: string; id?: string }>): string[] {
+  const used = new Set<string>();
+  return blocks.map((b) => {
+    const base = renderKeyBase(b);
+    let key = base, n = 2;
+    while (used.has(key)) key = `${base}_${n++}`;
+    used.add(key);
+    return key;
+  });
+}
+/** One row of the editor-facing sidecar: the canonical section id, the render
+ *  key (the sections_hidden namespace), and the raw-list index the validated
+ *  block came from — the exact join between a stamped `data-dds-sid` on the
+ *  canvas and an index into the stored (working-copy) block list. */
+export interface SectionMapEntry { sid: string; key: string; src_index: number }
+
 // ── Phase T-STYLE: validate a block's optional `look` (per-section style options).
 // Enumerated ONLY — any unknown value is dropped (→ the template default), never
 // stored. Returns undefined when nothing non-default was chosen, so a default block
@@ -251,7 +301,24 @@ export type StoredBlock = WithLook<
  *  render key + storage never clash. This is the authoritative boundary — the
  *  render trusts only what this returns. */
 export function validateBlocks(raw: unknown): StoredBlock[] {
+  return validateBlocksTracked(raw).blocks;
+}
+/** G13: validateBlocks + the editor-facing map — { blocks, map } where map[i]
+ *  gives blocks[i]'s canonical sid, its render key, and the RAW-list index it
+ *  came from (validateBlocks' drop rules applied by the server, never imitated
+ *  by a client). blocks is byte-identical to validateBlocks(raw). Pure. */
+export function validateBlocksWithMap(raw: unknown): { blocks: StoredBlock[]; map: SectionMapEntry[] } {
+  const { blocks, src } = validateBlocksTracked(raw);
+  const sids = sectionSidsFor(blocks);
+  const keys = blockRenderKeys(blocks);
+  return { blocks, map: blocks.map((_b, i) => ({ sid: sids[i], key: keys[i], src_index: src[i] })) };
+}
+/** The one validation walk, tracking which raw-list index each KEPT block came
+ *  from (`src` is index-aligned with `blocks`). Behavior is exactly the
+ *  original validateBlocks — the index bookkeeping is the only addition. */
+function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: number[] } {
   const out: StoredBlock[] = [];
+  const src: number[] = [];
   const seen = new Set<string>();
   // Per-type id registries for the MULTI blocks — each instance gets a unique id so
   // its render key (block_<type>_<id>) + storage never collide with a sibling.
@@ -262,7 +329,9 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
     while (set.has(id)) id = `${id}_${out.length}`;
     set.add(id); return id;
   };
-  for (const b of arr(raw)) {
+  const rawList = arr(raw);
+  for (let ri = 0; ri < rawList.length; ri++) {
+    const b = rawList[ri];
     if (!b || typeof b !== 'object') continue;
     const type = String((b as any).type || '');
     // Only the genuine SINGLETON types (toc / reviews_wall) are one-per-page; every
@@ -663,11 +732,11 @@ export function validateBlocks(raw: unknown): StoredBlock[] {
       // is clockless — WHEN it shows is decided at render against snapshot.created_at.
       const win = parseWindow(b);
       if (win) { if (win.show_from) (block as any).show_from = win.show_from; if (win.show_until) (block as any).show_until = win.show_until; }
-      out.push(block); if (SINGLETON.has(type)) seen.add(type);
+      out.push(block); src.push(ri); if (SINGLETON.has(type)) seen.add(type);
     }
     if (out.length >= MAX_BLOCKS) break;
   }
-  return out;
+  return { blocks: out, src };
 }
 
 /** Resolve stored media IDs → MediaRefs using the serializer's ref() (which also
@@ -911,7 +980,17 @@ export interface BlockRenderCtx {
    *  When absent (e.g. a direct unit call), every section renders — so no-window
    *  output is byte-identical to before this feature. */
   now?: string;
+  /** G13 (internal): set by the columns-cell re-entry so a NESTED block render
+   *  emits no data-dds-* stamps — a nested cell isn't a page section and its
+   *  fields need a ctx path prefix (a later slice, design doc §4). */
+  noDds?: boolean;
 }
+
+// G13: a rendered block's ROOT tag — the applyStyle idiom widened one character
+// so the space divider's `class="block-divider …"` root is covered too (`[ -]`
+// matches `class="block ` and `class="block-`). Group 2 keeps an anchor id that
+// the second pass may already have stamped.
+const DDS_ROOT_RE = /<(section|nav|div)( id="[^"]*")? class="block([ -])/;
 
 export interface RenderedBlock { key: string; type: SiteBlockType; html: string; ld?: object }
 
@@ -1116,8 +1195,18 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   const { esc, attr, safeHref } = ctx;
   // First pass: build each block's HTML/LD (the `toc` block is deferred — it needs
   // every OTHER section's heading + anchor, known only after this pass).
-  const built: Array<{ b: SiteBlock; html: string; ld?: object }> = [];
-  const h2 = (t: string | undefined, fallback: string) => `<h2>${esc(t || fallback)}</h2>`;
+  // G13: `bi` is the block's index in the INPUT list — the final pass stamps
+  // data-dds-sid from sids[bi], so windowed-out/empty siblings still count and
+  // the stamped sid always equals the /settings sidecar's sid for the same list.
+  const built: Array<{ b: SiteBlock; bi: number; html: string; ld?: object }> = [];
+  // G13 field stamp: a dot-path into the STORED block (`title`, `items.0.text`,
+  // `tiers.1.name`, …) on the text-bearing element the in-place editor will make
+  // editable; `md` marks the container of a renderMarkdown-fed field, so the
+  // client never keeps its own list of which fields are markdown. Suppressed for
+  // a nested cell render (ctx.noDds). Attributes only — never new elements.
+  const dds = (path: string, md?: boolean): string =>
+    ctx.noDds ? '' : ` data-dds-field="${attr(path)}"${md ? ' data-dds-md="1"' : ''}`;
+  const h2 = (t: string | undefined, fallback: string, f?: string) => `<h2${f ? dds(f) : ''}>${esc(t || fallback)}</h2>`;
   let tabsSeq = 0;   // per-page counter → each tabs block gets a unique radio-group name
   // Wave-2 G18: per-page counter → each ZOOM gallery gets its own lightbox id
   // namespace (lb-0, lb-1, …). Same per-call posture as tabsSeq: deterministic for
@@ -1126,7 +1215,9 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   // page mixing a TOP-LEVEL zoom gallery with a NESTED one could collide ids.)
   let zoomSeq = 0;
 
-  for (const b of blocks || []) {
+  const list = blocks || [];
+  for (let bi = 0; bi < list.length; bi++) {
+    const b = list[bi];
     // Phase EXP: auto-expiring content — a section outside its window at the publish
     // clock is omitted entirely (no HTML, no schema, no anchor, absent from the TOC).
     // No window (the default) → always visible → byte-identical to before.
@@ -1134,32 +1225,32 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     let html = '', ld: object | undefined;
     switch (b.type) {
       case 'features':
-        html = `<section class="block wrap block-features">${h2(b.title, 'Why choose us')}<div class="svc-grid">${b.items.map((it) =>
-          `<div class="svc">${it.icon ? `<div class="svc-ic" aria-hidden="true">${esc(it.icon)}</div>` : ''}<div class="nm">${esc(it.title)}</div>${it.text ? `<div class="ds">${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
+        html = `<section class="block wrap block-features">${h2(b.title, 'Why choose us', 'title')}<div class="svc-grid">${b.items.map((it, i) =>
+          `<div class="svc">${it.icon ? `<div class="svc-ic" aria-hidden="true">${esc(it.icon)}</div>` : ''}<div class="nm"${dds(`items.${i}.title`)}>${esc(it.title)}</div>${it.text ? `<div class="ds"${dds(`items.${i}.text`)}>${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
         break;
       case 'stats':
-        html = `<section class="block alt block-stats"><div class="wrap">${h2(b.title, 'By the numbers')}<div class="cards stats">${b.items.map((it) =>
-          `<div class="card stat"><div class="stat-v">${esc(it.value)}</div><div class="stat-l">${esc(it.label)}</div></div>`).join('')}</div></div></section>`;
+        html = `<section class="block alt block-stats"><div class="wrap">${h2(b.title, 'By the numbers', 'title')}<div class="cards stats">${b.items.map((it, i) =>
+          `<div class="card stat"><div class="stat-v"${dds(`items.${i}.value`)}>${esc(it.value)}</div><div class="stat-l"${dds(`items.${i}.label`)}>${esc(it.label)}</div></div>`).join('')}</div></div></section>`;
         break;
       case 'team':
-        html = `<section class="block wrap block-team">${h2(b.title, 'Meet the team')}<div class="cards">${b.members.map((m) =>
-          `<div class="card team-card">${m.media ? `<div class="team-photo">${blockImg(m.media, esc, attr, '(max-width:640px) 100vw, 220px')}</div>` : ''}<div class="nm">${esc(m.name)}</div>${m.role ? `<div class="pr">${esc(m.role)}</div>` : ''}${m.bio ? `<p class="ds">${esc(m.bio)}</p>` : ''}</div>`).join('')}</div></section>`;
+        html = `<section class="block wrap block-team">${h2(b.title, 'Meet the team', 'title')}<div class="cards">${b.members.map((m, i) =>
+          `<div class="card team-card">${m.media ? `<div class="team-photo">${blockImg(m.media, esc, attr, '(max-width:640px) 100vw, 220px')}</div>` : ''}<div class="nm"${dds(`members.${i}.name`)}>${esc(m.name)}</div>${m.role ? `<div class="pr"${dds(`members.${i}.role`)}>${esc(m.role)}</div>` : ''}${m.bio ? `<p class="ds"${dds(`members.${i}.bio`)}>${esc(m.bio)}</p>` : ''}</div>`).join('')}</div></section>`;
         ld = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: b.members.map((m, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Person', name: m.name, jobTitle: m.role || undefined } })) };
         break;
       case 'process':
-        html = `<section class="block alt block-process"><div class="wrap">${h2(b.title, 'How it works')}<ol class="process">${b.steps.map((st) =>
-          `<li><span class="step-t">${esc(st.step)}</span>${st.detail ? `<span class="step-d">${esc(st.detail)}</span>` : ''}</li>`).join('')}</ol></div></section>`;
+        html = `<section class="block alt block-process"><div class="wrap">${h2(b.title, 'How it works', 'title')}<ol class="process">${b.steps.map((st, i) =>
+          `<li><span class="step-t"${dds(`steps.${i}.step`)}>${esc(st.step)}</span>${st.detail ? `<span class="step-d"${dds(`steps.${i}.detail`)}>${esc(st.detail)}</span>` : ''}</li>`).join('')}</ol></div></section>`;
         ld = { '@context': 'https://schema.org', '@type': 'HowTo', name: b.title || 'How it works', step: b.steps.map((st, i) => ({ '@type': 'HowToStep', position: i + 1, name: st.step, text: st.detail || st.step })) };
         break;
       case 'pricing':
         if (b.variant === 'list') {
           // Wave-1 G4 variant: atelier-style price rows — name, a quiet dotted
           // rule, price; features as a muted line beneath. Same data, same schema.
-          html = `<section class="block wrap block-pricing v-list">${h2(b.title, 'Pricing')}<div class="price-list">${b.tiers.map((tr) =>
-            `<div class="pl-row"><div class="pl-head"><span class="pl-name">${esc(tr.name)}</span><span class="pl-rule" aria-hidden="true"></span>${tr.price_text ? `<span class="pl-price">${esc(tr.price_text)}</span>` : ''}</div>${tr.features.length ? `<p class="pl-feats">${tr.features.map((f) => esc(f)).join(' · ')}</p>` : ''}</div>`).join('')}</div></section>`;
+          html = `<section class="block wrap block-pricing v-list">${h2(b.title, 'Pricing', 'title')}<div class="price-list">${b.tiers.map((tr, i) =>
+            `<div class="pl-row"><div class="pl-head"><span class="pl-name"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</span><span class="pl-rule" aria-hidden="true"></span>${tr.price_text ? `<span class="pl-price"${dds(`tiers.${i}.price_text`)}>${esc(tr.price_text)}</span>` : ''}</div>${tr.features.length ? `<p class="pl-feats">${tr.features.map((f) => esc(f)).join(' · ')}</p>` : ''}</div>`).join('')}</div></section>`;
         } else {
-          html = `<section class="block wrap block-pricing">${h2(b.title, 'Pricing')}<div class="cards">${b.tiers.map((tr) =>
-            `<div class="card price-tier"><div class="nm">${esc(tr.name)}</div>${tr.price_text ? `<div class="pr">${esc(tr.price_text)}</div>` : ''}${tr.features.length ? `<ul class="tier-feats">${tr.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>`;
+          html = `<section class="block wrap block-pricing">${h2(b.title, 'Pricing', 'title')}<div class="cards">${b.tiers.map((tr, i) =>
+            `<div class="card price-tier"><div class="nm"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</div>${tr.price_text ? `<div class="pr"${dds(`tiers.${i}.price_text`)}>${esc(tr.price_text)}</div>` : ''}${tr.features.length ? `<ul class="tier-feats">${tr.features.map((f, k) => `<li${dds(`tiers.${i}.features.${k}`)}>${esc(f)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>`;
         }
         ld = { '@context': 'https://schema.org', '@type': 'ItemList', name: b.title || 'Pricing', itemListElement: b.tiers.map((tr, i) => {
           const price = numericPrice(tr.price_text);
@@ -1167,11 +1258,11 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         }) };
         break;
       case 'certifications':
-        html = `<section class="block alt block-certs"><div class="wrap">${h2(b.title, 'Credentials & certifications')}<ul class="certs">${b.items.map((it) =>
-          `<li><strong>${esc(it.name)}</strong>${it.issuer ? ` — ${esc(it.issuer)}` : ''}</li>`).join('')}</ul></div></section>`;
+        html = `<section class="block alt block-certs"><div class="wrap">${h2(b.title, 'Credentials & certifications', 'title')}<ul class="certs">${b.items.map((it, i) =>
+          `<li><strong${dds(`items.${i}.name`)}>${esc(it.name)}</strong>${it.issuer ? ` — ${esc(it.issuer)}` : ''}</li>`).join('')}</ul></div></section>`;
         break;
       case 'service_areas':
-        html = `<section class="block wrap block-areas">${h2(b.title, 'Areas we serve')}<ul class="areas">${b.areas.map((a) => `<li>${esc(a)}</li>`).join('')}</ul></section>`;
+        html = `<section class="block wrap block-areas">${h2(b.title, 'Areas we serve', 'title')}<ul class="areas">${b.areas.map((a, i) => `<li${dds(`areas.${i}`)}>${esc(a)}</li>`).join('')}</ul></section>`;
         break;
       case 'cta': {
         const href = b.url ? safeHref(b.url) : null;
@@ -1179,7 +1270,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         // the .v-card class switches the layout (rules in BLOCK_CSS); the default
         // ('banner') emits no class, so existing markup stays byte-identical.
         const vc = b.variant === 'card' ? ' v-card' : '';
-        html = `<section class="block alt block-cta${vc}"><div class="wrap cta-inner"><p class="cta-text">${esc(b.text)}</p>${href ? `<a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Get started')}</a>` : ''}</div></section>`;
+        html = `<section class="block alt block-cta${vc}"><div class="wrap cta-inner"><p class="cta-text"${dds('text')}>${esc(b.text)}</p>${href ? `<a class="btn" href="${attr(href)}" rel="noopener"${dds('button')}>${esc(b.button || 'Get started')}</a>` : ''}</div></section>`;
         break;
       }
       case 'gallery': {
@@ -1209,7 +1300,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           const n = b.images.length;
           const thumbs = b.images.map((m, i) => {
             const cap = capOf(m, i);
-            return `<figure class="ga"><a class="ga-zoom" href="#${gid}-${i + 1}" aria-label="${attr(cap ? `View larger: ${cap}` : `View image ${i + 1} larger`)}">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}</a>${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
+            return `<figure class="ga"><a class="ga-zoom" href="#${gid}-${i + 1}" aria-label="${attr(cap ? `View larger: ${cap}` : `View image ${i + 1} larger`)}">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}</a>${cap ? `<figcaption${dds(`captions.${i}`)}>${esc(cap)}</figcaption>` : ''}</figure>`;
           }).join('');
           const overlays = b.images.map((m, i) => {
             const cap = capOf(m, i);
@@ -1222,16 +1313,16 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
               (n > 1 ? `<span class="lb-count">${i + 1} / ${n}</span><a class="lb-prev" href="#${gid}-${prev}" aria-label="Previous image">‹</a><a class="lb-next" href="#${gid}-${next}" aria-label="Next image">›</a>` : '') +
               `</figure>`;
           }).join('');
-          html = `<section class="block wrap block-gallery${vg} v-zoom">${h2(b.title, 'Gallery')}<div class="gallery" id="${gid}">${thumbs}</div>${overlays}</section>`;
+          html = `<section class="block wrap block-gallery${vg} v-zoom">${h2(b.title, 'Gallery', 'title')}<div class="gallery" id="${gid}">${thumbs}</div>${overlays}</section>`;
         } else {
-          html = `<section class="block wrap block-gallery${vg}">${h2(b.title, 'Gallery')}<div class="gallery">${b.images.map((m, i) =>
-            `<figure class="ga">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}${capOf(m, i) ? `<figcaption>${esc(capOf(m, i))}</figcaption>` : ''}</figure>`).join('')}</div></section>`;
+          html = `<section class="block wrap block-gallery${vg}">${h2(b.title, 'Gallery', 'title')}<div class="gallery">${b.images.map((m, i) =>
+            `<figure class="ga">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}${capOf(m, i) ? `<figcaption${dds(`captions.${i}`)}>${esc(capOf(m, i))}</figcaption>` : ''}</figure>`).join('')}</div></section>`;
         }
         break;
       }
       case 'before_after':
-        html = `<section class="block alt block-ba"><div class="wrap">${h2(b.title, 'Before &amp; after')}${b.items.map((it) =>
-          `<div class="ba-pair">${['Before', 'After'].map((lab, k) => { const m = k ? it.after : it.before; return `<figure class="ba-fig"><span class="ba-lab">${lab}</span>${blockImg(m, esc, attr, '(max-width:640px) 100vw, 340px')}</figure>`; }).join('')}${it.caption ? `<p class="ba-cap">${esc(it.caption)}</p>` : ''}</div>`).join('')}</div></section>`;
+        html = `<section class="block alt block-ba"><div class="wrap">${h2(b.title, 'Before &amp; after', 'title')}${b.items.map((it, i) =>
+          `<div class="ba-pair">${['Before', 'After'].map((lab, k) => { const m = k ? it.after : it.before; return `<figure class="ba-fig"><span class="ba-lab">${lab}</span>${blockImg(m, esc, attr, '(max-width:640px) 100vw, 340px')}</figure>`; }).join('')}${it.caption ? `<p class="ba-cap"${dds(`items.${i}.caption`)}>${esc(it.caption)}</p>` : ''}</div>`).join('')}</div></section>`;
         break;
       case 'video': {
         // Poster + link-out — NEVER an external iframe (constitution Part 4: zero
@@ -1242,13 +1333,13 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           const inner = b.poster
             ? `<span class="v-poster">${blockImg(b.poster, esc, attr, '(max-width:900px) 100vw, 820px')}<span class="v-play" aria-hidden="true">▶</span></span>`
             : `<span class="v-textlink">▶ ${esc(label)}</span>`;
-          html = `<section class="block wrap block-video">${h2(b.title, 'Video')}<a class="v-link" href="${attr(href)}" rel="noopener" aria-label="${attr('Watch: ' + label)}">${inner}</a>${b.caption ? `<p class="v-cap">${esc(b.caption)}</p>` : ''}</section>`;
+          html = `<section class="block wrap block-video">${h2(b.title, 'Video', 'title')}<a class="v-link" href="${attr(href)}" rel="noopener" aria-label="${attr('Watch: ' + label)}">${inner}</a>${b.caption ? `<p class="v-cap"${dds('caption')}>${esc(b.caption)}</p>` : ''}</section>`;
         }
         break;
       }
       case 'newsletter': {   // calm ESP link-out — mirrors the appointment button
         const href = safeHref(b.url);
-        html = href ? `<section class="block wrap block-newsletter">${h2(b.title, 'Get updates from us')}${b.text ? `<p class="nl-text">${esc(b.text)}</p>` : ''}<p class="nl-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Sign up')}</a></p></section>` : '';
+        html = href ? `<section class="block wrap block-newsletter">${h2(b.title, 'Get updates from us', 'title')}${b.text ? `<p class="nl-text"${dds('text')}>${esc(b.text)}</p>` : ''}<p class="nl-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button')}>${esc(b.button || 'Sign up')}</a></p></section>` : '';
         break;
       }
       case 'social': {   // icon strip, link-out only — no live feeds, no external assets
@@ -1257,18 +1348,20 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           const label = SOCIAL_LABELS[l.network] || (l.network ? l.network.charAt(0).toUpperCase() + l.network.slice(1) : 'Website');
           return `<li><a href="${attr(href)}" rel="noopener" target="_blank" aria-label="${attr(label)}" title="${attr(label)}">${socialIcon(l.network)}</a></li>`;
         }).filter(Boolean);
-        if (links.length) html = `<section class="block wrap block-social">${h2(b.title, 'Find us online')}<ul class="social">${links.join('')}</ul></section>`;
+        if (links.length) html = `<section class="block wrap block-social">${h2(b.title, 'Find us online', 'title')}<ul class="social">${links.join('')}</ul></section>`;
         break;
       }
       case 'events': {   // clean list; ISO dates show human ("Jul 26") inside <time>
-        const rows = b.items.map((it) => {
+        const rows = b.items.map((it, i) => {
           const nice = humanDate(it.date);
           const when = nice ? `<time datetime="${attr(it.date)}">${esc(nice)}</time>` : esc(it.date);
           const href = it.url ? safeHref(it.url) : null;
           const name = href ? `<a href="${attr(href)}" rel="noopener">${esc(it.name)}</a>` : esc(it.name);
-          return `<li class="ev"><span class="ev-when">${when}${it.time ? `<span class="ev-time">${esc(it.time)}</span>` : ''}</span><span class="ev-body"><span class="ev-name">${name}</span>${it.detail ? `<span class="ev-detail">${esc(it.detail)}</span>` : ''}</span></li>`;
+          // G13: date is NOT stamped — the shown text ("Jul 26") isn't the stored
+          // ISO string, so an in-place read-back would corrupt it. Exact-text fields only.
+          return `<li class="ev"><span class="ev-when">${when}${it.time ? `<span class="ev-time"${dds(`items.${i}.time`)}>${esc(it.time)}</span>` : ''}</span><span class="ev-body"><span class="ev-name"${dds(`items.${i}.name`)}>${name}</span>${it.detail ? `<span class="ev-detail"${dds(`items.${i}.detail`)}>${esc(it.detail)}</span>` : ''}</span></li>`;
         });
-        html = `<section class="block alt block-events"><div class="wrap">${h2(b.title, 'Upcoming events')}<ul class="events">${rows.join('')}</ul></div></section>`;
+        html = `<section class="block alt block-events"><div class="wrap">${h2(b.title, 'Upcoming events', 'title')}<ul class="events">${rows.join('')}</ul></div></section>`;
         // Honest Event schema: only items with a machine-readable ISO date, and only
         // the fields actually present (startDate gains a time only when it's HH:MM).
         const ldEvents = b.items.filter((it) => humanDate(it.date) !== null).map((it) => {
@@ -1289,22 +1382,22 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         const dirHref = b.directions_url ? safeHref(b.directions_url)
           : (b.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}` : null);
         const img = b.image ? `<div class="map-img">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px')}</div>` : '';
-        const addr = b.address ? `<p class="map-addr">${esc(b.address)}</p>` : '';
+        const addr = b.address ? `<p class="map-addr"${dds('address')}>${esc(b.address)}</p>` : '';
         const dir = dirHref ? `<p class="map-dir"><a href="${attr(dirHref)}" rel="noopener" target="_blank">Get directions →</a></p>` : '';
-        if (img || addr) html = `<section class="block wrap block-map">${h2(b.title, 'Find us')}${img}${addr}${dir}</section>`;
+        if (img || addr) html = `<section class="block wrap block-map">${h2(b.title, 'Find us', 'title')}${img}${addr}${dir}</section>`;
         break;
       }
       case 'richtext': {   // readable prose, markdown → safe semantic HTML (escape-first)
         const prose = renderMarkdown(b.body);
-        if (prose) html = `<section class="block wrap block-richtext">${b.title ? h2(b.title, '') : ''}<div class="prose">${prose}</div></section>`;
+        if (prose) html = `<section class="block wrap block-richtext">${b.title ? h2(b.title, '', 'title') : ''}<div class="prose"${dds('body', true)}>${prose}</div></section>`;
         break;
       }
       case 'image': {   // a figure; wrapped in a safe link only when the link is safe
         if (b.image) {
-          const fig = `<figure class="img-fig">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px', b.decorative ? { decorative: true } : undefined)}${b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ''}</figure>`;
+          const fig = `<figure class="img-fig">${blockImg(b.image, esc, attr, '(max-width:900px) 100vw, 820px', b.decorative ? { decorative: true } : undefined)}${b.caption ? `<figcaption${dds('caption')}>${esc(b.caption)}</figcaption>` : ''}</figure>`;
           const href = b.link ? safeHref(b.link) : null;
           const inner = href ? `<a class="img-link" href="${attr(href)}" rel="noopener">${fig}</a>` : fig;
-          html = `<section class="block wrap block-image">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
+          html = `<section class="block wrap block-image">${b.title ? h2(b.title, '', 'title') : ''}${inner}</section>`;
         }
         break;
       }
@@ -1312,20 +1405,23 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         const prose = b.body ? renderMarkdown(b.body) : '';
         const img = b.image ? `<div class="it-media">${blockImg(b.image, esc, attr, '(max-width:620px) 100vw, 460px')}</div>` : '';
         const href = b.button ? safeHref(b.button.url) : null;
-        const btn = href ? `<p class="it-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button!.label)}</a></p>` : '';
-        const text = `<div class="it-text">${prose}${btn}</div>`;
-        if (img || prose) html = `<section class="block wrap block-imgtext">${b.title ? h2(b.title, '') : ''}<div class="it-row it-${b.side === 'right' ? 'right' : 'left'}">${img}${text}</div></section>`;
+        const btn = href ? `<p class="it-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button.label')}>${esc(b.button!.label)}</a></p>` : '';
+        // G13: no dedicated prose wrapper exists here (attributes-only contract —
+        // no new elements), so the md stamp rides .it-text; the button inside
+        // carries its own field stamp, which the field editor excludes.
+        const text = `<div class="it-text"${prose ? dds('body', true) : ''}>${prose}${btn}</div>`;
+        if (img || prose) html = `<section class="block wrap block-imgtext">${b.title ? h2(b.title, '', 'title') : ''}<div class="it-row it-${b.side === 'right' ? 'right' : 'left'}">${img}${text}</div></section>`;
         break;
       }
       case 'accordion': {   // native <details>/<summary> — keyboard + a11y for free, zero JS
         if (b.variant === 'two-column') {
           // Wave-1 G4 variant: an OPEN Q&A grid (two columns ≥620px, stacks on
           // phones) — every answer visible, real headings, still zero JS.
-          const rows = b.items.map((it) => `<div class="qa-item"><h3 class="qa-q">${esc(it.summary)}</h3>${it.body ? `<div class="prose">${renderMarkdown(it.body)}</div>` : ''}</div>`).join('');
-          html = `<section class="block wrap block-accordion v-two-column">${h2(b.title, 'More information')}<div class="qa-grid">${rows}</div></section>`;
+          const rows = b.items.map((it, i) => `<div class="qa-item"><h3 class="qa-q"${dds(`items.${i}.summary`)}>${esc(it.summary)}</h3>${it.body ? `<div class="prose"${dds(`items.${i}.body`, true)}>${renderMarkdown(it.body)}</div>` : ''}</div>`).join('');
+          html = `<section class="block wrap block-accordion v-two-column">${h2(b.title, 'More information', 'title')}<div class="qa-grid">${rows}</div></section>`;
         } else {
-          const rows = b.items.map((it) => `<details class="acc-item"><summary>${esc(it.summary)}</summary>${it.body ? `<div class="prose">${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
-          html = `<section class="block wrap block-accordion">${h2(b.title, 'More information')}<div class="accordion">${rows}</div></section>`;
+          const rows = b.items.map((it, i) => `<details class="acc-item"><summary${dds(`items.${i}.summary`)}>${esc(it.summary)}</summary>${it.body ? `<div class="prose"${dds(`items.${i}.body`, true)}>${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
+          html = `<section class="block wrap block-accordion">${h2(b.title, 'More information', 'title')}<div class="accordion">${rows}</div></section>`;
         }
         break;
       }
@@ -1334,38 +1430,38 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         const nm = 'site-tabs' + (tabsSeq ? '-' + tabsSeq : '');   // first keeps 'site-tabs' (byte-identical); duplicates get their own group
         tabsSeq++;
         const radios = b.tabs.map((_t, i) => `<input type="radio" name="${nm}" id="${nm}-${i}" class="tab-radio"${i === 0 ? ' checked' : ''}>`).join('');
-        const strip = b.tabs.map((t, i) => `<label class="tab-label" for="${nm}-${i}">${esc(t.label)}</label>`).join('');
-        const panels = b.tabs.map((t) => {
+        const strip = b.tabs.map((t, i) => `<label class="tab-label" for="${nm}-${i}"${dds(`tabs.${i}.label`)}>${esc(t.label)}</label>`).join('');
+        const panels = b.tabs.map((t, i) => {
           const img = t.image ? `<div class="col-media">${blockImg(t.image, esc, attr, '(max-width:620px) 100vw, 640px')}</div>` : '';
-          const prose = t.body ? `<div class="prose">${renderMarkdown(t.body)}</div>` : '';
+          const prose = t.body ? `<div class="prose"${dds(`tabs.${i}.body`, true)}>${renderMarkdown(t.body)}</div>` : '';
           return `<div class="tab-panel">${img}${prose}</div>`;
         }).join('');
-        html = `<section class="block wrap block-tabs">${b.title ? h2(b.title, '') : ''}<div class="tabs">${radios}<div class="tab-strip" role="tablist">${strip}</div><div class="tab-panels">${panels}</div></div></section>`;
+        html = `<section class="block wrap block-tabs">${b.title ? h2(b.title, '', 'title') : ''}<div class="tabs">${radios}<div class="tab-strip" role="tablist">${strip}</div><div class="tab-panels">${panels}</div></div></section>`;
         break;
       }
       case 'carousel': {   // swipeable slideshow — ZERO JS (CSS scroll-snap). Keyboard-
         // scrollable (the track is focusable); each slide snaps; images are lazy + responsive.
-        const slides = b.slides.map((sl) => {
-          const cap = sl.caption ? `<figcaption class="cr-cap">${esc(sl.caption)}</figcaption>` : '';
+        const slides = b.slides.map((sl, i) => {
+          const cap = sl.caption ? `<figcaption class="cr-cap"${dds(`slides.${i}.caption`)}>${esc(sl.caption)}</figcaption>` : '';
           return `<figure class="cr-slide">${blockImg(sl.image!, esc, attr, '(max-width:760px) 100vw, 900px')}${cap}</figure>`;
         }).join('');
-        html = `<section class="block wrap block-carousel">${b.title ? h2(b.title, '') : ''}<div class="carousel" tabindex="0" role="group" aria-roledescription="carousel" aria-label="${attr(b.title || 'Image carousel')}"><div class="cr-track">${slides}</div></div><p class="cr-hint">Swipe or scroll →</p></section>`;
+        html = `<section class="block wrap block-carousel">${b.title ? h2(b.title, '', 'title') : ''}<div class="carousel" tabindex="0" role="group" aria-roledescription="carousel" aria-label="${attr(b.title || 'Image carousel')}"><div class="cr-track">${slides}</div></div><p class="cr-hint">Swipe or scroll →</p></section>`;
         break;
       }
       case 'progress': {   // labeled progress/skill bars — width via inline style (CSP allows it)
-        const rows = b.items.map((it) => {
+        const rows = b.items.map((it, i) => {
           const p = Math.max(0, Math.min(100, Math.round(it.percent)));
-          return `<div class="pgb"><div class="pgb-head"><span class="pgb-lbl">${esc(it.label)}</span><span class="pgb-pct">${p}%</span></div><div class="pgb-track"><div class="pgb-fill" style="width:${p}%" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${attr(it.label)}"></div></div></div>`;
+          return `<div class="pgb"><div class="pgb-head"><span class="pgb-lbl"${dds(`items.${i}.label`)}>${esc(it.label)}</span><span class="pgb-pct">${p}%</span></div><div class="pgb-track"><div class="pgb-fill" style="width:${p}%" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${attr(it.label)}"></div></div></div>`;
         }).join('');
-        html = `<section class="block wrap block-progress">${b.title ? h2(b.title, '') : ''}<div class="pgbars">${rows}</div></section>`;
+        html = `<section class="block wrap block-progress">${b.title ? h2(b.title, '', 'title') : ''}<div class="pgbars">${rows}</div></section>`;
         break;
       }
       case 'buttons': {   // a small centered row of real links; drop any without a safe href
-        const btns = b.buttons.map((bt) => {
+        const btns = b.buttons.map((bt, i) => {
           const href = safeHref(bt.url); if (!href) return '';
-          return `<a class="btn${bt.style === 'outline' ? ' btn-outline' : ''}" href="${attr(href)}" rel="noopener">${esc(bt.label)}</a>`;
+          return `<a class="btn${bt.style === 'outline' ? ' btn-outline' : ''}" href="${attr(href)}" rel="noopener"${dds(`buttons.${i}.label`)}>${esc(bt.label)}</a>`;
         }).filter(Boolean);
-        if (btns.length) html = `<section class="block wrap block-buttons">${b.title ? h2(b.title, '') : ''}<div class="btn-row">${btns.join('')}</div></section>`;
+        if (btns.length) html = `<section class="block wrap block-buttons">${b.title ? h2(b.title, '', 'title') : ''}<div class="btn-row">${btns.join('')}</div></section>`;
         break;
       }
       case 'divider': {   // presentational only — a hairline rule or plain vertical space
@@ -1376,7 +1472,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       }
       case 'form': {   // custom form builder — typed fields → accessible, XSS-safe form
         const inner = renderForm(b, { esc, attr, safeHref, formEndpoint: ctx.formEndpoint });
-        html = `<section class="block wrap block-form">${b.title ? h2(b.title, '') : ''}${inner}</section>`;
+        html = `<section class="block wrap block-form">${b.title ? h2(b.title, '', 'title') : ''}${inner}</section>`;
         break;
       }
       case 'booking': {   // NATIVE booking widget — a calm, mobile-first, first-party
@@ -1387,11 +1483,11 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         // dynamic UI via createElement + textContent (owner data never interpolated
         // into HTML). Without a bookEndpoint (unpublished/preview) it shows a placeholder.
         const endpoint = ctx.bookEndpoint || '';
-        const intro = b.intro ? `<p class="bk-intro">${esc(b.intro)}</p>` : '';
+        const intro = b.intro ? `<p class="bk-intro"${dds('intro')}>${esc(b.intro)}</p>` : '';
         const inner = endpoint
           ? `<div class="booking-widget" data-book="${attr(endpoint)}">${intro}<div class="bk-stage" aria-live="polite"><p class="bk-msg">Loading available times…</p><noscript><p class="bk-msg">Online booking needs JavaScript turned on. Please enable it, or use the contact details on this page to book with us directly.</p></noscript></div></div>`
           : `${intro}<p class="bk-msg">Your booking widget will appear here once your site is published.</p>`;
-        html = `<section class="block wrap block-booking">${h2(b.title, 'Book an appointment')}${inner}</section>`;
+        html = `<section class="block wrap block-booking">${h2(b.title, 'Book an appointment', 'title')}${inner}</section>`;
         if (endpoint) html += bookingScript();
         ld = { '@context': 'https://schema.org', '@type': 'ReserveAction', name: b.title || 'Book an appointment' };
         break;
@@ -1433,25 +1529,27 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
               `<blockquote class="rw-quote-body"><p>${esc(r.body)}</p></blockquote>` +
               `<figcaption class="rw-quote-author">${esc(r.author)}${when}</figcaption>${reply}</figure>`;
           }).join('');
-          html = `<section class="block alt block-reviews-wall v-quotes"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-quotes">${quotes}</div></div></section>`;
+          html = `<section class="block alt block-reviews-wall v-quotes"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews', 'title')}${summary}</div><div class="rw-quotes">${quotes}</div></div></section>`;
         } else if (b.variant === 'strip') {
-          html = `<section class="block alt block-reviews-wall v-strip"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-strip">${cards}</div></div></section>`;
+          html = `<section class="block alt block-reviews-wall v-strip"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews', 'title')}${summary}</div><div class="rw-strip">${cards}</div></div></section>`;
         } else {
-          html = `<section class="block alt block-reviews-wall"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews')}${summary}</div><div class="rw-grid">${cards}</div></div></section>`;
+          html = `<section class="block alt block-reviews-wall"><div class="wrap"><div class="rw-head">${h2(b.title, 'Reviews', 'title')}${summary}</div><div class="rw-grid">${cards}</div></div></section>`;
         }
         break;
       }
       case 'columns': {   // Layout Container — a responsive grid that stacks < 620px
-        const cells = b.columns.map((c) => {
+        const cells = b.columns.map((c, ci) => {
           // #184: a cell holding a nested COMPONENT renders it (recursively, via the
           // SAME engine — never a container, so recursion is bounded). Falls back to the
           // classic body/image/button stack when there's no nested block.
-          if (c.block) { const nested = renderSiteBlocks([c.block], ctx); if (nested[0] && nested[0].html) return { inner: `<div class="col-block">${nested[0].html}</div>`, span: c.span }; }
+          // G13: the re-entry suppresses stamps (noDds) — a nested cell block is not
+          // a page section; its fields need a ctx path prefix (a later slice, §4).
+          if (c.block) { const nested = renderSiteBlocks([c.block], { ...ctx, noDds: true }); if (nested[0] && nested[0].html) return { inner: `<div class="col-block">${nested[0].html}</div>`, span: c.span }; }
           const prose = c.body ? renderMarkdown(c.body) : '';
           const img = c.image ? `<div class="col-media">${blockImg(c.image, esc, attr, '(max-width:620px) 100vw, 320px')}</div>` : '';
           const href = c.button ? safeHref(c.button.url) : null;
-          const btn = href ? `<p class="col-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(c.button!.label)}</a></p>` : '';
-          return { inner: `${img}${prose ? `<div class="prose">${prose}</div>` : ''}${btn}`, span: c.span };
+          const btn = href ? `<p class="col-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds(`columns.${ci}.button.label`)}>${esc(c.button!.label)}</a></p>` : '';
+          return { inner: `${img}${prose ? `<div class="prose"${dds(`columns.${ci}.body`, true)}>${prose}</div>` : ''}${btn}`, span: c.span };
         });
         const cnt = b.columns.length;
         const hasSpan = cells.some((c) => c.span !== undefined);
@@ -1459,7 +1557,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           // ORIGINAL equal-width path — kept byte-identical so existing sites (and the
           // render goldens) are unchanged. Spans + 1/4+ columns take the grid path below.
           const cols = cells.map((c) => `<div class="col">${c.inner}</div>`).join('');
-          html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '') : ''}<div class="cols" data-cols="${cnt}">${cols}</div></section>`;
+          html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '', 'title') : ''}<div class="cols" data-cols="${cnt}">${cols}</div></section>`;
         } else {
           // 12-unit responsive grid (Adobe's Layout Container). Each cell spans its
           // width; a cell with no span takes an equal share. Everything stacks to one
@@ -1469,22 +1567,22 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
             const sp = c.span !== undefined ? Math.max(1, Math.min(12, c.span)) : equal;
             return `<div class="col" data-span="${sp}">${c.inner}</div>`;
           }).join('');
-          html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '') : ''}<div class="cols cols-grid">${cols}</div></section>`;
+          html = `<section class="block wrap block-columns">${b.title ? h2(b.title, '', 'title') : ''}<div class="cols cols-grid">${cols}</div></section>`;
         }
         break;
       }
       case 'cards': {   // a teaser grid; each card is one link when a safe href is set
-        const cards = b.cards.map((c) => {
+        const cards = b.cards.map((c, ci) => {
           const media = c.image ? `<div class="tc-media">${blockImg(c.image, esc, attr, '(max-width:620px) 100vw, 300px')}</div>` : '';
-          const head = c.heading ? `<p class="tc-title">${esc(c.heading)}</p>` : '';
-          const text = c.text ? `<p class="tc-text">${esc(c.text)}</p>` : '';
+          const head = c.heading ? `<p class="tc-title"${dds(`cards.${ci}.heading`)}>${esc(c.heading)}</p>` : '';
+          const text = c.text ? `<p class="tc-text"${dds(`cards.${ci}.text`)}>${esc(c.text)}</p>` : '';
           const href = c.link ? safeHref(c.link) : null;
           const body = `<div class="tc-body">${head}${text}${href ? `<span class="tc-link" aria-hidden="true">Learn more →</span>` : ''}</div>`;
           return href
             ? `<a class="teaser-card" href="${attr(href)}" rel="noopener">${media}${body}</a>`
             : `<div class="teaser-card">${media}${body}</div>`;
         }).join('');
-        html = `<section class="block wrap block-cards">${b.title ? h2(b.title, '') : ''}<div class="card-grid">${cards}</div></section>`;
+        html = `<section class="block wrap block-cards">${b.title ? h2(b.title, '', 'title') : ''}<div class="card-grid">${cards}</div></section>`;
         break;
       }
       case 'download': {   // an accessible download link to a first-party file (zero external origins)
@@ -1498,32 +1596,32 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           if (href) {
             const name = b.label || b.file.alt || 'file';
             const icon = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-            html = `<section class="block wrap block-download">${b.title ? h2(b.title, '') : ''}<p class="dl-row"><a class="dl" href="${attr(href)}" download rel="noopener" aria-label="${attr('Download ' + name)}">${icon}<span>Download ${esc(name)}</span></a></p></section>`;
+            html = `<section class="block wrap block-download">${b.title ? h2(b.title, '', 'title') : ''}<p class="dl-row"><a class="dl" href="${attr(href)}" download rel="noopener" aria-label="${attr('Download ' + name)}">${icon}<span>Download ${esc(name)}</span></a></p></section>`;
           }
         }
         break;
       }
       case 'title': {   // a standalone heading + optional subtitle
-        html = `<section class="block wrap block-titleonly"><h2>${esc(b.title)}</h2>${b.subtitle ? `<p class="title-sub">${esc(b.subtitle)}</p>` : ''}</section>`;
+        html = `<section class="block wrap block-titleonly"><h2${dds('title')}>${esc(b.title)}</h2>${b.subtitle ? `<p class="title-sub"${dds('subtitle')}>${esc(b.subtitle)}</p>` : ''}</section>`;
         break;
       }
       case 'link_list': {   // a titled list of safe links (safeHref drops anything unsafe)
-        const items = b.links.map((lk) => { const href = safeHref(lk.url); return href ? `<li><a href="${attr(href)}" rel="noopener">${esc(lk.label)}</a></li>` : ''; }).filter(Boolean).join('');
-        if (items) html = `<section class="block wrap block-linklist">${b.title ? h2(b.title, '') : ''}<ul class="linklist">${items}</ul></section>`;
+        const items = b.links.map((lk, i) => { const href = safeHref(lk.url); return href ? `<li><a href="${attr(href)}" rel="noopener"${dds(`links.${i}.label`)}>${esc(lk.label)}</a></li>` : ''; }).filter(Boolean).join('');
+        if (items) html = `<section class="block wrap block-linklist">${b.title ? h2(b.title, '', 'title') : ''}<ul class="linklist">${items}</ul></section>`;
         break;
       }
       case 'table': {   // a simple data table; the wrapper scrolls it horizontally on phones
-        const head = b.headers.length ? `<thead><tr>${b.headers.map((hd) => `<th scope="col">${esc(hd)}</th>`).join('')}</tr></thead>` : '';
-        const body = `<tbody>${b.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
-        html = `<section class="block wrap block-table">${b.title ? h2(b.title, '') : ''}<div class="table-wrap"><table class="site-table">${head}${body}</table></div></section>`;
+        const head = b.headers.length ? `<thead><tr>${b.headers.map((hd, i) => `<th scope="col"${dds(`headers.${i}`)}>${esc(hd)}</th>`).join('')}</tr></thead>` : '';
+        const body = `<tbody>${b.rows.map((r, ri2) => `<tr>${r.map((c, ci) => `<td${dds(`rows.${ri2}.${ci}`)}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+        html = `<section class="block wrap block-table">${b.title ? h2(b.title, '', 'title') : ''}<div class="table-wrap"><table class="site-table">${head}${body}</table></div></section>`;
         break;
       }
       case 'spotlight': {   // a prominent highlight band — eyebrow + heading + prose + optional button
         const href = b.button ? safeHref(b.button.url) : null;
-        const btn = href ? `<p class="sp-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button!.label)}</a></p>` : '';
-        const eyebrow = b.eyebrow ? `<p class="sp-eyebrow">${esc(b.eyebrow)}</p>` : '';
-        const body = b.body ? `<div class="prose sp-body">${renderMarkdown(b.body)}</div>` : '';
-        html = `<section class="block wrap block-spotlight"><div class="sp-inner">${eyebrow}<h2>${esc(b.title)}</h2>${body}${btn}</div></section>`;
+        const btn = href ? `<p class="sp-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button.label')}>${esc(b.button!.label)}</a></p>` : '';
+        const eyebrow = b.eyebrow ? `<p class="sp-eyebrow"${dds('eyebrow')}>${esc(b.eyebrow)}</p>` : '';
+        const body = b.body ? `<div class="prose sp-body"${dds('body', true)}>${renderMarkdown(b.body)}</div>` : '';
+        html = `<section class="block wrap block-spotlight"><div class="sp-inner">${eyebrow}<h2${dds('title')}>${esc(b.title)}</h2>${body}${btn}</div></section>`;
         break;
       }
       case 'freeform': {   // G25 reversal · the fenced canvas — absolute position
@@ -1561,18 +1659,18 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         break;
     }
     if (b.type === 'partners') {
-      html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
+      html = `<section class="block wrap block-partners">${h2(b.title, 'Trusted by', 'title')}<ul class="partners">${b.logos.map((m) => `<li>${blockImg(m, esc, attr, '150px')}</li>`).join('')}</ul></section>`;
     }
     if (b.type === 'reviews') {
       const full = Math.round(b.rating);
       const stars = '★'.repeat(Math.min(5, full)) + '☆'.repeat(Math.max(0, 5 - full));
-      html = `<section class="block alt block-reviews"><div class="wrap rev-inner">${h2(b.title, 'What customers say')}<p class="rev-stars" aria-hidden="true">${stars}</p><p class="rev-text">${esc(String(b.rating))} out of 5 — from ${esc(String(b.count))} reviews${b.source ? ` on ${esc(b.source)}` : ''}</p></div></section>`;
+      html = `<section class="block alt block-reviews"><div class="wrap rev-inner">${h2(b.title, 'What customers say', 'title')}<p class="rev-stars" aria-hidden="true">${stars}</p><p class="rev-text">${esc(String(b.rating))} out of 5 — from ${esc(String(b.count))} reviews${b.source ? ` on ${esc(b.source)}` : ''}</p></div></section>`;
     }
     if (b.type === 'appointment') {
       const href = safeHref(b.url);
-      html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment')}${b.text ? `<p class="appt-text">${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener">${esc(b.button || 'Book now')}</a></p></section>` : '';
+      html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment', 'title')}${b.text ? `<p class="appt-text"${dds('text')}>${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button')}>${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    built.push({ b, html: applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style), ld });
+    built.push({ b, bi, html: applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style), ld });
   }
 
   // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
@@ -1596,12 +1694,16 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     if (e.b.type !== 'toc') continue;
     if (!tocEntries.length) { e.html = ''; continue; }
     const title = (e.b as SiteBlockToc).title || 'On this page';
-    e.html = applyStyle(applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2>${esc(title)}</h2><ol class="toc">${
+    e.html = applyStyle(applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2${dds('title')}>${esc(title)}</h2><ol class="toc">${
       tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`, (e.b as { look?: BlockLook }).look), (e.b as { style?: BlockStyle }).style);
   }
 
   const out: RenderedBlock[] = [];
   const usedKeys = new Set<string>();
+  // G13: canonical sids over the FULL input list (index-aligned with `bi`), so a
+  // windowed-out or empty-rendered sibling still counts — the stamped sid always
+  // matches the sidecar computed over the same list, never a renumbered copy.
+  const sids = ctx.noDds ? null : sectionSidsFor(list);
   for (const e of built) {
     if (!e.html) continue;
     const b = e.b;
@@ -1612,13 +1714,17 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     // key off their stable id; every other type keys off its type, then de-dupes with
     // a numeric suffix so the FIRST instance keeps `block_<type>` (byte-identical to
     // before) and later duplicates get `block_<type>_2`, `_3`, … — all distinct.
-    const baseKey = (b.type === 'form' || b.type === 'columns' || b.type === 'cards' || b.type === 'freeform')
-      ? `block_${b.type}_${(b as { id: string }).id}`
-      : `block_${b.type}`;
+    const baseKey = renderKeyBase(b as { type: string; id?: string });   // G13: the ONE base-key rule (shared with blockRenderKeys)
     let key = baseKey, n = 2;
     while (usedKeys.has(key)) key = `${baseKey}_${n++}`;
     usedKeys.add(key);
-    out.push({ key, type: b.type, html: e.html, ...(e.ld ? { ld: e.ld } : {}) });
+    // G13: stamp the canonical section id + the EXACT render key on the root tag
+    // (`data-dds-sid` / `data-dds-key`, design doc §1.2) — server truth the editor
+    // reads instead of any client mirror. First match only = the outer section;
+    // a nested cell render was suppressed (ctx.noDds), so a block carries exactly
+    // one sid. Attributes only: stripping ` data-dds-*` restores today's bytes.
+    const html = sids ? e.html.replace(DDS_ROOT_RE, `<$1$2 data-dds-sid="${attr(sids[e.bi])}" data-dds-key="${attr(key)}" class="block$3`) : e.html;
+    out.push({ key, type: b.type, html, ...(e.ld ? { ld: e.ld } : {}) });
   }
   return out;
 }
