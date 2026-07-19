@@ -277,6 +277,25 @@ outbound email compose → remaining F items as Eric prioritizes. Batch A
 don't wait a week behind features. Then descend D → C → B; E (design-system
 foundations) LAST as its own approved effort. Every batch: usual pipeline
 (build → adversarial review → gates → screenshots → Eric approves merge).
+## 🌐 DNS ONE-STOP SHOP — DECISIONS LOCKED (Eric 2026-07-19)
+
+Spec: docs/design/DNS-ONE-STOP-SHOP.md. Eric chose: **FULL SHOP** (real
+delegated DNS + in-app domain SELLING) · backbone **AWS Route 53** with a
+reusable delegation set · **branded nameservers ns1-4.davisdigitalstudio.com
+YES**. Resale starts on **Name.com Core API** (retail+markup, $0 commitment),
+graduating to OpenSRS wholesale at volume. Build order D1→D5 per spec; all
+slices ship DORMANT + fail-closed until secrets land (the slice-6 Resend
+pattern).
+
+🔑 **NEEDS ERIC (one-time setup, in order):**
+1. AWS account → IAM user with Route53 (+Route53Domains later) permissions →
+   access key pair as function secrets AWS_ACCESS_KEY_ID /
+   AWS_SECRET_ACCESS_KEY / AWS_REGION (runbook will be at
+   docs/presence/DNS-SETUP.md when D1 lands).
+2. After D1 creates the delegation set: FOUR GLUE RECORDS
+   (ns1-4.davisdigitalstudio.com → the four Route 53 IPs) at HIS registrar
+   for davisdigitalstudio.com — exact values will be in the runbook.
+3. Name.com account + API token (for D5 resale) — can wait until D5.
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
