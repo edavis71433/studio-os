@@ -265,6 +265,18 @@ editor → G12+G34 → S-finishers → G33/G14/G35.
 dashboard setup (inbound email dormant until then) · legal drafts on request ·
 Tier-2/3 verification (staging creds, owner items).
 
+## 🔧 POST-AUDIT DIRECTIVE (Eric 2026-07-19: "Start with the big stuff and
+then move down to the little stuff"; batch E "later")
+
+Full audit: docs/design/POST-REDESIGN-AUDIT.md (six auditors, batches A-F).
+ORDER: F big-ticket first — G13 in-place editing (Wave-2 queue head, with
+server-stamped section keys replacing the three client mirrors) → freeform
+EDITOR slice (G25 backend live but unreachable) → route-for-review bridge →
+outbound email compose → remaining F items as Eric prioritizes. Batch A
+(12 bugs/regressions, all S) runs as an immediate PARALLEL sweep — bugs
+don't wait a week behind features. Then descend D → C → B; E (design-system
+foundations) LAST as its own approved effort. Every batch: usual pipeline
+(build → adversarial review → gates → screenshots → Eric approves merge).
 ## ⛔ STANDING RULE FROM ERIC (do not lose to compaction — he has repeated this many times)
 
 **The redesign (#167) is GATED behind ALL other updates.** Order of work: updates
