@@ -1244,8 +1244,8 @@ async function renderRequests(){
   let list=[],services=[],listFailed=false,svcFailed=false;
   const [sr,svr]=await Promise.all([api('/client/support').catch(()=>null),api('/client/services').catch(()=>null)]);
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  if(sr&&sr.ok)list=(((sr.body&&sr.body.data)||[])).filter(x=>x&&x.id);else listFailed=true;
-  if(svr&&svr.ok)services=(((svr.body&&svr.body.data)||[])).filter(x=>x&&x.id);else svcFailed=true;
+  if(sr&&sr.ok){const d=sr.body&&sr.body.data;list=(Array.isArray(d)?d:[]).filter(x=>x&&x.id);}else listFailed=true;
+  if(svr&&svr.ok){const d=svr.body&&svr.body.data;services=(Array.isArray(d)?d:[]).filter(x=>x&&x.id);}else svcFailed=true;
   // freshest activity first — the SAME recency each row displays (last_activity_at
   // with the updated_at fallback), so the order can never contradict the meta.
   // The backend's updated_at-desc order would sink a request with a fresh studio

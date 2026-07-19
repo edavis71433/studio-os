@@ -870,12 +870,23 @@ const REQ_API = {
     { id: 'custom', name: 'Custom request', category: '', description: 'Something else in mind? Tell your studio exactly what you’d like and they’ll follow up.', price: '' },
   ] },
   '/client/support': { data: [
-    // last_activity_at (slice 2's reply-recency fix) feeds the meta when present…
-    { id: SUP_GEN, subject: 'Logo tweak', status: 'open', project_id: null, updated_at: '2026-07-06T00:00:00Z', last_activity_at: '2026-07-07T00:00:00Z' },
-    // …and the meta falls back to updated_at when it is absent
-    { id: SUP_PROG, subject: 'New headshots', status: 'in_progress', project_id: null, updated_at: '2026-07-05T00:00:00Z' },
-    { id: SUP_PRJ, subject: 'Copy fixes', status: 'resolved', project_id: PID, updated_at: '2026-07-04T00:00:00Z' },
+    // Modeled on production: the array arrives in the backend's updated_at-DESC
+    // order, and EVERY row carries last_activity_at (slice 2 stamps it
+    // per-response whenever the batch activity read succeeds — the absent case
+    // is an older function build, covered by its own fixture below). All dates
+    // are >7 days old so rel() renders exact "Mon D" text, not relative words.
+    // New headshots was TOUCHED latest (06-25) but Logo tweak has the freshest
+    // ACTIVITY (a studio reply, 07-01) — the page must re-rank by activity.
+    { id: SUP_PROG, subject: 'New headshots', status: 'in_progress', project_id: null, updated_at: '2026-06-25T00:00:00Z', last_activity_at: '2026-06-25T00:00:00Z' },
+    { id: SUP_GEN, subject: 'Logo tweak', status: 'open', project_id: null, updated_at: '2026-06-20T00:00:00Z', last_activity_at: '2026-07-01T00:00:00Z' },
+    { id: SUP_PRJ, subject: 'Copy fixes', status: 'resolved', project_id: PID, updated_at: '2026-06-10T00:00:00Z', last_activity_at: '2026-06-10T00:00:00Z' },
   ] },
+  // the SUP_PROG thread — so a row-click test can never be served the LIST
+  // fixture by the harness's longest-prefix match on '/client/support'
+  [`/client/support/${SUP_PROG}`]: { data: {
+    request: { id: SUP_PROG, subject: 'New headshots', body: 'We need fresh team photos.', status: 'in_progress', project_id: null, created_at: '2026-06-24T00:00:00Z' },
+    messages: [],
+  } },
   // the booking engine behind the "Book a call" tile (fixture round-trip)
   '/client/book': { data: { site_id: 'site-1' } },
   '/book/site-1/types': { data: { enabled: true, intro: 'Pick a time that suits you.', max_days_ahead: 30,
@@ -956,22 +967,45 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     await expect(listHost.getByText('Copy fixes')).toHaveCount(0);
     const row = listHost.locator('.reqrow', { hasText: 'Logo tweak' });
     await expect(row.locator('.qico')).toHaveAttribute('aria-hidden', 'true');
-    // the meta is the honest "Updated <rel>" (from last_activity_at when present) —
-    // the list payload has no last-actor field, so no "your studio replied" claim
-    await expect(row.locator('.reqmeta')).toContainText('Updated');
+    // the meta is the honest "Updated <rel>" and its recency SOURCE is
+    // last_activity_at: this row's own updated_at is Jun 20 — the meta must
+    // read the activity stamp (Jul 1). No last-actor field in the payload,
+    // so no "your studio replied" claim either.
+    await expect(row.locator('.reqmeta')).toHaveText('Updated Jul 1');
+    await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.reqmeta')).toHaveText('Updated Jun 25');
     await expect(row.locator('.schip')).toHaveText('open');
     await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.schip')).toHaveText('in progress');
+    // freshest ACTIVITY first — the fixture arrives in backend updated_at order
+    // (New headshots first); the page must lead with Logo tweak (activity Jul 1)
+    await expect(listHost.locator('.reqrow').nth(0)).toContainText('Logo tweak');
+    await expect(listHost.locator('.reqrow').nth(1)).toContainText('New headshots');
     // All shows everything, with the resolved row in the "done" (good) styling
     await page.locator('#reqFilterAll').click();
     await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#reqFilterOpen')).toHaveAttribute('aria-pressed', 'false');
     await expect(listHost.locator('.reqrow')).toHaveCount(3);
+    // …still in activity order, resolved (oldest activity) last
+    await expect(listHost.locator('.reqrow').nth(0)).toContainText('Logo tweak');
+    await expect(listHost.locator('.reqrow').nth(2)).toContainText('Copy fixes');
     const done = listHost.locator('.reqrow', { hasText: 'Copy fixes' });
     await expect(done.locator('.schip.done')).toHaveText('resolved');
     await expect(done.locator('.qico.done')).toBeVisible();
     // back to Open — the filter is a pure client-side toggle
     await page.locator('#reqFilterOpen').click();
     await expect(listHost.locator('.reqrow')).toHaveCount(2);
+  });
+
+  test('an older function build (rows without last_activity_at) falls back to updated_at for meta AND order', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/client/support': { data: [
+      { id: SUP_PROG, subject: 'New headshots', status: 'in_progress', project_id: null, updated_at: '2026-06-25T00:00:00Z' },
+      { id: SUP_GEN, subject: 'Logo tweak', status: 'open', project_id: null, updated_at: '2026-06-20T00:00:00Z' },
+    ] } } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    const listHost = page.locator('#reqlist');
+    await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.reqmeta')).toHaveText('Updated Jun 25');
+    await expect(listHost.locator('.reqrow', { hasText: 'Logo tweak' }).locator('.reqmeta')).toHaveText('Updated Jun 20');
+    await expect(listHost.locator('.reqrow').nth(0)).toContainText('New headshots');
   });
 
   test('all-resolved: the filter defaults to All so the list is never mysteriously empty', async ({ page }) => {
@@ -1007,15 +1041,218 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     await expect(page.locator('#reqlist')).toHaveCount(0);
   });
 
-  test('reviewer: read-only — no action tiles, no Request buttons, calm empty states', async ({ page }) => {
+  // ── failure honesty: a failed read must NEVER render the empty-state copy ──
+  test('a 502 on the requests read shows the couldn’t-load line — never the empty state', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.getByText('We couldn’t load your requests just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toHaveCount(0);
+    await expect(page.locator('.reqfilter')).toHaveCount(0);
+    // the services read succeeded — that section still renders fully
+    await expect(page.locator('.svcgrid .card')).toHaveCount(3);
+  });
+
+  test('a 502 on the services read shows the couldn’t-load line — never the no-services copy', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.route('**/functions/v1/presence/client/services', (route) =>
+      route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) }));
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.getByText('We couldn’t load your studio’s services just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('hasn’t listed services here yet', { exact: false })).toHaveCount(0);
+    // the requests read succeeded — the list still renders
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(2);
+  });
+
+  // ── booking-flow depth: date → slots → confirm → the exact POST payload ──
+  test('booking depth: pick a day, pick a slot, confirm — the POST carries {type_id, slot_start, name, email}', async ({ page }) => {
+    const SLOT = '2026-08-01T10:00:00Z';
+    await installApp(page, { api: { ...REQ_API,
+      '/book/site-1/slots': { data: { slots: [SLOT, '2026-08-01T11:00:00Z'] } },
+    } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#bookCall').click();
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
+    // pick a day — the change handler refetches slots for THAT date
+    const day = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    const slotsReq = page.waitForRequest((r) => r.url().includes('/book/site-1/slots') && r.url().includes(`date=${day}`));
+    await page.locator('#bk-date').fill(day);
+    await slotsReq;
+    // slots render as time buttons; picking one opens the confirm step
+    await page.getByRole('button', { name: '10:00' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirm your booking' })).toBeVisible();
+    await page.getByLabel('Your name').fill('Sam Client');
+    await page.getByLabel('Email').fill('sam@example.com');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/book\/site-1$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Book it' }).click();
+    expect((await post).postDataJSON()).toEqual({ type_id: 'bt1', slot_start: SLOT, name: 'Sam Client', email: 'sam@example.com' });
+    // the booked screen + its back link land on the Requests tab again
+    await expect(page.getByRole('heading', { name: /You’re booked/ })).toBeVisible();
+    await page.getByRole('link', { name: '← Back to requests' }).click();
+    await expect(page.locator('.acttile')).toHaveCount(2);
+  });
+
+  test('booking fallback: no bookable site → the calm not-set-up state, back to requests', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/client/book': { data: {} } } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#bookCall').click();
+    await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toBeVisible();
+    await page.getByRole('link', { name: '← Back to requests' }).click();
+    await expect(page.locator('.acttile')).toHaveCount(2);
+  });
+
+  test('booking fallback: engine disabled / no types → the no-times state', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/book/site-1/types': { data: { enabled: false } } } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#bookCall').click();
+    await expect(page.getByText('hasn’t opened any times for booking yet', { exact: false })).toBeVisible();
+  });
+
+  // ── degraded (non-UUID) service ids ride the POST untouched ──
+  test('Request this on the custom and svc:0 cards POSTs their non-UUID ids as-is', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: SUP_GEN } }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.getByRole('button', { name: 'Request this — Custom request' }).click();
+    await page.getByLabel('What do you need?').fill('Something bespoke.');
+    let post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Send request' }).click();
+    expect((await post).postDataJSON()).toEqual({
+      subject: 'Service request: Custom request', service: 'custom',
+      brief: { need: 'Something bespoke.', timeline: '', budget: '' },
+    });
+    // success re-renders the Requests view — the next card is right there
+    await page.getByRole('button', { name: 'Request this — Extra page' }).click();
+    await page.getByLabel('What do you need?').fill('One more page please.');
+    post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Send request' }).click();
+    expect((await post).postDataJSON()).toEqual({
+      subject: 'Service request: Extra page', service: 'svc:0',
+      brief: { need: 'One more page please.', timeline: '', budget: '' },
+    });
+  });
+
+  test('the brief refuses an empty need: toast, no POST, button still enabled', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    let posts = 0;
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname)) posts++; });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await page.getByRole('button', { name: 'Send request' }).click();
+    await expect(page.locator('#toast')).toContainText('Tell your studio what you need first.');
+    expect(posts).toBe(0);
+    await expect(page.getByRole('button', { name: 'Send request' })).toBeEnabled();
+  });
+
+  test('a failed brief POST keeps the composer: toast + re-enabled button, nothing typed is lost', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed' }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await page.getByLabel('What do you need?').fill('A softer palette.');
+    await page.getByRole('button', { name: 'Send request' }).click();
+    await expect(page.locator('#toast')).toContainText('That didn’t send — please try again.');
+    await expect(page.getByRole('button', { name: 'Send request' })).toBeEnabled();
+    await expect(page.getByLabel('What do you need?')).toHaveValue('A softer palette.');
+  });
+
+  // ── "Something else?" round-trips to the Requests tab (back AND success) ──
+  test('Something else? returns to Requests on back and after a successful send — never strands on Home', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#newReq').click();
+    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
+    // back → the Requests tab, not Home
+    await page.getByRole('link', { name: '← Back' }).click();
+    await expect(page.locator('.acttile')).toHaveCount(2);
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toHaveCount(0);
+    // and a successful send lands back on Requests too
+    await page.locator('#newReq').click();
+    await page.getByLabel('Subject').fill('A quick question');
+    await page.getByLabel('What do you need?').fill('Can we add a testimonial?');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.locator('#toast')).toContainText('Sent — your studio will get back to you.');
+    await expect(page.locator('.acttile')).toHaveCount(2);
+    await expect(page.locator('#tabnav [data-tab="requests"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toHaveCount(0);
+  });
+
+  // ── the Open/All chips are pure client-side, and the choice persists ──
+  test('chip clicks trigger zero refetches, and the All choice survives tab-away/back', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    let supportGets = 0;
+    await page.route('**/functions/v1/presence/client/support', (route) => {
+      if (route.request().method() === 'GET') supportGets++;
+      return route.fallback();
+    });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(2);
+    expect(supportGets).toBe(1);
+    await page.locator('#reqFilterAll').click();
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
+    await page.locator('#reqFilterOpen').click();
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(2);
+    await page.locator('#reqFilterAll').click();
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
+    expect(supportGets).toBe(1);   // filtering never refetched
+    // tab away and back — the explicit All choice persists for the session
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await openRequestsTab(page);
+    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
+  });
+
+  test('reviewer: read-only — a POPULATED catalog renders zero Request buttons, no action tiles', async ({ page }) => {
+    // the services fixture is the point: with cards actually on screen, the
+    // zero-Request-buttons assertion bites on the canMessage guard (deleting
+    // the guard renders 3 buttons and fails this). /client/support answers a
+    // reviewer with a genuine empty list ({data:[]}) — the honest empty state.
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,
       '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+      '/client/services': REQ_API['/client/services'],
+      '/client/support': { data: [] },
+    } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.locator('.svcgrid .card')).toHaveCount(3);   // the catalog IS rendered…
+    await expect(page.getByRole('heading', { name: 'Brand refresh' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Request this/ })).toHaveCount(0);   // …with no way to act on it
+    await expect(page.locator('.acttile')).toHaveCount(0);
+    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
+  });
+
+  test('reviewer: an EMPTY catalog gets the calm reviewer empty state', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+      '/client/services': { data: [] },
+      '/client/support': { data: [] },
     } });
     await page.goto('/client.html');
     await openRequestsTab(page);
     await expect(page.locator('.acttile')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Request this/ })).toHaveCount(0);
     await expect(page.getByText('Your studio hasn’t listed services here yet.')).toBeVisible();
     await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
   });
