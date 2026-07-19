@@ -47,7 +47,7 @@ html.dds-embed #detailWrap{padding-top:0}
         customers.html / contacts.html / leads.html / inbox.html by hand
         (.lhead/.lrow1/.obj-ic/.lbtn/.lmeta + the Table ⇄ Cards seg) ── */
   .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
-  .lrow1{display:flex;align-items:center;gap:10px}
+  .lrow1{display:flex;align-items:center;gap:6px}
   .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
@@ -76,10 +76,13 @@ html.dds-embed #detailWrap{padding-top:0}
   thead th .arrow{font-size:10px;color:var(--p)}
   tbody tr{cursor:pointer}
   tbody tr:hover{background:var(--p-soft)}
-  tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
   tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
   tbody tr:last-child td{border-bottom:none}
   td .n{font-weight:600}
+  /* the row's REAL control: the project name is a button (accessible name +
+     native Enter/Space); the whole-row click stays as pointer convenience */
+  td .rowlink{font:inherit;font-weight:600;color:var(--ink);background:none;border:none;padding:0;cursor:pointer;text-align:left}
+  td .rowlink:hover{color:var(--p);text-decoration:underline}
   td.num{font-variant-numeric:tabular-nums}
   td .mutcell{color:var(--faint)}
   .pcell{min-width:130px}
@@ -117,7 +120,9 @@ html.dds-embed #detailWrap{padding-top:0}
   #statusMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
   #statusMenu [role=menuitem]{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
   #statusMenu [role=menuitem]:hover{background:var(--p-soft)}
-  .car{font-size:10px;color:var(--faint)}
+  /* .rcar, not .car — shell.js's injected nav uses .car for its own caret and
+     this page must never restyle the shell's markup */
+  .rcar{font-size:10px;color:var(--faint)}
 
   /* highlights panel: label-over-value tiles */
   .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
@@ -147,9 +152,17 @@ html.dds-embed #detailWrap{padding-top:0}
   @media(min-width:900px){.dgrid{grid-template-columns:minmax(0,1fr) 330px}}
   .dmain{display:flex;flex-direction:column;gap:14px;min-width:0}
   .dside{display:flex;flex-direction:column;gap:14px;min-width:0}
-  .sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
-  .sec h3{font-size:14.5px;font-weight:700;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .sec h3 .n{color:var(--faint);font-weight:600;font-size:12.5px;margin-left:2px}
+  /* .rsec, not .sec — shell.js's injected top-bar nav wraps every section in
+     its OWN div.sec wrapper (shell.js nav markup); an unscoped .sec here
+     would restyle the flat slice-7 bar into boxed buttons. Page classes must
+     never collide with shell markup. */
+  .rsec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .rsec h3{font-size:14.5px;font-weight:700;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .rsec h3 .n{color:var(--faint);font-weight:600;font-size:12.5px;margin-left:2px}
+  /* Messages keeps its intentional accent emphasis (the pre-slice styling) */
+  #detailInner .rsec.msgs{border-color:var(--p);box-shadow:0 1px 3px rgba(91,63,160,.08)}
+  #detailInner .rsec.msgs form.mini textarea{min-height:90px}
+  #detailInner .rsec.msgs form.mini{background:var(--card)}
   .subhead{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:14px 0 4px}
   .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);min-width:0}
   .item:last-child{border-bottom:none}
@@ -261,14 +274,15 @@ let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='ta
 function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}renderRoster();}
 
 // sortable columns — Progress/Open approvals sort on the lazily-fetched report
-// numbers (unknown sorts last, shown as "—"; no fake numbers)
+// numbers. A null key = unknown/undated: shown as "—", sorted LAST in BOTH
+// directions by sortedRows (no fake numbers, no sentinel values).
 const COLS=[
   ['name','Project',(p)=>String(p.name||'').toLowerCase()],
   ['customer','Customer',(p)=>customerName(p).toLowerCase()],
   ['status','Status',(p)=>String(p.status||'active')],
-  ['progress','Progress',(p)=>{const r=REPORTS[p.id];return r&&r.progress?Number(r.progress.pct||0):-1;}],
-  ['target_date','Target',(p)=>String(p.target_date||'9999-99-99')],
-  ['approvals','Open approvals',(p)=>{const r=REPORTS[p.id];return r?Number(r.pending_approvals||0):-1;}],
+  ['progress','Progress',(p)=>{const r=REPORTS[p.id];return r&&r.progress?Number(r.progress.pct||0):null;}],
+  ['target_date','Target',(p)=>p.target_date?String(p.target_date):null],
+  ['approvals','Open approvals',(p)=>{const r=REPORTS[p.id];return r?Number(r.pending_approvals||0):null;}],
 ];
 let SORT={key:'name',dir:1};
 
@@ -315,7 +329,15 @@ function headerHtml(){
 function sortedRows(){
   const list=ITEMS.slice();
   const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
-  list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
+  // unknown/undated (null) partitions to the END regardless of direction —
+  // "—" rows never lead the list just because the direction flipped
+  list.sort((a,b)=>{
+    const av=col[2](a),bv=col[2](b);
+    if(av==null&&bv==null)return 0;
+    if(av==null)return 1;
+    if(bv==null)return -1;
+    return av<bv?-SORT.dir:av>bv?SORT.dir:0;
+  });
   return list;
 }
 
@@ -340,8 +362,8 @@ function tableHtml(list){
   const trs=list.map(p=>{
     const st=String(p.status||'active');
     const cust=customerName(p);
-    return `<tr data-id="${esc(p.id)}" tabindex="0" aria-label="Open ${esc(p.name||'Untitled project')}">
-      <td><span class="n">${esc(p.name||'Untitled project')}</span>${p.client_visible===false?'<span class="tag">internal</span>':''}</td>
+    return `<tr data-id="${esc(p.id)}">
+      <td><button type="button" class="rowlink" data-open="${esc(p.id)}">${esc(p.name||'Untitled project')}</button>${p.client_visible===false?'<span class="tag">internal</span>':''}</td>
       <td>${cust==='Internal'?'<span class="mutcell">Internal</span>':(cust==='—'?'<span class="mutcell">—</span>':esc(cust))}</td>
       <td><span class="pill ${esc(st)}">${esc(statusLabel(st))}</span></td>
       <td>${progressCell(p)}</td>
@@ -373,6 +395,21 @@ function renderRoster(){
   wireRoster();
 }
 
+// a11y: the async enrichment re-renders replace the roster DOM wholesale, which
+// would drop keyboard focus to <body>. Capture the focused control's identity
+// (control id · sort key · row data-id) and restore focus to its equivalent
+// after the render; if it no longer exists, do nothing — never steal focus.
+function renderRosterKeepFocus(){
+  const ae=document.activeElement;let sel='';
+  if(ae&&ae!==document.body&&$('listWrap')&&$('listWrap').contains(ae)){
+    if(ae.id)sel='#'+ae.id;
+    else if(ae.dataset&&ae.dataset.sort)sel='[data-sort="'+ae.dataset.sort+'"]';
+    else{const row=ae.closest('[data-id]');if(row)sel='[data-id="'+row.dataset.id+'"]'+(ae.classList.contains('rowlink')?' .rowlink':'');}
+  }
+  renderRoster();
+  if(sel){const el=$('listWrap').querySelector(sel);if(el)el.focus();}
+}
+
 function wireRoster(){
   // refresh (soft: a failed refresh toasts and keeps the list) + focus-return
   const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true)));
@@ -386,7 +423,10 @@ function wireRoster(){
     renderRoster();
     const nb=$('list').querySelector('[data-sort="'+k+'"]'); if(nb)nb.focus();
   }));
-  // rows open the record (Enter AND Space, like the other rosters)
+  // the table row's REAL control: the project-name button (native Enter/Space)
+  $('list').querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openProject(b.dataset.open);}));
+  // whole-row/card click stays as pointer convenience; cards (role=button) also
+  // keep Enter AND Space, like the other rosters
   $('list').querySelectorAll('[data-id]').forEach(el=>{
     const open=(e)=>{if(e.target.closest('button'))return;openProject(el.dataset.id);};
     el.addEventListener('click',open);
@@ -403,8 +443,9 @@ async function load(soft){
     renderRoster();
     // enrichment (existing routes only): customer names once + per-project report
     // summaries for Progress / Open approvals — cells fill in as they arrive.
-    ensureCustomers().then((changed)=>{if(changed)renderRoster();});
-    ensureReports().then((changed)=>{if(changed)renderRoster();});
+    // These re-renders are async: keep the user's keyboard focus where it was.
+    ensureCustomers().then((changed)=>{if(changed)renderRosterKeepFocus();});
+    ensureReports().then((changed)=>{if(changed)renderRosterKeepFocus();});
   }catch(e){
     if(soft)throw e;
     if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>';
@@ -507,7 +548,7 @@ async function openProject(id){
   // a11y: in-view actions re-open the same project to refresh. Remember whether the
   // record was already showing so we can restore keyboard focus after the re-render.
   const wasOpen=!$('detailWrap').hidden;
-  $('detailInner').innerHTML='<div class="sec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
+  $('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
     const p=data.project; STUDIO=data.is_studio_view!==false;
@@ -518,12 +559,14 @@ async function openProject(id){
 
     // ── record header: breadcrumb · 📁 · serif title · status chip · actions ──
     const statusDd=(STUDIO&&nextP.length)?`<div class="statusdd">
-        <button class="btn ghost sm" id="statusBtn" aria-haspopup="menu" aria-expanded="false">Status <span class="car" aria-hidden="true">▾</span></button>
+        <button class="btn ghost sm" id="statusBtn" aria-haspopup="menu" aria-expanded="false">Status <span class="rcar" aria-hidden="true">▾</span></button>
         <div id="statusMenu" role="menu" aria-label="Change status" hidden>${nextP.map(s=>`<button role="menuitem" data-pstatus="${s}">Mark ${esc(statusLabel(s))}</button>`).join('')}</div>
       </div>`:'';
     const acts=STUDIO?`<div class="rhead-acts">${statusDd}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
 
-    // ── highlights: Customer · Target date · Progress · Waiting on client · Files ──
+    // ── highlights: Customer · Target date · Progress · Waiting on client · Files
+    //    (+ the old overview's remaining stats: open client actions when any
+    //    exist, CSAT when the report carries ratings — omitted honestly otherwise) ──
     const hl=[
       ['Customer',esc(cust)],
       ['Target date',p.target_date?esc(p.target_date):'—'],
@@ -531,6 +574,8 @@ async function openProject(id){
       ['Waiting on client',rp?String(Number(rp.pending_approvals||0))+(Number(rp.pending_approvals||0)===1?' approval':' approvals'):'—'],
       ['Files',rp?String(Number(rp.shared_files||0))+' shared':'—'],
     ];
+    if(rp&&Number(rp.open_client_actions||0)>0)hl.push(['Client actions',String(Number(rp.open_client_actions))+' open']);
+    if(rp&&rp.csat&&Number(rp.csat.count||0)>0)hl.push(['CSAT',`${esc(String(rp.csat.average))}★ <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">(${Number(rp.csat.count)})</span>`]);
     const hlHtml=`<div class="hl-panel">${hl.map(t=>`<div class="hl"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div>`).join('')}</div>`;
 
     // ── related lists ──
@@ -559,31 +604,38 @@ async function openProject(id){
       ${pathHtml(data.milestones||[])}
       <div class="dbody"><div class="dgrid">
         <div class="dmain">
-          <div class="sec"><h3>Tasks${rp&&rp.progress?`<span class="n">${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)}</span>`:''} ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
-          <div class="sec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
-          ${STUDIO?`<div class="sec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>`:''}
-          <div class="sec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
+          <div class="rsec"><h3>Tasks${rp&&rp.progress?`<span class="n">${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)}</span>`:''} ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
+          <div class="rsec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
+          ${STUDIO?`<div class="rsec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>`:''}
+          <div class="rsec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
         </div>
         <aside class="dside">
-          <div class="sec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
-          <div class="sec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
-          ${STUDIO?`<div class="sec"><h3>Support requests</h3><div id="supList" class="mut">Loading…</div><div class="subhead" id="genHead">General messages</div><div id="genList" class="mut"></div></div>`:''}
+          <div class="rsec"><h3>Milestones ${STUDIO?'<button class="btn ghost sm" id="addMs">+ Add</button>':''}</h3><div id="msList">${ms}</div><div id="msForm"></div></div>
+          <div class="rsec"><h3>Files ${STUDIO?'<button class="btn ghost sm" id="addFile">+ Share</button>':''}</h3><div id="dlList">${dl}</div><div id="dlForm"></div></div>
+          ${STUDIO?`<div class="rsec"><h3>Support requests</h3><div id="supList" class="mut">Loading…</div><div class="subhead" id="genHead">General messages</div><div id="genList" class="mut"></div></div>`:''}
         </aside>
       </div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
 
-    // Status ▾ — the popup contract: open focuses the first item, arrows move,
-    // Escape closes back to the trigger; outside clicks close via the ONE
-    // document-level delegated closer above.
+    // Status ▾ — the popup contract: open focuses the first item, arrows move
+    // (Home/End jump to first/last), Escape closes back to the trigger — and
+    // Escape on the trigger itself closes an open menu without moving focus;
+    // focus leaving button+menu closes it (no focus steal); outside clicks
+    // close via the ONE document-level delegated closer above.
     const sbtn=$('statusBtn'),smenu=$('statusMenu');
     if(sbtn&&smenu){
       const close=()=>{smenu.hidden=true;sbtn.setAttribute('aria-expanded','false');};
       sbtn.addEventListener('click',()=>{const open=smenu.hidden;smenu.hidden=!open;sbtn.setAttribute('aria-expanded',open?'true':'false');if(open){const f=smenu.querySelector('button');if(f)f.focus();}});
+      sbtn.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!smenu.hidden){e.preventDefault();close();}});
+      const sdd=sbtn.closest('.statusdd');
+      if(sdd)sdd.addEventListener('focusout',(e)=>{if(!smenu.hidden&&!(e.relatedTarget&&sdd.contains(e.relatedTarget)))close();});
       smenu.addEventListener('keydown',(e)=>{
         const opts=[...smenu.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
         if(e.key==='Escape'){e.preventDefault();close();sbtn.focus();}
         else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
         else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+        else if(e.key==='Home'){e.preventDefault();opts[0].focus();}
+        else if(e.key==='End'){e.preventDefault();opts[opts.length-1].focus();}
       });
     }
     // status transitions (the bounded P_NEXT ladder, server re-checked)
@@ -621,7 +673,7 @@ async function openProject(id){
     loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);loadClientGeneral(id);}
     // a11y: the re-render replaced whatever control had focus — land on the title
     if(wasOpen){const t=$('dtitle');if(t)t.focus();}
-  }catch(e){ $('detailInner').innerHTML='<div class="sec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="rsec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
 }
 
 async function shareFile(id){
@@ -716,7 +768,7 @@ async function loadClientGeneral(id,focusRid){
 // full-page treatment as a project record) — read the thread and reply, or resolve it.
 async function openStudioSupportFull(rid){
   history.replaceState(null,'','?support='+rid+(scope()?'&client='+scope():''));
-  $('detailInner').innerHTML='<div class="sec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
+  $('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]);
     const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
@@ -735,7 +787,7 @@ async function openStudioSupportFull(rid){
           <div class="rec-sub"><span class="pill">${esc(rq.status||'open')}</span><span class="mut">a general request (not tied to a project)</span></div>
         </div>
       </div>
-      <div class="dbody"><div class="sec"><h3>Conversation</h3>${rowsHtml}
+      <div class="dbody"><div class="rsec"><h3>Conversation</h3>${rowsHtml}
       ${resolved?'<div class="empty">This request is resolved.</div>':`<form class="mini" id="srf-reply"><label for="srf-body-${rid}">Reply to the client</label>${pickerHtml}<textarea id="srf-body-${rid}" data-dds-draft="1" placeholder="Write a reply…"></textarea><div class="row2" style="justify-content:flex-end"><button class="btn sm" type="submit">Send reply</button><button class="btn ghost sm" type="button" id="srf-res">Resolve</button></div></form>`}</div></div>`;
     $('closeDetail').onclick=closeProjectDetail;
     const t=$('dtitle'); if(t)t.focus();
@@ -743,7 +795,7 @@ async function openStudioSupportFull(rid){
     const cn=$('srf-canned-'+rid); if(cn)cn.onchange=()=>{const b=replyMap[cn.value]; if(b&&sta){const cur=sta.value; sta.value=cur?(cur.replace(/\s*$/,'')+'\n\n'+b):b; sta.focus();} cn.value='';};
     const rf=$('srf-reply'); if(rf)rf.onsubmit=async(e)=>{e.preventDefault();const body=sta.value.trim();if(!body)return;try{await api('/support/'+rid+'/messages','POST',{body});if(window.ddsDraftClear)window.ddsDraftClear(sta);openStudioSupportFull(rid);}catch(err){toast(nice(err),true);}};
     const rb=$('srf-res'); if(rb)rb.onclick=async()=>{try{await api('/support/'+rid,'PATCH',{status:'resolved'});toast('Resolved');closeProjectDetail();}catch(e){toast(nice(e),true);}};
-  }catch(e){ $('detailInner').innerHTML='<div class="sec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
+  }catch(e){ $('detailInner').innerHTML='<div class="rsec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
 }
 
 (async function(){
