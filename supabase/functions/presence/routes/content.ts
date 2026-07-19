@@ -16,7 +16,7 @@ import { asUser, svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import { suggestedBlocksFor, suggestionNoteFor } from '../lib/vertical_presets.ts';
-import { REALIZED_BLOCK_TYPES } from '../lib/site_blocks.ts';
+import { REALIZED_BLOCK_TYPES, validateBlocksWithMap, type SectionMapEntry } from '../lib/site_blocks.ts';
 import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
@@ -393,8 +393,34 @@ async function redirectsForRenames(site: SiteRow, principal: Principal, renames:
   } catch { /* best-effort — the rename itself already succeeded */ }
 }
 
+// ── G13 · the editor-facing sidecar (design doc §1.4) ────────────────────────
+// GET and PUT /settings responses are decorated with `data.section_meta` — the
+// {sid, key, src_index} map from validateBlocksWithMap over the just-read /
+// just-written row (home blocks + each custom page). This is the exact join
+// between a stamped `data-dds-sid` on the canvas and an index into the client's
+// working copy, with validateBlocks' drop rules applied by the SERVER — never
+// imitated client-side. Recomputed per response, never stored: the row, the
+// snapshots, and the draft hash are untouched.
+function settingsSectionMeta(row: Record<string, unknown>): { blocks: SectionMapEntry[]; pages: Record<string, SectionMapEntry[]> } {
+  const pages: Record<string, SectionMapEntry[]> = {};
+  for (const p of (Array.isArray(row.pages) ? row.pages : [])) {
+    const slug = String((p as { slug?: unknown } | null)?.slug ?? '');
+    if (slug) pages[slug] = validateBlocksWithMap((p as { blocks?: unknown }).blocks).map;
+  }
+  return { blocks: validateBlocksWithMap(row.blocks).map, pages };
+}
+async function withSectionMeta(resp: Response | null, cors: Record<string, string>): Promise<Response | null> {
+  if (!resp || resp.status !== 200) return resp;
+  try {
+    const body = await resp.clone().json();
+    if (!body || typeof body !== 'object' || !body.data || typeof body.data !== 'object') return resp;
+    body.data.section_meta = settingsSectionMeta(body.data as Record<string, unknown>);
+    return json(body, 200, cors);
+  } catch { return resp; }   // decoration is additive — never break the save/read itself
+}
+
 export async function handleSettings(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (req.method.toUpperCase() !== 'PUT') return singleton(req, jwt, site, principal, cors, SETTINGS_CFG);
+  if (req.method.toUpperCase() !== 'PUT') return withSectionMeta(await singleton(req, jwt, site, principal, cors, SETTINGS_CFG), cors);
   let payload: Record<string, unknown> = {};
   try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
   // G7: pull rename markers out of a pages payload (the stored draft never carries them)
@@ -405,7 +431,7 @@ export async function handleSettings(req: Request, jwt: string, site: SiteRow, p
   }
   const resp = await singleton(req, jwt, site, principal, cors, SETTINGS_CFG, payload);
   if (resp && resp.status === 200 && renames.length) await redirectsForRenames(site, principal, renames);
-  return resp;
+  return withSectionMeta(resp, cors);
 }
 
 // ═══ Wave-1 G7 · page operations ═══
