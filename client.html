@@ -294,6 +294,38 @@
   .wslist .wsrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13.5px;padding:7px 0;border-top:1px solid var(--line);color:var(--ink)}
   .wslist .wsrow:first-child{border-top:0}
   .wslist .wsrow .wsnum{flex:0 0 auto;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  /* ── slice 11: the Requests tab — quick-action tiles · service card grid ·
+     the "Your requests" list view with Open/All filter chips ── */
+  .acttiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .acttile{display:flex;align-items:center;gap:13px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;font-weight:400;transition:border-color .15s,box-shadow .15s,transform .15s}
+  .acttile:hover{border-color:var(--p);box-shadow:var(--shadow-lift);transform:translateY(-1px)}
+  .acttile .at-ico{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--p-soft);display:grid;place-items:center;font-size:18px}
+  .acttile .at-main{flex:1 1 auto;min-width:0}
+  .acttile .at-t{display:block;font-family:var(--serif);font-weight:500;font-size:17px;color:var(--ink);letter-spacing:-.01em;line-height:1.25}
+  .acttile .at-d{display:block;font-size:13px;color:var(--soft);margin-top:2px}
+  .acttile .at-chev{flex:0 0 auto;color:var(--faint);font-size:18px;margin-left:auto}
+  .svcgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .svcgrid .card{margin-bottom:0;display:flex;flex-direction:column;align-items:flex-start}
+  .svccat{margin-bottom:8px}
+  .svcfoot{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;width:100%;margin-top:auto;padding-top:14px;flex-wrap:wrap}
+  .svcfoot button{font-size:13px;padding:7px 15px}
+  .svcprice{font-size:13.5px;font-weight:600;color:var(--ink)}
+  @media (max-width:719px){.acttiles,.svcgrid{grid-template-columns:1fr}}
+  @media (prefers-reduced-motion:reduce){.acttile,.acttile:hover{transition:none;transform:none}}
+  .reqfilter{display:flex;gap:8px;margin-bottom:12px}
+  .chip[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--on-p)}
+  .reqlist{padding:5px 18px}
+  .reqrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);padding:13px 2px;cursor:pointer;font-weight:400}
+  .reqrow:first-child{border-top:0}
+  .reqrow:hover{background:var(--bg);color:inherit}
+  .qico.done{background:var(--good-soft)}
+  .reqmain{flex:1 1 auto;min-width:0}
+  .reqsubj{display:block;font-weight:600;font-size:14.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reqmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
+  .schip{flex:0 0 auto;display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .schip.done{background:var(--good-soft);color:var(--good)}
+  .reqchev{flex:0 0 auto;color:var(--faint);font-size:17px}
+  .reqnone{padding:14px 0;margin:0;font-size:13.5px}
 </style>
 <script>
 // Self-contained client portal: the operator shell (shell.css/shell.js) is
@@ -1181,10 +1213,26 @@ async function renderInvoices(){
   html+=appendBilling(inv);
   $('main').innerHTML=html;
 }
-// ── REQUESTS (R2) — the studio's service catalog + your open requests ─────────
-// Pick a service → a structured brief → a PENDING request the studio reviews.
-// Nothing is ever charged or ordered automatically (the moat). A reviewer with
-// no service-link just sees the calm empty state, never an error.
+// ── REQUESTS (R2, slice 11 layout) — quick-action tiles, the studio's service
+// catalog as a card grid, and "Your requests" as a list view with Open/All
+// filter chips. Pick a service → a structured brief → a PENDING request the
+// studio reviews. Nothing is ever charged or ordered automatically (the moat).
+// A reviewer (canMessage false) sees no action tiles and no Request buttons —
+// just the calm empty states, never an error.
+// One request row: icon + subject + "Updated <rel>" meta + status chip +
+// chevron; the WHOLE row is the button (opens the thread in Messages). The
+// list payload carries no last-actor field, so the meta stays a plain honest
+// "Updated …" — never a guessed "your studio replied".
+function reqRowHtml(rq){
+  const s=String(rq.status||'open');const done=s==='resolved'||s==='closed';
+  const when=rq.last_activity_at||rq.updated_at;
+  return `<button class="reqrow" data-sup="${esc(rq.id)}">`+
+    `<span class="qico${done?' done':''}" aria-hidden="true">${done?'✓':'💬'}</span>`+
+    `<span class="reqmain"><span class="reqsubj">${esc(rq.subject||'Request')}</span>`+
+    `<span class="reqmeta">${when?`Updated ${esc(rel(when))}`:'Sent to your studio'}</span></span>`+
+    `<span class="schip${done?' done':''}">${esc(s.replace(/_/g,' '))}</span>`+
+    `<span class="reqchev" aria-hidden="true">›</span></button>`;
+}
 async function renderRequests(){
   $('main').innerHTML=spinnerHtml();
   const canMessage=PORTAL.persona==='client';
@@ -1194,36 +1242,59 @@ async function renderRequests(){
     services=(((svr&&svr.body&&svr.body.data)||[])).filter(x=>x&&x.id);
   }catch(_){}
   let html=portalHeader('Requests','Browse what your studio offers and ask for what you need. Nothing is charged automatically — every request is reviewed first.');
-  // ── book a call (self-schedule with the studio) ──
-  if(canMessage)html+=`<section><div class="card"><h3>📅 Book a call</h3><p class="muted">Grab a time to talk with your studio.</p><div class="row"><button id="bookCall">See available times</button></div></div></section>`;
-  // ── service catalog ──
+  // ── quick actions: book a call (self-schedule) · a free-form message ──
+  if(canMessage)html+=`<section class="acttiles" aria-label="Quick actions">`+
+    `<button class="acttile" id="bookCall"><span class="at-ico" aria-hidden="true">📅</span><span class="at-main"><span class="at-t">Book a call</span><span class="at-d">Grab a time to talk with your studio.</span></span><span class="at-chev" aria-hidden="true">›</span></button>`+
+    `<button class="acttile" id="newReq"><span class="at-ico" aria-hidden="true">💬</span><span class="at-main"><span class="at-t">Something else?</span><span class="at-d">Tell your studio what you have in mind — they’ll reply with next steps.</span></span><span class="at-chev" aria-hidden="true">›</span></button>`+
+    `</section>`;
+  // ── service catalog — a two-column card grid (one column on phones) ──
   html+=`<section><h2>Request a service</h2>`;
-  if(!services.length)html+=emptyCard('Your studio hasn’t listed services here yet — you can still message them for anything you need using the button below.');
+  if(!services.length)html+=emptyCard(canMessage?'Your studio hasn’t listed services here yet — you can still message them for anything you need with “Something else?” above.':'Your studio hasn’t listed services here yet.');
   else{
+    html+=`<div class="svcgrid">`;
     for(const svc of services){
-      html+=`<div class="card"><h3>${esc(svc.name)}</h3>`+
-        `${svc.category?`<p class="muted" style="margin:-2px 0 6px;font-size:12.5px">${esc(svc.category)}</p>`:''}`+
+      html+=`<div class="card">`+
+        `${svc.category?`<span class="kchip svccat">${esc(svc.category)}</span>`:''}`+
+        `<h3>${esc(svc.name)}</h3>`+
         `${svc.description?`<p>${esc(svc.description)}</p>`:''}`+
-        `${svc.price?`<p class="muted" style="margin-top:6px">${esc(svc.price)}</p>`:''}`+
-        `${canMessage?`<div class="row"><button class="approve" data-svc="${esc(svc.id)}">Request this</button></div>`:''}</div>`;
+        `<div class="svcfoot">${svc.price?`<span class="svcprice">${esc(svc.price)}</span>`:'<span></span>'}`+
+        `${canMessage?`<button class="approve" data-svc="${esc(svc.id)}" aria-label="Request this — ${esc(svc.name)}">Request this</button>`:''}</div>`+
+        `</div>`;
     }
+    html+=`</div>`;
   }
   html+=`</section>`;
-  // ── generic "something else" ──
-  if(canMessage)html+=`<section><div class="card"><h3>Something else?</h3><p class="muted">Not sure which service fits, or need something custom? Tell your studio what you have in mind — they’ll reply with next steps. Nothing is charged automatically.</p><div class="row"><button id="newReq">Message your studio</button></div></div></section>`;
-  // ── your open requests ──
+  // ── your requests — a list view with Open/All filter chips ──
+  const openList=list.filter(r=>!(r.status==='resolved'||r.status==='closed'));
   html+=`<section><h2>Your requests</h2>`;
   if(!list.length)html+=emptyCard('You haven’t made any requests yet. When you ask your studio for something, you’ll be able to track it here.');
-  else for(const rq of list){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}
+  else html+=`<div class="reqfilter" role="group" aria-label="Filter requests">`+
+    `<button class="chip" id="reqFilterOpen" aria-pressed="false">Open</button>`+
+    `<button class="chip" id="reqFilterAll" aria-pressed="false">All</button></div>`+
+    `<div class="card reqlist" id="reqlist"></div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
   const bc=$('bookCall');if(bc)bc.addEventListener('click',openBooking);
   const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null));
   document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-svc');const svc=services.find(x=>x.id===id);if(svc)openServiceRequest(svc);}));
-  // "View & reply" opens the thread where conversations now live: the Messages
+  // A request row opens its thread where conversations now live: the Messages
   // tab's reading pane (slice 5). The drill-in's Support section keeps
   // openSupportThread — it stays as the project-scoped fallback view.
-  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openMessagesTo(b.getAttribute('data-sup'))));
+  if(list.length){
+    // default Open (what still needs attention); when EVERYTHING is resolved,
+    // default to All so the list is never mysteriously empty.
+    let mode=openList.length?'open':'all';
+    const paint=()=>{
+      const shown=mode==='open'?openList:list;
+      $('reqFilterOpen').setAttribute('aria-pressed',String(mode==='open'));
+      $('reqFilterAll').setAttribute('aria-pressed',String(mode==='all'));
+      $('reqlist').innerHTML=shown.length?shown.map(reqRowHtml).join(''):`<p class="reqnone muted">No open requests — everything’s been handled. Switch to All to see past requests.</p>`;
+      $('reqlist').querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openMessagesTo(b.getAttribute('data-sup'))));
+    };
+    $('reqFilterOpen').addEventListener('click',()=>{mode='open';paint();});
+    $('reqFilterAll').addEventListener('click',()=>{mode='all';paint();});
+    paint();
+  }
 }
 // ── Book a call — self-schedule with the studio via the public /book/* engine ──
 // The #1 forgotten portal gap. Resolves the studio site (/client/book), lists
