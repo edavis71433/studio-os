@@ -117,9 +117,12 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(body.locator('.kchip', { hasText: 'Invoice' })).toBeVisible();
     await expect(body.getByRole('heading', { name: 'Homepage design' })).toBeVisible();
     await expect(body.getByText('1 thing for you')).toBeVisible();
-    // action names include the row title (aria-label) so repeated actions stay distinguishable
-    await expect(body.getByRole('link', { name: 'Pay — Deposit' })).toBeVisible();
-    await expect(body.getByRole('button', { name: 'Review — Homepage design' })).toBeVisible();
+    // action names include the row title (aria-label) so repeated actions stay
+    // distinguishable. Slice 10 (approved mock): the visible CTAs became explicit
+    // verbs — "Review & approve" / "View & pay" — and the accessible names follow
+    // (label-in-name intact: the visible text starts each name).
+    await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).toBeVisible();
+    await expect(body.getByRole('button', { name: 'Review & approve — Homepage design' })).toBeVisible();
     // the unread row carries an sr-only "New — " text alternative for its dot
     await expect(body.locator('.qrow.unread .sr-only')).toHaveText('New — ');
     // the unread notification for approval a1 marks its row as new
@@ -251,6 +254,103 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.locator('.cb-brand')).toBeHidden();
     await expect(page.locator('#navbell')).toBeHidden();
     await expect(page.locator('#bell')).toBeVisible();
+  });
+});
+
+// ── slice 10: the Home greeting + at-a-glance strip + action-feed rows ───────
+// A time-of-day greeting headline over the unchanged sub line; a strip of mini
+// tiles (needs your OK · new messages · to pay · project status) built ONLY
+// from data Home already loads — a tile hides when its datum is absent, and a
+// zero count is real data, never faked. Queue rows carry the action-feed
+// anatomy (type icon + explicit CTA) with every existing behavior intact.
+test.describe('Client portal — Home greeting + glance strip (slice 10)', () => {
+  test('the headline is a time-of-day greeting; the sub line is unchanged', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#main header h1')).toHaveText(/^Good (morning|afternoon|evening)/);
+    await expect(page.getByText('Everything your studio is doing with you, in one place.')).toBeVisible();
+  });
+
+  test('the glance strip renders real tiles: needs OK · messages · to pay · project', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    const strip = page.locator('#home-glance');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('#glance-ok .gn')).toHaveText('1');       // the pending approval
+    await expect(strip.locator('#glance-ok .gl')).toHaveText('needs your OK');
+    await expect(strip.locator('#glance-msgs .gn')).toHaveText('0');     // a real zero, not a fake
+    await expect(strip.locator('#glance-due .gn')).toHaveText('$500');   // the unpaid Deposit
+    await expect(strip.locator('#glance-due .gl')).toHaveText('to pay');
+    await expect(strip.locator('#glance-proj .gn')).toHaveText('active');
+    await expect(strip.locator('#glance-proj .gl')).toHaveText('Website redesign');
+    // and the strip sits ABOVE the Needs-you queue (the website-card adjacency is untouched)
+    await expect(page.locator('#home-glance + #home-needs')).toBeVisible();
+  });
+
+  test('tiles hide when their datum is absent — a reviewer gets no due/project tiles', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [],
+        pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: '', decide_path: '/foundations/plans/p1/decide' }],
+        last_published: null } },
+    } });
+    await page.goto('/client.html');
+    const strip = page.locator('#home-glance');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('#glance-ok .gn')).toHaveText('1');
+    await expect(strip.locator('#glance-due')).toHaveCount(0);
+    await expect(strip.locator('#glance-proj')).toHaveCount(0);
+  });
+
+  test('unread messages count into the tile, and opening the bell zeroes it live', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'uses the ≥720px context-bar bell');
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#glance-msgs .gn')).toHaveText('2');
+    await page.locator('#navbell').click();
+    await expect(page.locator('#glance-msgs .gn')).toHaveText('0');
+  });
+
+  test('queue rows carry the action-feed anatomy: type icon + explicit CTA text', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    const body = page.locator('#needs-body');
+    await expect(body.locator('.qcard')).toBeVisible();
+    await expect(body.locator('.qico')).toHaveCount(3); // approval · to-do · invoice
+    await expect(body.locator('.qico').first()).toHaveAttribute('aria-hidden', 'true');
+    await expect(body.getByRole('button', { name: 'Review & approve — Homepage design' })).toHaveText('Review & approve');
+    await expect(body.getByRole('button', { name: 'Open to-dos — Website redesign' })).toHaveText('Open to-dos');
+    await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).toHaveText('View & pay');
+  });
+
+  test('the Review & approve CTA still round-trips into the project record', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await page.getByRole('button', { name: 'Review & approve — Homepage design' }).click();
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+  });
+
+  test('mobile: the strip stacks its tiles with no horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the stacked-tiles check is the <720px contract');
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#home-glance')).toBeVisible();
+    await expect(page.locator('#needs-body .qcard')).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('no serious/critical axe violations on the slice-10 Home', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#home-glance')).toBeVisible();
+    await expect(page.locator('#needs-body .qcard')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
   });
 });
 
