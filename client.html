@@ -317,7 +317,8 @@
   .reqlist{padding:5px 18px}
   .reqrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);padding:13px 2px;cursor:pointer;font-weight:400}
   .reqrow:first-child{border-top:0}
-  .reqrow:hover{background:var(--bg);color:inherit}
+  .reqrow:hover{background:var(--bg);color:inherit;border-color:var(--line)}   /* the global button:hover purple must never tint the row's top divider */
+  .reqrow .qico{align-self:center;margin-top:0}   /* Home rows top-align the icon; these rows center vertically */
   .qico.done{background:var(--good-soft)}
   .reqmain{flex:1 1 auto;min-width:0}
   .reqsubj{display:block;font-weight:600;font-size:14.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1234,13 +1235,23 @@ function reqRowHtml(rq){
     `<span class="reqchev" aria-hidden="true">›</span></button>`;
 }
 async function renderRequests(){
+  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   $('main').innerHTML=spinnerHtml();
   const canMessage=PORTAL.persona==='client';
-  let list=[],services=[];
-  try{const[sr,svr]=await Promise.all([api('/client/support'),api('/client/services')]);
-    list=(((sr&&sr.body&&sr.body.data)||[])).filter(x=>x&&x.id);
-    services=(((svr&&svr.body&&svr.body.data)||[])).filter(x=>x&&x.id);
-  }catch(_){}
+  // Per-read failure honesty (slice 10's Home rule): a FAILED read renders a calm
+  // couldn't-load line, never the empty-state copy — only a genuine {data:[]}
+  // earns the honest empty states below.
+  let list=[],services=[],listFailed=false,svcFailed=false;
+  const [sr,svr]=await Promise.all([api('/client/support').catch(()=>null),api('/client/services').catch(()=>null)]);
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  if(sr&&sr.ok)list=(((sr.body&&sr.body.data)||[])).filter(x=>x&&x.id);else listFailed=true;
+  if(svr&&svr.ok)services=(((svr.body&&svr.body.data)||[])).filter(x=>x&&x.id);else svcFailed=true;
+  // freshest activity first — the SAME recency each row displays (last_activity_at
+  // with the updated_at fallback), so the order can never contradict the meta.
+  // The backend's updated_at-desc order would sink a request with a fresh studio
+  // reply below one merely touched later — and disagree with the Messages tab.
+  const reqWhen=(r)=>String(r.last_activity_at||r.updated_at||'');
+  list.sort((a,b)=>reqWhen(b).localeCompare(reqWhen(a)));
   let html=portalHeader('Requests','Browse what your studio offers and ask for what you need. Nothing is charged automatically — every request is reviewed first.');
   // ── quick actions: book a call (self-schedule) · a free-form message ──
   if(canMessage)html+=`<section class="acttiles" aria-label="Quick actions">`+
@@ -1249,7 +1260,8 @@ async function renderRequests(){
     `</section>`;
   // ── service catalog — a two-column card grid (one column on phones) ──
   html+=`<section><h2>Request a service</h2>`;
-  if(!services.length)html+=emptyCard(canMessage?'Your studio hasn’t listed services here yet — you can still message them for anything you need with “Something else?” above.':'Your studio hasn’t listed services here yet.');
+  if(svcFailed)html+=`<div class="card"><p class="muted">We couldn’t load your studio’s services just now — please try again in a moment.</p></div>`;
+  else if(!services.length)html+=emptyCard(canMessage?'Your studio hasn’t listed services here yet — you can still message them for anything you need with “Something else?” above.':'Your studio hasn’t listed services here yet.');
   else{
     html+=`<div class="svcgrid">`;
     for(const svc of services){
@@ -1267,7 +1279,8 @@ async function renderRequests(){
   // ── your requests — a list view with Open/All filter chips ──
   const openList=list.filter(r=>!(r.status==='resolved'||r.status==='closed'));
   html+=`<section><h2>Your requests</h2>`;
-  if(!list.length)html+=emptyCard('You haven’t made any requests yet. When you ask your studio for something, you’ll be able to track it here.');
+  if(listFailed)html+=`<div class="card"><p class="muted">We couldn’t load your requests just now — please try again in a moment.</p></div>`;
+  else if(!list.length)html+=emptyCard('You haven’t made any requests yet. When you ask your studio for something, you’ll be able to track it here.');
   else html+=`<div class="reqfilter" role="group" aria-label="Filter requests">`+
     `<button class="chip" id="reqFilterOpen" aria-pressed="false">Open</button>`+
     `<button class="chip" id="reqFilterAll" aria-pressed="false">All</button></div>`+
@@ -1275,15 +1288,17 @@ async function renderRequests(){
   html+=`</section>`;
   $('main').innerHTML=html;
   const bc=$('bookCall');if(bc)bc.addEventListener('click',openBooking);
-  const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null));
+  const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null,'requests'));
   document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-svc');const svc=services.find(x=>x.id===id);if(svc)openServiceRequest(svc);}));
   // A request row opens its thread where conversations now live: the Messages
   // tab's reading pane (slice 5). The drill-in's Support section keeps
   // openSupportThread — it stays as the project-scoped fallback view.
   if(list.length){
     // default Open (what still needs attention); when EVERYTHING is resolved,
-    // default to All so the list is never mysteriously empty.
-    let mode=openList.length?'open':'all';
+    // default to All so the list is never mysteriously empty. An explicit chip
+    // choice persists for the session (REQ_FILTER) — tab-away/back and the
+    // post-send re-render keep the filter the client picked.
+    let mode=(REQ_FILTER==='open'||REQ_FILTER==='all')?REQ_FILTER:(openList.length?'open':'all');
     const paint=()=>{
       const shown=mode==='open'?openList:list;
       $('reqFilterOpen').setAttribute('aria-pressed',String(mode==='open'));
@@ -1291,11 +1306,14 @@ async function renderRequests(){
       $('reqlist').innerHTML=shown.length?shown.map(reqRowHtml).join(''):`<p class="reqnone muted">No open requests — everything’s been handled. Switch to All to see past requests.</p>`;
       $('reqlist').querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openMessagesTo(b.getAttribute('data-sup'))));
     };
-    $('reqFilterOpen').addEventListener('click',()=>{mode='open';paint();});
-    $('reqFilterAll').addEventListener('click',()=>{mode='all';paint();});
+    $('reqFilterOpen').addEventListener('click',()=>{mode='open';REQ_FILTER='open';paint();});
+    $('reqFilterAll').addEventListener('click',()=>{mode='all';REQ_FILTER='all';paint();});
     paint();
   }
 }
+// The session-scoped Open/All choice ('' until the client picks — first visit
+// still gets the sensible default above).
+let REQ_FILTER='';
 // ── Book a call — self-schedule with the studio via the public /book/* engine ──
 // The #1 forgotten portal gap. Resolves the studio site (/client/book), lists
 // services, reads open slots for a chosen day, and books — all grounded on the
@@ -1721,13 +1739,17 @@ async function openSurvey(sid,pid){
   $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
   $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
 }
-async function openSupport(pid){
+// `ret` names the view to return to on back/success when there's no project —
+// the Requests tab passes 'requests' so its "Something else?" round-trips home
+// to the tab (and the fresh request), not to the Home feed. Other callers keep
+// the old default (project → the project; otherwise the client home).
+async function openSupport(pid,ret){
   setWide(false);
   let html=`<p><a class="link" href="#" id="back">${pid?'← Back to project':'← Back'}</a></p><header><h1>${pid?'Open a support request':'Message your studio'}</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
   $('main').innerHTML=html;
   // No project yet? Back and success return to the client home (load), not a
   // missing project — so a managed client with zero projects never hits a dead end.
-  const backTo=()=>{pid?openProject(pid):load();};
+  const backTo=()=>{if(pid)return openProject(pid);if(ret==='requests')return showTab('requests');load();};
   $('back').addEventListener('click',(e)=>{e.preventDefault();backTo();});
   $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid});if(r.ok){toast('Sent — your studio will get back to you.');backTo();}else{toast('That didn’t send.');b.disabled=false;}});
 }
