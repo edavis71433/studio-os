@@ -1202,22 +1202,23 @@ function paneCompose(host){
 // mock — rel() words ('2 days ago') stay on activity surfaces.
 function fdate(iso){const t=Date.parse(iso);return isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'long',day:'numeric'}):'';}
 // Simple type icon from the title's extension — a friendly hint, never load-bearing.
+// The ONE media store accepts only JPEG/PNG/WebP images and PDF documents
+// (lib/media.ts MIME_ALLOW), so those are the only kinds this icon advertises —
+// anything else (or no extension) reads as a document.
 function fileIcon(title){
   const m=/\.([a-z0-9]+)$/i.exec(String(title||''));const e=m?m[1].toLowerCase():'';
-  if(/^(png|jpe?g|gif|webp|heic|svg|bmp|tiff?)$/.test(e))return'🖼';
-  if(/^(zip|rar|7z|tar|gz)$/.test(e))return'📦';
-  if(/^(mp4|mov|webm|avi)$/.test(e))return'🎬';
-  if(/^(mp3|wav|m4a|aac|flac)$/.test(e))return'🎵';
-  if(/^(ai|psd|fig|sketch|xd)$/.test(e))return'🎨';
+  if(/^(png|jpe?g|webp)$/.test(e))return'🖼';
   return'📄';
 }
-// Which deliverables the CLIENT sent: the bundle payload carries no dedicated
-// flag — the ONLY signal today is the server-stamped note (client_delivery.ts
-// handleClientUploadCreate writes exactly this string). Brittle by nature, so
-// the match is exact and a future additive `client_upload` boolean is honored
-// first if the backend ever grows one.
-const CLIENT_UPLOAD_NOTE='Uploaded by the client.';
-function isClientUpload(f){return !!f&&(f.client_upload===true||f.note===CLIENT_UPLOAD_NOTE);}
+// Which deliverables the CLIENT sent: a future additive `client_upload` boolean
+// is honored first; otherwise the ONLY payload signal is the server-stamped
+// note (client_delivery.ts handleClientUploadCreate writes 'Uploaded by the
+// client.'). PREFIX match, deliberately: a studio appending to that note
+// ('Uploaded by the client. Resized + filed.') must not flip the chip off.
+// Cosmetic edge that remains: a studio hand-typing the exact sentence at the
+// START of its own note earns the chip — display-only, not worth a schema column.
+const CLIENT_UPLOAD_NOTE='Uploaded by the client';
+function isClientUpload(f){return !!f&&(f.client_upload===true||String(f.note||'').startsWith(CLIENT_UPLOAD_NOTE));}
 function fileRowHtml(f){
   const mine=isClientUpload(f);const when=fdate(f.created_at);
   return `<div class="frow"><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span>`+
@@ -1238,14 +1239,37 @@ function docRowHtml(d){
     `<span class="fst${signed?' sig':''}">${esc(status)}</span>${view}</div>`;
 }
 // The client→studio share card (uploads are PER-PROJECT: hidden entirely with
-// zero projects, and a reviewer never sees it — same canMessage boundary as
-// every other write surface on this page).
+// zero projects; a reviewer never reaches any of this — renderFiles' persona
+// gate returns the calm read-only state before any share UI or /client/* read).
+// Type/size honesty up front: the ONE media store accepts JPEG/PNG/WebP images
+// up to 10MB and PDF documents up to 25MB (lib/media.ts MIME_ALLOW / MAX_BYTES /
+// MAX_DOC_BYTES). The input advertises exactly that, the card copy says it, and
+// a pre-flight check catches the rest BEFORE any network call.
+const SHARE_ACCEPT='image/jpeg,image/png,image/webp,application/pdf';
+const SHARE_IMG_CAP=10*1024*1024,SHARE_PDF_CAP=25*1024*1024;
+function sharePreflight(file){
+  const t=String((file&&file.type)||'');
+  if(SHARE_ACCEPT.split(',').indexOf(t)<0)return'That kind of file can’t be sent here — a JPEG, PNG or WebP image, or a PDF, works.';
+  const cap=t==='application/pdf'?SHARE_PDF_CAP:SHARE_IMG_CAP;
+  if(file.size>cap)return t==='application/pdf'?'That PDF is too big — PDFs can be up to 25MB.':'That image is too big — images can be up to 10MB.';
+  return'';
+}
+// Known server 422s whose wording reads wrong IN THE PORTAL get a portal voice
+// (the store's alt-text ask is studio-speak; the under-the-cap sentence is a
+// lie for a 0-byte file). Anything unknown surfaces verbatim — the server's
+// copy is already friendly.
+function shareServerMsg(m,file){
+  m=String(m||'');
+  if(/alt text|give this document a name/i.test(m))return'Give the file a short name (a few characters helps your studio find it).';
+  if(file&&!file.size&&/must be under/i.test(m))return'That file looks empty — pick it again?';
+  return m;
+}
 function shareCardHtml(){
   return `<div class="fshare"><span class="fshare-i" aria-hidden="true">📤</span>`+
-    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">Photos, logos, documents — it lands in your project’s files right away.</p></div>`+
+    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB — it lands in your project’s files right away.</p></div>`+
     `<button class="approve fshare-btn" id="fchoose">Choose a file</button>`+
-    `<input type="file" id="ffile" class="fshare-file" aria-hidden="true" tabindex="-1">`+
-    `<div class="fsend" id="fsend" hidden></div></div>`;
+    `<input type="file" id="ffile" class="fshare-file" accept="${SHARE_ACCEPT}" aria-hidden="true" tabindex="-1">`+
+    `<form class="fsend" id="fsend" aria-live="polite" hidden></form></div>`;
 }
 function wireShareCard(){
   const inp=$('ffile'),choose=$('fchoose');
@@ -1253,46 +1277,96 @@ function wireShareCard(){
   choose.addEventListener('click',()=>inp.click());
   inp.addEventListener('change',()=>{const f=inp.files&&inp.files[0];if(f)shareCompose(f);});
 }
-// After a pick: confirm inline — project picker only when there's a real choice
-// (exactly one active project auto-selects), optional title defaulting to the
-// filename, then Send/Cancel.
-function shareCompose(file){
-  const host=$('fsend');if(!host)return;
-  const multi=PORTAL.projects.length>1;
+// Orphan-free retry state: a successful PUT's media id is KEPT (with its
+// project), so a failed record step retries ONLY the record — no fresh
+// upload-url/PUT, no orphaned media row per retry. A new pick resets it.
+let SHARE_KEPT={mediaId:'',pid:''};
+// The compose's own fresh project list (the boot-time list can go stale —
+// hidden/soft-deleted projects); a failed refetch falls back to the cached
+// PORTAL.projects. Compose-local so the rest of the page keeps its own list.
+let SHARE_PROJECTS=null;
+const shareProjects=()=>SHARE_PROJECTS||PORTAL.projects;
+// After a pick: pre-flight the type/size (honest before ANY network), refetch
+// the picker's project list, then confirm inline — project picker only when
+// there's a real choice (exactly one project auto-selects), optional title
+// defaulting to the filename, then Send/Cancel. The compose is a real <form>
+// (Enter in the title submits); focus moves to the title on open, and Cancel
+// hands it back to the share button.
+async function shareCompose(file){
+  SHARE_KEPT={mediaId:'',pid:''};   // a NEW file invalidates any kept upload
+  const bad=sharePreflight(file);
+  if(bad){toast(bad);const i=$('ffile');if(i)i.value='';return;}
+  try{const r=await api('/client/projects');const d=r&&r.ok&&r.body&&r.body.data;SHARE_PROJECTS=Array.isArray(d)?d:null;}catch(_){SHARE_PROJECTS=null;}
+  const host=$('fsend');if(!host)return;   // resolved AFTER the await — the tab may have moved on mid-fetch
+  const list=shareProjects();
+  const multi=list.length>1;
   host.hidden=false;
   host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
-    (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${PORTAL.projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select>`:'')+
+    (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select>`:'')+
     `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
-    `<div class="row" style="margin-top:14px"><button class="approve" id="fgo">Send to your studio</button><button id="fno">Cancel</button></div>`;
-  $('fno').addEventListener('click',()=>{host.hidden=true;host.innerHTML='';const i=$('ffile');if(i)i.value='';});
-  $('fgo').addEventListener('click',()=>shareSend(file));
+    `<div class="row" style="margin-top:14px"><button type="submit" class="approve" id="fgo">Send to your studio</button><button type="button" id="fno">Cancel</button></div>`;
+  host.onsubmit=(e)=>{e.preventDefault();shareSend(file);};   // the <form> contract: Enter in the title submits
+  $('fno').addEventListener('click',()=>{host.hidden=true;host.innerHTML='';const i=$('ffile');if(i)i.value='';const c=$('fchoose');if(c)c.focus();});
+  const t=$('ftitle');if(t)t.focus();
 }
-// The three-step send (the EXISTING per-project upload backend, untouched):
-// POST upload-url (mime/size/quota validated server-side — its 422 message is
-// friendly copy, surface it verbatim) → PUT the bytes → POST uploads to record
-// it. Honest per-step failure: toast + the button re-enables; never silent.
+// The three-step send (the EXISTING per-project upload backend): POST
+// upload-url (mime/size/quota validated server-side — its 422 copy surfaces,
+// portal-mapped where the wording reads wrong here) → PUT the bytes → POST
+// uploads to record it. Honest per-step failure: toast + the buttons re-enable;
+// never silent. While a send is in flight, Cancel and Choose-a-file are fenced
+// off, and the failure handler resolves every node by id AT failure time — it
+// never writes into a detached DOM. A step-3 failure keeps SHARE_KEPT, so the
+// retry re-runs ONLY the record step.
 async function shareSend(file){
   const btn=$('fgo');if(!btn||btn.disabled)return;
+  const view=VIEW_SEQ;   // captured before the async chain — the success re-render is skipped if anything newer owns #main
   const sel=$('fproj');
-  const pid=sel?sel.value:(PORTAL.projects[0]&&PORTAL.projects[0].id);
+  const pid=sel?sel.value:(shareProjects()[0]&&shareProjects()[0].id);
   if(!pid){toast('No project to attach this to yet.');return;}
   const title=(($('ftitle')&&$('ftitle').value)||'').trim()||file.name;
   btn.disabled=true;const was=btn.textContent;btn.textContent='Sending…';
-  const fail=(m)=>{toast(m||'That didn’t send — please try again.');btn.disabled=false;btn.textContent=was;};
+  const fence=(on)=>{const no=$('fno');if(no)no.disabled=on;const ch=$('fchoose');if(ch)ch.disabled=on;};
+  fence(true);
+  const fail=(m)=>{toast(m||'That didn’t send — please try again.');const b=$('fgo');if(b){b.disabled=false;b.textContent=was;}fence(false);};
   try{
-    const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title});
-    if(!up.ok||!up.body.data||!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');
-    const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
-    if(!put.ok)return fail('The upload didn’t finish — please try again.');
-    const rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:up.body.data.media_id,title});
-    if(!rec.ok)return fail((rec.body&&rec.body.message)||'Couldn’t save that file.');
-    toast('Sent to your studio ✓');PORTAL.snaps=null;renderFiles();
+    let mediaId=(SHARE_KEPT.pid===pid&&SHARE_KEPT.mediaId)||'';
+    if(!mediaId){   // fresh send — a kept id (a prior step-3 failure on THIS project) skips straight to the record step
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title});
+      if(!up.ok||!up.body.data)return fail(shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.');
+      if(!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');   // a 200 with no URL is its own honest failure, never a throw
+      const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      if(!put.ok)return fail('The upload didn’t finish — please try again.');
+      mediaId=up.body.data.media_id;
+      SHARE_KEPT={mediaId,pid};   // the bytes are up — a failed record step retries from HERE, orphan-free
+    }
+    const rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:mediaId,title});
+    if(!rec.ok){
+      // a 422 means the server refused THIS media for good (bad/cleaned-up media
+      // row — retrying the same id can never succeed); transient failures keep it
+      if(rec.status===422)SHARE_KEPT={mediaId:'',pid:''};
+      return fail(shareServerMsg(rec.body&&rec.body.message,file)||'Couldn’t save that file.');
+    }
+    SHARE_KEPT={mediaId:'',pid:''};
+    toast('Sent to your studio ✓');PORTAL.snaps=null;
+    fence(false);
+    // guarded re-render: only when the Files tab still owns #main (VIEW_SEQ
+    // unmoved — showTab AND every drill-in bump it); the toast already fired.
+    // After the repaint, focus lands back on the share card's button.
+    if(view===VIEW_SEQ)renderFiles().then(()=>{const c=$('fchoose');if(c)c.focus();});
   }catch(_){fail('The upload didn’t finish — please try again.');}
 }
 async function renderFiles(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
+  if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line (renderMessages' contract)
+    $('main').innerHTML=portalHeader('Files & documents','Everything your studio has shared — files, proposals, and agreements.')+
+      emptyCard('Your studio’s files and documents will appear here once they’ve set up your account.','📁');
+    return;
+  }
   $('main').innerHTML=spinnerHtml();
-  const canShare=PORTAL.persona==='client'&&PORTAL.projects.length>0;
+  // persona is 'client' past the gate above (the load() derivation makes a
+  // reviewer-with-projects unrepresentable), so sharing depends only on having
+  // a project to attach the file to.
+  const canShare=PORTAL.projects.length>0;
   const [snaps,docsRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null)]);
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   const docsFailed=!(docsRes&&docsRes.ok);
