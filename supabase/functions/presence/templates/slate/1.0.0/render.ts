@@ -345,7 +345,7 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
     : '';
   const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
   return `${heroOff ? '' : `
-<section class="hero wrap">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
+<section class="hero wrap" data-dds-core="hero">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
   ${heroImgOk ? `<div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div>` : ''}`}
 </section>`}
 <div class="strip"><div class="wrap">
@@ -355,14 +355,14 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
 </div></div>
 ${(() => {
   const parts: Record<string, string> = {
-    about: `<section class="block wrap"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>`,
-    offerings: featured.length ? `<section class="block alt"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
+    about: `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>`,
+    offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
 </div><p style="margin-top:22px"><a class="btn ghost" href="${attr(v.offeringPath)}">All ${esc(v.offeringLabel.toLowerCase())}</a></p></div></section>` : '',
-    testimonials: tst.length ? `<section class="block wrap"><h2>What customers say</h2><div class="cards">${tst.map((t) => `
+    testimonials: tst.length ? `<section class="block wrap" data-dds-core="testimonials"><h2>What customers say</h2><div class="cards">${tst.map((t) => `
   <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
 </div></section>` : '',
-    faqs: faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
+    faqs: faqs.length ? `<section class="block alt" data-dds-core="faqs"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd class="prose">${renderMarkdown(f.answer)}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
   };

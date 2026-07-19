@@ -46,7 +46,7 @@ const ctx = { esc, attr, safeHref };
     { type: 'cta', text: 'Ready?', button: 'Book', url: 'https://ex.com/book' },
   ]);
   const r = renderSiteBlocks(all, ctx);
-  ok('every enabled block renders a <section>; every non-CTA carries an <h2>', r.length === 8 && r.every((b) => b.html.includes('<section')) && r.filter((b) => b.type !== 'cta').every((b) => b.html.includes('<h2>')));
+  ok('every enabled block renders a <section>; every non-CTA carries an <h2>', r.length === 8 && r.every((b) => b.html.includes('<section')) && r.filter((b) => b.type !== 'cta').every((b) => b.html.includes('<h2 data-dds-field="title">')));
   ok('stable block_<type> keys', r.map((b) => b.key).join(',') === 'block_features,block_stats,block_team,block_process,block_pricing,block_certifications,block_service_areas,block_cta');
   ok('duplicate content blocks get UNIQUE render keys (no silent overwrite)', (() => {
     const dup = renderSiteBlocks(validateBlocks([{ type: 'features', items: [{ title: 'A' }] }, { type: 'features', items: [{ title: 'B' }] }]), ctx);
@@ -211,7 +211,7 @@ const ctx = { esc, attr, safeHref };
   ok('richtext requires a body (empty → skipped)', validateBlocks([{ type: 'richtext', body: '   ' }]).length === 0 && validateBlocks([{ type: 'richtext', body: 'Hello' }]).length === 1);
   ok('richtext preserves newlines (not whitespace-collapsed like short fields)', validateBlocks([{ type: 'richtext', body: 'Line one\n\nLine two' }])[0].body === 'Line one\n\nLine two');
   const rt = renderSiteBlocks(validateBlocks([{ type: 'richtext', title: 'Our story', body: '## We started small\n\nWith **grit** and a [plan](https://ex.com).\n\n- one\n- two' }]), ctx)[0];
-  ok('richtext renders a prose section with semantic markdown (h2/strong/list/link)', rt.html.includes('block-richtext') && rt.html.includes('<div class="prose">') && rt.html.includes('<h2>We started small</h2>') && rt.html.includes('<strong>grit</strong>') && rt.html.includes('<ul>') && rt.html.includes('href="https://ex.com"'));
+  ok('richtext renders a prose section with semantic markdown (h2/strong/list/link)', rt.html.includes('block-richtext') && rt.html.includes('<div class="prose" data-dds-field="body" data-dds-md="1">') && rt.html.includes('<h2>We started small</h2>') && rt.html.includes('<strong>grit</strong>') && rt.html.includes('<ul>') && rt.html.includes('href="https://ex.com"'));
   ok('richtext emits no schema', !rt.ld);
   const rtx = renderSiteBlocks(validateBlocks([{ type: 'richtext', body: '<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[x](javascript:alert(1))' }]), ctx)[0].html;
   ok('richtext markdown is escape-first (no live script/img, javascript: link dropped)', !/<script>alert|<img\s+src=x/.test(rtx) && rtx.includes('&lt;script&gt;') && !/href="javascript:/i.test(rtx));
@@ -220,7 +220,7 @@ const ctx = { esc, attr, safeHref };
   ok('image needs a resolvable media id (no image → dropped)', resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG }]), () => null).length === 0);
   ok('image keeps a valid uuid; junk id dropped at validation', validateBlocks([{ type: 'image', image_id: IMG }])[0].image_id === IMG && validateBlocks([{ type: 'image', image_id: 'nope' }]).length === 0);
   const im = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG, caption: 'Out front', alt: 'The shop', link: 'https://ex.com' }]), IREF), ctx)[0];
-  ok('image renders a <figure> with srcset image + <figcaption>, wrapped in a safe link', im.html.includes('block-image') && im.html.includes('<figure') && im.html.includes('srcset=') && im.html.includes('<figcaption>Out front</figcaption>') && im.html.includes('<a class="img-link" href="https://ex.com"'));
+  ok('image renders a <figure> with srcset image + <figcaption>, wrapped in a safe link', im.html.includes('block-image') && im.html.includes('<figure') && im.html.includes('srcset=') && im.html.includes('<figcaption data-dds-field="caption">Out front</figcaption>') && im.html.includes('<a class="img-link" href="https://ex.com"'));
   const imBad = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'image', image_id: IMG, link: 'javascript:alert(1)' }]), IREF), ctx)[0].html;
   ok('image with an unsafe link renders the figure but NO anchor', imBad.includes('<figure') && !imBad.includes('<a '));
 
@@ -236,8 +236,8 @@ const ctx = { esc, attr, safeHref };
   ok('accordion caps items at 10 + requires a summary per item', (() => { const a = validateBlocks([{ type: 'accordion', items: Array.from({ length: 14 }, (_, i) => ({ summary: `S${i}`, body: 'b' })).concat([{ summary: '', body: 'x' }]) }])[0]; return a.items.length === 10 && a.items.every((it) => it.summary); })());
   ok('accordion with no valid items is skipped', validateBlocks([{ type: 'accordion', items: [{ summary: '', body: 'x' }] }]).length === 0 && validateBlocks([{ type: 'accordion', items: [] }]).length === 0);
   const ac = renderSiteBlocks(validateBlocks([{ type: 'accordion', items: [{ summary: 'Shipping', body: 'We ship **fast**.' }, { summary: '<b>Returns</b>', body: 'Within 30 days' }] }]), ctx)[0];
-  ok('accordion uses native <details>/<summary> (keyboard + a11y, zero JS)', ac.html.includes('<details class="acc-item">') && ac.html.includes('<summary>Shipping</summary>') && !/<script|onclick=/i.test(ac.html));
-  ok('accordion summary is escaped; body renders markdown', ac.html.includes('<summary>&lt;b&gt;Returns&lt;/b&gt;</summary>') && ac.html.includes('<strong>fast</strong>'));
+  ok('accordion uses native <details>/<summary> (keyboard + a11y, zero JS)', ac.html.includes('<details class="acc-item">') && ac.html.includes('<summary data-dds-field="items.0.summary">Shipping</summary>') && !/<script|onclick=/i.test(ac.html));
+  ok('accordion summary is escaped; body renders markdown', ac.html.includes('<summary data-dds-field="items.1.summary">&lt;b&gt;Returns&lt;/b&gt;</summary>') && ac.html.includes('<strong>fast</strong>'));
   ok('accordion emits no schema (distinct from FAQ)', !ac.ld);
 
   // — buttons: real <a> via safeHref, cap 3, styles, empty-skip —
@@ -455,8 +455,8 @@ const ctx = { esc, attr, safeHref };
       { type: 'pricing', variant: 'list', tiers: [{ name: 'Cut', price_text: '$85', features: ['Wash'] }] },
       { type: 'accordion', variant: 'two-column', items: [{ summary: 'Q?', body: 'A.' }] },
     ]), ctx);
-    return r[0].html.includes('block-cta v-card') && r[1].html.includes('block-pricing v-list') && r[1].html.includes('pl-price">$85')
-      && r[2].html.includes('qa-grid') && r[2].html.includes('<h3 class="qa-q">Q?</h3>') && !r[2].html.includes('<details');
+    return r[0].html.includes('block-cta v-card') && r[1].html.includes('block-pricing v-list') && r[1].html.includes('pl-price" data-dds-field="tiers.0.price_text">$85')
+      && r[2].html.includes('qa-grid') && r[2].html.includes('<h3 class="qa-q" data-dds-field="items.0.summary">Q?</h3>') && !r[2].html.includes('<details');
   })());
   ok('gallery masonry/filmstrip + reviews_wall quotes/strip render their variant containers', (() => {
     const g = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', variant: 'masonry', image_ids: [G] }, { type: 'gallery', variant: 'filmstrip', image_ids: [G] }]), REF), ctx);
@@ -515,11 +515,11 @@ const ctx = { esc, attr, safeHref };
     const plain = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Work', image_ids: [G, H] }]), REF), ctx)[0].html;
     const junk = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Work', image_ids: [G, H], zoom: 'yes' }]), REF), ctx)[0].html;
     return plain === junk && !plain.includes('v-zoom') && !plain.includes('class="lb') && !plain.includes('ga-zoom') && !plain.includes('#lb-')
-      && plain.includes('<figure class="ga"><picture>') && plain.includes('<figcaption>Our work</figcaption>');
+      && plain.includes('<figure class="ga"><picture>') && plain.includes('<figcaption data-dds-field="captions.0">Our work</figcaption>');
   })());
   ok('captions without zoom show in the grid figcaption (alt stays the fallback)', (() => {
     const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G, H], captions: ['Front porch', ''] }]), REF), ctx)[0].html;
-    return r.includes('<figcaption>Front porch</figcaption>') && r.includes('<figcaption>Our work</figcaption>') && !r.includes('v-zoom');
+    return r.includes('<figcaption data-dds-field="captions.0">Front porch</figcaption>') && r.includes('<figcaption data-dds-field="captions.1">Our work</figcaption>') && !r.includes('v-zoom');
   })());
 
   // — render: zoom markup — thumbs are anchors, overlays are :target figures —
@@ -872,7 +872,7 @@ const ctx = { esc, attr, safeHref };
     { id: 'cta', kind: 'button', x: 10, y: 70, w: 24, h: 12, z: 3, button: { label: 'Book now', url: 'https://ex.com/book', style: 'outline' } },
   ], { id: 'promo', title: 'Promo', aspect: 'banner' })]);
   const richHtml = renderSiteBlocks(resolveBlockMedia(rich, REF), ctx)[0].html;
-  ok('freeform: section + canvas markup (block-freeform, ff-canvas ff-aspect-banner, h2 + anchor from the title)', richHtml.includes('<section id="promo" class="block wrap block-freeform"><h2>Promo</h2>') && richHtml.includes('<div class="ff-canvas ff-aspect-banner">'));
+  ok('freeform: section + canvas markup (block-freeform, ff-canvas ff-aspect-banner, h2 + anchor from the title)', richHtml.includes('<section id="promo" data-dds-sid="freeform:promo" data-dds-key="block_freeform_promo" class="block wrap block-freeform"><h2>Promo</h2>') && richHtml.includes('<div class="ff-canvas ff-aspect-banner">'));
   ok('freeform: every element positions via a numbers-only style attr (fixed printer: 12.5 prints "12.5", integers bare)', richHtml.includes('style="left:12.5%;top:10%;width:40%;height:22%;z-index:2"') && richHtml.includes('style="left:60%;top:5%;width:35%;height:80%;z-index:1"') && richHtml.includes('style="left:10%;top:70%;width:24%;height:12%;z-index:3"'));
   ok('freeform: text renders enumerated classes (ff-size-xl, ff-align-center) with the body escaped via esc()', richHtml.includes('class="ff-el ff-text ff-size-xl ff-align-center"') && richHtml.includes('>Summer sale</div>'));
   ok('freeform: the image goes through blockImg (AVIF+WebP picture, lazy) with sizes derived from its clamped w', richHtml.includes('<div class="ff-el ff-image ff-hide-phone"') && richHtml.includes('<picture><source type="image/avif"') && richHtml.includes('sizes="(max-width:620px) 100vw, 35vw"') && richHtml.includes('loading="lazy"'));

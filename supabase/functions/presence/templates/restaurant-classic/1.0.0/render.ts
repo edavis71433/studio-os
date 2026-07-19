@@ -346,7 +346,7 @@ function homeBody(c: SnapshotContent, site: SiteConfig, blocks: RenderedBlock[] 
     : '';
   const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
   return `${heroOff ? '' : `
-<section class="hero wrap">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
+<section class="hero wrap" data-dds-core="hero">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
   ${hero ? `<div class="hero-img">${img(hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}`}
 </section>`}
 <div class="strip"><div class="wrap">
@@ -357,14 +357,14 @@ function homeBody(c: SnapshotContent, site: SiteConfig, blocks: RenderedBlock[] 
 </div></div>
 ${(() => {
   const parts: Record<string, string> = {
-    about: `<section class="block wrap"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>`,
-    offerings: featured.length ? `<section class="block alt"><div class="wrap"><h2>From the menu</h2><ul class="items">${featured.map((o) => `
+    about: `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>`,
+    offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap"><h2>From the menu</h2><ul class="items">${featured.map((o) => `
   <li class="item"${prE('offering', o.id)}><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
 </ul><p style="margin-top:18px"><a class="btn ghost" href="/menu/">Full menu</a></p></div></section>` : '',
-    testimonials: tst.length ? `<section class="block wrap"><h2>What guests say</h2><div class="cards">${tst.map((t) => `
+    testimonials: tst.length ? `<section class="block wrap" data-dds-core="testimonials"><h2>What guests say</h2><div class="cards">${tst.map((t) => `
   <div class="card"${prE('testimonial', t.id)}><blockquote class="t"><p>“${esc(t.quote)}”</p><footer>— ${esc(t.author)}${t.source ? `, ${esc(t.source)}` : ''}</footer></blockquote></div>`).join('')}
 </div></section>` : '',
-    faqs: faqs.length ? `<section class="block alt"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
+    faqs: faqs.length ? `<section class="block alt" data-dds-core="faqs"><div class="wrap"><h2>Good to know</h2><dl class="faq">${faqs.map((f) =>
   `<dt${prE('faq', f.id)}>${esc(f.question)}</dt><dd class="prose">${renderMarkdown(f.answer)}</dd>`).join('')}
 </dl><p style="margin-top:18px"><a href="/faq/">All questions →</a></p></div></section>` : '',
   };
