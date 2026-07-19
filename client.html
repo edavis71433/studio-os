@@ -120,8 +120,35 @@
     .chipbar{top:52px}
     section[id^="sec-"],#sec-overview{scroll-margin-top:118px}
   }
-  /* ── group heading (Files by project) — normal case, not the uppercase eyebrow ── */
-  .grouphd{font-family:var(--serif);font-weight:500;font-size:17px;color:var(--ink);text-transform:none;letter-spacing:0;margin:0 0 12px}
+  /* ── slice 12: the Files tab — share card (dashed) + document/file list views.
+     All class names are f-prefixed and unique to this tab (the slice-9 .sec
+     lesson: no generic names that could bleed into other views). ── */
+  .fshare{background:var(--card);border:1.5px dashed var(--p);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);margin:4px 0 8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .fshare-i{width:42px;height:42px;border-radius:12px;background:var(--p-soft);display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+  .fshare-m{flex:1 1 220px;min-width:0}
+  .fshare-t{font-weight:700;font-size:15px;margin:0;color:var(--ink)}
+  .fshare-d{color:var(--faint);font-size:13px;margin:2px 0 0}
+  .fshare-btn{margin-left:auto;white-space:nowrap;flex:0 0 auto}
+  .fshare-file{display:none}
+  .fsend{flex-basis:100%;border-top:1px solid var(--line);padding-top:14px;margin-top:2px}
+  .fsend[hidden]{display:none}
+  .fsend .fsel{font-weight:600;font-size:14px;margin:0 0 4px;color:var(--ink);overflow-wrap:anywhere}
+  .fsend .fld{display:block;font-weight:600;font-size:13.5px;margin:10px 0 5px;color:var(--ink)}
+  .fsend .fin{width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)}
+  @media (max-width:560px){.fshare-btn{margin-left:0;width:100%}}
+  .flv{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+  .frow{display:flex;align-items:center;gap:12px;padding:13px 17px;border-bottom:1px solid var(--line)}
+  .frow:last-child{border-bottom:none}
+  .fico{width:34px;height:34px;border-radius:9px;background:var(--p-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .fmain{flex:1 1 auto;min-width:0}
+  .fname{display:block;font-weight:600;font-size:14px;color:var(--ink);overflow-wrap:anywhere}
+  .fmeta{display:block;color:var(--faint);font-size:12.5px;margin-top:1px}
+  .fyou{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--good-soft);color:var(--good);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  .fst{flex:0 0 auto;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .fst.sig{background:var(--good-soft);color:var(--good)}
+  .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
+  .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
+  .fload{margin:0 0 14px;font-size:14px}
   /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
   .tl-here{display:inline-block;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
   .pathcard{padding:14px 16px}
@@ -1170,33 +1197,123 @@ function paneCompose(host){
   if(window.matchMedia('(max-width:719px)').matches){const b=$('mback');if(b)b.focus();}
   else{const ta=$('gmsg');if(ta)ta.focus();}
 }
-// ── FILES — every shared file, grouped by project ──
+// ── FILES (slice 12) — share card · Documents list view · per-project list views ──
+// A calm exact date for file/document rows ('July 12'), matching the approved
+// mock — rel() words ('2 days ago') stay on activity surfaces.
+function fdate(iso){const t=Date.parse(iso);return isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'long',day:'numeric'}):'';}
+// Simple type icon from the title's extension — a friendly hint, never load-bearing.
+function fileIcon(title){
+  const m=/\.([a-z0-9]+)$/i.exec(String(title||''));const e=m?m[1].toLowerCase():'';
+  if(/^(png|jpe?g|gif|webp|heic|svg|bmp|tiff?)$/.test(e))return'🖼';
+  if(/^(zip|rar|7z|tar|gz)$/.test(e))return'📦';
+  if(/^(mp4|mov|webm|avi)$/.test(e))return'🎬';
+  if(/^(mp3|wav|m4a|aac|flac)$/.test(e))return'🎵';
+  if(/^(ai|psd|fig|sketch|xd)$/.test(e))return'🎨';
+  return'📄';
+}
+// Which deliverables the CLIENT sent: the bundle payload carries no dedicated
+// flag — the ONLY signal today is the server-stamped note (client_delivery.ts
+// handleClientUploadCreate writes exactly this string). Brittle by nature, so
+// the match is exact and a future additive `client_upload` boolean is honored
+// first if the backend ever grows one.
+const CLIENT_UPLOAD_NOTE='Uploaded by the client.';
+function isClientUpload(f){return !!f&&(f.client_upload===true||f.note===CLIENT_UPLOAD_NOTE);}
+function fileRowHtml(f){
+  const mine=isClientUpload(f);const when=fdate(f.created_at);
+  return `<div class="frow"><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span>`+
+    `<span class="fmain"><span class="fname">${esc(f.title)}${mine?'<span class="fyou">You shared</span>':''}</span>`+
+    `<span class="fmeta">${mine?'Sent to your studio':'Shared by your studio'}${when?` · ${esc(when)}`:''}</span></span>`+
+    `<button class="fbtn" data-dl="${esc(f.id)}" aria-label="Download — ${esc(f.title)}">Download</button></div>`;
+}
+// Documents (proposals & agreements): a Signed chip is the good/green state;
+// everything else stays purple. Meta = kind · signed/sent <date>.
+function docRowHtml(d){
+  const contract=d.kind==='contract';const signed=!!(contract&&d.signed_at);
+  const status=contract?(signed?'Signed':'Awaiting signature'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
+  const when=signed?fdate(d.signed_at):fdate(d.created_at);
+  const meta=(contract?'Agreement':'Proposal')+(when?` · ${signed?'signed':'sent'} ${when}`:'');
+  const view=d.view_url?`<a class="fbtn" href="${esc(d.view_url)}" target="_blank" rel="noopener" aria-label="View — ${esc(d.title)}">View</a>`:'';
+  return `<div class="frow"><span class="fico" aria-hidden="true">${contract?'✍️':'📄'}</span>`+
+    `<span class="fmain"><span class="fname">${esc(d.title)}</span><span class="fmeta">${esc(meta)}</span></span>`+
+    `<span class="fst${signed?' sig':''}">${esc(status)}</span>${view}</div>`;
+}
+// The client→studio share card (uploads are PER-PROJECT: hidden entirely with
+// zero projects, and a reviewer never sees it — same canMessage boundary as
+// every other write surface on this page).
+function shareCardHtml(){
+  return `<div class="fshare"><span class="fshare-i" aria-hidden="true">📤</span>`+
+    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">Photos, logos, documents — it lands in your project’s files right away.</p></div>`+
+    `<button class="approve fshare-btn" id="fchoose">Choose a file</button>`+
+    `<input type="file" id="ffile" class="fshare-file" aria-hidden="true" tabindex="-1">`+
+    `<div class="fsend" id="fsend" hidden></div></div>`;
+}
+function wireShareCard(){
+  const inp=$('ffile'),choose=$('fchoose');
+  if(!inp||!choose)return;
+  choose.addEventListener('click',()=>inp.click());
+  inp.addEventListener('change',()=>{const f=inp.files&&inp.files[0];if(f)shareCompose(f);});
+}
+// After a pick: confirm inline — project picker only when there's a real choice
+// (exactly one active project auto-selects), optional title defaulting to the
+// filename, then Send/Cancel.
+function shareCompose(file){
+  const host=$('fsend');if(!host)return;
+  const multi=PORTAL.projects.length>1;
+  host.hidden=false;
+  host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
+    (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${PORTAL.projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select>`:'')+
+    `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
+    `<div class="row" style="margin-top:14px"><button class="approve" id="fgo">Send to your studio</button><button id="fno">Cancel</button></div>`;
+  $('fno').addEventListener('click',()=>{host.hidden=true;host.innerHTML='';const i=$('ffile');if(i)i.value='';});
+  $('fgo').addEventListener('click',()=>shareSend(file));
+}
+// The three-step send (the EXISTING per-project upload backend, untouched):
+// POST upload-url (mime/size/quota validated server-side — its 422 message is
+// friendly copy, surface it verbatim) → PUT the bytes → POST uploads to record
+// it. Honest per-step failure: toast + the button re-enables; never silent.
+async function shareSend(file){
+  const btn=$('fgo');if(!btn||btn.disabled)return;
+  const sel=$('fproj');
+  const pid=sel?sel.value:(PORTAL.projects[0]&&PORTAL.projects[0].id);
+  if(!pid){toast('No project to attach this to yet.');return;}
+  const title=(($('ftitle')&&$('ftitle').value)||'').trim()||file.name;
+  btn.disabled=true;const was=btn.textContent;btn.textContent='Sending…';
+  const fail=(m)=>{toast(m||'That didn’t send — please try again.');btn.disabled=false;btn.textContent=was;};
+  try{
+    const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title});
+    if(!up.ok||!up.body.data||!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');
+    const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+    if(!put.ok)return fail('The upload didn’t finish — please try again.');
+    const rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:up.body.data.media_id,title});
+    if(!rec.ok)return fail((rec.body&&rec.body.message)||'Couldn’t save that file.');
+    toast('Sent to your studio ✓');PORTAL.snaps=null;renderFiles();
+  }catch(_){fail('The upload didn’t finish — please try again.');}
+}
 async function renderFiles(){
+  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   $('main').innerHTML=spinnerHtml();
+  const canShare=PORTAL.persona==='client'&&PORTAL.projects.length>0;
   const [snaps,docsRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null)]);
-  const withFiles=snaps.filter(s=>s.deliverables&&s.deliverables.length);
-  const docs=(docsRes&&docsRes.ok&&docsRes.body.data&&docsRes.body.data.documents)||[];
-  let html=portalHeader('Files & documents','Everything your studio has shared — files, proposals, and agreements.');
-  // Documents section: proposals & agreements the client can re-open any time (a top
-  // portal gap — before this they were reachable only from the original email).
-  if(docs.length){
-    html+=`<section><h2 class="grouphd">Documents</h2>`;
-    for(const d of docs){
-      const kindLabel=d.kind==='contract'?'Agreement':'Proposal';
-      const statusLabel=d.kind==='contract'?(d.signed_at?'Signed':'Awaiting signature'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
-      const view=d.view_url?`<a class="btn" href="${esc(d.view_url)}" target="_blank" rel="noopener">View</a>`:'';
-      html+=`<div class="card"><h3>${esc(d.title)}</h3><p>${kindLabel} · ${esc(statusLabel)}</p><div class="row">${view}</div></div>`;
-    }
-    html+=`</section>`;
-  }
-  if(!withFiles.length&&!docs.length){html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');$('main').innerHTML=html;return;}
-  for(const s of withFiles){
-    html+=`<section><h2 class="grouphd">${esc(s.name)}</h2>`;
-    for(const f of s.deliverables)html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;
-    html+=`</section>`;
-  }
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  const docsFailed=!(docsRes&&docsRes.ok);
+  const docs=(!docsFailed&&docsRes.body.data&&docsRes.body.data.documents)||[];
+  let html=portalHeader('Files & documents',canShare
+    ?'Everything your studio has shared — and anything you want to send them.'
+    :'Everything your studio has shared — files, proposals, and agreements.');
+  if(canShare)html+=shareCardHtml();
+  // Documents: proposals & agreements the client can re-open any time. A FAILED
+  // read says so — it must never masquerade as "no documents".
+  if(docsFailed)html+=`<section><h2>Documents</h2><p class="muted fload">We couldn’t load your documents just now — please try again in a moment.</p></section>`;
+  else if(docs.length)html+=`<section><h2>Documents</h2><div class="flv" id="fdocs">${docs.map(docRowHtml).join('')}</div></section>`;
+  const withFiles=snaps.filter(s=>s&&!s.failed&&s.deliverables&&s.deliverables.length);
+  const failedSnaps=snaps.filter(s=>s&&s.failed);
+  for(const s of withFiles)html+=`<section><h2>${esc(s.name)}</h2><div class="flv">${s.deliverables.map(fileRowHtml).join('')}</div></section>`;
+  // per-project read failures get their own honest line — never the empty copy
+  for(const s of failedSnaps)html+=`<section><h2>${esc(s.name)}</h2><p class="muted fload">We couldn’t load this project’s files just now — please try again in a moment.</p></section>`;
+  if(!docsFailed&&!docs.length&&!withFiles.length&&!failedSnaps.length)html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');
   $('main').innerHTML=html;
   wireDownloads(document);
+  if(canShare)wireShareCard();
 }
 // ── INVOICES — the studio's service invoices (separate from the SaaS subscription) ──
 // appendBilling renders the invoice cards (service billing = the studio's project
