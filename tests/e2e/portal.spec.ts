@@ -1295,14 +1295,24 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
 // note — the payload's only signal) read "Sent to your studio" + a You-shared
 // chip. Failure honesty per read; a reviewer never sees the share card.
 const PID2 = '66666666-6666-4666-8666-666666666666'; // second project (the picker case)
+// PRODUCTION ORDER: handleClientDocuments sorts created_at DESC (one merged
+// list across proposals + contracts) — the fixture models that exactly and the
+// spec asserts the rows render in that order. Status variants cover every chip
+// the route can emit: signed / sent contract, sent / declined / superseded
+// proposal (superseded falls into docRowHtml's default 'Sent' — see the spec).
 const FILES_DOCS = { data: { documents: [
-  { kind: 'contract', id: 'c1', title: 'Service agreement', status: 'signed', signed_at: '2026-07-12T00:00:00Z', created_at: '2026-07-02T00:00:00Z', view_url: 'https://docs.example/view/c1' },
+  { kind: 'proposal', id: 'pr2', title: 'Care plan proposal', status: 'declined', created_at: '2026-07-14T00:00:00Z', view_url: 'https://docs.example/view/pr2' },
+  { kind: 'contract', id: 'c2', title: 'Care plan agreement', status: 'sent', created_at: '2026-07-13T00:00:00Z', view_url: 'https://docs.example/view/c2' },
   { kind: 'proposal', id: 'pr1', title: 'Website redesign proposal', status: 'sent', created_at: '2026-07-08T00:00:00Z', view_url: 'https://docs.example/view/pr1' },
+  { kind: 'proposal', id: 'pr0', title: 'First draft proposal', status: 'superseded', created_at: '2026-07-04T00:00:00Z', view_url: 'https://docs.example/view/pr0' },
+  { kind: 'contract', id: 'c1', title: 'Service agreement', status: 'signed', signed_at: '2026-07-12T00:00:00Z', created_at: '2026-07-02T00:00:00Z', view_url: 'https://docs.example/view/c1' },
 ] } };
 const FILES_DELIVERABLES = [
   { id: 'd1', title: 'Homepage mock v2.pdf', note: 'First look', created_at: '2026-07-15T00:00:00Z' },
   { id: 'd2', title: 'Brand palette.png', note: '', created_at: '2026-07-12T00:00:00Z' },
   { id: 'd3', title: 'Kitchen photos.zip', note: 'Uploaded by the client.', created_at: '2026-07-16T00:00:00Z' },
+  // the studio APPENDED to the server-stamped note — the prefix match keeps the chip
+  { id: 'd4', title: 'Site copy draft.pdf', note: 'Uploaded by the client. Filed under content.', created_at: '2026-07-11T00:00:00Z' },
 ];
 const filesBundle = (deliverables: unknown[]) => ({ data: {
   project: { id: PID, name: 'Website redesign', status: 'active' },
@@ -1333,22 +1343,32 @@ const routeUploadBackend = async (page: import('@playwright/test').Page, opts: {
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) });
   });
 };
-const SHARE_FILE = { name: 'Team photos.zip', mimeType: 'application/zip', buffer: Buffer.from('zip-bytes') };
+const SHARE_FILE = { name: 'Team photos.png', mimeType: 'image/png', buffer: Buffer.from('png-bytes') };
 
 test.describe('Client portal — Files tab (slice 12)', () => {
-  test('Documents is a list view: icons, kind · date meta, status chips, View links', async ({ page }) => {
+  test('Documents is a list view in production order (created_at desc): icons, meta, every status chip, View links', async ({ page }) => {
     await installApp(page, { api: FILES_API });
     await page.goto('/client.html');
     await openFilesTab(page);
     const docs = page.locator('#fdocs');
-    await expect(docs.locator('.frow')).toHaveCount(2);
+    await expect(docs.locator('.frow')).toHaveCount(5);
+    // rows render in the route's order — created_at DESC across kinds
+    await expect(docs.locator('.frow .fname')).toHaveText([
+      'Care plan proposal', 'Care plan agreement', 'Website redesign proposal', 'First draft proposal', 'Service agreement',
+    ]);
+    // one chip per status the route can emit. NOTE (current behavior, asserted
+    // as-is): a SUPERSEDED proposal falls into docRowHtml's default 'Sent' chip —
+    // arguably it should read 'Replaced' (a newer proposal supersedes it), but
+    // that is a copy decision for its own slice, not a silent change here.
+    await expect(docs.locator('.frow .fst')).toHaveText(['Declined', 'Awaiting signature', 'Sent', 'Sent', 'Signed']);
     const signed = docs.locator('.frow', { hasText: 'Service agreement' });
     await expect(signed.locator('.fmeta')).toHaveText('Agreement · signed July 12');
     await expect(signed.locator('.fst.sig')).toHaveText('Signed');   // Signed = the good/green chip
+    const unsigned = docs.locator('.frow', { hasText: 'Care plan agreement' });
+    await expect(unsigned.locator('.fmeta')).toHaveText('Agreement · sent July 13');
+    await expect(unsigned.locator('.fst.sig')).toHaveCount(0);       // …everything else stays purple
     const prop = docs.locator('.frow', { hasText: 'Website redesign proposal' });
     await expect(prop.locator('.fmeta')).toHaveText('Proposal · sent July 8');
-    await expect(prop.locator('.fst')).toHaveText('Sent');
-    await expect(prop.locator('.fst.sig')).toHaveCount(0);           // …everything else stays purple
     // View keeps the existing behavior: the signed doc-viewer URL, new tab, no opener
     const view = signed.getByRole('link', { name: 'View — Service agreement' });
     await expect(view).toHaveAttribute('href', 'https://docs.example/view/c1');
@@ -1364,7 +1384,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     await page.goto('/client.html');
     await openFilesTab(page);
     const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Website redesign', exact: true }) });
-    await expect(sec.locator('.frow')).toHaveCount(3);
+    await expect(sec.locator('.frow')).toHaveCount(4);
     const studio = sec.locator('.frow', { hasText: 'Homepage mock v2.pdf' });
     await expect(studio.locator('.fmeta')).toHaveText('Shared by your studio · July 15');
     await expect(studio.locator('.fyou')).toHaveCount(0);
@@ -1372,6 +1392,10 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     const mine = sec.locator('.frow', { hasText: 'Kitchen photos.zip' });
     await expect(mine.locator('.fmeta')).toHaveText('Sent to your studio · July 16');
     await expect(mine.locator('.fyou')).toHaveText('You shared');
+    // PREFIX detection: a studio-appended note keeps the You-shared chip
+    const appended = sec.locator('.frow', { hasText: 'Site copy draft.pdf' });
+    await expect(appended.locator('.fyou')).toHaveText('You shared');
+    await expect(appended.locator('.fmeta')).toHaveText('Sent to your studio · July 11');
     // Download keeps the wireDownloads round-trip: signed URL fetched, then opened
     await studio.getByRole('button', { name: 'Download — Homepage mock v2.pdf' }).click();
     await expect.poll(() => page.evaluate(() => (window as any).__opened)).toBe('https://files.example/dl/1');
@@ -1380,50 +1404,66 @@ test.describe('Client portal — Files tab (slice 12)', () => {
   test('share flow end-to-end (one project): auto-selected, title defaults to the filename, 3-step send, re-render shows the You-shared file', async ({ page }) => {
     await installApp(page, { api: FILES_API });
     await routeUploadBackend(page, { afterUpload: [...FILES_DELIVERABLES,
-      { id: 'nd1', title: 'Team photos.zip', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] });
+      { id: 'nd1', title: 'Team photos.png', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] });
     await page.goto('/client.html');
     await openFilesTab(page);
     const share = page.locator('.fshare');
     await expect(share.getByText('Share a file with your studio')).toBeVisible();
     await page.locator('#ffile').setInputFiles(SHARE_FILE);
-    // exactly one project → no picker; the optional title defaults to the filename
+    // exactly one project → no picker; the optional title defaults to the filename;
+    // the pick moves focus into the compose (its title field)
     await expect(page.locator('#fsend')).toBeVisible();
     await expect(page.locator('#fproj')).toHaveCount(0);
-    await expect(page.locator('#ftitle')).toHaveValue('Team photos.zip');
+    await expect(page.locator('#ftitle')).toHaveValue('Team photos.png');
+    await expect(page.locator('#ftitle')).toBeFocused();
     const upUrl = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/projects\/[^/]+\/upload-url$/.test(new URL(r.url()).pathname));
     const put = page.waitForRequest((r) => r.method() === 'PUT' && r.url().startsWith('https://storage.example/up/1'));
     const rec = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/projects\/[^/]+\/uploads$/.test(new URL(r.url()).pathname));
     await page.locator('#fgo').click();
     // step 1: the validated upload-url request carries the real mime/bytes/title
-    expect((await upUrl).postDataJSON()).toEqual({ mime: 'application/zip', bytes: SHARE_FILE.buffer.length, title: 'Team photos.zip' });
-    // step 2: the bytes go to the URL the server returned, typed as the file
-    expect((await put).headers()['content-type']).toBe('application/zip');
+    expect((await upUrl).postDataJSON()).toEqual({ mime: 'image/png', bytes: SHARE_FILE.buffer.length, title: 'Team photos.png' });
+    // step 2: the bytes go to the URL the server returned, typed as the file —
+    // and the PUT body IS the picked file's bytes, byte for byte
+    expect((await put).headers()['content-type']).toBe('image/png');
+    expect((await put).postDataBuffer()).toEqual(SHARE_FILE.buffer);
     // step 3: the recording POST ties the media id back
-    expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.zip' });
+    expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.png' });
     await expect(page.locator('#toast')).toContainText('Sent to your studio');
-    // the re-render shows the new file with its You-shared mark
-    const row = page.locator('.frow', { hasText: 'Team photos.zip' });
+    // the re-render shows the new file with its You-shared mark, and focus lands
+    // back on the share card's button (the compose is gone)
+    const row = page.locator('.frow', { hasText: 'Team photos.png' });
     await expect(row.locator('.fyou')).toHaveText('You shared');
+    await expect(page.locator('#fchoose')).toBeFocused();
   });
 
-  test('two projects: the picker chooses which project the file belongs to', async ({ page }) => {
+  test('two projects: steps 1, 2 AND 3 all pin to the PICKED project — then the re-render shows its chip', async ({ page }) => {
     await installApp(page, { api: {
       ...FILES_API,
       '/client/projects': { data: [
         { id: PID, name: 'Website redesign', status: 'active' },
         { id: PID2, name: 'Brand refresh', status: 'active' },
       ] },
-      [`/client/projects/${PID2}`]: { data: {
-        project: { id: PID2, name: 'Brand refresh', status: 'active' },
-        milestones: [], tasks: [], events: [], deliverables: [], approvals: [], surveys: [], progress: { total: 0, done: 0, pct: 0 },
-      } },
     } });
-    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'p' } }) }));
+    let recorded = false;
+    await page.route(`**/functions/v1/presence/client/projects/${PID2}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+        project: { id: PID2, name: 'Brand refresh', status: 'active' },
+        milestones: [], tasks: [], events: [],
+        deliverables: recorded ? [{ id: 'nd2', title: 'Team photos.png', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] : [],
+        approvals: [], surveys: [], progress: { total: 0, done: 0, pct: 0 },
+      } }) }));
+    // per-project responses: the media id + PUT URL DIFFER per project, so a send
+    // that mixes projects across the steps cannot pass by accident
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) => {
+      const forP2 = route.request().url().includes(PID2);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+        media_id: forP2 ? 'm-p2' : 'm-p1', upload_url: forP2 ? 'https://storage.example/up/p2' : 'https://storage.example/up/p1', storage_path: 'p' } }) });
+    });
     await page.route('https://storage.example/**', (route) => route.fulfill({ status: 200, body: '' }));
-    await page.route('**/functions/v1/presence/client/projects/*/uploads', (route) =>
-      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) }));
+    await page.route('**/functions/v1/presence/client/projects/*/uploads', (route) => {
+      recorded = true;
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd2' } }) });
+    });
     await page.goto('/client.html');
     await openFilesTab(page);
     await page.locator('#ffile').setInputFiles(SHARE_FILE);
@@ -1431,10 +1471,172 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     await expect(sel).toBeVisible();
     await expect(sel.locator('option')).toHaveText(['Website redesign', 'Brand refresh']);
     await sel.selectOption(PID2);
-    const upUrl = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID2}/upload-url`));
+    // steps 1 and 3 are pinned by EXACT pathname to the picked project id — a
+    // send that posts either step at any other project never resolves these
+    const upUrl = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname.endsWith(`/client/projects/${PID2}/upload-url`));
+    const put = page.waitForRequest((r) => r.method() === 'PUT' && r.url().startsWith('https://storage.example/'));
+    const rec = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname.endsWith(`/client/projects/${PID2}/uploads`));
     await page.locator('#fgo').click();
-    await upUrl;   // the POST went to the PICKED project
+    await upUrl;
+    // step 2 rides the PICKED project's signed URL and carries the real bytes
+    expect((await put).url()).toBe('https://storage.example/up/p2');
+    expect((await put).postDataBuffer()).toEqual(SHARE_FILE.buffer);
+    // step 3 ties the PICKED project's media id back
+    expect((await rec).postDataJSON()).toEqual({ media_id: 'm-p2', title: 'Team photos.png' });
     await expect(page.locator('#toast')).toContainText('Sent to your studio');
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Brand refresh', exact: true }) });
+    await expect(sec.locator('.frow', { hasText: 'Team photos.png' }).locator('.fyou')).toHaveText('You shared');
+  });
+
+  test('an edited title rides BOTH the upload-url and the record POST — and Enter in the title submits (the compose is a form)', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await routeUploadBackend(page);
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#ftitle').fill('Kitchen — final photos');
+    const upUrl = page.waitForRequest((r) => r.method() === 'POST' && /\/upload-url$/.test(new URL(r.url()).pathname));
+    const rec = page.waitForRequest((r) => r.method() === 'POST' && /\/uploads$/.test(new URL(r.url()).pathname));
+    await page.locator('#ftitle').press('Enter');   // no button click — the <form> submits
+    expect((await upUrl).postDataJSON()).toEqual({ mime: 'image/png', bytes: SHARE_FILE.buffer.length, title: 'Kitchen — final photos' });
+    expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Kitchen — final photos' });
+    await expect(page.locator('#toast')).toContainText('Sent to your studio');
+  });
+
+  test('a step-3 (record) failure keeps the upload: toast + re-enable, and the retry re-runs ONLY the record step', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    let upCalls = 0, putCalls = 0, recCalls = 0;
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) => { upCalls++;
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'p' } }) }); });
+    await page.route('https://storage.example/**', (route) => { putCalls++; return route.fulfill({ status: 200, body: '' }); });
+    await page.route('**/functions/v1/presence/client/projects/*/uploads', (route) => { recCalls++;
+      if (recCalls === 1) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — please try again.' }) });
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) });
+    });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('That didn’t save — please try again.');
+    await expect(page.locator('#fgo')).toBeEnabled();
+    await expect(page.locator('#fgo')).toHaveText('Send to your studio');
+    await expect(page.locator('#fno')).toBeEnabled();       // the fence lifts with the failure
+    await expect(page.locator('#fchoose')).toBeEnabled();
+    // the retry re-runs ONLY the record step: the media id was kept, nothing re-uploads
+    const rec = page.waitForRequest((r) => r.method() === 'POST' && /\/uploads$/.test(new URL(r.url()).pathname));
+    await page.locator('#fgo').click();
+    expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.png' });
+    await expect(page.locator('#toast')).toContainText('Sent to your studio');
+    expect(upCalls).toBe(1);    // NO second upload-url — no orphaned media per retry
+    expect(putCalls).toBe(1);   // …and no second PUT
+    expect(recCalls).toBe(2);
+  });
+
+  test('a 200 upload-url with NO url is an honest failure: toast, re-enabled button, no PUT', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { media_id: 'm-new' } }) }));
+    let puts = 0;
+    page.on('request', (r) => { if (r.method() === 'PUT') puts++; });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('Uploads aren’t available right now.');
+    await expect(page.locator('#fgo')).toBeEnabled();
+    expect(puts).toBe(0);
+  });
+
+  test('in flight: Cancel and Choose-a-file are fenced off until the send settles', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', async (route) => {
+      await gate;
+      return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'x', message: 'Not this time.' }) });
+    });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#fgo').click();
+    await expect(page.locator('#fgo')).toHaveText('Sending…');
+    await expect(page.locator('#fno')).toBeDisabled();
+    await expect(page.locator('#fchoose')).toBeDisabled();
+    release();
+    await expect(page.locator('#toast')).toContainText('Not this time.');
+    await expect(page.locator('#fno')).toBeEnabled();
+    await expect(page.locator('#fchoose')).toBeEnabled();
+  });
+
+  test('Cancel closes the compose, returns focus to the share button, and the SAME file re-picks cleanly', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await expect(page.locator('#fsend')).toBeVisible();
+    await page.locator('#fno').click();
+    await expect(page.locator('#fsend')).toBeHidden();
+    await expect(page.locator('#fchoose')).toBeFocused();   // focus hands back to the share button
+    // the input was cleared on cancel, so picking the SAME file fires change again
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await expect(page.locator('#fsend')).toBeVisible();
+    await expect(page.locator('#ftitle')).toHaveValue('Team photos.png');
+    await expect(page.locator('#ftitle')).toBeFocused();
+  });
+
+  test('pre-flight honesty: a type the store can’t take is refused BEFORE any network call', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    let calls = 0;
+    page.on('request', (r) => { if (/upload-url|\/uploads$|storage\.example/.test(r.url())) calls++; });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    // the input itself advertises exactly what the store accepts, and the copy names the caps
+    await expect(page.locator('#ffile')).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
+    await expect(page.locator('.fshare-d')).toContainText('10MB');
+    await expect(page.locator('.fshare-d')).toContainText('25MB');
+    await page.locator('#ffile').setInputFiles({ name: 'Team photos.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') });
+    await expect(page.locator('#toast')).toContainText('a JPEG, PNG or WebP image, or a PDF');
+    await expect(page.locator('#fsend')).toBeHidden();      // the compose never opens
+    expect(calls).toBe(0);
+  });
+
+  test('pre-flight honesty: an over-cap image is refused with the cap named, no network', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    let calls = 0;
+    page.on('request', (r) => { if (/upload-url|\/uploads$|storage\.example/.test(r.url())) calls++; });
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
+    await expect(page.locator('#toast')).toContainText('images can be up to 10MB');
+    await expect(page.locator('#fsend')).toBeHidden();
+    expect(calls).toBe(0);
+  });
+
+  test('portal-voiced 422s: the store’s alt-text ask maps to portal copy; unknown messages stay verbatim', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+      route.fulfill({ status: 422, contentType: 'application/json',
+        body: JSON.stringify({ error: 'alt_required', message: 'Please describe the image (alt text) — it helps customers and search engines.' }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('Give the file a short name (a few characters helps your studio find it).');
+    await expect(page.locator('#fgo')).toBeEnabled();
+  });
+
+  test('portal-voiced 422s: the 0-byte case reads "looks empty", never the under-the-cap lie', async ({ page }) => {
+    await installApp(page, { api: FILES_API });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) =>
+      route.fulfill({ status: 422, contentType: 'application/json',
+        body: JSON.stringify({ error: 'too_large', message: 'Images must be under 10MB.' }) }));
+    await page.goto('/client.html');
+    await openFilesTab(page);
+    await page.locator('#ffile').setInputFiles({ name: 'empty.png', mimeType: 'image/png', buffer: Buffer.alloc(0) });
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('That file looks empty — pick it again?');
+    await expect(page.locator('#fgo')).toBeEnabled();
   });
 
   test('zero projects: the share card is hidden entirely (uploads are project-scoped)', async ({ page }) => {
@@ -1477,18 +1679,31 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     expect(recorded).toBe(0);   // a dead PUT never records a phantom file
   });
 
-  test('reviewer: no share card — the read-only lists render fine', async ({ page }) => {
+  test('reviewer: /client/* 403s in production — the calm read-only state, no error line, NO Files-tab fetches', async ({ page }) => {
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,
       '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
-      '/client/projects': { data: [] },
-      '/client/documents': FILES_DOCS,
     } });
+    // PRODUCTION shape: every /client/* route answers 403 for a client_reviewer.
+    // (The earlier version of this spec fed the reviewer populated 200s — a
+    // world the persona can never see; against real 403s it showed the
+    // permanent "couldn't load" error line this spec now forbids.)
+    await page.route('**/functions/v1/presence/client/**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    const calls: string[] = [];
+    page.on('request', (r) => { if (/\/client\/(documents|projects\/)/.test(r.url())) calls.push(r.url()); });
     await page.goto('/client.html');
     await openFilesTab(page);
+    await expect(page.getByText('Your studio’s files and documents will appear here', { exact: false })).toBeVisible();
     await expect(page.locator('.fshare')).toHaveCount(0);
-    await expect(page.locator('#fdocs .frow')).toHaveCount(2);
-    await expect(page.locator('#fdocs .fst.sig')).toHaveText('Signed');
+    await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);   // never the error line
+    expect(calls).toHaveLength(0);   // the reviewer render makes NO /client/* reads at all
+    // Mutation M1 (dropping the persona clause from the share gate) re-verified:
+    // the load() persona derivation makes a reviewer-with-projects UNREPRESENTABLE
+    // (any account with projects — or is_managed_client — is persona 'client'),
+    // so the enforced reviewer boundary is the persona gate at the TOP of
+    // renderFiles, asserted here against the production 403 world; below that
+    // gate, share visibility legitimately depends only on projects.length.
   });
 
   test('a 502 on the documents read shows the couldn’t-load line — never "no documents"', async ({ page }) => {
