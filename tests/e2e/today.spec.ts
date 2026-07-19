@@ -146,14 +146,19 @@ const DASH = { data: {
   },
   website: { traffic: { visitors: 214, has_data: true } },
 } };
-// the schedule filters on the page's own local date — build today's ymd the same way
-const _d = new Date();
-const TODAY_YMD = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
-const APPTS = { data: { appointments: [
-  { id: 'b1', type_name: 'Strategy call', slot_start_local: `${TODAY_YMD}T14:30`, customer_name: 'Sam Rivera', status: 'confirmed' },
-  { id: 'b2', type_name: 'Intro chat', slot_start_local: `${TODAY_YMD}T09:00`, customer_name: 'Dana Lee', status: 'pending' },
-  { id: 'b3', type_name: 'Next week', slot_start_local: '2099-01-05T10:00', customer_name: 'Future', status: 'confirmed' },
-], scope: 'upcoming', pending: 1 } };
+// The schedule judges each row against "today" in the ROW's own site timezone
+// (rows without one fall back to the browser-local date). Fixture days are
+// computed INSIDE each test, at run time, with the same Intl frame the page
+// uses — a module-load capture can go stale across midnight (X4).
+const ymdIn = (tz?: string) => new Intl.DateTimeFormat('en-CA', tz ? { timeZone: tz } : {}).format(new Date());
+const apptsFixture = () => {
+  const ymd = ymdIn();
+  return { data: { appointments: [
+    { id: 'b1', type_name: 'Strategy call', slot_start_local: `${ymd}T14:30`, customer_name: 'Sam Rivera', status: 'confirmed' },
+    { id: 'b2', type_name: 'Intro chat', slot_start_local: `${ymd}T09:00`, customer_name: 'Dana Lee', status: 'pending' },
+    { id: 'b3', type_name: 'Next week', slot_start_local: '2099-01-05T10:00', customer_name: 'Future', status: 'confirmed' },
+  ], scope: 'upcoming', pending: 1 } };
+};
 const PROJECTS_API = {
   '/projects': { data: [
     { id: 'p1', name: 'Acme website build', status: 'active' },
@@ -234,7 +239,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
   });
 
   test('Today’s schedule lists today’s bookings only, with a to-confirm chip', async ({ page }) => {
-    await installApp(page, { api: { '/bookings/appointments': APPTS } });
+    await installApp(page, { api: { '/bookings/appointments': apptsFixture() } });
     await page.goto('/today.html');
     const sched = page.locator('#today-schedule');
     await expect(sched.getByText('Today’s schedule')).toBeVisible();
@@ -249,15 +254,42 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await expect(rows.nth(1).locator('.schip')).toHaveCount(0);
   });
 
-  test('schedule: a confirmed-empty day is friendly; an unreachable read is honest', async ({ page }) => {
+  test('schedule: confirmed-empty is friendly; a dormant 404 hides the card; a 500 stays honest', async ({ page }) => {
     await installApp(page, { api: { '/bookings/appointments': { data: { appointments: [], scope: 'upcoming', pending: 0 } } } });
     await page.goto('/today.html');
     await expect(page.locator('#today-schedule')).toContainText('Nothing booked for today — the day is yours.');
-    // now the route 404s (an edition without bookings / older build) — say we couldn't check
+    // 404/403 = bookings aren't in play on this site (edition without them /
+    // older build) — the card disappears entirely; a dormant feature is not a hiccup
+    let status = 404;
     await page.route('**/functions/v1/presence/bookings/appointments**', (route) =>
-      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ error: 'nope' }) }));
+    await page.reload();
+    await expect(page.locator('.feedcard')).toBeVisible();               // the page rendered…
+    await expect(page.locator('#today-schedule')).toHaveCount(0);        // …with no schedule card at all
+    // a 5xx is a transient hiccup — say we couldn't check, never a fake clear day
+    status = 500;
     await page.reload();
     await expect(page.locator('#today-schedule')).toContainText('We couldn’t check your bookings just now');
+  });
+
+  test('schedule honours each row’s SITE timezone — inclusion by the site’s date, never the viewer’s', async ({ page }) => {
+    // Kiritimati (UTC+14) and Etc/GMT+12 (UTC-12) sit 26 hours apart, so NO
+    // viewer timezone can share a calendar date with both; expectations are
+    // computed here with the same Intl call the page itself uses (T1).
+    const plusDay = (ymd: string) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+    const KIRI = ymdIn('Pacific/Kiritimati'), WEST = ymdIn('Etc/GMT+12');
+    await installApp(page, { api: { '/bookings/appointments': { data: { appointments: [
+      { id: 'k1', type_name: 'Kiritimati today', slot_start_local: `${KIRI}T10:00`, timezone: 'Pacific/Kiritimati', status: 'confirmed' },
+      { id: 'k2', type_name: 'Kiritimati tomorrow', slot_start_local: `${plusDay(KIRI)}T10:00`, timezone: 'Pacific/Kiritimati', status: 'confirmed' },
+      { id: 'w1', type_name: 'West today', slot_start_local: `${WEST}T11:00`, timezone: 'Etc/GMT+12', status: 'confirmed' },
+      { id: 'x1', type_name: 'Bad zone', slot_start_local: `${ymdIn()}T12:00`, timezone: 'Not/A_Zone', status: 'confirmed' },
+    ], scope: 'upcoming', pending: 0 } } } });
+    await page.goto('/today.html');
+    const sched = page.locator('#today-schedule');
+    await expect(sched.getByText('Kiritimati today')).toBeVisible();     // today on ITS calendar → shown
+    await expect(sched.getByText('West today')).toBeVisible();           // ditto for the far-west site
+    await expect(sched.getByText('Kiritimati tomorrow')).toHaveCount(0); // tomorrow there → not today
+    await expect(sched.getByText('Bad zone')).toBeVisible();             // invalid zone → viewer-local fallback
   });
 
   test('Recent records renders the slice-7 cache as-is (data-noscope), hidden when empty', async ({ page }) => {
@@ -287,15 +319,27 @@ test.describe('Today — Lightning Home (slice 10)', () => {
 
   test('Waiting on clients: pending approvals per project, from the roster’s own source', async ({ page }) => {
     await installApp(page, { api: PROJECTS_API });
+    // X1: the complete project's report is a hard 404 — if the page ever asked
+    // for it, the row would silently drop and the spy below would catch the ask.
+    await page.route('**/functions/v1/presence/projects/p2/report**', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    const reportsFetched: string[] = [];
+    page.on('request', (req) => {
+      const m = req.url().match(/\/functions\/v1\/presence\/projects\/([^/?]+)\/report/);
+      if (m) reportsFetched.push(m[1]);
+    });
     await page.goto('/today.html');
     const card = page.locator('#rail-waiting');
     await expect(card).toBeVisible();
     await expect(card.getByText('Waiting on clients')).toBeVisible();
     const row = card.locator('.rrows a');
-    await expect(row).toHaveCount(1); // only p1 has pending approvals; complete p2 is never fetched
+    await expect(row).toHaveCount(1); // only p1 has pending approvals
     await expect(row).toContainText('Acme website build');
     await expect(row).toContainText('2 approvals');
     await expect(row).toHaveAttribute('href', '/projects.html?project=p1');
+    // the scoping property itself: NO report fetch is ever issued for a
+    // complete/archived project — only the active p1 was asked
+    expect(reportsFetched).toEqual(['p1']);
   });
 
   test('Waiting on clients stays hidden when nothing is pending', async ({ page }) => {
@@ -303,6 +347,50 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await page.goto('/today.html');
     await expect(page.locator('.feedcard')).toBeVisible();
     await expect(page.locator('#rail-waiting')).toBeHidden();
+  });
+
+  test('nothing renderable inline but the bell rings → ONE fallback row routes to the Inbox', async ({ page }) => {
+    // default context keeps attention_count: 2 (client messages / support live
+    // only in the bell) while the feed itself has nothing to render inline
+    await installApp(page, { api: {
+      '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
+      '/moments': { data: [] },
+    } });
+    await page.goto('/today.html');
+    const rows = page.locator('.feedcard a.moment.todo');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toHaveAttribute('href', '/inbox.html');
+    await expect(rows.first()).toContainText('2 things need you');
+    await expect(rows.first().locator('.fcta')).toHaveText('Open your Inbox →');
+  });
+
+  test('approval feed rows route by precedence: explicit href → connected → foundations', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [
+        { id: 'p1', kind: 'infrastructure', title: 'Custom target', summary: '', href: '/sharing.html', decide_path: '/x/p1/decide' },
+        { id: 'p2', kind: 'connected', title: 'A connected change', summary: '', decide_path: '/x/p2/decide' },
+        { id: 'p3', kind: 'infrastructure', title: 'Default target', summary: '', decide_path: '/x/p3/decide' },
+      ], last_published: null } },
+      '/moments': { data: [] },
+    } });
+    await page.goto('/today.html');
+    const rows = page.locator('.feedcard a.moment.todo');
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0)).toHaveAttribute('href', '/sharing.html');            // an explicit p.href wins
+    await expect(rows.nth(1)).toHaveAttribute('href', '/connections.html');        // kind==='connected'
+    await expect(rows.nth(2)).toHaveAttribute('href', '/presence.html#foundations'); // the default
+  });
+
+  test('an all-degraded rail collapses — no dead 30% column, no phantom "At a glance" region', async ({ page }) => {
+    await installApp(page); // no dashboard/recents/projects fixtures → every rail card degrades away
+    await page.route('**/functions/v1/presence/analytics/dashboard**', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();
+    await expect(page.locator('#col-rail')).toBeHidden();
+    // main owns the full row: the grid is single-column while the rail is empty
+    const cols = await page.locator('.cols').evaluate((el) => getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/).length);
+    expect(cols).toBe(1);
   });
 
   test('a calm "Everything else looks good" line when needs exist but nothing more is worth a look', async ({ page }) => {
@@ -314,7 +402,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
 
   test('mobile: the full home (feed + rail cards) stacks without horizontal overflow', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'the stacked-columns check is the <980px contract');
-    await installApp(page, { api: { '/analytics/dashboard': DASH, '/bookings/appointments': APPTS, ...PROJECTS_API } });
+    await installApp(page, { api: { '/analytics/dashboard': DASH, '/bookings/appointments': apptsFixture(), ...PROJECTS_API } });
     await page.goto('/today.html');
     await expect(page.locator('.feedcard')).toBeVisible();
     await expect(page.locator('#rail-month')).toBeVisible();
@@ -328,7 +416,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await page.addInitScript(() => {
       localStorage.setItem('dds-recent-records', JSON.stringify([{ label: 'Marlow’s Kitchen', href: '/crm.html?client=abc-123', at: 1 }]));
     });
-    await installApp(page, { api: { '/analytics/dashboard': DASH, '/bookings/appointments': APPTS, ...PROJECTS_API } });
+    await installApp(page, { api: { '/analytics/dashboard': DASH, '/bookings/appointments': apptsFixture(), ...PROJECTS_API } });
     await page.goto('/today.html');
     await expect(page.locator('#rail-month')).toBeVisible();
     await expect(page.locator('#rail-waiting')).toBeVisible();

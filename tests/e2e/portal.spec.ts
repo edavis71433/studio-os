@@ -276,8 +276,11 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await page.goto('/client.html');
     const strip = page.locator('#home-glance');
     await expect(strip).toBeVisible();
-    await expect(strip.locator('#glance-ok .gn')).toHaveText('1');       // the pending approval
-    await expect(strip.locator('#glance-ok .gl')).toHaveText('needs your OK');
+    // the SAME definition as the project cards' "need your OK" line: pending
+    // approvals + flagged to-dos (a1 + t1) — one count, everywhere on Home
+    await expect(strip.locator('#glance-ok .gn')).toHaveText('2');
+    await expect(strip.locator('#glance-ok .gl')).toHaveText('need your OK');
+    await expect(page.locator(`#glance-${PID}`)).toContainText('2 things need your OK'); // the card agrees
     await expect(strip.locator('#glance-msgs .gn')).toHaveText('0');     // a real zero, not a fake
     await expect(strip.locator('#glance-due .gn')).toHaveText('$500');   // the unpaid Deposit
     await expect(strip.locator('#glance-due .gl')).toHaveText('to pay');
@@ -302,13 +305,29 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await expect(strip.locator('#glance-proj')).toHaveCount(0);
   });
 
-  test('unread messages count into the tile, and opening the bell zeroes it live', async ({ page }, testInfo) => {
+  test('unread messages count into the tile, and opening the bell re-renders it whole', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'uses the ≥720px context-bar bell');
     await installApp(page, { api: MSG_API });
     await page.goto('/client.html');
-    await expect(page.locator('#glance-msgs .gn')).toHaveText('2');
+    // ONLY the genuine studio message counts — the support_message row derives
+    // from support updated_at (it moves on the client's own filing) and must not
+    await expect(page.locator('#glance-msgs .gn')).toHaveText('1');
+    await expect(page.locator('#glance-msgs .gl')).toHaveText('new message');
     await page.locator('#navbell').click();
+    // number AND label move together — never a frozen "0 new message"
     await expect(page.locator('#glance-msgs .gn')).toHaveText('0');
+    await expect(page.locator('#glance-msgs .gl')).toHaveText('new messages');
+  });
+
+  test('a failed feed read HIDES the needs-OK tile — never a fake zero', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/portal/feed**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/client.html');
+    await expect(page.locator('#home-glance')).toBeVisible();        // the other sources still answered
+    await expect(page.locator('#glance-ok')).toHaveCount(0);         // its source failed → the tile hides
+    await expect(page.locator('#glance-msgs .gn')).toHaveText('0');  // notifications succeeded — a REAL zero stays
+    await expect(page.locator('#glance-due .gn')).toHaveText('$500');
   });
 
   test('queue rows carry the action-feed anatomy: type icon + explicit CTA text', async ({ page }) => {
