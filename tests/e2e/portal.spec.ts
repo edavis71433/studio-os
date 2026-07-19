@@ -851,3 +851,201 @@ test.describe('Client portal — the "Your website" card', () => {
     expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
   });
 });
+
+// ── slice 11: the Requests tab redesign ──────────────────────────────────────
+// Quick actions become two side-by-side tiles (Book a call · Something else?),
+// the service catalog becomes a two-column card grid (category chip, serif
+// name, price, "Request this" → the structured brief), and "Your requests"
+// becomes a list view — whole-row buttons (icon + subject + honest "Updated"
+// meta + status chip + chevron) behind Open/All filter chips that default to
+// All when everything is resolved. Every flow underneath is unchanged:
+// openBooking, openSupport(null), openServiceRequest, openMessagesTo.
+const SVC_OFFER = '44444444-4444-4444-8444-444444444444'; // a real offering id (uuid-shaped)
+const SUP_PROG = '55555555-5555-4555-8555-555555555555';  // an in_progress request
+const REQ_API = {
+  ...MSG_API,
+  '/client/services': { data: [
+    { id: SVC_OFFER, name: 'Brand refresh', category: 'Design', description: 'A light refresh of your logo and colors.', price: 'From $800' },
+    { id: 'svc:0', name: 'Extra page', category: '', description: '', price: '$150' },
+    { id: 'custom', name: 'Custom request', category: '', description: 'Something else in mind? Tell your studio exactly what you’d like and they’ll follow up.', price: '' },
+  ] },
+  '/client/support': { data: [
+    // last_activity_at (slice 2's reply-recency fix) feeds the meta when present…
+    { id: SUP_GEN, subject: 'Logo tweak', status: 'open', project_id: null, updated_at: '2026-07-06T00:00:00Z', last_activity_at: '2026-07-07T00:00:00Z' },
+    // …and the meta falls back to updated_at when it is absent
+    { id: SUP_PROG, subject: 'New headshots', status: 'in_progress', project_id: null, updated_at: '2026-07-05T00:00:00Z' },
+    { id: SUP_PRJ, subject: 'Copy fixes', status: 'resolved', project_id: PID, updated_at: '2026-07-04T00:00:00Z' },
+  ] },
+  // the booking engine behind the "Book a call" tile (fixture round-trip)
+  '/client/book': { data: { site_id: 'site-1' } },
+  '/book/site-1/types': { data: { enabled: true, intro: 'Pick a time that suits you.', max_days_ahead: 30,
+    types: [{ id: 'bt1', name: 'Intro call', duration_min: 30, price_text: '', description: '' }] } },
+};
+const openRequestsTab = async (page: import('@playwright/test').Page) => {
+  await page.locator('#tabnav [data-tab="requests"]').click();
+  await expect(page.locator('#main').getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
+};
+
+test.describe('Client portal — Requests tab (slice 11)', () => {
+  test('quick-action tiles render, and Book a call round-trips into the booking flow', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.locator('.acttile')).toHaveCount(2);
+    await expect(page.locator('#bookCall')).toContainText('Book a call');
+    await expect(page.locator('#newReq')).toContainText('Something else?');
+    // the tile drives the EXISTING openBooking flow: /client/book resolves the
+    // site, /book/<site>/types lists the studio's bookable services
+    await page.locator('#bookCall').click();
+    await expect(page.getByRole('heading', { name: 'Book a call' })).toBeVisible();
+    await expect(page.getByText('Pick a time that suits you.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
+    // and the back link lands on the Requests tab again
+    await page.getByRole('link', { name: '← Back to requests' }).click();
+    await expect(page.locator('.acttile')).toHaveCount(2);
+  });
+
+  test('the Something-else tile opens the free-form message flow (openSupport)', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#newReq').click();
+    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
+    await expect(page.getByLabel('Subject')).toBeVisible();
+  });
+
+  test('the service catalog is a card grid: category chip, name, price — Request this opens the brief and POSTs it', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    // the list fixture serves GET /client/support; the brief POST needs a created id back
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: SUP_GEN } }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    const grid = page.locator('.svcgrid');
+    await expect(grid.locator('.card')).toHaveCount(3);
+    const card = grid.locator('.card', { hasText: 'Brand refresh' });
+    await expect(card.locator('.kchip')).toHaveText('Design');
+    await expect(card.getByRole('heading', { name: 'Brand refresh' })).toBeVisible();
+    await expect(card.locator('.svcprice')).toHaveText('From $800');
+    // a category-less service simply has no chip
+    await expect(grid.locator('.card', { hasText: 'Extra page' }).locator('.kchip')).toHaveCount(0);
+    // Request this → the EXISTING structured-brief flow, unchanged payload
+    await card.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
+    await page.getByLabel('What do you need?').fill('A softer palette.');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Send request' }).click();
+    expect((await post).postDataJSON()).toEqual({
+      subject: 'Service request: Brand refresh', service: SVC_OFFER,
+      brief: { need: 'A softer palette.', timeline: '', budget: '' },
+    });
+    await expect(page.locator('#toast')).toContainText('Sent — your studio will review');
+  });
+
+  test('the requests list is a list view: whole-row buttons with icon, Updated meta, status chip', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    const listHost = page.locator('#reqlist');
+    // default filter: Open — the resolved request is not shown
+    await expect(page.locator('#reqFilterOpen')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'false');
+    await expect(listHost.locator('.reqrow')).toHaveCount(2);
+    await expect(listHost.getByText('Copy fixes')).toHaveCount(0);
+    const row = listHost.locator('.reqrow', { hasText: 'Logo tweak' });
+    await expect(row.locator('.qico')).toHaveAttribute('aria-hidden', 'true');
+    // the meta is the honest "Updated <rel>" (from last_activity_at when present) —
+    // the list payload has no last-actor field, so no "your studio replied" claim
+    await expect(row.locator('.reqmeta')).toContainText('Updated');
+    await expect(row.locator('.schip')).toHaveText('open');
+    await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.schip')).toHaveText('in progress');
+    // All shows everything, with the resolved row in the "done" (good) styling
+    await page.locator('#reqFilterAll').click();
+    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#reqFilterOpen')).toHaveAttribute('aria-pressed', 'false');
+    await expect(listHost.locator('.reqrow')).toHaveCount(3);
+    const done = listHost.locator('.reqrow', { hasText: 'Copy fixes' });
+    await expect(done.locator('.schip.done')).toHaveText('resolved');
+    await expect(done.locator('.qico.done')).toBeVisible();
+    // back to Open — the filter is a pure client-side toggle
+    await page.locator('#reqFilterOpen').click();
+    await expect(listHost.locator('.reqrow')).toHaveCount(2);
+  });
+
+  test('all-resolved: the filter defaults to All so the list is never mysteriously empty', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/client/support': { data: [
+      { id: SUP_PRJ, subject: 'Copy fixes', status: 'resolved', project_id: PID, updated_at: '2026-07-04T00:00:00Z' },
+    ] } } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#reqlist .reqrow', { hasText: 'Copy fixes' })).toBeVisible();
+    // Open is still reachable and says so honestly
+    await page.locator('#reqFilterOpen').click();
+    await expect(page.locator('#reqlist .reqrow')).toHaveCount(0);
+    await expect(page.locator('#reqlist')).toContainText('No open requests');
+  });
+
+  test('a request row opens its thread in the Messages reading pane', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#reqlist .reqrow', { hasText: 'Logo tweak' }).click();
+    // openMessagesTo: the Messages tab activates with the thread in the pane
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#mpane')).toContainText('Could we nudge the logo left?');
+  });
+
+  test('no requests yet: the calm empty state, no filter chips', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/client/support': { data: [] } } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
+    await expect(page.locator('.reqfilter')).toHaveCount(0);
+    await expect(page.locator('#reqlist')).toHaveCount(0);
+  });
+
+  test('reviewer: read-only — no action tiles, no Request buttons, calm empty states', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.locator('.acttile')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Request this/ })).toHaveCount(0);
+    await expect(page.getByText('Your studio hasn’t listed services here yet.')).toBeVisible();
+    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
+  });
+
+  test('mobile: the tiles and service cards stack in one column, no horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the stacked layout is the <720px contract');
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    // the tiles stack: the second tile sits BELOW the first
+    const tiles = page.locator('.acttile');
+    const t0 = await tiles.nth(0).boundingBox(); const t1 = await tiles.nth(1).boundingBox();
+    expect(t1!.y).toBeGreaterThan(t0!.y + t0!.height - 1);
+    // the service cards stack too
+    const cards = page.locator('.svcgrid .card');
+    const c0 = await cards.nth(0).boundingBox(); const c1 = await cards.nth(1).boundingBox();
+    expect(c1!.y).toBeGreaterThan(c0!.y + c0!.height - 1);
+    await expect(page.locator('#reqlist .reqrow').first()).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('no serious/critical axe violations on the Requests tab', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page.locator('#reqlist .reqrow').first()).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
+  });
+});
