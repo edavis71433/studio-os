@@ -121,6 +121,51 @@ ok(/BLOCKS_WORK\.splice\(at, 0, blk\)/.test(pasteFn) && /saveBlocks\(\)/.test(pa
 ok(/JSON\.parse\(JSON\.stringify\(clip\)\)/.test(pasteFn), 'paste deep-copies the clipboard (structured block), never shares references or raw HTML');
 ok(/function dcCopyBlock\(/.test(html) && /function dcCutBlock\(/.test(html), 'copy + cut both exist');
 
+// ── G13 · server-stamped section keys — the three client mirrors are DELETED and
+// must STAY deleted (docs/design/G13-INPLACE-EDITING.md §1.5). Section identity is
+// read off data-dds-sid/-core stamps; sid → BLOCKS_WORK index is a PURE LOOKUP into
+// the server's /settings section_meta sidecar — no heading text in the code path. ──
+ok(!/EE_MANDATORY_H2|eeEffHeading|eeSlug\(|eeBuildIdMap|EE_IDMAP/.test(html), 'the heading/slug mirror (EE_MANDATORY_H2 + eeEffHeading + eeSlug + eeBuildIdMap + EE_IDMAP) stays deleted');
+ok(!/function cmSectionIds|eeBlockKey/.test(html), 'the comment-id mirror (cmSectionIds) and the render-key mirror (eeBlockKey) stay deleted');
+const classify = extractFn(html, 'eeClassify');
+ok(/data-dds-sid/.test(classify) && /data-dds-core/.test(classify), 'eeClassify reads the server stamps (data-dds-sid / data-dds-core)');
+ok(!/querySelector|textContent|classList|h1,h2,h3/.test(classify), 'eeClassify contains NO structural probes or heading-text reads (mirror-free)');
+ok(/DDS_SIDMAP/.test(classify), 'sid resolution goes through the sidecar-built lookup only');
+{
+  // Behavior: pure lookup + fallbacks, extracted and driven with stub elements.
+  const coreView = (html.match(/const DDS_CORE_VIEW = \{[^}]*\};/) || [''])[0];
+  ok(!!coreView, 'DDS_CORE_VIEW (core key → panel view) exists');
+  const mk = new Function('S', 'DC_PAGE', 'BLOCKS_WORK',
+    'let DDS_SIDMAP = null;\n' + coreView + '\n' +
+    extractFn(html, 'ddsMetaFor') + '\n' + extractFn(html, 'ddsRebuildSidMap') + '\n' +
+    extractFn(html, 'ddsSidFor') + '\n' + extractFn(html, 'ddsKeyFor') + '\n' + extractFn(html, 'eeClassify') + '\n' +
+    'ddsRebuildSidMap(); return { classify: eeClassify, sidFor: ddsSidFor, keyFor: ddsKeyFor };');
+  const meta = { blocks: [
+    { sid: 'richtext', key: 'block_richtext', src_index: 1 },
+    { sid: 'richtext#2', key: 'block_richtext_2', src_index: 3 },
+    { sid: 'columns:cols_a', key: 'block_columns_cols_a', src_index: 4 },
+  ], pages: { team: [{ sid: 'cta', key: 'block_cta', src_index: 0 }] } };
+  const el = (attrs) => ({ getAttribute: (k) => (k in attrs ? attrs[k] : null) });
+  const home = mk({ sectionMeta: meta }, '', new Array(6));
+  const c1 = home.classify(el({ 'data-dds-sid': 'richtext#2' }));
+  ok(c1.kind === 'block' && c1.bi === 3, 'a stamped sid resolves to its src_index by pure sidecar lookup');
+  ok(home.sidFor(3) === 'richtext#2' && home.keyFor(1) === 'block_richtext', 'ddsSidFor/ddsKeyFor read the same sidecar in reverse');
+  const c2 = home.classify(el({ 'data-dds-sid': 'ghost#9' }));
+  ok(c2.kind === 'core' && c2.view === 'design', 'an unknown sid degrades to the panel fallback (never a dead click)');
+  const c3 = home.classify(el({ 'data-dds-core': 'offerings' }));
+  ok(c3.kind === 'core' && c3.view === 'offerings' && c3.key === 'offerings', 'data-dds-core routes to its tab + hide key');
+  const c4 = home.classify(el({ 'data-dds-core': 'hero' }));
+  ok(c4.view === 'business' && c4.key === 'hero', 'hero routes to the business tab with its sections_hidden key');
+  const c5 = home.classify(el({}));
+  ok(c5.kind === 'core' && c5.view === 'design' && c5.key === null, 'an UNSTAMPED section (stale render) gets today\'s design-panel fallback — feature-detect, no hard dependency');
+  const pg = mk({ sectionMeta: meta }, 'team', new Array(2));
+  ok(pg.classify(el({ 'data-dds-sid': 'cta' })).bi === 0, 'a custom page resolves through its own pages["slug"] meta');
+  const noMeta = mk({}, '', new Array(6));
+  const c6 = noMeta.classify(el({ 'data-dds-sid': 'richtext' }));
+  ok(c6.kind === 'core' && c6.view === 'design', 'stamps without a loaded sidecar degrade to the panel (no crash, no guess)');
+}
+ok(/route === "\/settings" && j && j\.data && j\.data\.section_meta/.test(html), 'api() captures the /settings section_meta sidecar into S.sectionMeta (the ONE writer)');
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);

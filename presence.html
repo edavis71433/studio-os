@@ -1438,6 +1438,11 @@ async function api(method, route, body) {
   // is stale too — OUR write is now the newest edit, so the "Last edit" line
   // must not keep attributing the draft to someone else.
   if (mut) { S.draftHash = null; S.lastChange = null; }
+  // G13: every /settings read/save carries the server-computed section_meta
+  // sidecar ({sid,key,src_index} per stored block, home + pages) — the ONE
+  // writer of S.sectionMeta, so the canvas' sid→index join is always the
+  // server's own validate-time truth, never a client recomputation.
+  if (route === "/settings" && j && j.data && j.data.section_meta) { S.sectionMeta = j.data.section_meta; ddsRebuildSidMap(); }
   return j;
 }
 async function apiHtml(route) {
@@ -3826,44 +3831,42 @@ async function loadPreview() {
 // output) — this chrome exists only in this editor's preview, never on the served
 // site. No external origins, no CSP change: everything is same-origin DOM work.
 //
-// Mapping: renderSiteBlocks stamps `<section id="<anchor-slug>">` on every library
-// block (slug of its heading, de-duped). We mirror the engine's effHeading +
-// slugifyAnchor here so a clicked section id resolves to its block in BLOCKS_WORK.
-// Core sections carry no id and are recognised by stable structural markers.
-const EE_MANDATORY_H2 = {   // must match lib/site_blocks.ts MANDATORY_H2 exactly
-  features: "Why choose us", stats: "By the numbers", team: "Meet the team", process: "How it works",
-  pricing: "Pricing", certifications: "Credentials & certifications", service_areas: "Areas we serve",
-  gallery: "Gallery", before_after: "Before & after", video: "Video", newsletter: "Get updates from us",
-  social: "Find us online", events: "Upcoming events", map: "Find us", accordion: "More information",
-  partners: "Trusted by", reviews: "What customers say", reviews_wall: "Reviews", appointment: "Book an appointment",
-};
-function eeEffHeading(b) {   // mirror of site_blocks.ts effHeading()
-  if (Object.prototype.hasOwnProperty.call(EE_MANDATORY_H2, b.type)) return (b.title || EE_MANDATORY_H2[b.type]);
-  if (b.type === "cta" || b.type === "divider" || b.type === "toc") return null;
-  return b.title || null;
+// Mapping (G13, server-stamped): renderSiteBlocks stamps every block section
+// with `data-dds-sid` (the canonical G11 section id) + `data-dds-key` (its exact
+// render key), and the templates stamp `data-dds-core` on core sections. The
+// /settings responses carry the section_meta sidecar ({sid,key,src_index} per
+// stored block), so a clicked section resolves to its BLOCKS_WORK index by PURE
+// LOOKUP — no heading text, no slug rules, no client mirror of server logic.
+// A render with no stamps (a stale deployed function) degrades to the core
+// fallback below: chrome still appears, all editing routes through the panel.
+const DDS_CORE_VIEW = { hero: "business", about: "business", offerings: "offerings", faqs: "faqs", testimonials: "testimonials" };
+// sid → BLOCKS_WORK index for the page on the canvas, built ONLY from the
+// server's section_meta sidecar. Rebuilt on every /settings response and every
+// chrome injection; locally PERMUTED by dcMove's optimistic reorder (the same
+// index math the save will confirm) so the tree stays correct mid-flight.
+let DDS_SIDMAP = null;
+function ddsMetaFor(page) {
+  const m = S.sectionMeta; if (!m) return null;
+  return page ? (m.pages || {})[page] || null : m.blocks || null;
 }
-function eeSlug(t) {   // mirror of site_blocks.ts slugifyAnchor()
-  return String(t).toLowerCase().replace(/&[a-z]+;/g, " ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "section";
+function ddsRebuildSidMap() {
+  const meta = ddsMetaFor(DC_PAGE || "");
+  if (!meta) { DDS_SIDMAP = null; return; }
+  const map = {};
+  meta.forEach((e) => { if (e && e.sid) map[e.sid] = e.src_index; });
+  DDS_SIDMAP = map;
 }
-function eeBlockKey(b) {   // mirror of site_blocks.ts section key (block_<type>[_<id>])
-  return (b.type === "form" || b.type === "columns" || b.type === "cards") ? `block_${b.type}_${b.id}` : `block_${b.type}`;
+// The sid / render key for one BLOCKS_WORK index (tray badges, Hide fallback) —
+// the same sidecar, read in the other direction.
+function ddsSidFor(bi) {
+  const meta = ddsMetaFor(DC_PAGE || "") || [];
+  for (let i = 0; i < meta.length; i++) if (meta[i] && meta[i].src_index === bi) return meta[i].sid;
+  return null;
 }
-// Greedy-align the actual rendered section ids (DOM order) to BLOCKS_WORK by base
-// slug, skipping empty (unrendered) blocks and resolving `-2/-3` de-dup suffixes.
-// Blocks that emit no <section id> (divider = <div>, toc = <nav>) are excluded.
-let EE_IDMAP = {};
-function eeBuildIdMap(reportedIds) {
-  const cand = [];
-  (BLOCKS_WORK || []).forEach((b, bi) => { if (b.type === "divider" || b.type === "toc") return; cand.push({ bi, base: eeSlug(eeEffHeading(b) || b.type) }); });
-  const map = {}; let j = 0;
-  reportedIds.forEach((id) => {
-    for (let k = j; k < cand.length; k++) {
-      const base = cand[k].base;
-      const dedup = id.length > base.length && id.slice(0, base.length) === base && id.charAt(base.length) === "-" && /^\d+$/.test(id.slice(base.length + 1));
-      if (id === base || dedup) { map[id] = cand[k].bi; j = k + 1; break; }
-    }
-  });
-  return map;
+function ddsKeyFor(bi) {
+  const meta = ddsMetaFor(DC_PAGE || "") || [];
+  for (let i = 0; i < meta.length; i++) if (meta[i] && meta[i].src_index === bi) return meta[i].key;
+  return null;
 }
 // ── actions (all REUSE the existing editor logic) ──
 function eeEditBlock(bi) {                       // open the block's editor panel
@@ -3889,21 +3892,21 @@ function eeHideKey(key) {                        // reuse the sections-visibilit
   hidden.add(key);
   Promise.resolve(saveSections(order, [...hidden])).then(() => loadPreview());
 }
-// Which editor a clicked section belongs to. Library blocks map precisely by id;
-// core/structural sections map to their tab by stable markers, never a dead click.
+// Which editor a clicked section belongs to — G13: read the SERVER STAMPS.
+// A block section carries data-dds-sid → resolve to its BLOCKS_WORK index via
+// the sidecar map (pure lookup). A core section carries data-dds-core → its
+// panel tab + hide key. Anything unstamped (a stale render, structural chrome)
+// takes today's fallback — the design studio panel — never a dead click.
 function eeClassify(el) {
-  const id = el.getAttribute("id");
-  if (id && EE_IDMAP[id] != null) return { kind: "block", bi: EE_IDMAP[id] };
-  if (el.classList.contains("hero")) return { kind: "core", view: "business", key: "hero" };
-  if (el.querySelector(".svc-grid, .svc")) return { kind: "core", view: "offerings", key: "offerings" };
-  if (el.querySelector("dl.faq")) return { kind: "core", view: "faqs", key: "faqs" };
-  if (el.querySelector("blockquote")) return { kind: "core", view: "testimonials", key: "testimonials" };
-  const h = ((el.querySelector("h1,h2,h3") || {}).textContent || "").toLowerCase();
-  if (/about/.test(h)) return { kind: "core", view: "business", key: "about" };
-  if (/contact|hours|find us|directions|location/.test(h)) return { kind: "core", view: "business", key: null };
-  if (/update|news/.test(h)) return { kind: "core", view: "updates", key: null };
-  if (/question|faq/.test(h)) return { kind: "core", view: "faqs", key: "faqs" };
-  return { kind: "core", view: "design", key: null };   // sensible fallback — the structure studio
+  const sid = el.getAttribute && el.getAttribute("data-dds-sid");
+  if (sid) {
+    const bi = DDS_SIDMAP && Object.prototype.hasOwnProperty.call(DDS_SIDMAP, sid) ? DDS_SIDMAP[sid] : -1;
+    if (bi >= 0 && bi < (BLOCKS_WORK || []).length) return { kind: "block", bi: bi };
+    return { kind: "core", view: "design", key: null };   // stamped but sidecar not loaded yet → panel
+  }
+  const core = el.getAttribute && el.getAttribute("data-dds-core");
+  if (core) return { kind: "core", view: DDS_CORE_VIEW[core] || "design", key: Object.prototype.hasOwnProperty.call(DDS_CORE_VIEW, core) ? core : null };
+  return { kind: "core", view: "design", key: null };   // unstamped → the structure studio
 }
 function eeEditTarget(el) { const c = eeClassify(el); if (c.kind === "block") eeEditBlock(c.bi); else eeEditCore(c.view); }
 // Inject the hover/click chrome into the proof document (called on every load).
@@ -3952,7 +3955,7 @@ function eeInjectChrome(doc, main) {
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(c.bi)));
       bar.appendChild(mkBtn("↑", "Move section up", () => eeMoveBlock(c.bi, -1), c.bi <= 0));
       bar.appendChild(mkBtn("↓", "Move section down", () => eeMoveBlock(c.bi, 1), c.bi >= len - 1));
-      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[c.bi]))));
+      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(el.getAttribute("data-dds-key") || ddsKeyFor(c.bi))));
     } else {
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
       if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Design settings → Your home page)", () => eeHideKey(c.key)));
@@ -3960,8 +3963,9 @@ function eeInjectChrome(doc, main) {
     bar.classList.add("on");
     place(el);
   };
-  // Build the id→block map for this render, then wire every top-level section.
-  EE_IDMAP = eeBuildIdMap(Array.prototype.map.call(main.querySelectorAll("section[id]"), (s) => s.id));
+  // G13: refresh the sid→index lookup from the server sidecar, then wire every
+  // top-level section (identity read straight off the stamps — no id alignment).
+  ddsRebuildSidMap();
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el) => {
     if (el.hasAttribute("data-dds-ee")) return;
@@ -4438,21 +4442,9 @@ function openPageSearchPanel() {
    /p/s/:token page carries a "Leave feedback" panel keyed by the SAME stable
    section ids, so both sides of the conversation land in the same threads. ── */
 let CM_ON = false, CM_THREADS = null, CM_BUSY = false, CM_PENDING = null;
-// Mirror of the server's stable section-id scheme (lib/section_comments.ts):
-// type | type#N (Nth same-type block) | type:storedId (multi-instance blocks).
-// Index-aligned with the block list (junk entries map to null, never counted).
-function cmSectionIds(blocks) {
-  const out = [], counts = {};
-  (blocks || []).forEach((b) => {
-    if (!b || typeof b !== "object") { out.push(null); return; }
-    const type = String(b.type || "");
-    if (!/^[a-z0-9_]{1,40}$/.test(type)) { out.push(null); return; }
-    counts[type] = (counts[type] || 0) + 1;
-    const own = typeof b.id === "string" && /^[a-z0-9_-]{1,60}$/i.test(b.id) ? b.id : "";
-    out.push(own ? type + ":" + own : (counts[type] === 1 ? type : type + "#" + counts[type]));
-  });
-  return out;
-}
+// G13: the stable section ids come from the SERVER (the /settings section_meta
+// sidecar via ddsSidFor / ddsMetaFor, and the canvas' data-dds-sid stamps) —
+// the old client mirror of lib/section_comments.ts is retired.
 function cmThreadFor(slug, bid) { const s = slug || "", b = bid || ""; return (CM_THREADS || []).find((t) => t.page_slug === s && t.block_id === b) || null; }
 function cmOpenFor(slug, bid) { const t = cmThreadFor(slug, bid); return t ? t.open_count : 0; }
 function cmTotalOpen() { return (CM_THREADS || []).reduce((n, t) => n + t.open_count, 0); }
@@ -4573,7 +4565,10 @@ async function cmResolveThread(slug, bid, name) {
 // silently lost) — one calm row per orphaned thread at the end of the tray.
 function cmOrphanRows(host) {
   if (!CM_ON) return;
-  const ids = cmSectionIds(BLOCKS_WORK || []);
+  // G13: current section ids from the server sidecar; without it we can't tell
+  // an orphan from a live section, so surface nothing rather than everything.
+  const meta = ddsMetaFor(DC_PAGE || ""); if (!meta) return;
+  const ids = meta.map((e) => e && e.sid).filter(Boolean);
   (CM_THREADS || []).filter((t) => t.page_slug === (DC_PAGE || "") && t.block_id && ids.indexOf(t.block_id) === -1).forEach((t) => {
     const row = el("div", "dc-tree-row core under-page");
     const mn = el("button", "dc-tree-main"); mn.type = "button"; mn.title = "Read this feedback";
@@ -8729,15 +8724,16 @@ function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type
 function dcMove(from, gap) {
   dcCaptureScroll();
   if (!moveBlockTo(from, gap)) return false;   // dropped back onto its own slot → no save, no reload
-  // BLOCKS_WORK just changed under the tree's feet: shift the canvas id→index map by
+  // BLOCKS_WORK just changed under the tree's feet: shift the sid→index map by
   // the same permutation, then rebuild the tree NOW — its data-bi stamps and
-  // pointerdown closures must match BLOCKS_WORK even if the save/reload never lands.
+  // pointerdown closures must match BLOCKS_WORK even if the save/reload never
+  // lands. (The save's /settings response then replaces this with server truth.)
   const to = dndDropIndex(from, gap);
-  Object.keys(EE_IDMAP).forEach((id) => {
-    let bi = EE_IDMAP[id];
+  if (DDS_SIDMAP) Object.keys(DDS_SIDMAP).forEach((sid) => {
+    let bi = DDS_SIDMAP[sid];
     if (bi === from) bi = to;
     else { if (bi > from) bi -= 1; if (bi >= to) bi += 1; }
-    EE_IDMAP[id] = bi;
+    DDS_SIDMAP[sid] = bi;
   });
   dcRefreshTree();
   saveBlocks();
@@ -8988,7 +8984,7 @@ function dcInjectCanvas(doc, main) {
       bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi)));
       bar.appendChild(mkBtn("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi)));
       bar.appendChild(mkBtn("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi)));
-      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(eeBlockKey(BLOCKS_WORK[bi]))));
+      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi))));
       bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger" }));
     } else {
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
@@ -8996,10 +8992,11 @@ function dcInjectCanvas(doc, main) {
     }
     bar.classList.add("on"); place(el2);
   };
-  // Build the id→block map for THIS render, then wire every top-level section's
-  // hover toolbar. Drop targets are computed live from these section rects by the
+  // G13: refresh the sid→index lookup from the server sidecar, then wire every
+  // top-level section's hover toolbar (identity read straight off the stamps).
+  // Drop targets are computed live from these section rects by the
   // pointer-drag engine (pdGaps) — no per-gap DOM nodes are injected any more.
-  EE_IDMAP = eeBuildIdMap(Array.prototype.map.call(main.querySelectorAll("section[id]"), (s) => s.id));
+  ddsRebuildSidMap();
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {
     if (!el2.hasAttribute("data-dc")) {
@@ -9217,7 +9214,9 @@ function dcTreeRow(el2, c) {
   // start a thread). Block rows only — keyed by the stable section id, so the
   // thread survives reorders and matches the client's shared-draft feedback.
   if (CM_ON && isBlock) {
-    const cid = cmSectionIds(BLOCKS_WORK || [])[c.bi];
+    // G13: the section's stamped sid (canvas) with the sidecar as fallback —
+    // never a client recomputation of the id scheme.
+    const cid = (el2.getAttribute && el2.getAttribute("data-dds-sid")) || ddsSidFor(c.bi);
     if (cid) row.appendChild(cmBadge(DC_PAGE, cid, name));
   }
   const acts = el("span", "dc-tree-acts");
