@@ -58,3 +58,44 @@ test.describe('Secure client drill-in', () => {
     await expect(page.locator('#dds-shell .dds-brand')).toContainText('Studio OS');
   });
 });
+
+// ── Batch A (post-redesign audit) — scope-carry regressions (A6) ─────────────
+// The drill-in scope must ride EVERY exit: the two convert redirects are JS
+// navigations (shell.js only rewrites anchors), and APP_PAGES must cover every
+// app page so page-authored anchors to customers/broadcasts get ?client= too.
+test.describe('Scope carry — convert redirects + APP_PAGES coverage', () => {
+  const scopedApi = { '/portal/context': scopedCtx('Joe’s Plumbing'),
+    '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
+    '/moments': { data: [] } };
+
+  test('leads.html: the → Deal convert redirect keeps ?client=', async ({ page }) => {
+    await installApp(page, { api: { ...scopedApi, '/sales/deals': { data: { id: 'd-9' } } } });
+    await page.goto(`/leads.html?client=${CLIENT}`);
+    await page.locator('[data-deal="l1"]').click();
+    await page.waitForURL(new RegExp(`crm\\.html\\?deal=d-9&tab=deal&client=${CLIENT}`));
+  });
+
+  test('contacts.html: the row → New deal redirect keeps ?client=', async ({ page }) => {
+    await installApp(page, { api: { ...scopedApi,
+      '/sales/contacts': { data: [{ id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', updated_at: '2026-07-01T00:00:00Z' }] },
+      '/sales/deals': { data: { id: 'd-9' } } } });
+    await page.goto(`/contacts.html?client=${CLIENT}`);
+    await page.locator('[data-deal="ct-1"]').first().click();
+    await page.waitForURL(new RegExp(`crm\\.html\\?deal=d-9&tab=deal&client=${CLIENT}`));
+  });
+
+  test('APP_PAGES covers customers + broadcasts: page-authored anchors get ?client=', async ({ page }) => {
+    await installApp(page, { api: scopedApi });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-shell')).toContainText('Joe’s Plumbing');
+    // inject page-authored anchors — the MutationObserver re-applies the carry
+    await page.evaluate(() => {
+      for (const [id, href] of [['x-cust', '/customers.html'], ['x-bc', '/broadcasts.html']]) {
+        const a = document.createElement('a'); a.id = id; a.href = href; a.textContent = id;
+        document.body.appendChild(a);
+      }
+    });
+    await expect(page.locator('#x-cust')).toHaveAttribute('href', `/customers.html?client=${CLIENT}`);
+    await expect(page.locator('#x-bc')).toHaveAttribute('href', `/broadcasts.html?client=${CLIENT}`);
+  });
+});

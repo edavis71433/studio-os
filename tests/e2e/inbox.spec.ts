@@ -288,3 +288,61 @@ test.describe('Inbox — split-view console', () => {
     // ≥760px the pane shows the calm all-clear; mobile shows the list only
   });
 });
+
+// ── Batch A (post-redesign audit) — inbox regressions ────────────────────────
+test.describe('Batch A regressions — inbox', () => {
+  test('A5 — approval decide refreshes IN PLACE: the row leaves, the console survives, no page reload', async ({ page }) => {
+    let feedCalls = 0;
+    await installApp(page, { api: API });
+    // after the decide, the server's feed no longer carries the approval —
+    // the in-place refresh must converge on that without a navigation
+    await page.route('**/functions/v1/presence/portal/feed', (route) => {
+      feedCalls++;
+      const body = feedCalls <= 1 ? FEED : { data: { ...FEED.data, pending_approvals: [] } };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+    await page.goto('/inbox.html');
+    // a marker that only survives if the document is never reloaded
+    await page.evaluate(() => { (window as unknown as { __noReload?: boolean }).__noReload = true; });
+    await page.locator('#rows [role=option]').filter({ hasText: 'Protect your email' }).click();
+    const decideReq = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/foundations/plans/p1/decide'));
+    await page.locator('#rpane').getByRole('button', { name: 'Approve' }).click();
+    await decideReq;
+    // the decided row is gone from the list — and the loaders re-ran (feed refetched)
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Protect your email' })).toHaveCount(0);
+    await expect.poll(() => feedCalls).toBeGreaterThanOrEqual(2);
+    // the other conversations are still there; the document never navigated
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
+  });
+
+  test('A9 — exactly one read failing renders the surviving half PLUS the honest partial notice', async ({ page }) => {
+    await installApp(page, { api: API });
+    // the feed 500s; the enquiry read (default /forms/inbox fixture) survives
+    await page.route('**/functions/v1/presence/portal/feed', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/inbox.html');
+    const notice = page.locator('#lnotice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('Part of your inbox couldn’t load just now');
+    await expect(notice).toContainText('messages and approvals');
+    // the surviving half still renders (the page's own /forms/inbox read)
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' })).toBeVisible();
+    // and a healthy load shows no notice
+    await page.unroute('**/functions/v1/presence/portal/feed');
+    await page.locator('#refreshBtn').click();
+    await expect(notice).toBeHidden();
+  });
+
+  test('A8 — the 7-13 day band reads "1 week ago", never "1 weeks ago"', async ({ page }) => {
+    const D8 = new Date(Date.now() - 8 * 86400000).toISOString();
+    await installApp(page, { api: { ...API,
+      '/portal/feed': { data: { ...FEED.data,
+        enquiries: [{ id: 'l-9', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Quote?', status: 'new', created_at: D8, thread_key: 'lead:l-9', unread: true }],
+      } },
+    } });
+    await page.goto('/inbox.html');
+    const row = page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' });
+    await expect(row.locator('.rwhen')).toHaveText('1 week ago');
+  });
+});

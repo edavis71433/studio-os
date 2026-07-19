@@ -206,3 +206,24 @@ test.describe('Contacts list view', () => {
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'false');
   });
 });
+
+// ── Batch A (post-redesign audit) — A1: the custom-fields manager is reachable ─
+test.describe('Contacts — Manage fields (A1)', () => {
+  test('the toolbar affordance opens the fields editor seeded from /sales/contacts/fields', async ({ page }) => {
+    await installApp(page, { api: {
+      '/sales/contacts': CONTACTS,
+      '/sales/contacts/fields': { data: [{ key: 'referred_by', label: 'Referred by', type: 'text' }] },
+    } });
+    await page.goto('/contacts.html');
+    await page.locator('#manageFields').click();
+    await expect(page.locator('#fieldsDlg')).toBeVisible();
+    await expect(page.locator('#fieldsRows .field-row .fr-label')).toHaveValue('Referred by');
+    // saving PUTs the definitions to /sales/contacts/fields
+    const put = page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/sales/contacts/fields'));
+    await page.getByRole('button', { name: 'Save fields' }).click();
+    expect((await put).postDataJSON()).toEqual({ fields: [{ label: 'Referred by', type: 'text' }] });
+    // the page toasts through the shell's ddsToast when present
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Fields saved.' }).first()).toBeVisible();
+    await expect(page.locator('#fieldsDlg')).toBeHidden();
+  });
+});

@@ -526,3 +526,24 @@ test.describe('Projects accessibility', () => {
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
   });
 });
+
+// ── Batch A (post-redesign audit) — A10: origin honesty in the Files list ────
+test.describe('Project record — client-upload origin (A10)', () => {
+  test('a client upload carries the "From client" chip + meta line; studio shares do not', async ({ page }) => {
+    const detail = JSON.parse(JSON.stringify(P1_DETAIL));
+    detail.data.deliverables = [
+      { id: 'd1', title: 'Homepage mock', status: 'shared', client_visible: true },
+      // the server-stamped note (client_delivery.ts) — PREFIX matched, so a
+      // studio appending to the note keeps the origin visible
+      { id: 'd2', title: 'logo-original.png', status: 'shared', client_visible: true, note: 'Uploaded by the client. Resized + filed.' },
+    ];
+    await installApp(page, { api: { ...API, '/projects/p1': detail } });
+    await page.goto('/projects.html?project=p1');
+    const files = page.locator('#dlList');
+    const clientRow = files.locator('.item').filter({ hasText: 'logo-original.png' });
+    await expect(clientRow.locator('.tag.fromclient')).toHaveText('From client');
+    await expect(clientRow).toContainText('Uploaded by the client');
+    const studioRow = files.locator('.item').filter({ hasText: 'Homepage mock' });
+    await expect(studioRow.locator('.tag.fromclient')).toHaveCount(0);
+  });
+});

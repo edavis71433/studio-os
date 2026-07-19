@@ -394,3 +394,34 @@ test.describe('Context bar (slice 7)', () => {
     await expect(panel).toBeVisible();
   });
 });
+
+// ── Batch A (post-redesign audit) — shell regressions ────────────────────────
+test.describe('Batch A regressions — shell', () => {
+  test('A3 — a FAILED feed read in the bell is honest, never "all caught up"', async ({ page }) => {
+    await installApp(page);
+    await page.route('**/functions/v1/presence/portal/feed', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/today.html');
+    await page.locator('#dds-bell').click();
+    const pop = page.locator('.dds-pop[aria-label="Notifications"]');
+    await expect(pop).toContainText('We couldn’t check just now — try again in a moment.');
+    await expect(pop).not.toContainText('You’re all caught up.');
+  });
+
+  test('A7 — --dds-p-deep is defined in all four theme blocks (dark = the deep-accent family value)', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/today.html');
+    const read = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dds-p-deep').trim());
+    // explicit toggle blocks (the shell theme toggle stamps data-theme)
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    expect(await read()).toBe('#cdb6f2');
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    expect(await read()).toBe('#2a1b4a');
+    // OS-scheme blocks (no explicit toggle)
+    await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
+    await page.emulateMedia({ colorScheme: 'dark' });
+    expect(await read()).toBe('#cdb6f2');
+    await page.emulateMedia({ colorScheme: 'light' });
+    expect(await read()).toBe('#2a1b4a');
+  });
+});

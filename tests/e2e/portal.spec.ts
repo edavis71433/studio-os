@@ -1756,3 +1756,81 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
   });
 });
+
+// ── Batch A (post-redesign audit) — portal regressions ───────────────────────
+// A2: a reviewer on the Requests tab gets the calm read-only state with NO
+// /client/* fetches (the renderMessages/renderFiles contract) — never the
+// couldn't-load cards a 403 world used to produce. A4: a failed billing read
+// says so, and is NOT cached for the session — the next visit retries. A12:
+// the drill-in support thread attributes by the server `from` field — a studio
+// reply whose author_kind resolves to 'client' must never render as "You".
+test.describe('Batch A regressions — portal', () => {
+  test('A2 — reviewer Requests: calm state, no /client/support or /client/services fetches', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    page.on('request', (r) => {
+      if (r.url().includes('/client/support') || r.url().includes('/client/services')) calls.push(r.url());
+    });
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="requests"]').click();
+    await expect(page.getByText('Your studio’s services will appear here once they’ve set up your account.')).toBeVisible();
+    // never the couldn't-load cards…
+    await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
+    // …and no reviewer-doomed /client/* reads were fired at all
+    expect(calls).toHaveLength(0);
+  });
+
+  test('A4 — a failed billing read shows the honest line and is NOT session-cached (the next visit refetches)', async ({ page }) => {
+    let calls = 0;
+    await installApp(page, { api: CLIENT_API });
+    // first TWO reads fail (Home's glance + the first Invoices visit); later ones succeed
+    await page.route('**/functions/v1/presence/client/billing', (route) => {
+      calls++;
+      if (calls <= 2) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { invoices: [
+        { id: 'i1', name: 'Deposit', amount: 500, status: 'open', due_date: '2026-07-20', pay_url: 'https://pay.example/x' },
+      ] } }) });
+    });
+    await page.goto('/client.html');
+    // Home's glance: the failed read HIDES the to-pay tile (never a fake $0),
+    // while the real counts still render their tiles
+    await expect(page.locator('#home-glance')).toBeVisible();
+    await expect(page.locator('#glance-due')).toHaveCount(0);
+    // first Invoices visit: the couldn't-load line — never "No invoices yet"
+    await page.locator('#tabnav [data-tab="invoices"]').click();
+    await expect(page.getByText('We couldn’t load your invoices just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
+    // away and back: the failure was NOT cached — the tab refetches and renders
+    await page.locator('#tabnav [data-tab="home"]').click();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await page.locator('#tabnav [data-tab="invoices"]').click();
+    await expect(page.getByRole('heading', { name: 'Deposit' })).toBeVisible();
+    expect(calls).toBeGreaterThanOrEqual(3);
+  });
+
+  test('A12 — the drill-in support thread attributes by the server `from`: a studio reply never renders as You', async ({ page }) => {
+    await installApp(page, { api: { ...MSG_API,
+      '/client/support': { data: [
+        { id: SUP_PRJ, subject: 'Copy fixes', status: 'open', project_id: PID, updated_at: '2026-07-04T00:00:00Z' },
+      ] },
+      [`/client/support/${SUP_PRJ}`]: { data: {
+        request: { id: SUP_PRJ, subject: 'Copy fixes', body: 'Some typos on the About page.', status: 'open', project_id: PID, created_at: '2026-07-03T00:00:00Z' },
+        // the poisoned production shape: the studio operator's reply ALSO stores
+        // author_kind 'client' — only the additive server `from` tells the sides
+        // apart. The old bubbleHtml path rendered this as "You".
+        messages: [{ id: 'x1', body: 'Fixed — take a look.', author_kind: 'client', from: 'studio', created_at: '2026-07-04T00:00:00Z' }],
+      } },
+    } });
+    await page.goto(`/client.html?project=${PID}`);
+    await page.locator('#sec-support').getByRole('button', { name: 'View & reply' }).click();
+    const thread = page.locator('#sthread');
+    const reply = thread.locator('.ti').filter({ hasText: 'Fixed — take a look.' });
+    await expect(reply).toContainText('Your studio replied');
+    await expect(reply).not.toContainText('You replied');
+    // the request body itself stays the client's own ("You opened this request")
+    await expect(thread.locator('.ti').filter({ hasText: 'Some typos on the About page.' })).toContainText('You opened this request');
+  });
+});
