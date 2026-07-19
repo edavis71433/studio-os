@@ -81,7 +81,10 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
-function when(iso){const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
+function when(iso){const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
+// SC-1: JS navigations must carry the agency drill-in scope themselves (shell.js
+// only rewrites <a href> anchors) — the same idiom as contacts.html openDetail.
+function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 
 function render(){
@@ -160,7 +163,7 @@ async function createDeal(id){
     // reflect converted state locally (idempotent: server returns the existing deal on a repeat)
     l.converted=true; l.deal_id=dealId; if(l.status==='new')l.status='read';
     toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.'); render();
-    if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href='/crm.html?deal='+dealId+'&tab=deal';},800);
+    if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href=scoped('/crm.html?deal='+dealId+'&tab=deal');},800);
   }catch(_){toast('Couldn’t start that deal.');}
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

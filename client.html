@@ -285,11 +285,6 @@
   .hist .hs{flex:0 0 auto;font-weight:600;font-size:13px;white-space:nowrap;color:var(--soft)}
   .hist .hs.ok{color:var(--good)} .hist .hs.chg{color:var(--warn)}
   /* ── chat-style message threads (project messages + support) ── */
-  .msgs{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
-  .bubble{max-width:85%;align-self:flex-start;background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 5px;padding:10px 14px;box-shadow:var(--shadow)}
-  .bubble.me{align-self:flex-end;background:var(--p-soft);border-color:transparent;border-radius:16px 16px 5px 16px}
-  .bubble .meta{display:block;font-size:12px;color:var(--faint);margin-bottom:3px;font-weight:600}
-  .bubble p{margin:0;color:var(--ink);font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere}
   /* ── friendly empty states (distinct from content cards) ── */
   .empty{background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:26px 20px;text-align:center;margin-bottom:14px}
   .empty .ei{font-size:26px;display:block;margin-bottom:8px}
@@ -594,10 +589,20 @@ function goHome(){showTab('home');}
 function portalHeader(title,sub){return `<header><h1>${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
 function emptyCard(msg,icon){return `<div class="empty">${icon?`<span class="ei" aria-hidden="true">${icon}</span>`:''}<p>${esc(msg)}</p></div>`;}
 function spinnerHtml(){return skeleton();}
-// one message bubble — the studio sits left, the client's own messages right
-function bubbleHtml(m){const mine=!(m.author_kind==='staff'||m.author_kind==='system');return `<div class="bubble${mine?' me':''}"><span class="meta">${mine?'You':'Your studio'}${m.created_at?` · ${esc(rel(m.created_at))}`:''}</span><p>${esc(m.body)}</p></div>`;}
-// billing (invoices) — cached per full load; degrades to empty for a reviewer
-async function ensureBilling(){if(PORTAL.billing)return PORTAL.billing;try{const r=await api('/client/billing');PORTAL.billing=(r.ok&&r.body&&r.body.data)||{invoices:[]};}catch(_){PORTAL.billing={invoices:[]};}return PORTAL.billing;}
+// billing (invoices) — a SUCCESSFUL read is cached per full load; a reviewer
+// never fetches (403 server-side — genuinely no invoices of their own). A
+// FAILED read returns {failed:true} and is NOT cached, so the next call
+// retries instead of pinning "couldn't load" (or a fake empty) for the session.
+async function ensureBilling(){
+  if(PORTAL.billing)return PORTAL.billing;
+  if(PORTAL.persona!=='client')return{invoices:[]};
+  try{
+    const r=await api('/client/billing');
+    if(!r.ok)return{invoices:[],failed:true};
+    PORTAL.billing=(r.body&&r.body.data)||{invoices:[]};
+  }catch(_){return{invoices:[],failed:true};}
+  return PORTAL.billing;
+}
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
 // per-project snapshots (the full client bundle, capped) — shared by Home + Files
 async function ensureSnaps(){
@@ -1401,6 +1406,9 @@ async function renderInvoices(){
   $('main').innerHTML=spinnerHtml();
   const b=await ensureBilling();const inv=(b&&b.invoices)||[];
   let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
+  // a FAILED read says so — never the "No invoices yet" story (and ensureBilling
+  // didn't cache it, so coming back to this tab retries the read)
+  if(b&&b.failed){html+=`<div class="card"><p class="muted">We couldn’t load your invoices just now — please try again in a moment.</p></div>`;$('main').innerHTML=html;return;}
   if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
   html+=appendBilling(inv);
   $('main').innerHTML=html;
@@ -1427,8 +1435,13 @@ function reqRowHtml(rq){
 }
 async function renderRequests(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
-  $('main').innerHTML=spinnerHtml();
   const canMessage=PORTAL.persona==='client';
+  if(!canMessage){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never the couldn't-load cards (renderMessages' contract)
+    $('main').innerHTML=portalHeader('Requests','Browse what your studio offers and ask for what you need.')+
+      emptyCard('Your studio’s services will appear here once they’ve set up your account.','🛎️');
+    return;
+  }
+  $('main').innerHTML=spinnerHtml();
   // Per-read failure honesty (slice 10's Home rule): a FAILED read renders a calm
   // couldn't-load line, never the empty-state copy — only a genuine {data:[]}
   // earns the honest empty states below.
@@ -1901,8 +1914,11 @@ async function openSupportThread(rid,pid){
   html+=`</section>`;
   $('main').innerHTML=html;
   $('back').addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):goHome();});
-  const thread=[];if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at});thread.push(...msgs);
-  $('sthread').innerHTML=thread.length?`<div class="msgs">${thread.map(bubbleHtml).join('')}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
+  // attribution goes through the ONE honest renderer (supportThreadItems — the
+  // server `from` field first, author_kind only as the old-build fallback), the
+  // same anatomy as the Messages pane: a studio reply must never read as "You".
+  const items=supportThreadItems(rq,msgs);
+  $('sthread').innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
   if(!resolved){const sbtn=$('ssend');sbtn.addEventListener('click',async()=>{const v=$('smsg').value.trim();if(!v)return;sbtn.disabled=true;const rr=await api('/client/support/'+rid+'/messages','POST',{body:v});if(rr.ok){openSupportThread(rid,pid);}else{toast('That didn’t send.');sbtn.disabled=false;}});}
 }
 async function openSurvey(sid,pid){

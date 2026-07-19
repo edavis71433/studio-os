@@ -475,7 +475,8 @@
     setExpanded('dds-bell', true);
     api('/portal/feed').then(function (r) {
       var body = notif.querySelector('.body');
-      if (!r.ok) { body.innerHTML = '<div class="muted">You’re all caught up.</div>'; return; }
+      // A FAILED read is not an empty one — never claim "caught up" on an error.
+      if (!r.ok) { body.innerHTML = '<div class="muted">We couldn’t check just now — try again in a moment.</div>'; return; }
       var d = r.body.data || {}; var out = '';
       // A reviewer's whole world is client.html — every bell row lands THERE
       // (the owner pages these rows normally target are 403 walls for them).
@@ -737,7 +738,7 @@
   // authored anchors ("← Back to Today", empty-state CTAs, rail exits) that were
   // the one systematic leak — a scoped operator must never silently switch
   // tenants by tapping a hardcoded exit.
-  var APP_PAGES = /^\/(today|presence|crm|contacts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
+  var APP_PAGES = /^\/(today|presence|crm|contacts|customers|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
   function carryScopeGlobally() {
     var s = scopeId(); if (!s) return;
     document.querySelectorAll('a[href^="/"]').forEach(function (a) {
