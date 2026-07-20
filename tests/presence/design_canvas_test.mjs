@@ -128,15 +128,16 @@ ok(/function dcCopyBlock\(/.test(html) && /function dcCutBlock\(/.test(html), 'c
 ok(!/EE_MANDATORY_H2|eeEffHeading|eeSlug\(|eeBuildIdMap|EE_IDMAP/.test(html), 'the heading/slug mirror (EE_MANDATORY_H2 + eeEffHeading + eeSlug + eeBuildIdMap + EE_IDMAP) stays deleted');
 ok(!/function cmSectionIds|eeBlockKey/.test(html), 'the comment-id mirror (cmSectionIds) and the render-key mirror (eeBlockKey) stay deleted');
 const classify = extractFn(html, 'eeClassify');
-ok(/data-dds-sid/.test(classify) && /data-dds-core/.test(classify), 'eeClassify reads the server stamps (data-dds-sid / data-dds-core)');
+ok(/data-dds-src/.test(classify) && /data-dds-sid/.test(classify) && /data-dds-core/.test(classify), 'eeClassify reads the server stamps (data-dds-src / data-dds-sid / data-dds-core)');
+ok(classify.indexOf('data-dds-src') < classify.indexOf('data-dds-sid'), 'the stored-index stamp (data-dds-src) is checked FIRST — the sid join is the fallback');
 ok(!/querySelector|textContent|classList|h1,h2,h3/.test(classify), 'eeClassify contains NO structural probes or heading-text reads (mirror-free)');
 ok(/DDS_SIDMAP/.test(classify), 'sid resolution goes through the sidecar-built lookup only');
 {
   // Behavior: pure lookup + fallbacks, extracted and driven with stub elements.
   const coreView = (html.match(/const DDS_CORE_VIEW = \{[^}]*\};/) || [''])[0];
   ok(!!coreView, 'DDS_CORE_VIEW (core key → panel view) exists');
-  const mk = new Function('S', 'DC_PAGE', 'BLOCKS_WORK',
-    'let DDS_SIDMAP = null;\n' + coreView + '\n' +
+  const mk = new Function('S', 'DC_PAGE', 'BLOCKS_WORK', 'DDS_SRCMAP_IN',
+    'let DDS_SIDMAP = null;\nlet DDS_SRCMAP = DDS_SRCMAP_IN || null;\n' + coreView + '\n' +
     extractFn(html, 'ddsMetaFor') + '\n' + extractFn(html, 'ddsRebuildSidMap') + '\n' +
     extractFn(html, 'ddsSidFor') + '\n' + extractFn(html, 'ddsKeyFor') + '\n' + extractFn(html, 'eeClassify') + '\n' +
     'ddsRebuildSidMap(); return { classify: eeClassify, sidFor: ddsSidFor, keyFor: ddsKeyFor };');
@@ -163,6 +164,53 @@ ok(/DDS_SIDMAP/.test(classify), 'sid resolution goes through the sidecar-built l
   const noMeta = mk({}, '', new Array(6));
   const c6 = noMeta.classify(el({ 'data-dds-sid': 'richtext' }));
   ok(c6.kind === 'core' && c6.view === 'design', 'stamps without a loaded sidecar degrade to the panel (no crash, no guess)');
+
+  // ── G13 fix: data-dds-src (the render's stored-list provenance) is PRIMARY ──
+  // Poisoning test — a deliberately WRONG sid map must LOSE to the stamp: this is
+  // the sid-divergence bug (linked-resolve / media-drop pages shift the per-type
+  // #N counters, so the sid join lands on the wrong same-type block).
+  const s1 = home.classify(el({ 'data-dds-sid': 'richtext#2', 'data-dds-src': '5' }));
+  ok(s1.kind === 'block' && s1.bi === 5, 'data-dds-src WINS over a wrong sidecar sid join (the divergence class is dead)');
+  const s2 = home.classify(el({ 'data-dds-src': '0' }));
+  ok(s2.kind === 'block' && s2.bi === 0, 'data-dds-src alone resolves — no sidecar needed for the index join');
+  ok(noMeta.classify(el({ 'data-dds-src': '2' })).bi === 2, 'src works with NO sidecar loaded at all (render truth is self-sufficient)');
+  // bounds-check: an out-of-range stamp (stale vs the working list) falls back
+  const s3 = home.classify(el({ 'data-dds-sid': 'richtext#2', 'data-dds-src': '6' }));
+  ok(s3.kind === 'block' && s3.bi === 3, 'src ≥ BLOCKS_WORK.length is rejected → the sid join fallback');
+  const s4 = home.classify(el({ 'data-dds-src': '99' }));
+  ok(s4.kind === 'core' && s4.view === 'design', 'out-of-range src with no usable sid degrades to the panel (never a dead click)');
+  const s5 = home.classify(el({ 'data-dds-sid': 'richtext', 'data-dds-src': '-1' }));
+  ok(s5.kind === 'block' && s5.bi === 1, 'a non-integer/negative src is ignored (validated parse) → sid join');
+  const s6 = home.classify(el({ 'data-dds-sid': 'richtext', 'data-dds-src': 'junk' }));
+  ok(s6.kind === 'block' && s6.bi === 1, 'garbage src is ignored → sid join');
+  // ABSENT src (an old deployed function's render) → the sid join, unchanged —
+  // the same feature-detect degrade posture as c5/c6 above (pinned by c1 too).
+  const s7 = home.classify(el({ 'data-dds-sid': 'columns:cols_a' }));
+  ok(s7.kind === 'block' && s7.bi === 4, 'absent src → the sid join keeps working (old-function deploy window)');
+  // the dcMove stale-window remap: eeClassify applies DDS_SRCMAP over the stamp
+  const moved = mk({ sectionMeta: meta }, '', new Array(6), { 2: 0, 0: 1, 1: 2 });
+  ok(moved.classify(el({ 'data-dds-src': '2' })).bi === 0, 'DDS_SRCMAP remaps a stale stamp after a local move (until the reload re-stamps)');
+  ok(moved.classify(el({ 'data-dds-src': '4' })).bi === 4, 'indices outside the remap pass through unchanged');
+}
+// dcPermuteIndex — the ONE permutation both stale-map compensations (DDS_SIDMAP
+// + DDS_SRCMAP) apply after a local move. Pin it against ground truth: actually
+// splice a marker list and check every old index lands where the helper says.
+{
+  const dcPermuteIndex = new Function('return (' + extractFn(html, 'dcPermuteIndex') + ')')();
+  let bad = [];
+  for (let len = 2; len <= 5; len++) for (let from = 0; from < len; from++) for (let gap = 0; gap <= len; gap++) {
+    const to = dndDropIndex(from, gap);
+    if (to === from) continue;
+    const arr = Array.from({ length: len }, (_, i) => i);
+    const [x] = arr.splice(from, 1); arr.splice(to, 0, x);
+    arr.forEach((old, j) => { if (dcPermuteIndex(old, from, to) !== j) bad.push(`len=${len} from=${from} gap=${gap} old=${old}`); });
+  }
+  ok(bad.length === 0, 'dcPermuteIndex matches the real splice for every (len, from, gap): ' + bad.slice(0, 3).join(' | '));
+  const moveFn = extractFn(html, 'dcMove');
+  ok(/DDS_SIDMAP\[sid\] = dcPermuteIndex\(/.test(moveFn) && /DDS_SRCMAP = next/.test(moveFn), 'dcMove shifts BOTH stale maps (sid join + src stamps) with the one extracted permutation');
+  ok(/ddsRebuildSidMap\(\);\s*\n\s*DDS_SRCMAP = null/.test(html), 'dcInjectCanvas resets the src remap when the reloaded canvas brings fresh stamps');
+  const orphan = extractFn(html, 'cmOrphanRows');
+  ok(/querySelectorAll\("\[data-dds-sid\]"\)/.test(orphan) && /ddsMetaFor/.test(orphan), 'cmOrphanRows reads live sids from the canvas stamps UNIONed with the sidecar (never stamps-blind)');
 }
 ok(/route === "\/settings" && j && j\.data && j\.data\.section_meta/.test(html), 'api() captures the /settings section_meta sidecar into S.sectionMeta (the ONE writer)');
 
