@@ -313,6 +313,23 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## ✅ STANDARDS SWEEP — WAVE 3 LIVE: PS1 + SS2 (2026-07-20, main@86c5154, Netlify)
+
+Both reviewed safe-to-present; all findings fixed red-first; 901/0 full e2e.
+- **PS1 portal honesty** (client.html): failed reads never masquerade — Home
+  keeps surviving rows + calm per-source lines ("caught up" only on all-ok-and-
+  empty), billingFailed hides the due tile by contract, recent-updates/bell/
+  Messages gated, snaps+wstats failures never cached (true retries), reviewer
+  bell calm on its contractual 403, mark-seen POST leak closed. Backlog:
+  projectsFailed honesty at Files/Messages tabs (named sliver), compound-failure
+  persona demotion (accepted risk), bell-open refetch lands with PS3.
+- **SS2 agency roster** (agency.html): full roster standard; 45d domain
+  threshold platform-aligned (was 30d — could show High-priority + "All clear"
+  on one page); search-issues-only clients surface in Needs attention; ↻ also
+  refreshes queues; full-boot Try-again; starter-kit double-POST dead. Backlog:
+  shared .tscroll 390px page-scroll leak (standard-wide, fix with
+  customers.html), 401 soft-↻ toast, kit-form state wipe, UTC date parse.
+
 ## ✅ STANDARDS SWEEP — WAVE 2 LIVE: SS1 + SS7 (2026-07-20, main@9b6ea1a, deploy SUCCESS)
 
 Both slices built → adversarially reviewed → consolidated fixes → gates green.
