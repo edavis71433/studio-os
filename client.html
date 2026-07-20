@@ -1716,20 +1716,40 @@ let REQ_FILTER='';
 let BOOK={site:'',type:null,slot:'',maxDays:30};
 const bkInput='style="width:100%;box-sizing:border-box;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
 function bookLabel(s){s=String(s);const t=s.indexOf('T')>=0?s.slice(s.indexOf('T')+1):s;return t.slice(0,5);}
+// PS5 (B4): failure ≠ absence in all three reads — only an OK /client/book with
+// no site_id earns "isn't set up", only an OK-but-disabled/empty types read
+// earns "hasn't opened any times", only an OK slots read earns "No open times
+// that day". Any transient failure gets its own honest couldn't-check card with
+// a Try again that re-runs THAT step. Every paint after an await is VIEW_SEQ
+// re-checked (including submitBooking's success takeover), the confirm step
+// prefills identity from the session (decision D5a — editable), and each step
+// hands focus to its h1 (the B3 sliver).
+function bookFocusH1(){const h=document.querySelector('#main h1');if(h){h.setAttribute('tabindex','-1');h.focus();}}
 async function openBooking(){
-  VIEW_SEQ++;   // this drill-in owns #main now — a late tab render must not clobber it
+  const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
   $('main').innerHTML=spinnerHtml();
   const back=`<p><a class="link" href="#" id="bk-back">← Back to requests</a></p>`;
   const backReq=()=>{const b=$('bk-back');if(b)b.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});};
-  let site='';try{const r=await api('/client/book');site=(r&&r.ok&&r.body.data&&r.body.data.site_id)||'';}catch(_){}
+  // a transient failure must never masquerade as "not set up" — the honest
+  // couldn't-check card, with a retry that re-runs this step
+  const failCard=()=>{$('main').innerHTML=back+`<div class="card"><p class="muted">We couldn’t check on booking just now — please try again in a moment.</p><div class="row"><button id="bk-retry">Try again</button></div></div>`;backReq();const rb=$('bk-retry');if(rb)rb.addEventListener('click',()=>openBooking());};
+  let siteRes=null;try{siteRes=await api('/client/book');}catch(_){}
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  if(!(siteRes&&siteRes.ok)){failCard();return;}
+  const site=(siteRes.body&&siteRes.body.data&&siteRes.body.data.site_id)||'';
   if(!site){$('main').innerHTML=back+emptyCard('Online booking isn’t set up yet — use “Message your studio” and they’ll find a time with you.');backReq();return;}
+  let typesRes=null;try{typesRes=await api('/book/'+site+'/types');}catch(_){}
+  if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
+  if(!(typesRes&&typesRes.ok)){failCard();return;}
+  const d=(typesRes.body&&typesRes.body.data)||{};
   let types=[],intro='';
-  try{const r=await api('/book/'+site+'/types');const d=(r&&r.body&&r.body.data)||{};if(d.enabled){types=d.types||[];intro=d.intro||'';BOOK={site,type:null,slot:'',maxDays:d.max_days_ahead||30};}}catch(_){}
+  if(d.enabled){types=d.types||[];intro=d.intro||'';BOOK={site,type:null,slot:'',maxDays:d.max_days_ahead||30};}
+  // an OK read with the engine off / no services is genuine absence — calm copy
   if(!types.length){$('main').innerHTML=back+emptyCard('Your studio hasn’t opened any times for booking yet — message them and they’ll find a slot with you.');backReq();return;}
   let html=back+`<header><h1>Book a call</h1>${intro?`<p class="sub">${esc(intro)}</p>`:''}</header><section><h2>Choose a service</h2>`;
   for(const t of types)html+=`<div class="card"><h3>${esc(t.name)}</h3><p class="muted">${t.duration_min?esc(String(t.duration_min))+' min':''}${t.price_text?' · '+esc(t.price_text):''}</p>${t.description?`<p>${esc(t.description)}</p>`:''}<div class="row"><button data-bt="${esc(t.id)}">Choose</button></div></div>`;
   html+=`</section>`;
-  $('main').innerHTML=html;backReq();
+  $('main').innerHTML=html;backReq();bookFocusH1();
   document.querySelectorAll('[data-bt]').forEach(b=>b.addEventListener('click',()=>{const t=types.find(x=>x.id===b.getAttribute('data-bt'));if(t)bookPickDate(t);}));
 }
 function bookPickDate(t){
@@ -1737,19 +1757,31 @@ function bookPickDate(t){
   const now=Date.now();const iso=(ms)=>new Date(ms).toISOString().slice(0,10);const min=iso(now+86400000),max=iso(now+(BOOK.maxDays||30)*86400000);
   $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>${esc(t.name)}</h1><p class="sub">Pick a day, then a time.</p></header><section><div class="card"><label for="bk-date" style="display:block;font-weight:600;margin-bottom:6px">Day</label><input id="bk-date" type="date" min="${min}" max="${max}" value="${min}" ${bkInput}><div id="bk-slots" style="margin-top:14px"></div></div></section>`;
   const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();openBooking();});
+  bookFocusH1();
   const dt=$('bk-date');const load=()=>bookLoadSlots(dt.value);dt.addEventListener('change',load);load();
 }
 async function bookLoadSlots(date){
   const host=$('bk-slots');if(!host)return;host.innerHTML='<p class="muted">Finding open times…</p>';
-  let slots=[];try{const r=await api('/book/'+BOOK.site+'/slots?type='+encodeURIComponent(BOOK.type.id)+'&date='+encodeURIComponent(date));slots=((r&&r.body&&r.body.data&&r.body.data.slots)||[]);}catch(_){}
-  if(!slots.length){host.innerHTML='<p class="muted">No open times that day — try another.</p>';return;}
-  host.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+slots.map(s=>`<button data-slot="${esc(String(s))}">${esc(bookLabel(s))}</button>`).join('')+'</div>';
-  host.querySelectorAll('[data-slot]').forEach(b=>b.addEventListener('click',()=>bookConfirm(b.getAttribute('data-slot'))));
+  const view=VIEW_SEQ;   // captured — a newer view mid-fetch means this panel is gone
+  let r=null;try{r=await api('/book/'+BOOK.site+'/slots?type='+encodeURIComponent(BOOK.type.id)+'&date='+encodeURIComponent(date));}catch(_){}
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  const h2=$('bk-slots');if(!h2)return;   // the panel was re-rendered away
+  // a failed slots read must never masquerade as "no open times" — the honest
+  // couldn't-check line, with a retry that re-runs THIS day's read in place
+  if(!(r&&r.ok)){h2.innerHTML='<p class="muted">We couldn’t check on booking just now — please try again in a moment.</p><div class="row"><button id="bk-slotsRetry">Try again</button></div>';const rb=$('bk-slotsRetry');if(rb)rb.addEventListener('click',()=>bookLoadSlots(date));return;}
+  const slots=((r.body&&r.body.data&&r.body.data.slots)||[]);
+  if(!slots.length){h2.innerHTML='<p class="muted">No open times that day — try another.</p>';return;}
+  h2.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+slots.map(s=>`<button data-slot="${esc(String(s))}">${esc(bookLabel(s))}</button>`).join('')+'</div>';
+  h2.querySelectorAll('[data-slot]').forEach(b=>b.addEventListener('click',()=>bookConfirm(b.getAttribute('data-slot'))));
 }
 function bookConfirm(slot){
   BOOK.slot=slot;
-  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>Confirm your booking</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(slot))}</p></header><section><div class="card"><label for="bk-name" style="display:block;font-weight:600;margin-bottom:6px">Your name</label><input id="bk-name" type="text" ${bkInput}><label for="bk-email" style="display:block;font-weight:600;margin:12px 0 6px">Email</label><input id="bk-email" type="email" placeholder="you@example.com" ${bkInput}><div class="row" style="margin-top:14px"><button class="approve" id="bk-go">Book it</button></div></div></section>`;
+  // D5a: the portal knows who's signed in — prefill, keep editable (booking on
+  // someone else's behalf stays one edit away)
+  const meName=firstName(USER),meEmail=(USER&&USER.email)?USER.email:'';
+  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>Confirm your booking</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(slot))}</p></header><section><div class="card"><label for="bk-name" style="display:block;font-weight:600;margin-bottom:6px">Your name</label><input id="bk-name" type="text" value="${esc(meName)}" ${bkInput}><label for="bk-email" style="display:block;font-weight:600;margin:12px 0 6px">Email</label><input id="bk-email" type="email" value="${esc(meEmail)}" placeholder="you@example.com" ${bkInput}><div class="row" style="margin-top:14px"><button class="approve" id="bk-go">Book it</button></div></div></section>`;
   const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();bookPickDate(BOOK.type);});
+  bookFocusH1();
   $('bk-go').addEventListener('click',submitBooking);
 }
 async function submitBooking(){
@@ -1757,8 +1789,10 @@ async function submitBooking(){
   if(!name){toast('Please add your name.');return;}
   if(!email){toast('Please add your email.');return;}
   const btn=$('bk-go');btn.disabled=true;
+  const view=VIEW_SEQ;   // captured — the success takeover must not paint over a newer view
   let r=null;try{r=await api('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
-  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});}
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-POST — the confirm UI is gone; never repaint #main
+  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});bookFocusH1();}
   else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
 }
 // Client file upload — signed-URL flow (mirrors the studio deliverable upload):
