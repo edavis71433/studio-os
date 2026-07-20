@@ -1055,7 +1055,7 @@ function subjectFromMessage(v){return (String(v==null?'':v).split('\n')[0]||'').
 // ── the console: state + views ──
 // activeId = the keyboard-active CONVERSATION (tracked by id, never by index —
 // re-sorts and re-renders recompute the index so focus stays on the same row).
-const MC={rows:[],sel:'',compose:false,activeId:'',unread:new Set(),cache:{},seq:0,supFailed:false};
+const MC={rows:[],sel:'',compose:false,activeId:'',unread:new Set(),cache:{},seq:0,supFailed:false,projFailed:false};
 const mid=(s)=>String(s).replace(/[^a-zA-Z0-9_-]/g,'_');
 // route straight into the Messages tab with a support thread opened in its pane
 // (the ?support= deep link, bell items, and the Requests tab's "View & reply").
@@ -1095,10 +1095,14 @@ async function renderMessages(focusSup){
   MC.rows=convRows(PORTAL.projects,support,latest);
   MC.unread=unreadKeysFrom(PORTAL.notifs);
   MC.supFailed=supFailed;
+  // PS6 (PS1 residual): a failed boot /client/projects read means every project
+  // conversation is silently missing from this list — its own calm head line,
+  // and the "No conversations yet" copies below are gated on it too.
+  MC.projFailed=PORTAL.projectsFailed;
   $('main').innerHTML=
     `<div class="mconsole" id="mconsole">`+
       `<aside class="mlist" aria-label="Conversation list">`+
-        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew">Message your studio</button></div><p class="mlmeta" id="mlmeta"></p>${supFailed?`<p class="mlmeta fload">We couldn’t check on support requests just now — please try again in a moment.</p>`:''}<p class="mlmeta">Talk to your studio — they usually reply within a day.</p></div>`+
+        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew">Message your studio</button></div><p class="mlmeta" id="mlmeta"></p>${supFailed?`<p class="mlmeta fload">We couldn’t check on support requests just now — please try again in a moment.</p>`:''}${MC.projFailed?`<p class="mlmeta fload">We couldn’t check on your project conversations just now — please try again in a moment.</p>`:''}<p class="mlmeta">Talk to your studio — they usually reply within a day.</p></div>`+
         `<ul id="mrows" role="listbox" aria-label="Conversations" tabindex="0"></ul>`+
       `</aside>`+
       `<section class="mpane" id="mpane" aria-label="Conversation"></section>`+
@@ -1133,8 +1137,9 @@ function renderMRows(){
   const rows=$('mrows');if(!rows)return;
   const meta=$('mlmeta');if(meta)meta.textContent=`${MC.rows.length} conversation${MC.rows.length===1?'':'s'} · newest first`;
   // "No conversations yet" is a claim only an all-sources-ok read may make —
-  // with the support read failed an empty list is UNKNOWN, not empty (B5)
-  if(!MC.rows.length){rows.innerHTML=MC.supFailed
+  // with the support OR projects read failed an empty list is UNKNOWN, not empty
+  // (B5 + the PS1-residual projects gate)
+  if(!MC.rows.length){rows.innerHTML=(MC.supFailed||MC.projFailed)
     ?`<li class="mempty" role="presentation">We couldn’t check just now — try again in a moment.</li>`
     :`<li class="mempty" role="presentation">No conversations yet — “Message your studio” starts one.</li>`;return;}
   rows.innerHTML=MC.rows.map((r)=>{
@@ -1195,7 +1200,7 @@ function renderMPane(){
     const c=$('mconsole');if(c)c.classList.remove('pane-open');   // never strand pane-open with no selection
     host.innerHTML=MC.rows.length
       ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">🗂</span><h2>Pick a conversation</h2><p class="muted">Choose one on the left — it opens right here.</p></div>`
-      :MC.supFailed   // B5: an empty list on a failed support read is UNKNOWN, never "No conversations yet"
+      :(MC.supFailed||MC.projFailed)   // B5 + PS1 residual: an empty list on a failed support OR projects read is UNKNOWN, never "No conversations yet"
       ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>We couldn’t check just now</h2><p class="muted">Please try again in a moment — “Message your studio” still works.</p></div>`
       :`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>No conversations yet</h2><p class="muted">“Message your studio” starts the first one.</p></div>`;
     return;
@@ -1536,7 +1541,10 @@ async function renderFiles(){
   for(const s of withFiles)html+=`<section><h2>${esc(s.name)}</h2><div class="flv">${s.deliverables.map(fileRowHtml).join('')}</div></section>`;
   // per-project read failures get their own honest line — never the empty copy
   for(const s of failedSnaps)html+=`<section><h2>${esc(s.name)}</h2><p class="muted fload">We couldn’t load this project’s files just now — please try again in a moment.</p></section>`;
-  if(!docsFailed&&!docs.length&&!withFiles.length&&!failedSnaps.length)html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');
+  // PS6 (PS1 residual): a failed PROJECTS read left every project section silently
+  // absent — say so, and never let "No files yet" masquerade over it below
+  if(PORTAL.projectsFailed)html+=`<section><h2>Project files</h2><p class="muted fload">We couldn’t load your project files just now — please try again in a moment.</p></section>`;
+  if(!docsFailed&&!docs.length&&!withFiles.length&&!failedSnaps.length&&!PORTAL.projectsFailed)html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');
   $('main').innerHTML=html;
   wireDownloads(document);
   if(canShare)wireShareCard();
@@ -2034,21 +2042,39 @@ function wireBellAt(bellId,panelId){
 // survey · support), RIGHT the project activity timeline + message composer.
 // Below 1000px it stacks to one column with the timeline LAST — actions first.
 let PROJ_EVENTS=[],PROJ_MSGS=[];   // the open project's timeline inputs
+let PROJ_MSGS_FAILED=false;   // PS6: a failed messages read renders ITS calm line in the rail — never the "say hello" empty copy
 async function openProject(id,focusSection){
-  VIEW_SEQ++;   // this drill-in owns #main now — a late tab render must not clobber it
+  // PS6: a reviewer following a stale ?project= deep link routes to calm Home —
+  // every /client/* read below is a doomed 403 for that persona (the
+  // renderMessages zero-fetch contract), so none of them may fire.
+  if(PORTAL.persona!=='client')return goHome();
+  const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
   setWide(false);
   $('main').innerHTML=skeleton();
-  const [d,rep,supRes,msgRes]=await Promise.all([
-    api('/client/projects/'+id),
-    api('/client/projects/'+id+'/report').catch(()=>null),
-    api('/client/support').catch(()=>null),
-    api('/client/projects/'+id+'/messages').catch(()=>null),
-  ]);
+  let d,rep,supRes,msgRes;
+  try{
+    [d,rep,supRes,msgRes]=await Promise.all([
+      api('/client/projects/'+id),
+      api('/client/projects/'+id+'/report').catch(()=>null),
+      api('/client/support').catch(()=>null),
+      api('/client/projects/'+id+'/messages').catch(()=>null),
+    ]);
+  }catch(_){
+    // the bundle read THREW (network down mid-read) — a calm couldn't-load card
+    // with a way back, never a skeleton stuck forever
+    if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+    $('main').innerHTML=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p>`+
+      emptyCard('We couldn’t load this project just now — please try again in a moment.','📁');
+    const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
+    return;
+  }
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   if(!d.ok){toast('That project isn’t available.');return goHome();}
   setWide(true);
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
   PROJ_EVENTS=(data.events||[]).slice();
   PROJ_MSGS=((msgRes&&msgRes.ok&&msgRes.body&&msgRes.body.data)||[]).slice();
+  PROJ_MSGS_FAILED=!(msgRes&&msgRes.ok);   // failed ≠ empty: the rail says so instead of "say hello"
   const hasOverview=!!(s&&s.progress&&s.milestones);
   const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
@@ -2090,10 +2116,13 @@ async function openProject(id,focusSection){
   html+=`<div class="card"><p class="muted" style="margin-bottom:8px">Send your studio a file — a logo, content, or a document.</p><div class="row" style="gap:8px;align-items:center"><input type="file" id="upFile" style="flex:1;min-width:0"><button class="approve" id="upBtn">Upload</button></div></div></section>`;
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
-  // support — the client can now SEE their requests + the studio's replies, not just fire one off
-  const sup=((supRes&&supRes.body&&supRes.body.data)||[]).filter(r=>!r.project_id||r.project_id===id);
+  // support — the client can now SEE their requests + the studio's replies, not just fire one off.
+  // A FAILED read says so calmly (the CTA below stays) — an ok-empty read renders no rows, honestly.
+  const supFailed=!(supRes&&supRes.ok);
+  const sup=((!supFailed&&supRes.body&&supRes.body.data)||[]).filter(r=>r&&r.id&&(!r.project_id||r.project_id===id));
   html+=`<section id="sec-support"><h2>Support</h2>`;
-  if(sup.length){for(const rq of sup){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}}
+  if(supFailed)html+=`<p class="muted fload">We couldn’t check on support requests just now — please try again in a moment.</p>`;
+  else if(sup.length){for(const rq of sup){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}}
   html+=`<div class="card"><p class="muted">${sup.length?'Need something else?':'Have a question for your studio?'} Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
   html+=`</div>`;   // /pleft
   // the activity rail — the project's client-visible timeline, composer below it
@@ -2128,8 +2157,8 @@ async function openProject(id,focusSection){
 // re-fetch the thread and repaint the rail (a sent message appears as a timeline item)
 async function loadThread(id){
   delete MC.cache[id];   // only reached after a successful send — the Messages pane's cached copy of this conversation is stale now
-  const r=await api('/client/projects/'+id+'/messages');if(!r.ok)return;/* a failed refetch must not erase the rail — keep the thread we have */
-  PROJ_MSGS=((r.body&&r.body.data)||[]).slice();renderProjTimeline();
+  const r=await api('/client/projects/'+id+'/messages').catch(()=>null);if(!r||!r.ok)return;/* a failed refetch must not erase the rail — keep the thread we have */
+  PROJ_MSGS=((r.body&&r.body.data)||[]).slice();PROJ_MSGS_FAILED=false;renderProjTimeline();
 }
 // ── the project activity timeline (crm.html's anatomy, the client's palette) ─
 // Bundle events (already filtered client-visible server-side; detail.from ===
@@ -2204,8 +2233,12 @@ function renderProjTimeline(){
   for(const e of PROJ_EVENTS){const it=projEventItem(e);if(it)items.push(it);}
   for(const m of PROJ_MSGS){const it=projMsgItem(m,fromById);if(it)items.push(it);}
   items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
-  if(!items.length){host.innerHTML=emptyCard('No messages yet — say hello any time.','💬');return;}
-  host.innerHTML=tlItemsHtml(items);
+  // PS6: a FAILED messages read says so — the surviving event items still render
+  // under the line, and the empty copy ("say hello") is a claim only an
+  // all-sources-ok read may make. The composer below stays either way.
+  const failLine=PROJ_MSGS_FAILED?`<p class="muted fload">We couldn’t load your messages just now — please try again in a moment.</p>`:'';
+  if(!items.length){host.innerHTML=failLine||emptyCard('No messages yet — say hello any time.','💬');return;}
+  host.innerHTML=failLine+tlItemsHtml(items);
 }
 // C1: the client's own support thread — see the studio's replies and reply back
 async function openSupportThread(rid,pid){

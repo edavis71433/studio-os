@@ -2769,3 +2769,132 @@ test.describe('booking day-integrity (slot-read race + the day-labeled confirm)'
     })).toContain('You’re booked');
   });
 });
+
+// ── PS6 — project-record cohesion sweep (B3): the drill-in brought up to every
+// cross-cutting contract at once. VIEW_SEQ: openProject/openSupportThread/
+// openSurvey paint after awaits — each captures the token and re-checks, so a
+// late record can never clobber a newer view. Network throws land the calm
+// couldn't-load card (never a stuck skeleton). Per-read honesty: each of
+// msgs/support failing alone renders ITS couldn't-load line while the other
+// sections survive. The legacy drill-in upload (no preflight, an orphan media
+// row per retry) is replaced by the slice-12 share card preselected to this
+// project. Support rows are reqRowHtml queue-rows on last_activity_at recency.
+// Focus lands on the record h1 on entry, and on the acted-on section after
+// decide/task-done/upload re-renders. A reviewer's stale ?project= deep link
+// routes to calm Home with ZERO /client/* reads.
+test.describe('PS6 — project-record cohesion (B3)', () => {
+  const fail500 = (route: import('@playwright/test').Route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+
+  test('a slow record read NEVER paints over the view the client moved on to (VIEW_SEQ)', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    // the report read resolves LATE — the record's Promise.all settles only
+    // after the client has moved on to the Messages tab
+    let releaseReport: (() => void) | null = null;
+    const gate = new Promise<void>((res) => { releaseReport = res; });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/report`, async (route) => {
+      await gate;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { summary: null } }) });
+    });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await page.locator('[data-proj]').click();          // drill in — record fetch in flight
+    await page.locator('#tabnav [data-tab="messages"]').click();  // …but the client moves on
+    await expect(page.locator('#mrows')).toBeVisible();
+    releaseReport!();                                    // the stale record read lands now
+    // the Messages view survives — the record never paints over it
+    await page.waitForTimeout(400);
+    await expect(page.locator('#mrows')).toBeVisible();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Website redesign' })).toHaveCount(0);
+  });
+
+  test('a NETWORK THROW on the record read lands the calm trouble card with a way back — never a stuck skeleton', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) =>
+      route.request().method() === 'GET' ? route.abort() : route.fallback());
+    await page.goto('/client.html');
+    await page.locator('[data-proj]').click();
+    await expect(page.getByText('We couldn’t load this project just now — please try again in a moment.')).toBeVisible();
+    await expect(page.locator('.skel')).toHaveCount(0);   // the skeleton resolved, not stuck
+    // the Back link really goes home
+    await page.getByRole('link', { name: '← Back to home' }).click();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+  });
+
+  test('failure matrix — a failed MESSAGES read: its calm line in the rail (never "say hello"), every other section survives', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages**`, fail500);
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    // the rail says so calmly — never the "say hello" empty copy a failed read can't earn
+    const rail = page.locator('#sec-messages');
+    await expect(rail.getByText('We couldn’t load your messages just now — please try again in a moment.')).toBeVisible();
+    await expect(rail.getByText('say hello', { exact: false })).toHaveCount(0);
+    // …the composer still works, and the other sections all survive
+    await expect(rail.locator('#msg')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.locator('#sec-files')).toContainText('Homepage mockup');
+    await expect(page.locator('#sec-support')).toBeVisible();
+  });
+
+  test('failure matrix — a failed SUPPORT read: its calm line in sec-support, the CTA kept, the rail survives', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'GET' ? fail500(route) : route.fallback());
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    const sup = page.locator('#sec-support');
+    await expect(sup.getByText('We couldn’t check on support requests just now — please try again in a moment.')).toBeVisible();
+    await expect(sup.getByRole('button', { name: 'Open a support request' })).toBeVisible();
+    // the rail's real thread survived the support failure
+    await expect(page.locator('#ptl .ti.t-message .ti-body')).toHaveText('Welcome aboard!');
+  });
+
+  test('failure matrix — a failed REPORT read: the tiles fall back to the bundle’s own facts, nothing else is lost', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/report`, fail500);
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    const tiles = page.locator('#sec-overview');
+    await expect(tiles.locator('.hl-v', { hasText: '25%' })).toBeVisible();      // bundle progress
+    await expect(tiles.locator('.hl-v', { hasText: '1 of 3' })).toBeVisible();  // bundle milestones
+    await expect(page.locator('#ptl .ti.t-message .ti-body')).toHaveText('Welcome aboard!');
+  });
+
+  test('reviewer: a stale ?project= deep link routes to calm Home — ZERO /client/* reads fired', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.includes('/client/') && !u.pathname.endsWith('/client/projects')) calls.push(u.pathname); });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // never the drill-in's four doomed 403 reads (bundle/report/support/messages)
+    expect(calls).toHaveLength(0);
+  });
+
+  test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/projects', fail500);
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="files"]').click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Files & documents' })).toBeVisible();
+    await expect(page.getByText('We couldn’t load your project files just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('No files yet', { exact: false })).toHaveCount(0);
+  });
+
+  test('PS1 residual — Messages tab on a failed projects read: couldn’t-check copy, never "No conversations yet"', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/support': { data: [] } } });
+    await page.route('**/functions/v1/presence/client/projects', fail500);
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    // the list head carries its own calm line for the missing project threads…
+    await expect(page.getByText('We couldn’t check on your project conversations just now — please try again in a moment.')).toBeVisible();
+    // …and the empty slot reads couldn't-check — the support read was fine, but
+    // an empty list with projects UNKNOWN is unknown, never "No conversations yet"
+    await expect(page.locator('#mrows .mempty')).toHaveText('We couldn’t check just now — try again in a moment.');
+    await expect(page.getByText('No conversations yet', { exact: false })).toHaveCount(0);
+  });
+});
