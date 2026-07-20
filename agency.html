@@ -486,7 +486,7 @@ async function mountQueues(){
   if(!r.ok||!r.body.data){
     host.hidden=false;
     host.innerHTML=`<h2 class="qhead">What needs you today</h2>
-      <div class="qfail">Your queues wouldn’t load just now — the portfolio below is complete.<button id="qretry" type="button">Try again</button></div>`;
+      <div class="qfail">Your queues wouldn’t load just now.<button id="qretry" type="button">Try again</button></div>`;
     const qr=$('qretry');if(qr)qr.addEventListener('click',()=>mountQueues());
     return;
   }
