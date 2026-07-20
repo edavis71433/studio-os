@@ -313,6 +313,34 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🟢 STANDARDS SWEEP — WAVE 6 BUILT: PS4+PS5 + SS6 + booking sliver (2026-07-20, pending Eric merge)
+
+All lanes built → adversarially reviewed → fixes red-first.
+- **PS4 Help tab**: three-way honest FAQ read, the LAST reviewer /client/* fetch
+  leak closed, VIEW_SEQ, account card → profile section. **PS5 booking**:
+  failure ≠ absence on all three reads, guarded paints, session identity
+  prefill, per-step h1 focus. Review: safe, no fixes. Bonus sliver (review-
+  found, pre-existing): stale-DAY slots race killed (BK_SLOT_SEQ) + the confirm/
+  success lines now NAME the day being booked.
+- **SS6 six CRM pages**: search (leads/inbox/projects), saved-reply INSERT
+  (inbox both composers + crm record composer), Add-a-customer (POST parity
+  verified; D7 scope header deliberately dropped — stray ?client= blanks the
+  roster), C7 fallback alignment + honest labels, REQ/ACT/PROJ_SEQ guards, real
+  crm tablists, sr-only h1 + aria-live. Review found a BLOCKING late-commit
+  regression: dialog margin:auto + layout-viewport inflation made mobile
+  Add-a-customer untappable — root-caused (minimum-scale=1 + explicit margins +
+  inner scroller) and pinned on all three affected pages; plus SR_FETCH stale
+  cache, refresh-failure honesty, invited:false honesty — all fixed red-first.
+- **NEW ERIC DECISION (add to P1-P4 list): saved-reply scope doctrine** — a
+  drilled-in operator's inbox picker AND manager resolve to the CUSTOMER site's
+  reply set (scoped api()), while crm's picker always uses the operator's own
+  (apiAg). Both defensible; pick one doctrine. Comments mark both sites.
+- Backlog: C7 server-path disagreement (feed still new-only — server widen or
+  label); stray-?client= breadcrumb on customers; leads "M new" base mixing;
+  projects search-beyond-cap reports; viewport inflation may affect OTHER
+  table pages lacking minimum-scale=1 (only 3 patched); WebKit pass in CI.
+Gates: pure 208/0; scoped suites all green ×3; full e2e at merge time.
+
 ## ✅ STANDARDS SWEEP — WAVE 5 LIVE: SS5 + PS3 (2026-07-20, Netlify)
 
 Both reviewed; all findings fixed red-first; 1083/0 full e2e + 208/0 pure.
