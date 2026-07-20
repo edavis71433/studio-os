@@ -313,6 +313,25 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## ✅ STANDARDS SWEEP — WAVE 5 LIVE: SS5 + PS3 (2026-07-20, Netlify)
+
+Both reviewed; all findings fixed red-first; 1083/0 full e2e + 208/0 pure.
+- **SS5 Pipeline**: roster standard (.lhead w/ honest totals — "Latest 100"
+  wording at the cap, board meta counts only rendered open cards "$X open",
+  search over cached contacts join w/ create-invalidation, REQ_SEQ + boot
+  retry, .bc-menu full popup contract incl. Tab-out close, linkable ?stage=won
+  landing; both analytics "View won deals" footers land on it, period honestly
+  omitted — deals API unwindowed). Backlog: post-move focus restore; >100
+  contacts join residual; per-deal task interleave.
+- **PS3 Bell chrome**: ONE bell on every tab (fixed top-right <720px, chipbar
+  zone reserved after the reviewer caught a tap collision), navFromHref
+  fallbacks (no dead clicks), three numbers reconciled by construction
+  (needsYouItems(); tile labeled 'in "Needs you"', badge labeled "since you
+  last looked"), bell-open refetch w/ exactly-one-GET + reviewer zero-fetch.
+  Backlog: persona-probe fallback blast radius (notifications zero out when a
+  client's probe fails — pre-existing derivation); mark-seen reopen race
+  (cosmetic); snapWaiting per-project wording (deliberate, pinned).
+
 ## ✅ STANDARDS SWEEP — WAVE 4 LIVE: PS2 + SS4 + analytics seams (2026-07-20, main@bc5b466, functions deploy SUCCESS; legal drafts with Eric)
 
 All four lanes built → adversarially reviewed → fixes red-first → gates green.
