@@ -856,15 +856,14 @@ async function loadWebsiteCard(){
   if(PORTAL.persona!=='client')return;
   if(PORTAL.wstats===undefined){
     // a FAILED read (non-OK or a throw) resolves false and is NEVER cached:
-    // wstats stays undefined and the in-flight handle clears, so the next Home
-    // visit genuinely retries instead of pinning the card hidden all session
-    // (the A4 rule). Only a SUCCESSFUL read caches — its data, or null (the
-    // route genuinely has nothing to show; the card stays hidden by design).
+    // wstats returns to undefined and the in-flight handle clears, so the next
+    // Home visit genuinely retries instead of pinning the card hidden all
+    // session (the A4 rule). Only a SUCCESSFUL read caches — its data, or null
+    // (the route genuinely has nothing to show; the card hides by design).
     if(!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
-    const got=await PORTAL.wstatsFetch;
+    PORTAL.wstats=await PORTAL.wstatsFetch;
     PORTAL.wstatsFetch=null;   // settled — a later call may start a fresh read
-    if(got===false)return;
-    PORTAL.wstats=got;
+    if(PORTAL.wstats===false){PORTAL.wstats=undefined;return;}
   }
   const host=document.getElementById('home-website');if(!host)return;   // the user moved on mid-fetch
   const h=wsCardHtml(PORTAL.wstats);

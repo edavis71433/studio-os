@@ -330,7 +330,8 @@ ok('portal: ensureSnaps refetches FAILED ids on the next call (never session-pin
 // caches (data or a genuine null); failure resolves false, clears the in-flight
 // handle, and leaves wstats undefined so the next Home visit truly retries.
 ok('portal: a failed website-stats read is never cached (false sentinel + cleared handle)',
-  portal.includes("r.ok?((r.body&&r.body.data)||null):false") && portal.includes('if(got===false)return;')
+  portal.includes("r.ok?((r.body&&r.body.data)||null):false")
+  && portal.includes('if(PORTAL.wstats===false){PORTAL.wstats=undefined;return;}')
   && portal.includes('PORTAL.wstatsFetch=null;   // settled'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',
   /<span class="qico[^"]*" aria-hidden="true">/.test(portal));
