@@ -43,7 +43,9 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
   failed=failed||{};
   const needsOk=(failed.feed||failed.snaps)?null:((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+snapWaiting(s),0);
   const newMsgs=failed.notifs?null:(notifs||[]).filter(n=>n&&!n.read&&n.kind==='message').length;
-  const dueTotal=unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
+  // a FAILED billing read hides the to-pay tile BY CONTRACT — never because a
+  // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
+  const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
   return{needsOk,newMsgs,due:dueTotal>0?'$'+dueTotal.toLocaleString('en-US'):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
 }
@@ -214,6 +216,13 @@ const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Websit
     gn.newMsgs===null && !glanceTiles(gn).some(t=>t.id==='glance-msgs') && glanceTiles(gn).some(t=>t.id==='glance-ok'));
   ok('glance: with BOTH count sources failed the strip renders NOTHING — even with real due/project data',
     glanceTiles(glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS,{feed:true,notifs:true})).length===0);
+  // PS1: the due tile hides BY CONTRACT on a failed billing read — even when the
+  // (stale/garbage) billing object still carries unpaid invoices, due must be ''.
+  const gb=glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS,{billing:true});
+  ok('glance: a failed billing read hides the to-pay tile by contract — never a fake $0 (or a stale $750)',
+    gb.due==='' && !glanceTiles(gb).some(t=>t.id==='glance-due') && glanceTiles(gb).some(t=>t.id==='glance-ok'));
+  ok('glance: a SUCCESSFUL billing read still sums unpaid invoices (the contract gates failure, not success)',
+    glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS,{}).due==='$750');
 }
 
 // ═══ structural pins — the wiring both pages must keep ═══
@@ -294,6 +303,16 @@ ok('portal: a failed projects read renders the couldn\'t-load line instead of th
 ok('portal: the rolebadge derives from persona, never projects.length',
   portal.includes("P.persona==='client'?'Your workspace':'Client view'")
   && !portal.includes("projects.length?'Your workspace':'Client view'"));
+// PS1: the Needs-you queue's per-source failure lines — any failed source keeps
+// its own calm line, and ONLY all-sources-ok-and-empty earns "all caught up".
+ok('portal: ensureBilling records PORTAL.billingFailed on a failed read (B1\'s named flag)',
+  portal.includes('PORTAL.billingFailed=true') && portal.includes('PORTAL.billingFailed=false'));
+ok('portal: the queue renders per-source couldn\'t-check lines for feed / projects / snaps / billing',
+  portal.includes('We couldn’t check on pending approvals just now — please try again in a moment.')
+  && portal.includes('We couldn’t check on some of your projects just now — please try again in a moment.')
+  && portal.includes('We couldn’t check on invoices just now — please try again in a moment.'));
+ok('portal: ONLY an all-sources-ok-and-empty queue may claim "You\'re all caught up."',
+  portal.includes('if(!items.length&&!srcFails.length)') && portal.includes('You’re all caught up.'));
 ok('portal: ensureSnaps marks a FAILED per-project read (failed:true), distinct from an empty one',
   /if\(!r\.ok\)throw 0;/.test(portal) && portal.includes('failed:true,milestones:[]'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',

@@ -1834,4 +1834,47 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     // client with a failed read is still in THEIR workspace, not "Client view"
     await expect(page.locator('.rolebadge')).toHaveText(/Your workspace/);
   });
+
+  // a managed client with genuinely nothing going on — the world where a failed
+  // read used to masquerade as "You're all caught up." with work outstanding
+  const EMPTY_CLIENT_API = {
+    ...CLIENT_API,
+    '/client/projects': { data: [] },
+    '/client/notifications': { data: [], unread_count: 0 },
+    '/client/billing': { data: { invoices: [] } },
+    '/client/support': { data: [] },
+  };
+
+  test('a failed feed read in an otherwise-empty world NEVER claims "You’re all caught up."', async ({ page }) => {
+    await installApp(page, { api: EMPTY_CLIENT_API });
+    await page.route('**/functions/v1/presence/portal/feed**', fail500);
+    await page.goto('/client.html');
+    const body = page.locator('#needs-body');
+    await expect(body.getByText('We couldn’t check on pending approvals just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('You’re all caught up.')).toHaveCount(0);
+  });
+
+  test('only an ALL-sources-ok-and-empty queue earns "You’re all caught up." (the gate does not over-fire)', async ({ page }) => {
+    await installApp(page, { api: EMPTY_CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.getByText('You’re all caught up.')).toBeVisible();
+    await expect(page.getByText('We couldn’t check', { exact: false })).toHaveCount(0);
+  });
+
+  test('a failed billing read: surviving queue rows + its own calm line, due tile hidden — no fake $0', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/billing', fail500);
+    await page.goto('/client.html');
+    const body = page.locator('#needs-body');
+    // the OTHER sources' rows survive the billing failure…
+    await expect(body.getByRole('button', { name: 'Review & approve — Homepage design' })).toBeVisible();
+    await expect(body.getByRole('button', { name: 'Open to-dos — Website redesign' })).toBeVisible();
+    // …with billing's one calm per-source line under them — never "caught up"
+    await expect(body.getByText('We couldn’t check on invoices just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('You’re all caught up.')).toHaveCount(0);
+    // the due tile hides BY CONTRACT (billingFailed) — never a fake $0
+    await expect(page.locator('#home-glance')).toBeVisible();
+    await expect(page.locator('#glance-due')).toHaveCount(0);
+    await expect(page.locator('#home-glance')).not.toContainText('$0');
+  });
 });

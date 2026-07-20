@@ -429,7 +429,9 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
   failed=failed||{};
   const needsOk=(failed.feed||failed.snaps)?null:((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+snapWaiting(s),0);
   const newMsgs=failed.notifs?null:(notifs||[]).filter(n=>n&&!n.read&&n.kind==='message').length;
-  const dueTotal=unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
+  // a FAILED billing read hides the to-pay tile BY CONTRACT — never because a
+  // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
+  const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
   return{needsOk,newMsgs,due:dueTotal>0?'$'+dueTotal.toLocaleString('en-US'):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
 }
@@ -594,13 +596,14 @@ function spinnerHtml(){return skeleton();}
 // FAILED read returns {failed:true} and is NOT cached, so the next call
 // retries instead of pinning "couldn't load" (or a fake empty) for the session.
 async function ensureBilling(){
-  if(PORTAL.billing)return PORTAL.billing;
+  if(PORTAL.billing){PORTAL.billingFailed=false;return PORTAL.billing;}
   if(PORTAL.persona!=='client')return{invoices:[]};
   try{
     const r=await api('/client/billing');
-    if(!r.ok)return{invoices:[],failed:true};
+    if(!r.ok){PORTAL.billingFailed=true;return{invoices:[],failed:true};}
     PORTAL.billing=(r.body&&r.body.data)||{invoices:[]};
-  }catch(_){return{invoices:[],failed:true};}
+  }catch(_){PORTAL.billingFailed=true;return{invoices:[],failed:true};}
+  PORTAL.billingFailed=false;   // B1's named flag — Home's queue + due tile consume it
   return PORTAL.billing;
 }
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
@@ -780,8 +783,19 @@ async function buildNeedsYou(){
   for(const i of unpaidInvoices(billing))
     items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?('$'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(i.due_date)}`:''}`,
       i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`));
-  if(!items.length){body.innerHTML=`<div class="card"><p><strong>You’re all caught up.</strong></p><p class="muted" style="margin-top:4px">Nothing needs you right now — we’ll flag anything here the moment it does.</p></div>`;return;}
-  body.innerHTML=`<div class="card qcard">${items.join('')}</div>`;
+  // Per-source failure honesty (the glance strip's rule, on the queue itself):
+  // any failed source keeps its OWN calm line under the surviving rows, and
+  // ONLY an all-sources-ok-and-empty queue may claim "You're all caught up."
+  // — a bad morning must never read as a clear one.
+  const srcFails=[];
+  if(PORTAL.feedFailed)srcFails.push('We couldn’t check on pending approvals just now — please try again in a moment.');
+  if(PORTAL.projectsFailed)srcFails.push('We couldn’t load your projects just now — please try again in a moment.');
+  else if(snaps.some(s=>s&&s.failed))srcFails.push('We couldn’t check on some of your projects just now — please try again in a moment.');
+  if(PORTAL.billingFailed)srcFails.push('We couldn’t check on invoices just now — please try again in a moment.');
+  const failHtml=srcFails.map(t=>`<p class="muted fload">${esc(t)}</p>`).join('');
+  if(!items.length&&!srcFails.length){body.innerHTML=`<div class="card"><p><strong>You’re all caught up.</strong></p><p class="muted" style="margin-top:4px">Nothing needs you right now — we’ll flag anything here the moment it does.</p></div>`;return;}
+  body.innerHTML=(items.length?`<div class="card qcard">${items.join('')}</div>`:'')+failHtml;
+  if(!items.length)return;   // nothing to wire — only the honest lines rendered
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
   body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
@@ -1971,7 +1985,7 @@ function ownerNote(){$('main').innerHTML=`<div class="center"><div class="roleba
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const params=new URLSearchParams(location.search);
   const dsup=params.get('support'); const deep=params.get('project');
   // honor a deep link once, then drop it from the URL so any later re-load
