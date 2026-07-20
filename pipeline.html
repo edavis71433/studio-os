@@ -281,6 +281,10 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// The roster's canonical URL: scope + the active stage filter — so a filtered
+// view (notably analytics' ?stage=won landing, D1) is linkable and survives a
+// deal-open round-trip. Kept in sync by the chips and closeDealDetail.
+const listUrl=()=>{const p=new URLSearchParams();if(scope())p.set('client',scope());if(typeof FILTER==='string'&&FILTER)p.set('stage',FILTER);const q=p.toString();return location.pathname+(q?'?'+q:'');};
 // EMBED: this page is hosted inside the unified Client Record's Deal tab (?embed=1).
 // The shell chrome + list are hidden by CSS; internal "open the project" links are
 // forwarded to the parent record so they switch tabs instead of navigating the iframe.
@@ -448,7 +452,7 @@ Signed for the Studio — ${STUDIO}`;
 function renderFilters(){
   const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
   $('filters').innerHTML=opts.map(([v,l])=>`<button type="button" aria-pressed="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
-  $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;renderFilters();load();});
+  $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;history.replaceState(null,'',listUrl());renderFilters();load();});
 }
 
 // The calm "your numbers" strip: open pipeline · won this month · win rate, plus
@@ -857,7 +861,7 @@ function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=tr
 function closeDealDetail(){
   const id=CURRENT_DEAL; CURRENT_DEAL=null;
   hideDetail();
-  history.replaceState(null,'',location.pathname+(scope()?'?client='+scope():''));
+  history.replaceState(null,'',listUrl());   // back to the roster URL — scope AND stage filter intact
   const c=(id&&document.querySelector('#list [data-id="'+id+'"], #board [data-id="'+id+'"], #table [data-id="'+id+'"]'))||document.querySelector('#list .card, #board .bcard, #table tr[data-id]');
   if(c&&c.focus)c.focus();
 }
@@ -1296,6 +1300,12 @@ async function boot(){
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/studio.html">sign in</a> to see your pipeline.</p>'; return; }
+    // D1 (pipeline half): boot reads ?stage= — a linkable stage landing, most
+    // importantly ?stage=won, the view the board deliberately hides. It lands
+    // in List (won/lost are outcomes, not board columns); the persisted display
+    // choice in storage is respected next visit, never overwritten here.
+    const urlStage=new URLSearchParams(location.search).get('stage');
+    if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;VIEW='list';}
     renderFilters();
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);

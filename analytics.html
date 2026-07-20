@@ -167,8 +167,10 @@ const withScope=(href)=>scope()?href+(href.includes('?')?'&':'?')+'client='+enco
 // D1 — the withScopePeriod pair: card() layers withScope onto every footer href,
 // so passing a withPeriod()'d target means the drill link carries the active
 // window AND the scope. Only targets that understand windows get a period
-// (business-insights — SS11 consumes these); pipeline's stage=won landing is
-// SS5, so pipeline footers stay bare until then.
+// (business-insights — SS11 consumes these). Pipeline footers: the won-deals
+// footers carry ?stage=won (SS5's landing) but stay period-less — the pipeline
+// won view isn't windowed (no won-date filter on the deals API), and lying a
+// period onto a target that ignores it breaks the discipline.
 const withPeriod=(href)=>href+(href.includes('?')?'&':'?')+'period='+encodeURIComponent(PERIOD);
 const PERIODS=[['this_month','This month'],['last_30','Last 30 days'],['quarter','This quarter'],['all','All time']];
 const periodLabel=()=>{const p=PERIODS.find(x=>x[0]===PERIOD);return p?p[1]:'This month';};
@@ -260,8 +262,12 @@ function salesBand(d){
       const hint=(tm.value_cents||lm.value_cents)?(tm.value_cents>lm.value_cents?' · <b class="up">↑ vs last month</b>':tm.value_cents<lm.value_cents?' · <b class="down">↓ vs last month</b>':' · same as last month'):'';
       body=tm.count?kpi(money(tm.value_cents),`expected value of ${num(tm.count)} deal${tm.count===1?'':'s'} won${hint}`):kpi('$0',`none won yet${hint}`);
     }else body=emptyState('Nothing to count yet','Deals you win will show up here.');
-    // stage=won landing deferred to SS5 — pipeline.html doesn't read ?stage yet.
-    h+=card('c3','Won this month',based('',s.truncated_deals),body,['/pipeline.html','View won deals']);
+    // SS5's ?stage=won landing (D1): the footer lands on the List view that
+    // provably renders won deals — never the board that hides them. No period:
+    // this card's window is fixed ("this month") and the pipeline's won view
+    // isn't windowed (the deals API has no won-date filter); scope rides via
+    // card()'s withScope as everywhere.
+    h+=card('c3','Won this month',based('',s.truncated_deals),body,['/pipeline.html?stage=won','View won deals']);
   }
   // KPI: new enquiries (D2: the count is period-windowed — label the window,
   // matching the sibling cards' periodLabel() wording)
@@ -331,8 +337,9 @@ function salesBand(d){
     const rows=(s.recent_wins||[]);
     const body=rows.length?`<table><caption>Recent wins — deal, value, closed date</caption><thead><tr><th scope="col">Deal</th><th class="r" scope="col">Value</th><th class="r" scope="col">Closed</th></tr></thead><tbody>${rows.map(w=>`<tr><td>${esc(w.title)}</td><td class="r">${money(w.value_cents)}</td><td class="r">${esc(shortDate(w.closed_at))}</td></tr>`).join('')}</tbody></table>`
       :emptyState('No wins yet','Deals you win in the next 90 days will be listed here.');
-    // stage=won landing deferred to SS5 — pipeline.html doesn't read ?stage yet.
-    h+=card(s.invoices?'c4':'c6','Recent wins',based('Last 90 days',s.truncated_deals),body,['/pipeline.html','View won deals']);
+    // SS5's ?stage=won landing (D1) — same target as the Won-this-month footer;
+    // fixed 90-day window on the card, so no period param (see the note above).
+    h+=card(s.invoices?'c4':'c6','Recent wins',based('Last 90 days',s.truncated_deals),body,['/pipeline.html?stage=won','View won deals']);
   }
   return h;
 }
