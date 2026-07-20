@@ -270,12 +270,15 @@ test.describe('Analytics (Business dashboard)', () => {
     expect(sentScope).toBe(CLIENT);
     // drill links carry the scope through to the report surfaces
     await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
+    // the won-deals landing carries the scope on top of its stage param
+    await expect(page.getByRole('link', { name: 'View won deals →' }).first())
+      .toHaveAttribute('href', `/pipeline.html?stage=won&client=${CLIENT}`);
     // D1 + scope together: windows-aware targets carry period AND client
     await expect(page.getByRole('link', { name: 'View website insights →' }).first())
       .toHaveAttribute('href', `/business-insights.html?period=this_month&client=${CLIENT}`);
   });
 
-  test('D1: business-insights drills carry the ACTIVE period; pipeline stays bare (stage=won is SS5)', async ({ page }) => {
+  test('D1: business-insights drills carry the ACTIVE period; won-deals footers land on ?stage=won', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
       const period = new URL(route.request().url()).searchParams.get('period');
@@ -287,10 +290,17 @@ test.describe('Analytics (Business dashboard)', () => {
       .toHaveAttribute('href', '/business-insights.html?period=this_month');
     await expect(page.getByRole('link', { name: 'View search insights →' }).first())
       .toHaveAttribute('href', '/business-insights.html?period=this_month');
-    // pipeline doesn't understand windows yet — its footers carry NO period,
-    // and "View won deals" keeps the plain target until SS5's stage=won landing
+    // SS5's D1 landing is live: BOTH "View won deals" footers (Won this month +
+    // Recent wins) target /pipeline.html?stage=won — the view that provably
+    // renders won deals. No period: the pipeline's won view isn't windowed
+    // (the deals API exposes no won-date filter), and both cards state their
+    // own fixed windows — the discipline keeps period off targets that can't
+    // honor it. The open-pipeline footer stays bare.
     await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', '/pipeline.html');
-    await expect(page.getByRole('link', { name: 'View won deals →' }).first()).toHaveAttribute('href', '/pipeline.html');
+    const wonLinks = page.getByRole('link', { name: 'View won deals →' });
+    await expect(wonLinks).toHaveCount(2);
+    await expect(wonLinks.nth(0)).toHaveAttribute('href', '/pipeline.html?stage=won');
+    await expect(wonLinks.nth(1)).toHaveAttribute('href', '/pipeline.html?stage=won');
     // switching the period re-labels every windows-aware drill
     await page.locator('#periodBtn').click();
     await page.locator('#periodMenu [data-period="last_30"]').click();
@@ -298,6 +308,8 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByRole('link', { name: 'View website insights →' }).first())
       .toHaveAttribute('href', '/business-insights.html?period=last_30');
     await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', '/pipeline.html');
+    // …while the stage=won targets stay stable across periods (not windowed)
+    await expect(wonLinks.nth(0)).toHaveAttribute('href', '/pipeline.html?stage=won');
   });
 
   test('D2: the period-windowed KPI cards say their window, matching their siblings', async ({ page }) => {

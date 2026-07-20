@@ -343,6 +343,71 @@ test.describe('SS5 board popup contract + group semantics', () => {
   });
 });
 
+// ── SS5 item 4 (D1, pipeline half): a linkable ?stage= landing. The board hides
+// won/lost, so analytics' "View won deals" needs a URL that provably renders
+// them: ?stage=won lands in List with the Won chip pressed and values showing.
+test.describe('SS5 ?stage=won landing (D1)', () => {
+  const WON = '33333333-3333-4333-8333-333333333333';
+  const WON_DEALS = { data: [
+    { id: WON, title: 'Gamma launch', stage: 'won', source: 'manual', expected_value_cents: 999000, expected_close: null, contact_id: 'ct-1', converted_client_id: 'cl-9', updated_at: past(4), next_step: null, next_step_at: null, last_contacted_at: past(9), agreement_signed: true },
+  ] };
+
+  test('?stage=won renders the won List view: chip pressed, values + Won ✓ badges, stage sent to the API', async ({ page }) => {
+    let sentStage = '';
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) => {
+      const stage = new URL(route.request().url()).searchParams.get('stage') || '';
+      if (stage) sentStage = stage;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stage === 'won' ? WON_DEALS : DEALS) });
+    });
+    await page.goto('/pipeline.html?stage=won');
+    await expect(page.locator('#viewList')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#filters .chip[data-stage="won"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#list .card')).toHaveCount(1);
+    await expect(page.locator('#list .card .stage.won')).toContainText('Won ✓');
+    await expect(page.locator('#list .card .val')).toContainText('$9,990');
+    await expect(page.locator('.lhead .lmeta')).toContainText('1 deal · $9,990 total');
+    expect(sentStage).toBe('won');
+  });
+
+  test('an empty won view is honest — never the "add your first deal" starter', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) => {
+      const stage = new URL(route.request().url()).searchParams.get('stage') || '';
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stage === 'won' ? { data: [] } : DEALS) });
+    });
+    await page.goto('/pipeline.html?stage=won');
+    await expect(page.locator('#list')).toContainText('No won deals yet');
+    await expect(page.locator('#list')).toContainText('Deals you win show up here with their values.');
+    await expect(page.locator('#list')).not.toContainText('No deals yet');
+  });
+
+  test('a persisted Board choice yields to the ?stage= landing without being overwritten', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) => {
+      const stage = new URL(route.request().url()).searchParams.get('stage') || '';
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stage === 'won' ? WON_DEALS : DEALS) });
+    });
+    await page.goto('/pipeline.html?stage=won');
+    await expect(page.locator('#list .card')).toHaveCount(1);           // List rendered, not the board
+    await expect(page.locator('#board')).toBeHidden();
+    expect(await page.evaluate(() => localStorage.getItem('dds-display:pipeline'))).toBe('board');   // choice untouched
+  });
+
+  test('chip clicks keep the URL linkable, and closing a deal restores it', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await page.locator('#filters .chip[data-stage="proposal"]').click();
+    await expect(page).toHaveURL(/\?stage=proposal$/);
+    await page.locator(`#list [data-id="${DEAL}"]`).click();
+    await expect(page.locator('#dtitle')).toContainText('Acme website');
+    await page.locator('#closeD').click();
+    await expect(page).toHaveURL(/\?stage=proposal$/);                  // the filter survives the round-trip
+    await expect(page.locator('#filters .chip[data-stage="proposal"]')).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
 test.describe('Deal drawer Path', () => {
   test('the Path chevron bar renders with guidance tip AND action (suggested_action fix)', async ({ page }) => {
     await installApp(page, { api: API });

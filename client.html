@@ -87,7 +87,15 @@
   .tabnav[hidden]{display:none}
   .tabnav-inner{max-width:660px;margin:0 auto;display:flex}
   .cb-tabs{flex:1 1 auto;min-width:0;display:flex;justify-content:space-around}
-  .cb-brand,.cb-right,.navpanel{display:none}
+  .cb-brand{display:none}
+  /* PS3 (D3a): the bell is persistent chrome on phones too — fixed top-right,
+     OUTSIDE #main (the tab nav's own rule), so it survives every innerHTML
+     rewrite and every tab keeps the ONE bell + badge. The account chip stays
+     a ≥720px affordance (Help is a bottom tab on phones). */
+  .cb-right{position:fixed;top:calc(10px + env(safe-area-inset-top));right:14px;z-index:31;display:flex;align-items:center;gap:8px}
+  .cb-acct{display:none}
+  .navpanel{display:block;position:fixed;top:calc(62px + env(safe-area-inset-top));right:14px;left:14px;margin:0;z-index:35;box-shadow:var(--shadow-lift);max-height:65vh;overflow:auto}
+  .navpanel[hidden]{display:none}
   .tab{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;border-radius:0;background:transparent;color:var(--soft);padding:8px 2px 9px;font-size:11px;font-weight:600;cursor:pointer;min-height:52px}
   .tab .ti{font-size:19px;line-height:1}
   .tab:hover{color:var(--p)}
@@ -110,13 +118,13 @@
     .tab .ti{font-size:15px}
     .tab[aria-current="page"]{background:transparent;border-bottom-color:var(--p)}
     .tab[aria-current="page"] .ti{background:transparent;padding:0;margin:0}
-    .cb-right{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
+    .cb-right{position:static;display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
+    .cb-acct{display:inline-flex}
     .cb-bell{width:36px;height:36px;font-size:16px;box-shadow:none;border:1px solid var(--line)}
     .cb-acct{width:32px;height:32px;padding:0;border-radius:50%;background:var(--p-soft);color:var(--p);font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line)}
     .cb-acct:hover{border-color:var(--p);color:var(--p)}
-    .navpanel{display:block;position:absolute;top:calc(100% + 8px);right:14px;width:min(400px,calc(100vw - 28px));margin:0;z-index:35;box-shadow:var(--shadow-lift);max-height:70vh;overflow:auto}
+    .navpanel{display:block;position:absolute;top:calc(100% + 8px);left:auto;right:14px;width:min(400px,calc(100vw - 28px));margin:0;z-index:35;box-shadow:var(--shadow-lift);max-height:70vh;overflow:auto}
     .navpanel[hidden]{display:none}
-    .topbar .bell{display:none}   /* at this width the bell lives in the context bar */
     .chipbar{top:52px}
     section[id^="sec-"],#sec-overview{scroll-margin-top:118px}
   }
@@ -732,10 +740,9 @@ function unreadKeysFrom(notifs){
 }
 function renderHome(){
   const P=PORTAL,projects=P.projects,feed=P.feed||{};
-  const badge=P.unread?`<span class="badge on" aria-hidden="true">${P.unread>9?'9+':P.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
-  let html=`<div class="topbar"><div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
-    `<button id="bell" class="bell" aria-label="What’s new${P.unread?` — ${P.unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button></div>`+
-    `<div id="np" class="notifpanel" role="region" aria-label="What’s new" hidden></div>`+
+  // PS3 (D3a): Home no longer renders its own bell — the ONE persistent bell
+  // (#navbell, outside #main) serves every tab on every viewport.
+  let html=`<div class="topbar"><div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div></div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
     `<header><h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
   html+=welcomeCardHtml();
   // slice 10: the at-a-glance strip — filled by buildNeedsYou from data Home
@@ -761,7 +768,7 @@ function renderHome(){
   else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><div class="qmain"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div></div>`).join('')}</div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
-  wireWelcome();wireBell();
+  wireWelcome();
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
   buildNeedsYou();
   loadWebsiteCard();
@@ -1793,10 +1800,9 @@ function notifPanelHtml(notifs,failed){
   }
   return h;
 }
-// One wiring for BOTH bells (Home's topbar bell on phones; the context bar's
-// bell ≥720px — both exist in the DOM at once, CSS shows exactly one per viewport).
-// Opening either marks everything seen: every badge clears (so the two bells can
-// never disagree) and the read-state persists server-side.
+// The ONE persistent bell (#navbell — fixed top-right on phones, in the context
+// bar ≥720px; PS3 D3a). Opening it marks everything seen: the badge clears and
+// the read-state persists server-side.
 const BELL_DOC_WIRED=new Set();   // document-level listeners bind ONCE per bell/panel pair
 function wireBellAt(bellId,panelId){
   const bell=$(bellId),panel=$(panelId);if(!bell||!panel)return;
@@ -1842,7 +1848,6 @@ function wireBellAt(bellId,panelId){
     document.addEventListener('keydown',(e)=>{const p=$(panelId);if(e.key==='Escape'&&p&&!p.hidden){const bl=liveClose();if(bl)bl.focus();}});
   }
 }
-function wireBell(){wireBellAt('bell','np');}
 // ── the project drill-in — the client's record page ─────────────────────────
 // Anatomy (Salesforce record page, portal skin): header (name + status chip) →
 // highlights tiles → milestone Path (read-only chevrons) → two-region body:

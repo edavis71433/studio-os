@@ -246,14 +246,18 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
   });
 
-  test('mobile: the bottom tab bar keeps its six tabs and the Home bell stays', async ({ page }, testInfo) => {
+  test('mobile: the bottom tab bar keeps its six tabs and the ONE persistent bell shows', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'bottom bar is the <720px nav');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
     await expect(page.locator('#tabnav .tab')).toHaveCount(6);
     await expect(page.locator('.cb-brand')).toBeHidden();
-    await expect(page.locator('#navbell')).toBeHidden();
-    await expect(page.locator('#bell')).toBeVisible();
+    // PS3 (D3a): the bell is persistent chrome OUTSIDE #main on phones too —
+    // one bell (#navbell), one badge, every tab. The old per-render Home
+    // topbar bell (#bell) is gone: one source of truth for the count.
+    await expect(page.locator('#navbell')).toBeVisible();
+    await expect(page.locator('#navbell .badge')).toHaveText('1');
+    await expect(page.locator('#bell')).toHaveCount(0);
   });
 });
 
@@ -2206,5 +2210,36 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
+  });
+});
+
+// ── PS3 — bell chrome: mobile reachability + dead clicks + the three numbers ──
+// The what's-new bell becomes persistent chrome (decision D3a): ONE bell
+// (#navbell) outside #main on every viewport, so all six tabs carry it on
+// phones. Notification clicks always land somewhere: '#support-<rid>' →
+// the Messages reading pane (D4a), unknown hrefs → Home (never a silent
+// no-op), and anchor scrolls try the exact element before its section. The
+// three adjacent numbers reconcile (D1a): the glance tile counts the queue's
+// rows BY CONSTRUCTION and is labeled for the list it counts; the bell badge
+// keeps the server's unseen cursor, and the panel says what THAT number means.
+// Opening the panel refetches the list — client persona only; the reviewer's
+// zero-/client/*-fetch calm stays contract.
+test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
+  test('mobile: the ONE persistent bell (badge included) rides along on every tab', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'phone reachability is the <720px contract');
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    for (const tab of ['home', 'messages', 'files', 'invoices', 'requests', 'help']) {
+      await page.locator(`#tabnav [data-tab="${tab}"]`).click();
+      await expect(page.locator('#navbell'), `bell on ${tab}`).toBeVisible();
+      await expect(page.locator('#navbell .badge'), `badge on ${tab}`).toHaveText('1');
+    }
+    // …and the panel genuinely opens over a non-Home tab
+    await page.locator('#navbell').click();
+    await expect(page.locator('.notifpanel:visible')).toBeVisible();
+    await expect(page.locator('.notifpanel:visible .nitem')).toHaveCount(1);
+    // no horizontal overflow from the floating chrome
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 });
