@@ -296,3 +296,107 @@ stop minting a false scope. Decide before SS3 builds.
   endpoint itself):** not page treatments; they stay on the audit track — D6's
   endpoint unblocks the final fan-out collapse in SS6/SS7, which ship interim
   caps/caches until it lands.
+
+---
+
+# PORTAL — standards sweep (Eric: "And the portal")
+
+Scope: every portal surface in client.html at HEAD, against the redesign standard
+(per-read failure honesty, VIEW_SEQ contract :531-536, reviewer zero-/client/*-fetch,
+queue-row/.frow anatomy, token-complete fields, focus management). Four recon
+auditors + POST-REDESIGN-AUDIT batch B, deduped. Shipped-and-verified at HEAD —
+do NOT re-open: A2 (Requests reviewer gate :1439-1443), A4 (billing no-cache
+honesty :592-604, :1411), A12 (support attribution via server `from`,
+supportThreadItems :905-915, :1917-1921).
+
+## 1. Portal verdict table
+
+| Surface | Verdict | Headline gaps | Effort |
+|---|---|---|---|
+| Home — glance + "Needs you" + Recent updates | partial | Queue renders "You're all caught up." on failed feed/snaps/billing reads (:779) — the zero-masquerade the glance strip avoids on the same paint **[L]**; billingFailed never consumed (:737, :776-778); three adjacent numbers, three definitions, none labeled (:430 vs :761-778 vs :414); Recent-updates rows lack queue-row anatomy and show empty copy on a failed feed (:722-724) | M |
+| Boot / first-run (load()) | partial | Failed /client/projects renders the zero-project 🚀 first-run as truth — active projects silently vanish for the session (:1979-1980) **[L]**; rolebadge keys off projects.length not persona (:708). (Audit's "unverified" first-run item now verified: the copy itself is genuinely built.) | S |
+| Bell / What's-new + tab chrome | partial | Panel says "You're all caught up — nothing new right now." on a FAILED notifications read (:1663-1664 vs notifsFailed :1993) — A3's portal sibling; <720px the only bell lives in renderHome, so 5 of 6 tabs have no bell on phones (:90, :707-709); navFromHref dead clicks (no fallback :522; resolved-anchor no-ops :405/:512); reviewer fires /client/notifications GET+POST 403s (:1992, :1708) | M |
+| Messages tab | partial | B5: failed /client/support at :940 silently drops ALL support threads; zero-project client then sees "No conversations yet" (:994, :1053) on a failed read **[L]** | S |
+| Files tab | partial | Failed snaps CACHED for the session (:608-624) — ":1391's try again in a moment" is a lie until reload; inconsistent with post-A4 billing | S |
+| Invoices tab | untreated (A4 patch only) | B1 whole: legacy paragraph cards (:1400-1403), no status chips/unpaid-total/VIEW_SEQ, `$1200` vs glance's `$1,200` (:1402/:777 vs :434), client-shaped reviewer copy (:1412) | M |
+| Requests tab | meets-standard | Only the B6 composer-VIEW_SEQ sliver (tracked in PS7) | — |
+| Help tab | untreated | B2 whole: 500/403 masquerades as "hasn't added any help articles yet" (:1615-1617); the ONLY tab where a reviewer still fetches /client/* (:1615 → workspace.ts:31 403); no VIEW_SEQ; account card unpromoted (:1624-1625) + its "message your studio" note shows to reviewers who have no message button | S-M |
+| Project record (openProject) | partial | B3: paint at :1792 unguarded after four awaits; msgs/support/report failures silently render as absent (:1734-1736, :1742, :1785); legacy upload flow — no preflight, orphan row per retry (:1781, :1575-1588); network throw = skeleton stuck forever (:1732 uncaught); focus lost on entry + every re-render | M |
+| Support thread (openSupportThread) | partial | Unguarded paint :1906→:1915; uncaught throw = stuck skeleton; reply textarea white-on-dark (:1912 missing card/ink tokens); reply re-runs the whole view, dropping focus (:1922) | S |
+| Survey (openSurvey) | partial | Unguarded paint :1926→:1945; slow read = dead click (no busy state; throw bypasses the toast); fields lack font:inherit + card/ink tokens (:1937); focus | S |
+| Book-a-call flow | partial | B4: three transient failures masquerade as "isn't set up" / "hasn't opened any times" / "No open times that day" (:1533-1537, :1553-1554) — an outage steers clients away from booking day after day; paints unguarded after awaits (:1534/:1537/:1541/:1570); asks a signed-in client to type their own name/email (:1560-1567) | S |
+| Composers (openServiceRequest / openSupport) | partial | B6: neither bumps VIEW_SEQ (:1592, :1953) — a late guarded render can wipe a half-typed brief/message; openSupport fields unthemed (:1955); no entry focus | S |
+| "Your website" card (slice 8b) | meets-standard | One sliver: a transiently failed stats read cached as null for the session (:830-832) — pins the card hidden until reload | S |
+
+## 2. Ordered portal slices (one Eric approval each)
+
+### PS1 — Failed-read honesty sweep: "a failed read never masquerades as empty" [M]
+The portal's remaining lies, all S-sized, one theme, one batch. Highest client
+impact: today a bad morning reads "You're all caught up." with a pending
+approval outstanding.
+- **Surfaces:** load(), renderHome (projects section + Needs-you + Recent updates), notifPanelHtml, renderMessages list, ensureBilling/ensureSnaps/loadWebsiteCard caches.
+- **Treatment:**
+  - load(): proj.ok false → `PORTAL.projectsFailed` (:1979-1980); Home's projects section renders the .fload couldn't-load line instead of the 🚀 first-run card; glance/needs-you treat it as a failed source. Rolebadge derives from persona, not projects.length (:708).
+  - buildNeedsYou consumes feedFailed / snap.failed / billingFailed: any failed source → surviving rows + one calm per-source line; only all-sources-OK-and-empty earns "You're all caught up." (:779). ensureBilling sets `PORTAL.billingFailed` (B1's named flag); due tile hides by contract, not by dueTotal accidentally computing 0 (:432-434, :748).
+  - Recent updates gates its empty copy on feedFailed (:722-723).
+  - notifPanelHtml(notifs, failed): failed → "We couldn't check just now — try again in a moment." (A3's exact copy), skip the mark-seen POST on the failed branch (:1663-1674, :1708).
+  - B5: supFailed tracked at :940 — calm list-head line, project threads kept, both "No conversations yet" copies (:994, :1053) gated on supFailed false. No caching, so tab re-entry retries free.
+  - ensureSnaps stops caching failed entries — refetch failed ids on next call (:608-624), so Files' :1391 copy and Home's hidden tiles genuinely retry. Same fix for wstats (:830-832, per-slice-8b decision D6).
+  - Mirror pure-helper changes in tests/presence/today_home_test.mjs + portal_ux_test.mjs (they copy these helpers 1:1).
+- **Absorbs:** B5 (whole), A3's portal sibling, B1's "billingFailed flag consumed by Home" clause, both recon L-findings, audit's "portal zero-project first-run" unverified item (verified; residuals fixed here).
+- **Effort:** M (eight S changes). **Deps:** none.
+
+### PS2 — Invoices tab full treatment (B1) [M]
+The one tab with no redesign slice; the money surface.
+- **Surfaces:** renderInvoices, appendBilling, needs-you invoice row, glance.
+- **Treatment:** `const view=++VIEW_SEQ` / re-check after ensureBilling (renderRequests pattern :1437/:1450); reviewer branch first — calm read-only copy ("Billing lives with the account owner"), zero fetches, replacing the client-shaped :1412; .frow rows (fileRowHtml anatomy :1242-1244): 🧾 + name + "amount · due <date>" meta + paid/overdue/sent status chip — overdue = unpaid (unpaidInvoices :606) && due_date < today (decision D2) — row action Pay → / Paid — thank you / studio-will-send; unpaid-total line using glanceData:434's formula; ONE shared money formatter for rows, total, needs-you row (:777), and glance (`toLocaleString('en-US')` — kills $1200 vs $1,200); keep :1411's honest-failure card verbatim.
+- **Absorbs:** B1 (whole), the renderInvoices half of B6's VIEW_SEQ list.
+- **Effort:** M. **Deps:** PS1 ships billingFailed; if PS1 is deferred, this slice ships the flag itself.
+
+### PS3 — Bell chrome: mobile reachability + dead clicks + the three numbers (B6 core) [M]
+- **Surfaces:** topbar/context-bar bells, notifPanelHtml, navFromHref, glance needs-OK tile, Recent updates rows.
+- **Treatment:** bell reachable on every tab <720px (placement per decision D3), one wireBellAt unchanged; refetch /client/notifications on bell open when notifsFailed (panel is currently load-time-only, stale a full session); navFromHref gains a '#support-<rid>' branch → the Messages reading pane (decision D4) and an else-fallback → showTab('home') so no click is ever dead; anchor scrolls try the exact element id before the section (decided approvals render li#approval-<id> :1774) so resolved-anchor clicks stop landing at an unexplained project top; gate the boot GET and the read POST on persona==='client' (:1992, :1708) — closes the reviewer 403 chrome leak; reconcile/label the three numbers per decision D1; Recent-updates rows to queue-row anatomy (qico from moment_type, neutral "Update" kchip, rel(created_at) — data already in the feed, workspace.ts:260); welcome-card tab tour gated on persona==='client'.
+- **Absorbs:** B6's mobile-bell, navFromHref, three-numbers, and recent-updates items.
+- **Effort:** M. **Deps:** PS1's panel failure copy (sequencing only). E2e extends tests/e2e/portal.spec.ts's notification fixtures (:387).
+
+### PS4 — Help tab treatment (B2) [S-M]
+- **Treatment:** reviewer gate FIRST — persona!=='client' renders the calm state with ZERO fetches (Help is the last tab violating the contract), account card kept but without the "message your studio" pointers reviewers can't act on; three-way FAQ read — r.ok+html → search+body unchanged; r.ok+empty → today's no-articles copy; !ok/throw → "We couldn't load help articles just now — please try again in a moment." (never cached, tab re-entry retries); VIEW_SEQ capture + re-check around the await; promote #sec-you to a profile section — identity block (firstName + email + studio), structured rows for Appearance / Change password / Sign out (existing handlers :1628-1630 unchanged).
+- **Absorbs:** B2 (whole), the renderHelp half of B6's VIEW_SEQ list.
+- **Effort:** S-M. **Deps:** none.
+
+### PS5 — Booking flow honesty (B4 + its B3 sliver) [S]
+- **Treatment:** separate failure from absence in all three reads — only an ok /client/book with no site_id earns "isn't set up" (:1534), only an ok types read with empty types earns "hasn't opened any times" (:1537 — r.ok is currently never checked at :1536), only an ok slots read earns "No open times that day" (:1554); any failure → "We couldn't check on booking just now — please try again in a moment." + Retry re-running that step (bookLoadSlots retries into #bk-slots); `const view=VIEW_SEQ` after the :1529 bump, re-check before every #main paint including submitBooking's success takeover (:1570); prefill #bk-name/#bk-email from firstName(USER)/USER.email, editable (decision D5); focus each step's h1 (tabindex=-1).
+- **Absorbs:** B4 (whole) + openBooking's line of B3's VIEW_SEQ item.
+- **Effort:** S. **Deps:** none.
+
+### PS6 — Project-record cohesion sweep (B3: openProject + openSupportThread + openSurvey) [M-L]
+The slice-4 page brought up to every cross-cutting contract at once.
+- **Treatment:**
+  - VIEW_SEQ: capture at entry, re-check before every paint after an await (:1792, :1906→:1915, :1926→:1945).
+  - Network throws caught: openProject's Promise.all (:1732) and the thread read (:1906) get try/catch → calm couldn't-load card with Back link, never a stuck skeleton; openSurvey's throw routes to the existing toast-and-stay path.
+  - Per-read honesty: failed support → muted couldn't-load line in sec-support (CTA kept, :1785-1788); failed msgs → same line in the rail instead of "say hello" (:1742); failed report → today's tile fallback (already honest).
+  - Files section: delete :1779-1781 + uploadClientFile (:1575-1588) — deliverables as fileRowHtml .frow rows, then shareCardHtml/wireShareCard preselected to this project (preflight, shareServerMsg, SHARE_KEPT orphan-free retry, focus-restore all inherited from slice 12). Kills the raw "Uploaded by the client." body copy and the orphan-row-per-retry.
+  - Support rows: reqRowHtml queue-rows sorted by last_activity_at||updated_at (matching :1428/:886), wired to openSupportThread as today.
+  - openSupportThread: reply success re-fetches the one thread and repaints #sthread in place (view-guarded), composer keeps focus; #smsg textarea gets background:var(--card);color:var(--ink) (white-on-dark today).
+  - openSurvey: busy state on the invoking control ("Opening…", restore on failure); fields get font:inherit + card/ink tokens.
+  - Focus: h1 tabindex=-1 + .focus() on paint; focusSection focuses the section h2 after scroll; post-decide/task-done/upload re-renders re-focus the acted-on section.
+  - Persona gate: reviewer following a stale ?project= deep link (:2001) routes to calm Home instead of firing four 403ing /client/* reads (:1732-1737).
+- **Absorbs:** B3 (whole).
+- **Effort:** M-L. **Deps:** slice-12 share card (shipped); pairs with PS3's exact-anchor fallback.
+
+### PS7 — VIEW_SEQ stragglers + composer polish (B6 remainder) [S]
+- **Treatment:** `VIEW_SEQ++` at the top of openServiceRequest and openSupport (openBooking's :1529 drill-in pattern, standard comment) — after PS2/PS4 ship, these two are all that remain of B6's four-renderer list; openSupport's #sup-subj/#sup-body gain background:var(--card);color:var(--ink);font:inherit (:1955, matching the sibling composer :1593); both composers focus their first field on paint (shareCompose's :1315 pattern). No routing changes — the ret/backTo contract stays.
+- **Absorbs:** B6's VIEW_SEQ item (remainder), both recon composer entries.
+- **Effort:** S. **Deps:** sequence after PS2/PS4 to avoid double-building their renderers' tokens.
+
+Batch-B coverage: B1→PS2 (+PS1 flag) · B2→PS4 · B3→PS6 · B4→PS5 · B5→PS1 · B6→PS1/PS2/PS3/PS4/PS7. Nothing in batch B is unassigned; recon found four items beyond the audit (boot projects lie, snaps/wstats failure caching, thread/survey field theming, survey busy state) — all absorbed above.
+
+## 3. Portal decision points for Eric
+
+- **D1 — The three adjacent numbers (PS3).** (a) *Unify:* one pure needsYouItems() helper; the needs-OK tile shows the queue's row count by construction and becomes a button scrolling to #home-needs; bell keeps its own server-cursor count but gains an explicit "updates since you last looked" label. (b) *Label-only:* keep all three definitions, give each a visible label. (a) is the recon recommendation — one number a client can reconcile by looking down the page; (b) is smaller and touches no counting logic.
+- **D2 — Overdue derivation (PS2).** Server status vocab has no "overdue". (a) Derive client-side: unpaid && due_date < today → overdue chip. (b) Render server status verbatim, no client re-litigating of money state. (a) matches B1's named chip vocab; (b) avoids a client/server disagreement if the studio side later adds its own overdue logic.
+- **D3 — Mobile bell placement (PS3).** (a) Persistent chrome outside #main (like the tab nav :525-527) — one bell, zero per-renderer edits, survives every innerHTML rewrite. (b) topbarHtml() prepended inside each tab renderer — everything stays in the paint cycle, but six call sites. (a) is structurally cleaner; (b) is the smaller diff.
+- **D4 — '#support-' notification destination (PS3).** (a) Messages reading pane via openMessagesTo — one honest renderer per A12, matches where ?support= deep links and Requests rows already land. (b) Record-page Support section — keeps project context but preserves two destinations for one thread. Recon recommends (a).
+- **D5 — Booking prefill (PS5).** (a) Prefill name/email from the session, editable. (b) Keep blank — a client may book on someone else's behalf. (a) removes friction and typo risk in the booking record; either is defensible.
+- **D6 — Failure-cache retry shape (PS1).** For ensureSnaps: (a) refetch only failed project ids and merge (keeps the warm cache); (b) billing-style full no-cache on any failure (simpler, refetches everything). Recon proposes (a); (b) is fewer moving parts.
+- **D7 — Truly-empty reviewer glance (PS1).** Zero projects + no feed approvals currently renders a lone "0 need your OK" tile. (a) Hide it per slice 10's hide-when-absent rule (there is no OK-able datum). (b) Keep the honest zero. Recon proposes (a).
