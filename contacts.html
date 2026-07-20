@@ -193,6 +193,8 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",ALL=[],Q="",LOADED_AT=0;
+// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/customers.html
+const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 // ONE delegated closer for the view menu (attached ONCE — render() rebuilds the
 // header many times; per-render document listeners would pile up): a click
@@ -242,8 +244,11 @@ function sortedRows(){
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
 }
-function headerHtml(count){
+const lmetaText=(count)=>{
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  return `${count} contact${count===1?'':'s'} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
+};
+function headerHtml(count){
   return `<h1 class="sr-only">Contacts</h1><div class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">👤</span>
@@ -257,7 +262,7 @@ function headerHtml(count){
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${count} contact${count===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
   </div>`;
 }
 function tableHtml(list){
@@ -294,24 +299,34 @@ function cardsHtml(list){
   }
   return h;
 }
+function listHtml(rows){
+  if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;
+  if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?'No contacts match “'+esc(Q)+'”.':'Nothing in this view — try “All contacts”.'}</p>`;
+  return DISPLAY==='table'?tableHtml(rows):cardsHtml(rows);
+}
 function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="new">+ Contact</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`;
-  if(!ALL.length){h+=`<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;}
-  else if(!rows.length){h+=`<p class="muted" style="text-align:center;padding:30px">${Q?'No contacts match “'+esc(Q)+'”.':'Nothing in this view — try “All contacts”.'}</p>`;}
-  else h+=DISPLAY==='table'?tableHtml(rows):cardsHtml(rows);
-  // Any re-render (search, sort, view, display, refresh) must not destroy an
-  // open — or in-flight — CSV import panel: carry the LIVE #csvZone node (its
-  // handlers, file pick, and progress included) across the innerHTML swap. A
-  // finished import empties the zone itself, so nothing sticks around after.
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="new">+ Contact</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`
+    +`<div id="listZone">${listHtml(rows)}</div>`;
+  // Any re-render (sort, view, display, refresh) must not destroy an open — or
+  // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,
+  // file pick, and progress included) across the innerHTML swap. A finished
+  // import empties the zone itself, so nothing sticks around after.
   const zPrev=document.getElementById('csvZone');
   const zKeep=!!(zPrev&&zPrev.innerHTML.trim());
-  $('main').innerHTML=h;wire();
+  $('main').innerHTML=h;wire();wireList();
   if(zKeep){const z=document.getElementById('csvZone');if(z)z.replaceWith(zPrev);}
 }
+// C5: keystrokes re-render ONLY the list zone (+ the meta count) — the search
+// input node is never rebuilt, so caret and focus survive without restoration.
+function renderListZone(){
+  const rows=sortedRows();
+  const lm=$('lmeta');if(lm)lm.textContent=lmetaText(rows.length);
+  const z=$('listZone');if(z){z.innerHTML=listHtml(rows);wireList();}
+}
 function wire(){
-  const q=$('q');if(q)q.addEventListener('input',()=>{Q=q.value;const p=q.selectionStart;render();const nq=$('q');if(nq){nq.focus();try{nq.setSelectionRange(p,p);}catch(_){}}});
+  const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;renderListZone();}));
   const nb=$('new');if(nb)nb.addEventListener('click',openNew);
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
   // view dropdown (fixed views, D3): listbox popup — opening focuses the first
@@ -336,6 +351,15 @@ function wire(){
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('We couldn’t load your contacts just now.')));
   const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
   const dc=$('dispCards');if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
+  const rt=$('retry');if(rt)rt.addEventListener('click',load);
+  const ic=$('importCsv');if(ic)ic.addEventListener('click',openImport);
+  // custom-field definitions editor — reachable from the toolbar (the old path
+  // lived only inside a never-shown detail dialog; a fetch failure just keeps
+  // the current defs and the dialog still opens for editing from scratch)
+  const mfb=$('manageFields');if(mfb)mfb.addEventListener('click',()=>{openFields().catch(()=>toast('We couldn’t load your fields just now.'));});
+}
+// handlers whose targets live INSIDE #listZone — re-wired on every list re-render
+function wireList(){
   // sortable column headers — click toggles asc/desc (aria-sort on the <th>)
   document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');
@@ -354,12 +378,6 @@ function wire(){
     tr.addEventListener('click',(e)=>{if(e.target.closest('a,button'))return;openDetail(tr.getAttribute('data-open'));});
     tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('a,button')){e.preventDefault();openDetail(tr.getAttribute('data-open'));}});
   });
-  const rt=$('retry');if(rt)rt.addEventListener('click',load);
-  const ic=$('importCsv');if(ic)ic.addEventListener('click',openImport);
-  // custom-field definitions editor — reachable from the toolbar (the old path
-  // lived only inside a never-shown detail dialog; a fetch failure just keeps
-  // the current defs and the dialog still opens for editing from scratch)
-  const mfb=$('manageFields');if(mfb)mfb.addEventListener('click',()=>{openFields().catch(()=>toast('We couldn’t load your fields just now.'));});
 }
 function openNew(){$('c-name').value='';$('c-email').value='';$('c-phone').value='';$('c-company').value='';$('newDlg').showModal();setTimeout(()=>$('c-name').focus(),20);}
 $('c-cancel').onclick=()=>$('newDlg').close();
@@ -567,8 +585,13 @@ $('fieldsForm').onsubmit=async(e)=>{
 };
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your contacts.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your contacts just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
+// REQ_SEQ (SS6): a superseded load must never paint — only the newest request's
+// response (success OR failure) is allowed to touch the page.
+let REQ_SEQ=0;
 async function load(){
+  const seq=++REQ_SEQ;
   const r=await api('/sales/contacts?limit=500');
+  if(seq!==REQ_SEQ)return;
   if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
   if(!r.ok){trouble();return;}
   ALL=(r.body&&r.body.data)||[];LOADED_AT=Date.now();render();

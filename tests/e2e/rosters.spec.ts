@@ -207,6 +207,62 @@ test.describe('Contacts list view', () => {
   });
 });
 
+// ── SS6 (C5): shared debounce + list-only re-render + REQ_SEQ on contacts ────
+test.describe('Contacts — SS6 quick wins', () => {
+  test('C5 — search re-renders only the list: the input node survives typing', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS } });
+    await page.goto('/contacts.html');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    const q = page.locator('#q');
+    await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
+    await q.pressSequentially('sam');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr').first()).toContainText('Sam Rivera');
+    // the C5 contract: keystrokes re-render the LIST, never the input itself
+    expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
+    await expect(q).toBeFocused();
+    // the meta count follows the filter
+    await expect(page.locator('.lmeta')).toContainText('1 contact');
+    await q.fill('');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+  });
+
+  test('REQ_SEQ — a slow superseded /sales/contacts load never paints over the newest one', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS } });
+    const row = (id: string, name: string) => ({ id, name, email: 'x@example.com', phone: '', company: 'Acme', updated_at: new Date().toISOString() });
+    let call = 0;
+    await page.route(/\/functions\/v1\/presence\/sales\/contacts(\?|$)/, (route) => {
+      call++;
+      const fulfill = (rows: unknown[]) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: rows }) });
+      // call 2 delays WITHOUT blocking the handler — the race is real
+      if (call === 2) { setTimeout(() => { fulfill([row('c2', 'Stale Contact')]).catch(() => {}); }, 700); return; }
+      return fulfill(call === 1 ? [row('c1', 'Boot Contact')] : [row('c3', 'Fresh Contact')]);
+    });
+    await page.goto('/contacts.html');
+    await expect(page.locator('tbody tr')).toContainText(['Boot Contact']);
+    await page.locator('#refreshBtn').click();
+    await page.locator('#refreshBtn').click();
+    await expect(page.locator('tbody tr')).toContainText(['Fresh Contact']);
+    await page.waitForTimeout(900);   // the stale response lands — and must be ignored
+    await expect(page.locator('tbody tr')).toContainText(['Fresh Contact']);
+    await expect(page.locator('#main')).not.toContainText('Stale Contact');
+  });
+
+  test('boots quiet: one h1, zero console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS } });
+    await page.goto('/contacts.html');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('h1')).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
+});
+
 // ── Batch A (post-redesign audit) — A1: the custom-fields manager is reachable ─
 test.describe('Contacts — Manage fields (A1)', () => {
   test('the toolbar affordance opens the fields editor seeded from /sales/contacts/fields', async ({ page }) => {
