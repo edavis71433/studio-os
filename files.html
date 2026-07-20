@@ -8,10 +8,17 @@
 <meta name="description" content="Every file for your business — photos, brand, documents, downloads — in one calm place.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--danger:#a3423a;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--danger:#e08b83;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--danger:#a3423a}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--danger:#e08b83}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — same aliasing pattern
+     as customers.html / crm.html / inbox.html. */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--danger:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1080px;margin:0 auto;padding:26px 20px 90px}
@@ -59,7 +66,9 @@
   .dot{width:6px;height:6px;border-radius:50%;flex:none}
   .dot.live{background:var(--good)} .dot.used{background:var(--p)} .dot.un{background:var(--faint)}
   .star{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.86);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--warn)}
-  @media (prefers-color-scheme:dark){.star{background:rgba(31,26,43,.82)}}
+  /* overlay chips follow the EFFECTIVE theme (data-theme wins over the OS scheme) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .star{background:rgba(31,26,43,.82)}}
+  :root[data-theme="dark"] .star{background:rgba(31,26,43,.82)}
   .star svg{width:15px;height:15px}
   .badge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--good-soft);color:var(--good)}
   .badge.doc{background:var(--p-soft);color:var(--p)}
@@ -71,7 +80,8 @@
   /* multi-select */
   .tile.sel{border-color:var(--p);box-shadow:0 0 0 2px var(--p) inset,var(--shadow)}
   .check{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.9);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--p);z-index:2}
-  @media (prefers-color-scheme:dark){.check{background:rgba(31,26,43,.86)}}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .check{background:rgba(31,26,43,.86)}}
+  :root[data-theme="dark"] .check{background:rgba(31,26,43,.86)}
   .tile.sel .check{background:var(--p);border-color:var(--p);color:#fff}
   .check svg{width:15px;height:15px}
   .bulkbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--p-soft);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px}
@@ -160,12 +170,10 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-async function api(method,path,body){
-  const o={method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()}};
-  if(body!==undefined)o.body=JSON.stringify(body);
-  const r=await fetch(FN+path,o);
-  return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status,body:await r.json().catch(()=>({}))};
-}
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+// the shared (path, method, body) shape — same as leads/contacts/crm (E3: this
+// page used to flip the first two args, a standing bug factory at every call site)
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body===undefined?undefined:JSON.stringify(body)});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 const IC={
   all:'<path d="M3 5h7l2 2h9v11a2 2 0 0 1-2 2H3z" fill="none" stroke="currentColor" stroke-width="1.6"/>',
   photo:'<rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.7" fill="currentColor"/><path d="M4 18l5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.6"/>',
@@ -210,7 +218,7 @@ function askConfirm(title, body, okLabel){
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
       b.style.cssText=primary
-        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
+        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
         :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
       return b; };
     const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
@@ -235,7 +243,7 @@ function askPrompt(title, body, okLabel, placeholder){
     inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
       return b; };
     const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
     row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
@@ -251,7 +259,7 @@ function askPrompt(title, body, okLabel, placeholder){
 
 async function loadContext(){
   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
-  const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('GET','/portal/context'));
+  const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));
   if(c.ok&&c.body.data){
     S.caps=c.body.data.capabilities||[];
     // A watch-plan (monitor) site observes — uploads are off, so never show an
@@ -269,7 +277,7 @@ function qstr(){
 }
 async function load(){
   if(S.col==='stock'){ if(S.stockState==null) return loadStock(); return renderStock(); }   // FD-T10: stock has its own surface
-  const [a,col,h]=await Promise.all([api('GET','/assets?'+qstr()),api('GET','/assets/collections'),api('GET','/assets/health')]);
+  const [a,col,h]=await Promise.all([api('/assets?'+qstr()),api('/assets/collections'),api('/assets/health')]);
   if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${esc((a.body&&a.body.message)||"")||"Your client view shows what you’ve chosen to share."}</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
   let rows=(a.ok&&a.body.data&&a.body.data.assets)||[];
   const c=COLS.find(x=>x.key===S.col);
@@ -311,7 +319,7 @@ function renderStock(){
 }
 async function loadStock(){
   S.stockState='loading'; renderStock();
-  const r=await api('GET','/stock/search?q='+encodeURIComponent(S.stockQ||'')+'&page=1');
+  const r=await api('/stock/search?q='+encodeURIComponent(S.stockQ||'')+'&page=1');
   if(r.status===503){S.stockState='unavailable';return renderStock();}
   if(r.ok&&r.body.data){S.stockResults=r.body.data.images||[];S.stockProvider=r.body.data.provider||'';S.stockLicense=(r.body.data.license&&r.body.data.license.name)||'';}
   else{S.stockResults=[];}
@@ -319,7 +327,7 @@ async function loadStock(){
 }
 async function addStock(id,alt,credit,btn){
   if(btn){btn.disabled=true;btn.textContent='Adding…';}
-  const r=await api('POST','/stock/import',{stock_id:id,alt_text:alt,credit:credit});
+  const r=await api('/stock/import','POST',{stock_id:id,alt_text:alt,credit:credit});
   if(r.ok){toast('Added to your Files');if(btn){btn.textContent='Added ✓';}}
   else if(r.status===503){toast('Stock library isn’t enabled yet');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
   else{toast((r.body&&r.body.message)||'Could not add that photo');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
@@ -425,7 +433,7 @@ async function onBulk(action){
   if(action==='tag'){ const tag=await askPrompt('Add a tag','This tag is added to '+ids.length+' file'+(ids.length===1?'':'s')+'.','Add tag','e.g. summer, hero'); if(!tag)return; body.tag=tag; }
   else if(action==='collection'){ const collection=await askPrompt('Move to a collection','Move '+ids.length+' file'+(ids.length===1?'':'s')+' into a collection.','Move','e.g. Brand, Contracts'); if(!collection)return; body.collection=collection; }
   else if(action==='archive'){ if(!(await askConfirm('Archive '+ids.length+' file'+(ids.length===1?'':'s')+'?','Archived files leave your library view but aren’t deleted — you can restore them from Archive.','Archive')))return; }
-  const r=await api('POST','/assets/bulk',body);
+  const r=await api('/assets/bulk','POST',body);
   if(!r.ok){toast((r.body&&r.body.message)||'Could not apply that');return;}
   const d=r.body.data||{}; const done=d.applied||0; const miss=(d.missing||[]).length;
   const verb=action==='tag'?'Tagged':action==='collection'?'Moved':action==='archive'?'Archived':'Approved';
@@ -442,7 +450,7 @@ async function openDetail(id){
   panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="spin"></div>`;
   scrim.classList.add('on');panel.classList.add('on');
   focusPanel();   // move focus INTO the dialog (Escape already closes it)
-  const r=await api('GET','/assets/'+id);
+  const r=await api('/assets/'+id);
   if(!r.ok){panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="empty"><h2>Couldn’t open that file.</h2></div>`;focusPanel();return;}
   S.current=r.body.data;renderDetail();
   if(!$('panel').contains(document.activeElement))focusPanel();   // re-render replaced the focused node
@@ -504,7 +512,7 @@ function renderDetail(){
 // link-preview one as your share image by pointing settings.og_media_id at this file.
 async function loadSocial(id){
   const slot=$('social-slot'); if(!slot)return;
-  const r=await api('GET','/assets/'+id+'/social');
+  const r=await api('/assets/'+id+'/social');
   if(!$('social-slot')||!S.current||S.current.asset.id!==id)return;   // panel changed while loading
   if(!r.ok||!r.body.data){slot.innerHTML=`<div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Not available for this file.</div>`;return;}
   const crops=r.body.data.crops||[];
@@ -528,7 +536,7 @@ async function loadSocial(id){
 async function loadCards(id,headline){
   const slot=$('cards-slot'); if(!slot)return;
   const q=headline?('?headline='+encodeURIComponent(headline)):'';
-  const r=await api('GET','/assets/'+id+'/cards'+q);
+  const r=await api('/assets/'+id+'/cards'+q);
   if(!$('cards-slot')||!S.current||S.current.asset.id!==id)return;   // panel changed while loading
   if(!r.ok||!r.body.data||!(r.body.data.cards||[]).length){
     const msg=r.status===403?((r.body&&r.body.message)||'Branded cards aren’t included in your plan.'):'Not available for this file.';
@@ -603,7 +611,7 @@ function saveBlob(blob,name){const u=URL.createObjectURL(blob);const a=document.
 // original photo is never touched either way.
 async function removeBg(id,btn){
   if(btn){btn.disabled=true;btn.textContent='Removing background…';}
-  const r=await api('POST','/assets/'+id+'/remove-background');
+  const r=await api('/assets/'+id+'/remove-background','POST');
   if(btn){btn.disabled=false;btn.textContent='Remove background';}
   if(!S.current||S.current.asset.id!==id)return;   // panel changed while working
   if(!r.ok){
@@ -631,7 +639,7 @@ async function rbgDecide(planId,variationId,decision){
   const body=decision==='approve'
     ?{decision,variation_id:variationId,alt_text:(((a&&(a.alt_text||a.name))||'Photo').slice(0,180))+' (background removed)'}
     :{decision};
-  const r=await api('POST','/visual/plans/'+planId+'/decide',body);
+  const r=await api('/visual/plans/'+planId+'/decide','POST',body);
   if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through — nothing changed');return;}
   const slot=$('rbg-slot');if(slot)slot.innerHTML='';
   if(decision==='approve'){toast('Saved as a new file beside the original');closeDetail();load();}
@@ -639,7 +647,7 @@ async function rbgDecide(planId,variationId,decision){
 }
 async function setShareImage(id,isOg){
   if(isOg){toast('Already your share image');return;}
-  const r=await api('PUT','/settings',{og_media_id:id});
+  const r=await api('/settings','PUT',{og_media_id:id});
   if(r.ok){toast('Set as your share image — publish to apply');const slot=$('social-slot');if(slot){const b=slot.querySelector('.ogbtn');if(b){b.textContent='✓ This is your share image';b.setAttribute('onclick',`setShareImage('${id}',true)`);}}}
   else toast((r.body&&r.body.message)||'Could not set share image');
 }
@@ -647,32 +655,32 @@ async function saveDetail(){
   const a=S.current.asset;
   const body={name:$('f-name').value,collection:$('f-col').value,caption:$('f-cap').value,tags:$('f-tags').value.split(',').map(s=>s.trim()).filter(Boolean)};
   const alt=$('f-alt');if(alt)body.alt_text=alt.value;
-  const r=await api('PATCH','/assets/'+a.id,body);
+  const r=await api('/assets/'+a.id,'PATCH',body);
   if(r.ok){toast('Saved');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not save');
 }
 async function toggleFav(id){
   const a=S.assets.find(x=>x.id===id);const next=!(a&&a.favorite);
-  const r=await api('PATCH','/assets/'+id,{favorite:next});
+  const r=await api('/assets/'+id,'PATCH',{favorite:next});
   if(r.ok){if(a)a.favorite=next;render();}
 }
 async function setAssetStatus(id,action){
-  const r=await api('POST','/assets/'+id+'/status',{action});
+  const r=await api('/assets/'+id+'/status','POST',{action});
   if(r.ok){toast(action==='archive'?'Archived':'Restored');closeDetail();load();}else toast((r.body&&r.body.message)||'Not allowed');
 }
-async function duplicate(id){const r=await api('POST','/assets/'+id+'/duplicate');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
-async function download(id){const r=await api('GET','/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('Could not prepare download');}
-async function rollback(id){if(!(await askConfirm('Restore the previous version?','This puts the earlier file back everywhere it was used.','Restore')))return;const r=await api('POST','/assets/'+id+'/rollback');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
+async function duplicate(id){const r=await api('/assets/'+id+'/duplicate','POST');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
+async function download(id){const r=await api('/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('Could not prepare download');}
+async function rollback(id){if(!(await askConfirm('Restore the previous version?','This puts the earlier file back everywhere it was used.','Restore')))return;const r=await api('/assets/'+id+'/rollback','POST');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
 async function decideFile(id,action){
   if(action==='reject'&&!(await askConfirm('Ask for changes?','This keeps the current version live and sets the proposed replacement aside.','Ask for changes')))return;
-  const r=await api('POST','/assets/'+id+'/status',{action});
+  const r=await api('/assets/'+id+'/status','POST',{action});
   if(r.ok){toast(action==='approve'?('Approved'+(r.body.data&&r.body.data.requires_publish?' — publish to go live':'')):'Sent back for changes');closeDetail();load();}
   else toast((r.body&&r.body.message)||'Could not do that');
 }
 async function del(id,inUse){
   if(inUse){toast('This file is in use — remove it from the page or archive it first.');return;}
   if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
-  const r=await api('DELETE','/assets/'+id);
+  const r=await api('/assets/'+id,'DELETE');
   if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');
 }
 
@@ -689,11 +697,11 @@ async function uploadFiles(files){
     // filename (as documents already do); you can refine it in the detail panel after.
     let alt=name.trim().length>=3?name:'Photo';
     const dims=await dimsOf(file);
-    const up=await api('POST','/media/upload-url',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});
+    const up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});
     if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');continue;}
     const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
     if(!put.ok){toast('Upload failed for '+file.name);continue;}
-    if(isDoc)await api('PATCH','/assets/'+up.body.data.media_id,{name});
+    if(isDoc)await api('/assets/'+up.body.data.media_id,'PATCH',{name});
   }
   toast('Uploaded');load();
 }
@@ -705,11 +713,11 @@ $('replacer').onchange=async(e)=>{
   if(!(await askConfirm('Replace this file?',`Replace “${old.name}” with ${file.name}.`+_extra,'Replace')))return;
   const isDoc=file.type==='application/pdf';const dims=await dimsOf(file);
   const alt=isDoc?old.name:(old.alt_text||old.name);
-  const up=await api('POST','/media/upload-url',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height});
+  const up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height});
   if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');return;}
   const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
   if(!put.ok){toast('Upload failed');return;}
-  const r=await api('POST','/assets/'+old.id+'/replace',{with:up.body.data.media_id});
+  const r=await api('/assets/'+old.id+'/replace','POST',{with:up.body.data.media_id});
   if(r.ok){toast(r.body.data&&r.body.data.pending?'Sent for approval — it goes live once approved':('Replaced'+(r.body.data.requires_publish?' — publish to go live':'')));closeDetail();load();}else toast((r.body&&r.body.message)||'Replace failed');
 };
 // drag & drop
