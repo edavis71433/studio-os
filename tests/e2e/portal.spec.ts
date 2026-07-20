@@ -2396,4 +2396,43 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     // no boot notifications GET, no bell-open refetch, no mark-seen POST
     expect(calls).toEqual([]);
   });
+
+  // ── Recent-updates rows join the queue-row anatomy; the tab tour is client-only ──
+  test('Recent-updates rows carry the queue-row anatomy: type icon · “Update” chip · relative time', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API,
+      '/portal/feed': { data: { role: 'business_owner', moments: [
+        { id: 'm1', headline: 'Your new hours are live', summary: 'Published last week.', moment_type: 'good_news', created_at: new Date(Date.now() - 2 * 86400000).toISOString() },
+      ], notices: [], pending_approvals: [], last_published: null } } } });
+    await page.goto('/client.html');
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Recent updates' }) });
+    const row = sec.locator('.qrow');
+    await expect(row).toHaveCount(1);
+    // the icon derives from the feed's own moment_type (workspace.ts:260),
+    // decorative; the neutral "Update" chip + rel(created_at) complete the row
+    await expect(row.locator('.qico')).toHaveText('🎉');
+    await expect(row.locator('.qico')).toHaveAttribute('aria-hidden', 'true');
+    await expect(row.locator('.kchip')).toHaveText('Update');
+    await expect(row.locator('.qwhen')).toHaveText('2 days ago');
+    await expect(row.getByRole('heading', { name: 'Your new hours are live' })).toBeVisible();
+  });
+
+  test('the welcome card’s tab tour is client-persona only — a reviewer gets none of it', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // the tour names Messages/Files/Invoices/Requests — tabs a reviewer's
+    // persona renders as calm empty states; don't tour what they can't use
+    await expect(page.locator('#welcome')).toHaveCount(0);
+    await expect(page.locator('.wl-step')).toHaveCount(0);
+  });
+
+  test('…and a client still gets the four-step tour (the gate does not over-fire)', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#welcome')).toBeVisible();
+    await expect(page.locator('.wl-step')).toHaveCount(4);
+  });
 });

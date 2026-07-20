@@ -209,6 +209,7 @@
   /* slice 10: the action-feed anatomy — a type icon leads each row */
   .qico{flex:0 0 auto;width:32px;height:32px;border-radius:9px;background:var(--p-soft);display:grid;place-items:center;font-size:14px;align-self:flex-start;margin-top:3px}
   .qico.todo{background:var(--warn-soft)} .qico.invoice{background:var(--good-soft)}
+  .qwhen{flex:0 0 auto;font-size:11.5px;color:var(--faint);padding-top:6px}   /* PS3: a row's own recency (Recent updates) */
   /* slice 10: the at-a-glance strip (Lightning Home highlights, portal skin) */
   .glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:22px}
   .glance[hidden]{display:none}
@@ -502,6 +503,11 @@ function needsYouItems(feed,snaps,billing){
 // server's "unseen since your last look" cursor, a different number from the
 // queue by design (it counts updates, not open items).
 function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' update'+(unread===1?'':'s')+' since you last looked';}
+// PS3: Recent-updates rows share the queue-row anatomy — the type icon comes
+// from the feed's own moment_type (workspace.ts:260 already selects it);
+// unknown/absent types keep the neutral sparkle. Informational rows stay
+// unactionable — the icon narrates tone, never a to-do.
+function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
 
 // ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
 // tests/presence/client_website_test.mjs; keep both copies in sync). ──
@@ -805,7 +811,9 @@ function renderHome(){
   // successful read may make
   if(P.feedFailed)html+=`<p class="muted fload">We couldn’t load recent updates just now — please try again in a moment.</p>`;
   else if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
-  else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><div class="qmain"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div></div>`).join('')}</div>`;
+  // PS3: queue-row anatomy for the updates too — moment_type icon (decorative),
+  // a neutral "Update" kind chip, and the row's own recency (rel created_at).
+  else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><span class="qico" aria-hidden="true">${momentIcon(m.moment_type)}</span><div class="qmain"><span class="kchip">Update</span><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>${m.created_at?`<span class="qwhen">${esc(rel(m.created_at))}</span>`:''}</div>`).join('')}</div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
   wireWelcome();
@@ -1810,6 +1818,9 @@ const WELCOME_KEY='dds-portal-welcomed';
 function welcomed(){try{return localStorage.getItem(WELCOME_KEY)==='1';}catch(_){return false;}}
 function welcomeCardHtml(){
   if(welcomed())return'';
+  // PS3: the tour names Messages/Files/Invoices/Requests — tabs a reviewer's
+  // persona renders as calm empty states. Don't tour what they can't use.
+  if(PORTAL.persona!=='client')return'';
   const n=firstName(USER);
   const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:13px">${desc}</span></span></button>`;
   // First-run orientation — names every destination, not just approve/download/message.

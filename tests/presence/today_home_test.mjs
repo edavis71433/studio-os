@@ -71,6 +71,7 @@ function needsYouItems(feed,snaps,billing){
   return items;
 }
 function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' update'+(unread===1?'':'s')+' since you last looked';}
+function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
 
 const results=[];
 const ok=(n,p)=>{results.push({n,p});console.log(`${p?'PASS':'FAIL'}  ${n}`);};
@@ -228,6 +229,12 @@ const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Websit
 ok('bell label: pluralized "N updates since you last looked", clamped at zero',
   bellSinceLabel(2)==='2 updates since you last looked' && bellSinceLabel(1)==='1 update since you last looked'
   && bellSinceLabel(0)==='0 updates since you last looked' && bellSinceLabel(-3)==='0 updates since you last looked');
+// ═══ momentIcon — Recent-updates type icons from the feed's moment_type ═══
+ok('moment icon: every schema moment_type maps; unknown/absent stay the neutral sparkle',
+  momentIcon('good_news')==='🎉' && momentIcon('needs_attention')==='⚠️' && momentIcon('reminder')==='⏰'
+  && momentIcon('opportunity')==='💡' && momentIcon('celebration')==='🎉' && momentIcon('seasonal')==='🍂'
+  && momentIcon('business_health')==='📈' && momentIcon('learning')==='📚'
+  && momentIcon('weird')==='✨' && momentIcon(null)==='✨' && momentIcon(undefined)==='✨');
 {
   const g=glanceData(null,[],[],null,[]);
   ok('glance: absent data → nothing due, no project — those tiles hide (no fake zeros)',
@@ -278,8 +285,8 @@ for(const fn of ['greet','dateLine','monthTiles','monthTrend','siteYmd','todaySl
   ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
 }
 ok('mirror: today.html defines money verbatim',today.includes(String(money)));
-for(const fn of ['portalGreeting','snapWaiting','fmtMoney','glanceData','glanceTiles','needsYouItems','bellSinceLabel']){
-  const m=String({portalGreeting,snapWaiting,fmtMoney,glanceData,glanceTiles,needsYouItems,bellSinceLabel}[fn]);
+for(const fn of ['portalGreeting','snapWaiting','fmtMoney','glanceData','glanceTiles','needsYouItems','bellSinceLabel','momentIcon']){
+  const m=String({portalGreeting,snapWaiting,fmtMoney,glanceData,glanceTiles,needsYouItems,bellSinceLabel,momentIcon}[fn]);
   ok(`mirror: client.html defines ${fn} verbatim`,portal.includes(m));
 }
 
@@ -409,6 +416,13 @@ ok('portal: the boot notifications GET is persona-gated (reviewer boots with zer
   portal.includes("PORTAL.persona==='client'?await api('/client/notifications').catch(()=>null):null"));
 ok('portal: the mark-seen POST is persona-gated too — after the failed-read skip, before the POST',
   /if\(PORTAL\.notifsFailed\)return;[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return;[\s\S]*?api\('\/client\/notifications\/read','POST'/.test(portal));
+// PS3: Recent-updates rows share the queue-row anatomy (icon from moment_type,
+// neutral "Update" chip, rel(created_at)); the welcome tab-tour is client-only.
+ok('portal: Recent-updates rows render momentIcon + the neutral Update chip + their recency',
+  portal.includes('momentIcon(m.moment_type)') && portal.includes('<span class="kchip">Update</span>')
+  && portal.includes('<span class="qwhen">${esc(rel(m.created_at))}</span>'));
+ok('portal: the welcome tab-tour is gated on persona===client (reviewers are never toured)',
+  /function welcomeCardHtml\(\)\{\s*if\(welcomed\(\)\)return'';[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return'';/.test(portal));
 // PS3 (D4a + dead clicks): '#support-<rid>' hrefs land the Messages pane, and
 // navFromHref ends in the Home fallback — no notification click is ever dead.
 ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls back to Home (no dead clicks)',
