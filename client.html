@@ -1515,7 +1515,7 @@ async function renderInvoices(){
   // glanceData's OWN formula over the same unpaidInvoices — the tab's total and
   // Home's to-pay tile can never disagree (one formula, one formatter)…
   const total=unpaidInvoices(b).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
-  html+=`<p class="muted" style="margin:-14px 0 14px">Your website subscription is billed separately.</p>`;
+  html+=`<p class="muted" style="margin:0 0 14px">Your website subscription is billed separately.</p>`;   // 0-top: the legacy -14px was tuned for a sub-less header and overlapped the sub line
   // …and the line only exists when something truly is unpaid — never a fake $0
   if(total>0)html+=`<p class="invtotal" id="inv-unpaid">Unpaid right now: <strong>${esc(fmtMoney(total))}</strong></p>`;
   html+=`<div class="flv" role="list" aria-label="Invoices">${inv.map(i=>invoiceRowHtml(i,today)).join('')}</div>`;
