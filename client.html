@@ -609,9 +609,7 @@ async function ensureBilling(){
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
 // per-project snapshots (the full client bundle, capped) — shared by Home + Files
 async function ensureSnaps(){
-  if(PORTAL.snaps)return PORTAL.snaps;
-  const list=PORTAL.projects.slice(0,8);
-  PORTAL.snaps=await Promise.all(list.map(async(p)=>{
+  const fetchSnap=async(p)=>{
     try{const r=await api('/client/projects/'+p.id);
       if(!r.ok)throw 0;   // an error response is a FAILED read, not an empty project
       const d=(r&&r.body&&r.body.data)||{};const prog=d.progress||{};
@@ -623,7 +621,15 @@ async function ensureSnaps(){
     // failed:true so the glance strip can tell "couldn't read" from "genuinely
     // empty" — its empty arrays keep every other consumer degrading as before
     }catch(_){return {id:p.id,name:p.name,failed:true,milestones:[],approvals:[],todos:[],surveys:[],deliverables:[]};}
-  }));
+  };
+  // failed entries are never pinned for the session (A4's billing rule, per
+  // project): each call REFETCHES just the failed ids and keeps the warm rest,
+  // so "try again in a moment" on Files and Home is genuinely true on re-entry.
+  if(PORTAL.snaps){
+    PORTAL.snaps=await Promise.all(PORTAL.snaps.map(s=>(s&&s.failed)?fetchSnap(s):Promise.resolve(s)));
+    return PORTAL.snaps;
+  }
+  PORTAL.snaps=await Promise.all(PORTAL.projects.slice(0,8).map(fetchSnap));
   return PORTAL.snaps;
 }
 // shared deliverable download (Files tab + a project's Files section reuse it)

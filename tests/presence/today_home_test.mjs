@@ -322,6 +322,10 @@ ok('portal: Recent updates gates its empty copy on feedFailed — the couldn\'t-
   && /if\(P\.feedFailed\)html\+=[\s\S]{0,200}else if\(!moments\.length\)html\+=emptyCard\('Nothing new to share/.test(portal));
 ok('portal: ensureSnaps marks a FAILED per-project read (failed:true), distinct from an empty one',
   /if\(!r\.ok\)throw 0;/.test(portal) && portal.includes('failed:true,milestones:[]'));
+// PS1 (decision D6a): failed snap entries are refetched on the next ensureSnaps
+// call — the warm cache stays, so Files'/Home's "try again in a moment" is true.
+ok('portal: ensureSnaps refetches FAILED ids on the next call (never session-pins a failure)',
+  portal.includes('(s&&s.failed)?fetchSnap(s):Promise.resolve(s)'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',
   /<span class="qico[^"]*" aria-hidden="true">/.test(portal));
 ok('portal: explicit CTAs whose accessible names keep the row title',

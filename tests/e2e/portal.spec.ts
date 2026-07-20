@@ -1938,4 +1938,27 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     }
     await expect(page.getByText('No conversations yet', { exact: false })).toHaveCount(0);
   });
+
+  test('a failed snapshot read is NOT session-cached: Files genuinely retries it on the next call', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    // the FIRST bundle read (Home's ensureSnaps) fails; later reads succeed —
+    // the exact-URL pattern matches only the bundle (not /report or /messages)
+    let bundleGets = 0;
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      bundleGets++;
+      return bundleGets === 1
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) })
+        : route.fallback();
+    });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    expect(bundleGets).toBe(1);
+    // Files re-enters ensureSnaps → the failed id is REFETCHED (not served from
+    // a poisoned cache) and this time renders the project's real files
+    await page.locator('#tabnav [data-tab="files"]').click();
+    await expect(page.locator('.frow', { hasText: 'Homepage mockup' })).toBeVisible();
+    await expect(page.getByText('We couldn’t load this project’s files just now', { exact: false })).toHaveCount(0);
+    await expect.poll(() => bundleGets).toBe(2);
+  });
 });
