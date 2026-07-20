@@ -92,19 +92,30 @@
   .st{background:var(--line);border-radius:12px;opacity:.55}
   @media (prefers-reduced-motion:no-preference){.st{animation:stp 1.1s ease-in-out infinite alternate}}
   @keyframes stp{to{opacity:.3}}
-  /* portfolio lens (agency, unscoped — untouched narrative view) */
-  .pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px 19px;box-shadow:var(--shadow);margin-bottom:12px;display:block;text-decoration:none;color:inherit;max-width:680px}
-  a.pcard:hover{border-color:var(--p)}
-  .pcard.good{border-left:3px solid var(--good)} .pcard.attention{border-left:3px solid var(--warn)}
-  .pcard .s{font-size:16px;line-height:1.5;font-weight:500}
-  .pcard .d{margin-top:6px;font-size:14px;color:var(--soft)}
-  .pcard .n{font-family:var(--serif);font-size:30px;line-height:1;color:var(--p);float:right;margin:0 0 6px 14px;font-variant-numeric:tabular-nums}
-  .pcard .go{margin-top:11px;color:var(--p);font-weight:600;font-size:13px}
-  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:15px 18px;color:var(--soft);font-size:14.5px;margin-bottom:12px;max-width:680px}
+  /* portfolio lens (agency, unscoped — SS7: the same .dhead dashboard anatomy) */
+  .cfull{grid-column:1/-1}
+  .subline{grid-column:1/-1;color:var(--soft);font-size:14.5px;margin:2px 2px 0}
+  .tchip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 10px}
+  .tchip.good{color:var(--good);background:var(--good-soft)}
+  .tchip.attention{color:var(--warn);background:var(--warn-soft)}
+  .tchip.neutral{color:var(--p);background:var(--p-soft)}
+  .isent{font-size:14px;color:var(--ink);margin-top:4px;line-height:1.45}
+  .card .go{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
+  .card .go:hover{text-decoration:underline}
+  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:15px 18px;color:var(--soft);font-size:14.5px}
   .quiet b{color:var(--ink);font-weight:600}
-  .phead{margin-bottom:16px}
-  .phead h1{font-weight:500;font-size:clamp(24px,5vw,32px)}
-  .phead .sub{color:var(--soft);font-size:15px}
+  /* per-client rollup — customers.html's .tscroll anatomy (wide content scrolls
+     inside its own container; the page never scrolls sideways) */
+  .tscroll{grid-column:1/-1;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll table{min-width:560px}
+  .tscroll th{padding:11px 14px}
+  .tscroll td{padding:10px 14px}
+  .tscroll tbody tr{cursor:pointer}
+  .tscroll tbody tr:hover td{background:var(--p-soft)}
+  .tscroll td a{color:var(--ink);text-decoration:none;font-weight:600}
+  .tscroll td a:hover{color:var(--p)}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .pill.wait{color:var(--warn);background:var(--warn-soft)} .pill.ok{color:var(--good);background:var(--good-soft)}
   /* shared states */
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
@@ -121,7 +132,7 @@
   .print{margin-top:26px;text-align:center}
   .print button{background:none;border:1px solid var(--line);border-radius:10px;color:var(--soft);font:inherit;font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer}
   .print button:hover{border-color:var(--p);color:var(--p)}
-  @media print{.seg,.print,.filters,.noprint,#dds-shell{display:none!important}.wrap{max-width:100%}.card,.pcard{box-shadow:none;break-inside:avoid}}
+  @media print{.seg,.print,.filters,.noprint,#dds-shell{display:none!important}.wrap{max-width:100%}.card,.tscroll{box-shadow:none;break-inside:avoid}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   /* mobile: cards stack — pairs at tablet width, a single column on phones */
@@ -435,9 +446,9 @@ document.addEventListener('click',(e)=>{
 
 // stencil loading — layout-shaped gray blocks, shown only when the fetch runs
 // >300ms (SLDS: no stencil flash on fast loads)
-function renderStencil(){
+function renderStencil(title){
   const blocks=['c3','c3','c3','c3','c6','c6','c4','c4','c4','c3','c3','c3','c3','c6','c6'];
-  $('main').innerHTML=`<header class="dhead"><span class="obj" aria-hidden="true">📊</span><h1 id="pagehead" tabindex="-1">Business dashboard</h1></header>
+  $('main').innerHTML=`<header class="dhead"><span class="obj" aria-hidden="true">📊</span><h1 id="pagehead" tabindex="-1">${esc(title||'Business dashboard')}</h1></header>
     <p class="sr-only" role="status">Loading your dashboard</p>
     <div class="grid" aria-hidden="true">${blocks.map(c=>`<div class="st ${c}" style="height:${c==='c3'?'110px':'190px'}"></div>`).join('')}</div>`;
 }
@@ -447,21 +458,84 @@ function warming(){$('main').innerHTML=`<div class="center"><h2>This dashboard i
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 
-// ── the agency portfolio lens (unscoped agency operators — untouched, AN-7) ──
+// ── the agency portfolio lens (unscoped agency operators — SS7 retires AN-7:
+//    the same .dhead dashboard anatomy the scoped Business dashboard wears) ──
+// Every number below is derived from the payload — clients/needs-attention/
+// enquiries/live come from /analytics/portfolio's websites[] rollup; the
+// per-client table reads /agency/portfolio (the one read that carries site_id
+// for the drill-in). Nothing is invented: per-client VISITORS aren't in either
+// payload today, so that column simply doesn't exist yet (backend seam —
+// /analytics/portfolio.websites[] would need site_id + visitors).
 function insightCard(i){
-  const cls=i.tone==='good'?'good':i.tone==='attention'?'attention':'';
-  const num=(i.number!=null&&i.number!=='')?`<span class="n">${esc(i.number)}</span>`:'';
-  const go=i.href?`<div class="go">${esc(i.cta||'Take a look')} →</div>`:'';
-  const tag=i.href?'a':'div';const href=i.href?` href="${esc(i.href)}"`:'';
-  return `<${tag} class="pcard ${cls}"${href}>${num}<div class="s">${esc(i.sentence)}</div>${i.detail?`<div class="d">${esc(i.detail)}</div>`:''}${go}</${tag}>`;
+  const tone=i.tone==='good'?'good':i.tone==='attention'?'attention':'neutral';
+  const chip=tone==='good'?'Good news':tone==='attention'?'Needs a look':'Worth knowing';
+  const head=`<div class="ch"><span class="tchip ${tone}">${chip}</span><h3 class="t" style="margin-top:7px">${esc(i.title||'Across your clients')}</h3></div>`;
+  const body=`${(i.number!=null&&i.number!=='')?`<p class="kn">${esc(i.number)}</p>`:''}<p class="isent">${esc(i.sentence)}</p>${i.detail?`<p class="kd">${esc(i.detail)}</p>`:''}`;
+  const foot=i.href?`<div class="cf"><a class="go" href="${esc(i.href)}">${esc(i.cta||'Take a look')} →</a></div>`:'';
+  return `<section class="card c4">${head}<div class="cb">${body}</div>${foot}</section>`;
 }
-function renderPortfolio(d){
-  let h=`<header class="phead"><h1 id="pagehead" tabindex="-1">Analytics</h1><p class="sub">${esc(d.headline||'Across your clients.')}</p></header>`;
-  if(!(d.insights||[]).length){h+=`<div class="quiet"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`;}
-  h+=(d.insights||[]).map(insightCard).join('');
-  h+=`<div class="pcard"><div class="s">Open the Studio to work client by client.</div><a class="go" href="/agency.html">Open Studio →</a></div>`;
-  h+=`<div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
+function portfolioRollup(roster){
+  // roster: /agency/portfolio rows (site_id · name · edition · status ·
+  // attention · leads_waiting). null = that read FAILED — say so, never a
+  // blank or an implied all-clear (failure ≠ empty).
+  let h=`<h2 class="band">Client by client</h2>`;
+  if(roster===null){
+    h+=`<div class="cfull card"><div class="cb" style="padding:14px 16px;color:var(--soft)">The client-by-client list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div></div>`;
+    return h;
+  }
+  if(!roster.length){
+    h+=`<div class="cfull card"><div class="cb">${emptyState('No clients yet','Businesses you add from your Studio tools will be listed here.')}</div></div>`;
+    return h;
+  }
+  const rows=roster.map(c=>{
+    const drill='/analytics.html?client='+encodeURIComponent(c.site_id||'');
+    const att=Number(c.attention||0),lw=Number(c.leads_waiting||0);
+    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td></tr>`;
+  }).join('');
+  h+=`<div class="tscroll"><table><caption>Clients — plan, what’s waiting, enquiries. Open a row for that client’s Business dashboard.</caption><thead><tr><th scope="col">Client</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return h;
+}
+function renderPortfolio(d,roster){
+  const ws=Array.isArray(d.websites)?d.websites:null;
+  let h=`<header class="dhead">
+      <span class="obj" aria-hidden="true">📊</span>
+      <h1 id="pagehead" tabindex="-1">Portfolio dashboard</h1>
+      <span class="asof">As of ${esc(asOf())} <button class="rbtn" id="refreshBtn">↻ Refresh</button></span>
+    </header>
+    <div class="grid" style="margin-top:12px">
+    <p class="subline">${esc(d.headline||'Across your clients.')}</p>`;
+  // KPI band — only from numbers the payload really carries (an older function
+  // build without websites[] simply shows fewer tiles, never a fake zero)
+  if(ws||d.client_count!=null){
+    h+=`<h2 class="band">Across your clients</h2>`;
+    const clients=d.client_count!=null?d.client_count:ws.length;
+    h+=card('c3','Clients','',kpi(num(clients),'in your portfolio'),['/agency.html','Open Studio']);
+    if(ws){
+      const att=ws.filter(w=>w&&w.needs_attention).length;
+      h+=card('c3','Needs attention','',kpi(num(att),att?'worth a look today':'all clear',att?'warn':''));
+      const enq=ws.reduce((a,w)=>a+(Number(w&&w.leads_waiting)||0),0);
+      h+=card('c3','Enquiries waiting','',kpi(num(enq),enq?'not yet answered':'nothing waiting',enq?'warn':''));
+      const live=ws.filter(w=>w&&w.draft_live==='live').length;
+      h+=card('c3','Sites live','',kpi(num(live),ws.length-live?`${num(ws.length-live)} still in draft`:'every site is live'));
+    }
+  }
+  // insight cards — the standard card anatomy (tone chip · title · number ·
+  // sentence · one .go affordance). An empty list on a SUCCESSFUL read is the
+  // honest all-quiet; a failed read never reaches here (loadPortfolio → trouble).
+  h+=`<h2 class="band">What stands out</h2>`;
+  const ins=d.insights||[];
+  if(!ins.length)h+=`<div class="quiet cfull"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`;
+  h+=ins.map(insightCard).join('');
+  h+=portfolioRollup(roster);
+  h+=`</div><div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
   $('main').innerHTML=h;
+  const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));
+  // row click drills into the client's scoped Business dashboard; the name link
+  // inside carries the keyboard/AT path, so plain rows stay non-focusable
+  document.querySelectorAll('.tscroll tr[data-drill]').forEach(tr=>tr.addEventListener('click',(e)=>{
+    if(e.target.closest('a'))return;   // the real link handles itself
+    location.href=tr.getAttribute('data-drill');
+  }));
 }
 
 // ── load (deploy-order tolerant BOTH ways: a 404 from an old function is a calm
@@ -495,12 +569,39 @@ async function loadDash(soft,nextPeriod){
   DASH=data;
   renderDash(DASH);
 }
-async function load(){
-  // Agency, unscoped → the portfolio lens (AN-7). Otherwise the business dashboard.
-  if(CTX&&CTX.is_agency&&!scope()){
-    const r=await api('/analytics/portfolio');
-    if(r.ok){renderPortfolio(r.body.data||{});return;}
+// ── the portfolio lens loader — same discipline as loadDash: REQ_SEQ stale
+//    guard, >300ms stencil, and honest states (401 → signed out, 404 → warming,
+//    soft-refresh failure keeps the last good board + a toast, anything else →
+//    trouble; a failed read NEVER paints the all-quiet card). The /agency/
+//    portfolio companion read only feeds the per-client rollup — its failure
+//    degrades that one section honestly, never the whole page.
+let PF=null;
+async function loadPortfolio(soft){
+  const gen=++REQ_SEQ;
+  let stencilTimer=null;
+  if(!soft)stencilTimer=setTimeout(()=>{if(!PF)renderStencil('Portfolio dashboard');},300);
+  let r,a;
+  try{
+    [r,a]=await Promise.all([
+      api('/analytics/portfolio').catch(()=>({ok:false,status:0})),
+      api('/agency/portfolio').catch(()=>({ok:false,status:0})),
+    ]);
+  }catch(_){r={ok:false,status:0};a={ok:false,status:0};}
+  if(stencilTimer)clearTimeout(stencilTimer);
+  if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale
+  if(!r.ok){
+    if(r.status===401){signedOut();return;}
+    if(soft&&PF){toast('Couldn’t refresh just now.');return;}
+    if(r.status===403){await loadDash();return;}   // context said agency, portfolio says no — fall back to the business dashboard
+    if(r.status===404){warming();return;}
+    trouble();return;
   }
+  PF=r.body.data||{};
+  renderPortfolio(PF,(a&&a.ok&&Array.isArray(a.body.data))?a.body.data:null);
+}
+async function load(){
+  // Agency, unscoped → the portfolio lens (SS7). Otherwise the business dashboard.
+  if(CTX&&CTX.is_agency&&!scope()){await loadPortfolio();return;}
   await loadDash();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
