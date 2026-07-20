@@ -152,6 +152,25 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('.lmeta')).toContainText('1 business ·');
   });
 
+  test('domain-expiring threshold matches the platform alert window (45d): a ~40d-out client is "expiring", never "all clear"', async ({ page }) => {
+    // The platform's canonical domain-expiring alert fires at days <= 45 with
+    // severity critical (optimization/providers.ts:27, catalog.ts) — so a 31-45d
+    // client must NOT sit in "All clear" while the queues panel calls it High
+    // priority. This pins the roster to the platform's window, red against the
+    // old de<=30 code.
+    await pinDisplay(page, 'table');
+    const fern = row({ site_id: 'a6', name: 'Fern Florist', domain: 'fern.example.com',
+      domain_expires_at: new Date(Date.now() + 40 * 86400_000).toISOString() });   // 31-45d: the contradiction window
+    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [MARLOW, DENTAL, CEDAR, fern] } } });
+    await page.goto('/agency.html');
+    await page.locator('[data-view="domain"]').click();
+    await expect(page.locator('tbody')).toContainText('Fern Florist');   // 40d ≤ 45 → in "Domain expiring"
+    await expect(page.locator('tbody tr')).toHaveCount(3);               // Marlow ~12d + Cedar ~5d + Fern ~40d
+    await page.locator('[data-view="clear"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);               // Bright Dental (~200d) alone…
+    await expect(page.locator('tbody')).not.toContainText('Fern Florist'); // …a 31-45d domain is NOT "all clear"
+  });
+
   test('search re-renders never destroy the input, its caret POSITION, or focus (the L bug)', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');

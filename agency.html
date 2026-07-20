@@ -159,7 +159,12 @@ const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return 
 
 // ── list-view state: fixed views · display · sort · search ───────────────────
 const daysToExpiry=(c)=>c.domain_expires_at?Math.floor((Date.parse(c.domain_expires_at)-Date.now())/86400000):null;
-const domainSoon=(c)=>{const de=daysToExpiry(c);return de!==null&&de<=30;};
+// 45 = the platform's canonical domain-expiring window (optimization/providers.ts
+// fires infrastructure.domain_expiring at days<=45, severity critical) — the
+// roster must agree, or a 31-45d client sits in "All clear" here while the
+// queues panel above calls it High priority.
+const DOMAIN_SOON_DAYS=45;
+const domainSoon=(c)=>{const de=daysToExpiry(c);return de!==null&&de<=DOMAIN_SOON_DAYS;};
 const VIEWS=[['all','All'],['attention','Needs attention'],['domain','Domain expiring'],['billing','Billing'],['clear','All clear']];
 let VIEWNAME='all',Q='';
 const viewMatch=(c)=>{
@@ -198,7 +203,7 @@ function statusBits(c,skipColumns){
   const bits=[];
   if(!skipColumns){const lw=Number(c.leads_waiting||0);if(lw)bits.push(`${lw} lead${lw===1?'':'s'} waiting`);}
   if(!skipColumns){const de=daysToExpiry(c);
-    if(de!==null&&de<=30)bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);}
+    if(de!==null&&de<=DOMAIN_SOON_DAYS)bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);}
   const si=Number(c.search_issues||0);if(si)bits.push(`${si} search issue${si===1?'':'s'}`);
   if(c.billing_issue)bits.push('billing needs a look');
   return bits;
@@ -228,7 +233,7 @@ function domainCell(c){
   const de=daysToExpiry(c);
   const nm=c.domain?esc(c.domain):'—';
   if(de===null)return `<span class="domln">${nm}</span>`;
-  if(de<=30)return `<span class="domln">${nm} <span class="exp">${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}</span></span>`;
+  if(de<=DOMAIN_SOON_DAYS)return `<span class="domln">${nm} <span class="exp">${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}</span></span>`;
   return `<span class="domln">${nm}</span>`;
 }
 function tableHtml(list){
