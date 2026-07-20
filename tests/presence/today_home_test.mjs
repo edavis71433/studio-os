@@ -282,6 +282,18 @@ ok('portal: the project cards\' glance line shares snapWaiting with the tile (on
   portal.includes('const waiting=snapWaiting(s);'));
 ok('portal: load() records feed/notification read failures for the strip',
   portal.includes('PORTAL.feedFailed=!feed.ok') && portal.includes('PORTAL.notifsFailed=!(n&&n.ok)'));
+// PS1: a failed /client/projects read is recorded (client persona only — a
+// reviewer's 403 is contract, not failure), feeds the glance's failed.snaps,
+// and Home's projects section renders the couldn't-load line, never the 🚀 card.
+ok('portal: load() records a client\'s failed projects read; a reviewer\'s 403 stays calm',
+  portal.includes("PORTAL.projectsFailed=PORTAL.persona==='client'&&!(proj&&proj.ok)"));
+ok('portal: the glance treats a failed projects read as a failed snaps source',
+  portal.includes('snaps:snaps.some(s=>s&&s.failed)||!!PORTAL.projectsFailed'));
+ok('portal: a failed projects read renders the couldn\'t-load line instead of the first-run card',
+  portal.includes('P.projectsFailed') && portal.includes('We couldn’t load your projects just now — please try again in a moment.'));
+ok('portal: the rolebadge derives from persona, never projects.length',
+  portal.includes("P.persona==='client'?'Your workspace':'Client view'")
+  && !portal.includes("projects.length?'Your workspace':'Client view'"));
 ok('portal: ensureSnaps marks a FAILED per-project read (failed:true), distinct from an empty one',
   /if\(!r\.ok\)throw 0;/.test(portal) && portal.includes('failed:true,milestones:[]'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',

@@ -1812,3 +1812,26 @@ test.describe('Batch A regressions — portal', () => {
     await expect(thread.locator('.ti').filter({ hasText: 'Some typos on the About page.' })).toContainText('You opened this request');
   });
 });
+
+// ── PS1 — failed-read honesty sweep: a failed read never masquerades as empty ─
+// The remaining portal lies, one theme: every read that can fail says so with a
+// calm couldn't-load line — never the empty/all-clear copy its success case
+// earns. failed ≠ empty ≠ reviewer-calm: three states, three copies.
+test.describe('PS1 — failed-read honesty (portal)', () => {
+  const fail500 = (route: import('@playwright/test').Route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+
+  test('a failed projects read shows the couldn’t-load line — never the 🚀 first-run card — and keeps the client badge', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    // the EXACT list path only — the per-project bundle reads stay untouched
+    await page.route('**/functions/v1/presence/client/projects', fail500);
+    await page.goto('/client.html');
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Your projects' }) });
+    await expect(sec.getByText('We couldn’t load your projects just now — please try again in a moment.')).toBeVisible();
+    // never the zero-project first-run story (active projects would silently vanish)
+    await expect(page.getByText('When your studio starts a project', { exact: false })).toHaveCount(0);
+    // the rolebadge derives from the persona, not projects.length — a managed
+    // client with a failed read is still in THEIR workspace, not "Client view"
+    await expect(page.locator('.rolebadge')).toHaveText(/Your workspace/);
+  });
+});

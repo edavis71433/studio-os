@@ -526,7 +526,7 @@ function navFromHref(href){
 // reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
 // never touch it). Home aggregates ACROSS projects; the other tabs are top-level
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
-const PORTAL={ready:false,persona:'',ctx:{},projects:[],feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,snaps:null,wstatsFetch:null};
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFailed:false,snaps:null,wstatsFetch:null};
 let CURRENT_TAB='home';
 // A monotonically increasing VIEW token: every function that owns a fresh paint
 // of #main bumps it (showTab AND every drill-in open — openProject, support
@@ -705,7 +705,7 @@ function unreadKeysFrom(notifs){
 function renderHome(){
   const P=PORTAL,projects=P.projects,feed=P.feed||{};
   const badge=P.unread?`<span class="badge on" aria-hidden="true">${P.unread>9?'9+':P.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
-  let html=`<div class="topbar"><div class="rolebadge">● ${projects.length?'Your workspace':'Client view'}</div>`+
+  let html=`<div class="topbar"><div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
     `<button id="bell" class="bell" aria-label="What’s new${P.unread?` — ${P.unread} new`:''}" aria-expanded="false" aria-haspopup="true">🔔${badge}</button></div>`+
     `<div id="np" class="notifpanel" role="region" aria-label="What’s new" hidden></div>`+
     `<header><h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
@@ -717,7 +717,11 @@ function renderHome(){
   // slice 8b: the "Your website" slot — filled by loadWebsiteCard() only when
   // there are real stats to show (unpublished / 404 / reviewer → stays hidden).
   html+=`<section id="home-website" hidden></section>`;
-  html+=`<section><h2>Your projects</h2>${projectCardsHtml(projects)}</section>`;
+  // a FAILED projects read says so — never the 🚀 first-run card (which would
+  // tell a client with active projects that none exist yet)
+  html+=`<section><h2>Your projects</h2>${P.projectsFailed
+    ?`<p class="muted fload">We couldn’t load your projects just now — please try again in a moment.</p>`
+    :projectCardsHtml(projects)}</section>`;
   html+=`<section><h2>Recent updates</h2>`;
   const moments=(feed.moments||[]);
   if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
@@ -745,7 +749,7 @@ async function buildNeedsYou(){
   // Per-source failure honesty: a tile whose read failed HIDES (never a fake 0).
   const gl=document.getElementById('home-glance');
   if(gl){
-    const failed={feed:!!PORTAL.feedFailed,notifs:!!PORTAL.notifsFailed,snaps:snaps.some(s=>s&&s.failed)};
+    const failed={feed:!!PORTAL.feedFailed,notifs:!!PORTAL.notifsFailed,snaps:snaps.some(s=>s&&s.failed)||!!PORTAL.projectsFailed,billing:!!PORTAL.billingFailed};
     const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects,failed));
     if(tiles.length){gl.innerHTML=tiles.map(t=>`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;}
     else gl.hidden=true;
@@ -1976,8 +1980,8 @@ async function load(){
   const ctx=await api('/portal/context');
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
-  const proj=await api('/client/projects');
-  const projects=(proj.ok&&proj.body.data)||[];
+  const proj=await api('/client/projects').catch(()=>null);
+  const projects=(proj&&proj.ok&&proj.body.data)||[];
   // A plain OWNER (full workspace, NOT a managed client, no delivery) — the full
   // workspace lives elsewhere. No client tabs.
   if(!projects.length && !c.is_managed_client && c.sees_full_workspace){hideNav();ownerNote();return;}
@@ -1987,6 +1991,11 @@ async function load(){
   PORTAL.ctx=c;
   PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
   PORTAL.projects=projects;
+  // A FAILED /client/projects read must never masquerade as the zero-project
+  // first-run: Home renders the couldn't-load line instead of the 🚀 card and
+  // the glance/needs-you queue treat it as a failed source. A reviewer's 403
+  // here is the CONTRACT (no projects of their own), not a failure — calm.
+  PORTAL.projectsFailed=PORTAL.persona==='client'&&!(proj&&proj.ok);
   const feed=await api('/portal/feed'); PORTAL.feed=(feed.ok&&feed.body.data)||{};
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   const n=await api('/client/notifications').catch(()=>null); const nb=(n&&n.body)||{};
