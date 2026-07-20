@@ -754,6 +754,9 @@ function wireBoard(){
         else if(ev.key==='ArrowUp'){ev.preventDefault();items[Math.max(i-1,0)].focus();}
       });
       const f=menu.querySelector('button'); if(f)f.focus();
+      // the 44px options make the menu tall enough to clip at the board
+      // scroller's bottom edge — nudge it fully into view
+      if(menu.scrollIntoView)menu.scrollIntoView({block:'nearest',inline:'nearest'});
     };
     // Escape on the trigger itself (menu open, focus not yet inside) also closes.
     btn.onkeydown=(e)=>{
