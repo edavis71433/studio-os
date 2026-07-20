@@ -543,12 +543,24 @@ function skeleton(){return'<div class="skel"><div class="l w40"></div><div class
 // Route a notification's href to the right in-portal view (no full navigation).
 // Support links land in the Messages tab's reading pane (slice 5) — the same
 // place the ?support= deep link and the Requests tab's "View & reply" go.
+// PS3 (D4a): '#support-<rid>' hrefs (project events) land there too — ONE
+// honest destination per thread, never a second one on the record page.
 function navFromHref(href){
   href=String(href||'');
-  const sup=href.match(/support=([0-9a-f-]{8,})/i);if(sup){openMessagesTo(sup[1]);return;}
+  const sup=href.match(/support=([0-9a-f-]{8,})/i)||href.match(/#support-([0-9a-f-]{8,})/i);
+  if(sup){openMessagesTo(sup[1]);return;}
   const pm=href.match(/\/projects\/([0-9a-f-]{8,})(#[a-z0-9-]+)?/i);
-  if(pm){openProject(pm[1],pm[2]?sectionForAnchor(pm[2]):null);return;}
+  if(pm){openProject(pm[1],pm[2]||null);return;}
+  // PS3: no notification click is ever dead — anything unroutable lands Home,
+  // the surface that aggregates everything the click could have meant.
+  showTab('home');
 }
+// PS3: anchor scrolls try the EXACT element id first (#approval-<id> exists on
+// pending cards AND on decided history rows), then fall back to the anchor's
+// section — a resolved-approval click lands on its decision row, never an
+// unexplained project top. Section-id callers (e.g. 'sec-approvals') hit the
+// exact branch whenever their section rendered.
+function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&document.getElementById(ex))?ex:sectionForAnchor(a);}
 
 // ── PERSISTENT PORTAL NAV + cross-tab client state ──
 // One always-visible nav (bottom tab bar on phones, top rail on wider screens),
@@ -1922,7 +1934,7 @@ async function openProject(id,focusSection){
   $('main').innerHTML=html;
   renderProjTimeline();
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
-  if(focusSection)requestAnimationFrame(()=>scrollToSection(focusSection));
+  if(focusSection)requestAnimationFrame(()=>scrollToSection(anchorTarget(focusSection)));   // PS3: exact element first, then the section
   // decide — surface the server's own sentence on failure (409s carry
   // 'This item was updated…' / 'already been decided…'), and on any 409 the
   // presented version/status is stale, so reload the bundle instead of letting

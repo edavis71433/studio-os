@@ -2242,4 +2242,63 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  // ── dead clicks: every notification click lands somewhere sensible ──
+  const PS3_ROUTES_API = { ...MSG_API,
+    '/client/notifications': { data: [
+      // a project-event support href ('#support-<rid>') — decision D4a says it
+      // belongs in the Messages reading pane, like ?support= and Requests rows
+      { kind: 'support_message', label: 'Support: Copy fixes', href: `/projects/${PID}#support-${SUP_PRJ}`, created_at: '2026-07-18T00:00:00Z', read: false },
+      // a kind/href navFromHref has no branch for — used to no-op silently
+      { kind: 'billing', label: 'A new invoice is ready', href: '/client.html#invoice-i9', created_at: '2026-07-18T00:00:00Z', read: false },
+    ], unread_count: 2 } };
+
+  test('D4a: a “#support-<rid>” notification lands the Messages reading pane, not the project page', async ({ page }) => {
+    await installApp(page, { api: PS3_ROUTES_API });
+    await page.goto('/client.html');
+    await page.locator('#navbell').click();
+    await page.locator('.notifpanel:visible .nitem', { hasText: 'Support: Copy fixes' }).click();
+    // ONE honest destination per thread (A12/D4a): the Messages tab's pane
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#mpane')).toContainText('Copy fixes');
+    await expect(page.locator('#mpane')).toContainText('Some typos on the About page.');
+  });
+
+  test('an unroutable notification href lands Home — never a silent no-op', async ({ page }) => {
+    await installApp(page, { api: PS3_ROUTES_API });
+    await page.goto('/client.html');
+    // start AWAY from Home so "nothing happened" and "landed Home" differ
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.locator('#navbell').click();
+    await page.locator('.notifpanel:visible .nitem', { hasText: 'A new invoice is ready' }).click();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await expect(page.locator('#tabnav [data-tab="home"]')).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('a resolved-approval anchor scrolls to the exact decision row — not an unexplained project top', async ({ page }) => {
+    // the decided world: NO pending approvals (so no #sec-approvals section
+    // exists) — only the history row li#approval-a2 can honor this click
+    const bundle = (CLIENT_API as any)[`/client/projects/${PID}`].data;
+    await installApp(page, { api: { ...CLIENT_API,
+      '/client/notifications': { data: [
+        { kind: 'approval_decided', label: 'Approved — Homepage design', href: `/projects/${PID}#approval-a2`, created_at: '2026-07-18T00:00:00Z', read: false },
+      ], unread_count: 1 },
+      [`/client/projects/${PID}`]: { data: { ...bundle,
+        approvals: [{ id: 'a2', subject_type: 'deliverable', title: 'Homepage design', summary: '', content_hash: 'h2', status: 'approved', decided_at: '2026-07-10T00:00:00Z' }],
+        // enough content BELOW the Decided section that the exact row can scroll to the top
+        deliverables: Array.from({ length: 12 }, (_, i) => ({ id: `d${i}`, title: `File ${i + 1}`, note: 'Shared with you', created_at: '2026-07-06T00:00:00Z' })),
+      } },
+    } });
+    await page.goto('/client.html');
+    await page.locator('#navbell').click();
+    await page.locator('.notifpanel:visible .nitem', { hasText: 'Approved — Homepage design' }).click();
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    // the exact li#approval-a2 ends up at/near the viewport top — never left
+    // sitting hundreds of px down while the page shows an unexplained top
+    await expect.poll(async () => page.evaluate(() => {
+      const el = document.getElementById('approval-a2');
+      return el ? Math.round(el.getBoundingClientRect().top) : 9999;
+    }), { timeout: 7000 }).toBeLessThan(260);
+  });
 });

@@ -356,6 +356,16 @@ ok('portal: explicit CTAs whose accessible names keep the row title',
 ok('portal: opening the bell re-renders the messages tile WHOLE — number and pluralized label together',
   portal.includes("document.getElementById('glance-msgs')") && portal.includes('glanceTiles({newMsgs:0})[0]')
   && !portal.includes("document.querySelector('#glance-msgs .gn')"));
+// PS3 (D4a + dead clicks): '#support-<rid>' hrefs land the Messages pane, and
+// navFromHref ends in the Home fallback — no notification click is ever dead.
+ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls back to Home (no dead clicks)',
+  portal.includes("href.match(/#support-([0-9a-f-]{8,})/i)")
+  && /function navFromHref\(href\)\{[\s\S]*?showTab\('home'\);\n\}/.test(portal));
+// PS3: anchor scrolls try the exact element id (#approval-<id> on decided
+// history rows too) before the anchor's section.
+ok('portal: openProject scrolls the EXACT anchor element first, then the section',
+  portal.includes('scrollToSection(anchorTarget(focusSection))')
+  && portal.includes("function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&document.getElementById(ex))?ex:sectionForAnchor(a);}"));
 
 const passed=results.filter(r=>r.p).length,failed=results.length-passed;
 console.log(`\n════ TODAY/HOME (SLICE 10): ${passed}/${results.length} PASSED ════`);

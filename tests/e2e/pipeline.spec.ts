@@ -188,6 +188,24 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
     await expect(page.locator('#list .card')).toHaveCount(2);
   });
 
+  test('mobile/tablet: the page body never scrolls horizontally — wide views scroll in their own containers', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'touch-viewport pin');
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    const noOverflow = () => page.evaluate(() => {
+      const d = document.scrollingElement!;
+      return d.scrollWidth <= d.clientWidth + 1;
+    });
+    expect(await noOverflow()).toBe(true);
+    await page.locator('#viewBoard').click();
+    await expect(page.locator('#board .col').first()).toBeVisible();
+    expect(await noOverflow()).toBe(true);   // the board scrolls inside .board-scroll, not the page
+    await page.locator('#viewTable').click();
+    await expect(page.locator('#table table')).toBeVisible();
+    expect(await noOverflow()).toBe(true);   // the table scrolls inside .tscroll, not the page
+  });
+
   test('search narrows the table and the board too', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: API });
