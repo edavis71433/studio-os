@@ -537,7 +537,12 @@ function renderPortfolio(d,roster){
   // honest all-quiet; a failed read never reaches here (loadPortfolio → trouble).
   h+=`<h2 class="band">What stands out</h2>`;
   const ins=d.insights||[];
-  if(!ins.length)h+=`<div class="quiet cfull"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`;
+  // The all-quiet line speaks about "every client" — with ZERO clients that's a
+  // contradiction, so the empty portfolio gets its own calm first-step line.
+  const clientCount=d.client_count!=null?(Number(d.client_count)||0):(ws?ws.length:0);
+  if(!ins.length)h+=clientCount>0
+    ?`<div class="quiet cfull"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`
+    :`<div class="quiet cfull"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
   h+=ins.map(insightCard).join('');
   h+=portfolioRollup(roster);
   h+=`</div><div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;

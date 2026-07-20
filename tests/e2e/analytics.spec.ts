@@ -497,6 +497,21 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // the rollup still renders
   });
 
+  test('zero clients: never "every client is current" — a calm first-client line instead', async ({ page }) => {
+    await installApp(page, { api: { ...AGENCY_API,
+      '/analytics/portfolio': { data: { headline: 'No clients yet.', client_count: 0, insights: [], websites: [] } },
+      '/agency/portfolio': { data: [] },
+    } });
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    // the all-quiet wording would contradict an empty portfolio
+    await expect(page.getByText('Every client is current')).toHaveCount(0);
+    await expect(page.getByText('Nothing to watch yet.')).toBeVisible();
+    await expect(page.getByText('Add your first client from your Studio tools')).toBeVisible();
+    // the rollup keeps its own no-clients empty state
+    await expect(page.getByText('No clients yet', { exact: false }).first()).toBeVisible();
+  });
+
   test('no serious/critical axe violations on the portfolio lens', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
     await installApp(page, { api: AGENCY_API });
