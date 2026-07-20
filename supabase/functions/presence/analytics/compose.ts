@@ -177,6 +177,31 @@ export function portfolioInsights(clients: PortfolioClientLite[], nowMs: number)
   return { headline, insights };
 }
 
+/** Cap honesty (AN-4): the /analytics/portfolio bulk visits read is bounded at
+ *  this many rows. Exported so the route's query `limit=` and the fold's
+ *  truncation check can never drift apart. */
+export const PORTFOLIO_VISITS_CAP = 20000;
+
+/** AN-2.4: unique visitors per site, folded from the ONE bulk portfolio visits
+ *  read (pageview rows: site_id + visitor_hash). PURE so the fixture pins hold.
+ *  `truncated` = the read came back AT the cap: rows beyond it were dropped by
+ *  PostgREST (lib/db.ts: the correctness cliff), so the per-site counts are
+ *  possibly short and NOT attributable to particular sites — one flag for the
+ *  whole read, never per row (a per-row flag would claim attribution precision
+ *  the data doesn't have). Consumers must stop presenting the counts as exact. */
+export function foldPortfolioVisitors(rows: Array<{ site_id?: string; visitor_hash?: string | null }>): { visitorsBySite: Record<string, number>; truncated: boolean } {
+  const sets = new Map<string, Set<string>>();
+  let i = 0;
+  for (const v of rows || []) {
+    i++;
+    if (!v || !v.site_id) continue;
+    const s = sets.get(String(v.site_id)) || new Set<string>();
+    s.add(v.visitor_hash ? String(v.visitor_hash) : `anon:${i}`);
+    sets.set(String(v.site_id), s);
+  }
+  return { visitorsBySite: Object.fromEntries([...sets].map(([k, s]) => [k, s.size])), truncated: (rows || []).length >= PORTFOLIO_VISITS_CAP };
+}
+
 /** SS7 seams: the per-site website rows for /analytics/portfolio (P2-F G4),
  *  PURE so the fixture pins can hold the KPI band to the SAME client set as
  *  the /agency/portfolio rollup. Input rows are buildPortfolio output ALREADY

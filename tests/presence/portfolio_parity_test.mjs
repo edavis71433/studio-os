@@ -7,7 +7,7 @@
 // default). These pins hold the two reads to the SAME client set, and pin the
 // additive websites[] fields (site_id + visitors) the rollup joins on.
 import { buildPortfolio, filterPortfolio } from '../../supabase/functions/presence/agency/portfolio.ts';
-import { portfolioInsights, websiteRows } from '../../supabase/functions/presence/analytics/compose.ts';
+import { portfolioInsights, websiteRows, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP } from '../../supabase/functions/presence/analytics/compose.ts';
 
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -81,6 +81,23 @@ ok('parity: filterPortfolio({}) drops the archived client (the rollup default)',
   ok('websites: missing plan map → coarse "unknown", never a crash', unknown[0].plan_status === 'unknown' && unknown[0].visitors === null);
 }
 
+// ── cap honesty (data-honesty item 1): the bulk visits fold ──
+// Past PostgREST's cap an UNORDERED read returns an ARBITRARY subset
+// (lib/db.ts calls this a correctness cliff) — so a read AT the cap must raise
+// visitors_truncated, and consumers stop presenting per-site counts as exact.
+{
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ site_id: ACTIVE, visitor_hash: `h${i}` }));
+  const at = foldPortfolioVisitors(mk(PORTFOLIO_VISITS_CAP));
+  ok('fold: a read AT the cap raises truncated (the arbitrary-subset cliff)', at.truncated === true);
+  ok('fold: counts still folded when truncated (additive marker — old pages keep numbers)',
+    at.visitorsBySite[ACTIVE] === PORTFOLIO_VISITS_CAP);
+  const below = foldPortfolioVisitors(mk(PORTFOLIO_VISITS_CAP - 1));
+  ok('fold: below the cap → truncated absent (numbers are exact)',
+    below.truncated === false && below.visitorsBySite[ACTIVE] === PORTFOLIO_VISITS_CAP - 1);
+  ok('fold: empty read → no sites, not truncated, never a crash',
+    foldPortfolioVisitors([]).truncated === false && Object.keys(foldPortfolioVisitors([]).visitorsBySite).length === 0);
+}
+
 // ── structural: the ROUTE composes the pure pieces exactly this way ──
 {
   const src = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/analytics.ts', import.meta.url));
@@ -89,8 +106,15 @@ ok('parity: filterPortfolio({}) drops the archived client (the rollup default)',
     /filterPortfolio\(buildPortfolio\(input\), \{\}\)/.test(seg));
   ok('route: websites built by the pure websiteRows builder', /websiteRows\(portfolio/.test(seg));
   ok('route: visitors map is null on a FAILED visits read (honest, not 0)',
-    /visitorsBySite:\s*\(?vr[\s\S]{0,80}\?\s*Object\.fromEntries[\s\S]{0,120}:\s*null/.test(seg));
+    /visitorsBySite:\s*\(?vr[\s\S]{0,80}\?\s*perSiteVisitors\s*:\s*null/.test(seg));
   ok('route: client_count still the active agencySiteIds count', /client_count: siteIds\.length/.test(seg));
+  // item 1: the bulk visits read is ORDERED to the shared cap constant —
+  // deterministic newest-first at worst, never an arbitrary subset
+  ok('route: bulk visits read ordered ts.desc with limit=PORTFOLIO_VISITS_CAP',
+    /presence_visits\?site_id=in\.[^`]*order=ts\.desc[^`]*limit=\$\{PORTFOLIO_VISITS_CAP\}/.test(seg));
+  ok('route: per-site visitors come from the pure foldPortfolioVisitors', /foldPortfolioVisitors\(arr\(vr\)\)/.test(seg));
+  ok('route: the visitors_truncated marker rides the payload (additive — old pages unaffected)',
+    /visitors_truncated/.test(seg));
 }
 
 const passed = results.filter((r) => r.p).length;

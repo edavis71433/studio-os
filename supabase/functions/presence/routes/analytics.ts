@@ -17,7 +17,7 @@ import { gather } from '../agency/routes.ts';
 import { buildPortfolio, filterPortfolio } from '../agency/portfolio.ts';
 import {
   inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights, websiteRows,
-  trafficInsights, trafficNotice, periodWord, type Period,
+  trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
 import { searchInsights, searchNotice, searchHealth, searchMilestones, searchDetailInsights, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
@@ -267,12 +267,21 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const portfolio = filterPortfolio(buildPortfolio(input), {});
   // AN-2.4: per-client visitor counts (this week) — one bounded query, aggregated
   // in code; reuses the same visits store (no duplicate aggregation).
+  // Cap honesty (AN-4, like loadVisits above): the read is ORDERED ts.desc —
+  // past PostgREST's cap an UNORDERED read returns an ARBITRARY subset (lib/
+  // db.ts: the correctness cliff), so at worst this is the deterministic
+  // "most recent 20k". Even so, a truncated read undercounts unpredictably per
+  // site — foldPortfolioVisitors raises `truncated` and the payload carries it
+  // (visitors_truncated below) so the page stops presenting the column as exact.
   const sinceIso = new Date(nowMs - 7 * 86_400_000).toISOString();
-  const vr = await svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&limit=20000`);
-  const perSite = new Map<string, Set<string>>();
-  for (const v of arr(vr)) { const s = perSite.get(v.site_id) || new Set<string>(); s.add(v.visitor_hash || String(Math.random())); perSite.set(v.site_id, s); }
+  const vr = await svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&order=ts.desc&limit=${PORTFOLIO_VISITS_CAP}`);
+  const { visitorsBySite: perSiteVisitors, truncated: visitorsTruncated } = foldPortfolioVisitors(arr(vr));
   const { headline, insights } = portfolioInsights(
-    (portfolio || []).map((c: any) => ({ name: c.name, leads_waiting: c.leads_waiting, unpublished_changes: c.unpublished_changes, last_published_at: c.last_published_at, attention: c.attention, visitors: (perSite.get(c.site_id) || new Set()).size })),
+    // truncated ⇒ per-site attribution is unknown — visitor-derived insight
+    // cards ("Getting visitors" / "Traffic, no inquiries") are SUPPRESSED via
+    // visitors:0 (their >0 gates) rather than composed from subset counts, so
+    // the cards can never contradict the page's — column (say less, never wrong).
+    (portfolio || []).map((c: any) => ({ name: c.name, leads_waiting: c.leads_waiting, unpublished_changes: c.unpublished_changes, last_published_at: c.last_published_at, attention: c.attention, visitors: visitorsTruncated ? 0 : (perSiteVisitors[String(c.site_id)] || 0) })),
     nowMs,
   );
 
@@ -326,7 +335,7 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const websites = websiteRows(portfolio, {
     planBySite: Object.fromEntries(sites.map((s: any) => [String(s.id), planStatus.get(String(s.client_id)) || 'unknown'])),
     failedSites: [...failed7] as string[],
-    visitorsBySite: (vr as any).ok ? Object.fromEntries([...perSite].map(([k, v]) => [k, v.size])) : null,
+    visitorsBySite: (vr as any).ok ? perSiteVisitors : null,
   });
   const websiteInsights: any[] = [];
   const failedCount = websites.filter((w: any) => w.publish_failed).length;
@@ -334,7 +343,11 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   if (failedCount) websiteInsights.push({ key: 'publish_failed', title: 'A publish needs attention', sentence: `${failedCount} ${failedCount === 1 ? 'client site' : 'client sites'} had a publish fail recently — worth a look.`, number: failedCount, tone: 'attention' });
   if (blockedCount) websiteInsights.push({ key: 'plan_blocked', title: 'A subscription needs attention', sentence: `${blockedCount} ${blockedCount === 1 ? 'client’s software subscription is' : 'clients’ software subscriptions are'} paused or ended — editing/publishing is limited until it’s resolved.`, number: blockedCount, tone: 'attention' });
 
-  return json({ data: { headline, insights: [...insights, ...searchInsightsAgency, ...websiteInsights], websites, client_count: siteIds.length } }, 200, cors);
+  // visitors_truncated: ONE top-level marker for the whole bulk read (dropped
+  // by JSON.stringify when false/undefined). Additive both ways: an old page
+  // ignores it (numbers render as before — no worse than today); an old
+  // function never sends it, so the new page renders numbers as exact.
+  return json({ data: { headline, insights: [...insights, ...searchInsightsAgency, ...websiteInsights], websites, client_count: siteIds.length, visitors_truncated: visitorsTruncated || undefined } }, 200, cors);
 }
 
 // ── Slice 8: GET /analytics/dashboard — the Business dashboard summary ────────

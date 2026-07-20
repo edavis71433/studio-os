@@ -449,6 +449,36 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // the KPI band is unchanged by the extra fields
     const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
     await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');
+    // no visitors_truncated marker → numbers presented as exact, no cap notice
+    await expect(page.getByText(/hidden rather than shown short/)).toHaveCount(0);
+  });
+
+  // Data-honesty item 1: past the 20k visits cap the per-site split is built
+  // from a subset — no per-client count is attributable as exact. The function
+  // sends a single top-level visitors_truncated marker; the page renders the
+  // honest unknown (— across the column) plus one calm notice, instead of
+  // presenting possibly-short numbers as truth. Additive both ways: an old
+  // function never sends the marker (numbers render as before), an old page
+  // ignores it (no worse than today).
+  test('visitors_truncated marker → em dashes across the Visitors column + one honest notice', async ({ page }) => {
+    const TRUNCATED = { data: { ...ENRICHED.data, visitors_truncated: true } };
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': TRUNCATED } });
+    await page.goto('/analytics.html');
+    // the column still exists (the shape is enriched) …
+    await expect(page.getByRole('columnheader', { name: 'Visitors (7 days)' })).toBeVisible();
+    const rows = page.locator('.tscroll tbody tr');
+    await expect(rows).toHaveCount(3);
+    // … but every value is the honest unknown — including the row that carried 42
+    await expect(rows.nth(0).locator('td').last()).toHaveText('—');
+    await expect(rows.nth(1).locator('td').last()).toHaveText('—');
+    await expect(rows.nth(2).locator('td').last()).toHaveText('—');
+    await expect(page.getByText('42', { exact: true })).toHaveCount(0);
+    // one calm notice says why
+    await expect(page.getByText(/hidden rather than shown short/)).toBeVisible();
+    // the rest of the rollup stays exact — enquiries and drill links untouched
+    await expect(rows.nth(0).getByRole('link', { name: 'Marlow’s Kitchen' })).toHaveAttribute('href', '/analytics.html?client=s1');
+    const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
+    await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');
   });
 
   test('older function payload (no site_id/visitors) renders EXACTLY the shipped table', async ({ page }) => {

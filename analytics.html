@@ -488,7 +488,7 @@ function insightCard(i){
   const foot=i.href?`<div class="cf"><a class="go" href="${esc(i.href)}">${esc(i.cta||'Take a look')} →</a></div>`:'';
   return `<section class="card c4">${head}<div class="cb">${body}</div>${foot}</section>`;
 }
-function portfolioRollup(roster,ws){
+function portfolioRollup(roster,ws,vTrunc){
   // roster: /agency/portfolio rows (site_id · name · edition · status ·
   // attention · leads_waiting). null = that read FAILED — say so, never a
   // blank or an implied all-clear (failure ≠ empty).
@@ -497,6 +497,10 @@ function portfolioRollup(roster,ws){
   // function build (rows without site_id/visitors) renders EXACTLY the shipped
   // table: no column, never an undefined-render. A null visitors value means
   // the visits read failed server-side → an honest —, never a fake 0.
+  // vTrunc (data-honesty): the function's visitors_truncated marker — the bulk
+  // visits read hit its cap, so NO per-client count is attributable as exact.
+  // The whole column shows the honest unknown (—) + one notice, instead of
+  // possibly-short numbers. An older function never sends the marker → numbers.
   const vs=Array.isArray(ws)&&ws.length&&ws.every(x=>x&&typeof x.site_id==='string'&&('visitors' in x))?new Map(ws.map(x=>[x.site_id,x.visitors])):null;
   let h=`<h2 class="band">Client by client</h2>`;
   if(roster===null){
@@ -511,10 +515,13 @@ function portfolioRollup(roster,ws){
     const drill='/analytics.html?client='+encodeURIComponent(c.site_id||'');
     const att=Number(c.attention||0),lw=Number(c.leads_waiting||0);
     const v=vs?vs.get(c.site_id):undefined;
-    const vcell=vs?`<td class="r">${v==null?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
+    const vcell=vs?`<td class="r">${(vTrunc||v==null)?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
     return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
   }).join('');
   h+=`<div class="tscroll"><table><caption>Clients — plan, what’s waiting, enquiries${vs?', visitors':''}. Open a row for that client’s Business dashboard.</caption><thead><tr><th scope="col">Client</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col">Visitors (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  // the one honest line for the — column: a partial count per client would be
+  // wrong, so nothing pretends. Everything else in the table is exact.
+  if(vs&&vTrunc)h+=`<p class="cfull" style="color:var(--soft);font-size:.85rem;margin:6px 2px 0">A busy week — visits crossed what the portfolio can count client by client, so visitor numbers are hidden rather than shown short. The other columns are exact.</p>`;
   return h;
 }
 function renderPortfolio(d,roster){
@@ -553,7 +560,7 @@ function renderPortfolio(d,roster){
     ?`<div class="quiet cfull"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`
     :`<div class="quiet cfull"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
   h+=ins.map(insightCard).join('');
-  h+=portfolioRollup(roster,ws);
+  h+=portfolioRollup(roster,ws,d.visitors_truncated===true);
   h+=`</div><div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
   $('main').innerHTML=h;
   const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));
