@@ -8,8 +8,8 @@
 // (stripping them restores the unstamped render byte-for-byte); and the
 // /settings handler ships the section_meta sidecar. Pure local run.
 import { renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
-import { validateBlocks, renderSiteBlocks, validateBlocksWithMap, resolveBlockMediaTracked } from '../../supabase/functions/presence/lib/site_blocks.ts';
-import { resolveLinkedBlocksTracked } from '../../supabase/functions/presence/lib/linked_sections.ts';
+import { validateBlocks, renderSiteBlocks, validateBlocksWithMap } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 
 const results = [];
@@ -115,18 +115,16 @@ const RAW = [
 
 // ═══ 6. G13 fix: data-dds-src through the REAL composition ═══
 // §2 above renders the SAME list the sidecar validated (the reviewed blind spot:
-// on that shortcut the sid join can't miss). These cases run the serializer's
-// real composition — resolveLinkedBlocksTracked → validateBlocksWithMap →
-// resolveBlockMediaTracked — where a resolve step CHANGES the list, and pin that
+// on that shortcut the sid join can't miss). These cases drive the serializer's
+// real EXPORTED composeBlocks — resolveLinkedBlocksTracked → validateBlocksWithMap
+// → resolveBlockMediaTracked — where a resolve step CHANGES the list, and pin that
 // every rendered section's data-dds-src equals its TRUE raw (stored-list) index,
 // while the sid join provably lands on the wrong same-type sibling (the bug the
-// stamp kills). `sidecar` below is exactly settingsSectionMeta's computation.
-const composeTracked = (raw, lookup, ref, extras) => {
-  const r1 = resolveLinkedBlocksTracked(raw, lookup);
-  const vm = validateBlocksWithMap(r1.blocks);
-  const m = resolveBlockMediaTracked(vm.blocks, ref, extras);
-  return { blocks: m.blocks, src: m.src.map((i) => r1.src[vm.map[i].src_index]), sidecar: validateBlocksWithMap(raw).map };
-};
+// stamp kills). Review follow-up: this used to re-implement the composition, so
+// reverting the real src mapping stayed green — now the import IS the pin.
+// `sidecar` below is exactly settingsSectionMeta's computation.
+const composeTracked = (raw, lookup, ref, extras) =>
+  ({ ...composeBlocks(raw, lookup, ref, extras), sidecar: validateBlocksWithMap(raw).map });
 const stampedSrcs = (r) => r.map((b) => { const m = b.html.match(/ data-dds-src="(\d+)"/); return m ? Number(m[1]) : null; });
 const stampedSids = (r) => r.map((b) => (b.html.match(/ data-dds-sid="([^"]+)"/) || [])[1]);
 {
@@ -179,6 +177,26 @@ const stampedSids = (r) => r.map((b) => (b.html.match(/ data-dds-sid="([^"]+)"/)
     r.length === 2 && JSON.stringify(stampedSrcs(r)) === JSON.stringify([1, 2]));
 }
 {
+  // (e) ALL THREE steps shift at once: a junk entry validate drops, a dead-media
+  // image the media step drops, a linked section resolving in place, a plain
+  // tail. Only the full r1.src ∘ vm.map ∘ m.src composition lands on the true
+  // stored indices — any single step's src (e.g. a regression to `m.src`) is
+  // off. THE non-vacuity case for the real composeBlocks: scenarios a-c keep
+  // the validate step lossless, so this one is what reddens a src regression.
+  const LIB = '11111111-2222-4333-8444-555555555555';
+  const DEAD = '99999999-9999-4999-8999-999999999999';
+  const raw = [
+    { type: 'not-a-block' },                          // stored raw 0 — validate drops
+    { type: 'image', image_id: DEAD, title: 'Gone' }, // stored raw 1 — media deleted → drops at resolve
+    { type: 'linked', ref: LIB },                     // stored raw 2 — resolves to a library richtext
+    { type: 'richtext', body: 'tail prose' },         // stored raw 3
+  ];
+  const { blocks, src } = composeTracked(raw, (id) => (id === LIB ? { type: 'richtext', body: 'library prose' } : null), () => null, undefined);
+  const r = renderSiteBlocks(blocks, { ...ctx, src });
+  ok('validate-drop + media-drop + linked-resolve: survivors stamp their TRUE stored indices (2, 3) through the full composition',
+    r.length === 2 && JSON.stringify(stampedSrcs(r)) === JSON.stringify([2, 3]) && JSON.stringify(src) === JSON.stringify([2, 3]));
+}
+{
   // (d) identity page (no resolve step changes the list): both joins agree —
   // stamped src equals the sidecar's src_index for every section.
   const { blocks, map } = validateBlocksWithMap(RAW);
@@ -196,6 +214,9 @@ const stampedSids = (r) => r.map((b) => (b.html.match(/ data-dds-sid="([^"]+)"/)
   const ser = read('supabase/functions/presence/lib/serializer.ts');
   ok('the serializer composes tracked provenance into settings.blocks_src (home + per-page)',
     /blocks_src/.test(ser) && /resolveLinkedBlocksTracked/.test(ser) && /validateBlocksWithMap/.test(ser) && /resolveBlockMediaTracked/.test(ser));
+  ok('composeBlocks is EXPORTED and serializeDraft delegates to it (no inline copy left for §6\'s pins to miss)',
+    /export function composeBlocks\(/.test(ser) && /const compose = \(raw: unknown\[\]\) => composeBlocks\(/.test(ser)
+    && /const homeBlocks = compose\(/.test(ser) && /const pc = compose\(/.test(ser));
   const tmpls = TEMPLATES.map((t) => read(`supabase/functions/presence/templates/${t}/1.0.0/render.ts`));
   ok('all 8 templates thread src into renderSiteBlocks (home blocks + custom pages)',
     tmpls.every((s) => s.includes('src: c.settings?.blocks_src') && s.includes('src: cp.blocks_src')));

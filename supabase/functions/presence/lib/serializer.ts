@@ -10,7 +10,7 @@ import { svc } from './db.ts';
 import { isImageMime } from './media.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer, SiteBlock } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
-import { validateBlocksWithMap, resolveBlockMediaTracked } from './site_blocks.ts';
+import { validateBlocksWithMap, resolveBlockMediaTracked, type BlockResolveExtras } from './site_blocks.ts';
 import { linkedRefIds, resolveLinkedBlocksTracked } from './linked_sections.ts';
 import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
@@ -80,6 +80,28 @@ export function buildDevLayer(row: { theme_tokens?: unknown; custom_css?: unknow
   const custom_html = sanitizeDevHtml(String(row.custom_html ?? ''));
   if (Object.keys(theme_tokens).length === 0 && !custom_css.trim() && !custom_html.trim()) return null;
   return { theme_tokens, custom_css, custom_html };
+}
+
+// G13: the ONE resolve pipeline, provenance-tracked — `blocks` is byte-identical
+// to resolveBlockMedia(validateBlocks(resolveLinkedBlocks(raw))) (proven by the
+// tracked variants' pins), and `src[j]` is the RAW stored-list index final block
+// j came from, composed across all three steps (linked-resolve, validate drops,
+// media/reviews drops). The render stamps it as data-dds-src, so the canvas'
+// index join can never diverge from what actually rendered. PURE — every read
+// arrives through the arguments (`lookup`: library payload by id, `ref`: media,
+// `extras`: approved reviews) — and EXPORTED (review follow-up) so the stamp
+// gate drives THIS function, not a re-implementation that could stay green
+// while the real composition drifts.
+export function composeBlocks(
+  raw: unknown[],
+  lookup: (id: string) => unknown,
+  ref: (id: string) => MediaRef | null,
+  extras?: BlockResolveExtras,
+): { blocks: SiteBlock[]; src: number[] } {
+  const r1 = resolveLinkedBlocksTracked(raw, lookup);
+  const vm = validateBlocksWithMap(r1.blocks);
+  const m = resolveBlockMediaTracked(vm.blocks, ref, extras);
+  return { blocks: m.blocks, src: m.src.map((i) => r1.src[vm.map[i].src_index]) };
 }
 
 // Wave-1 G7: per-page SHARE image — the owner stores a media ID in
@@ -161,19 +183,10 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     const libRows = await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`);
     for (const r of libRows as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
   }
-  // G13: the ONE resolve pipeline, provenance-tracked — `blocks` is byte-identical
-  // to resolveBlockMedia(validateBlocks(resolveLinkedBlocks(raw))) (proven by the
-  // tracked variants' pins), and `src[j]` is the RAW stored-list index final block
-  // j came from, composed across all three steps (linked-resolve, validate drops,
-  // media/reviews drops). The render stamps it as data-dds-src, so the canvas'
-  // index join can never diverge from what actually rendered.
-  const composeBlocks = (raw: unknown[]): { blocks: SiteBlock[]; src: number[] } => {
-    const r1 = resolveLinkedBlocksTracked(raw, (id) => libMap.get(id) ?? null);
-    const vm = validateBlocksWithMap(r1.blocks);
-    const m = resolveBlockMediaTracked(vm.blocks, ref, reviewsWall ? { reviewsWall } : undefined);
-    return { blocks: m.blocks, src: m.src.map((i) => r1.src[vm.map[i].src_index]) };
-  };
-  const homeBlocks = composeBlocks(rawBlocks);
+  // G13: home + every custom page run the SAME exported composeBlocks (above)
+  // over this request's library lookup / media ref / approved reviews.
+  const compose = (raw: unknown[]) => composeBlocks(raw, (id) => libMap.get(id) ?? null, ref, reviewsWall ? { reviewsWall } : undefined);
+  const homeBlocks = compose(rawBlocks);
   // Build the custom pages: each page's blocks run through the SAME validate →
   // resolve pipeline as the home blocks, so they're identical structured/safe blocks.
   // Slugs are made URL-safe + unique and can never collide with a template's built-in
@@ -185,7 +198,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     if (!slug || RESERVED_PAGE_SLUGS.has(slug) || seenSlugs.has(slug)) return null;
     seenSlugs.add(slug);
     const title = (String(p?.title || '').trim().slice(0, 80)) || slug;
-    const pc = composeBlocks(Array.isArray(p?.blocks) ? p.blocks : []);
+    const pc = compose(Array.isArray(p?.blocks) ? p.blocks : []);
     const base = { slug, title, blocks: pc.blocks, blocks_src: pc.src };
     return p?.hideNav === true ? { ...base, hideNav: true } : base;
   }).filter((p): p is { slug: string; title: string; blocks: SiteBlock[]; blocks_src: number[]; hideNav?: boolean } => !!p);
