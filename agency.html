@@ -418,11 +418,15 @@ function openClient(siteId){
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your agency workspace.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-// FAILED portfolio read = an honest couldn't-load with Try-again wired to load()
-// in place — NEVER the empty roster ("No clients yet" was the old lie).
+// FAILED read = an honest couldn't-load with Try-again wired to boot() in place
+// — NEVER the empty roster ("No clients yet" was the old lie). Try-again re-runs
+// the FULL boot path (me + load + mounts): a load()-only retry after a failed
+// /agency/me left a recovered portfolio wearing ME=null placeholders with the
+// queues cockpit never mounted. boot is idempotent here — mountHealthDoor
+// guards its own node and mountQueues is QSEQ-guarded.
 function trouble(){
   $('main').innerHTML=`<div class="center"><h2>We couldn’t load your portfolio just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="primary">Try again</button></div>`;
-  const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
 }
 
 // soft=true (the ↻ refresh): any failure keeps the current list and toasts —
@@ -453,7 +457,8 @@ async function load(soft){
   loadKits();
 }
 
-(async function(){
+// The full boot path — named so trouble()'s Try-again can re-run ALL of it.
+async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
     const me=await api('/agency/me');
@@ -465,7 +470,8 @@ async function load(soft){
     mountQueues();   // "what needs me today" — the cross-client morning cockpit
     mountHealthDoor();   // staff-only doorway to the platform Health Center
   }catch(_){trouble();}
-})();
+}
+boot();
 
 // ── Platform health doorway (staff only). admin-health.html existed with no way
 //    in from any page; the Studio surface is its natural parent. We probe the

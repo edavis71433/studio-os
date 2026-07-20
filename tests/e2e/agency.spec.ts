@@ -222,6 +222,27 @@ test.describe('Agency portfolio', () => {
     expect(calls).toBe(2);   // Try-again really refetched
   });
 
+  test('/agency/me failure recovery: Try again re-runs the FULL boot — real agency name, queues mounted', async ({ page }) => {
+    // trouble()'s Try-again used to call load() alone: after a failed /agency/me,
+    // a succeeding portfolio read rendered with ME=null placeholders ("Your
+    // agency") and the queues cockpit never mounted. The retry must re-run the
+    // whole boot path (me + load + mounts).
+    await installApp(page, { api: agencyApi });
+    let meCalls = 0;
+    await page.route('**/functions/v1/presence/agency/me', (route) => {
+      meCalls++;
+      if (meCalls === 1) return route.fulfill(boom());
+      return route.fulfill(ok(agencyApi['/agency/me']));
+    });
+    await page.goto('/agency.html');
+    await expect(page.locator('#main')).toContainText('We couldn’t load your portfolio just now.');
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');          // the roster recovered…
+    await expect(page.locator('.top .brand')).toContainText('Bright Studio');       // …with the REAL agency name, not "Your agency"
+    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority'); // …and the queues cockpit mounted
+    expect(meCalls).toBe(2);   // the retry really re-ran /agency/me
+  });
+
   test('a genuinely EMPTY portfolio still earns the honest first-run copy', async ({ page }) => {
     await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [] } } });
     await page.goto('/agency.html');
