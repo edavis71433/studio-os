@@ -727,9 +727,11 @@ function renderHome(){
   // there are real stats to show (unpublished / 404 / reviewer → stays hidden).
   html+=`<section id="home-website" hidden></section>`;
   // a FAILED projects read says so — never the 🚀 first-run card (which would
-  // tell a client with active projects that none exist yet)
+  // tell a client with active projects that none exist yet). The section keeps
+  // the SHORT line; the Needs-you queue is the failure ledger and carries the
+  // one try-again phrasing — the same sentence never renders twice on Home.
   html+=`<section><h2>Your projects</h2>${P.projectsFailed
-    ?`<p class="muted fload">We couldn’t load your projects just now — please try again in a moment.</p>`
+    ?`<p class="muted fload">We couldn’t load your projects just now.</p>`
     :projectCardsHtml(projects)}</section>`;
   html+=`<section><h2>Recent updates</h2>`;
   const moments=(feed.moments||[]);

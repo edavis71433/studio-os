@@ -1827,7 +1827,12 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await page.route('**/functions/v1/presence/client/projects', fail500);
     await page.goto('/client.html');
     const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Your projects' }) });
-    await expect(sec.getByText('We couldn’t load your projects just now — please try again in a moment.')).toBeVisible();
+    // the section defers with the short line; the Needs-you queue is the failure
+    // LEDGER and carries the one try-again phrasing — never the same sentence
+    // twice on one screen
+    await expect(sec.getByText('We couldn’t load your projects just now.')).toBeVisible();
+    await expect(page.locator('#needs-body').getByText('We couldn’t load your projects just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('We couldn’t load your projects just now — please try again in a moment.')).toHaveCount(1);
     // never the zero-project first-run story (active projects would silently vanish)
     await expect(page.getByText('When your studio starts a project', { exact: false })).toHaveCount(0);
     // the rolebadge derives from the persona, not projects.length — a managed

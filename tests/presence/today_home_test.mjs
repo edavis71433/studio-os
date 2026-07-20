@@ -304,7 +304,12 @@ ok('portal: load() records a client\'s failed projects read; a reviewer\'s 403 s
 ok('portal: the glance treats a failed projects read as a failed snaps source',
   portal.includes('snaps:snaps.some(s=>s&&s.failed)||!!PORTAL.projectsFailed'));
 ok('portal: a failed projects read renders the couldn\'t-load line instead of the first-run card',
-  portal.includes('P.projectsFailed') && portal.includes('We couldn’t load your projects just now — please try again in a moment.'));
+  portal.includes('P.projectsFailed') && portal.includes('We couldn’t load your projects just now.</p>'));
+// PS1 review (cosmetic dedupe): the projects SECTION defers with the short
+// line; the Needs-you queue is the failure ledger and carries the ONE
+// try-again phrasing — the identical sentence never renders twice on Home.
+ok('portal: the projects try-again phrasing lives ONLY in the Needs-you queue (no duplicate line)',
+  portal.split('We couldn’t load your projects just now — please try again in a moment.').length===2);
 ok('portal: the rolebadge derives from persona, never projects.length',
   portal.includes("P.persona==='client'?'Your workspace':'Client view'")
   && !portal.includes("projects.length?'Your workspace':'Client view'"));
