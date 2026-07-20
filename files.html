@@ -237,7 +237,7 @@ const COLS=[
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
-let S={col:'all',q:'',caps:[],policy:'immediate',assets:[],counts:{},countsOk:true,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],
+let S={col:'all',q:'',caps:[],policy:'immediate',assets:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
   selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 let LOADED_AT=0;
@@ -276,8 +276,10 @@ function deriveRailCounts(rows,total){
   RAILN.archive=(typeof total==='number'&&rows.length<300&&total>=rows.length)?(total-rows.length):undefined;
 }
 function railN(key){
-  if(key==='templates')return S.countsOk?(S.counts.Templates||0):undefined;
-  if(key==='downloads')return S.countsOk?(S.counts.Downloads||0):undefined;
+  // before the first successful load the counts are UNKNOWN — render count-less
+  // (a "0" on the trouble screen would be a guess wearing a number's clothes)
+  if(key==='templates')return (S.countsOk&&S.loadedOnce)?(S.counts.Templates||0):undefined;
+  if(key==='downloads')return (S.countsOk&&S.loadedOnce)?(S.counts.Downloads||0):undefined;
   if(key==='stock')return undefined;   // a browse surface, not a collection
   return RAILN[key];
 }
@@ -363,6 +365,9 @@ async function load(soft){
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
   if(!a.ok){
     if(soft&&S.loadedOnce){toast('Couldn’t refresh just now.');return;}
+    // absorb a successful collections read even here — the trouble surface's
+    // rail shows real counts when it can, count-less when it can't
+    if(col&&col.ok){S.countsOk=true;S.counts=buildCounts(col.body.data||[]);}
     renderTrouble(a);return;
   }
   const full=(a.body.data&&a.body.data.assets)||[];
