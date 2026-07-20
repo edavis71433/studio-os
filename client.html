@@ -97,6 +97,9 @@
   .cb-acct{display:none}
   .navpanel{display:block;position:fixed;top:calc(62px + env(safe-area-inset-top));right:14px;left:14px;margin:0;z-index:35;box-shadow:var(--shadow-lift);max-height:65vh;overflow:auto}
   .navpanel[hidden]{display:none}
+  /* the record page's sticky chipbar pins to y=0 on phones — reserve the fixed
+     bell's zone so a tap at the right edge hits the chip, never the bell */
+  .chipbar{padding-right:64px}
   .tab{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;border-radius:0;background:transparent;color:var(--soft);padding:8px 2px 9px;font-size:11px;font-weight:600;cursor:pointer;min-height:52px}
   .tab .ti{font-size:19px;line-height:1}
   .tab:hover{color:var(--p)}
