@@ -178,6 +178,22 @@ test.describe('Files (the DAM, customer-facing)', () => {
     expect(qs).toContain('slowly');
   });
 
+  test('stock: a SLOW stock response never paints over the roster after switching away (REQ_SEQ)', async ({ page }) => {
+    await installApp(page, { api: filesApi });
+    await page.route(/\/functions\/v1\/presence\/stock\/search/, async (route) => {
+      await new Promise((r) => setTimeout(r, 1200));
+      return route.fulfill(ok({ data: { images: [{ id: 's1', thumb: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', alt: 'A stock photo', credit: 'Someone' }], provider: 'Prov', license: { name: 'CC0' } } }));
+    });
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('Logo');
+    await page.locator('[data-col="stock"]').click();     // the stock read departs (slow)
+    await page.locator('[data-col="all"]').click();       // the user changes their mind
+    await expect(page.locator('#root')).toContainText('Logo');
+    await page.waitForTimeout(1600);                      // the stock response lands late — it must be DROPPED
+    await expect(page.locator('#root')).toContainText('Logo');
+    await expect(page.locator('#root')).not.toContainText('Add to my files');
+  });
+
   test('failed assets read: couldn’t-load + Try-again refetches in place — never an empty state', async ({ page }) => {
     await installApp(page, { api: filesApi });
     let listCalls = 0;

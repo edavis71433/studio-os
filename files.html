@@ -357,7 +357,10 @@ function qstr(){
 // soft=true (the ↻ refresh): any failure keeps the current list and toasts —
 // leads.html's soft-fail contract; the in-place trouble state is for hard loads.
 async function load(soft){
-  if(S.col==='stock'){ if(S.stockState==null) return loadStock(); return renderStock(); }   // FD-T10: stock has its own surface
+  // FD-T10: stock has its own surface. Entering it BUMPS the generation too, so an
+  // in-flight roster read can never paint over stock; a leftover 'loading' state is
+  // an orphan (its request was invalidated by that bump) — re-fetch, don't hang.
+  if(S.col==='stock'){ REQ_SEQ++; if(S.stockState==null||S.stockState==='loading') return loadStock(); return renderStock(); }
   const gen=++REQ_SEQ;
   let a,col,h;
   try{[a,col,h]=await Promise.all([api('/assets?'+qstr()),api('/assets/collections'),api('/assets/health')]);}
@@ -437,8 +440,10 @@ function renderStock(){
   document.querySelectorAll('[data-stock-add]').forEach(b=>b.addEventListener('click',()=>addStock(b.dataset.stockAdd,b.dataset.alt,b.dataset.credit,b)));
 }
 async function loadStock(){
+  const gen=++REQ_SEQ;   // the SAME stale-response discipline as load() (C5)
   S.stockState='loading'; renderStock();
   const r=await api('/stock/search?q='+encodeURIComponent(S.stockQ||'')+'&page=1');
+  if(gen!==REQ_SEQ||S.col!=='stock')return;   // a newer read started, or the user left stock — never paint over what they moved on to
   if(r.status===503){S.stockState='unavailable';return renderStock();}
   if(r.ok&&r.body.data){S.stockResults=r.body.data.images||[];S.stockProvider=r.body.data.provider||'';S.stockLicense=(r.body.data.license&&r.body.data.license.name)||'';}
   else{S.stockResults=[];}
