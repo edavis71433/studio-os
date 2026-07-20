@@ -313,6 +313,37 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🟢 STANDARDS SWEEP — WAVE 4 BUILT: PS2 + SS4 + analytics seams + legal drafts (2026-07-20, pending Eric merge)
+
+All four lanes built → adversarially reviewed → fixes red-first → gates green.
+- **PS2 Invoices** (client.html): .frow rows w/ Paid/derived-Overdue chips (D2
+  local-calendar math, UTC-trap documented), one fmtMoney everywhere, unpaid
+  total = glance formula (string-equal pinned), reviewer-first calm branch,
+  VIEW_SEQ, A4 failure honesty kept. Review: safe, no required fixes; optional
+  hardenings APPLIED (https-only pay links both surfaces + structural pin, one
+  overdue word across tab/needs-you, real status vocab in fixtures).
+- **SS4 Broadcasts** (broadcasts.html): console standard + the dead-draft fix
+  (Edit draft→GET /:id→PATCH same id); review caught 2 CONFIRMED bugs — post-
+  send composer resurrection (duplicate-draft path on the irreversible action)
+  + empty drilled-open panel after send — both fixed red-first, plus soft
+  retries, ↻ invalidates detail cache, assist merges without blanking. Deferral:
+  per-address failed-recipient list needs a new server route (rows exist in
+  presence_broadcast_sends, unexposed).
+- **Analytics seams** (SUPABASE TOUCHED → deploy.yml at merge):
+  /analytics/portfolio active-only (KPI/rollup parity — archived clients no
+  longer skew the band), websites[] +site_id +visitors (additive), Visitors
+  (7 days) column feature-detected w/ em-dash null; hardening: visits read
+  ordered + visitors_truncated marker (em dashes + notice past the 20k cap,
+  insight cards suppressed under truncation), hashless rows skipped (parity
+  with every other visitors surface).
+- **Legal drafts #166**: docs/design/LEGAL-DRAFTS-166.md delivered to Eric — 6
+  decisions flagged (refund posture, jurisdiction, address, wind-down number,
+  publish-now-vs-activation, dates); compliance catch: SUBPROCESSORS "never
+  your uploaded photos" is FALSE for the photo-edit path (corrected language
+  drafted); ai-disclaimer needs an OpenAI line when Visual activates.
+Gates at tip 8125ecc: pure sweep 208/0, portal 309/0 ×3, broadcasts 54/54,
+analytics 82/0; full suite running at merge time.
+
 ## ✅ STANDARDS SWEEP — WAVE 3 LIVE: PS1 + SS2 (2026-07-20, main@86c5154, Netlify)
 
 Both reviewed safe-to-present; all findings fixed red-first; 901/0 full e2e.
