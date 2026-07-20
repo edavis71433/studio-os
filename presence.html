@@ -3851,10 +3851,12 @@ const DDS_CORE_VIEW = { hero: "business", about: "business", offerings: "offerin
 // index math the save will confirm) so the tree stays correct mid-flight.
 let DDS_SIDMAP = null;
 // G13 fix: local remap over the DOM's data-dds-src stamps — null = identity.
-// The canvas DOM only re-stamps on reload, so after a local dcMove the stamped
-// indices are stale against BLOCKS_WORK; dcMove composes the SAME permutation
-// it applies to DDS_SIDMAP into this map, and dcInjectCanvas resets it when the
-// fresh render (fresh stamps) lands. eeClassify applies it before bounds-check.
+// The canvas DOM only re-stamps on reload, so after ANY local list edit the
+// stamped indices are stale against BLOCKS_WORK; every splice site (dcMove /
+// eeMoveBlock via dcPermuteIndex, delete / cut / duplicate / paste / add via
+// dcShiftIndex) composes its shift into this map through dcComposeSrcMap, and
+// dcInjectCanvas resets it when the fresh render (fresh stamps) lands.
+// eeClassify applies it before bounds-check; -1 = that section was deleted.
 let DDS_SRCMAP = null;
 function ddsMetaFor(page) {
   const m = S.sectionMeta; if (!m) return null;
@@ -3893,6 +3895,10 @@ function eeEditCore(view) {                      // open the core-section tab
 function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder swap + save
   const o = BLOCKS_WORK; const ni = bi + dir; if (ni < 0 || ni >= o.length) return;
   [o[ni], o[bi]] = [o[bi], o[ni]];
+  // G13 fix (review finding 1): an adjacent swap IS a one-slot move — compose
+  // the same dcPermuteIndex dcMove composes, so the proof's stale src stamps
+  // keep resolving until the save's reload re-stamps them.
+  dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, bi, ni));
   if ($("blocksCard")) renderBlocksCard();
   saveBlocks().then(() => loadPreview());        // persist, then redraw the proof
 }
@@ -8370,6 +8376,11 @@ function spliceMove(arr, from, gap) {
 function addBlockAt(d, at) {
   const blk = emptyBlock(d);   // REUSE the exact block factory the click path uses
   const i = Math.max(0, Math.min(at, BLOCKS_WORK.length));
+  // G13 fix (review finding 1): THE insert splice (dcAddAt, the insert menu,
+  // the drag-drop add, the rail's append all land here) — compose the shift
+  // over the clamped index BEFORE the splice, so the canvas DOM's stale
+  // data-dds-src stamps keep resolving until the save's reload re-stamps.
+  dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, i, 1));
   BLOCKS_WORK.splice(i, 0, blk);
   BLOCK_FOCUS = i; DC_FOCUS_BI = i;   // canvas will scroll to + flash this new section after reload
   renderBlocksCard();
@@ -8763,6 +8774,33 @@ function dcPermuteIndex(bi, from, to) {
   if (bi >= to) bi += 1;
   return bi;
 }
+// PURE sibling of dcPermuteIndex — where list index i lands after ONE non-move
+// splice. delta -1 = a removal at `at`: i < at unchanged; i === at → -1 (that
+// section is GONE — eeClassify's bounds-check rejects -1, taking the same
+// sid-join/panel fallback a LAST-section delete already escaped through, never
+// a wrong-but-in-range block); i > at shifts down. delta +1 = an insertion at
+// `at`: i >= at shifts up. An i that is already -1 stays -1 (gone is gone,
+// however many edits stack on top). Index math only — never x/y (moat).
+function dcShiftIndex(i, at, delta) {
+  if (i < 0) return -1;
+  if (delta < 0) return i < at ? i : (i === at ? -1 : i - 1);
+  return i >= at ? i + 1 : i;
+}
+// G13 fix (review finding 1): EVERY local splice of BLOCKS_WORK — not just
+// dcMove's reorder — leaves the canvas DOM's data-dds-src stamps stale until
+// the debounced save's reload re-stamps them (~1-3s), so a second quick action
+// on the old DOM would hit the wrong section. Each splice site composes its
+// index transform HERE, over the CURRENT map state, so stacked quick edits
+// keep resolving. The map's keys are the DOM's stamp values — the keys the map
+// already has once it exists (the stamp domain is the list AT LAST RELOAD, so
+// it must survive later length changes), else 0..n-1 for the PRE-splice length
+// `n` callers pass. dcInjectCanvas resets the map when a fresh render lands.
+function dcComposeSrcMap(n, fn) {
+  const prev = DDS_SRCMAP, next = {};
+  const keys = prev ? Object.keys(prev) : Array.from({ length: n }, (_, v) => v);
+  keys.forEach((k) => { next[k] = fn(prev ? prev[k] : Number(k)); });
+  DDS_SRCMAP = next;
+}
 function dcMove(from, gap) {
   dcCaptureScroll();
   if (!moveBlockTo(from, gap)) return false;   // dropped back onto its own slot → no save, no reload
@@ -8777,9 +8815,7 @@ function dcMove(from, gap) {
   // remap eeClassify applies over them. Unlike DDS_SIDMAP this is NOT replaced
   // by the /settings response (the old DOM stays stamped with pre-move indices
   // even after the save lands); it resets when dcInjectCanvas sees fresh stamps.
-  const n = (BLOCKS_WORK || []).length, prev = DDS_SRCMAP, next = {};
-  for (let v = 0; v < n; v++) next[v] = dcPermuteIndex(prev && Object.prototype.hasOwnProperty.call(prev, v) ? prev[v] : v, from, to);
-  DDS_SRCMAP = next;
+  dcComposeSrcMap((BLOCKS_WORK || []).length, (v) => dcPermuteIndex(v, from, to));
   dcRefreshTree();
   saveBlocks();
   return true;
@@ -8801,13 +8837,16 @@ function dcDuplicate(bi) {
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
   if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
-  dcCaptureScroll(); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
+  // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
 }
 function dcDelete(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   if (!confirm("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.")) return;
-  dcCaptureScroll(); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+  // G13 fix (review finding 1): compose the removal shift BEFORE the splice
+  // (pre-splice length = the DOM's stamp domain) so stale stamps keep resolving.
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
 }
 // ── Copy / Cut / Paste a section (AEM parity) — a section clipboard ─────────────
 // The clipboard holds ONE section (deep copy), persisted to sessionStorage so it
@@ -8827,7 +8866,8 @@ function dcCopyBlock(bi) {
 function dcCutBlock(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
   dcCopyBlock(bi);
-  dcCaptureScroll(); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+  // G13 fix (review finding 1): same removal shift as dcDelete, pre-splice.
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
   toast("Cut — paste it anywhere with the ＋ points");
 }
 function dcPasteAt(gap) {
@@ -8835,7 +8875,8 @@ function dcPasteAt(gap) {
   const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit;
   if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
   const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
-  dcCaptureScroll(); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; DC_FOCUS_BI = at; renderBlocksCard(); saveBlocks();
+  // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, at, 1)); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; DC_FOCUS_BI = at; renderBlocksCard(); saveBlocks();
 }
 // ── column controls (responsive grid) — PURE helpers, extracted + unit-tested ──
 // The Columns block is the render engine's LAYOUT CONTAINER (Adobe Layout Mode):

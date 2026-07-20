@@ -207,10 +207,94 @@ ok(/DDS_SIDMAP/.test(classify), 'sid resolution goes through the sidecar-built l
   }
   ok(bad.length === 0, 'dcPermuteIndex matches the real splice for every (len, from, gap): ' + bad.slice(0, 3).join(' | '));
   const moveFn = extractFn(html, 'dcMove');
-  ok(/DDS_SIDMAP\[sid\] = dcPermuteIndex\(/.test(moveFn) && /DDS_SRCMAP = next/.test(moveFn), 'dcMove shifts BOTH stale maps (sid join + src stamps) with the one extracted permutation');
+  ok(/DDS_SIDMAP\[sid\] = dcPermuteIndex\(/.test(moveFn) && /dcComposeSrcMap\([^;]*dcPermuteIndex\(v, from, to\)/.test(moveFn), 'dcMove shifts BOTH stale maps (sid join + src stamps) with the one extracted permutation');
   ok(/ddsRebuildSidMap\(\);\s*\n\s*DDS_SRCMAP = null/.test(html), 'dcInjectCanvas resets the src remap when the reloaded canvas brings fresh stamps');
   const orphan = extractFn(html, 'cmOrphanRows');
   ok(/querySelectorAll\("\[data-dds-sid\]"\)/.test(orphan) && /ddsMetaFor/.test(orphan), 'cmOrphanRows reads live sids from the canvas stamps UNIONed with the sidecar (never stamps-blind)');
+}
+
+// ── G13 fix, review finding 1: NON-MOVE local edits (delete / cut / duplicate /
+// paste / add) splice BLOCKS_WORK too — each must compose its shift into
+// DDS_SRCMAP so a second quick action on the not-yet-reloaded DOM hits the TRUE
+// block. dcShiftIndex is the ONE pure shift; dcComposeSrcMap is the ONE
+// composition every splice site (moves included) goes through. ──
+const mkSrcMaps = () => new Function(
+  extractFn(html, 'dcPermuteIndex') + '\n' + extractFn(html, 'dcShiftIndex') + '\n' +
+  'let DDS_SRCMAP = null;\n' + extractFn(html, 'dcComposeSrcMap') + '\n' +
+  'return { compose: dcComposeSrcMap, shift: dcShiftIndex, permute: dcPermuteIndex, get: () => DDS_SRCMAP };'
+)();
+{
+  const { shift } = mkSrcMaps();
+  // Pin dcShiftIndex against ground truth: actually splice a marker list and
+  // check every old index lands where the helper says (-1 = the marker is gone).
+  let bad = [];
+  for (let len = 2; len <= 5; len++) {
+    for (let at = 0; at < len; at++) {          // removal at `at`
+      const arr = Array.from({ length: len }, (_, i) => i); arr.splice(at, 1);
+      for (let i = 0; i < len; i++) if (shift(i, at, -1) !== arr.indexOf(i)) bad.push(`del len=${len} at=${at} i=${i}`);
+    }
+    for (let at = 0; at <= len; at++) {         // insertion at `at` (incl. append)
+      const arr = Array.from({ length: len }, (_, i) => i); arr.splice(at, 0, 'new');
+      for (let i = 0; i < len; i++) if (shift(i, at, 1) !== arr.indexOf(i)) bad.push(`ins len=${len} at=${at} i=${i}`);
+    }
+  }
+  ok(bad.length === 0, 'dcShiftIndex matches the real splice for every (len, at, index), removal AND insertion: ' + bad.slice(0, 3).join(' | '));
+  ok(shift(-1, 0, -1) === -1 && shift(-1, 0, 1) === -1, 'an already-deleted index (-1) stays -1 through further edits (gone is gone)');
+}
+{
+  // Stacking: the composition domain is the DOM's stamp set AT LAST RELOAD —
+  // it must survive later length changes. 5 sections at reload; dcDelete(1)
+  // (list is now 4), then dcMove 0 → slot 2: every stamp 0..4 must still map
+  // to ground truth, including the top stamp 4 the shrunken list no longer has.
+  const m = mkSrcMaps();
+  m.compose(5, (v) => m.shift(v, 1, -1));                     // dcDelete(1) with pre-splice length 5
+  ok(JSON.stringify(m.get()) === JSON.stringify({ 0: 0, 1: -1, 2: 1, 3: 2, 4: 3 }), 'a local delete composes its shift into DDS_SRCMAP (stamp 1 → -1 gone, later stamps down one)');
+  m.compose(4, (v) => m.permute(v, 0, 2));                    // dcMove over the CURRENT map (post-delete length 4)
+  ok(JSON.stringify(m.get()) === JSON.stringify({ 0: 2, 1: -1, 2: 0, 3: 1, 4: 3 }), 'a move stacked on a delete composes OVER the current map — the stamp-4 key survives the shrunken list (multiple quick edits stack)');
+}
+{
+  // eeClassify with a post-delete map — THE reviewer repro: delete block 1 of
+  // 5, then hover the not-yet-reloaded DOM. Old stamps must resolve to the
+  // TRUE post-splice blocks, and the deleted section's own ghost must fall
+  // back (never a wrong-but-in-range block).
+  const meta2 = { blocks: [], pages: {} };
+  const el2 = (attrs) => ({ getAttribute: (k) => (k in attrs ? attrs[k] : null) });
+  const mk2 = new Function('S', 'DC_PAGE', 'BLOCKS_WORK', 'DDS_SRCMAP_IN',
+    'let DDS_SIDMAP = null;\nlet DDS_SRCMAP = DDS_SRCMAP_IN || null;\n' +
+    (html.match(/const DDS_CORE_VIEW = \{[^}]*\};/) || [''])[0] + '\n' +
+    extractFn(html, 'ddsMetaFor') + '\n' + extractFn(html, 'ddsRebuildSidMap') + '\n' + extractFn(html, 'eeClassify') + '\n' +
+    'ddsRebuildSidMap(); return { classify: eeClassify };');
+  const delMap = (() => { const m = mkSrcMaps(); m.compose(5, (v) => m.shift(v, 1, -1)); return m.get(); })();
+  const afterDel = mk2({ sectionMeta: meta2 }, '', new Array(4), delMap);
+  ok(afterDel.classify(el2({ 'data-dds-src': '2' })).bi === 1, 'REVIEW FINDING 1 PINNED: delete block 1 of 5 → the old src=2 section resolves to its true index 1, not the wrong block');
+  ok(afterDel.classify(el2({ 'data-dds-src': '4' })).bi === 3, 'post-delete: the old LAST stamp (in range pre-fix, off by one) now resolves true (4 → 3)');
+  ok(afterDel.classify(el2({ 'data-dds-src': '0' })).bi === 0, 'post-delete: stamps before the removal are untouched');
+  const ghost = afterDel.classify(el2({ 'data-dds-src': '1' }));
+  ok(ghost.kind === 'core' && ghost.view === 'design', "post-delete: the DELETED section's own ghost maps to -1 → fails the bounds-check → panel fallback, never a wrong block");
+  // the reviewer's caveat: deleting the LAST section already escaped via the
+  // bounds-check — the -1 convention must keep that exact posture.
+  const delLastMap = (() => { const m = mkSrcMaps(); m.compose(5, (v) => m.shift(v, 4, -1)); return m.get(); })();
+  const afterDelLast = mk2({ sectionMeta: meta2 }, '', new Array(4), delLastMap);
+  const lastGhost = afterDelLast.classify(el2({ 'data-dds-src': '4' }));
+  ok(lastGhost.kind === 'core' && lastGhost.view === 'design', 'deleting the LAST section still escapes to the fallback (-1 preserves the pre-fix bounds-check posture)');
+  ok(afterDelLast.classify(el2({ 'data-dds-src': '2' })).bi === 2, 'last-section delete: every earlier stamp is untouched');
+  // insertion (duplicate / paste / add): stamps at/after the point shift up.
+  const dupMap = (() => { const m = mkSrcMaps(); m.compose(4, (v) => m.shift(v, 2, 1)); return m.get(); })();
+  const afterDup = mk2({ sectionMeta: meta2 }, '', new Array(5), dupMap);
+  ok(afterDup.classify(el2({ 'data-dds-src': '2' })).bi === 3, 'INSERTION PINNED: duplicate/paste/add at 2 → the old src=2 section resolves to 3 (shifted past the insert)');
+  ok(afterDup.classify(el2({ 'data-dds-src': '1' })).bi === 1, 'post-insert: stamps before the insertion point are untouched');
+}
+{
+  // Every splice site composes, BEFORE its splice (pre-splice length = the
+  // stamp domain when the map is fresh). eeMoveBlock is a one-slot MOVE and
+  // reuses dcPermuteIndex, exactly like dcMove.
+  for (const [fn, kind] of [['dcDelete', '-1'], ['dcCutBlock', '-1'], ['dcDuplicate', '1'], ['dcPasteAt', '1'], ['addBlockAt', '1']]) {
+    const s = extractFn(html, fn);
+    ok(new RegExp('dcComposeSrcMap\\(BLOCKS_WORK\\.length, \\(v\\) => dcShiftIndex\\(v, [^,]+, ' + kind + '\\)\\)').test(s), fn + ' composes dcShiftIndex(…, ' + (kind === '-1' ? 'removal' : 'insertion') + ') into DDS_SRCMAP');
+    ok(s.indexOf('dcComposeSrcMap(') < s.indexOf('.splice('), fn + ' composes BEFORE its splice (the pre-splice length is the stamp domain)');
+  }
+  const eeMove = extractFn(html, 'eeMoveBlock');
+  ok(/dcComposeSrcMap\(o\.length, \(v\) => dcPermuteIndex\(v, bi, ni\)\)/.test(eeMove), 'eeMoveBlock (adjacent swap = one-slot move) composes dcPermuteIndex like dcMove');
 }
 ok(/route === "\/settings" && j && j\.data && j\.data\.section_meta/.test(html), 'api() captures the /settings section_meta sidecar into S.sectionMeta (the ONE writer)');
 
