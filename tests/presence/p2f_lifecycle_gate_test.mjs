@@ -16,6 +16,7 @@ const publish = read('supabase/functions/presence/routes/publish.ts');
 const sales = read('supabase/functions/presence/routes/sales.ts');
 const commercial = read('supabase/functions/presence/routes/commercial.ts');
 const analytics = read('supabase/functions/presence/routes/analytics.ts');
+const compose = read('supabase/functions/presence/analytics/compose.ts');   // SS7: the oversight row shape lives in the pure websiteRows builder
 const review = read('presence.html');
 const notice = read('supabase/functions/presence/lib/notice.ts');
 const clientd = read('supabase/functions/presence/routes/client_delivery.ts');
@@ -34,7 +35,7 @@ step(11, 'The enquiry surfaces in the Studio (leads inbox links its deal)', /con
 
 // analytics + oversight (12, 17)
 step(12, 'Analytics is site-scoped + connection-state aware (no fake data)', /gscConnected/.test(analytics) && /presence_visits\?site_id=eq/.test(analytics));
-step(17, 'Studio oversees linked customers WITHOUT payment details (coarse plan)', /plan_status: plan/.test(analytics) && /never payment details/.test(analytics));
+step(17, 'Studio oversees linked customers WITHOUT payment details (coarse plan)', /plan_status: plan/.test(compose) && /never payment details/.test(compose));
 
 // notifications (15, 21)
 step(15, 'Website-attention rides the ONE notice model, idempotent + deep-linked', /presence_plan_notices\?on_conflict=client_id,kind,period/.test(notice) && /kind: 'publish_failed', period: `pub:\$\{pubId\}`/.test(publish));

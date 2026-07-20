@@ -475,10 +475,11 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see
 //    the same .dhead dashboard anatomy the scoped Business dashboard wears) ──
 // Every number below is derived from the payload — clients/needs-attention/
 // enquiries/live come from /analytics/portfolio's websites[] rollup; the
-// per-client table reads /agency/portfolio (the one read that carries site_id
-// for the drill-in). Nothing is invented: per-client VISITORS aren't in either
-// payload today, so that column simply doesn't exist yet (backend seam —
-// /analytics/portfolio.websites[] would need site_id + visitors).
+// per-client table reads /agency/portfolio (the one read that carries the
+// edition/status and attention COUNT its columns render). SS7 seams: the
+// enriched websites[] rows now carry site_id + visitors, so the table gains a
+// Visitors column by a site_id join — the PAIRED model stays (each read keeps
+// its own shipped failure degradation), the join only ENRICHES.
 function insightCard(i){
   const tone=i.tone==='good'?'good':i.tone==='attention'?'attention':'neutral';
   const chip=tone==='good'?'Good news':tone==='attention'?'Needs a look':'Worth knowing';
@@ -487,10 +488,16 @@ function insightCard(i){
   const foot=i.href?`<div class="cf"><a class="go" href="${esc(i.href)}">${esc(i.cta||'Take a look')} →</a></div>`:'';
   return `<section class="card c4">${head}<div class="cb">${body}</div>${foot}</section>`;
 }
-function portfolioRollup(roster){
+function portfolioRollup(roster,ws){
   // roster: /agency/portfolio rows (site_id · name · edition · status ·
   // attention · leads_waiting). null = that read FAILED — say so, never a
   // blank or an implied all-clear (failure ≠ empty).
+  // SS7 item 3: visitors joined from the ENRICHED /analytics/portfolio
+  // websites[] by site_id — feature-detected on the payload SHAPE, so an older
+  // function build (rows without site_id/visitors) renders EXACTLY the shipped
+  // table: no column, never an undefined-render. A null visitors value means
+  // the visits read failed server-side → an honest —, never a fake 0.
+  const vs=Array.isArray(ws)&&ws.length&&ws.every(x=>x&&typeof x.site_id==='string'&&('visitors' in x))?new Map(ws.map(x=>[x.site_id,x.visitors])):null;
   let h=`<h2 class="band">Client by client</h2>`;
   if(roster===null){
     h+=`<div class="cfull card"><div class="cb" style="padding:14px 16px;color:var(--soft)">The client-by-client list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div></div>`;
@@ -503,9 +510,11 @@ function portfolioRollup(roster){
   const rows=roster.map(c=>{
     const drill='/analytics.html?client='+encodeURIComponent(c.site_id||'');
     const att=Number(c.attention||0),lw=Number(c.leads_waiting||0);
-    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td></tr>`;
+    const v=vs?vs.get(c.site_id):undefined;
+    const vcell=vs?`<td class="r">${v==null?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
+    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
   }).join('');
-  h+=`<div class="tscroll"><table><caption>Clients — plan, what’s waiting, enquiries. Open a row for that client’s Business dashboard.</caption><thead><tr><th scope="col">Client</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  h+=`<div class="tscroll"><table><caption>Clients — plan, what’s waiting, enquiries${vs?', visitors':''}. Open a row for that client’s Business dashboard.</caption><thead><tr><th scope="col">Client</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col">Visitors (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   return h;
 }
 function renderPortfolio(d,roster){
@@ -544,7 +553,7 @@ function renderPortfolio(d,roster){
     ?`<div class="quiet cfull"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`
     :`<div class="quiet cfull"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
   h+=ins.map(insightCard).join('');
-  h+=portfolioRollup(roster);
+  h+=portfolioRollup(roster,ws);
   h+=`</div><div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
   $('main').innerHTML=h;
   const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));

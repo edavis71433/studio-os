@@ -427,6 +427,40 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.getByRole('button', { name: 'Print this summary' })).toBeVisible();
   });
 
+  // SS7 item 3: the enriched /analytics/portfolio websites[] (site_id + visitors)
+  // feeds a Visitors column in the rollup, joined by site_id. Feature-detected on
+  // the payload SHAPE — an older function build renders EXACTLY the shipped table.
+  const ENRICHED = { data: { ...PORTFOLIO.data, websites: [
+    { site_id: 's1', name: 'Marlow’s Kitchen', draft_live: 'live', leads_waiting: 3, needs_attention: false, plan_status: 'active', visitors: 42 },
+    { site_id: 's2', name: 'Beacon Plumbing', draft_live: 'live', leads_waiting: 1, needs_attention: true, plan_status: 'active', visitors: null },
+    { site_id: 's3', name: 'Cedar Studio', draft_live: 'draft', leads_waiting: 0, needs_attention: false, plan_status: 'active', visitors: 0 },
+  ] } };
+
+  test('enriched websites[] adds the Visitors column, joined by site_id (null → honest dash)', async ({ page }) => {
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': ENRICHED } });
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('columnheader', { name: 'Visitors (7 days)' })).toBeVisible();
+    const rows = page.locator('.tscroll tbody tr');
+    await expect(rows.nth(0).locator('td').last()).toHaveText('42');
+    // null = the visits read failed server-side — an honest dash, NEVER a fake 0
+    await expect(rows.nth(1).locator('td').last()).toHaveText('—');
+    // a successful read with no visits is an honest 0
+    await expect(rows.nth(2).locator('td').last()).toHaveText('0');
+    // the KPI band is unchanged by the extra fields
+    const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
+    await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');
+  });
+
+  test('older function payload (no site_id/visitors) renders EXACTLY the shipped table', async ({ page }) => {
+    await installApp(page, { api: AGENCY_API });   // the legacy mock — websites[] rows carry neither field
+    await page.goto('/analytics.html');
+    await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);
+    // no Visitors column, no undefined-render — the four shipped columns only
+    await expect(page.getByRole('columnheader', { name: /Visitors/ })).toHaveCount(0);
+    await expect(page.locator('.tscroll thead th')).toHaveCount(4);
+    await expect(page.locator('.tscroll tbody tr').nth(0).locator('td')).toHaveCount(4);
+  });
+
   test('a rollup row click drills into that client’s SCOPED Business dashboard', async ({ page }) => {
     await installApp(page, { api: { ...AGENCY_API, '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
