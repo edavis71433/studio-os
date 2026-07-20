@@ -303,6 +303,8 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     { id: 'd5', title: 'Fifth', stage: 'lead', expected_value_cents: 40000 },
     { id: 'd6', title: 'Sixth', stage: 'lead', expected_value_cents: 30000 },
     { id: 'd7', title: 'Seventh — beyond the cap', stage: 'lead', expected_value_cents: 20000 },
+    { id: 'd8', title: 'Lost cause', stage: 'lost', expected_value_cents: 888800 },          // lost → never a "key deal"
+    { id: 'd9', title: 'Legacy converted', stage: 'converted', expected_value_cents: 777700 }, // legacy converted → closed, not open
   ] };
 
   test('Key deals: top 5 OPEN deals by expected value, deep-linking to the deal drawer', async ({ page }) => {
@@ -318,6 +320,10 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await expect(rows.nth(0)).toHaveAttribute('href', '/pipeline.html?deal=d1');
     await expect(rows.nth(1)).toContainText('Mid job');
     await expect(card.getByText('Won already')).toHaveCount(0);            // won is not open
+    // the open-stage ALLOWLIST: lost and legacy 'converted' deals are closed —
+    // their (high) values must never outrank a genuinely open deal
+    await expect(card.getByText('Lost cause')).toHaveCount(0);
+    await expect(card.getByText('Legacy converted')).toHaveCount(0);
     await expect(card.getByText('Seventh — beyond the cap')).toHaveCount(0);
     await expect(card.getByRole('link', { name: 'Pipeline →' })).toHaveAttribute('href', '/pipeline.html');
   });

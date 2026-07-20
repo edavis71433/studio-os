@@ -232,9 +232,12 @@ function monthCardHtml(d){
 // Hidden ENTIRELY on a failed read / 403 / empty list — never an empty card
 // (a sales-less edition is dormant, not broken). Rows deep-link to the deal
 // drawer (/pipeline.html?deal= — the pipeline's existing ?deal= boot read).
+// "Open" is an ALLOWLIST of the four open stages (lib/sales_lifecycle.ts
+// STAGES minus won/lost) — a stage!=='won' guard would let lost deals (and
+// legacy 'converted' rows, routes/sales.ts) pose as key open deals.
 function keyDeals(list){
   return (Array.isArray(list)?list:[])
-    .filter(d=>d&&d.id&&d.stage&&d.stage!=='won')
+    .filter(d=>d&&d.id&&(d.stage==='lead'||d.stage==='qualified'||d.stage==='proposal'||d.stage==='contract'))
     .sort((a,b)=>(Number(b.expected_value_cents)||0)-(Number(a.expected_value_cents)||0))
     .slice(0,5);
 }
