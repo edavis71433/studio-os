@@ -22,8 +22,10 @@
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1080px;margin:0 auto;padding:26px 20px 90px}
-  .layout{display:grid;grid-template-columns:210px 1fr;gap:26px}
-  @media (max-width:720px){.layout{grid-template-columns:1fr;gap:16px}}
+  /* minmax(0,1fr): the wide table must scroll INSIDE .tscroll, never blow the
+     column (and the .lhead row) open past the viewport */
+  .layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:26px}
+  @media (max-width:720px){.layout{grid-template-columns:minmax(0,1fr);gap:16px}}
 
   /* collections rail */
   .rail{display:flex;flex-direction:column;gap:2px;position:sticky;top:64px;align-self:start}
