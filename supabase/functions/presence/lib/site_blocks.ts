@@ -1002,6 +1002,12 @@ export interface BlockRenderCtx {
    *  emits no data-dds-* stamps — a nested cell isn't a page section and its
    *  fields need a ctx path prefix (a later slice, design doc §4). */
   noDds?: boolean;
+  /** G13: per-block STORED-list index (the serializer's blocks_src, index-aligned
+   *  with the input list) — stamped as `data-dds-src` so the canvas joins a
+   *  clicked section straight to its working-copy index, immune to the resolve
+   *  steps that shift the per-type sid counters. Absent (an old snapshot, a
+   *  direct unit call) → no attribute; the canvas falls back to the sid join. */
+  src?: number[];
 }
 
 // G13: a rendered block's ROOT tag — the applyStyle idiom widened one character
@@ -1214,8 +1220,12 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   // First pass: build each block's HTML/LD (the `toc` block is deferred — it needs
   // every OTHER section's heading + anchor, known only after this pass).
   // G13: `bi` is the block's index in the INPUT list — the final pass stamps
-  // data-dds-sid from sids[bi], so windowed-out/empty siblings still count and
-  // the stamped sid always equals the /settings sidecar's sid for the same list.
+  // data-dds-sid from sids[bi], so windowed-out/empty siblings still count.
+  // NOTE the input list here is the RESOLVED list (post linked-resolve + media/
+  // reviews drops); the /settings sidecar's sids are computed over the STORED
+  // list, so on a page where a resolve step changed the list the per-type #N
+  // counters DIVERGE. Canvas index joins therefore come from data-dds-src (the
+  // stored-list index, stamped below) — sids are display identity, not an index.
   const built: Array<{ b: SiteBlock; bi: number; html: string; ld?: object }> = [];
   // G13 field stamp: a dot-path into the STORED block (`title`, `items.0.text`,
   // `tiers.1.name`, …) on the text-bearing element the in-place editor will make
@@ -1719,8 +1729,9 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   const out: RenderedBlock[] = [];
   const usedKeys = new Set<string>();
   // G13: canonical sids over the FULL input list (index-aligned with `bi`), so a
-  // windowed-out or empty-rendered sibling still counts — the stamped sid always
-  // matches the sidecar computed over the same list, never a renumbered copy.
+  // windowed-out or empty-rendered sibling still counts. These are the RESOLVED
+  // list's sids — they equal the sidecar's stored-list sids only when no resolve
+  // step changed the list; the canvas' index join reads data-dds-src instead.
   const sids = ctx.noDds ? null : sectionSidsFor(list);
   for (const e of built) {
     if (!e.html) continue;
@@ -1741,7 +1752,12 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     // reads instead of any client mirror. First match only = the outer section;
     // a nested cell render was suppressed (ctx.noDds), so a block carries exactly
     // one sid. Attributes only: stripping ` data-dds-*` restores today's bytes.
-    const html = sids ? e.html.replace(DDS_ROOT_RE, `<$1$2 data-dds-sid="${attr(sids[e.bi])}" data-dds-key="${attr(key)}" class="block$3`) : e.html;
+    // data-dds-src = the block's TRUE stored-list index (ctx.src, serializer
+    // provenance) — printed only when supplied AND a valid non-negative integer
+    // (validated-printer posture), so an old snapshot renders byte-identical.
+    const sv = ctx.src?.[e.bi];
+    const srcAttr = Number.isInteger(sv) && (sv as number) >= 0 ? ` data-dds-src="${sv}"` : '';
+    const html = sids ? e.html.replace(DDS_ROOT_RE, `<$1$2 data-dds-sid="${attr(sids[e.bi])}" data-dds-key="${attr(key)}"${srcAttr} class="block$3`) : e.html;
     out.push({ key, type: b.type, html, ...(e.ld ? { ld: e.ld } : {}) });
   }
   return out;

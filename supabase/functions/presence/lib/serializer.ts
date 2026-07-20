@@ -8,10 +8,10 @@
 // variant), and stamps contract/template versions + timestamp.
 import { svc } from './db.ts';
 import { isImageMime } from './media.ts';
-import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer } from './render_types.ts';
+import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer, SiteBlock } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
-import { validateBlocks, resolveBlockMedia } from './site_blocks.ts';
-import { linkedRefIds, resolveLinkedBlocks } from './linked_sections.ts';
+import { validateBlocksWithMap, resolveBlockMediaTracked } from './site_blocks.ts';
+import { linkedRefIds, resolveLinkedBlocksTracked } from './linked_sections.ts';
 import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
@@ -161,7 +161,19 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     const libRows = await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`);
     for (const r of libRows as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
   }
-  const resolvedBlocks = resolveLinkedBlocks(rawBlocks, (id) => libMap.get(id) ?? null);
+  // G13: the ONE resolve pipeline, provenance-tracked — `blocks` is byte-identical
+  // to resolveBlockMedia(validateBlocks(resolveLinkedBlocks(raw))) (proven by the
+  // tracked variants' pins), and `src[j]` is the RAW stored-list index final block
+  // j came from, composed across all three steps (linked-resolve, validate drops,
+  // media/reviews drops). The render stamps it as data-dds-src, so the canvas'
+  // index join can never diverge from what actually rendered.
+  const composeBlocks = (raw: unknown[]): { blocks: SiteBlock[]; src: number[] } => {
+    const r1 = resolveLinkedBlocksTracked(raw, (id) => libMap.get(id) ?? null);
+    const vm = validateBlocksWithMap(r1.blocks);
+    const m = resolveBlockMediaTracked(vm.blocks, ref, reviewsWall ? { reviewsWall } : undefined);
+    return { blocks: m.blocks, src: m.src.map((i) => r1.src[vm.map[i].src_index]) };
+  };
+  const homeBlocks = composeBlocks(rawBlocks);
   // Build the custom pages: each page's blocks run through the SAME validate →
   // resolve pipeline as the home blocks, so they're identical structured/safe blocks.
   // Slugs are made URL-safe + unique and can never collide with a template's built-in
@@ -173,10 +185,10 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     if (!slug || RESERVED_PAGE_SLUGS.has(slug) || seenSlugs.has(slug)) return null;
     seenSlugs.add(slug);
     const title = (String(p?.title || '').trim().slice(0, 80)) || slug;
-    const pResolved = resolveLinkedBlocks(Array.isArray(p?.blocks) ? p.blocks : [], (id) => libMap.get(id) ?? null);
-    const blocks = resolveBlockMedia(validateBlocks(pResolved), ref, reviewsWall ? { reviewsWall } : undefined);
-    return p?.hideNav === true ? { slug, title, blocks, hideNav: true } : { slug, title, blocks };
-  }).filter((p): p is { slug: string; title: string; blocks: ReturnType<typeof resolveBlockMedia> } => !!p);
+    const pc = composeBlocks(Array.isArray(p?.blocks) ? p.blocks : []);
+    const base = { slug, title, blocks: pc.blocks, blocks_src: pc.src };
+    return p?.hideNav === true ? { ...base, hideNav: true } : base;
+  }).filter((p): p is { slug: string; title: string; blocks: SiteBlock[]; blocks_src: number[]; hideNav?: boolean } => !!p);
 
   // Editable GLOBAL nav (the header/footer are global — one edit changes every page).
   // Each item: a trimmed/capped label + a SAFE href — an internal path ("/", "/x/") or
@@ -231,7 +243,9 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       // Phase T-BLOCKS: validated + capped structured blocks (authoritative boundary);
       // FD-T17 resolves any block media IDs → MediaRefs via the SAME ref() (so block
       // photos land in the media manifest and get variants — one media pipeline).
-      blocks: resolveBlockMedia(validateBlocks(resolvedBlocks), ref, reviewsWall ? { reviewsWall } : undefined),
+      // G13: blocks_src rides alongside (raw-index provenance → data-dds-src stamps).
+      blocks: homeBlocks.blocks,
+      blocks_src: homeBlocks.src,
       // Multi-page: only present when the owner has custom pages (absent = byte-identical).
       ...(customPages.length ? { pages: customPages } : {}),
       // Editable global nav — only present when the owner set one (absent = default nav).

@@ -396,11 +396,16 @@ async function redirectsForRenames(site: SiteRow, principal: Principal, renames:
 // ── G13 · the editor-facing sidecar (design doc §1.4) ────────────────────────
 // GET and PUT /settings responses are decorated with `data.section_meta` — the
 // {sid, key, src_index} map from validateBlocksWithMap over the just-read /
-// just-written row (home blocks + each custom page). This is the exact join
-// between a stamped `data-dds-sid` on the canvas and an index into the client's
-// working copy, with validateBlocks' drop rules applied by the SERVER — never
-// imitated client-side. Recomputed per response, never stored: the row, the
-// snapshots, and the draft hash are untouched.
+// just-written row (home blocks + each custom page), with validateBlocks' drop
+// rules applied by the SERVER — never imitated client-side. CONTRACT: this is
+// STORED-LIST meta (per-block labels/sids/keys for the panel + badges). It is
+// deliberately validate-only — it lacks the render's resolve context (library
+// payloads, media refs, approved reviews), so its sids can diverge from the
+// canvas stamps on a page where a resolve step changed the list. Canvas INDEX
+// joins therefore read the DOM's `data-dds-src` stamps (the render's own
+// provenance); the sid→src_index join here is only the degrade fallback for a
+// render without src stamps. Recomputed per response, never stored: the row,
+// the snapshots, and the draft hash are untouched.
 function settingsSectionMeta(row: Record<string, unknown>): { blocks: SectionMapEntry[]; pages: Record<string, SectionMapEntry[]> } {
   const pages: Record<string, SectionMapEntry[]> = {};
   for (const p of (Array.isArray(row.pages) ? row.pages : [])) {

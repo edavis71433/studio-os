@@ -86,11 +86,20 @@ export interface SnapshotContent {
      *  styles. The page remains a structured block list; the output is still
      *  never free-form HTML, raw CSS, or runtime code. */
     blocks?: SiteBlock[];
+    /** G13: per-block STORED-list provenance, index-aligned with `blocks` —
+     *  blocks_src[j] is the raw presence_settings.blocks index block j came from,
+     *  carried through ALL the resolve steps (linked-resolve, validate drops,
+     *  media/reviews drops). The render stamps it as `data-dds-src` so the canvas
+     *  joins a clicked section straight to its working-copy index; a snapshot
+     *  without it (pre-G13 fix) renders without the stamp and the canvas falls
+     *  back to the sid join. */
+    blocks_src?: number[];
     /** Multi-page: owner-created pages, each with its own validated blocks. Rendered
      *  as /{slug}/index.html by the template, sharing its header/nav/footer. Absent
      *  or empty = single-page (byte-identical to before). Slugs are safe + unique and
-     *  never collide with a template's built-in pages. */
-    pages?: Array<{ slug: string; title: string; blocks: SiteBlock[]; hideNav?: boolean }>;
+     *  never collide with a template's built-in pages. `blocks_src` is the same G13
+     *  provenance as settings.blocks_src, per page. */
+    pages?: Array<{ slug: string; title: string; blocks: SiteBlock[]; blocks_src?: number[]; hideNav?: boolean }>;
     /** Editable GLOBAL top navigation. When present + non-empty the template renders
      *  THIS header nav on every page (the header/footer are global — one edit changes
      *  all pages) instead of its built-in default. Each item links to an internal path

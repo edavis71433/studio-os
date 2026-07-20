@@ -495,7 +495,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
     files[file] = html;
   };
 
-  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
+  const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: c.settings?.blocks_src });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
   // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
   // only) onto the ONE business node — home only, where the reviews_wall is visible.
   const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
@@ -522,7 +522,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
 
   // Multi-page: the owner's own pages, rendered with the SAME shell/nav/footer.
   for (const cp of (c.settings?.pages || [])) {
-    const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at });
+    const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: cp.blocks_src });
     page(`/${cp.slug}/`, {
       ...seoOv(`page:${cp.slug}`, `${cp.title} — ${i.business_name}`, siteDesc),
       ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
