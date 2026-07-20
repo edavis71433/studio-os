@@ -738,7 +738,14 @@
   // authored anchors ("← Back to Today", empty-state CTAs, rail exits) that were
   // the one systematic leak — a scoped operator must never silently switch
   // tenants by tapping a hardcoded exit.
-  var APP_PAGES = /^\/(today|presence|crm|contacts|customers|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
+  // customers.html is deliberately EXCLUDED: it is the agency-portfolio roster,
+  // fetched via /studio/customers keyed on agency_site_id=eq.{site}. Carrying a
+  // drilled LEAF client's scope onto "← Customers" / "Open Customers" resolves
+  // that query to the leaf (no sub-customers) → an empty roster, stranding the
+  // operator. Those two anchors are the intended escape hatch UP to the full
+  // list, so they must stay unscoped. (broadcasts stays: its handler is per-site,
+  // so a drilled scope correctly shows that client's broadcasts.)
+  var APP_PAGES = /^\/(today|presence|crm|contacts|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
   function carryScopeGlobally() {
     var s = scopeId(); if (!s) return;
     document.querySelectorAll('a[href^="/"]').forEach(function (a) {

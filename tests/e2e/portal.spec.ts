@@ -1223,39 +1223,12 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
   });
 
-  test('reviewer: read-only — a POPULATED catalog renders zero Request buttons, no action tiles', async ({ page }) => {
-    // the services fixture is the point: with cards actually on screen, the
-    // zero-Request-buttons assertion bites on the canMessage guard (deleting
-    // the guard renders 3 buttons and fails this). /client/support answers a
-    // reviewer with a genuine empty list ({data:[]}) — the honest empty state.
-    await installApp(page, { api: {
-      '/portal/context': REVIEWER_CTX,
-      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
-      '/client/services': REQ_API['/client/services'],
-      '/client/support': { data: [] },
-    } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.locator('.svcgrid .card')).toHaveCount(3);   // the catalog IS rendered…
-    await expect(page.getByRole('heading', { name: 'Brand refresh' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Request this/ })).toHaveCount(0);   // …with no way to act on it
-    await expect(page.locator('.acttile')).toHaveCount(0);
-    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
-  });
-
-  test('reviewer: an EMPTY catalog gets the calm reviewer empty state', async ({ page }) => {
-    await installApp(page, { api: {
-      '/portal/context': REVIEWER_CTX,
-      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
-      '/client/services': { data: [] },
-      '/client/support': { data: [] },
-    } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.locator('.acttile')).toHaveCount(0);
-    await expect(page.getByText('Your studio hasn’t listed services here yet.')).toBeVisible();
-    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
-  });
+  // NOTE: the two former "reviewer" cases here fed a reviewer populated 200s on
+  // /client/services + /client/support — a world the persona can NEVER see
+  // (reviewerAllowed() 403s both, workspace.ts:31). Batch A (finding A2) made the
+  // Requests tab gate the reviewer BEFORE any fetch, so the honest contract now
+  // lives in "Batch A regressions — portal › A2" below (calm card, zero /client/*
+  // reads), which also carries the zero-tiles / zero-Request-buttons guards.
 
   test('mobile: the tiles and service cards stack in one column, no horizontal overflow', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'the stacked layout is the <720px contract');
@@ -1779,6 +1752,11 @@ test.describe('Batch A regressions — portal', () => {
     await expect(page.getByText('Your studio’s services will appear here once they’ve set up your account.')).toBeVisible();
     // never the couldn't-load cards…
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
+    // …the reviewer gets NO way to act: no catalog cards, no Request buttons, no
+    // quick-action tiles (the early persona gate renders none of the acting UI)…
+    await expect(page.locator('.svcgrid .card')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Request this/ })).toHaveCount(0);
+    await expect(page.locator('.acttile')).toHaveCount(0);
     // …and no reviewer-doomed /client/* reads were fired at all
     expect(calls).toHaveLength(0);
   });

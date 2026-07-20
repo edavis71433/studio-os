@@ -60,9 +60,14 @@ test.describe('Secure client drill-in', () => {
 });
 
 // ── Batch A (post-redesign audit) — scope-carry regressions (A6) ─────────────
-// The drill-in scope must ride EVERY exit: the two convert redirects are JS
-// navigations (shell.js only rewrites anchors), and APP_PAGES must cover every
-// app page so page-authored anchors to customers/broadcasts get ?client= too.
+// The drill-in scope must ride EVERY exit that stays WITHIN the drilled tenant:
+// the two convert redirects are JS navigations (shell.js only rewrites anchors),
+// and APP_PAGES must cover per-site app pages (e.g. broadcasts) so page-authored
+// anchors get ?client= too. customers.html is the deliberate EXCEPTION — it is
+// the agency-portfolio roster (/studio/customers keyed on agency_site_id), so
+// carrying a drilled LEAF's scope would resolve it to an empty list. Those
+// "← Customers" / "Open Customers" anchors are the escape hatch UP to the full
+// roster and must stay UNSCOPED.
 test.describe('Scope carry — convert redirects + APP_PAGES coverage', () => {
   const scopedApi = { '/portal/context': scopedCtx('Joe’s Plumbing'),
     '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
@@ -84,7 +89,7 @@ test.describe('Scope carry — convert redirects + APP_PAGES coverage', () => {
     await page.waitForURL(new RegExp(`crm\\.html\\?deal=d-9&tab=deal&client=${CLIENT}`));
   });
 
-  test('APP_PAGES covers customers + broadcasts: page-authored anchors get ?client=', async ({ page }) => {
+  test('APP_PAGES scopes per-site anchors (broadcasts) but NOT the customers escape hatch', async ({ page }) => {
     await installApp(page, { api: scopedApi });
     await page.goto(`/today.html?client=${CLIENT}`);
     await expect(page.locator('#dds-shell')).toContainText('Joe’s Plumbing');
@@ -95,7 +100,10 @@ test.describe('Scope carry — convert redirects + APP_PAGES coverage', () => {
         document.body.appendChild(a);
       }
     });
-    await expect(page.locator('#x-cust')).toHaveAttribute('href', `/customers.html?client=${CLIENT}`);
+    // broadcasts is per-site → carries the drilled scope
     await expect(page.locator('#x-bc')).toHaveAttribute('href', `/broadcasts.html?client=${CLIENT}`);
+    // customers is the agency-portfolio roster → the anchor stays UNSCOPED so
+    // "← Customers" / "Open Customers" reach the full list, not an empty leaf view
+    await expect(page.locator('#x-cust')).toHaveAttribute('href', '/customers.html');
   });
 });
