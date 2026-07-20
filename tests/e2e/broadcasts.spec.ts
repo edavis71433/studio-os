@@ -317,6 +317,20 @@ test.describe('SS4 — broadcasts console', () => {
     expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
   });
 
+  test('composer text survives a ↻ re-render — load() never eats what is typed', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/broadcasts.html');
+    await page.locator('#subj').fill('Typed subject under way');
+    await page.locator('#bodytx').fill('A body the owner is mid-typing.');
+    // mark the CURRENT render so we can prove the refresh re-rendered the page
+    await page.evaluate(() => document.getElementById('bcMeta')!.setAttribute('data-stale', '1'));
+    await page.getByRole('button', { name: /Refresh/ }).click();
+    await expect(page.locator('#bcMeta[data-stale]')).toHaveCount(0);   // the re-render happened…
+    // …and the composer still holds every keystroke (syncDraftFromForm-in-load)
+    await expect(page.locator('#subj')).toHaveValue('Typed subject under way');
+    await expect(page.locator('#bodytx')).toHaveValue('A body the owner is mid-typing.');
+  });
+
   test('REQ_SEQ — a slow earlier refresh never paints over a newer one', async ({ page }) => {
     await installApp(page, { api: API });
     const stale = { data: { broadcasts: [{ ...ROW_SENT, id: T_ID, subject: 'STALE list' }] } };
