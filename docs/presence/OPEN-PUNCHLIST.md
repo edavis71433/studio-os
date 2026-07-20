@@ -316,16 +316,17 @@ verbatim. One combined slice plan covers studio + portal.
 ## ⏸️ PAUSED BY ERIC (2026-07-20: "lets pause until i have more fable")
 
 State at pause — everything through WAVE 6 is MERGED + LIVE (main@11a0af9).
-WAVE 7 was mid-build when the pause landed (its agents die with this message;
-completed page/item commits are already pushed — check `git log origin` for
-any "SS8"/"PS6"/"PS7" commits to see how far they got before resuming):
-- SS8 (attention + website-health + content-tree family chrome; the
-  website-health 403-renders-all-clear lie is the headline fix) — resume by
-  relaunching the build agent from docs/design/STUDIO-STANDARDS-SWEEP.md §SS8,
-  continuing from whatever page commits landed.
+WAVE 7 state at pause (updated after the dust settled):
+- **SS8 is COMPLETE and pushed** (9bb85d3/1f6c9fa/91ee002/c45511c — all three
+  pages wear the family chrome, the website-health 403 lie is dead, 84 new
+  page-spec tests ×3 green + shell). NOT yet reviewed — on resume it goes
+  through the adversarial review before any merge ask.
 - PS6+PS7 (project drill-in cohesion B3 + composer stragglers B6; incl. the
-  PS1-review residual: projectsFailed honesty at Files/Messages tabs) — same:
-  relaunch from §PS6/§PS7, continue from landed commits.
+  PS1-review residual: projectsFailed honesty at Files/Messages tabs) — the build agent was STOPPED mid-item to honor
+  the pause (its partial openSupportThread rewrite was uncommitted and has been
+  discarded; NO PS6/PS7 commits landed). On resume: relaunch cleanly from
+  §PS6/§PS7 including the PS1-review residual (projectsFailed at Files/
+  Messages).
 Then reviews → fixes → full suite → Eric merge ask, per the standing pipeline.
 
 REMAINING AFTER WAVE 7 (all Eric-gated):
