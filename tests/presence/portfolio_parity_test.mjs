@@ -98,6 +98,25 @@ ok('parity: filterPortfolio({}) drops the archived client (the rollup default)',
     foldPortfolioVisitors([]).truncated === false && Object.keys(foldPortfolioVisitors([]).visitorsBySite).length === 0);
 }
 
+// ── unique-fold parity (data-honesty item 2): hashless rows are SKIPPED ──
+// aggregateVisits (lib/visits.ts) and weeklyVisitors (lib/analytics_dashboard.ts)
+// both skip pageview rows without a visitor_hash — the headline-KPI semantics.
+// Counting each hashless row as a fresh unique would inflate the portfolio's
+// visitors above every other surface's number for the same site.
+{
+  const { visitorsBySite } = foldPortfolioVisitors([
+    { site_id: ACTIVE, visitor_hash: 'h1' },
+    { site_id: ACTIVE, visitor_hash: 'h1' },   // same visitor — dedupes
+    { site_id: ACTIVE, visitor_hash: '' },     // hashless — skipped
+    { site_id: ACTIVE },                       // hashless — skipped
+    { site_id: ARCHIVED, visitor_hash: null }, // hashless-only site — honest 0 (absent), not 1
+  ]);
+  ok('fold: hashless rows never count as fresh uniques (matches aggregateVisits + weeklyVisitors)',
+    visitorsBySite[ACTIVE] === 1);
+  ok('fold: a site with ONLY hashless rows contributes nothing — never a phantom visitor',
+    !(ARCHIVED in visitorsBySite));
+}
+
 // ── structural: the ROUTE composes the pure pieces exactly this way ──
 {
   const src = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/analytics.ts', import.meta.url));

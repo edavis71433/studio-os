@@ -188,15 +188,17 @@ export const PORTFOLIO_VISITS_CAP = 20000;
  *  PostgREST (lib/db.ts: the correctness cliff), so the per-site counts are
  *  possibly short and NOT attributable to particular sites — one flag for the
  *  whole read, never per row (a per-row flag would claim attribution precision
- *  the data doesn't have). Consumers must stop presenting the counts as exact. */
+ *  the data doesn't have). Consumers must stop presenting the counts as exact.
+ *  Hashless rows are SKIPPED — the same unique-visitor semantics as
+ *  aggregateVisits (lib/visits.ts) and weeklyVisitors (lib/analytics_dashboard
+ *  .ts): counting each hashless row as a fresh unique would inflate this
+ *  column above every other visitors surface for the same site. */
 export function foldPortfolioVisitors(rows: Array<{ site_id?: string; visitor_hash?: string | null }>): { visitorsBySite: Record<string, number>; truncated: boolean } {
   const sets = new Map<string, Set<string>>();
-  let i = 0;
   for (const v of rows || []) {
-    i++;
-    if (!v || !v.site_id) continue;
+    if (!v || !v.site_id || !v.visitor_hash) continue;
     const s = sets.get(String(v.site_id)) || new Set<string>();
-    s.add(v.visitor_hash ? String(v.visitor_hash) : `anon:${i}`);
+    s.add(String(v.visitor_hash));
     sets.set(String(v.site_id), s);
   }
   return { visitorsBySite: Object.fromEntries([...sets].map(([k, s]) => [k, s.size])), truncated: (rows || []).length >= PORTFOLIO_VISITS_CAP };
