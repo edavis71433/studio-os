@@ -292,7 +292,9 @@ const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 if(EMBED)document.addEventListener('click',(e)=>{const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const href=a.getAttribute('href')||'';if(/^\/projects\.html/.test(href)){e.preventDefault();try{window.parent.postMessage({type:'dds-open-delivery'},location.origin);}catch(_){}}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
-const money0=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{minimumFractionDigits:0});
+// money0 shows a real cents PAIR when the value is fractional ("$2,500.50",
+// never "$2,500.5") and stays whole-dollar clean otherwise.
+const money0=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{minimumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
 // A proposal's optional discount/tax + revise trail ride ONE reserved element in
 // its line_items (see lib/sales_lifecycle.ts). Split it out and mirror the pure
 // computeProposalTotals so the drawer's total/breakdown match the document + the
@@ -353,6 +355,13 @@ function ago(iso){const then=Date.parse(iso),now=Date.now();if(!isFinite(then))r
 // The activity quick-log kinds (calm, plain — icon + label).
 const ACTKINDS=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 Meeting'],['note','📝 Note']];
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
+// The roster read's page size = the server's MAX_PAGE (lib/sales_lifecycle.ts
+// clampLimit). A bare read gets clamped to DEFAULT_PAGE=25, which silently
+// truncated the roster (and its meta "total") to the newest 25 — worst on the
+// analytics ?stage=won landing. Ask for the full page the server will grant;
+// DEALS.length reaching this cap means the set may be INCOMPLETE (renderMeta
+// words itself accordingly).
+const FETCH_LIMIT=100;
 let Q='';                    // the .lhead search query — client-side, across List/Board/Table
 let LOADED_AT=Date.now();    // when the roster last loaded (the .lmeta "Updated …" fact)
 let REQ_SEQ=0;               // roster-read generation: a slow response that resolves after a newer request started is DISCARDED
@@ -539,7 +548,10 @@ async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton(host,4);
   try{
     // Board shows every open stage, so it ignores the list's stage filter.
-    const res=await api('/sales/deals'+((!board&&FILTER)?('?stage='+FILTER):''));
+    // limit = the server's MAX_PAGE (see FETCH_LIMIT) — never the 25-row default.
+    const qs=new URLSearchParams({limit:String(FETCH_LIMIT)});
+    if(!board&&FILTER)qs.set('stage',FILTER);
+    const res=await api('/sales/deals?'+qs.toString());
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];
     LOADED_AT=Date.now();
@@ -586,13 +598,24 @@ function visibleDeals(){
     return (String(d.title||'').toLowerCase()+' '+ct).includes(q);
   });
 }
-// ── the .lmeta line: visible count · total value (money0 — the same cents
-// formatter the summary strip uses) · freshness · table sort, in one breath.
+// ── the .lmeta line: visible count · value (money0 — the same cents formatter
+// the summary strip uses) · freshness · table sort, in one breath.
+// HONEST-MATH contract (SS5 item 1): "total" is claimed ONLY when the fetched
+// set is provably complete (below FETCH_LIMIT). A full page means the server
+// may hold more rows, so the wording scopes itself to "the latest 100" instead.
+// Why not drive this line from /sales/summary? Its rollup carries no per-stage
+// totals for won/lost (so it can't serve the ?stage=won landing, the worst
+// offender) and can't follow the client-side search filter — the page-sum with
+// honest scoping is the option whose semantics actually fit this line.
 function renderMeta(){
   const el=$('lmeta'); if(!el)return;
   const list=visibleDeals();
   const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
-  let m=list.length+' deal'+(list.length===1?'':'s')+' · '+money0(sum)+' total · '+updatedLabel();
+  const n=list.length,atCap=DEALS.length>=FETCH_LIMIT;
+  const count=atCap
+    ?(n===DEALS.length?'Latest '+FETCH_LIMIT+' deals':n+' of the latest '+FETCH_LIMIT+' deals')
+    :n+' deal'+(n===1?'':'s');
+  let m=count+' · '+money0(sum)+(atCap?'':' total')+' · '+updatedLabel();
   if(VIEW==='table'){const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];m+=' · Sorted by '+col[1]+' — '+(TSORT.dir>0?'ascending':'descending');}
   el.textContent=m;
 }

@@ -426,6 +426,41 @@ test.describe('SS5 ?stage=won landing (D1)', () => {
   });
 });
 
+// ── SS5 honest .lmeta math: the roster read asks for the server's real page cap
+// (MAX_PAGE=100 — not the 25-row DEFAULT_PAGE the old bare read got clamped to),
+// and when a FULL page comes back the meta stops claiming a "total" it can't
+// prove (the server may hold more rows). Below the cap the exact complete-set
+// wording is already pinned above (:133, :169, :387).
+test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
+  test('the roster read requests limit=100, and a full page drops the "total" claim', async ({ page }) => {
+    let dealsUrl = '';
+    // 100 rows = exactly the server cap; one fractional value pins money0's cents pair
+    const capped = { data: Array.from({ length: 100 }, (_, i) => ({
+      id: `dd-${String(i).padStart(3, '0')}`, title: `Deal ${i}`, stage: 'lead', source: 'manual',
+      expected_value_cents: i === 0 ? 100050 : 100000, expected_close: null, contact_id: null,
+      converted_client_id: null, updated_at: past(1), next_step: null, next_step_at: null,
+      last_contacted_at: null, agreement_signed: false })) };
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) => {
+      dealsUrl = route.request().url();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(capped) });
+    });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(100);
+    // (a) the read asked for the server's MAX_PAGE — not the 25-row default
+    expect(new URL(dealsUrl).searchParams.get('limit')).toBe('100');
+    // (b) at the cap the meta scopes itself to what it actually has — never "total"
+    //     99 × $1,000 + one $1,000.50 = $100,000.50 (the cents pair, never "$….5")
+    await expect(page.locator('.lhead .lmeta')).toContainText('Latest 100 deals · $100,000.50');
+    await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
+    // a search over a capped page stays scoped too ("N of the latest 100")
+    await page.locator('#dealSearch').fill('Deal 1');   // Deal 1, Deal 10…19 → 11 matches
+    await expect(page.locator('#list .card')).toHaveCount(11);
+    await expect(page.locator('.lhead .lmeta')).toContainText('11 of the latest 100 deals · $11,000');
+    await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
+  });
+});
+
 test.describe('Deal drawer Path', () => {
   test('the Path chevron bar renders with guidance tip AND action (suggested_action fix)', async ({ page }) => {
     await installApp(page, { api: API });
