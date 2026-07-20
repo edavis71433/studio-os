@@ -2874,6 +2874,111 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     expect(calls).toHaveLength(0);
   });
 
+  // ── the drill-in Files section: slice-12 share flow replaces the legacy upload ──
+  const PS6_DELIVERABLES = [
+    { id: 'd1', title: 'Homepage mockup', note: 'First look', created_at: '2026-07-06T00:00:00Z' },
+    { id: 'd5', title: 'Kitchen photos.png', note: 'Uploaded by the client.', created_at: '2026-07-07T00:00:00Z' },
+  ];
+  const PS6_FILES_API = {
+    ...CLIENT_API,
+    [`/client/projects/${PID}`]: { data: {
+      ...(CLIENT_API[`/client/projects/${PID}`] as any).data,
+      deliverables: PS6_DELIVERABLES,
+    } },
+  };
+
+  test('drill-in Files: .frow rows with the You-shared chip + the share card — the legacy raw-note cards and bare input are GONE', async ({ page }) => {
+    await installApp(page, { api: PS6_FILES_API });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    const files = page.locator('#sec-files');
+    await expect(files.locator('.frow')).toHaveCount(2);
+    const mine = files.locator('.frow', { hasText: 'Kitchen photos.png' });
+    await expect(mine.locator('.fyou')).toHaveText('You shared');
+    await expect(mine.locator('.fmeta')).toContainText('Sent to your studio');
+    await expect(files.getByRole('button', { name: 'Download — Homepage mockup' })).toBeVisible();
+    // the share card replaces the legacy upload UI…
+    await expect(files.getByText('Share a file with your studio')).toBeVisible();
+    await expect(files.locator('#fchoose')).toBeVisible();
+    // …no bare file input + Upload button, and never the raw server note as body copy
+    await expect(page.locator('#upFile')).toHaveCount(0);
+    await expect(page.locator('#upBtn')).toHaveCount(0);
+    await expect(files.getByText('Uploaded by the client.', { exact: true })).toHaveCount(0);
+  });
+
+  test('drill-in share: the preflight rejects a wrong type BEFORE any network call (the legacy flow had none)', async ({ page }) => {
+    await installApp(page, { api: PS6_FILES_API });
+    const sends: string[] = [];
+    page.on('request', (r) => { if (/upload-url|\/uploads$/.test(new URL(r.url()).pathname) || r.method() === 'PUT') sends.push(r.url()); });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('#sec-files #fchoose')).toBeVisible();
+    await page.locator('#ffile').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') });
+    await expect(page.locator('#toast')).toContainText('That kind of file can’t be sent here');
+    expect(sends).toHaveLength(0);
+  });
+
+  test('drill-in share: 3-step send pinned to THIS project; a step-3 failure retries ONLY the record — no orphan row per retry', async ({ page }) => {
+    await installApp(page, { api: PS6_FILES_API });
+    let upCalls = 0, putCalls = 0, recCalls = 0, recorded = false;
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+        ...(PS6_FILES_API[`/client/projects/${PID}`] as any).data,
+        deliverables: recorded ? [...PS6_DELIVERABLES, { id: 'nd1', title: 'Team photos.png', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] : PS6_DELIVERABLES,
+      } }) });
+    });
+    await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) => { upCalls++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'p' } }) }); });
+    await page.route('https://storage.example/**', (route) => { putCalls++; return route.fulfill({ status: 200, body: '' }); });
+    await page.route('**/functions/v1/presence/client/projects/*/uploads', (route) => { recCalls++;
+      if (recCalls === 1) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — please try again.' }) });
+      recorded = true;
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) });
+    });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('#sec-files #fchoose')).toBeVisible();
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await expect(page.locator('#ftitle')).toHaveValue('Team photos.png');   // compose opened, title defaulted
+    // step 1 must pin to THIS project (the record's own id)
+    const upUrl = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname.endsWith(`/client/projects/${PID}/upload-url`));
+    await page.locator('#fgo').click();
+    await upUrl;
+    await expect(page.locator('#toast')).toContainText('That didn’t save — please try again.');
+    await expect(page.locator('#fgo')).toBeEnabled();
+    // the retry re-runs ONLY the record step — the kept media id, no fresh upload
+    await page.locator('#fgo').click();
+    await expect(page.locator('#toast')).toContainText('Sent to your studio');
+    expect(upCalls).toBe(1);    // NO second upload-url — no orphaned media row per retry
+    expect(putCalls).toBe(1);
+    expect(recCalls).toBe(2);
+    // the record re-rendered and shows the sent file with its You-shared chip
+    await expect(page.locator('#sec-files .frow', { hasText: 'Team photos.png' }).locator('.fyou')).toHaveText('You shared');
+  });
+
+  test('drill-in share with TWO projects: the picker is PRESELECTED to the open record’s project', async ({ page }) => {
+    const P2 = '77777777-7777-4777-8777-777777777777';
+    await installApp(page, { api: {
+      ...PS6_FILES_API,
+      '/client/projects': { data: [
+        { id: PID, name: 'Website redesign', status: 'active' },
+        { id: P2, name: 'Brand refresh', status: 'active' },
+      ] },
+      [`/client/projects/${P2}`]: { data: {
+        project: { id: P2, name: 'Brand refresh', status: 'active' },
+        milestones: [], tasks: [], events: [], deliverables: [], approvals: [], surveys: [],
+        progress: { total: 0, done: 0, pct: 0 },
+      } },
+      [`/client/projects/${P2}/report`]: { data: { summary: null } },
+      [`/client/projects/${P2}/messages`]: { data: [] },
+    } });
+    await page.goto(`/client.html?project=${P2}`);
+    await expect(page.locator('#main').getByRole('heading', { name: 'Brand refresh' })).toBeVisible();
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    const sel = page.locator('#fproj');
+    await expect(sel).toBeVisible();
+    await expect(sel).toHaveValue(P2);   // preselected to THIS record — not the list's first
+  });
+
   test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.route('**/functions/v1/presence/client/projects', fail500);

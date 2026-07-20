@@ -1428,7 +1428,15 @@ function shareCardHtml(){
     `<input type="file" id="ffile" class="fshare-file" accept="${SHARE_ACCEPT}" aria-hidden="true" tabindex="-1">`+
     `<form class="fsend" id="fsend" aria-live="polite" hidden></form></div>`;
 }
-function wireShareCard(){
+// PS6: the ONE share card serves two hosts — the Files tab and the project
+// drill-in. The wirer declares its context: `pid` preselects the compose's
+// project picker to the open record, `ondone` names the guarded post-send
+// re-render (the Files tab's default re-renders itself and hands focus back
+// to the share button). Wiring always RESETS the context, so a tab's card
+// never inherits a drill-in's.
+let SHARE_CTX={pid:'',ondone:null};
+function wireShareCard(opts){
+  SHARE_CTX={pid:(opts&&opts.pid)||'',ondone:(opts&&opts.ondone)||null};
   const inp=$('ffile'),choose=$('fchoose');
   if(!inp||!choose)return;
   choose.addEventListener('click',()=>inp.click());
@@ -1459,7 +1467,7 @@ async function shareCompose(file){
   const multi=list.length>1;
   host.hidden=false;
   host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
-    (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select>`:'')+
+    (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}"${p.id===SHARE_CTX.pid?' selected':''}>${esc(p.name)}</option>`).join('')}</select>`:'')+
     `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
     `<div class="row" style="margin-top:14px"><button type="submit" class="approve" id="fgo">Send to your studio</button><button type="button" id="fno">Cancel</button></div>`;
   host.onsubmit=(e)=>{e.preventDefault();shareSend(file);};   // the <form> contract: Enter in the title submits
@@ -1506,10 +1514,15 @@ async function shareSend(file){
     SHARE_KEPT={mediaId:'',pid:''};
     toast('Sent to your studio ✓');PORTAL.snaps=null;
     fence(false);
-    // guarded re-render: only when the Files tab still owns #main (VIEW_SEQ
+    // guarded re-render: only when the wiring view still owns #main (VIEW_SEQ
     // unmoved — showTab AND every drill-in bump it); the toast already fired.
-    // After the repaint, focus lands back on the share card's button.
-    if(view===VIEW_SEQ)renderFiles().then(()=>{const c=$('fchoose');if(c)c.focus();});
+    // The host's own ondone re-renders (the drill-in re-opens its record at the
+    // Files section); the Files-tab default repaints itself and hands focus
+    // back to the share card's button.
+    if(view===VIEW_SEQ){
+      if(SHARE_CTX.ondone)SHARE_CTX.ondone();
+      else renderFiles().then(()=>{const c=$('fchoose');if(c)c.focus();});
+    }
   }catch(_){fail('The upload didn’t finish — please try again.');}
 }
 async function renderFiles(){
@@ -1822,20 +1835,9 @@ async function submitBooking(){
 }
 // Client file upload — signed-URL flow (mirrors the studio deliverable upload):
 // request an upload URL → PUT the bytes → record it as a client-visible file.
-async function uploadClientFile(id){
-  const inp=$('upFile'); const file=inp&&inp.files&&inp.files[0]; if(!file){toast('Choose a file first.');return;}
-  const btn=$('upBtn'); btn.disabled=true; const was=btn.textContent; btn.textContent='Uploading…';
-  const fail=(m)=>{toast(m||'Couldn’t upload that.');btn.disabled=false;btn.textContent=was;};
-  try{
-    const up=await api('/client/projects/'+id+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title:file.name});
-    if(!up.ok||!up.body.data||!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');
-    const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
-    if(!put.ok)return fail('The upload didn’t finish — please try again.');
-    const rec=await api('/client/projects/'+id+'/uploads','POST',{media_id:up.body.data.media_id,title:file.name});
-    if(!rec.ok)return fail((rec.body&&rec.body.message)||'Couldn’t save that file.');
-    toast('Sent to your studio ✓'); PORTAL.snaps=null; openProject(id);
-  }catch(_){fail();}
-}
+// (the legacy uploadClientFile — no preflight, an orphan media row per retry —
+// is gone: the drill-in now drives the slice-12 share card, wireShareCard's
+// drill-in context above.)
 // A short, standard brief for a picked service → POST as a PENDING support
 // request (service ref + structured fields). Per-service custom fields are out
 // of R2 scope. Crystal-clear that NOTHING is charged or ordered automatically.
@@ -2073,7 +2075,8 @@ async function openProject(id,focusSection){
   setWide(true);
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
   PROJ_EVENTS=(data.events||[]).slice();
-  PROJ_MSGS=((msgRes&&msgRes.ok&&msgRes.body&&msgRes.body.data)||[]).slice();
+  const msgData=msgRes&&msgRes.ok&&msgRes.body&&msgRes.body.data;
+  PROJ_MSGS=Array.isArray(msgData)?msgData.slice():[];   // shape-guarded — a non-array payload must never throw the whole record
   PROJ_MSGS_FAILED=!(msgRes&&msgRes.ok);   // failed ≠ empty: the rail says so instead of "say hello"
   const hasOverview=!!(s&&s.progress&&s.milestones);
   const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
@@ -2109,11 +2112,15 @@ async function openProject(id,focusSection){
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}
   // your tasks
   if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`}</div>`;}html+=`</section>`;}
-  // files
+  // files — the Files tab's exact list anatomy (fileRowHtml .frow rows with
+  // You-shared chips and honest meta — never the raw server note as body copy),
+  // then the slice-12 share card preselected to THIS project (preflight,
+  // portal-voiced 422s, SHARE_KEPT orphan-free retry all inherited — the legacy
+  // no-preflight upload that minted an orphan media row per retry is gone).
   html+=`<section id="sec-files"><h2>Files</h2>`;
-  for(const f of (data.deliverables||[])){html+=`<div class="card"><h3>${esc(f.title)}</h3><p>${esc(f.note||'Shared with you')}</p><div class="row"><button data-dl="${esc(f.id)}">Download</button></div></div>`;}
-  // client upload — send the studio a file (logo, content, a document)
-  html+=`<div class="card"><p class="muted" style="margin-bottom:8px">Send your studio a file — a logo, content, or a document.</p><div class="row" style="gap:8px;align-items:center"><input type="file" id="upFile" style="flex:1;min-width:0"><button class="approve" id="upBtn">Upload</button></div></div></section>`;
+  const dels=(data.deliverables||[]);
+  if(dels.length)html+=`<div class="flv">${dels.map(fileRowHtml).join('')}</div>`;
+  html+=shareCardHtml()+`</section>`;
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
   // support — the client can now SEE their requests + the studio's replies, not just fire one off.
@@ -2147,7 +2154,10 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=$('nt-'+b.getAttribute('data-asend'));adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
   document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id);}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));
-  const upBtn=$('upBtn'); if(upBtn)upBtn.addEventListener('click',()=>uploadClientFile(id));
+  // the share card, in drill-in context: compose preselects THIS project, and a
+  // successful send re-opens the record at its Files section (view-guarded in
+  // shareSend — a client who moved on mid-send is never yanked back)
+  wireShareCard({pid:id,ondone:()=>openProject(id,'sec-files')});
   wireDownloads(document);
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
