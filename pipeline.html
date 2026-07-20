@@ -577,7 +577,13 @@ let CONTACT_NAME=null,CONTACT_TEXT=null,CONTACT_LOADING=null,CONTACT_FAILED=fals
 function ensureContactNames(){
   if(CONTACT_NAME&&!CONTACT_FAILED)return Promise.resolve();
   if(CONTACT_LOADING)return CONTACT_LOADING;
-  CONTACT_LOADING=api('/sales/contacts?limit=500')
+  // limit=100 = the server's MAX_PAGE (clampLimit silently caps anything higher
+  // right back to 100 — the old limit=500 claimed a capacity the server refuses).
+  // HONEST RESIDUAL: a studio with >100 contacts gets only the 100 most recently
+  // updated — older contacts' deals read "—" in the Table and match by title only
+  // in search. Lifting that needs paged fetches or a server-side join, not a
+  // bigger number here.
+  CONTACT_LOADING=api('/sales/contacts?limit=100')
     .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;for(const c of (r.data||[])){CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}})
     .catch(()=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=true;})   // plan-gated or offline → cells read “—” for THIS render; a failure is never cached — the next render retries
     .finally(()=>{CONTACT_LOADING=null;});

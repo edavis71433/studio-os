@@ -538,6 +538,22 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     await expect(page.locator('#list .card')).toContainText('Gamma site');
     await expect(page.locator('#list')).not.toContainText('No deals match that.');
   });
+
+  // SS5 item 4: the contacts join asked for limit=500, but the server's
+  // clampLimit caps every read at MAX_PAGE=100 — code must never claim a
+  // capacity the server refuses. Pin the honest request.
+  test('the contacts-name join requests the 100 the server actually grants — never 500', async ({ page }) => {
+    let contactsUrl = '';
+    await pinTable(page);
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/contacts(\?|$)/, (route) => {
+      contactsUrl = route.request().url();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(API['/sales/contacts']) });
+    });
+    await page.goto('/pipeline.html');
+    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(1)).toHaveText('Sam Rivera');
+    expect(new URL(contactsUrl).searchParams.get('limit')).toBe('100');
+  });
 });
 
 test.describe('Deal drawer Path', () => {
