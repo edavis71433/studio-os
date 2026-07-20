@@ -130,6 +130,22 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(page.locator('tbody tr').first()).toContainText('Logo');
   });
 
+  test('Size sorts NUMERICALLY — 700 B < 9 KB < 80 KB (the lexical-regression trap)', async ({ page }) => {
+    await pinTable(page);
+    // chosen so ANY lexical compare (raw bytes '9216'>'81920'>'700', or the
+    // formatted '9 KB'>'80 KB'>'700 B') orders them wrongly — only numeric passes
+    const TINY = { ...LOGO, id: 'ffffffff-6666-4666-8666-ffffffffffff', name: 'Tiny', bytes: 700 };
+    const NINE = { ...LOGO, id: '99999999-7777-4777-8777-999999999999', name: 'Nine', bytes: 9 * 1024 };
+    const EIGHTY = { ...LOGO, id: '88888888-8888-4888-8888-888888888888', name: 'Eighty', bytes: 80 * 1024 };
+    await installApp(page, { api: { ...filesApi, '/assets': { data: { assets: [NINE, TINY, EIGHTY], total: 3, shown: 3, policy: 'immediate' } } } });
+    await page.goto('/files.html');
+    await page.locator('.thb', { hasText: 'Size' }).click();   // first click: largest first
+    await expect(page.locator('th[aria-sort="descending"]')).toContainText('Size');
+    await expect(page.locator('tbody tr .nm2')).toHaveText(['Eighty', 'Nine', 'Tiny']);
+    await page.locator('.thb', { hasText: 'Size' }).click();   // toggle: smallest first
+    await expect(page.locator('tbody tr .nm2')).toHaveText(['Tiny', 'Nine', 'Eighty']);
+  });
+
   test('display toggle: persists to localStorage and restores on reload (aria-pressed)', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: filesApi });
@@ -301,6 +317,25 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(page.locator('#panel')).not.toHaveClass(/on/);
   });
 
+  test('upload partial failure tells the truth — "Uploaded 1 · 1 failed", never a blanket "Uploaded"', async ({ page }) => {
+    await installApp(page, { api: filesApi });
+    let uploadCalls = 0;
+    await page.route(/\/functions\/v1\/presence\/media\/upload-url/, (route) => {
+      uploadCalls++;
+      if (uploadCalls === 1) return route.fulfill(ok({ data: { media_id: '11111111-1111-4111-8111-111111111111', upload_url: 'http://127.0.0.1:4173/__e2e_put__', storage_path: 'presence-media/x.png' } }));
+      return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'too_large', message: 'Images must be under 10MB.' }) });
+    });
+    await page.route(/__e2e_put__/, (route) => route.fulfill({ status: 200, body: '' }));   // the storage PUT for the good file
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('Logo');
+    await page.setInputFiles('#picker', [
+      { name: 'one.png', mimeType: 'image/png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },
+      { name: 'two.png', mimeType: 'image/png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },
+    ]);
+    await expect(page.locator('.dds-toast')).toContainText('Uploaded 1 · 1 failed');
+    expect(uploadCalls).toBe(2);
+  });
+
   test('a read that removes a selected row PRUNES the selection — bulk never acts on hidden rows', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: filesApi });
@@ -323,14 +358,20 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(page.locator('.bulkbar .cnt')).toHaveText('1 selected');   // the surviving row keeps its selection
   });
 
-  test('search re-renders never destroy the input or caret', async ({ page }) => {
+  test('search re-renders never destroy the input, its caret POSITION, or focus', async ({ page }) => {
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');
     const q = page.locator('#q');
     await q.click();
     await q.pressSequentially('logo', { delay: 30 });
+    await page.keyboard.press('ArrowLeft');   // park the caret INSIDE the value…
+    await page.keyboard.press('ArrowLeft');   // …at index 2 (a collapsed selection)
     await page.waitForTimeout(600);   // debounce + reload + re-render behind it
     await expect(q).toBeFocused();    // the SAME control still holds focus…
-    await expect(q).toHaveValue('logo');   // …and the typed value survived the swap
+    await expect(q).toHaveValue('logo');   // …the typed value survived the swap…
+    // …and so did the caret POSITION — a naive focus()+value restore leaves the
+    // caret at the end (index 4) and reddens this
+    const caret = await q.evaluate((el) => ({ s: (el as HTMLInputElement).selectionStart, e: (el as HTMLInputElement).selectionEnd }));
+    expect(caret).toEqual({ s: 2, e: 2 });
   });
 });
