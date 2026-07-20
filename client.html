@@ -330,6 +330,16 @@
   details.faq-item[open]>summary::after{content:"–"}
   .faq-answer{padding:0 18px 15px;color:var(--soft);font-size:14.5px}
   .faq-answer a{color:var(--p)}
+  /* ── PS4: the account card as a proper profile section ── */
+  .acctid{display:flex;align-items:center;gap:12px;padding-bottom:13px}
+  .acctav{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:var(--p-soft);color:var(--p);font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .acctwho{display:flex;flex-direction:column;min-width:0}
+  .acctwho strong{font-size:15.5px}
+  .acctwho .muted{font-size:13px;overflow-wrap:anywhere}
+  .acctrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+  .acctlab{display:flex;flex-direction:column;min-width:0}
+  .acctlab .muted{font-size:12.5px}
+  .acctrow button{flex:0 0 auto;white-space:nowrap}
   /* ── slice 8b: the "Your website" card (Home, between "Needs you" and projects) ── */
   .wscard .wslead{color:var(--soft);font-size:14.5px;line-height:1.55}
   .wscard .wslead b{color:var(--ink)}
@@ -1790,25 +1800,60 @@ async function openServiceRequest(svc){
   });
 }
 // ── HELP — the studio's FAQ (searchable/expandable) + a way to reach a human ──
+// PS4 (B2): the reviewer is persona-gated BEFORE the fetch (zero /client/*
+// reads — the renderMessages/renderFiles contract; Help was the last tab still
+// firing a doomed 403 read), the FAQ read is three-way honest (failed ≠ empty ≠
+// loaded, and a failure is never cached — tab re-entry retries free), and the
+// account card is a proper profile section whose "message your studio" pointers
+// only render for a persona that CAN message.
+function accountSectionHtml(canMessage){
+  const name=firstName(USER);
+  const email=(USER&&USER.email)?USER.email:'';
+  const av=((name||email||'').charAt(0)||'•').toUpperCase();
+  return `<section id="sec-you"><h2>Your account</h2><div class="card">`+
+    `<div class="acctid"><span class="acctav" aria-hidden="true">${esc(av)}</span><div class="acctwho"><strong>${name?esc(name):'Signed in'}</strong>${email?`<span class="muted">${esc(email)}</span>`:''}</div></div>`+
+    `<div class="acctrow"><div class="acctlab"><strong>Appearance</strong><span class="muted">Light, dark, or match your device.</span></div><button id="appearance">${esc(themeLabel())}</button></div>`+
+    (email?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a link to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
+    `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
+    (canMessage?`<p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p>`:'')+
+    `</div></section>`;
+}
+function wireAccountSection(){
+  const email=(USER&&USER.email)?USER.email:'';
+  const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
+  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
+  const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
+}
 async function renderHelp(){
-  $('main').innerHTML=spinnerHtml();
+  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   const canMessage=PORTAL.persona==='client';
-  let faqHtml='';try{const r=await api('/client/faq');faqHtml=(r&&r.body&&r.body.data&&r.body.data.html)||'';}catch(_){}
+  if(!canMessage){ // reviewer: /client/faq is 403 server-side — the calm read-only state, ZERO fetches, never an error line (renderMessages' contract)
+    $('main').innerHTML=portalHeader('Help','Quick answers from your studio.')+
+      emptyCard('Help articles will appear here once your studio has set up your account.','❓')+
+      accountSectionHtml(false);
+    wireAccountSection();
+    return;
+  }
+  $('main').innerHTML=spinnerHtml();
+  let r=null;try{r=await api('/client/faq');}catch(_){}
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  const faqFailed=!(r&&r.ok);
+  const faqHtml=(!faqFailed&&r.body&&r.body.data&&r.body.data.html)||'';
   let html=portalHeader('Help','Quick answers from your studio.');
-  if(!faqHtml)html+=emptyCard('Your studio hasn’t added any help articles yet — but you can always ask them a question below.','❓');
+  // failed ≠ empty: a failed read says so calmly (nothing was cached, so coming
+  // back to the tab retries) — only a genuine ok-empty earns the no-articles copy
+  if(faqFailed)html+=`<div class="card"><p class="muted">We couldn’t load help articles just now — please try again in a moment.</p></div>`;
+  else if(!faqHtml)html+=emptyCard('Your studio hasn’t added any help articles yet — but you can always ask them a question below.','❓');
   else{
     html+=`<div class="card" style="padding:12px 14px"><input id="faqSearch" type="search" placeholder="Search help…" aria-label="Search help" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)"></div>`;
     html+=`<div id="faqBody">${faqHtml}</div>`;
     html+=`<p id="faqNone" class="muted" hidden style="padding:4px 2px">No answers match that. Try fewer words, or message your studio below.</p>`;
   }
-  if(canMessage)html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
-  const email=(USER&&USER.email)?USER.email:'';
-  html+=`<section id="sec-you"><h2>Your account</h2><div class="card">${email?`<p>Signed in as <strong>${esc(email)}</strong></p>`:'<p>You’re signed in.</p>'}<div class="row"><button id="appearance">${esc(themeLabel())}</button>${email?`<button id="chgpw">Change password</button>`:''}<button id="signout2">Sign out</button></div><p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p></div></section>`;
+  html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
+  html+=accountSectionHtml(true);
   $('main').innerHTML=html;
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',()=>openSupport(null));
-  const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
-  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
-  const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
+  wireAccountSection();
   const search=$('faqSearch');
   if(search)search.addEventListener('input',()=>{
     const q=search.value.trim().toLowerCase();const items=document.querySelectorAll('#faqBody .faq-item');let shown=0;

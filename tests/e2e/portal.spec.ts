@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { installApp } from './helpers/app';
+import { installApp, OWNER_SESSION } from './helpers/app';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
 // you" (Phase PP Section 4), then approve what's theirs to approve.
@@ -2434,5 +2434,270 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     await page.goto('/client.html');
     await expect(page.locator('#welcome')).toBeVisible();
     await expect(page.locator('.wl-step')).toHaveCount(4);
+  });
+});
+
+// ── PS4 — Help tab treatment (B2) ────────────────────────────────────────────
+// Per-read honesty (a failed FAQ read never masquerades as "no help articles"),
+// the reviewer persona gate BEFORE the fetch (Help was the LAST tab where a
+// reviewer still fired a doomed /client/* read), the VIEW_SEQ contract on the
+// renderer, and the account card promoted to a proper profile section whose
+// "message your studio" pointers only render for a persona that CAN message.
+const FAQ_HTML = '<section class="faq"><details class="faq-item"><summary>How do I pay an invoice?</summary>'
+  + '<div class="faq-answer"><p>Open the Invoices tab and use the Pay link.</p></div></details></section>';
+const HELP_API = { ...CLIENT_API, '/client/faq': { data: { html: FAQ_HTML, faq: { items: [{ q: 'How do I pay an invoice?', a: 'Open the Invoices tab and use the Pay link.' }] } } } };
+const openHelpTab = async (page: import('@playwright/test').Page) => {
+  await page.locator('#tabnav [data-tab="help"]').click();
+  await expect(page.locator('#main').getByRole('heading', { name: 'Help', exact: true })).toBeVisible();
+};
+
+test.describe('PS4 — Help tab (B2)', () => {
+  test('a 500 on the FAQ read shows the couldn’t-load line — never “hasn’t added any help articles” — and tab re-entry retries', async ({ page }) => {
+    let calls = 0;
+    await installApp(page, { api: HELP_API });
+    await page.route('**/functions/v1/presence/client/faq', (route) => {
+      calls++;
+      if (calls === 1) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fallback();
+    });
+    await page.goto('/client.html');
+    await openHelpTab(page);
+    // failed ≠ empty: the honest couldn't-load line, never the no-articles story
+    await expect(page.getByText('We couldn’t load help articles just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('hasn’t added any help articles', { exact: false })).toHaveCount(0);
+    // the failure was NOT cached — leaving and coming back refetches and renders
+    await page.locator('#tabnav [data-tab="home"]').click();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await openHelpTab(page);
+    await expect(page.locator('#faqBody .faq-item')).toHaveCount(1);
+    await expect(page.getByText('We couldn’t load help articles', { exact: false })).toHaveCount(0);
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('client ok-empty still earns the no-articles copy (the failure copy stays distinct)', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/faq': { data: { html: '', faq: { items: [] } } } } });
+    await page.goto('/client.html');
+    await openHelpTab(page);
+    await expect(page.getByText('Your studio hasn’t added any help articles yet', { exact: false })).toBeVisible();
+    await expect(page.getByText('We couldn’t load help articles', { exact: false })).toHaveCount(0);
+  });
+
+  test('reviewer: /client/faq 403s in production — the calm state with ZERO fetches (the last tab joins the contract)', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    // PRODUCTION shape: every /client/* answers 403 for a client_reviewer —
+    // the helpers' 200 catch-all would mask a leaked fetch as a calm empty
+    await page.route('**/functions/v1/presence/client/**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    const calls: string[] = [];
+    page.on('request', (r) => { if (r.url().includes('/client/faq')) calls.push(r.url()); });
+    await page.goto('/client.html');
+    await openHelpTab(page);
+    await expect(page.getByText('Help articles will appear here once your studio has set up your account.')).toBeVisible();
+    await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);   // never the error line
+    expect(calls).toHaveLength(0);   // the reviewer render makes NO FAQ read at all
+  });
+
+  test('account card gating: a reviewer gets NO “message your studio” pointers (they have no message button)', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    await page.route('**/functions/v1/presence/client/**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    await page.goto('/client.html');
+    await openHelpTab(page);
+    // no "Still need help?" message card, no name/email-change pointer…
+    await expect(page.locator('#helpMsg')).toHaveCount(0);
+    await expect(page.getByText('Message your studio and they’ll update it', { exact: false })).toHaveCount(0);
+    // …but the account section itself stays: appearance + sign out still work here
+    await expect(page.locator('#sec-you')).toBeVisible();
+    await expect(page.locator('#appearance')).toBeVisible();
+    await expect(page.locator('#signout2')).toBeVisible();
+  });
+
+  test('the account card is a proper profile section: identity block + structured rows (client)', async ({ page }) => {
+    await installApp(page, { api: HELP_API, session: { ...OWNER_SESSION,
+      user: { id: 'e2e-owner', email: 'maria@example.com', aud: 'authenticated', role: 'authenticated', user_metadata: { name: 'Maria Alvarez' } } } });
+    await page.goto('/client.html');
+    await openHelpTab(page);
+    const you = page.locator('#sec-you');
+    // identity: who is signed in — first name + email + the workspace relationship
+    await expect(you.locator('.acctid')).toContainText('Maria');
+    await expect(you.locator('.acctid')).toContainText('maria@example.com');
+    // structured rows: Appearance / Password / Sign out, each labeled, handlers intact
+    await expect(you.locator('.acctrow')).toHaveCount(3);
+    await expect(you.locator('#appearance')).toBeVisible();
+    await expect(you.locator('#chgpw')).toBeVisible();
+    await expect(you.locator('#signout2')).toBeVisible();
+    // the client CAN message — the name/email-change pointer stays for them
+    await expect(you.getByText('Message your studio and they’ll update it', { exact: false })).toBeVisible();
+  });
+
+  test('VIEW_SEQ: a slow FAQ read never paints over the tab the user moved on to', async ({ page }) => {
+    await installApp(page, { api: HELP_API });
+    await page.route('**/functions/v1/presence/client/faq', async (route) => {
+      await new Promise((r) => setTimeout(r, 700));
+      return route.fallback();
+    });
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="help"]').click();
+    // move on before the read lands
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.waitForTimeout(1100);   // let the stale response arrive
+    await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
+    await expect(page.locator('#main').getByRole('heading', { name: 'Help', exact: true })).toHaveCount(0);
+    await expect(page.locator('#faqSearch')).toHaveCount(0);
+  });
+});
+
+// ── PS5 — booking flow honesty (B4 + its B3 sliver) ─────────────────────────
+// Three transient failures each masqueraded as calm absence ("isn't set up" /
+// "hasn't opened any times" / "No open times that day"); each becomes a
+// distinct couldn't-check + Try again. Paints after awaits get VIEW_SEQ
+// re-checks, the confirm step prefills from the session (D5a, editable), and
+// each step's h1 takes entry focus (B3 sliver).
+const BOOK_SLOT = '2026-08-01T10:00:00Z';
+const BOOK_API = { ...REQ_API, '/book/site-1/slots': { data: { date: '2026-08-01', duration_min: 30, slots: [BOOK_SLOT, '2026-08-01T11:00:00Z'] } } };
+const openBookingFlow = async (page: import('@playwright/test').Page) => {
+  await page.goto('/client.html');
+  await openRequestsTab(page);
+  await page.locator('#bookCall').click();
+};
+
+test.describe('PS5 — booking flow honesty (B4)', () => {
+  test('a 500 on /client/book shows the couldn’t-check card — never “isn’t set up” — and Try again retries', async ({ page }) => {
+    let calls = 0;
+    await installApp(page, { api: BOOK_API });
+    await page.route('**/functions/v1/presence/client/book', (route) => {
+      calls++;
+      if (calls === 1) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fallback();
+    });
+    await openBookingFlow(page);
+    await expect(page.getByText('We couldn’t check on booking just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toHaveCount(0);
+    // Try again re-runs the step — the flow comes back for real
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByRole('heading', { name: 'Book a call' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('a 500 on the types read shows the couldn’t-check card — never “hasn’t opened any times”', async ({ page }) => {
+    await installApp(page, { api: BOOK_API });
+    await page.route('**/book/site-1/types**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await openBookingFlow(page);
+    await expect(page.getByText('We couldn’t check on booking just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('hasn’t opened any times', { exact: false })).toHaveCount(0);
+  });
+
+  test('genuine ok-absence keeps its calm copy: no site → “isn’t set up”, disabled engine → “hasn’t opened any times”', async ({ page }) => {
+    await installApp(page, { api: { ...BOOK_API, '/client/book': { data: { site_id: null } } } });
+    await openBookingFlow(page);
+    await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toBeVisible();
+    await expect(page.getByText('We couldn’t check on booking', { exact: false })).toHaveCount(0);
+  });
+
+  test('a 500 on the slots read shows the couldn’t-check line in the slot panel — never “No open times that day” — and Try again reloads', async ({ page }) => {
+    let calls = 0;
+    await installApp(page, { api: BOOK_API });
+    await page.route('**/book/site-1/slots**', (route) => {
+      calls++;
+      if (calls === 1) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fallback();
+    });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();
+    const panel = page.locator('#bk-slots');
+    await expect(panel.getByText('We couldn’t check on booking just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('No open times that day', { exact: false })).toHaveCount(0);
+    // the retry re-runs the SLOTS step in place — times appear
+    await panel.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByRole('button', { name: '10:00' })).toBeVisible();
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('an ok-empty slots read still earns “No open times that day”', async ({ page }) => {
+    await installApp(page, { api: { ...BOOK_API, '/book/site-1/slots': { data: { date: '2026-08-01', duration_min: 30, slots: [] } } } });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await expect(page.getByText('No open times that day — try another.')).toBeVisible();
+    await expect(page.getByText('We couldn’t check on booking', { exact: false })).toHaveCount(0);
+  });
+
+  test('D5a: the confirm step arrives prefilled from the session — and stays editable', async ({ page }) => {
+    await installApp(page, { api: BOOK_API, session: { ...OWNER_SESSION,
+      user: { id: 'e2e-owner', email: 'maria@example.com', aud: 'authenticated', role: 'authenticated', user_metadata: { name: 'Maria Alvarez' } } } });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await page.getByRole('button', { name: '10:00' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirm your booking' })).toBeVisible();
+    // the signed-in client is never asked to type their own identity…
+    await expect(page.locator('#bk-name')).toHaveValue('Maria');
+    await expect(page.locator('#bk-email')).toHaveValue('maria@example.com');
+    // …but booking on someone's behalf stays possible: both fields editable
+    await page.locator('#bk-name').fill('Jo Colleague');
+    await page.locator('#bk-email').fill('jo@example.com');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/book\/site-1$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Book it' }).click();
+    expect((await post).postDataJSON()).toEqual({ type_id: 'bt1', slot_start: BOOK_SLOT, name: 'Jo Colleague', email: 'jo@example.com' });
+  });
+
+  test('VIEW_SEQ: a slow /client/book read never clobbers the tab the user moved on to', async ({ page }) => {
+    await installApp(page, { api: BOOK_API });
+    await page.route('**/functions/v1/presence/client/book', async (route) => {
+      await new Promise((r) => setTimeout(r, 700));
+      return route.fallback();
+    });
+    await openBookingFlow(page);
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.waitForTimeout(1100);
+    await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
+    await expect(page.getByRole('heading', { name: 'Book a call' })).toHaveCount(0);
+    await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toHaveCount(0);
+  });
+
+  test('VIEW_SEQ: a slow booking POST never paints the success takeover over another tab', async ({ page }) => {
+    await installApp(page, { api: BOOK_API });
+    await page.route('**/functions/v1/presence/book/site-1', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      await new Promise((r) => setTimeout(r, 700));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await page.getByRole('button', { name: '10:00' }).click();
+    await page.locator('#bk-name').fill('Sam Client');
+    await page.locator('#bk-email').fill('sam@example.com');
+    await page.getByRole('button', { name: 'Book it' }).click();
+    // move on while the POST is in flight
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.waitForTimeout(1100);
+    await expect(page.locator('#mrows')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /You’re booked/ })).toHaveCount(0);
+  });
+
+  test('B3 sliver: each booking step hands focus to its h1', async ({ page }) => {
+    await installApp(page, { api: BOOK_API });
+    await openBookingFlow(page);
+    const focusedH1 = () => page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.tagName === 'H1' ? (el.textContent || '') : '';
+    });
+    await expect(page.getByRole('heading', { name: 'Book a call' })).toBeVisible();
+    expect(await focusedH1()).toContain('Book a call');
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
+    expect(await focusedH1()).toContain('Intro call');
+    await page.getByRole('button', { name: '10:00' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirm your booking' })).toBeVisible();
+    expect(await focusedH1()).toContain('Confirm your booking');
   });
 });
