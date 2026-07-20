@@ -162,7 +162,6 @@ function askPrompt(title, body, okLabel, placeholder){
     dlg.showModal(); setTimeout(()=>inp.focus(),20);
   });
 }
-function scParam(){const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
 
@@ -235,10 +234,14 @@ function wire(){
   document.querySelectorAll('[data-resched]').forEach(b=>b.addEventListener('click',()=>reschedule(b.getAttribute('data-resched'))));
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>toggleRow(b.getAttribute('data-open'),b)));
   const rf=$('bcRefresh');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('bcRefresh');if(nr)nr.focus();}));
-  const sr=$('segRetry');if(sr)sr.addEventListener('click',()=>load());
-  const br=$('bcRetry');if(br)br.addEventListener('click',()=>load());
+  // notice retries are SOFT — retrying ONE section must not let a transient
+  // failure of the OTHER section tear down its last-good render (the ↻ contract)
+  const sr=$('segRetry');if(sr)sr.addEventListener('click',()=>load(true));
+  const br=$('bcRetry');if(br)br.addEventListener('click',()=>load(true));
   const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;});
-  if(OPEN&&DETAILS[OPEN]){const box=$('d-'+OPEN);if(box)paintDetail(box,OPEN);}
+  // repaint the drilled-open row; if a list refresh just dropped the DETAILS
+  // cache, RE-READ it — the open panel gets fresh counts, never a blank
+  if(OPEN){const box=$('d-'+OPEN);if(box){if(DETAILS[OPEN])paintDetail(box,OPEN);else loadDetail(OPEN);}}
 }
 // ── history drill-in (client.html Messages idiom): status · audience · counts ·
 //    the delivered body in a sandboxed srcdoc iframe · honest failed line ──────
@@ -251,13 +254,20 @@ async function toggleRow(id,btn){
   if(wasOpen)return;
   OPEN=id;btn.setAttribute('aria-expanded','true');box.hidden=false;
   if(DETAILS[id])return void paintDetail(box,id);
+  await loadDetail(id);
+}
+// Fetch (or RE-fetch) the drill-in for the currently OPEN row and paint it.
+// Also called from wire() when a list refresh dropped the DETAILS cache while a
+// row was open — it re-reads fresh counts instead of leaving a blank panel.
+async function loadDetail(id){
+  const box=$('d-'+id);if(!box)return;
   box.innerHTML='<p class="muted">Opening…</p>';
   const gen=++DET_SEQ;
   let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
   if(gen!==DET_SEQ||OPEN!==id)return;   // a newer drill-in started, or the row was closed — never paint stale
   if(!r.ok||!r.body.data){
     box.innerHTML='<p class="muted">Couldn’t open this one just now. <button class="ghost" data-dretry type="button">Try again</button></p>';
-    const rt=box.querySelector('[data-dretry]');if(rt)rt.addEventListener('click',()=>{OPEN=null;toggleRow(id,btn);});
+    const rt=box.querySelector('[data-dretry]');if(rt)rt.addEventListener('click',()=>loadDetail(id));
     return;
   }
   DETAILS[id]=r.body.data;paintDetail(box,id);
@@ -299,11 +309,15 @@ async function reschedule(id){
 function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAFT||{};DRAFT.subject=s.value;DRAFT.body=t.value;}}
 
 async function assist(){
+  syncDraftFromForm();   // capture what's typed FIRST, like every other render path — the proposal merges in, it never replaces
   const goal=await askPrompt('What’s this update about?','A sentence is enough — you’ll get a draft you can edit.','Draft it','e.g. the summer menu is live');
   if(!goal)return;
   toast('Writing a draft…');
   const r=await api('/broadcasts/draft-assist','POST',{goal});
   if(!r.ok){toast(r.body&&r.body.message||'Couldn’t draft that.');return;}
+  // overwrite ONLY what the server proposed — draft-assist may return subject-only
+  // or body-only (routes/broadcasts.ts cleans each independently), and a
+  // subject-only proposal must not blank a typed body, nor vice versa
   DRAFT=DRAFT||{};if(r.body.data.subject)DRAFT.subject=r.body.data.subject;if(r.body.data.body)DRAFT.body=r.body.data.body;
   render();toast('Here’s a starting point — edit anything.');
 }
@@ -427,7 +441,12 @@ async function load(soft){
   if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.');
   if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;}
   else if(!soft)SEG_OK=false;   // soft keeps the last good lists on screen
-  if(list.ok){BROADCASTS=(list.body.data&&list.body.data.broadcasts)||[];LIST_OK=true;LOADED_AT=Date.now();}
+  if(list.ok){
+    BROADCASTS=(list.body.data&&list.body.data.broadcasts)||[];LIST_OK=true;LOADED_AT=Date.now();
+    // a fresh list drops the per-row cache — drilled-in counts must not freeze
+    // for the session while the list refreshes (an OPEN row re-reads in wire())
+    for(const k of Object.keys(DETAILS))delete DETAILS[k];
+  }
   else if(!soft)LIST_OK=false;
   syncDraftFromForm();   // a re-render must never eat what's typed in the composer
   render();

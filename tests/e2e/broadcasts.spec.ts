@@ -207,6 +207,63 @@ test.describe('SS4 — broadcasts console', () => {
     expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
   });
 
+  test('a notice Try again is a SOFT retry — the other section keeps its last-good render if its read hiccups', async ({ page }) => {
+    await installApp(page, { api: API });
+    let segCalls = 0, listCalls = 0;
+    await page.route((u) => /\/broadcasts\/segments$/.test(u.pathname), (route) => {
+      segCalls++;
+      if (segCalls === 1) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SEGS) });
+    });
+    await page.route((u) => isListGet(u.href, 'GET'), (route) => {
+      listCalls++;
+      if (listCalls === 1) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(LIST) });
+      return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+    });
+    await page.goto('/broadcasts.html');
+    await expect(page.locator('#segNotice')).toBeVisible();
+    await expect(page.locator('.bc').filter({ hasText: 'June recap' })).toBeVisible();
+    await page.locator('#segNotice').getByRole('button', { name: 'Try again' }).click();
+    // segments recover…
+    await expect(page.locator('[data-seg="contacts"]')).toBeVisible();
+    // …and history KEEPS its last-good rows even though ITS read failed this time
+    // (a hard retry would swap the whole history card for the bcNotice)
+    await expect(page.locator('.bc').filter({ hasText: 'June recap' })).toBeVisible();
+    await expect(page.locator('#bcNotice')).toHaveCount(0);
+  });
+
+  test('↻ refresh drops the drill-in cache — an open row re-reads fresh counts instead of freezing them for the session', async ({ page }) => {
+    await installApp(page, { api: API });
+    let detCalls = 0;
+    await page.route((u) => u.pathname.endsWith('/broadcasts/' + T_ID), (route) => {
+      detCalls++;
+      const d = JSON.parse(JSON.stringify(SENT_DETAIL));
+      if (detCalls > 1) d.data.broadcast.sent_count = 43;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
+    });
+    await page.goto('/broadcasts.html');
+    await page.locator('.bc').filter({ hasText: 'June recap' }).getByRole('button', { name: /June recap/ }).click();
+    await expect(page.locator('.bc').filter({ hasText: 'June recap' }).locator('.bcdetail')).toContainText('42 sent');
+    await page.getByRole('button', { name: /Refresh/ }).click();
+    // the successful list refresh invalidated the cache: the open row re-read and shows fresh counts
+    await expect(page.locator('.bc').filter({ hasText: 'June recap' }).locator('.bcdetail')).toContainText('43 sent');
+  });
+
+  test('✨ assist merges the proposal — a subject-only response never blanks a typed body', async ({ page }) => {
+    // routes/broadcasts.ts draft-assist may return subject-only or body-only
+    // (each cleaned independently; only both-empty is an error) — the composer
+    // must take what was proposed and KEEP what the owner already typed.
+    await installApp(page, { api: { ...API, '/broadcasts/draft-assist': { data: { subject: 'Summer menu is here', body: '', note: 'A starting point.' } } } });
+    await page.goto('/broadcasts.html');
+    await page.locator('#bodytx').fill('My hand-typed body that must survive.');
+    await page.getByRole('button', { name: /Help me write it/ }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.locator('input').fill('summer menu');
+    await dlg.getByRole('button', { name: 'Draft it' }).click();
+    await expect(page.locator('#subj')).toHaveValue('Summer menu is here');
+    await expect(page.locator('#bodytx')).toHaveValue('My hand-typed body that must survive.');
+  });
+
   test('D6 — boot reads run in PARALLEL: the list read is issued while segments is still in flight', async ({ page }) => {
     await installApp(page, { api: API });
     let releaseSegs!: () => void;
