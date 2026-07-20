@@ -169,6 +169,25 @@ test.describe('SS4 — broadcasts console', () => {
     await expect(page.locator('#send')).toHaveText('Reschedule');
   });
 
+  test('sending a drilled-open row closes its panel — no empty detail left visible', async ({ page }) => {
+    await installApp(page, { api: { ...API, ['/broadcasts/' + S_ID + '/send']: { data: { status: 'scheduled' } } } });
+    await page.goto('/broadcasts.html');
+    const row = page.locator('.bc').filter({ hasText: 'Weekend tasting event' });
+    await row.getByRole('button', { name: /Weekend tasting event/ }).click();
+    await expect(row.locator('.bcdetail')).toBeVisible();
+    await expect(row.locator('.bcdetail')).toContainText('All website enquiries');
+    // reschedule the drilled-open row (schedule mode, prefilled future time) and send
+    await row.getByRole('button', { name: 'Reschedule' }).click();
+    await expect(page.locator('#send')).toHaveText('Reschedule');
+    const sent = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/broadcasts/' + S_ID + '/send'));
+    await page.locator('#send').click();
+    await sent;
+    // the send invalidated the drill-in — its panel must CLOSE, not linger visibly empty
+    await expect(page.locator('.bc').filter({ hasText: 'Weekend tasting event' })).toBeVisible();
+    await expect(page.locator('#d-' + S_ID)).toBeHidden();
+    await expect(page.locator('.bcdetail:not([hidden])')).toHaveCount(0);
+  });
+
   test('↻ refresh soft-fails: the list survives + a toast — the document NEVER reloads', async ({ page }) => {
     await installApp(page, { api: API });
     let calls = 0;

@@ -393,7 +393,7 @@ async function doSend(id){
     const s=$('subj');if(s)s.value='';
     const t=$('bodytx');if(t)t.value='';
   }
-  delete DETAILS[id];
+  delete DETAILS[id];if(OPEN===id)OPEN=null;   // mirror cancelBc — a drilled-open row must not re-render as a visible empty panel
   $('stage').innerHTML='';
   await load();
 }
