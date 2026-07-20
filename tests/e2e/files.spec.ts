@@ -211,6 +211,28 @@ test.describe('Files (the DAM, customer-facing)', () => {
     expect(listCalls).toBe(2);   // Try-again really refetched
   });
 
+  test('trouble screen: a SUCCESSFUL collections read still shows real rail counts', async ({ page }) => {
+    await installApp(page, { api: { ...filesApi, '/assets/collections': { data: [{ name: 'Brand', count: 1 }, { name: 'Templates', count: 4 }] } } });
+    await page.route(LIST_RE, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('We couldn’t load your files just now.');
+    await expect(page.locator('[data-col="templates"] .n')).toHaveText('4');   // truth that WAS readable renders
+    await expect(page.locator('[data-col="downloads"] .n')).toHaveText('0');   // a successful read saying "none" is honest
+  });
+
+  test('boot failure with collections ALSO down: the rail shows NO counts at all (no fake zeros)', async ({ page }) => {
+    // Pins 68a952f's hardening — reverting the countsOk gate must redden this:
+    // an unknown count on the trouble screen is a guess wearing a number's clothes.
+    await installApp(page, { api: filesApi });
+    await page.route(LIST_RE, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.route(/\/functions\/v1\/presence\/assets\/collections/, (route) =>
+      route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'down' }) }));
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('We couldn’t load your files just now.');
+    await expect(page.locator('.rail')).toContainText('Templates');   // the rail itself stays
+    await expect(page.locator('#rail .n')).toHaveCount(0);            // but not a single count — zero would be a lie
+  });
+
   test('↻ refresh soft-fails: a failed refresh keeps the list (leads.html contract)', async ({ page }) => {
     await installApp(page, { api: filesApi });
     let listCalls = 0;

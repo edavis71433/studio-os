@@ -276,10 +276,11 @@ function deriveRailCounts(rows,total){
   RAILN.archive=(typeof total==='number'&&rows.length<300&&total>=rows.length)?(total-rows.length):undefined;
 }
 function railN(key){
-  // before the first successful load the counts are UNKNOWN — render count-less
-  // (a "0" on the trouble screen would be a guess wearing a number's clothes)
-  if(key==='templates')return (S.countsOk&&S.loadedOnce)?(S.counts.Templates||0):undefined;
-  if(key==='downloads')return (S.countsOk&&S.loadedOnce)?(S.counts.Downloads||0):undefined;
+  // counts render ONLY once a collections read has SUCCEEDED (countsOk) — unknown
+  // never paints as 0, and a good read shows real counts even on the trouble
+  // screen (load() absorbs collections there for exactly this)
+  if(key==='templates')return S.countsOk?(S.counts.Templates||0):undefined;
+  if(key==='downloads')return S.countsOk?(S.counts.Downloads||0):undefined;
   if(key==='stock')return undefined;   // a browse surface, not a collection
   return RAILN[key];
 }
