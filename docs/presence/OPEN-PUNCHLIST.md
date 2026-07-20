@@ -313,7 +313,7 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
-## 🟢 STANDARDS SWEEP — WAVE 6 BUILT: PS4+PS5 + SS6 + booking sliver (2026-07-20, pending Eric merge)
+## ✅ STANDARDS SWEEP — WAVE 6 LIVE: PS4+PS5 + SS6 + booking sliver (2026-07-20, Netlify)
 
 All lanes built → adversarially reviewed → fixes red-first.
 - **PS4 Help tab**: three-way honest FAQ read, the LAST reviewer /client/* fetch
