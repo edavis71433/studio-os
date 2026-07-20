@@ -313,6 +313,9 @@ ok('portal: the queue renders per-source couldn\'t-check lines for feed / projec
   && portal.includes('We couldn’t check on invoices just now — please try again in a moment.'));
 ok('portal: ONLY an all-sources-ok-and-empty queue may claim "You\'re all caught up."',
   portal.includes('if(!items.length&&!srcFails.length)') && portal.includes('You’re all caught up.'));
+ok('portal: Recent updates gates its empty copy on feedFailed — the couldn\'t-load line first',
+  portal.includes('We couldn’t load recent updates just now — please try again in a moment.')
+  && /if\(P\.feedFailed\)html\+=[\s\S]{0,200}else if\(!moments\.length\)html\+=emptyCard\('Nothing new to share/.test(portal));
 ok('portal: ensureSnaps marks a FAILED per-project read (failed:true), distinct from an empty one',
   /if\(!r\.ok\)throw 0;/.test(portal) && portal.includes('failed:true,milestones:[]'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',

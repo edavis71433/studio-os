@@ -727,7 +727,10 @@ function renderHome(){
     :projectCardsHtml(projects)}</section>`;
   html+=`<section><h2>Recent updates</h2>`;
   const moments=(feed.moments||[]);
-  if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
+  // a FAILED feed read says so — "Nothing new to share" is a claim only a
+  // successful read may make
+  if(P.feedFailed)html+=`<p class="muted fload">We couldn’t load recent updates just now — please try again in a moment.</p>`;
+  else if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
   else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><div class="qmain"><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div></div>`).join('')}</div>`;
   html+=`</section>`;
   $('main').innerHTML=html;

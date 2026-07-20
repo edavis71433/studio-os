@@ -1854,6 +1854,15 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect(page.getByText('You’re all caught up.')).toHaveCount(0);
   });
 
+  test('a failed feed read gates Recent updates: the couldn’t-load line, never "Nothing new to share"', async ({ page }) => {
+    await installApp(page, { api: EMPTY_CLIENT_API });
+    await page.route('**/functions/v1/presence/portal/feed**', fail500);
+    await page.goto('/client.html');
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Recent updates' }) });
+    await expect(sec.getByText('We couldn’t load recent updates just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('Nothing new to share right now', { exact: false })).toHaveCount(0);
+  });
+
   test('only an ALL-sources-ok-and-empty queue earns "You’re all caught up." (the gate does not over-fire)', async ({ page }) => {
     await installApp(page, { api: EMPTY_CLIENT_API });
     await page.goto('/client.html');
