@@ -1889,6 +1889,29 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     expect(markSeen).toBe(0);
   });
 
+  test('reviewer: the notifications 403 is CONTRACT, not failure — the bell shows the calm empty copy', async ({ page }) => {
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    // PRODUCTION shape: every /client/* route answers 403 for a client_reviewer
+    // (reviewerAllowed, workspace.ts:31). The helpers' catch-all serves 200
+    // {data:{}} — which masks an ungated notifsFailed flag — so the contract
+    // 403 is routed explicitly here. failed ≠ empty ≠ reviewer-calm: this is
+    // the reviewer-calm copy, not a transient claim about a permanent contract.
+    await page.route('**/functions/v1/presence/client/**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // whichever bell this viewport shows (Home topbar <720px, context bar above)
+    await page.locator('#navbell:visible, #bell:visible').first().click();
+    const panel = page.locator('.notifpanel:visible');
+    await expect(panel.getByText('You’re all caught up — nothing new right now.')).toBeVisible();
+    // never the couldn't-check line — that copy claims a transient failure the
+    // reviewer's permanent 403 can't earn
+    await expect(panel.getByText('We couldn’t check just now', { exact: false })).toHaveCount(0);
+  });
+
   test('a failed billing read: surviving queue rows + its own calm line, due tile hidden — no fake $0', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.route('**/functions/v1/presence/client/billing', fail500);

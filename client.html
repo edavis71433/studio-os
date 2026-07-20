@@ -2049,7 +2049,7 @@ async function load(){
   const feed=await api('/portal/feed'); PORTAL.feed=(feed.ok&&feed.body.data)||{};
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   const n=await api('/client/notifications').catch(()=>null); const nb=(n&&n.body)||{};
-  PORTAL.notifsFailed=!(n&&n.ok);   // …nor a failed notifications read as zero messages
+  PORTAL.notifsFailed=PORTAL.persona==='client'&&!(n&&n.ok);   // …nor a failed notifications read as zero messages — but a reviewer's 403 here is the CONTRACT (reviewerAllowed), not a failure: their bell stays calm
   PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
   PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
   PORTAL.ready=true;

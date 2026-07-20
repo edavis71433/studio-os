@@ -290,7 +290,12 @@ ok('portal: the strip fills from buildNeedsYou\'s own data (no new reads), carry
 ok('portal: the project cards\' glance line shares snapWaiting with the tile (one count, everywhere)',
   portal.includes('const waiting=snapWaiting(s);'));
 ok('portal: load() records feed/notification read failures for the strip',
-  portal.includes('PORTAL.feedFailed=!feed.ok') && portal.includes('PORTAL.notifsFailed=!(n&&n.ok)'));
+  portal.includes('PORTAL.feedFailed=!feed.ok') && portal.includes('PORTAL.notifsFailed='));
+// PS1 review: like projectsFailed, notifsFailed is CLIENT-persona-only — a
+// reviewer's GET /client/notifications 403s by contract (reviewerAllowed),
+// so their bell must show the calm empty copy, never the couldn't-check line.
+ok('portal: load() records a client\'s failed notifications read; a reviewer\'s 403 stays calm',
+  portal.includes("PORTAL.notifsFailed=PORTAL.persona==='client'&&!(n&&n.ok)"));
 // PS1: a failed /client/projects read is recorded (client persona only — a
 // reviewer's 403 is contract, not failure), feeds the glance's failed.snaps,
 // and Home's projects section renders the couldn't-load line, never the 🚀 card.
