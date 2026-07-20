@@ -313,6 +313,31 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## ⏸️ PAUSED BY ERIC (2026-07-20: "lets pause until i have more fable")
+
+State at pause — everything through WAVE 6 is MERGED + LIVE (main@11a0af9).
+WAVE 7 was mid-build when the pause landed (its agents die with this message;
+completed page/item commits are already pushed — check `git log origin` for
+any "SS8"/"PS6"/"PS7" commits to see how far they got before resuming):
+- SS8 (attention + website-health + content-tree family chrome; the
+  website-health 403-renders-all-clear lie is the headline fix) — resume by
+  relaunching the build agent from docs/design/STUDIO-STANDARDS-SWEEP.md §SS8,
+  continuing from whatever page commits landed.
+- PS6+PS7 (project drill-in cohesion B3 + composer stragglers B6; incl. the
+  PS1-review residual: projectsFailed honesty at Files/Messages tabs) — same:
+  relaunch from §PS6/§PS7, continue from landed commits.
+Then reviews → fixes → full suite → Eric merge ask, per the standing pipeline.
+
+REMAINING AFTER WAVE 7 (all Eric-gated):
+- Decisions: P1 (timeline+upcoming merge), P2 (business-insights vs analytics),
+  P3 (leads vs inbox one-queue), P4 (sharing under drill-in), saved-reply scope
+  doctrine, legal drafts' 6 decisions (docs/design/LEGAL-DRAFTS-166.md).
+- Decision-gated slices: SS3 (settings trio), SS9 (timeline consolidation),
+  SS10/SS12 (small, could also run un-gated), SS11 (approval-center+insights).
+- G13 slice 2 — THE IN-PLACE EDITOR — ready to start on Eric's "go".
+- Activation: Resend dashboard (inbound email), AWS keys + 4 glue records
+  (DNS), Name.com token (D5 resale).
+
 ## ✅ STANDARDS SWEEP — WAVE 6 LIVE: PS4+PS5 + SS6 + booking sliver (2026-07-20, Netlify)
 
 All lanes built → adversarially reviewed → fixes red-first.
