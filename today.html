@@ -8,20 +8,19 @@
 <meta name="description" content="What needs you today — at most a few calm things, in plain words.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
+  /* C5 — page skin = the shell's --dds-* tokens. shell.css is the canonical
+     palette and carries the full four-block theme contract (light base ·
+     prefers-color-scheme dark · data-theme="light" · data-theme="dark"), so
+     this page follows every mode automatically — same aliasing pattern as
+     analytics.html / pipeline.html / crm.html. Fallbacks only cover a missing
+     shell.css. */
   :root{
-    --bg:#faf8f5; --card:#fff; --ink:#1b1525; --soft:#6b6478; --faint:#6f677d; --line:#eee9e0;
-    --accent:#5b3fa0; --accent-soft:#efeafa; --good:#33664b; --good-soft:#e7f1ea;
-    --warn:#775d31; --warn-soft:#f3ead9; --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05);
+    --bg:var(--dds-bg,#faf8f5); --card:var(--dds-card,#fff); --ink:var(--dds-ink,#1b1525); --soft:var(--dds-soft,#6b6478); --faint:var(--dds-faint,#6f677d); --line:var(--dds-line,#eee9e0);
+    --accent:var(--dds-accent,#5b3fa0); --accent-soft:var(--dds-accent-soft,#efeafa); --good:var(--dds-good,#33664b); --good-soft:var(--dds-good-soft,#e7f1ea);
+    --warn:var(--dds-warn,#775d31); --warn-soft:var(--dds-warn-soft,#f3ead9); --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme:dark){
-    :root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;
-      --accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;
-      --shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28);}
-  }
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:680px;margin:0 auto;padding:48px 22px 96px}
@@ -129,6 +128,9 @@
   .rrows a:hover{color:var(--accent)}
   .rrows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
   .rrows .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap}
+  /* non-link rail rows (recent wins carry no drill-in id — no fake link) */
+  .rrows .rr{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);font-size:13.5px;font-weight:500}
+  .rrows .rr:first-child{border-top:0}
   .schedrow{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
   .schedrow:first-child{border-top:0;padding-top:2px}
   .schedrow .st{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent);font-size:13px;min-width:64px}
@@ -186,7 +188,8 @@ const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigit
 // traffic read never becomes a fake zero; no sections → no card at all).
 function monthTiles(d){
   d=d||{};const s=d.sales||{};const w=d.website||{};const t=[];
-  if(s.won&&s.won.this_month)t.push([money(s.won.this_month.value_cents),'won this month']);
+  // D3 sibling: the number is summed EXPECTED deal value — the label says so.
+  if(s.won&&s.won.this_month)t.push([money(s.won.this_month.value_cents),'expected value won']);
   if(s.pipeline&&s.pipeline.open)t.push([money(s.pipeline.open.value_cents),'open pipeline']);
   if(s.enquiries&&s.enquiries.count!=null)t.push([String(s.enquiries.count),s.enquiries.count===1?'new enquiry':'new enquiries']);
   if(w.traffic&&w.traffic.has_data!==false&&w.traffic.visitors!=null)t.push([String(w.traffic.visitors),'site visitors']);
@@ -225,6 +228,29 @@ function monthCardHtml(d){
     (trend?`<p class="trend">${esc(trend)}</p>`:'')+
     `<div class="rfoot"><a class="link" href="${esc(scopeHref('/analytics.html'))}">Dashboard →</a></div></div>`;
 }
+// "Key deals" (C6) — GET /sales/deals, the top open deals by expected value.
+// Hidden ENTIRELY on a failed read / 403 / empty list — never an empty card
+// (a sales-less edition is dormant, not broken). Rows deep-link to the deal
+// drawer (/pipeline.html?deal= — the pipeline's existing ?deal= boot read).
+function keyDeals(list){
+  return (Array.isArray(list)?list:[])
+    .filter(d=>d&&d.id&&d.stage&&d.stage!=='won')
+    .sort((a,b)=>(Number(b.expected_value_cents)||0)-(Number(a.expected_value_cents)||0))
+    .slice(0,5);
+}
+function keyDealsCardHtml(list){
+  const ds=keyDeals(list);
+  if(!ds.length)return'';
+  return `<div class="rcard" id="rail-deals"><h2 class="rh">Key deals</h2><div class="rrows">${ds.map(d=>`<a href="${esc(scopeHref('/pipeline.html?deal='+encodeURIComponent(d.id)))}">${esc(d.title||'A deal')}<span class="rn">${money(d.expected_value_cents)}</span></a>`).join('')}</div><div class="rfoot"><a class="link" href="${esc(scopeHref('/pipeline.html'))}">Pipeline →</a></div></div>`;
+}
+// "Recent wins" (C6) — rendered from the dash payload ALREADY in hand (the
+// slice-8 recent_wins array; no extra read). Hidden entirely when empty; rows
+// carry no per-deal id in this payload, so they are honest non-links.
+function winsCardHtml(d){
+  const rows=(d&&d.sales&&Array.isArray(d.sales.recent_wins))?d.sales.recent_wins.slice(0,4):[];
+  if(!rows.length)return'';
+  return `<div class="rcard" id="rail-wins"><h2 class="rh">Recent wins</h2><div class="rrows">${rows.map(w=>`<div class="rr">${esc(w.title||'A win')}<span class="rn">${money(w.value_cents)}</span></div>`).join('')}</div></div>`;
+}
 // "Recent records" — hrefs render EXACTLY as cached (they already carry their
 // identity params); data-noscope keeps the shell's scope-carry rewrite off them.
 function recentsCardHtml(){
@@ -252,6 +278,16 @@ function scheduleHtml(list){
 // decided. Same source the Projects roster uses: GET /projects + each active
 // project's /report (summary.pending_approvals), capped like ensureSnaps.
 // Hidden entirely when there are none, or when this edition has no projects.
+// D6 mitigation: ONE shared in-page cache for per-project report reads. Every
+// consumer on this page funnels through projectReport(), so the same project's
+// report is fetched at most once per page view (the fan-out can't multiply).
+// Collapses onto the D6 batch endpoint when that backend lands — no backend
+// change here. A failed read resolves null (that row simply drops).
+const REPORTS=new Map();
+function projectReport(id){
+  if(!REPORTS.has(id))REPORTS.set(id,apiGet('/projects/'+id+'/report').then(r=>r&&r.data).catch(()=>null));
+  return REPORTS.get(id);
+}
 async function waitingCard(){
   let projects=null;
   try{projects=(await apiGet('/projects')).data;}catch(_){return;}
@@ -260,11 +296,9 @@ async function waitingCard(){
   if(!act.length)return;
   const rows=[];
   await Promise.all(act.map(async(p)=>{
-    try{
-      const r=(await apiGet('/projects/'+p.id+'/report')).data;
-      const n=Number((r&&r.summary&&r.summary.pending_approvals)||0);
-      if(n>0)rows.push({id:p.id,name:p.name||'A project',n});
-    }catch(_){/* a failed report just drops that row */}
+    const r=await projectReport(p.id);
+    const n=Number((r&&r.summary&&r.summary.pending_approvals)||0);
+    if(n>0)rows.push({id:p.id,name:p.name||'A project',n});
   }));
   if(!rows.length)return;
   rows.sort((a,b)=>b.n-a.n);
@@ -276,7 +310,7 @@ async function waitingCard(){
   const cols=document.getElementById('home-cols');if(cols)cols.classList.remove('norail');
 }
 
-function render(moments, features, feed, ctx, dash, appts){
+function render(moments, features, feed, ctx, dash, appts, deals){
   $('greeting').textContent = greet();
   const items = (moments||[]).filter(Boolean);
   // PP-5: the empty-state speaks in the language of what this edition actually is.
@@ -383,7 +417,7 @@ function render(moments, features, feed, ctx, dash, appts){
   // rail card degrades away, the aside is dropped (hidden + a single-column
   // grid) so main spans the full width instead of leaving a dead ~30% gutter;
   // a late Waiting-on-clients card revives it (see waitingCard). ──
-  const railCards = monthCardHtml(dash) + recentsCardHtml();
+  const railCards = monthCardHtml(dash) + keyDealsCardHtml(deals) + winsCardHtml(dash) + recentsCardHtml();
   const railEmpty = !railCards;
   const rail = railCards + '<div id="rail-waiting" hidden></div>';
   $('main').innerHTML = `<div class="cols${railEmpty?' norail':''}" id="home-cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance"${railEmpty?' hidden':''}>${rail}</aside></div>`;
@@ -471,7 +505,7 @@ function trouble(){
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
     let feedFailed = false;
-    const [moments, features, ctx, feed, bridged, dash, appts] = await Promise.all([
+    const [moments, features, ctx, feed, bridged, dash, appts, deals] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       (window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null)),   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
@@ -479,10 +513,11 @@ function trouble(){
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
       apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
       apiGet('/bookings/appointments').catch((e)=>e===404||e===403?'dormant':null),   // "Today's schedule" — 404/403 = bookings dormant (no card); else an honest couldn't-check line
+      apiGet('/sales/deals').catch(()=>null),                // "Key deals" (C6) — hidden entirely on empty/403/failure, never an empty card
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
-    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList);
+    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data);
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);
