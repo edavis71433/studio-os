@@ -283,6 +283,14 @@ certs and all that" → SSL provisioning/renewal is a HARD REQUIREMENT of the
 DNS slices (post-delegation cert re-trigger + status + renewal watch + DS
 pre-check). G13 slice 1 (server stamping) building.
 
+## ✅ MIGRATION 0114 APPLIED (Eric, 2026-07-20, verified)
+
+Eric ran docs/presence/APPLY-0114-prod.sql in the prod SQL Editor; the verify
+select returned BOTH index names (screenshot confirmed). Inbound-email
+idempotency (external_id columns + partial unique dedup indexes on
+presence_support_messages/requests) is in place. The inbound-email receive
+side now waits ONLY on Eric's Resend dashboard setup.
+
 ## 🏢 STUDIO-WIDE STANDARDS DIRECTIVE (Eric 2026-07-20 — do not lose to compaction)
 
 Eric, after seeing the un-redesigned studio Files page (live site confirmed
