@@ -305,7 +305,7 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
-## 🟢 STANDARDS SWEEP — WAVE 2 BUILT: SS1 + SS7 (2026-07-20, pending Eric merge)
+## ✅ STANDARDS SWEEP — WAVE 2 LIVE: SS1 + SS7 (2026-07-20, main@9b6ea1a, deploy SUCCESS)
 
 Both slices built → adversarially reviewed → consolidated fixes → gates green.
 - **SS1 Files roster** (files.html): full roster standard — .lhead + live rail
