@@ -305,6 +305,34 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🟢 STANDARDS SWEEP — WAVE 2 BUILT: SS1 + SS7 (2026-07-20, pending Eric merge)
+
+Both slices built → adversarially reviewed → consolidated fixes → gates green.
+- **SS1 Files roster** (files.html): full roster standard — .lhead + live rail
+  counts + ↻ soft-fail refresh, Table⇄Grid (persisted, mobile Grid), sortable
+  typed columns + "by client" provenance chip, REQ_SEQ ?q= search (caret-safe),
+  per-read honesty, bulk bar + bulk Download, a11y. Review fixes: F1 the chip was
+  production-dead — server now stamps client uploads on the MEDIA row
+  (client_delivery.ts) and /assets surfaces client_upload (SUPABASE TOUCHED →
+  deploy.yml needed at merge); F2 stock-read generation guard; F3 selection
+  pruned on row-set changes; F4 railN countsOk-only gate; F8 test-gap closures.
+  Backlog: F5 300-row count cap, F6 search soft semantics, F7 stale-counts cue +
+  esc() quotes.
+- **SS7 Dashboard + Home** (analytics.html, today.html): the AGENCY PORTFOLIO
+  LENS now wears the dashboard standard (KPI band from real payload, insight
+  cards recut, per-client rollup drilling into scoped dashboards with ?client=,
+  honest trouble/warming, REQ_SEQ + stencil); scoped deltas D1 (?period on all 8
+  business-insights footers) / D2 (period labels) / D3 (expected-value copy);
+  today.html C5 tokens, C6 Key Deals rail (OPEN-stage allowlist; limit=100) +
+  Recent wins, D6 REPORTS cache. Review fixes: lost/converted deals excluded
+  from Key deals, keep-last-good roster on soft ↻, zero-client copy, pure-suite
+  mirrors re-synced. Backlog (server-side): archived-client mismatch in
+  /analytics/portfolio websites[] vs client_count/roster; websites[] should
+  carry site_id + visitors (unlocks rollup visitors column); ?stage=won landing
+  waits for SS5.
+Gates at tip cc03a56: pure sweep 207/0 (70/70 today_home restored), scoped e2e
+165/0 ×3 projects, files+shell 121/0; full-suite run in flight at merge time.
+
 ## 🟢 POST-AUDIT BUILD — WAVE 1 (2026-07-20)
 
 Three pieces built + independently reviewed. Eric's call (2026-07-20): **ship
