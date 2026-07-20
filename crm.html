@@ -763,6 +763,11 @@ function restoreComposer(s){
 // toolkit (their own site's settings) — a customer-scoped record must not
 // resolve them against the customer's site (the /sales/* doctrine above).
 // Kept in sync by hand with inbox.html's copy. ──
+// SCOPE DOCTRINE (SS6, flagged decision): inbox.html's copy diverges — its
+// api() carries the drill-in scope, so a drilled-in operator THERE gets the
+// CUSTOMER site's reply set ("replies live where the conversation lives"),
+// while this page always uses the operator's own. Both are defensible; which
+// one wins is Eric's call (punchlist). No behavior change until then. ──
 let SR_FETCH=null;
 function insertSavedReplies(taId){
   const ta=$(taId);if(!ta)return;

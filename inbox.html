@@ -518,6 +518,13 @@ let DRAFT=null;   // {sel, vals, focus} — set by refresh(), consumed once by t
 // live in a JS map keyed by id (projects.html's picker idiom — nothing goes
 // into an attribute); insert APPENDS after what's typed and refocuses the
 // textarea. Kept in sync by hand with crm.html's copy. ──
+// SCOPE DOCTRINE (SS6, flagged decision): this page's api() carries the
+// drill-in ?client= scope, so a drilled-in operator's picker AND the ⋯
+// Saved-replies manager both resolve to the CUSTOMER site's reply set —
+// "replies live where the conversation lives". crm.html's picker holds the
+// opposite doctrine (apiAg: always the OPERATOR's own replies, even on a
+// customer-scoped record). Both are defensible; which one wins is Eric's
+// call (punchlist). Do not "align" either side without that decision. ──
 let SR_FETCH=null;
 function insertSavedReplies(taId){
   const ta=$(taId);if(!ta)return;
