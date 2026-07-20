@@ -844,7 +844,7 @@ async function saveSaved(){
   const btn=$('sheet-save');btn.disabled=true;btn.textContent='Saving…';
   const r=await api('/service/saved-replies','PUT',{replies:cleaned});
   btn.disabled=false;btn.textContent='Save changes';
-  if(r.ok){toast('Saved replies updated.');closeSheet();}
+  if(r.ok){SR_FETCH=null;toast('Saved replies updated.');closeSheet();}   // drop the picker cache — the next insert refetches the edited list
   else if(r.status===422)toast('Please check your replies and try again.','err');
   else if(r.status===503)toast('Saved replies aren’t switched on for this site yet.','err');
   else toast('Couldn’t save just now — try again in a moment.','err');

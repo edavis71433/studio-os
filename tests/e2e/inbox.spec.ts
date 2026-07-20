@@ -348,6 +348,44 @@ test.describe('SS6 — inbox console quick wins', () => {
     await expect(pane.locator('#supBody')).toHaveValue('Thanks for reaching out!');
   });
 
+  test('C3 — saving an edit in the manager invalidates the picker cache: the NEXT picker refetches', async ({ page }) => {
+    let puts = 0; let gets = 0;
+    await installApp(page, { api: API });
+    // a tiny stateful server: GETs serve the original reply until a PUT lands,
+    // then serve the edited one — exactly what a real backend would do
+    await page.route(/\/functions\/v1\/presence\/service\/saved-replies(\?|$)/, (route) => {
+      if (route.request().method() === 'PUT') {
+        puts++;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+      }
+      gets++;
+      const replies = puts
+        ? [{ id: 'r1', title: 'Opening hours (rewritten)', body: 'New hours: 10am to 4pm.' }]
+        : [{ id: 'r1', title: 'Opening hours', body: 'We open at 9am, Monday to Saturday.' }];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { replies } }) });
+    });
+    await page.goto('/inbox.html');
+    // prime the page-lifetime cache through the message composer's picker
+    await page.locator('#rows [role=option]').filter({ hasText: 'Sent you a message' }).first().click();
+    const pane = page.locator('#rpane');
+    await expect(pane.locator('select[aria-label="Insert a saved reply"] option')).toContainText(['Insert a saved reply…', 'Opening hours']);
+    // edit the reply via the manager (⋯ → Saved replies) and save (PUT ok);
+    // mobile stacks the panes, so step back to the list where ⋯ lives
+    const back = page.locator('#paneBack');
+    if (await back.isVisible()) await back.click();
+    await page.locator('#ovfBtn').click();
+    await page.locator('#ovfSaved').click();
+    await expect(page.locator('#sheet-list [data-f=title]')).toHaveValue('Opening hours');
+    await page.locator('#sheet-list [data-f=title]').fill('Opening hours (rewritten)');
+    await page.locator('#sheet-save').click();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved replies updated.' }).first()).toBeVisible();
+    expect(puts).toBe(1);
+    // the NEXT picker open must show the edit — a refetch, not the stale cache
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    await expect(pane.locator('select[aria-label="Insert a saved reply"] option')).toContainText(['Insert a saved reply…', 'Opening hours (rewritten)']);
+    expect(gets, 'picker + manager + post-edit picker (the PUT reset the cache)').toBe(3);
+  });
+
   test('C3 — no saved replies (or the route failing) renders no picker and stays quiet', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
