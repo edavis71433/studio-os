@@ -22,9 +22,7 @@
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1080px;margin:0 auto;padding:26px 20px 90px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:0 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:15px}
-  .layout{display:grid;grid-template-columns:210px 1fr;gap:26px;margin-top:22px}
+  .layout{display:grid;grid-template-columns:210px 1fr;gap:26px}
   @media (max-width:720px){.layout{grid-template-columns:1fr;gap:16px}}
 
   /* collections rail */
@@ -47,7 +45,43 @@
   .btn:hover{border-color:var(--p)}
   .btn.primary{background:var(--p);color:#fff;border-color:var(--p)}
   .btn.primary:hover{filter:brightness(1.06)}
-  select.sort{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;cursor:pointer}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* ── list-view header (SLDS list-view anatomy, dds skin) — the same .lhead/
+        .lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html / leads.html ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lrow1{display:flex;align-items:center;gap:10px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  .notice{font-size:12.5px;color:var(--faint);margin:-6px 0 12px}
+
+  /* ── the table view (customers.html .tscroll anatomy): sortable columns; the
+        table scrolls in its OWN container — the page never overflows sideways ── */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+  .tscroll thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  .tscroll thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  .tscroll thead th .thb:hover{color:var(--p)}
+  .tscroll thead th .arrow{font-size:10px;color:var(--p)}
+  .tscroll tbody tr{cursor:pointer}
+  .tscroll tbody tr:hover{background:var(--p-soft)}
+  .tscroll tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+  .tscroll tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .tscroll tbody tr:last-child td{border-bottom:none}
+  .tscroll td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tscroll th.ck,.tscroll td.ck{width:34px;padding:11px 6px 11px 12px}
+  .ncell{display:flex;align-items:center;gap:10px;min-width:0}
+  .ncell .nm2{font-weight:600}
+  .mthumb{width:34px;height:26px;border-radius:6px;background:var(--p-soft) center/cover no-repeat;display:inline-flex;align-items:center;justify-content:center;color:var(--faint);flex:0 0 auto}
+  .mthumb svg{width:15px;height:15px;opacity:.7}
+  .tscroll .use{font-size:12.5px;color:var(--faint);display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .fromclient{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:var(--good-soft);color:var(--good);border-radius:999px;padding:2px 7px;margin-left:6px;white-space:nowrap;display:inline-block}
 
   /* health nudge */
   .nudge{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:11px 15px;font-size:13.5px;margin-bottom:16px;display:flex;gap:10px;align-items:center;border:1px solid transparent}
@@ -148,7 +182,7 @@
 </head>
 <body>
 <div class="wrap">
-  <header><h1>Files</h1><p class="sub">Every file for your business — photos, brand, documents, downloads — in one place.</p></header>
+  <!-- the h1 lives in the rendered .lhead (leads.html's pattern) — one h1 per page -->
   <div id="root"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · Files — your business library, safely organized.</footer>
 </div>
@@ -201,9 +235,50 @@ const COLS=[
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
-let S={col:'all',q:'',sort:'recent',caps:[],policy:'immediate',assets:[],counts:{},health:[],canEdit:true,current:null,cards:[],
+let S={col:'all',q:'',caps:[],policy:'immediate',assets:[],counts:{},countsOk:true,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],
   selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
+let LOADED_AT=0;
+let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED (C5)
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
+// Table ⇄ Grid display choice, persisted; small screens default to Grid (the tiles).
+const DISPLAY_KEY='dds-display:files';
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='grid')return v;}catch(_){/* storage may be denied */}
+  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'grid':'table';})();
+function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
+// sortable columns (the fields /assets actually returns); the old sort <select>
+// died into the .lmeta "Sorted by …" line — the Grid follows the same order
+const TCOLS=[
+  ['name','Name',(a)=>String(a.name||'').toLowerCase()],
+  ['kind','Kind',(a)=>String(a.kind||'')],
+  ['bytes','Size',(a)=>Number(a.bytes||0)],
+  ['added','Added',(a)=>Date.parse(a.created_at||0)||0],
+  ['use','Where used',(a)=>a.in_use?1:0],
+  ['state','Status',(a)=>String(a.state||'')],
+];
+let SORT={key:'added',dir:-1};   // newest first — the old "Recent" default
+// ── rail counts: named collections come from /assets/collections; kind/favorite/
+//    brand and the archive remainder derive from the last UNFILTERED, unsearched
+//    /assets read (the All-files view is exactly that read). undefined = unknown
+//    → that rail row renders count-less rather than guessing. ──
+let RAILN={};
+function deriveRailCounts(rows,total){
+  RAILN.all=rows.length;
+  RAILN.fav=rows.filter(r=>r.favorite).length;
+  RAILN.photos=rows.filter(r=>r.kind==='image').length;
+  RAILN.documents=rows.filter(r=>r.kind==='document').length;
+  RAILN.brand=rows.filter(r=>r.brand).length;
+  // /assets `total` counts every non-deleted row INCLUDING archived; the list
+  // excludes archived — the difference is the Archive count. Exact only while
+  // the library fits the read limit; beyond that stay honest and omit it.
+  RAILN.archive=(typeof total==='number'&&rows.length<300&&total>=rows.length)?(total-rows.length):undefined;
+}
+function railN(key){
+  if(key==='templates')return S.countsOk?(S.counts.Templates||0):undefined;
+  if(key==='downloads')return S.countsOk?(S.counts.Downloads||0):undefined;
+  if(key==='stock')return undefined;   // a browse surface, not a collection
+  return RAILN[key];
+}
 
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
 // Small styled confirm — replaces native confirm(), matching the app's surfaces
@@ -275,27 +350,59 @@ function qstr(){
   p.set('limit','300');
   return p.toString();
 }
-async function load(){
+// soft=true (the ↻ refresh): any failure keeps the current list and toasts —
+// leads.html's soft-fail contract; the in-place trouble state is for hard loads.
+async function load(soft){
   if(S.col==='stock'){ if(S.stockState==null) return loadStock(); return renderStock(); }   // FD-T10: stock has its own surface
-  const [a,col,h]=await Promise.all([api('/assets?'+qstr()),api('/assets/collections'),api('/assets/health')]);
-  if(!a.ok){$('root').innerHTML=a.status===403?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${esc((a.body&&a.body.message)||"")||"Your client view shows what you’ve chosen to share."}</p></div>`:`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — refresh in a moment.</p></div>`;return;}
-  let rows=(a.ok&&a.body.data&&a.body.data.assets)||[];
+  const gen=++REQ_SEQ;
+  let a,col,h;
+  try{[a,col,h]=await Promise.all([api('/assets?'+qstr()),api('/assets/collections'),api('/assets/health')]);}
+  catch(_){a={ok:false,status:0,body:{}};col={ok:false};h={ok:false};}
+  if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
+  if(!a.ok){
+    if(soft&&S.loadedOnce){toast('Couldn’t refresh just now.');return;}
+    renderTrouble(a);return;
+  }
+  const full=(a.body.data&&a.body.data.assets)||[];
+  let rows=full;
   const c=COLS.find(x=>x.key===S.col);
   if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
   if(c&&c.favs)rows=rows.filter(r=>r.favorite);
   S.policy=(a.body.data&&a.body.data.policy)||'immediate';
-  S.assets=sortRows(rows);
-  S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];
+  if(S.col==='all'&&!S.q.trim())deriveRailCounts(full,a.body.data&&a.body.data.total);
+  S.assets=rows;
+  S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];   // health is a nudge — its failure just means no nudge
+  S.countsOk=!!col.ok;   // collections failure degrades the rail count-less, with a notice — never fake zeros
   S.counts=buildCounts((col.ok&&col.body.data)||[]);
+  S.loadedOnce=true;LOADED_AT=Date.now();
   render();
+}
+// FAILED read = an honest couldn't-load with Try-again wired to load() in place —
+// never an empty state. The rail stays. 403 keeps its own distinct message.
+function renderTrouble(a){
+  const inner=a.status===403
+    ?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${esc((a.body&&a.body.message)||"")||"Your client view shows what you’ve chosen to share."}</p></div>`
+    :`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — it usually passes.</p><p style="margin-top:16px"><button class="btn primary" id="retry">Try again</button></p></div>`;
+  $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav><div>
+    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
+    <div class="lmeta">Couldn’t load just now</div></header>${inner}</div></div>`;
+  document.querySelectorAll('#rail .col').forEach(b=>b.addEventListener('click',()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();}));
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load());
 }
 function buildCounts(collections){
   const m={};collections.forEach(c=>{m[c.name]=c.count;});return m;
 }
 // ── FD-T10: Stock Library — browse a royalty-free source, import into Files. The
 //    imported image becomes an ordinary asset (same storage/variants/publish). ──
+// ONE rail for every surface (roster, stock, trouble): counts where truth is
+// available (railN → undefined renders count-less), aria-current marks the
+// active collection for assistive tech.
 function railHtml(){
-  return COLS.map(c=>`<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}">${svg(IC[c.ic],'ic')}<span>${c.label}</span></button>`).join('');
+  return COLS.map(c=>{
+    const n=railN(c.key);
+    return `<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}"${S.col===c.key?' aria-current="true"':''}>${svg(IC[c.ic],'ic')}<span>${c.label}</span>${n!==undefined?`<span class="n">${n}</span>`:''}</button>`;
+  }).join('');
 }
 function stockTile(im){
   return `<figure class="tile" style="margin:0"><img src="${esc(im.thumb)}" alt="${esc(im.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block">`+
@@ -309,12 +416,17 @@ function renderStock(){
     : (S.stockResults||[]).length ? S.stockResults.map(stockTile).join('')
     : `<div class="empty" style="grid-column:1/-1"><h2>${S.stockQ?'No photos match that search.':'Find a professional photo.'}</h2><p>Try “office”, “coffee”, “construction”, “salon”…</p></div>`;
   const note = S.stockLicense ? `Royalty-free from ${esc(S.stockProvider)} · ${esc(S.stockLicense)} · added to your Files and hosted on your own site.` : 'Professional royalty-free photos, added straight to your Files.';
-  $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail">${railHtml()}</nav><div>
+  $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav><div>
+    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
+    <div class="lmeta">Stock Library — professional royalty-free photos</div></header>
     <div class="bar"><div class="search">${svg(IC.search)}<input id="sq" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div></div>
     <p style="margin:2px 0 12px;color:var(--faint);font-size:12.5px">${note}</p>
     <div class="grid">${grid}</div></div></div>`;
   document.querySelectorAll('#rail .col').forEach(b=>b.addEventListener('click',()=>{S.col=b.dataset.col;load();}));
-  const sq=$('sq'); if(sq){ sq.focus(); sq.addEventListener('keydown',e=>{if(e.key==='Enter'){S.stockQ=sq.value.trim();loadStock();}}); }
+  const srf=$('refreshBtn'); if(srf)srf.addEventListener('click',()=>{loadStock().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.'));});
+  // no sq.focus() here — auto-stealing focus on every render broke keyboard flow
+  // through the rail (the render is reached from rail clicks, not just typing)
+  const sq=$('sq'); if(sq){ sq.addEventListener('keydown',e=>{if(e.key==='Enter'){S.stockQ=sq.value.trim();loadStock();}}); }
   document.querySelectorAll('[data-stock-add]').forEach(b=>b.addEventListener('click',()=>addStock(b.dataset.stockAdd,b.dataset.alt,b.dataset.credit,b)));
 }
 async function loadStock(){
@@ -333,42 +445,98 @@ async function addStock(id,alt,credit,btn){
   else{toast((r.body&&r.body.message)||'Could not add that photo');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
 }
 function sortRows(rows){
+  const col=TCOLS.find(x=>x[0]===SORT.key)||TCOLS[3];
   const r=[...rows];
-  if(S.sort==='name')r.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  else if(S.sort==='size')r.sort((a,b)=>(b.bytes||0)-(a.bytes||0));
-  else r.sort((a,b)=>Date.parse(b.created_at||0)-Date.parse(a.created_at||0));
+  r.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return r;
 }
+function lheadHtml(shown){
+  const sortCol=TCOLS.find(x=>x[0]===SORT.key)||TCOLS[3];
+  return `<header class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">🗂</span>
+      <h1 id="pagehead" tabindex="-1">Files</h1>
+      <div class="seg" role="group" aria-label="Display as">
+        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+        <button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button>
+      </div>
+      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta">${shown} file${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+  </header>`;
+}
 function render(){
-  const rail=COLS.map(c=>{
-    const n=c.key==='templates'?(S.counts.Templates||0):c.key==='downloads'?(S.counts.Downloads||0):'';
-    return `<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}">${svg(IC[c.ic],'ic')}<span>${c.label}</span>${n?`<span class="n">${n}</span>`:''}</button>`;
-  }).join('');
+  const rows=sortRows(S.assets);
   const nudge=renderNudge();
-  const tiles=S.assets.length?S.assets.map(tile).join(''):`<div class="empty" style="grid-column:1/-1"><h2>${S.q?'No files match that search.':'Nothing here yet.'}</h2><p>${S.canEdit?'Drag files in, or use Add files above.':'Files your studio adds will appear here.'}</p></div>`;
+  const notice=S.countsOk?'':`<div class="notice">Collection counts aren’t available just now — your files are all here.</div>`;
+  const bodyHtml=rows.length
+    ?(DISPLAY==='table'?tableHtml(rows):`<div class="grid">${rows.map(tile).join('')}</div>`)
+    :`<div class="empty"><h2>${S.q?'No files match that search.':'Nothing here yet.'}</h2><p>${S.canEdit?'Drag files in, or use Add files above.':'Files your studio adds will appear here.'}</p></div>`;
+  // Any re-render must never destroy a focused search input's value or caret
+  // (contacts.html's contract) — capture before the innerHTML swap, restore after.
+  const act=document.activeElement;const wasQ=!!(act&&act.id==='q');
+  const qv=wasQ?act.value:null;const qp=wasQ?act.selectionStart:0;
   $('root').innerHTML=`
     <div class="layout">
-      <nav class="rail" id="rail">${rail}</nav>
+      <nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav>
       <div>
+        ${lheadHtml(rows.length)}
+        ${notice}
         <div class="bar">
           <div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="Search files" placeholder="Search files — try “logo”" value="${esc(S.q)}" autocomplete="off"></div>
-          <select class="sort" id="sort"><option value="recent"${S.sort==='recent'?' selected':''}>Recent</option><option value="name"${S.sort==='name'?' selected':''}>Name</option><option value="size"${S.sort==='size'?' selected':''}>Largest</option></select>
-          ${S.canEdit&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
+          ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
           ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
         </div>
         <div class="drop" id="drop">Drop to upload</div>
         ${bulkBar()}
         ${nudge}
-        <div class="grid">${tiles}</div>
+        ${bodyHtml}
       </div>
     </div>`;
   wire();
+  if(wasQ){const nq=$('q');if(nq){if(qv!=null)nq.value=qv;nq.focus();try{nq.setSelectionRange(qp,qp);}catch(_){/* */}}}
+}
+// A10's studio-side sibling (projects.html): a client upload is marked by the
+// server-stamped note 'Uploaded by the client.' (client_delivery.ts) — PREFIX
+// match so a studio-written note doesn't false-positive — plus a future-proof
+// explicit `client_upload` boolean; assets carry theirs in metadata.
+function isClientUpload(a){
+  if(!a)return false;
+  if(a.client_upload===true)return true;
+  return String(a.note||(a.metadata&&a.metadata.note)||'').startsWith('Uploaded by the client');
+}
+function tableHtml(rows){
+  const allSel=rows.length&&rows.every(a=>S.selected.has(a.id));
+  const ckTh=S.canEdit?`<th scope="col" class="ck"><input type="checkbox" id="ckAll" aria-label="Select all files"${allSel?' checked':''}></th>`:'';
+  const ths=ckTh+TCOLS.map(([k,label])=>{
+    const on=SORT.key===k;
+    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+  }).join('');
+  const trs=rows.map(a=>{
+    const t=a.thumb?` style="background-image:url('${esc(a.thumb)}')"`:'';
+    const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
+    const st=a.state||'approved';
+    const stateLbl={live:'Live',pending:'Pending',approved:'Approved',draft:'Draft',archived:'Archived'}[st]||st;
+    const ckTd=S.canEdit?`<td class="ck"><input type="checkbox" data-pick="${esc(a.id)}" aria-label="Select ${esc(a.name)}"${S.selected.has(a.id)?' checked':''}></td>`:'';
+    return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}">
+      ${ckTd}
+      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2">${esc(a.name)}</span></span></td>
+      <td>${a.kind==='document'?'PDF':'Photo'}</td>
+      <td class="num">${bytes(a.bytes)||'—'}</td>
+      <td class="num">${esc(when(a.created_at))||'—'}${isClientUpload(a)?'<span class="fromclient">by client</span>':''}</td>
+      <td><span class="use"><span class="dot ${a.in_use?'used':'un'}"></span>${a.in_use?'On your site':'Not used'}</span></td>
+      <td><span class="sbadge ${esc(st)}">${esc(stateLbl)}</span></td>
+    </tr>`;
+  }).join('');
+  return `<div class="tscroll"><table aria-label="Files"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 // The bulk-action bar — one move applied to the current selection. Approve appears
 // only where an approval step actually applies (never as empty friction).
 function bulkBar(){
-  if(!S.selectMode)return'';
+  // grid: shown while Select mode is on (the tiles' flow, unchanged);
+  // table: the checkbox column feeds it — it appears once anything is selected
   const n=S.selected.size;
+  if(!S.selectMode&&!(DISPLAY==='table'&&S.canEdit&&n))return'';
   const approve=S.policy!=='immediate'?`<button class="btn" data-bulk="approve">Approve</button>`:'';
   return `<div class="bulkbar">
     <span class="cnt">${n} selected</span>
@@ -377,6 +545,7 @@ function bulkBar(){
       <button class="btn" data-bulk="tag"${n?'':' disabled'}>Add tag</button>
       <button class="btn" data-bulk="collection"${n?'':' disabled'}>Move to collection…</button>
       ${approve?approve.replace('data-bulk="approve"',`data-bulk="approve"${n?'':' disabled'}`):''}
+      <button class="btn" data-bulk="download"${n?'':' disabled'}>Download</button>
       <button class="btn" data-bulk="archive"${n?'':' disabled'}>Archive</button>
     </span>
   </div>`;
@@ -413,22 +582,51 @@ function tile(a){
 }
 function wire(){
   document.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();});
-  document.querySelectorAll('[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});
-  document.querySelectorAll('[data-pick]').forEach(b=>{const pick=()=>togglePick(b.dataset.pick);b.onclick=pick;b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}};});
+  // grid tiles open on click/Enter/Space; table rows do too, but never from a
+  // click on the row's own controls (checkbox / future buttons)
+  document.querySelectorAll('.tile[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});
+  document.querySelectorAll('tr[data-open]').forEach(tr=>{
+    tr.onclick=(e)=>{if(e.target.closest('input,button,a'))return;openDetail(tr.dataset.open);};
+    tr.onkeydown=(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('input,button,a')){e.preventDefault();openDetail(tr.dataset.open);}};
+  });
+  document.querySelectorAll('.tile[data-pick]').forEach(b=>{const pick=()=>togglePick(b.dataset.pick);b.onclick=pick;b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}};});
+  document.querySelectorAll('input[data-pick]').forEach(b=>{b.onchange=()=>togglePick(b.dataset.pick);});
+  const ckAll=$('ckAll');if(ckAll)ckAll.onchange=()=>{
+    const rows=sortRows(S.assets);
+    const all=rows.length&&rows.every(a=>S.selected.has(a.id));
+    S.selected=all?new Set():new Set(rows.map(a=>a.id));
+    render();const nb=$('ckAll');if(nb)nb.focus();
+  };
   document.querySelectorAll('[data-fav]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();toggleFav(b.dataset.fav);});
   document.querySelectorAll('[data-bulk]').forEach(b=>b.onclick=()=>onBulk(b.dataset.bulk));
-  const selb=$('selbtn');if(selb)selb.onclick=()=>{S.selectMode=!S.selectMode;S.selected.clear();render();};
-  const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load().then(()=>{const el=$('q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}});},280);};}
-  const sort=$('sort');if(sort)sort.onchange=()=>{S.sort=sort.value;S.assets=sortRows(S.assets);render();};
+  const selb=$('selbtn');if(selb)selb.onclick=()=>{S.selectMode=!S.selectMode;S.selected.clear();render();const nb=$('selbtn');if(nb)nb.focus();};
+  // search stays a SERVER ?q= query (debounced); the re-render preserves the
+  // input + caret (render()'s contract) and REQ_SEQ drops stale responses
+  const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load();},280);};}
+  // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract);
+  // these re-renders also restore focus to their control (the rosters' pattern)
+  const rf=$('refreshBtn');if(rf)rf.onclick=()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.'));
+  const dt=$('dispTable');if(dt)dt.onclick=()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}};
+  const dg=$('dispGrid');if(dg)dg.onclick=()=>{if(DISPLAY!=='grid'){setDisplay('grid');const nb=$('dispGrid');if(nb)nb.focus();}};
+  // sortable column headers — click toggles asc/desc (aria-sort on the <th>);
+  // Size/Added read largest/newest-first on their first click
+  document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{
+    const k=b.getAttribute('data-sort');
+    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:(k==='added'||k==='bytes')?-1:1};
+    render();
+    const nb=document.querySelector('[data-sort="'+k+'"]');if(nb)nb.focus();
+  });
   const add=$('add');if(add)add.onclick=()=>$('picker').click();
-  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';S.sort='recent';load();};
+  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';SORT={key:'added',dir:-1};load();};
 }
-function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.selected.add(id); render(); }
+function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.selected.add(id); render();
+  const nb=document.querySelector('[data-pick="'+id+'"]'); if(nb)nb.focus(); }   // focus survives the re-render
 // One bulk move applied to the current selection, via POST /assets/bulk. Reuses the
 // same tag/collection/status logic server-side; here we just gather the input.
 async function onBulk(action){
   if(action==='all'){ const all=S.selected.size>=S.assets.length; S.selected=all?new Set():new Set(S.assets.map(a=>a.id)); return render(); }
   const ids=[...S.selected]; if(!ids.length){toast('Select some files first');return;}
+  if(action==='download')return bulkDownload(ids);
   const body={action,ids};
   if(action==='tag'){ const tag=await askPrompt('Add a tag','This tag is added to '+ids.length+' file'+(ids.length===1?'':'s')+'.','Add tag','e.g. summer, hero'); if(!tag)return; body.tag=tag; }
   else if(action==='collection'){ const collection=await askPrompt('Move to a collection','Move '+ids.length+' file'+(ids.length===1?'':'s')+' into a collection.','Move','e.g. Brand, Contracts'); if(!collection)return; body.collection=collection; }
@@ -439,6 +637,18 @@ async function onBulk(action){
   const verb=action==='tag'?'Tagged':action==='collection'?'Moved':action==='archive'?'Archived':'Approved';
   toast(done?`${verb} ${done} file${done===1?'':'s'}${miss?` · ${miss} skipped`:''}`:'Nothing changed');
   S.selected.clear(); S.selectMode=false; load();
+}
+// Bulk Download: one signed URL per file, saved via anchor clicks. Non-destructive,
+// so the selection stays. The toast tells the truth about partial failure.
+async function bulkDownload(ids){
+  let ok=0,fail=0;
+  for(const id of ids){
+    let r; try{r=await api('/assets/'+id+'/download');}catch(_){r={ok:false};}
+    const url=r&&r.ok&&r.body.data&&r.body.data.url;
+    if(url){const a=document.createElement('a');a.href=url;a.download='';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();ok++;}
+    else fail++;
+  }
+  toast(fail?(ok?`Downloaded ${ok} · ${fail} failed`:'Downloads failed — try again in a moment'):`Downloaded ${ok} file${ok===1?'':'s'}`);
 }
 
 /* ── detail panel ── */
@@ -690,6 +900,9 @@ async function dimsOf(file){
   try{const bmp=await createImageBitmap(file);const d={width:bmp.width,height:bmp.height};bmp.close&&bmp.close();return d;}catch(_){return{};}
 }
 async function uploadFiles(files){
+  // Count what actually landed — the summary toast tells the truth ("Uploaded N ·
+  // M failed"), instead of the old unconditional "Uploaded" over any failures.
+  let ok=0,fail=0,firstErr='';
   for(const file of files){
     const isDoc=file.type==='application/pdf';
     let name=(file.name||'file').replace(/\.[a-z0-9]+$/i,'');
@@ -697,13 +910,17 @@ async function uploadFiles(files){
     // filename (as documents already do); you can refine it in the detail panel after.
     let alt=name.trim().length>=3?name:'Photo';
     const dims=await dimsOf(file);
-    const up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});
-    if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');continue;}
-    const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
-    if(!put.ok){toast('Upload failed for '+file.name);continue;}
-    if(isDoc)await api('/assets/'+up.body.data.media_id,'PATCH',{name});
+    let up; try{up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});}catch(_){up={ok:false,body:{}};}
+    if(!up.ok){fail++;firstErr=firstErr||(up.body&&up.body.message)||'';continue;}
+    let put; try{put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});}catch(_){put={ok:false};}
+    if(!put.ok){fail++;continue;}
+    if(isDoc)await api('/assets/'+up.body.data.media_id,'PATCH',{name}).catch(()=>{});
+    ok++;
   }
-  toast('Uploaded');load();
+  toast(fail
+    ?(ok?`Uploaded ${ok} · ${fail} failed`:(firstErr||'Uploads failed — nothing was added'))
+    :`Uploaded ${ok} file${ok===1?'':'s'}`);
+  if(ok)load();
 }
 $('picker').onchange=(e)=>{const f=[...e.target.files];e.target.value='';if(f.length)uploadFiles(f);};
 $('replacer').onchange=async(e)=>{
@@ -736,7 +953,7 @@ function signedOut(){$('root').innerHTML=`<div class="empty"><h2>Sign in to see 
     if(!TOKEN){signedOut();return;}
     await loadContext();await load();
     const fid=focusParam();if(fid)openDetail(fid);
-  }catch(_){$('root').innerHTML=`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>Refresh in a moment.</p></div>`;}
+  }catch(_){renderTrouble({ok:false,status:0,body:{}});}   // honest trouble + Try-again, never a dead end
 })();
 </script>
 </body>
