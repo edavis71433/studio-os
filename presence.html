@@ -9082,8 +9082,16 @@ function dcInjectCanvas(doc, main) {
   // top-level section's hover toolbar (identity read straight off the stamps).
   // Drop targets are computed live from these section rects by the
   // pointer-drag engine (pdGaps) — no per-gap DOM nodes are injected any more.
+  // KNOWN RACE (G13 review finding 2 — accepted, no code change): the
+  // DDS_SRCMAP reset below trusts a frame LOAD as proof the stamps are fresh.
+  // A second local edit while a preview fetch is already in flight (or a
+  // failed save that schedules no reload) can land OLDER stamps here and
+  // clear the remap they still needed — a stale window until the next
+  // successful save→reload re-stamps and converges. The per-splice
+  // compensation (dcComposeSrcMap at every BLOCKS_WORK splice) shrinks that
+  // window; worst case is one mis-resolved hover, never a crash.
   ddsRebuildSidMap();
-  DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the dcMove remap is consumed
+  DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the local-edit remap is consumed
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {
     if (!el2.hasAttribute("data-dc")) {
