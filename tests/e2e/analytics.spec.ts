@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { installApp } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // Slice 8 — analytics.html is the Business dashboard: the Salesforce Lightning
 // "Reports & Dashboards" treatment. Two bands (Sales · Your website), an
@@ -270,6 +270,51 @@ test.describe('Analytics (Business dashboard)', () => {
     expect(sentScope).toBe(CLIENT);
     // drill links carry the scope through to the report surfaces
     await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
+    // D1 + scope together: windows-aware targets carry period AND client
+    await expect(page.getByRole('link', { name: 'View website insights →' }).first())
+      .toHaveAttribute('href', `/business-insights.html?period=this_month&client=${CLIENT}`);
+  });
+
+  test('D1: business-insights drills carry the ACTIVE period; pipeline stays bare (stage=won is SS5)', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
+      const period = new URL(route.request().url()).searchParams.get('period');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(period === 'last_30' ? DASH_30 : DASH) });
+    });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'View website insights →' }).first())
+      .toHaveAttribute('href', '/business-insights.html?period=this_month');
+    await expect(page.getByRole('link', { name: 'View search insights →' }).first())
+      .toHaveAttribute('href', '/business-insights.html?period=this_month');
+    // pipeline doesn't understand windows yet — its footers carry NO period,
+    // and "View won deals" keeps the plain target until SS5's stage=won landing
+    await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', '/pipeline.html');
+    await expect(page.getByRole('link', { name: 'View won deals →' }).first()).toHaveAttribute('href', '/pipeline.html');
+    // switching the period re-labels every windows-aware drill
+    await page.locator('#periodBtn').click();
+    await page.locator('#periodMenu [data-period="last_30"]').click();
+    await expect(page.getByText('$99,900', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'View website insights →' }).first())
+      .toHaveAttribute('href', '/business-insights.html?period=last_30');
+    await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', '/pipeline.html');
+  });
+
+  test('D2: the period-windowed KPI cards say their window, matching their siblings', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    for (const name of ['New enquiries', 'Visitors', 'Actions taken']) {
+      await expect(page.locator('section.card', { has: page.getByRole('heading', { name, exact: true }) }).locator('.ch .s'))
+        .toHaveText(/^This month/);
+    }
+  });
+
+  test('D3: Won this month speaks expected-deal-value truth', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$3,850', { exact: true })).toBeVisible();
+    await expect(page.getByText('expected value of 2 deals won')).toBeVisible();
   });
 
   test('mobile: the grid stacks to a single column', async ({ page }, testInfo) => {
@@ -303,6 +348,142 @@ test.describe('Analytics (Business dashboard)', () => {
     await page.goto('/analytics.html');
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+  });
+});
+
+// ── SS7: the AGENCY PORTFOLIO LENS — an unscoped agency operator lands on the
+// same dashboard anatomy as the scoped Business dashboard (AN-7 retired).
+// KPI band + insight cards come from /analytics/portfolio; the per-client
+// rollup comes from /agency/portfolio (the read that carries site_id), and
+// each row drills into that client's SCOPED Business dashboard.
+const AGENCY_CTX = { data: {
+  site_role: 'business_owner', edition: 'presence',
+  edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
+  is_agency: true, is_operator: true, sees_full_workspace: true, is_client_portal: false,
+  capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'],
+  landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV,
+  plan_key: 'presence', upsell: null,
+} };
+const PORTFOLIO = { data: {
+  headline: 'Across 3 clients, here’s what stands out.',
+  client_count: 3,
+  insights: [
+    { key: 'growing', title: 'New inquiries', sentence: '2 of your 3 clients have new inquiries waiting.', number: 2, detail: 'Marlow’s Kitchen, Beacon Plumbing', tone: 'good' },
+    { key: 'attention', title: 'Needs attention', sentence: '1 client needs a look.', number: 1, detail: 'Beacon Plumbing', tone: 'attention' },
+    { key: 'search_not_connected', title: 'Connect Search Console', sentence: '1 of 3 clients needs Google Search Console connected.', number: 1, tone: 'neutral', href: '/connections.html?client=s3', cta: 'Connect it for them' },
+  ],
+  websites: [
+    { name: 'Marlow’s Kitchen', draft_live: 'live', leads_waiting: 3, needs_attention: false, plan_status: 'active' },
+    { name: 'Beacon Plumbing', draft_live: 'live', leads_waiting: 1, needs_attention: true, plan_status: 'active' },
+    { name: 'Cedar Studio', draft_live: 'draft', leads_waiting: 0, needs_attention: false, plan_status: 'active' },
+  ],
+} };
+const AGENCY_ROSTER = { data: [
+  { site_id: 's1', name: 'Marlow’s Kitchen', edition: 'presence', status: 'live', attention: 0, leads_waiting: 3 },
+  { site_id: 's2', name: 'Beacon Plumbing', edition: 'presence', status: 'live', attention: 2, leads_waiting: 1 },
+  { site_id: 's3', name: 'Cedar Studio', edition: 'presence', status: 'draft', attention: 0, leads_waiting: 0 },
+] };
+const AGENCY_API = { '/portal/context': AGENCY_CTX, '/analytics/portfolio': PORTFOLIO, '/agency/portfolio': AGENCY_ROSTER };
+
+test.describe('Analytics (Agency portfolio lens)', () => {
+  test('wears the dashboard anatomy: header · KPI band · insight cards · rollup · print', async ({ page }) => {
+    await installApp(page, { api: AGENCY_API });
+    await page.goto('/analytics.html');
+    // .dhead anatomy, one h1
+    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.getByText(/^As of /)).toBeVisible();
+    await expect(page.getByRole('button', { name: '↻ Refresh' })).toBeVisible();
+    await expect(page.getByText('Across 3 clients, here’s what stands out.')).toBeVisible();
+    // KPI band — every number derived from the payload (KPI tiles are c3;
+    // insight cards are c4 — 'Needs attention' titles exist in both bands)
+    const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
+    await expect(kpiCard('Clients').locator('.kn')).toHaveText('3');
+    await expect(kpiCard('Clients').getByRole('link', { name: 'Open Studio →' })).toHaveAttribute('href', '/agency.html');
+    await expect(kpiCard('Needs attention').locator('.kn')).toHaveText('1');
+    await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');   // 3 + 1 + 0
+    await expect(kpiCard('Sites live').locator('.kn')).toHaveText('2');
+    await expect(kpiCard('Sites live')).toContainText('1 still in draft');
+    // insight cards recut to the standard anatomy: tone chip · title · number ·
+    // sentence · one .go affordance
+    const inquiries = page.locator('section.card.c4', { has: page.getByRole('heading', { name: 'New inquiries' }) });
+    await expect(inquiries.locator('.tchip')).toHaveText('Good news');
+    await expect(inquiries.locator('.kn')).toHaveText('2');
+    await expect(inquiries).toContainText('2 of your 3 clients have new inquiries waiting.');
+    await expect(inquiries).toContainText('Marlow’s Kitchen, Beacon Plumbing');
+    await expect(page.locator('.tchip.attention')).toHaveText('Needs a look');
+    await expect(page.getByRole('link', { name: 'Connect it for them →' })).toHaveAttribute('href', '/connections.html?client=s3');
+    // the per-client rollup: one row per client, name links drill SCOPED
+    const rows = page.locator('.tscroll tbody tr');
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0).getByRole('link', { name: 'Marlow’s Kitchen' })).toHaveAttribute('href', '/analytics.html?client=s1');
+    await expect(rows.nth(1).getByRole('link', { name: 'Beacon Plumbing' })).toHaveAttribute('href', '/analytics.html?client=s2');
+    await expect(rows.nth(1).locator('.pill.wait')).toHaveText('2 waiting');
+    await expect(rows.nth(0).locator('.pill.ok')).toHaveText('all clear');
+    // the print summary affordance survives the recut
+    await expect(page.getByRole('button', { name: 'Print this summary' })).toBeVisible();
+  });
+
+  test('a rollup row click drills into that client’s SCOPED Business dashboard', async ({ page }) => {
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/dashboard': DASH } });
+    await page.goto('/analytics.html');
+    // click the row itself (not the name link) — the drill still fires
+    await page.locator('.tscroll tbody tr[data-drill="/analytics.html?client=s2"] td').nth(1).click();
+    await expect(page).toHaveURL(/analytics\.html\?client=s2/);
+    // and the destination is the scoped Business dashboard, scope carried
+    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+  });
+
+  test('a failed portfolio read is the TROUBLE state — never the all-quiet card', async ({ page }) => {
+    await installApp(page, { api: AGENCY_API });
+    await page.route('**/functions/v1/presence/analytics/portfolio**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/analytics.html');
+    await expect(page.getByText('We couldn’t load your analytics just now.')).toBeVisible();
+    await expect(page.getByText('All quiet.')).toHaveCount(0);
+    await expect(page.locator('.tscroll')).toHaveCount(0);
+  });
+
+  test('a 404 from an older function build is the calm warming state', async ({ page }) => {
+    await installApp(page, { api: AGENCY_API });
+    await page.route('**/functions/v1/presence/analytics/portfolio**', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    await page.goto('/analytics.html');
+    await expect(page.getByText('This dashboard is warming up.')).toBeVisible();
+  });
+
+  test('a failed ROSTER read degrades only the rollup — the board stands, with an honest line', async ({ page }) => {
+    await installApp(page, { api: AGENCY_API });
+    await page.route('**/functions/v1/presence/agency/portfolio**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Clients', exact: true }) }).locator('.kn')).toHaveText('3');
+    await expect(page.getByText('The client-by-client list wouldn’t load just now')).toBeVisible();
+    await expect(page.locator('.tscroll tbody tr')).toHaveCount(0);
+  });
+
+  test('all-quiet renders ONLY on a successful empty read', async ({ page }) => {
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': { data: {
+      headline: 'All 3 clients are quiet and current — nothing needs you.',
+      client_count: 3, insights: [], websites: PORTFOLIO.data.websites,
+    } } } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('All quiet.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // the rollup still renders
+  });
+
+  test('no serious/critical axe violations on the portfolio lens', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: AGENCY_API });
+    await page.goto('/analytics.html');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);

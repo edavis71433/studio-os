@@ -206,7 +206,9 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     const card = page.locator('#rail-month');
     await expect(card).toBeVisible();
     await expect(card.getByText('$3,850')).toBeVisible();
-    await expect(card.getByText('won this month')).toBeVisible();
+    // D3 sibling: the number is summed EXPECTED deal value — the label says so
+    await expect(card.getByText('expected value won')).toBeVisible();
+    await expect(card.getByText('won this month')).toHaveCount(0);
     await expect(card.getByText('$12,400')).toBeVisible();
     await expect(card.getByText('open pipeline')).toBeVisible();
     await expect(card.getByText('9', { exact: true })).toBeVisible();
@@ -290,6 +292,76 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await expect(sched.getByText('West today')).toBeVisible();           // ditto for the far-west site
     await expect(sched.getByText('Kiritimati tomorrow')).toHaveCount(0); // tomorrow there → not today
     await expect(sched.getByText('Bad zone')).toBeVisible();             // invalid zone → viewer-local fallback
+  });
+
+  // ── SS7/C6: the Key Deals rail card — GET /sales/deals, top open by value ──
+  const SALES_DEALS = { data: [
+    { id: 'd1', title: 'Patio rebuild', stage: 'proposal', expected_value_cents: 240000 },
+    { id: 'd2', title: 'Small job', stage: 'lead', expected_value_cents: 50000 },
+    { id: 'd3', title: 'Won already', stage: 'won', expected_value_cents: 999900 },   // won → never a "key deal"
+    { id: 'd4', title: 'Mid job', stage: 'qualified', expected_value_cents: 120000 },
+    { id: 'd5', title: 'Fifth', stage: 'lead', expected_value_cents: 40000 },
+    { id: 'd6', title: 'Sixth', stage: 'lead', expected_value_cents: 30000 },
+    { id: 'd7', title: 'Seventh — beyond the cap', stage: 'lead', expected_value_cents: 20000 },
+  ] };
+
+  test('Key deals: top 5 OPEN deals by expected value, deep-linking to the deal drawer', async ({ page }) => {
+    await installApp(page, { api: { '/sales/deals': SALES_DEALS } });
+    await page.goto('/today.html');
+    const card = page.locator('#rail-deals');
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Key deals')).toBeVisible();
+    const rows = card.locator('.rrows a');
+    await expect(rows).toHaveCount(5);                                     // capped, 6 open in the fixture
+    await expect(rows.nth(0)).toContainText('Patio rebuild');              // sorted by value, not payload order
+    await expect(rows.nth(0)).toContainText('$2,400');
+    await expect(rows.nth(0)).toHaveAttribute('href', '/pipeline.html?deal=d1');
+    await expect(rows.nth(1)).toContainText('Mid job');
+    await expect(card.getByText('Won already')).toHaveCount(0);            // won is not open
+    await expect(card.getByText('Seventh — beyond the cap')).toHaveCount(0);
+    await expect(card.getByRole('link', { name: 'Pipeline →' })).toHaveAttribute('href', '/pipeline.html');
+  });
+
+  test('Key deals rows carry the ?client= scope for a drilled-in operator', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: { '/sales/deals': SALES_DEALS } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await expect(page.locator('#rail-deals .rrows a').first())
+      .toHaveAttribute('href', `/pipeline.html?deal=d1&client=${CLIENT}`);
+  });
+
+  test('Key deals hides ENTIRELY on a 403 and on an empty list — never an empty card', async ({ page }) => {
+    await installApp(page, { api: { '/sales/deals': { data: [] } } });
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();
+    await expect(page.locator('#rail-deals')).toHaveCount(0);              // [] → no card
+    await page.route('**/functions/v1/presence/sales/deals**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    await page.reload();
+    await expect(page.locator('.feedcard')).toBeVisible();                 // the page stands…
+    await expect(page.locator('#rail-deals')).toHaveCount(0);              // …with no Key-deals card at all
+  });
+
+  test('Recent wins renders from the dash payload already in hand; hidden when empty', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.sales.recent_wins = [
+      { title: 'Patio rebuild — Sam R.', value_cents: 240000, closed_at: '2026-07-12T00:00:00Z' },
+      { title: 'Site refresh — Marlow’s', value_cents: 145000, closed_at: '2026-07-03T00:00:00Z' },
+    ];
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/today.html');
+    const wins = page.locator('#rail-wins');
+    await expect(wins).toBeVisible();
+    await expect(wins.getByText('Recent wins')).toBeVisible();
+    await expect(wins.getByText('Patio rebuild — Sam R.')).toBeVisible();
+    await expect(wins.getByText('$2,400')).toBeVisible();
+    // no per-deal id in this payload → honest non-links, never a fake drill
+    await expect(wins.locator('.rrows a')).toHaveCount(0);
+    // and without wins in the payload there is no card at all
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.goto('/today.html');
+    await expect(page.locator('#rail-month')).toBeVisible();
+    await expect(page.locator('#rail-wins')).toHaveCount(0);
   });
 
   test('Recent records renders the slice-7 cache as-is (data-noscope), hidden when empty', async ({ page }) => {
