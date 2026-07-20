@@ -279,6 +279,28 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(page.locator('#panel')).not.toHaveClass(/on/);
   });
 
+  test('a read that removes a selected row PRUNES the selection — bulk never acts on hidden rows', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: filesApi });
+    await page.route(LIST_RE, (route) => {
+      const q = new URL(route.request().url()).searchParams.get('q') || '';
+      if (q) return route.fulfill(ok({ data: { assets: [CONTRACT], total: 3, shown: 1, policy: 'immediate' } }));
+      return route.fulfill(ok(filesApi['/assets']));
+    });
+    await page.goto('/files.html');
+    await page.locator(`input[data-pick="${LOGO.id}"]`).check();
+    await expect(page.locator('.bulkbar .cnt')).toHaveText('1 selected');
+    await page.locator('#q').fill('contract');               // the search removes the selected Logo row
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('.bulkbar')).toHaveCount(0);   // pruned to nothing → the bulkbar goes quiet
+    await page.locator('#q').fill('');                       // back to the full roster
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await page.locator('#ckAll').check();
+    await expect(page.locator('.bulkbar .cnt')).toHaveText('2 selected');
+    await page.locator('#q').fill('contract');
+    await expect(page.locator('.bulkbar .cnt')).toHaveText('1 selected');   // the surviving row keeps its selection
+  });
+
   test('search re-renders never destroy the input or caret', async ({ page }) => {
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');

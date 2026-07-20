@@ -381,6 +381,10 @@ async function load(soft){
   S.policy=(a.body.data&&a.body.data.policy)||'immediate';
   if(S.col==='all'&&!S.q.trim())deriveRailCounts(full,a.body.data&&a.body.data.total);
   S.assets=rows;
+  // any read that changes the row set prunes selections that are no longer
+  // visible — bulk actions only ever act on rows the user can SEE, and the
+  // bulkbar count always equals the visible checked rows
+  {const keep=new Set(rows.map(r=>r.id));S.selected=new Set([...S.selected].filter(id=>keep.has(id)));}
   S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];   // health is a nudge — its failure just means no nudge
   S.countsOk=!!col.ok;   // collections failure degrades the rail count-less, with a notice — never fake zeros
   S.counts=buildCounts((col.ok&&col.body.data)||[]);
