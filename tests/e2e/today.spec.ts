@@ -309,6 +309,12 @@ test.describe('Today — Lightning Home (slice 10)', () => {
 
   test('Key deals: top 5 OPEN deals by expected value, deep-linking to the deal drawer', async ({ page }) => {
     await installApp(page, { api: { '/sales/deals': SALES_DEALS } });
+    // the read must widen its window to 100 rows — the route's default page is
+    // the 25 most-recently-updated, which could hide a big-but-idle open deal
+    const dealReads: string[] = [];
+    page.on('request', (req) => {
+      if (/\/functions\/v1\/presence\/sales\/deals/.test(req.url())) dealReads.push(req.url());
+    });
     await page.goto('/today.html');
     const card = page.locator('#rail-deals');
     await expect(card).toBeVisible();
@@ -326,6 +332,8 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await expect(card.getByText('Legacy converted')).toHaveCount(0);
     await expect(card.getByText('Seventh — beyond the cap')).toHaveCount(0);
     await expect(card.getByRole('link', { name: 'Pipeline →' })).toHaveAttribute('href', '/pipeline.html');
+    expect(dealReads.length).toBeGreaterThan(0);
+    expect(dealReads.every((u) => new URL(u).searchParams.get('limit') === '100')).toBe(true);
   });
 
   test('Key deals rows carry the ?client= scope for a drilled-in operator', async ({ page }) => {

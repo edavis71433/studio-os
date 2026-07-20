@@ -516,7 +516,7 @@ function trouble(){
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
       apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
       apiGet('/bookings/appointments').catch((e)=>e===404||e===403?'dormant':null),   // "Today's schedule" — 404/403 = bookings dormant (no card); else an honest couldn't-check line
-      apiGet('/sales/deals').catch(()=>null),                // "Key deals" (C6) — hidden entirely on empty/403/failure, never an empty card
+      apiGet('/sales/deals?limit=100').catch(()=>null),      // "Key deals" (C6) — hidden entirely on empty/403/failure, never an empty card. ?limit=100 (the route's MAX_PAGE): the default page is only the 25 most-recently-UPDATED deals, which could hide a big open deal from the top-5 window
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
