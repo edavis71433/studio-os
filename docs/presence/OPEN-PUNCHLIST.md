@@ -350,8 +350,8 @@ through the resolve pipeline) and the canvas joins by it — sid join demoted to
 deploy-window fallback. Adversarial review: safe-to-merge (formula proven under
 stacked divergences + 200-fixture fuzz); hardening applied (DDS_SRCMAP
 compensation for non-move edits, composeBlocks exported + directly tested).
-Gates: 207/207 pure, 699/0 full e2e ×2, golden byte-identical. Functions deploy
-triggered post-merge. Next: G13 slice 2 (in-place editor), sequenced with the
+Gates: 207/207 pure, 699/0 full e2e ×2, golden byte-identical. Functions deploy #22
+SUCCESS on b03cff6 (2026-07-20) — G13 s1 fully LIVE, functions + frontend. Next: G13 slice 2 (in-place editor), sequenced with the
 standards sweep.** Original hold record follows for history:
 ⛔ (historical) G13 slice 1 — HELD (do NOT merge until fixed): review found a HIGH,
 conditional join-divergence. The `/settings` sidecar computes sids via
