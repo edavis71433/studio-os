@@ -177,7 +177,19 @@ debounce; `insertSavedReplies(textareaId)` lazy-loading /service/saved-replies).
 Absorbs: C2, C3, C4, C5 (contacts/customers/leads parts), C7, D7 (customers half).
 
 ### SS7 — Dashboard + Home (analytics · today) — **M** — depends on SS5 (stage=won landing)
-- **analytics:** withScopePeriod() appends `period=` to card footers (**D1**);
+- **analytics — the AGENCY PORTFOLIO LENS (added 2026-07-20; recon miss, Eric-hit):**
+  an unscoped agency operator lands in `renderPortfolio` (analytics.html:450-465) —
+  the pre-slice-8 view deliberately skipped as AN-7, so the operator's own daily
+  Analytics still looks old even though the slice-8 Business dashboard is live on
+  the single-business/scoped path. Treatment: the same .dhead dashboard anatomy —
+  📊 header, period control where the data supports it, KPI band (clients ·
+  needs-attention · open enquiries · expected value across clients), the insight
+  cards re-cut to the standard card anatomy, a per-client rollup table
+  (.tscroll: client · visitors · enquiries · status → row click drills into that
+  client's SCOPED Business dashboard with ?client= carried), honest
+  trouble/warming states, stencil loading. This is the surface Eric sees —
+  BUILD ORDER PULLED UP: SS7 runs immediately after SS1.
+- **analytics (scoped Business dashboard deltas):** withScopePeriod() appends `period=` to card footers (**D1**);
   `stage=won` on both "View won deals" footers; periodLabel() onto New
   enquiries/Visitors/Actions (**D2**); "expected value of N deals won" copy
   (**D3**). Period stays only on targets that understand windows
