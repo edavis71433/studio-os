@@ -588,7 +588,7 @@ async function loadDash(soft,nextPeriod){
 //    trouble; a failed read NEVER paints the all-quiet card). The /agency/
 //    portfolio companion read only feeds the per-client rollup — its failure
 //    degrades that one section honestly, never the whole page.
-let PF=null;
+let PF=null,ROSTER=null;   // ROSTER: the last GOOD /agency/portfolio rows (soft-refresh keep-last-good)
 async function loadPortfolio(soft){
   const gen=++REQ_SEQ;
   let stencilTimer=null;
@@ -610,7 +610,16 @@ async function loadPortfolio(soft){
     trouble();return;
   }
   PF=r.body.data||{};
-  renderPortfolio(PF,(a&&a.ok&&Array.isArray(a.body.data))?a.body.data:null);
+  // The roster read degrades ONLY its own section — and with loadDash's
+  // keep-last-good discipline: on a SOFT ↻ refresh a failed roster keeps the
+  // previous good rows + a toast, instead of replacing them with the
+  // couldn't-load line. A first (hard) load has no last-good, so it keeps the
+  // honest couldn't-load line.
+  const roster=(a&&a.ok&&Array.isArray(a.body.data))?a.body.data:null;
+  if(roster!==null)ROSTER=roster;
+  else if(soft&&ROSTER)toast('Couldn’t refresh the client list just now.');
+  else ROSTER=null;
+  renderPortfolio(PF,ROSTER);
 }
 async function load(){
   // Agency, unscoped → the portfolio lens (SS7). Otherwise the business dashboard.

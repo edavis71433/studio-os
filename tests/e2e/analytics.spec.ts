@@ -467,6 +467,25 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(0);
   });
 
+  test('soft ↻ refresh keeps the last-good rollup when only the roster read fails', async ({ page }) => {
+    let rosterFails = false;
+    await installApp(page, { api: AGENCY_API });
+    await page.route('**/functions/v1/presence/agency/portfolio**', (route) => {
+      if (rosterFails) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(AGENCY_ROSTER) });
+    });
+    await page.goto('/analytics.html');
+    await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);
+    // now the roster hiccups while the portfolio read stays fine — ↻ must NOT
+    // trade three good rows for the couldn't-load line (loadDash discipline)
+    rosterFails = true;
+    await page.getByRole('button', { name: '↻ Refresh' }).click();
+    await expect(page.getByText('Couldn’t refresh the client list just now.')).toBeVisible();
+    await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // last-good kept
+    await expect(page.getByText('The client-by-client list wouldn’t load just now')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Marlow’s Kitchen' })).toBeVisible();
+  });
+
   test('all-quiet renders ONLY on a successful empty read', async ({ page }) => {
     await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': { data: {
       headline: 'All 3 clients are quiet and current — nothing needs you.',
