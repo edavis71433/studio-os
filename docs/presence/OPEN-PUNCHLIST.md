@@ -283,6 +283,21 @@ certs and all that" → SSL provisioning/renewal is a HARD REQUIREMENT of the
 DNS slices (post-delegation cert re-trigger + status + renewal watch + DS
 pre-check). G13 slice 1 (server stamping) building.
 
+## 🏢 STUDIO-WIDE STANDARDS DIRECTIVE (Eric 2026-07-20 — do not lose to compaction)
+
+Eric, after seeing the un-redesigned studio Files page (live site confirmed
+CURRENT at main@ec4e46c — "looks the same" was correct, the page was never in
+the 12 slices): **"yes i want the whole studio to those standards."** Scope:
+EVERY studio tab to the redesign standard (roster .lhead + search/filter/sort
+list views, record anatomy, split consoles, honest failure/empty states,
+VIEW_SEQ, dds tokens). Not-yet-treated pages: files, broadcasts, schedule,
+connections, sharing, website-health, snapshot-history, content-tree, timeline,
+upcoming, business-insights, attention, approval-center, admin-health, agency —
+plus delta gaps on the redone pages (audit batches C + D fold into this sweep).
+Method: recon → docs/design/STUDIO-STANDARDS-SWEEP.md slice plan → Eric approves
+order → slices through the usual pipeline. Sequenced after the G13 divergence
+fix (built, in adversarial review + full e2e as of this entry).
+
 ## 🟢 POST-AUDIT BUILD — WAVE 1 (2026-07-20)
 
 Three pieces built + independently reviewed. Eric's call (2026-07-20): **ship
