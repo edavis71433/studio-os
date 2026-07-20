@@ -323,10 +323,14 @@ WAVE 7 state at pause (updated after the dust settled):
   through the adversarial review before any merge ask.
 - PS6+PS7 (project drill-in cohesion B3 + composer stragglers B6; incl. the
   PS1-review residual: projectsFailed honesty at Files/Messages tabs) — the build agent was STOPPED mid-item to honor
-  the pause (its partial openSupportThread rewrite was uncommitted and has been
-  discarded; NO PS6/PS7 commits landed). On resume: relaunch cleanly from
-  §PS6/§PS7 including the PS1-review residual (projectsFailed at Files/
-  Messages).
+  the pause. THREE PS6 commits LANDED first: 640210e (record cohesion —
+  VIEW_SEQ + throw honesty + per-read lines + reviewer gate), cf02f99 (drill-in
+  Files → slice-12 share card), f8e8090 (support queue-rows + focus contract).
+  The uncommitted partial (an openSupportThread rewrite + in-progress spec
+  edits) was discarded. On resume: relaunch from §PS6/§PS7 CONTINUING from
+  those three commits — remaining: openSupportThread/openSurvey guards+theming,
+  PS7 composer VIEW_SEQ/theming/focus, the projectsFailed residual at Files/
+  Messages tabs, then the PS6+SS8 reviews (SS8 is also complete-but-unreviewed).
 Then reviews → fixes → full suite → Eric merge ask, per the standing pipeline.
 
 REMAINING AFTER WAVE 7 (all Eric-gated):
