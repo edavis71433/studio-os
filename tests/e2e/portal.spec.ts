@@ -2012,3 +2012,198 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect.poll(() => calls).toBe(2);
   });
 });
+
+// ── PS2 — Invoices tab full treatment (B1): the money surface ────────────────
+// .frow rows (fileRowHtml's anatomy): 🧾 + name heading + "amount · due <date>"
+// meta + a Paid/Overdue/server-word status chip — overdue derived CLIENT-side
+// (decision D2: unpaid && due_date < the client's local today, date-only
+// strings compared in the local calendar). The unpaid-total line uses
+// glanceData's own formula; ONE money formatter renders the same cents as the
+// SAME string on the glance tile, the Needs-you row, every Invoices row and
+// the total (never $1200 drifting from $1,200). Reviewer branch first — calm
+// account-owner copy, ZERO /client/billing reads. VIEW_SEQ: a stale billing
+// response never paints over a newer view. A4's honest-failure card stays
+// verbatim and is never session-cached.
+test.describe('PS2 — Invoices tab (B1)', () => {
+  // date-only YYYY-MM-DD in the CLIENT'S LOCAL calendar — the exact sense the
+  // page derives "overdue" in, so due-yesterday/due-tomorrow can't tz-drift
+  const ymd = (offsetDays: number) => {
+    const t = new Date(Date.now() + offsetDays * 86400000);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  };
+  const dueLabel = (offsetDays: number) => {
+    const [y, m, d] = ymd(offsetDays).split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  };
+  // the PRODUCTION payload shape (client_delivery.ts handleClientBilling):
+  // id · name · description · amount (dollars = amount_cents/100) · status ·
+  // due_date · paid_at · pay_url (null once paid) · created_at
+  const INVOICES = [
+    { id: 'v1', name: 'Kickoff deposit', description: null, amount: 1200, status: 'paid', due_date: ymd(-30), paid_at: '2026-06-20T00:00:00Z', pay_url: null, created_at: '2026-06-01T00:00:00Z' },
+    { id: 'v2', name: 'Design phase', description: null, amount: 1234.5, status: 'open', due_date: ymd(-1), paid_at: null, pay_url: 'https://pay.example/v2', created_at: '2026-06-20T00:00:00Z' },
+    { id: 'v3', name: 'Build phase', description: null, amount: 800, status: 'sent', due_date: ymd(1), paid_at: null, pay_url: null, created_at: '2026-07-01T00:00:00Z' },
+  ];
+  const INV_API = { ...CLIENT_API,
+    '/client/billing': { data: { billing_type: 'service', note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.', invoices: INVOICES, summary: { open_count: 2, paid_count: 1 } } } };
+  const openInvoices = async (page: import('@playwright/test').Page) => {
+    await page.locator('#tabnav [data-tab="invoices"]').click();
+  };
+
+  test('rows are .frow anatomy — 🧾 icon, name heading, "amount · due <date>" meta — with Paid / Overdue (due-yesterday) / server-word (due-tomorrow) chips', async ({ page }) => {
+    await installApp(page, { api: INV_API });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const rows = page.locator('#main .frow');
+    await expect(rows).toHaveCount(3);
+    // anatomy: every row leads with the 🧾 type icon and a REAL heading name
+    await expect(rows.nth(0).locator('.fico')).toHaveText('🧾');
+    await expect(page.locator('#main .frow h3.fname')).toHaveCount(3);
+    // paid: green chip, formatted amount, thank-you action — and NO pay link
+    const paid = rows.filter({ hasText: 'Kickoff deposit' });
+    await expect(paid.locator('.fst.sig')).toHaveText('Paid');
+    await expect(paid.locator('.fmeta').first()).toHaveText(`$1,200 · due ${dueLabel(-30)}`);
+    await expect(paid.getByText('Paid — thank you.')).toBeVisible();
+    await expect(paid.locator('a')).toHaveCount(0);
+    // due-yesterday unpaid: the DERIVED Overdue chip (decision D2) + cents kept
+    const over = rows.filter({ hasText: 'Design phase' });
+    await expect(over.locator('.fst.od')).toHaveText('Overdue');
+    await expect(over.locator('.fmeta').first()).toHaveText(`$1,234.50 · due ${dueLabel(-1)}`);
+    // due-tomorrow unpaid: NOT overdue — the server's own word, default chip
+    const sent = rows.filter({ hasText: 'Build phase' });
+    await expect(sent.locator('.fst')).toHaveText('sent');
+    await expect(sent.locator('.fst.od')).toHaveCount(0);
+    await expect(sent.locator('.fst.sig')).toHaveCount(0);
+    await expect(sent.getByText('Your studio will send payment details.')).toBeVisible();
+    // meta dates are FORMATTED — never a raw ISO date on the money surface
+    await expect(page.locator('#main .frow .fmeta').first()).not.toContainText(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  test('the Pay action is the pay_url in a new tab with rel=noopener, named for its invoice', async ({ page }) => {
+    await installApp(page, { api: INV_API });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const pay = page.getByRole('link', { name: 'Pay — Design phase' });
+    await expect(pay).toBeVisible();
+    await expect(pay).toHaveAttribute('href', 'https://pay.example/v2');
+    await expect(pay).toHaveAttribute('target', '_blank');
+    await expect(pay).toHaveAttribute('rel', 'noopener');
+    // paid + no-link rows offer no Pay anywhere else
+    await expect(page.locator('#main a.fbtn')).toHaveCount(1);
+  });
+
+  test('the unpaid-total line uses glanceData\'s formula — the SAME string as Home\'s to-pay tile', async ({ page }) => {
+    await installApp(page, { api: INV_API });
+    await page.goto('/client.html');
+    // Home's glance: 1234.5 + 800 unpaid (paid excluded) → $2,034.50
+    await expect(page.locator('#glance-due .gn')).toBeVisible();
+    const glance = (await page.locator('#glance-due .gn').textContent())!.trim();
+    expect(glance).toBe('$2,034.50');
+    await openInvoices(page);
+    const total = page.locator('#inv-unpaid');
+    await expect(total).toContainText('Unpaid right now:');
+    const totalMoney = (await total.locator('strong').textContent())!.trim();
+    expect(totalMoney).toBe(glance); // pinned EQUAL — one formatter, one formula
+  });
+
+  test('money-formatter consistency: the same cents render as the SAME string on the glance tile, the Needs-you row, the invoice row and the total', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API,
+      '/client/billing': { data: { billing_type: 'service', invoices: [
+        { id: 'w1', name: 'Deposit', description: null, amount: 1200, status: 'open', due_date: ymd(7), paid_at: null, pay_url: 'https://pay.example/w1', created_at: '2026-07-01T00:00:00Z' },
+      ], summary: { open_count: 1, paid_count: 0 } } } } });
+    await page.goto('/client.html');
+    await expect(page.locator('#glance-due .gn')).toHaveText('$1,200');
+    // the Needs-you invoice row carries the same formatted amount…
+    const qrow = page.locator('#needs-body .qrow').filter({ hasText: 'Deposit' });
+    await expect(qrow).toContainText('$1,200 ·');
+    // …and the old bare "$1200" never appears anywhere on Home
+    await expect(page.locator('#main')).not.toContainText('$1200 ');
+    await openInvoices(page);
+    await expect(page.locator('#main .frow .fmeta').first()).toContainText('$1,200 ·');
+    await expect(page.locator('#inv-unpaid strong')).toHaveText('$1,200');
+  });
+
+  test('reviewer: the calm account-owner copy, with ZERO /client/billing fetches — never the client-shaped empty state', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    page.on('request', (r) => { if (r.url().includes('/client/billing')) calls.push(r.url()); });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    // the calm read-only copy — billing belongs to the account owner…
+    await expect(page.getByText('Billing lives with the account owner')).toBeVisible();
+    // …never the client-shaped "No invoices yet" story, and never an error line
+    await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
+    await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('a failed read shows A4\'s honest line (failed ≠ empty) and is NOT cached — re-entry REFETCHES (request-counted)', async ({ page }) => {
+    let calls = 0;
+    await installApp(page, { api: INV_API });
+    // first TWO reads fail (Home's glance + the first Invoices visit); then succeed
+    await page.route('**/functions/v1/presence/client/billing', (route) => {
+      calls++;
+      if (calls <= 2) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { billing_type: 'service', invoices: INVOICES, summary: { open_count: 2, paid_count: 1 } } }) });
+    });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    // failed ≠ empty ≠ reviewer: the honest line, verbatim — no empty story,
+    // no rows, no total (a fake $0 would be a lie built on nothing)
+    await expect(page.getByText('We couldn’t load your invoices just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
+    await expect(page.locator('#main .frow')).toHaveCount(0);
+    await expect(page.locator('#inv-unpaid')).toHaveCount(0);
+    await expect.poll(() => calls).toBe(2);
+    // away and back: NOT session-cached — the tab genuinely refetches and renders
+    await page.locator('#tabnav [data-tab="home"]').click();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await openInvoices(page);
+    await expect(page.getByRole('heading', { name: 'Design phase' })).toBeVisible();
+    await expect.poll(() => calls).toBeGreaterThanOrEqual(3);
+  });
+
+  test('VIEW_SEQ: a stale billing response never paints over the newer view', async ({ page }) => {
+    const waiters: Array<() => void> = [];
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/billing', async (route) => {
+      await new Promise<void>((r) => waiters.push(r));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { billing_type: 'service', invoices: INVOICES, summary: { open_count: 2, paid_count: 1 } } }) });
+    });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await openInvoices(page); // the billing read hangs — the tab shows its skeleton
+    await page.locator('#tabnav [data-tab="home"]').click(); // the user moves on
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    waiters.splice(0).forEach((release) => release()); // the STALE response lands now
+    await page.waitForTimeout(200);
+    // Home still owns #main — the stale Invoices render was dropped, not painted
+    await expect(page.locator('#main header h1')).toHaveText(/^Good (morning|afternoon|evening)/);
+    await expect(page.locator('#main .frow')).toHaveCount(0);
+    await expect(page.locator('#inv-unpaid')).toHaveCount(0);
+  });
+
+  test('mobile: invoice rows wrap their action under the meta — no horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the stacked-rows check is the <720px contract');
+    await installApp(page, { api: INV_API });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    await expect(page.locator('#main .frow')).toHaveCount(3);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('no serious/critical axe violations on the Invoices tab', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: INV_API });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    await expect(page.locator('#main .frow')).toHaveCount(3);
+    await page.waitForLoadState('networkidle');
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
+  });
+});

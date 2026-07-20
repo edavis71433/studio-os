@@ -146,6 +146,19 @@
   .fyou{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--good-soft);color:var(--good);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
   .fst{flex:0 0 auto;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .fst.sig{background:var(--good-soft);color:var(--good)}
+  /* PS2 — Invoices rows: the invoice name is a REAL h3 (heading nav on the money
+     surface) restyled to the .fname line; Overdue chip = warn family; the
+     non-link row action (thank-you / will-send) is a quiet trailing note. */
+  .frow h3.fname{margin:0;font-size:14px}
+  .fst.od{background:var(--warn-soft);color:var(--warn)}
+  .finote{flex:0 0 auto;color:var(--faint);font-size:12.5px}
+  .invtotal{font-size:14px;color:var(--soft);margin:0 0 12px}
+  .invtotal strong{color:var(--ink)}
+  @media (max-width:719px){
+    .frow.inv{flex-wrap:wrap}
+    .frow.inv .fmain{min-width:58%}
+    .frow.inv .finote,.frow.inv a.fbtn{margin-left:46px} /* stacked under the name, aligned past the 34px icon + 12px gap */
+  }
   .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
   .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
   .fload{margin:0 0 14px;font-size:14px}
@@ -798,7 +811,7 @@ async function buildNeedsYou(){
         `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`));
   }
   for(const i of unpaidInvoices(billing))
-    items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?('$'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(i.due_date)}`:''}`,
+    items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
       i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`));
   // Per-source failure honesty (the glance strip's rule, on the queue itself):
   // any failed source keeps its OWN calm line under the surviving rows, and
@@ -1448,23 +1461,64 @@ async function renderFiles(){
   wireDownloads(document);
   if(canShare)wireShareCard();
 }
-// ── INVOICES — the studio's service invoices (separate from the SaaS subscription) ──
-// appendBilling renders the invoice cards (service billing = the studio's project
-// invoices, explicitly distinct from the Studio OS software subscription).
-function appendBilling(inv){
-  let h=`<p class="muted" style="margin:-14px 0 14px">Your website subscription is billed separately.</p>`;
-  for(const i of (inv||[]))h+=`<div class="card"><h3>${esc(i.name||'Invoice')}</h3><p>${i.amount?('Amount: $'+esc(String(i.amount))+' · '):''}${esc((i.status||'').replace('_',' '))}${i.due_date?(' · due '+esc(i.due_date)):''}</p>${i.pay_url?`<p><a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener">Pay this invoice →</a></p>`:(i.paid_at?'<p class="muted">Paid — thank you.</p>':'<p class="muted">Your studio will send payment details.</p>')}</div>`;
-  return h;
+// ── INVOICES (PS2, B1) — the studio's service invoices (separate from the SaaS
+// subscription), as .frow list rows to fileRowHtml's anatomy. ──
+// Invoice due_date is a DATE-ONLY string (YYYY-MM-DD). Date.parse would read it
+// as UTC midnight and shift a day west of Greenwich, so BOTH the display label
+// and the overdue math work in the client's LOCAL calendar: the string's own
+// y-m-d, compared against local today's y-m-d (decision D2 — "overdue" is
+// derived here, client-side: unpaid && due_date < today; the server has no
+// overdue status of its own).
+function invYmd(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?m[0]:'';}
+function invDueLabel(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'long',day:'numeric'}):'';}
+function portalTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function invOverdue(i,todayYmd){if(!i||i.status==='paid'||i.status==='void'||i.status==='canceled')return false;const d=invYmd(i.due_date);return !!d&&d<todayYmd;}
+// One invoice row: 🧾 + name (a REAL h3 heading — screen readers navigate the
+// money surface by invoice name) + "amount · due <date>" meta + status chip +
+// the row action. Chip: Paid (green) / Overdue (derived, warn) / the server's
+// own word (sent, open …) — never an invented state. Action: an unpaid invoice
+// with a pay link gets Pay (new tab, rel=noopener); a paid one says thank you;
+// an unpaid one without a link says the studio will send payment details;
+// void/canceled rows get no action at all (there is nothing to do or await).
+function invoiceRowHtml(i,todayYmd){
+  const dead=i.status==='void'||i.status==='canceled';
+  const over=invOverdue(i,todayYmd);
+  const due=invDueLabel(i.due_date)||String(i.due_date||'');
+  const meta=[i.amount?fmtMoney(i.amount):'',due?'due '+due:''].filter(Boolean).join(' · ');
+  const chip=i.status==='paid'?'Paid':over?'Overdue':String(i.status||'sent').replace(/_/g,' ');
+  const act=i.status==='paid'?`<span class="finote">Paid — thank you.</span>`
+    :dead?''
+    :i.pay_url?`<a class="fbtn" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
+    :`<span class="finote">Your studio will send payment details.</span>`;
+  return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">🧾</span>`+
+    `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+
+    `${meta?`<span class="fmeta">${esc(meta)}</span>`:''}</div>`+
+    `<span class="fst${i.status==='paid'?' sig':over?' od':''}">${esc(chip)}</span>${act}</div>`;
 }
 async function renderInvoices(){
+  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
+  if(PORTAL.persona!=='client'){ // reviewer: /client/billing is 403 server-side — the calm read-only state, ZERO fetches, in the account-owner voice (never the client-shaped "No invoices yet")
+    $('main').innerHTML=portalHeader('Invoices','Billing lives with the account owner.')+
+      emptyCard('Invoices for this work go to the account owner — there’s nothing here for you to pay.','🧾');
+    return;
+  }
   $('main').innerHTML=spinnerHtml();
-  const b=await ensureBilling();const inv=(b&&b.invoices)||[];
+  const b=await ensureBilling();
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  const inv=(b&&b.invoices)||[];
   let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
   // a FAILED read says so — never the "No invoices yet" story (and ensureBilling
   // didn't cache it, so coming back to this tab retries the read)
   if(b&&b.failed){html+=`<div class="card"><p class="muted">We couldn’t load your invoices just now — please try again in a moment.</p></div>`;$('main').innerHTML=html;return;}
   if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
-  html+=appendBilling(inv);
+  const today=portalTodayYmd();
+  // glanceData's OWN formula over the same unpaidInvoices — the tab's total and
+  // Home's to-pay tile can never disagree (one formula, one formatter)…
+  const total=unpaidInvoices(b).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
+  html+=`<p class="muted" style="margin:-14px 0 14px">Your website subscription is billed separately.</p>`;
+  // …and the line only exists when something truly is unpaid — never a fake $0
+  if(total>0)html+=`<p class="invtotal" id="inv-unpaid">Unpaid right now: <strong>${esc(fmtMoney(total))}</strong></p>`;
+  html+=`<div class="flv" role="list" aria-label="Invoices">${inv.map(i=>invoiceRowHtml(i,today)).join('')}</div>`;
   $('main').innerHTML=html;
 }
 // ── REQUESTS (R2, slice 11 layout) — quick-action tiles, the studio's service
