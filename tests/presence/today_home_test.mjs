@@ -16,7 +16,8 @@ function dateLine(nowMs){return new Date(nowMs==null?Date.now():nowMs).toLocaleD
 const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
 function monthTiles(d){
   d=d||{};const s=d.sales||{};const w=d.website||{};const t=[];
-  if(s.won&&s.won.this_month)t.push([money(s.won.this_month.value_cents),'won this month']);
+  // D3 sibling: the number is summed EXPECTED deal value — the label says so.
+  if(s.won&&s.won.this_month)t.push([money(s.won.this_month.value_cents),'expected value won']);
   if(s.pipeline&&s.pipeline.open)t.push([money(s.pipeline.open.value_cents),'open pipeline']);
   if(s.enquiries&&s.enquiries.count!=null)t.push([String(s.enquiries.count),s.enquiries.count===1?'new enquiry':'new enquiries']);
   if(w.traffic&&w.traffic.has_data!==false&&w.traffic.visitors!=null)t.push([String(w.traffic.visitors),'site visitors']);
@@ -75,7 +76,7 @@ const FULL_DASH={sales:{
 {
   const t=monthTiles(FULL_DASH);
   ok('tiles: a full dashboard yields all four (won · pipeline · enquiries · visitors)',
-    t.length===4 && t[0][1]==='won this month' && t[1][1]==='open pipeline'
+    t.length===4 && t[0][1]==='expected value won' && t[1][1]==='open pipeline'
     && t[2][0]==='9' && t[2][1]==='new enquiries' && t[3][0]==='214' && t[3][1]==='site visitors');
   ok('tiles: money renders from cents with a $ and no decimals',
     t[0][0].replace(/,/g,'')==='$3850' && t[1][0].replace(/,/g,'')==='$12400' && money(0)==='$0');
@@ -244,8 +245,13 @@ ok('today: a transiently-failed bookings read says "couldn\'t check" — it neve
   today.includes('We couldn’t check your bookings just now') && today.includes('Nothing booked for today'));
 ok('today: recents render as-cached with data-noscope (the shell\'s scope-carry stays off them)',
   today.includes('data-noscope="1"') && today.includes("localStorage.getItem('dds-recent-records')"));
-ok('today: Waiting-on-clients uses the Projects roster\'s own source (/projects + /report summaries)',
-  today.includes("apiGet('/projects')") && today.includes("apiGet('/projects/'+p.id+'/report')")
+// D6 refactor: the per-project /report read moved behind the shared REPORTS
+// cache (projectReport). The pin still requires the card's DATA SOURCE to be
+// /projects + per-project /report — rerouting the card to any other read (or
+// bypassing the cache) must redden this.
+ok('today: Waiting-on-clients uses the Projects roster\'s own source (/projects + per-project /report, via the REPORTS cache)',
+  today.includes("apiGet('/projects')") && today.includes("apiGet('/projects/'+id+'/report')")
+  && /waitingCard\(\)\{[\s\S]*?projectReport\(p\.id\)/.test(today)
   && today.includes('summary&&r.summary.pending_approvals'));
 ok('today: feed rows keep the .moment.todo identity the attention math is pinned on',
   today.includes('class="moment attn todo"'));
