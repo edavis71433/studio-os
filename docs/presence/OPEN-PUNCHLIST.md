@@ -313,7 +313,7 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
-## 🟢 STANDARDS SWEEP — WAVE 4 BUILT: PS2 + SS4 + analytics seams + legal drafts (2026-07-20, pending Eric merge)
+## ✅ STANDARDS SWEEP — WAVE 4 LIVE: PS2 + SS4 + analytics seams (2026-07-20, main@bc5b466, functions deploy SUCCESS; legal drafts with Eric)
 
 All four lanes built → adversarially reviewed → fixes red-first → gates green.
 - **PS2 Invoices** (client.html): .frow rows w/ Paid/derived-Overdue chips (D2
