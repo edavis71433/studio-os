@@ -298,6 +298,13 @@ Method: recon → docs/design/STUDIO-STANDARDS-SWEEP.md slice plan → Eric appr
 order → slices through the usual pipeline. Sequenced after the G13 divergence
 fix (built, in adversarial review + full e2e as of this entry).
 
+**"And the portal" (Eric, same directive):** the client portal is IN SCOPE too —
+every portal tab to the same standard. Slices 4/5/8b/10/11/12 treated Home,
+Messages, website card, Today, Requests, Files; the sweep recons ALL portal
+surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
+booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
+verbatim. One combined slice plan covers studio + portal.
+
 ## 🟢 POST-AUDIT BUILD — WAVE 1 (2026-07-20)
 
 Three pieces built + independently reviewed. Eric's call (2026-07-20): **ship
