@@ -1905,4 +1905,37 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect(page.locator('#glance-due')).toHaveCount(0);
     await expect(page.locator('#home-glance')).not.toContainText('$0');
   });
+
+  test('B5 — a failed support read: calm list-head line, project threads KEPT, never "No conversations yet"', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'GET' ? fail500(route) : route.fallback());
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    // the list head says so, calmly…
+    await expect(page.getByText('We couldn’t check on support requests just now — please try again in a moment.')).toBeVisible();
+    // …the project thread rows survive the support failure…
+    await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toBeVisible();
+    // …and the empty-state copy never fires over a failed read
+    await expect(page.getByText('No conversations yet', { exact: false })).toHaveCount(0);
+  });
+
+  test('B5 — zero projects + failed support: both "No conversations yet" copies are gated', async ({ page }) => {
+    await installApp(page, { api: { ...MSG_API, '/client/projects': { data: [] } } });
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'GET' ? fail500(route) : route.fallback());
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    // the list's empty slot reads couldn't-check, not "No conversations yet"…
+    await expect(page.locator('#mrows .mempty')).toHaveText('We couldn’t check just now — try again in a moment.');
+    // …and the pane's zero-state heading matches (mobile stacks the panes, so
+    // the pane copy is only asserted where it's shown)
+    const pane = page.locator('#mpane');
+    if (await pane.isVisible()) {
+      await expect(pane.getByRole('heading', { name: 'We couldn’t check just now' })).toBeVisible();
+    }
+    await expect(page.getByText('No conversations yet', { exact: false })).toHaveCount(0);
+  });
 });

@@ -941,7 +941,7 @@ function subjectFromMessage(v){return (String(v==null?'':v).split('\n')[0]||'').
 // ── the console: state + views ──
 // activeId = the keyboard-active CONVERSATION (tracked by id, never by index —
 // re-sorts and re-renders recompute the index so focus stays on the same row).
-const MC={rows:[],sel:'',compose:false,activeId:'',unread:new Set(),cache:{},seq:0};
+const MC={rows:[],sel:'',compose:false,activeId:'',unread:new Set(),cache:{},seq:0,supFailed:false};
 const mid=(s)=>String(s).replace(/[^a-zA-Z0-9_-]/g,'_');
 // route straight into the Messages tab with a support thread opened in its pane
 // (the ?support= deep link, bell items, and the Requests tab's "View & reply").
@@ -958,7 +958,12 @@ async function renderMessages(focusSup){
   }
   document.body.classList.add('msgsview');   // the split view earns the wider wrap ≥720px
   $('main').innerHTML=spinnerHtml();
-  let support=[];try{const r=await api('/client/support');support=(((r&&r.body&&r.body.data)||[])).filter(x=>x&&x.id);}catch(_){}
+  // B5: a FAILED support read must never silently drop every support thread —
+  // it's tracked (MC.supFailed) so the list head says so, the project threads
+  // below still render, and neither "No conversations yet" copy can fire.
+  // Nothing is cached, so re-entering the tab retries for free.
+  let support=[],supFailed=false;
+  try{const r=await api('/client/support');if(r&&r.ok)support=(((r.body&&r.body.data)||[])).filter(x=>x&&x.id);else supFailed=true;}catch(_){supFailed=true;}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch (another tab OR a drill-in) — never paint over the newer view
   // the newest message per project gives each project row its preview + recency.
   // DATA CHOICE: limit=1 here — deliberately NOT a full bundle per row; the pane
@@ -975,10 +980,11 @@ async function renderMessages(focusSup){
   if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
   MC.rows=convRows(PORTAL.projects,support,latest);
   MC.unread=unreadKeysFrom(PORTAL.notifs);
+  MC.supFailed=supFailed;
   $('main').innerHTML=
     `<div class="mconsole" id="mconsole">`+
       `<aside class="mlist" aria-label="Conversation list">`+
-        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew">Message your studio</button></div><p class="mlmeta" id="mlmeta"></p><p class="mlmeta">Talk to your studio — they usually reply within a day.</p></div>`+
+        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew">Message your studio</button></div><p class="mlmeta" id="mlmeta"></p>${supFailed?`<p class="mlmeta fload">We couldn’t check on support requests just now — please try again in a moment.</p>`:''}<p class="mlmeta">Talk to your studio — they usually reply within a day.</p></div>`+
         `<ul id="mrows" role="listbox" aria-label="Conversations" tabindex="0"></ul>`+
       `</aside>`+
       `<section class="mpane" id="mpane" aria-label="Conversation"></section>`+
@@ -1012,7 +1018,11 @@ async function renderMessages(focusSup){
 function renderMRows(){
   const rows=$('mrows');if(!rows)return;
   const meta=$('mlmeta');if(meta)meta.textContent=`${MC.rows.length} conversation${MC.rows.length===1?'':'s'} · newest first`;
-  if(!MC.rows.length){rows.innerHTML=`<li class="mempty" role="presentation">No conversations yet — “Message your studio” starts one.</li>`;return;}
+  // "No conversations yet" is a claim only an all-sources-ok read may make —
+  // with the support read failed an empty list is UNKNOWN, not empty (B5)
+  if(!MC.rows.length){rows.innerHTML=MC.supFailed
+    ?`<li class="mempty" role="presentation">We couldn’t check just now — try again in a moment.</li>`
+    :`<li class="mempty" role="presentation">No conversations yet — “Message your studio” starts one.</li>`;return;}
   rows.innerHTML=MC.rows.map((r)=>{
     const unread=MC.unread.has(r.unreadKey);
     // the dot is a bare pseudo-element — unread rows carry an sr-only "New — "
@@ -1071,6 +1081,8 @@ function renderMPane(){
     const c=$('mconsole');if(c)c.classList.remove('pane-open');   // never strand pane-open with no selection
     host.innerHTML=MC.rows.length
       ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">🗂</span><h2>Pick a conversation</h2><p class="muted">Choose one on the left — it opens right here.</p></div>`
+      :MC.supFailed   // B5: an empty list on a failed support read is UNKNOWN, never "No conversations yet"
+      ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>We couldn’t check just now</h2><p class="muted">Please try again in a moment — “Message your studio” still works.</p></div>`
       :`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>No conversations yet</h2><p class="muted">“Message your studio” starts the first one.</p></div>`;
     return;
   }
