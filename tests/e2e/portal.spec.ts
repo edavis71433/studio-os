@@ -275,16 +275,17 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await expect(page.getByText('Everything your studio is doing with you, in one place.')).toBeVisible();
   });
 
-  test('the glance strip renders real tiles: needs OK · messages · to pay · project', async ({ page }) => {
+  test('the glance strip renders real tiles: needs-you · messages · to pay · project', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
     const strip = page.locator('#home-glance');
     await expect(strip).toBeVisible();
-    // the SAME definition as the project cards' "need your OK" line: pending
-    // approvals + flagged to-dos (a1 + t1) — one count, everywhere on Home
-    await expect(strip.locator('#glance-ok .gn')).toHaveText('2');
-    await expect(strip.locator('#glance-ok .gl')).toHaveText('need your OK');
-    await expect(page.locator(`#glance-${PID}`)).toContainText('2 things need your OK'); // the card agrees
+    // PS3 (D1a): the tile counts the QUEUE's rows by construction — approval
+    // a1 + the to-do row + the unpaid Deposit = 3 — and its label names the
+    // list it counts, so the two adjacent numbers can't read as contradictory
+    await expect(strip.locator('#glance-ok .gn')).toHaveText('3');
+    await expect(strip.locator('#glance-ok .gl')).toHaveText('in “Needs you”');
+    await expect(page.locator(`#glance-${PID}`)).toContainText('2 things need your OK'); // the per-project card line keeps snapWaiting
     await expect(strip.locator('#glance-msgs .gn')).toHaveText('0');     // a real zero, not a fake
     await expect(strip.locator('#glance-due .gn')).toHaveText('$500');   // the unpaid Deposit
     await expect(strip.locator('#glance-due .gl')).toHaveText('to pay');
@@ -2300,5 +2301,32 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
       const el = document.getElementById('approval-a2');
       return el ? Math.round(el.getBoundingClientRect().top) : 9999;
     }), { timeout: 7000 }).toBeLessThan(260);
+  });
+
+  // ── the three adjacent numbers (D1a): each defined once, each labeled ──
+  test('D1a: the glance tile IS the queue row count by construction — a button that jumps to the list', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    const tile = page.locator('#glance-ok');
+    await expect(tile).toBeVisible();
+    // number 1 (the tile) === number 2 (the queue rows), by construction
+    await expect(page.locator('#needs-body .qrow')).toHaveCount(3);
+    await expect(tile.locator('.gn')).toHaveText('3');
+    await expect(tile.locator('.gl')).toHaveText('in “Needs you”');
+    // the tile is a REAL button pointing at the list it counts
+    expect(await tile.evaluate((el) => el.tagName)).toBe('BUTTON');
+    await tile.click();
+    await expect(page.locator('#home-needs')).toBeInViewport();
+  });
+
+  test('D1a: the bell badge is its OWN number — the server cursor — and the panel says what it means', async ({ page }) => {
+    await installApp(page, { api: MSG_API });
+    await page.goto('/client.html');
+    // badge = the server's unseen cursor (2) — NOT the queue's row count (3)
+    await expect(page.locator('#navbell .badge')).toHaveText('2');
+    await expect(page.locator('#needs-body .qrow')).toHaveCount(3);
+    await page.locator('#navbell').click();
+    // the panel labels the badge's meaning out loud
+    await expect(page.locator('.notifpanel:visible')).toContainText('2 updates since you last looked');
   });
 });

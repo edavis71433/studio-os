@@ -42,7 +42,7 @@ function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).l
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
 function glanceData(feed,snaps,notifs,billing,projects,failed){
   failed=failed||{};
-  const needsOk=(failed.feed||failed.snaps)?null:((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+snapWaiting(s),0);
+  const needsOk=(failed.feed||failed.snaps)?null:needsYouItems(feed,snaps,failed.billing?null:billing).length;
   const newMsgs=failed.notifs?null:(notifs||[]).filter(n=>n&&!n.read&&n.kind==='message').length;
   // a FAILED billing read hides the to-pay tile BY CONTRACT — never because a
   // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
@@ -52,12 +52,25 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
 }
 function glanceTiles(g){
   g=g||{};const t=[];
-  if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:g.needsOk===1?'needs your OK':'need your OK'});
+  if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:'in “Needs you”'});
   if(g.newMsgs!=null)t.push({id:'glance-msgs',n:String(g.newMsgs),l:g.newMsgs===1?'new message':'new messages'});
   if(g.due)t.push({id:'glance-due',n:g.due,l:'to pay'});
   if(g.project)t.push({id:'glance-proj',n:g.project.status,l:g.project.name});
   return(g.needsOk!=null||g.newMsgs!=null)?t:[];
 }
+function needsYouItems(feed,snaps,billing){
+  const items=[];
+  for(const p of ((feed&&feed.pending_approvals)||[]))items.push({kind:'feed',p});
+  for(const s of (snaps||[])){
+    if(!s)continue;
+    for(const a of (s.approvals||[]))items.push({kind:'approval',s,a});
+    if((s.todos||[]).length)items.push({kind:'todos',s});
+    for(const sv of (s.surveys||[]))items.push({kind:'survey',s,sv});
+  }
+  for(const i of unpaidInvoices(billing))items.push({kind:'invoice',i});
+  return items;
+}
+function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' update'+(unread===1?'':'s')+' since you last looked';}
 
 const results=[];
 const ok=(n,p)=>{results.push({n,p});console.log(`${p?'PASS':'FAIL'}  ${n}`);};
@@ -181,8 +194,10 @@ const BILLING={invoices:[
 const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Website redesign',status:'active'}];
 {
   const g=glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS);
-  ok('glance: needs-OK = feed approvals + per-project snapWaiting (approvals AND to-dos — same count as the cards)',
-    g.needsOk===4 && g.needsOk===FEED.pending_approvals.length+SNAPS.reduce((a,s)=>a+snapWaiting(s),0));
+  // PS3 (D1a): the tile's number IS the queue's row count, by construction —
+  // 1 feed approval + 2 project approvals + 1 to-dos row + 2 unpaid invoices.
+  ok('glance (D1a): needs-you = needsYouItems().length — the queue row count, by construction',
+    g.needsOk===6 && g.needsOk===needsYouItems(FEED,SNAPS,BILLING).length);
   ok('glance: new messages count ONLY unread kind==="message" — support_message rows (own-filing updated_at churn) never count',
     g.newMsgs===1);
   ok('glance: the due amount sums unpaid invoices only (paid/void/canceled excluded)',g.due==='$750');
@@ -192,10 +207,27 @@ const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Websit
   const t=glanceTiles(g);
   ok('glance: four tiles when every datum exists, in strip order',
     t.length===4 && t[0].id==='glance-ok' && t[1].id==='glance-msgs' && t[2].id==='glance-due' && t[3].id==='glance-proj');
-  ok('glance: plural/singular labels follow the counts',
-    glanceTiles({needsOk:1}).length===1 && glanceTiles({needsOk:1})[0].l==='needs your OK'
-    && t[0].l==='need your OK' && glanceTiles({newMsgs:1})[0].l==='new message');
+  ok('glance (D1a): the needs-you tile is labeled for the LIST it counts; message labels stay pluralized',
+    glanceTiles({needsOk:1}).length===1 && glanceTiles({needsOk:1})[0].l==='in “Needs you”'
+    && t[0].l==='in “Needs you”' && glanceTiles({newMsgs:1})[0].l==='new message' && glanceTiles({newMsgs:2})[0].l==='new messages');
 }
+// ═══ needsYouItems — ONE definition of the queue (PS3 D1a) ═══
+{
+  const items=needsYouItems(FEED,SNAPS,BILLING);
+  ok('needsYou: rows in queue order — feed approvals · per-project approvals/to-dos/surveys · unpaid invoices',
+    JSON.stringify(items.map(i=>i.kind))===JSON.stringify(['feed','approval','approval','todos','invoice','invoice']));
+  ok('needsYou: to-dos collapse to ONE row per project; surveys get a row each',
+    needsYouItems(null,[{approvals:[],todos:[1,2,3],surveys:[{id:'sv1'},{id:'sv2'}]}],null).map(i=>i.kind).join()==='todos,survey,survey');
+  ok('needsYou: paid/void/canceled invoices add no rows; billing=null adds none (the failed-read contract)',
+    needsYouItems(null,[],{invoices:[{id:'x',status:'paid'},{id:'y',status:'void'}]}).length===0
+    && needsYouItems(FEED,SNAPS,null).length===4);
+  ok('needsYou: defensive on shape — null/empty inputs yield an empty list, never a throw',
+    needsYouItems(null,null,null).length===0 && needsYouItems({},[null,{}],{}).length===0);
+}
+// ═══ bellSinceLabel — the badge's own words (PS3 D1a) ═══
+ok('bell label: pluralized "N updates since you last looked", clamped at zero',
+  bellSinceLabel(2)==='2 updates since you last looked' && bellSinceLabel(1)==='1 update since you last looked'
+  && bellSinceLabel(0)==='0 updates since you last looked' && bellSinceLabel(-3)==='0 updates since you last looked');
 {
   const g=glanceData(null,[],[],null,[]);
   ok('glance: absent data → nothing due, no project — those tiles hide (no fake zeros)',
@@ -222,6 +254,10 @@ const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Websit
   const gb=glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS,{billing:true});
   ok('glance: a failed billing read hides the to-pay tile by contract — never a fake $0 (or a stale $750)',
     gb.due==='' && !glanceTiles(gb).some(t=>t.id==='glance-due') && glanceTiles(gb).some(t=>t.id==='glance-ok'));
+  // PS3 (D1a): with billing failed the tile counts a queue that renders no
+  // invoice rows — the two numbers still agree (stale invoices never counted)
+  ok('glance (D1a): a failed billing read drops invoice rows from the needs-you COUNT too — tile === queue still',
+    gb.needsOk===4 && gb.needsOk===needsYouItems(FEED,SNAPS,null).length);
   ok('glance: a SUCCESSFUL billing read still sums unpaid invoices (the contract gates failure, not success)',
     glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS,{}).due==='$750');
   // PS2: the ONE portal money formatter — thousands grouped, whole dollars
@@ -242,8 +278,8 @@ for(const fn of ['greet','dateLine','monthTiles','monthTrend','siteYmd','todaySl
   ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
 }
 ok('mirror: today.html defines money verbatim',today.includes(String(money)));
-for(const fn of ['portalGreeting','snapWaiting','fmtMoney','glanceData','glanceTiles']){
-  const m=String({portalGreeting,snapWaiting,fmtMoney,glanceData,glanceTiles}[fn]);
+for(const fn of ['portalGreeting','snapWaiting','fmtMoney','glanceData','glanceTiles','needsYouItems','bellSinceLabel']){
+  const m=String({portalGreeting,snapWaiting,fmtMoney,glanceData,glanceTiles,needsYouItems,bellSinceLabel}[fn]);
   ok(`mirror: client.html defines ${fn} verbatim`,portal.includes(m));
 }
 
@@ -356,6 +392,14 @@ ok('portal: explicit CTAs whose accessible names keep the row title',
 ok('portal: opening the bell re-renders the messages tile WHOLE — number and pluralized label together',
   portal.includes("document.getElementById('glance-msgs')") && portal.includes('glanceTiles({newMsgs:0})[0]')
   && !portal.includes("document.querySelector('#glance-msgs .gn')"));
+// PS3 (D1a): the queue renders FROM needsYouItems — the same array whose
+// length the tile shows — and the tile is a real button to the list; the bell
+// panel labels the badge's own number in words.
+ok('portal (D1a): queue rows come from needsYouItems and the needs-you tile is a button to #home-needs',
+  portal.includes('needsYouItems(PORTAL.feed,snaps,billing)')
+  && portal.includes("okT.addEventListener('click',()=>scrollToSection('home-needs'))"));
+ok('portal (D1a): the bell panel opens with the badge\'s label — bellSinceLabel(PORTAL.unread)',
+  portal.includes('bellSinceLabel(PORTAL.unread)'));
 // PS3 (D4a + dead clicks): '#support-<rid>' hrefs land the Messages pane, and
 // navFromHref ends in the Home fallback — no notification click is ever dead.
 ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls back to Home (no dead clicks)',

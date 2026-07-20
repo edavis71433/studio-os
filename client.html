@@ -60,6 +60,7 @@
   .bell .badge.on{display:flex}
   .notifpanel{background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);margin:12px 0 4px;overflow:hidden}
   .notifpanel[hidden]{display:none}
+  .nsince{padding:12px 16px 0;font-size:12.5px;font-weight:600;color:var(--soft)}   /* PS3: the badge's own label — "N updates since you last looked" */
   .ngroup{padding:11px 16px 3px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
   .nempty{padding:20px 16px;color:var(--soft);font-size:14px}
   .nitem{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:transparent;padding:13px 16px;cursor:pointer;transition:background .12s}
@@ -212,6 +213,10 @@
   .glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:22px}
   .glance[hidden]{display:none}
   .glance .gt{background:var(--card);padding:12px 14px;min-width:0}
+  /* PS3 (D1a): the needs-you tile is a REAL button pointing at the list it counts */
+  .glance button.gt{display:block;width:100%;border:0;border-radius:0;text-align:left;font:inherit;font-weight:400;cursor:pointer}
+  .glance button.gt:hover{background:var(--p-soft);color:inherit;border-color:transparent}
+  .glance button.gt .gn,.glance button.gt .gl{display:block}
   .glance .gn{font-family:var(--serif);font-size:18.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .glance .gl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .qmain{flex:1 1 220px;min-width:0}
@@ -454,7 +459,7 @@ function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumF
 // status changes — counting them faked "new messages" that never were.
 function glanceData(feed,snaps,notifs,billing,projects,failed){
   failed=failed||{};
-  const needsOk=(failed.feed||failed.snaps)?null:((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+snapWaiting(s),0);
+  const needsOk=(failed.feed||failed.snaps)?null:needsYouItems(feed,snaps,failed.billing?null:billing).length;
   const newMsgs=failed.notifs?null:(notifs||[]).filter(n=>n&&!n.read&&n.kind==='message').length;
   // a FAILED billing read hides the to-pay tile BY CONTRACT — never because a
   // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
@@ -468,12 +473,35 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
 // sources failed) → no strip — due/project alone can't carry an honest glance.
 function glanceTiles(g){
   g=g||{};const t=[];
-  if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:g.needsOk===1?'needs your OK':'need your OK'});
+  if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:'in “Needs you”'});
   if(g.newMsgs!=null)t.push({id:'glance-msgs',n:String(g.newMsgs),l:g.newMsgs===1?'new message':'new messages'});
   if(g.due)t.push({id:'glance-due',n:g.due,l:'to pay'});
   if(g.project)t.push({id:'glance-proj',n:g.project.status,l:g.project.name});
   return(g.needsOk!=null||g.newMsgs!=null)?t:[];
 }
+// PS3 (D1a): ONE definition of the "Needs you" list. Home's queue renders
+// exactly these rows (in this order) and the glance tile shows THIS array's
+// length — the two adjacent numbers agree BY CONSTRUCTION. A failed billing
+// read passes billing=null (no invoice rows — matching the queue, which
+// renders none and carries its own couldn't-check line instead). The third
+// number — the bell badge — stays the server's unseen cursor, and the panel
+// labels it in words (bellSinceLabel).
+function needsYouItems(feed,snaps,billing){
+  const items=[];
+  for(const p of ((feed&&feed.pending_approvals)||[]))items.push({kind:'feed',p});
+  for(const s of (snaps||[])){
+    if(!s)continue;
+    for(const a of (s.approvals||[]))items.push({kind:'approval',s,a});
+    if((s.todos||[]).length)items.push({kind:'todos',s});
+    for(const sv of (s.surveys||[]))items.push({kind:'survey',s,sv});
+  }
+  for(const i of unpaidInvoices(billing))items.push({kind:'invoice',i});
+  return items;
+}
+// PS3 (D1a): what the bell badge MEANS, said out loud in the panel — the
+// server's "unseen since your last look" cursor, a different number from the
+// queue by design (it counts updates, not open items).
+function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' update'+(unread===1?'':'s')+' since you last looked';}
 
 // ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
 // tests/presence/client_website_test.mjs; keep both copies in sync). ──
@@ -803,7 +831,13 @@ async function buildNeedsYou(){
   if(gl){
     const failed={feed:!!PORTAL.feedFailed,notifs:!!PORTAL.notifsFailed,snaps:snaps.some(s=>s&&s.failed)||!!PORTAL.projectsFailed,billing:!!PORTAL.billingFailed};
     const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects,failed));
-    if(tiles.length){gl.innerHTML=tiles.map(t=>`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;}
+    // PS3 (D1a): the needs-you tile counts the queue below, so it IS a button
+    // to that queue — labeled for the list it counts.
+    if(tiles.length){gl.innerHTML=tiles.map(t=>t.id==='glance-ok'
+      ?`<button type="button" class="gt" id="${esc(t.id)}" aria-label="${esc(t.n)} in the “Needs you” list — jump to it"><span class="gn">${esc(t.n)}</span><span class="gl">${esc(t.l)}</span></button>`
+      :`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;
+      const okT=document.getElementById('glance-ok');
+      if(okT&&okT.tagName==='BUTTON')okT.addEventListener('click',()=>scrollToSection('home-needs'));}
     else gl.hidden=true;
   }
   const body=document.getElementById('needs-body');if(!body)return;
@@ -814,30 +848,30 @@ async function buildNeedsYou(){
   // reader. Slice 10: each row leads with a type icon (action-feed anatomy).
   const QICO={Approval:'👍',Connected:'🔗','To-do':'✅',Survey:'📝',Invoice:'🧾'};
   const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${QICO[kind]||'🔔'}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
-  const items=[];
-  for(const p of (PORTAL.feed.pending_approvals||[]))
-    items.push(row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
-      `<button class="approve" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`));
-  for(const s of snaps){
-    for(const a of s.approvals)
-      items.push(row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
-        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="Review &amp; approve — ${esc(a.title||'A change is ready')}">Review &amp; approve</button>`));
-    if(s.todos.length)
-      items.push(row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} thing${s.todos.length===1?'':'s'} for you`,esc(s.name),
-        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`));
-    for(const sv of s.surveys)
-      items.push(row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
-        `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`));
-  }
+  // PS3 (D1a): the rows come from needsYouItems — the SAME array whose length
+  // the glance tile shows, so the two numbers agree by construction.
   const nyToday=portalTodayYmd();
-  for(const i of unpaidInvoices(billing)){
+  const items=needsYouItems(PORTAL.feed,snaps,billing).map(it=>{
+    if(it.kind==='feed'){const p=it.p;
+      return row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
+        `<button class="approve" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`);}
+    if(it.kind==='approval'){const s=it.s,a=it.a;
+      return row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
+        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="Review &amp; approve — ${esc(a.title||'A change is ready')}">Review &amp; approve</button>`);}
+    if(it.kind==='todos'){const s=it.s;
+      return row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} thing${s.todos.length===1?'':'s'} for you`,esc(s.name),
+        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`);}
+    if(it.kind==='survey'){const s=it.s,sv=it.sv;
+      return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
+        `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`);}
+    const i=it.i;
     // the SAME derived state word the Invoices tab chips (PS2 D2) — the two
     // surfaces must never disagree about whether the same invoice is overdue
     const stWord=invOverdue(i,nyToday)?'overdue':(i.status||'').replace('_',' ');
     const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
-    items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
-      nyPay?`<a class="link" href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`));
-  }
+    return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
+      nyPay?`<a class="link" href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
+  });
   // Per-source failure honesty (the glance strip's rule, on the queue itself):
   // any failed source keeps its OWN calm line under the surviving rows, and
   // ONLY an all-sources-ok-and-empty queue may claim "You're all caught up."
@@ -1821,7 +1855,11 @@ function wireBellAt(bellId,panelId){
   let built=false;
   const close=()=>{panel.hidden=true;bell.setAttribute('aria-expanded','false');};
   const open=()=>{
-    if(!built){panel.innerHTML=notifPanelHtml(PORTAL.notifs,PORTAL.notifsFailed);built=true;
+    if(!built){
+      // PS3 (D1a): the badge's number gets its label — the panel head says
+      // "N updates since you last looked" (the server cursor, not the queue).
+      const since=(!PORTAL.notifsFailed&&PORTAL.notifs.length)?`<div class="nsince">${esc(bellSinceLabel(PORTAL.unread))}</div>`:'';
+      panel.innerHTML=since+notifPanelHtml(PORTAL.notifs,PORTAL.notifsFailed);built=true;
       panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>{close();navFromHref(b.getAttribute('data-nav'));}));
     }
     panel.hidden=false;bell.setAttribute('aria-expanded','true');
