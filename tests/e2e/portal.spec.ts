@@ -1808,7 +1808,8 @@ test.describe('Batch A regressions — portal', () => {
       } },
     } });
     await page.goto(`/client.html?project=${PID}`);
-    await page.locator('#sec-support').getByRole('button', { name: 'View & reply' }).click();
+    // PS6: the support section is reqRowHtml queue-rows — the whole row opens the thread
+    await page.locator('#sec-support [data-sup]').click();
     const thread = page.locator('#sthread');
     const reply = thread.locator('.ti').filter({ hasText: 'Fixed — take a look.' });
     await expect(reply).toContainText('Your studio replied');
@@ -2977,6 +2978,69 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     const sel = page.locator('#fproj');
     await expect(sel).toBeVisible();
     await expect(sel).toHaveValue(P2);   // preselected to THIS record — not the list's first
+  });
+
+  // ── support rows + focus management ──
+  test('drill-in Support: reqRowHtml queue-rows on last_activity_at recency — a fresh reply outranks a later-touched request', async ({ page }) => {
+    const SA = '44444444-4444-4444-8444-444444444444', SB = '55555555-5555-4555-8555-555555555555';
+    await installApp(page, { api: { ...CLIENT_API,
+      // A was TOUCHED later (updated_at) but B has the fresher REPLY
+      // (last_activity_at) — recency must follow activity, matching each row's
+      // own "Updated …" meta and the Requests tab's order
+      '/client/support': { data: [
+        { id: SA, subject: 'Logo tweak', status: 'open', project_id: PID, updated_at: '2026-07-10T00:00:00Z', last_activity_at: '2026-07-08T00:00:00Z' },
+        { id: SB, subject: 'Copy pass', status: 'open', project_id: PID, updated_at: '2026-07-05T00:00:00Z', last_activity_at: '2026-07-09T00:00:00Z' },
+      ] },
+      [`/client/support/${SB}`]: { data: {
+        request: { id: SB, subject: 'Copy pass', body: 'A quick copy review?', status: 'open', project_id: PID, created_at: '2026-07-05T00:00:00Z' },
+        messages: [],
+      } },
+    } });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    const rows = page.locator('#sec-support .reqrow');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Copy pass');   // freshest ACTIVITY first
+    await expect(rows.nth(1)).toContainText('Logo tweak');
+    await expect(rows.nth(0).locator('.schip')).toHaveText('open');
+    // the WHOLE row opens its thread — the project-scoped fallback view
+    await rows.nth(0).click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Copy pass' })).toBeVisible();
+    await expect(page.locator('#sthread')).toBeVisible();
+  });
+
+  test('entry hands focus to the record h1 — every drill-in paint says where you are', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    expect(await page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.tagName === 'H1' ? (el.textContent || '') : '';
+    })).toContain('Website redesign');
+  });
+
+  test('a notification anchor lands focus ON its approval card after the scroll', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await page.locator('#navbell:visible, #bell:visible').first().click();
+    await page.locator('.notifpanel:visible .nitem', { hasText: 'Your approval is requested' }).click();
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (document.activeElement && document.activeElement.id) || '')).toBe('approval-a1');
+  });
+
+  test('the task-done re-render refocuses the acted-on section (Your to-dos)', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/tasks/t1/done`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) }));
+    await page.goto(`/client.html?project=${PID}`);
+    await page.getByRole('button', { name: 'Mark done' }).click();
+    await expect(page.locator('#toast')).toContainText('Marked done — your studio will see it.');
+    // the re-rendered record puts the client back AT the section they acted on
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.tagName === 'H2' ? (el.textContent || '') : '';
+    })).toBe('Your to-dos');
   });
 
   test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {

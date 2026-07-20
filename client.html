@@ -2127,9 +2127,15 @@ async function openProject(id,focusSection){
   // A FAILED read says so calmly (the CTA below stays) — an ok-empty read renders no rows, honestly.
   const supFailed=!(supRes&&supRes.ok);
   const sup=((!supFailed&&supRes.body&&supRes.body.data)||[]).filter(r=>r&&r.id&&(!r.project_id||r.project_id===id));
+  // the Requests tab's exact queue-row anatomy AND its exact recency:
+  // last_activity_at (replies only INSERT — they never bump updated_at) with
+  // the updated_at fallback, so the order can never contradict each row's own
+  // "Updated …" meta or the tab's list.
+  const supWhen=(r)=>String(r.last_activity_at||r.updated_at||'');
+  sup.sort((a,b)=>supWhen(b).localeCompare(supWhen(a)));
   html+=`<section id="sec-support"><h2>Support</h2>`;
   if(supFailed)html+=`<p class="muted fload">We couldn’t check on support requests just now — please try again in a moment.</p>`;
-  else if(sup.length){for(const rq of sup){const resolved=rq.status==='resolved'||rq.status==='closed';html+=`<div class="card"><h3>${esc(rq.subject)}</h3><p><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span>${rq.updated_at?` · updated ${esc(rel(rq.updated_at))}`:''}</p><div class="row"><button data-sup="${esc(rq.id)}">${resolved?'View':'View & reply'}</button></div></div>`;}}
+  else if(sup.length)html+=`<div class="card reqlist">${sup.map(reqRowHtml).join('')}</div>`;
   html+=`<div class="card"><p class="muted">${sup.length?'Need something else?':'Have a question for your studio?'} Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
   html+=`</div>`;   // /pleft
   // the activity rail — the project's client-visible timeline, composer below it
@@ -2137,23 +2143,36 @@ async function openProject(id,focusSection){
   $('main').innerHTML=html;
   renderProjTimeline();
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
-  if(focusSection)requestAnimationFrame(()=>scrollToSection(anchorTarget(focusSection)));   // PS3: exact element first, then the section
+  // PS6 focus management: every paint of this view says where you are. A plain
+  // entry hands focus to the record h1; an anchor entry (notification click,
+  // post-action re-render) focuses the acted-on target after the scroll — a
+  // section's own h2, an exact card itself (PS3: exact element first, then the
+  // section). A target the action removed (last approval decided) falls back
+  // to the h1 — focus never silently stays on a dead control.
+  const focusEl=(el)=>{if(!el)return false;el.setAttribute('tabindex','-1');el.focus({preventScroll:true});return true;};
+  if(focusSection)requestAnimationFrame(()=>{
+    const t=anchorTarget(focusSection);scrollToSection(t);
+    const el=document.getElementById(t);
+    const h=el&&el.tagName==='SECTION'?(el.querySelector('h2')||el):el;
+    if(!focusEl(h))focusEl($('main').querySelector('h1'));
+  });
+  else focusEl($('main').querySelector('h1'));
   // decide — surface the server's own sentence on failure (409s carry
   // 'This item was updated…' / 'already been decided…'), and on any 409 the
   // presented version/status is stale, so reload the bundle instead of letting
   // a retry loop on the same stale hash. Clearing PORTAL.snaps keeps Home's
   // "Needs you" honest (it renders from that cache).
   const adec=async(aid,ah,decision,note,btn)=>{if(btn)btn.disabled=true;const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:ah,note:note||''});
-    if(r.ok){PORTAL.snaps=null;toast(decision==='approved'?'Approved — thank you.':'Sent — your studio will take a look.');openProject(id);return;}
+    if(r.ok){PORTAL.snaps=null;toast(decision==='approved'?'Approved — thank you.':'Sent — your studio will take a look.');openProject(id,'sec-approvals');return;}   // re-focus the acted-on section
     toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
-    if(r.status===409){PORTAL.snaps=null;openProject(id);return;}
+    if(r.status===409){PORTAL.snaps=null;openProject(id,'sec-approvals');return;}
     if(btn)btn.disabled=false;};
   document.querySelectorAll('[data-adec]').forEach(b=>b.addEventListener('click',()=>adec(b.getAttribute('data-adec'),b.getAttribute('data-ah'),'approved',null,b)));
   document.querySelectorAll('[data-areq]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-areq'));if(n){n.style.display='block';const t=$('nt-'+b.getAttribute('data-areq'));if(t)t.focus();}}));
   document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-acancel'));if(n)n.style.display='none';}));
   document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=$('nt-'+b.getAttribute('data-asend'));adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
-  document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id);}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));
+  document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id,'sec-todos');}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));   // re-focus the acted-on section
   // the share card, in drill-in context: compose preselects THIS project, and a
   // successful send re-opens the record at its Files section (view-guarded in
   // shareSend — a client who moved on mid-send is never yanked back)
