@@ -24,7 +24,12 @@ ok('a clear "← Back to pipeline" affordance returns to the list', /← Back to
 // ═══ deep-link + URL/focus cleanup preserved ═══
 ok('deep-link: ?deal=<id> still opens the deal (now full-screen) on load', /get\('deal'\); if\(deep\) openDeal\(deep\)/.test(pipe));
 ok('open sets the ?deal= URL (deep-linkable)', /history\.replaceState\(null,'','\?deal='\+id/.test(pipe));
-ok('close cleans the URL back to a bare path (a refresh never reopens a stale deal)', /function closeDealDetail\(\)\{[\s\S]*?history\.replaceState\(null,'',location\.pathname\+\(scope\(\)\?'\?client='\+scope\(\):''\)\)/.test(pipe));
+// SS5 strengthened this: close restores the ROSTER url via listUrl() — scope
+// AND the stage filter both survive (a refresh never reopens a stale deal, and
+// a ?stage=won landing keeps its link after a drill-in round-trip)
+ok('close cleans the URL back to the roster url (scope + stage intact, never a stale deal)',
+  /function closeDealDetail\(\)\{[\s\S]*?history\.replaceState\(null,'',listUrl\(\)\)/.test(pipe)
+  && /const listUrl=\(\)=>\{[\s\S]*?p\.set\('client',scope\(\)\)[\s\S]*?p\.set\('stage',FILTER\)/.test(pipe));
 ok('close restores keyboard focus to the card we came from', /document\.querySelector\('#list \[data-id="'\+id/.test(pipe));
 ok('a11y: an in-view refresh re-lands focus on the deal title', /if\(wasOpen\)\{const t=\$\('dtitle'\);if\(t\)t\.focus\(\)/.test(pipe));
 ok('board: a stage move re-renders the OPEN deal via the panel (not a dialog.open check)', /if\(!\$\('detailWrap'\)\.hidden&&CURRENT_DEAL===id\)openDeal\(id\)/.test(pipe));
