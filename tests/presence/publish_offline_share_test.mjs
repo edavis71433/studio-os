@@ -82,7 +82,12 @@ const SITE_B = '22222222-2222-4222-8222-222222222222';
   const swapped = btoa(JSON.stringify({ site_id: SITE_B, exp: now + ttl, scope: 'preview' })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const vt = await verifyPreviewToken(`${swapped}.${sig}`, secret, now);
   ok('token: tampered payload → rejected (bad signature)', vt.ok === false && vt.error === 'bad_signature');
-  const vs = await verifyPreviewToken(`${body}.${sig.slice(0, -2)}ab`, secret, now);
+  // deterministic tamper — flip the FIRST hex char. The old `slice(0,-2)+"ab"`
+  // was a NO-OP whenever the sig already ended in "ab" (~1/256 of the
+  // timestamp-derived sigs), so the "expect rejected" assertion reddened CI at
+  // random (it did on deploy #20). Flipping char 0 always changes the string.
+  const badSig = (sig[0] === '0' ? '1' : '0') + sig.slice(1);
+  const vs = await verifyPreviewToken(`${body}.${badSig}`, secret, now);
   ok('token: tampered signature → rejected', vs.ok === false && vs.error === 'bad_signature');
   const vw = await verifyPreviewToken(tok, 'some-other-secret', now);
   ok('token: wrong secret → rejected', vw.ok === false && vw.error === 'bad_signature');
