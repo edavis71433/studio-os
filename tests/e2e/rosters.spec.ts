@@ -207,6 +207,125 @@ test.describe('Contacts list view', () => {
   });
 });
 
+// ── SS6 (C4/C5/D7): customers gets Add-a-customer + unscoped read + search ───
+test.describe('Customers — SS6 quick wins', () => {
+  test('C4 — "+ Add a customer" (contacts’ dialog, ported): provision POSTs /sales/customers and shows the invite outcome', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: {
+      '/studio/customers': CUSTOMERS,
+      '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
+    } });
+    await page.goto('/customers.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await page.locator('#cu-name').fill('Jane Doe');
+    await page.locator('#cu-biz').fill('Acme Bakery');
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
+    await page.locator('#cu-submit').click();
+    // exactly what handleSalesAddCustomer reads: mode/name/business_name/email/edition
+    expect((await post).postDataJSON()).toEqual({ mode: 'provision', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com', edition: 'presence' });
+    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
+  });
+
+  test('C4 — the connect-by-email mode saves without provisioning', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: {
+      '/studio/customers': CUSTOMERS,
+      '/sales/customers': { data: { mode: 'connect', pending: true, connected: false } },
+    } });
+    await page.goto('/customers.html');
+    await page.locator('#addCust').click();
+    await page.locator('input[name="cumode"][value="connect"]').check();
+    // provision-only fields hide; the submit relabels honestly
+    await expect(page.locator('#cu-provision-only')).toBeHidden();
+    await expect(page.locator('#cu-submit')).toHaveText('Save');
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
+    await page.locator('#cu-submit').click();
+    expect((await post).postDataJSON()).toEqual({ mode: 'connect', email: 'jane@acmebakery.com' });
+    await expect(page.locator('#cust-done')).toContainText('Saved');
+  });
+
+  test('D7 — a stray ?client= cannot blank the roster: /studio/customers is asked UNSCOPED', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
+    let scopeHeader: string | undefined = 'unset';
+    page.on('request', (r) => { if (r.url().includes('/studio/customers')) scopeHeader = r.headers()['x-dds-scope-site']; });
+    await page.goto('/customers.html?client=site-acme');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    // the roster is keyed on the AGENCY site — a drilled leaf scope would
+    // resolve it to an empty list, so the read must not carry the header
+    expect(scopeHeader === undefined || scopeHeader === '').toBe(true);
+  });
+
+  test('C5 — debounced search re-renders only the list: the input node survives typing', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
+    await page.goto('/customers.html');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    const q = page.locator('#search');
+    await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
+    await q.pressSequentially('acme');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
+    expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
+    await expect(q).toBeFocused();
+    await expect(page.locator('.lmeta')).toContainText('1 customer');
+  });
+
+  test('REQ_SEQ — a slow superseded /studio/customers load never paints over the newest one', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
+    const row = (id: string, name: string) => ({ client_id: id, name, email: 'x@example.com', project_id: 'p1', project_name: 'Site', status: 'active', customer_site_id: null, open_support: 0, project_count: 1 });
+    let call = 0;
+    await page.route(/\/functions\/v1\/presence\/studio\/customers(\?|$)/, (route) => {
+      call++;
+      const fulfill = (rows: unknown[]) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: rows }) });
+      if (call === 2) { setTimeout(() => { fulfill([row('c2', 'Stale Customer')]).catch(() => {}); }, 700); return; }
+      return fulfill(call === 1 ? [row('c1', 'Boot Customer')] : [row('c3', 'Fresh Customer')]);
+    });
+    await page.goto('/customers.html');
+    await expect(page.locator('tbody tr')).toContainText(['Boot Customer']);
+    await page.locator('#refreshBtn').click();
+    await page.locator('#refreshBtn').click();
+    await expect(page.locator('tbody tr')).toContainText(['Fresh Customer']);
+    await page.waitForTimeout(900);
+    await expect(page.locator('tbody tr')).toContainText(['Fresh Customer']);
+    await expect(page.locator('#main')).not.toContainText('Stale Customer');
+  });
+
+  test('boots quiet: one h1, the toolbar, zero console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
+    await page.goto('/customers.html');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    await expect(page.locator('#addCust')).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('a failed boot offers Try again and recovers in place', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
+    let call = 0;
+    await page.route(/\/functions\/v1\/presence\/studio\/customers(\?|$)/, (route) => {
+      call++;
+      if (call === 1) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CUSTOMERS) });
+    });
+    await page.goto('/customers.html');
+    // honest trouble state with a real retry control (the shipped standard)
+    await expect(page.locator('#main')).toContainText('We couldn’t load your customers just now.');
+    await page.locator('#retry').click();
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+  });
+});
+
 // ── SS6 (C5): shared debounce + list-only re-render + REQ_SEQ on contacts ────
 test.describe('Contacts — SS6 quick wins', () => {
   test('C5 — search re-renders only the list: the input node survives typing', async ({ page }) => {
