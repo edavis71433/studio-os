@@ -556,6 +556,39 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
   });
 });
 
+// ── SS5 polish: tab-out closes the Move menu (no zombie aria-expanded), and an
+// OPEN-stage ?stage= landing respects a persisted Board choice — only won/lost
+// (the outcomes the board can't show) force the List view.
+test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
+  test('tabbing out of the Move menu closes it and resets aria-expanded', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
+    await move.click();
+    const items = page.locator('#board .bc-menu button');
+    await expect(items.first()).toBeFocused();
+    // walk to the last option (proposal → contract · qualified · lost), then Tab OUT
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(2)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#board .bc-menu')).toHaveCount(0);
+    await expect(move).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('?stage=<open stage> keeps a persisted Board choice — only won/lost force List', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html?stage=proposal');
+    await expect(page.locator('#board .col').first()).toBeVisible();   // the board survives
+    await expect(page.locator('#list .card')).toHaveCount(0);
+    // switching to List applies the carried filter: the Proposal chip is pressed
+    await page.locator('#viewList').click();
+    await expect(page.locator('#filters .chip[data-stage="proposal"]')).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
 test.describe('Deal drawer Path', () => {
   test('the Path chevron bar renders with guidance tip AND action (suggested_action fix)', async ({ page }) => {
     await installApp(page, { api: API });

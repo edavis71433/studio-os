@@ -789,7 +789,13 @@ function wireBoard(){
       menu.innerHTML=boardMoveTargets(card.dataset.stage).map(t=>`<button type="button" role="menuitem" data-to="${t}">${t==='lost'?'Mark as not a fit':'Move to '+esc(stageLabel(t))}</button>`).join('');
       card.querySelector('.bc-actions').appendChild(menu);
       menu.querySelectorAll('button').forEach(mb=>mb.onclick=(ev)=>{ev.stopPropagation();move(card.dataset.id,mb.dataset.to);});
-      const close=()=>{menu.remove();btn.setAttribute('aria-expanded','false');btn.focus();};
+      // focus the invoker BEFORE removing: removing the focused node makes the
+      // browser's focus fixup land on <body>, clobbering a focus() issued after.
+      const close=()=>{btn.focus();menu.remove();btn.setAttribute('aria-expanded','false');};
+      // Tab-out closes too (no zombie open menu with aria-expanded=true) —
+      // WITHOUT stealing focus back: the user chose to leave, let them land
+      // where Tab took them. relatedTarget inside the menu = arrow/tab within.
+      menu.addEventListener('focusout',(ev)=>{if(!menu.isConnected||menu.contains(ev.relatedTarget))return;menu.remove();btn.setAttribute('aria-expanded','false');});
       menu.addEventListener('keydown',(ev)=>{
         const items=[...menu.querySelectorAll('button')]; const i=items.indexOf(document.activeElement);
         if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close();}
@@ -1351,7 +1357,10 @@ async function boot(){
     // in List (won/lost are outcomes, not board columns); the persisted display
     // choice in storage is respected next visit, never overwritten here.
     const urlStage=new URLSearchParams(location.search).get('stage');
-    if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;VIEW='list';}
+    // Only won/lost force List — they're outcomes the board structurally can't
+    // show. An OPEN-stage landing keeps the persisted Board/Table choice (the
+    // filter still applies the moment List/Table renders).
+    if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;if(urlStage==='won'||urlStage==='lost')VIEW='list';}
     renderFilters();
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
