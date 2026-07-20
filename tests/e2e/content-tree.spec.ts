@@ -136,6 +136,8 @@ test.describe('Content tree — family chrome', () => {
     await page.goto('/content-tree.html');
     await expect(page.getByText(/this account can.t see this website.s map/i)).toBeVisible();
     await expect(page.getByText(/couldn.t load your map just now/i)).toBeHidden();
+    // no empty chrome over a failure state (hidden must beat the .lhead display rule)
+    await expect(page.locator('.lhead')).toBeHidden();
   });
 
   test('404 renders its own not-found copy, distinct from trouble', async ({ page }) => {

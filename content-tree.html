@@ -28,6 +28,7 @@
         just now" · ↻ soft refresh) — kept in sync by hand with attention.html /
         website-health.html (the SS9–SS12 primitive). ── */
   .lhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px;margin:22px 0 0}
+  .lhead[hidden]{display:none}   /* the display rule must never defeat the hidden attribute */
   .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lmeta{flex:1;min-width:0;font-size:13px;color:var(--soft);margin:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}

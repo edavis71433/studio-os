@@ -61,6 +61,8 @@ test.describe('Website health — family chrome', () => {
     await expect(page.getByText(/nothing.s wrong/i)).toBeHidden();
     await expect(page.getByText(/your website is being set up/i)).toBeHidden();
     await expect(page.locator('.verdict')).toBeHidden();
+    // no empty chrome over a failure state (hidden must beat the .lhead display rule)
+    await expect(page.locator('.lhead')).toBeHidden();
   });
 
   test('404 renders its own not-found copy, distinct from trouble', async ({ page }) => {

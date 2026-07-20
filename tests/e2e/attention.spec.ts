@@ -95,6 +95,8 @@ test.describe('Attention center — family chrome', () => {
     await expect(page.getByText(/this account can.t see this website/i)).toBeVisible();
     await expect(page.getByText('Everything looks good.')).toBeHidden();
     await expect(page.getByText(/couldn.t check just now/i)).toBeHidden();
+    // no empty chrome over a failure state (hidden must beat the .lhead display rule)
+    await expect(page.locator('.lhead')).toBeHidden();
   });
 
   test('404 renders its own not-found copy, distinct from trouble', async ({ page }) => {
