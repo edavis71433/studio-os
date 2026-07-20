@@ -1850,23 +1850,42 @@ function notifPanelHtml(notifs,failed){
 // bar ≥720px; PS3 D3a). Opening it marks everything seen: the badge clears and
 // the read-state persists server-side.
 const BELL_DOC_WIRED=new Set();   // document-level listeners bind ONCE per bell/panel pair
+let BELL_OPEN_SEQ=0;              // PS3: invalidates a stale refetch when the panel is re-opened mid-flight
 function wireBellAt(bellId,panelId){
   const bell=$(bellId),panel=$(panelId);if(!bell||!panel)return;
-  let built=false;
   const close=()=>{panel.hidden=true;bell.setAttribute('aria-expanded','false');};
-  const open=()=>{
-    if(!built){
-      // PS3 (D1a): the badge's number gets its label — the panel head says
-      // "N updates since you last looked" (the server cursor, not the queue).
-      const since=(!PORTAL.notifsFailed&&PORTAL.notifs.length)?`<div class="nsince">${esc(bellSinceLabel(PORTAL.unread))}</div>`:'';
-      panel.innerHTML=since+notifPanelHtml(PORTAL.notifs,PORTAL.notifsFailed);built=true;
-      panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>{close();navFromHref(b.getAttribute('data-nav'));}));
-    }
+  const open=async()=>{
     panel.hidden=false;bell.setAttribute('aria-expanded','true');
+    // PS3: the panel is no longer load-time-only — every open REFETCHES the
+    // list (client persona only: a reviewer's /client/* 403 is contract and
+    // their bell stays zero-fetch calm), so the failed branch's "try again in
+    // a moment" genuinely comes true on the very next open.
+    if(PORTAL.persona==='client'){
+      const seq=++BELL_OPEN_SEQ;
+      panel.innerHTML='<p class="nempty">Checking…</p>';
+      let r=null;try{r=await api('/client/notifications');}catch(_){r=null;}
+      if(seq!==BELL_OPEN_SEQ)return;   // a newer open owns the panel now
+      if(r&&r.ok){
+        const nb=r.body||{};
+        PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
+        PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
+        PORTAL.notifsFailed=false;
+        syncBellBadges();              // the badge follows the fresh cursor even if the panel closed
+      }else PORTAL.notifsFailed=true;  // failed ≠ empty — the panel says so below
+      if(panel.hidden)return;          // closed while fetching — nothing was seen
+    }
+    // PS3 (D1a): the badge's number gets its label — the panel head says
+    // "N updates since you last looked" (the server cursor, not the queue).
+    const since=(!PORTAL.notifsFailed&&PORTAL.notifs.length)?`<div class="nsince">${esc(bellSinceLabel(PORTAL.unread))}</div>`:'';
+    panel.innerHTML=since+notifPanelHtml(PORTAL.notifs,PORTAL.notifsFailed);
+    panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>{close();navFromHref(b.getAttribute('data-nav'));}));
     // a FAILED notifications read: the honest panel above, and NOTHING seen to
     // mark — persisting the last_seen_at cursor for a read we never got would
     // silently swallow whatever it held.
     if(PORTAL.notifsFailed)return;
+    // PS3: nothing to persist for a reviewer either — the mark-seen POST is a
+    // /client/* write, and the zero-fetch contract holds on the bell chrome too.
+    if(PORTAL.persona!=='client')return;
     // Seen now — ALWAYS clear the derived unread styling AND persist the server
     // cursor (an idempotent last_seen_at upsert), regardless of the local count:
     // reading threads in the Messages split view drives PORTAL.unread to 0
@@ -2174,7 +2193,9 @@ async function load(){
   PORTAL.projectsFailed=PORTAL.persona==='client'&&!(proj&&proj.ok);
   const feed=await api('/portal/feed'); PORTAL.feed=(feed.ok&&feed.body.data)||{};
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
-  const n=await api('/client/notifications').catch(()=>null); const nb=(n&&n.body)||{};
+  // PS3: the boot notifications GET is persona-gated — a reviewer's /client/*
+  // 403 is contract (reviewerAllowed); their bell boots calm with ZERO fetches.
+  const n=PORTAL.persona==='client'?await api('/client/notifications').catch(()=>null):null; const nb=(n&&n.body)||{};
   PORTAL.notifsFailed=PORTAL.persona==='client'&&!(n&&n.ok);   // …nor a failed notifications read as zero messages — but a reviewer's 403 here is the CONTRACT (reviewerAllowed), not a failure: their bell stays calm
   PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
   PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
@@ -2182,8 +2203,8 @@ async function load(){
   showNav();
   // deep links open the relevant drill-down; the nav stays visible around it.
   // ?support= now opens the Messages tab with that thread in the reading pane.
-  if(dsup){await openMessagesTo(dsup);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
-  if(deep){await openProject(deep);api('/client/notifications/read','POST',{}).catch(()=>{});return;}
+  if(dsup){await openMessagesTo(dsup);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}   // PS3: the mark-read POST is /client/* — client persona only
+  if(deep){await openProject(deep);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   showTab(CURRENT_TAB||'home');
 }
 // Always-available client sign-out (the shell's profile menu is owner-shaped;

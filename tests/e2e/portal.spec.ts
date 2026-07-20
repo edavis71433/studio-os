@@ -2329,4 +2329,71 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     // the panel labels the badge's meaning out loud
     await expect(page.locator('.notifpanel:visible')).toContainText('2 updates since you last looked');
   });
+
+  // ── bell-open refetch (PS1 review finding 6): load-time-only no more ──
+  test('opening the panel refetches the list — exactly ONE GET per open (request-counted)', async ({ page }) => {
+    let gets = 0;
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/notifications', (route) => {
+      if (route.request().method() === 'GET') gets++;
+      return route.fallback();
+    });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    expect(gets).toBe(1); // the boot read
+    await page.locator('#navbell').click();
+    await expect(page.locator('.notifpanel:visible .nitem')).toHaveCount(1);
+    await expect.poll(() => gets).toBe(2); // ONE refetch per open — no more
+    await page.locator('#navbell').click(); // close
+    await expect(page.locator('.notifpanel:visible')).toHaveCount(0);
+    await page.locator('#navbell').click(); // reopen → exactly one more
+    await expect(page.locator('.notifpanel:visible .nitem')).toHaveCount(1);
+    await expect.poll(() => gets).toBe(3);
+  });
+
+  test('what arrived AFTER load shows up when the panel opens — “try again in a moment” can come true', async ({ page }) => {
+    let gets = 0;
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/notifications', (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      gets++;
+      const boot = { data: [
+        { kind: 'approval_requested', label: 'Your approval is requested', href: `/projects/${PID}#approval-a1`, created_at: '2026-07-07T00:00:00Z', read: false },
+      ], unread_count: 1 };
+      const later = { data: [
+        { kind: 'message', label: 'A brand-new message', href: `/projects/${PID}#messages`, created_at: '2026-07-18T00:00:00Z', read: false },
+        ...boot.data,
+      ], unread_count: 2 };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(gets === 1 ? boot : later) });
+    });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await page.locator('#navbell').click();
+    const panel = page.locator('.notifpanel:visible');
+    // the item that did not exist at load time is here — the panel refetched
+    await expect(panel.getByText('A brand-new message')).toBeVisible();
+    await expect(panel.getByText('Your approval is requested')).toBeVisible();
+  });
+
+  test('reviewer: the bell is ZERO-fetch end to end — no boot GET, no open GET, no mark-seen POST', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: {
+      '/portal/context': REVIEWER_CTX,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
+    } });
+    // PRODUCTION shape: every /client/* answers 403 for a client_reviewer
+    await page.route('**/functions/v1/presence/client/**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    // every notifications read/write — the bell's whole surface (the one
+    // remaining boot /client/projects GET is the persona probe itself, the
+    // pre-existing contract that DERIVES reviewer vs client)
+    page.on('request', (r) => { if (r.url().includes('/client/notifications')) calls.push(`${r.method()} ${r.url()}`); });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await page.locator('#navbell').click();
+    await expect(page.locator('.notifpanel:visible').getByText('You’re all caught up — nothing new right now.')).toBeVisible();
+    // the shipped zero-/client/*-fetch contract now covers the bell chrome too:
+    // no boot notifications GET, no bell-open refetch, no mark-seen POST
+    expect(calls).toEqual([]);
+  });
 });

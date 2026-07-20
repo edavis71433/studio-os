@@ -400,6 +400,15 @@ ok('portal (D1a): queue rows come from needsYouItems and the needs-you tile is a
   && portal.includes("okT.addEventListener('click',()=>scrollToSection('home-needs'))"));
 ok('portal (D1a): the bell panel opens with the badge\'s label — bellSinceLabel(PORTAL.unread)',
   portal.includes('bellSinceLabel(PORTAL.unread)'));
+// PS3: the bell panel is no longer load-time-only — every open refetches the
+// list, gated on persona==='client' so the reviewer's zero-fetch calm holds;
+// the boot GET and the mark-seen POST carry the same gate.
+ok('portal: opening the bell REFETCHES /client/notifications (client persona only)',
+  /const open=async\(\)=>\{[\s\S]{0,700}?if\(PORTAL\.persona==='client'\)\{[\s\S]{0,400}?await api\('\/client\/notifications'\)/.test(portal));
+ok('portal: the boot notifications GET is persona-gated (reviewer boots with zero /client/* reads)',
+  portal.includes("PORTAL.persona==='client'?await api('/client/notifications').catch(()=>null):null"));
+ok('portal: the mark-seen POST is persona-gated too — after the failed-read skip, before the POST',
+  /if\(PORTAL\.notifsFailed\)return;[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return;[\s\S]*?api\('\/client\/notifications\/read','POST'/.test(portal));
 // PS3 (D4a + dead clicks): '#support-<rid>' hrefs land the Messages pane, and
 // navFromHref ends in the Home fallback — no notification click is ever dead.
 ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls back to Home (no dead clicks)',
