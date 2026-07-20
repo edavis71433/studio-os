@@ -58,6 +58,9 @@ html.dds-embed #detailWrap{padding-top:0}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
 
   .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  /* ── C2 search — the rosters' .search anatomy (contacts.html), kept in sync by hand ── */
+  .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
+  .search:focus{border-color:var(--p)}
   .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
   .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
@@ -201,8 +204,10 @@ html.dds-embed #detailWrap{padding-top:0}
 <body>
 <div class="wrap" id="listWrap">
   <header id="lhead"></header>
-  <div class="bar" id="filters" role="tablist" aria-label="Filter by status"></div>
-  <div class="bar"><button class="btn" id="newProject" hidden>+ New project</button><span class="spacer"></span></div>
+  <div class="bar" id="filters" role="group" aria-label="Filter by status"></div>
+  <!-- C2: the search input is STATIC page skeleton — renderRoster only rebuilds
+       #lhead + #list, so the input node (and caret) is never disturbed -->
+  <div class="bar"><input class="search" id="q" type="search" aria-label="Search projects" placeholder="Search project or customer…"><button class="btn" id="newProject" hidden>+ New project</button></div>
   <!-- Cross-client client messages now live in the Inbox (grouped by client). This
        page is the projects list view + the project record page; a customer's own
        general messages live INSIDE their record page (loadClientGeneral). -->
@@ -261,7 +266,9 @@ async function api(path,method,body){
 }
 
 // ── roster state: items · per-project report cache · customer-name map ───────
-let ITEMS=[],LOADED_AT=0;
+let ITEMS=[],LOADED_AT=0,Q="";
+// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
+const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
 let CUSTMAP=null;          // client_id → customer name (studio only), fetched once
 let CUSTTRIED=false;
@@ -302,15 +309,18 @@ document.addEventListener('click',(e)=>{
 });
 
 function renderFilters(){
+  // SS6 (C5): an honest role=group with aria-pressed — these chips filter, they
+  // don't own tab panels (the E2 downgrade SS5's pipeline rows also took).
   const opts=[['','All'],...STATUSES.map(s=>[s,s[0].toUpperCase()+s.slice(1).replace('_',' ')])];
-  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" aria-selected="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
+  $('filters').innerHTML=opts.map(([v,l])=>`<button aria-pressed="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.status;renderFilters();load();});
 }
 
 // ── the shared list-view header (.lhead anatomy: 📁 icon · H1 · refresh · meta) ──
-function headerHtml(){
-  const n=ITEMS.length;
-  const active=ITEMS.filter(p=>p.status==='active').length;
+// counts what the roster SHOWS (the C2 search included), never raw ITEMS
+function headerHtml(list){
+  const n=list.length;
+  const active=list.filter(p=>p.status==='active').length;
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   const mid=FILTER?` · ${esc(statusLabel(FILTER))}`:` · ${active} active`;
   return `<div class="lhead">
@@ -384,11 +394,18 @@ function cardsHtml(list){
   }).join('');
 }
 
+// C2: the search filters what the roster shows — project name + the enriched
+// customer-name column (so "salon" finds Beta Salon's project).
+function visRows(){
+  const q=Q.trim().toLowerCase();
+  return sortedRows().filter(p=>!q||((p.name||'')+' '+customerName(p)).toLowerCase().includes(q));
+}
 function renderRoster(){
-  $('lhead').innerHTML=headerHtml();
-  const list=sortedRows();
+  const list=visRows();
+  $('lhead').innerHTML=headerHtml(list);
   if(!list.length){
-    if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
+    if(Q.trim())$('list').innerHTML='<p class="mut">No projects match “'+esc(Q)+'”.</p>';
+    else if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
     else $('list').innerHTML='<p class="mut">No projects yet.</p>';
   }else{
     $('list').innerHTML=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
@@ -465,9 +482,11 @@ async function ensureCustomers(){
   }catch(_){return false;}
 }
 // per-project report summaries (the existing /projects/:id/report route) for the
-// Progress + Open approvals columns — parallel, cached, best-effort.
+// Progress + Open approvals columns — parallel, cached, best-effort. SS6: the
+// fan-out is capped to the rows the roster actually SHOWS (search included) —
+// the interim answer until the D6 batch endpoint ships.
 async function ensureReports(){
-  const ids=ITEMS.map(p=>p.id).filter(id=>id&&!REPORTS[id]).slice(0,60);
+  const ids=visRows().map(p=>p.id).filter(id=>id&&!REPORTS[id]).slice(0,60);
   if(!ids.length)return false;
   let changed=false;
   await Promise.allSettled(ids.map(id=>api('/projects/'+id+'/report').then(r=>{const s=r&&r.data&&r.data.summary;if(s){REPORTS[id]=s;changed=true;}}).catch(()=>{})));
@@ -521,7 +540,18 @@ function miniForm(host, fields, onSubmit){
 // record are two panels of the ONE page; only one is visible at a time.
 function showDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(l)l.hidden=true; if(d)d.hidden=false; window.scrollTo(0,0); }
 function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=true; if(l)l.hidden=false; }
-function closeProjectDetail(){ hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():'')); const c=document.querySelector('#list [data-id]')||$('pagehead'); if(c)c.focus(); }
+function closeProjectDetail(){ PROJ_SEQ++; hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():'')); const c=document.querySelector('#list [data-id]')||$('pagehead'); if(c)c.focus(); }
+
+// PROJ_SEQ (SS6): ONE monotonic token threaded through openProject and every
+// record-section loader. Opening a different record (or closing back to the
+// roster) bumps it, so a section response that raced in late can never paint
+// another record's data into the current one (the real cross-record stale-paint
+// bug this fixes).
+let PROJ_SEQ=0;
+// C2 search wiring — the input is static page skeleton; renderRoster rebuilds
+// only #lhead + #list, so typing never disturbs the input node or its caret.
+const qInput=$('q');
+if(qInput)qInput.addEventListener('input',debounce(()=>{Q=qInput.value;renderRoster();}));
 
 // ── the Path = the project's milestones in order (chevron bar) ───────────────
 // Rendered ONLY when the project has milestones; completed steps ✓ tinted, the
@@ -545,6 +575,7 @@ function pathHtml(milestones){
 }
 
 async function openProject(id){
+  const seq=++PROJ_SEQ;   // this record is now the ONLY one allowed to paint
   history.replaceState(null,'','?project='+id+(scope()?'&client='+scope():''));
   // a11y: in-view actions re-open the same project to refresh. Remember whether the
   // record was already showing so we can restore keyboard focus after the re-render.
@@ -552,9 +583,11 @@ async function openProject(id){
   $('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
+    if(seq!==PROJ_SEQ)return;   // a newer record (or the roster) took over mid-flight
     const p=data.project; STUDIO=data.is_studio_view!==false;
     const rp=rep&&rep.data&&rep.data.summary; if(rp)REPORTS[id]=rp;
     if(STUDIO)await ensureCustomers();   // the Customer highlight tile (cached after the first record)
+    if(seq!==PROJ_SEQ)return;
     const cust=customerName(p);
     const nextP=(P_NEXT[p.status]||[]);
 
@@ -698,8 +731,10 @@ async function shareFile(id){
 }
 
 async function loadMessages(id){
+  const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{
     const {data}=await api('/projects/'+id+'/messages?limit=30');
+    if(seq!==PROJ_SEQ)return;
     const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="empty">No messages yet — say hello.</div>';
     $('msgList').innerHTML=items;
     const host=$('msgForm');
@@ -711,8 +746,11 @@ async function loadMessages(id){
   }catch(e){ $('msgList').innerHTML='<div class="empty">Couldn’t load messages.</div>'; }
 }
 async function loadSurveys(id){
+  const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{
-    const {data}=await api('/projects/'+id+'/surveys'); const items=data||[];
+    const {data}=await api('/projects/'+id+'/surveys');
+    if(seq!==PROJ_SEQ)return;
+    const items=data||[];
     $('svList').innerHTML=items.length?items.map(s=>`<div class="item"><div class="t">${esc(s.title)} <span class="tag">${esc(s.status)}</span></div><button class="btn ghost sm" data-sv="${s.id}">Responses</button></div>`).join(''):'<div class="empty">No surveys yet — <button class="linkbtn" id="emptySurvey">send a check-in →</button></div>';
     const es=$('emptySurvey'); if(es&&$('addSurvey'))es.onclick=()=>$('addSurvey').click();
     $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(nice(e),true);}});
@@ -720,8 +758,11 @@ async function loadSurveys(id){
 }
 const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);return d<7?d+'d ago':new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 async function loadSupport(id,focusRid){
+  const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{
-    const {data}=await api('/support'); const items=(data||[]).filter(r=>r.project_id===id);
+    const {data}=await api('/support');
+    if(seq!==PROJ_SEQ)return;
+    const items=(data||[]).filter(r=>r.project_id===id);
     $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2" style="margin-top:0"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="empty">No support requests for this project.</div>';
     $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id,b.dataset.res);}catch(e){toast(nice(e),true);}});
     $('supList').querySelectorAll('[data-sopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.sopen,id));
@@ -737,8 +778,11 @@ async function loadSupport(id,focusRid){
 // conversations (one per list) never collide on a shared id.
 async function openStudioSupport(rid,pid,opts){
   opts=opts||{}; const host=opts.host||$('supList'); const back=opts.back||(()=>loadSupport(pid,rid)); if(!host)return;
+  const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{
-    const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]); const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
+    const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]);
+    if(seq!==PROJ_SEQ)return;
+    const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
@@ -762,8 +806,10 @@ async function openStudioSupport(rid,pid,opts){
 // Resolve affordance as project Support.
 async function loadClientGeneral(id,focusRid){
   const host=$('genList'); if(!host)return;
+  const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{
     const {data,customer}=await api('/projects/'+id+'/client-messages');
+    if(seq!==PROJ_SEQ)return;
     const items=data||[]; const nm=(customer&&customer.name)?customer.name:'';
     const head=$('genHead'); if(head)head.textContent='General messages'+(nm?' from '+nm:'');
     if(!items.length){host.innerHTML='<div class="empty">'+(nm?('Nothing from '+esc(nm)+' outside this project yet. '):'')+'Anything this client sends that isn’t tied to a project shows up here.</div>';return;}
@@ -777,10 +823,12 @@ async function loadClientGeneral(id,focusRid){
 // A project-less client request, opened as its own full-screen conversation (same
 // full-page treatment as a project record) — read the thread and reply, or resolve it.
 async function openStudioSupportFull(rid){
+  const seq=++PROJ_SEQ;   // this conversation is now the only view allowed to paint
   history.replaceState(null,'','?support='+rid+(scope()?'&client='+scope():''));
   $('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
     const [r,srRes]=await Promise.all([api('/support/'+rid),api('/service/saved-replies').catch(()=>null)]);
+    if(seq!==PROJ_SEQ)return;
     const d=r.data||{}; const rq=d.request||{}; const msgs=d.messages||[];
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';

@@ -128,8 +128,8 @@ test.describe('Projects list view', () => {
     await expect(page.locator('.lmeta')).toContainText('3 projects');
     await expect(page.locator('.lmeta')).toContainText('2 active');
     await expect(page.locator('.lmeta')).toContainText('Updated just now');
-    // the status filter chips survive (role=tablist, All selected)
-    await expect(page.locator('#filters [role="tab"][aria-selected="true"]')).toHaveText('All');
+    // the status filter chips survive (SS6: an honest role=group, All pressed)
+    await expect(page.locator('#filters [aria-pressed="true"]')).toHaveText('All');
     await expect(page.locator('#filters .chip')).toHaveCount(5);
     // + New project survives for the studio view
     await expect(page.locator('#newProject')).toBeVisible();
@@ -203,10 +203,107 @@ test.describe('Projects list view', () => {
     await page.goto('/projects.html');
     await expect(page.locator('tbody tr')).toHaveCount(3);
     await page.locator('#filters [data-status="complete"]').click();
-    await expect(page.locator('#filters [data-status="complete"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#filters [data-status="complete"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr').first()).toContainText('Beta brand refresh');
     await expect(page.locator('.lmeta')).toContainText('1 project · complete');
+  });
+
+  // ── SS6: C2 roster search · honest filter group · PROJ_SEQ · visible-rows fan-out ──
+  test('C2 — roster search filters by project AND customer without rebuilding the input', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    await routeP3Report404(page);
+    await page.goto('/projects.html');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    // wait for the customer enrichment so the customer-name search is real
+    await expect(page.locator('tbody tr[data-id="p2"]')).toContainText('Beta Salon');
+    const q = page.locator('#q');
+    await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
+    await q.pressSequentially('acme website');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr').first()).toContainText('Acme website build');
+    expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
+    await expect(page.locator('.lmeta')).toContainText('1 project');
+    // customer-name search reaches the enriched column
+    await q.fill('salon');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr').first()).toContainText('Beta brand refresh');
+    // no-match stays honest
+    await q.fill('zzz-nobody');
+    await expect(page.locator('#list')).toContainText('No projects match');
+    await q.fill('');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+  });
+
+  test('C5 — the status filters are an honest role=group with aria-pressed (no fake tablist)', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    await page.goto('/projects.html');
+    await expect(page.locator('#filters')).toHaveAttribute('role', 'group');
+    await expect(page.locator('#filters [role=tab]')).toHaveCount(0);
+    await expect(page.locator('#filters [data-status=""]')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('PROJ_SEQ — a stale section load can never paint into a newer record', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    // p1's messages arrive LATE (non-blocking delay) — after the user has moved on to p2
+    await page.route(/\/functions\/v1\/presence\/projects\/p1\/messages/, (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      setTimeout(() => {
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [
+          { id: 'm1', body: 'STALE P1 MESSAGE', author_kind: 'client', audience: 'client', created_at: '2026-07-01T00:00:00Z' },
+        ] }) }).catch(() => {});
+      }, 800);
+    });
+    await page.goto('/projects.html');
+    await page.locator('[data-open="p1"]').click();
+    await expect(page.locator('#dtitle')).toContainText('Acme website build');
+    await page.locator('#closeDetail').click();               // back to the roster
+    await page.locator('[data-open="p2"]').click();           // open a DIFFERENT record
+    await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
+    await expect(page.locator('#msgList')).toContainText('No messages yet');
+    await page.waitForTimeout(1100);                          // p1's stale response lands
+    await expect(page.locator('#detailInner')).not.toContainText('STALE P1 MESSAGE');
+    await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
+  });
+
+  test('ensureReports fans out only to VISIBLE rows when a searched roster reloads', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    const reportCalls: string[] = [];
+    // every report 404s so nothing caches — the fan-out size is what's under test
+    await page.route(/\/functions\/v1\/presence\/projects\/(p1|p2|p3)\/report/, (route) => {
+      reportCalls.push(route.request().url());
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Report not found.' }) });
+    });
+    await page.goto('/projects.html');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    await expect.poll(() => reportCalls.length).toBe(3);      // boot: every row is visible
+    await page.locator('#q').fill('acme website');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    const before = reportCalls.length;
+    await page.locator('#refreshBtn').click();                // reload with the search active
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect.poll(() => reportCalls.length).toBeGreaterThan(before);
+    await page.waitForTimeout(300);                           // let any extra fan-out land
+    const delta = reportCalls.slice(before);
+    expect(delta.length).toBe(1);                             // ONLY the visible row re-asked
+    expect(delta[0]).toContain('/projects/p1/report');
+  });
+
+  test('boots quiet: one h1, zero console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await pinTable(page);
+    await installApp(page, { api: API });   // no 404 route here — a 404 logs a browser network error by design
+    await page.goto('/projects.html');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('#q')).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test('a row opens the record in-page and keeps the ?client= scope; breadcrumb returns', async ({ page }) => {
