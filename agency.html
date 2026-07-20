@@ -7,59 +7,139 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
+  /* SS2: page skin = the shell's --dds-* tokens (shell.css is the canonical
+     palette; light/dark/data-theme all follow it automatically — this is what
+     fixes the old hand-copied dark block that never defined --warn/--good) —
+     same aliasing pattern as customers.html / files.html / crm.html. */
   :root{
-    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;
-    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;
-    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:760px;margin:0 auto;padding:36px 20px 90px}
-  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .wrap{max-width:980px;margin:0 auto;padding:26px 20px 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
   .brand{font-family:var(--serif);font-size:22px;font-weight:500}
   .brand small{display:block;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.03em}
   .rolebadge{font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  .acting{margin-top:18px;padding:12px 16px;background:var(--p-soft);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-  .acting b{color:var(--p)} .acting .who{font-weight:600}
-  h1{font-family:var(--serif);font-weight:500;font-size:26px;margin:22px 0 3px}
-  .sub{color:var(--soft);font-size:14.5px;margin:0 0 22px}
-  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:16px}
+
+  /* ── list-view header (SLDS list-view anatomy, dds skin) — the same .lhead/
+        .lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html / files.html ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lrow1{display:flex;align-items:center;gap:10px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  .notice{font-size:12.5px;color:var(--faint);margin:-6px 0 12px}
+
+  /* fixed-view chips (leads.html's filter anatomy; role=group + aria-pressed) */
+  .filters{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+  .filters button{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;padding:6px 13px;cursor:pointer}
+  .filters button[aria-pressed="true"]{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
+
+  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:14px}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
-  .client{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;cursor:pointer;transition:.15s;width:100%;text-align:left;font-family:inherit}
+
+  /* ── the table view (customers.html .tscroll anatomy): sortable columns; the
+        table scrolls in its OWN container — the page never overflows sideways ── */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:680px}
+  .tscroll thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  .tscroll thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  .tscroll thead th .thb:hover{color:var(--p)}
+  .tscroll thead th .arrow{font-size:10px;color:var(--p)}
+  .tscroll tbody tr{cursor:pointer}
+  .tscroll tbody tr:hover{background:var(--p-soft)}
+  .tscroll tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+  .tscroll tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .tscroll tbody tr:last-child td{border-bottom:none}
+  .tscroll td .n{font-weight:600}
+  .tscroll td.num{font-variant-numeric:tabular-nums}
+  .bits{font-size:12px;color:var(--warn);margin-top:2px}
+  .domln{white-space:nowrap;font-size:13px}
+  .domln .exp{color:var(--warn);font-weight:600}
+  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .rowact:hover{border-color:var(--p);color:var(--p)}
+  .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+
+  /* ── the card view (the page's original look, kept for warmth) ── */
+  .client{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:0;cursor:pointer;transition:.15s;width:100%;text-align:left;font-family:inherit;color:inherit;font-size:inherit}
   .client:hover{border-color:var(--p)}
   .client .av{width:38px;height:38px;border-radius:10px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
   .client .n{font-weight:600;font-size:15px} .client .m{font-size:12.5px;color:var(--faint);font-family:var(--mono)}
+  .client .bitln{font-size:12px;color:var(--warn);font-family:var(--sans)}
   .client .badge{margin-left:auto;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
   .badge.wait{color:var(--warn);background:var(--warn-soft)} .badge.ok{color:var(--good);background:var(--good-soft)}
-  .detail .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
-  .stat{display:flex;gap:26px;flex-wrap:wrap;margin-top:6px}
-  .stat div .n{font-family:var(--mono);font-size:22px;font-weight:600} .stat div .l{font-size:12px;color:var(--soft)}
-  button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer}
-  button:hover{border-color:var(--p);color:var(--p)}
+  .managerow{text-align:right;margin-top:5px}
+  .managerow button{background:none;border:none;color:var(--p);font-weight:600;font-size:12.5px;cursor:pointer;padding:2px 4px;font-family:inherit}
+
+  /* ── work queues panel — today.html's rail-card (.rcard/.rrows) anatomy ── */
+  .qhead{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 10px}
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:10px}
+  .rcard .rh{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 6px}
+  .rrows a{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
+  .rrows a:first-child{border-top:0}
+  .rrows a:hover{color:var(--p)}
+  .rrows a:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:8px}
+  .rrows .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap}
+  .qmore{color:var(--soft);font-size:12.5px;margin:6px 0 0}
+  .qfail{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-bottom:10px;font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .qfail button{margin-left:auto;font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 12px;cursor:pointer}
+  .qfail button:hover{border-color:var(--p);color:var(--p)}
+  #queues{margin-bottom:22px}
+
+  /* ── starter kits (CP-1) — class-based card, no inline style soup ── */
+  .kitcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);margin-top:18px}
+  .kitcard h2{font-size:15px;font-weight:600;font-family:var(--sans);margin:0 0 6px}
+  .kitcard .muted{margin-bottom:10px}
+  .kitrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .kitrow select,.kitrow input{font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);flex:1;min-width:150px;margin:0}
+  .kitrow select:focus,.kitrow input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .kitrow .btn{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 16px;cursor:pointer;flex:0 0 auto}
+  .kitrow .btn:hover{border-color:var(--p);color:var(--p)}
+  .kitrow .btn[disabled]{opacity:.6;cursor:default}
+  .kitchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;margin:0 6px 6px 0;font-size:13px}
+  .kitchip button{border:none;background:none;cursor:pointer;color:var(--faint);font-size:13px;font-family:inherit}
+
+  button.primary{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer}
   a.link{color:var(--p);text-decoration:none;font-weight:600}a.link:hover{text-decoration:underline}
   .center{text-align:center;padding:52px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<div class="wrap">
+  <!-- queues live OUTSIDE #main: the roster re-renders #main.innerHTML per
+       keystroke and must never wipe the cockpit panel -->
+  <section id="queues" aria-label="Work queues" hidden></section>
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
-// Agency dashboard (A7.2): portfolio + client switcher + acting-as banner.
-// Consumes the existing /agency/me + /agency/portfolio (role x scope enforced
-// server-side). "Acting for" focuses one client within this agency surface — it
-// never impersonates the client's own login (isolation preserved).
+// Agency roster (A7.2 → standards sweep SS2): the studio's portfolio as a real
+// list view — shared .lhead, fixed-view chips, sortable typed columns behind a
+// persisted Table ⇄ Cards toggle, REQ_SEQ-guarded reads, honest failure states
+// (a failed portfolio read is NEVER "No clients yet"), and once-wired starter-kit
+// events (the old per-load listeners double-POSTed). Consumes the existing
+// /agency/me + /agency/portfolio (role x scope enforced server-side).
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -68,87 +148,251 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // styled toast via the shared shell (replaces native alert()); bad→error styling
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
-let TOKEN="",ME=null,CLIENTS=[],ACTING=null,PROJECT_BY_SITE={};
+let TOKEN="",ME=null,CLIENTS=[],PROJECT_BY_SITE={},CUST_FAILED=false,LOADED_ONCE=false,LOADED_AT=0;
+let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
-function renderList(filter){
-  const q=(filter||'').toLowerCase();
-  const list=CLIENTS.filter(c=>!q||String(c.name||'').toLowerCase().includes(q));
-  let html=`<div class="top"><div class="brand">${esc(ME.agency||'Your agency')}<small>Studio</small></div><span class="rolebadge">● ${esc(ME.role||'member')}</span></div>`;
-  html+=`<h1>Your clients</h1><p class="sub">${CLIENTS.length} ${CLIENTS.length===1?'business':'businesses'} in your portfolio. Pick one to focus on.</p>`;
-  html+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(filter||'')}">`;
-  if(!list.length){html+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet — add businesses from your studio tools.'}</p></div>`;}
-  for(const c of list){
-    // Section 3 — the at-a-glance status: everything asking for someone, from data the platform already computes.
+// ── list-view state: fixed views · display · sort · search ───────────────────
+const daysToExpiry=(c)=>c.domain_expires_at?Math.floor((Date.parse(c.domain_expires_at)-Date.now())/86400000):null;
+const domainSoon=(c)=>{const de=daysToExpiry(c);return de!==null&&de<=30;};
+const VIEWS=[['all','All'],['attention','Needs attention'],['domain','Domain expiring'],['billing','Billing'],['clear','All clear']];
+let VIEWNAME='all',Q='';
+const viewMatch=(c)=>{
+  const att=Number(c.attention||0);
+  if(VIEWNAME==='attention')return att>0;
+  if(VIEWNAME==='domain')return domainSoon(c);
+  if(VIEWNAME==='billing')return !!c.billing_issue;
+  if(VIEWNAME==='clear')return att===0&&!c.billing_issue&&!domainSoon(c)&&!Number(c.search_issues||0);
+  return true;
+};
+// Table ⇄ Cards display choice, persisted; small screens default to Cards.
+const DISPLAY_KEY='dds-display:agency';
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
+  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
+// sortable columns (the fields /agency/portfolio actually returns)
+const COLS=[
+  ['name','Name',(c)=>String(c.name||'').toLowerCase()],
+  ['edition','Edition',(c)=>String(c.edition||'')],
+  ['status','Status',(c)=>String(c.status||'')],
+  ['attention','Waiting',(c)=>Number(c.attention||0)],
+  ['leads','Leads',(c)=>Number(c.leads_waiting||0)],
+  ['domain','Domain',(c)=>c.domain_expires_at?Date.parse(c.domain_expires_at):Infinity],
+];
+let SORT={key:'name',dir:1};
+
+function sortedRows(){
+  const q=Q.trim().toLowerCase();
+  const list=CLIENTS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.domain||'').toLowerCase().includes(q));
+  const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
+  return list;
+}
+// the at-a-glance status bits (Section 3) — everything asking for someone
+function statusBits(c,skipColumns){
+  const bits=[];
+  if(!skipColumns){const lw=Number(c.leads_waiting||0);if(lw)bits.push(`${lw} lead${lw===1?'':'s'} waiting`);}
+  if(!skipColumns){const de=daysToExpiry(c);
+    if(de!==null&&de<=30)bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);}
+  const si=Number(c.search_issues||0);if(si)bits.push(`${si} search issue${si===1?'':'s'}`);
+  if(c.billing_issue)bits.push('billing needs a look');
+  return bits;
+}
+
+function lheadHtml(shown){
+  const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
+  return `<header class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">🗂</span>
+      <h1 id="pagehead" tabindex="-1">Your clients</h1>
+      <div class="seg" role="group" aria-label="Display as">
+        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+        <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
+      </div>
+      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta">${shown} business${shown===1?'':'es'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+  </header>`;
+}
+function chipsHtml(){
+  return `<div class="filters" role="group" aria-label="Filter clients">${
+    VIEWS.map(([k,label])=>`<button data-view="${k}" aria-pressed="${VIEWNAME===k?'true':'false'}">${label}</button>`).join('')
+  }</div>`;
+}
+function domainCell(c){
+  const de=daysToExpiry(c);
+  const nm=c.domain?esc(c.domain):'—';
+  if(de===null)return `<span class="domln">${nm}</span>`;
+  if(de<=30)return `<span class="domln">${nm} <span class="exp">${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}</span></span>`;
+  return `<span class="domln">${nm}</span>`;
+}
+function tableHtml(list){
+  const ths=COLS.map(([k,label])=>{
+    const on=SORT.key===k;
+    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+  }).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  const trs=list.map(c=>{
     const att=Number(c.attention||0);
-    const bits=[];
-    const lw=Number(c.leads_waiting||0); if(lw) bits.push(`${lw} lead${lw===1?'':'s'} waiting`);
-    const de=c.domain_expires_at?Math.floor((Date.parse(c.domain_expires_at)-Date.now())/86400000):null;
-    if(de!==null&&de<=30) bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);
-    const si=Number(c.search_issues||0); if(si) bits.push(`${si} search issue${si===1?'':'s'}`);
-    if(c.billing_issue) bits.push('billing needs a look');
-    const statusLine=bits.length?`<br><span class="m" style="color:var(--warn);font-family:var(--sans)">${esc(bits.join(' · '))}</span>`:'';
-    const hasProject=!!PROJECT_BY_SITE[c.site_id];
-    html+=`<div style="margin-bottom:10px"><button class="client" style="margin-bottom:0" data-open="${esc(c.site_id)}"><span class="av">${esc(initial(c.name))}</span>
+    const bits=statusBits(c,true);   // leads/domain have their own columns here
+    return `<tr data-open="${esc(c.site_id)}" tabindex="0" aria-label="Open ${esc(c.name||'(unnamed)')}">
+      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${bits.length?`<div class="bits">${esc(bits.join(' · '))}</div>`:''}</td>
+      <td>${esc(c.edition||'presence')}</td>
+      <td><span class="pill">${esc(c.status||'—')}</span></td>
+      <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
+      <td class="num">${Number(c.leads_waiting||0)}</td>
+      <td>${domainCell(c)}</td>
+      <td>${PROJECT_BY_SITE[c.site_id]?`<button class="rowact" data-web="${esc(c.site_id)}">Manage their website</button>`:''}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="tscroll"><table aria-label="Clients"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+function cardsHtml(list){
+  let h='';
+  for(const c of list){
+    const att=Number(c.attention||0);
+    const bits=statusBits(c,false);
+    const statusLine=bits.length?`<br><span class="bitln">${esc(bits.join(' · '))}</span>`:'';
+    h+=`<div style="margin-bottom:10px"><button class="client" data-open="${esc(c.site_id)}"><span class="av">${esc(initial(c.name))}</span>
       <span><span class="n">${esc(c.name||'(unnamed)')}</span><br><span class="m">${esc(c.edition||'presence')} · ${esc(c.status||'')}</span>${statusLine}</span>
       <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
-    // FIX 7: opening a client goes to your DELIVERY view (project thread, files,
-    // approvals, support). Managing their website is a clearly-secondary action.
-    if(hasProject) html+=`<div style="text-align:right;margin-top:5px"><button data-web="${esc(c.site_id)}" style="background:none;border:none;color:var(--p);font-weight:600;font-size:12.5px;cursor:pointer;padding:2px 4px">Manage their website →</button></div>`;
-    html+=`</div>`;
+    // FIX 7: opening a client goes to your DELIVERY view; managing their website
+    // is the clearly-secondary action.
+    if(PROJECT_BY_SITE[c.site_id])h+=`<div class="managerow"><button data-web="${esc(c.site_id)}">Manage their website →</button></div>`;
+    h+=`</div>`;
   }
-  // ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
-  html+=`<div class="detail" style="margin-top:18px"><div class="card"><div class="stat" style="margin-bottom:6px">Starter kits</div>
-    <p class="muted" style="margin-bottom:10px">Save a client's setup (services, FAQs, voice, colors, industry — never their name, reviews, or photos) and start the next client from it. Applying only fills what's empty; it never overwrites work.</p>
+  return h;
+}
+// ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
+function kitCardHtml(){
+  return `<div class="kitcard"><h2>Starter kits</h2>
+    <p class="muted">Save a client's setup (services, FAQs, voice, colors, industry — never their name, reviews, or photos) and start the next client from it. Applying only fills what's empty; it never overwrites work.</p>
     <div id="kitList" class="muted">Loading…</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
-      <select id="kitFromSite" class="search" aria-label="Save a kit from which client" style="margin:0;flex:1;min-width:150px"><option value="">Save a kit from…</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
-      <input id="kitName" class="search" aria-label="Kit name" style="margin:0;flex:1;min-width:130px" placeholder="Kit name (e.g. Contractor Starter)">
-      <button class="client" id="kitSave" style="width:auto;margin:0;padding:10px 16px;justify-content:center">Save kit</button>
+    <div class="kitrow">
+      <select id="kitFromSite" aria-label="Save a kit from which client"><option value="">Save a kit from…</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
+      <input id="kitName" aria-label="Kit name" placeholder="Kit name (e.g. Contractor Starter)">
+      <button class="btn" id="kitSave">Save kit</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
-      <select id="kitPick" class="search" aria-label="Apply a kit" style="margin:0;flex:1;min-width:150px"><option value="">Apply a kit…</option></select>
-      <select id="kitToSite" class="search" style="margin:0;flex:1;min-width:150px"><option value="">…to client</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
-      <button class="client" id="kitApply" style="width:auto;margin:0;padding:10px 16px;justify-content:center">Apply</button>
-    </div></div></div>`;
-  $('main').innerHTML=html;
-  const s=$('search'); if(s) s.addEventListener('input',()=>renderList(s.value));
-  document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openClient(b.getAttribute('data-open'))));
-  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',()=>{location.href='/today.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
-  loadKits();
+    <div class="kitrow">
+      <select id="kitPick" aria-label="Apply a kit"><option value="">Apply a kit…</option>${KITS.map(k=>`<option value="${esc(k.id)}">${esc(k.name)}</option>`).join('')}</select>
+      <select id="kitToSite" aria-label="Apply the kit to which client"><option value="">…to client</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
+      <button class="btn" id="kitApply">Apply</button>
+    </div></div>`;
 }
-let KITS=[];
+
+function render(){
+  const list=sortedRows();
+  let h=`<div class="top"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}<small>Studio</small></div><span class="rolebadge">● ${esc((ME&&ME.role)||'member')}</span></div>`;
+  h+=lheadHtml(list.length);
+  h+=chipsHtml();
+  h+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(Q)}">`;
+  if(CUST_FAILED)h+=`<div class="notice">Some delivery details wouldn’t load just now — client records still open.</div>`;
+  if(!list.length){
+    h+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet — add businesses from your studio tools.'}</p></div>`;
+  }else{
+    h+=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
+  }
+  h+=kitCardHtml();
+  // Any re-render must never destroy a focused search input's value or caret
+  // (contacts.html's contract) — capture before the innerHTML swap, restore after.
+  const act=document.activeElement;const wasQ=!!(act&&act.id==='search');
+  const qv=wasQ?act.value:null;const qp=wasQ?act.selectionStart:0;
+  $('main').innerHTML=h;
+  wire();
+  if(wasQ){const nq=$('search');if(nq){if(qv!=null)nq.value=qv;nq.focus();try{nq.setSelectionRange(qp,qp);}catch(_){/* */}}}
+  paintKits();
+}
+function wire(){
+  // search — client-side filter, re-rendered live; render() preserves input/caret/focus
+  const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;render();});
+  // fixed-view chips — focus returns to the clicked chip after the re-render
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{
+    VIEWNAME=b.getAttribute('data-view');render();
+    const nb=document.querySelector('[data-view="'+VIEWNAME+'"]');if(nb)nb.focus();
+  }));
+  // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract)
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true)));
+  const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
+  const dc=$('dispCards');if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
+  // sortable column headers — click toggles asc/desc (aria-sort on the <th>);
+  // Waiting/Leads read most-first on their first click
+  document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.getAttribute('data-sort');
+    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:(k==='attention'||k==='leads')?-1:1};
+    render();
+    const nb=document.querySelector('[data-sort="'+k+'"]');if(nb)nb.focus();
+  }));
+  // cards: the whole card opens; table: the row opens on click/Enter/Space
+  document.querySelectorAll('button[data-open]').forEach(b=>b.addEventListener('click',()=>openClient(b.getAttribute('data-open'))));
+  document.querySelectorAll('tr[data-open]').forEach(tr=>{
+    const open=(e)=>{if(e.target.closest('button,a'))return;openClient(tr.getAttribute('data-open'));};
+    tr.addEventListener('click',open);
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();openClient(tr.getAttribute('data-open'));}});
+  });
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/today.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+}
+
+// ── starter kits: data + painting. Events are DELEGATED ONCE below — the old
+//    per-loadKits addEventListener calls piled up on the same buttons, so one
+//    click on Save/Apply fired two POSTs after the first save. Never again. ──
+let KITS=[],KITS_STATE='loading',KIT_BUSY=false;
+function paintKits(){
+  const host=$('kitList');if(!host)return;
+  if(KITS_STATE==='loading'){host.textContent='Loading…';return;}
+  if(KITS_STATE==='failed'){host.textContent='Kits wouldn’t load just now.';return;}
+  host.innerHTML=KITS.length?KITS.map(k=>`<span class="kitchip">${esc(k.name)} <button data-delkit="${esc(k.id)}" title="Delete kit" aria-label="Delete kit ${esc(k.name)}">✕</button></span>`).join(''):'No kits yet — save your best-configured client as the first one.';
+  const pick=$('kitPick');if(pick){const v=pick.value;pick.innerHTML='<option value="">Apply a kit…</option>'+KITS.map(k=>`<option value="${esc(k.id)}">${esc(k.name)}</option>`).join('');pick.value=v;}
+}
 async function loadKits(){
-  const host=$('kitList'); if(!host) return;
   try{
-    const r=await api('/agency/kits'); KITS=(r.body&&r.body.data)||[];
-    host.innerHTML=KITS.length?KITS.map(k=>`<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;margin:0 6px 6px 0;font-size:13px">${esc(k.name)} <button data-delkit="${esc(k.id)}" title="Delete kit" style="border:none;background:none;cursor:pointer;color:var(--faint);font-size:13px">✕</button></span>`).join(''):'No kits yet — save your best-configured client as the first one.';
-    const pick=$('kitPick'); if(pick){pick.innerHTML='<option value="">Apply a kit…</option>'+KITS.map(k=>`<option value="${esc(k.id)}">${esc(k.name)}</option>`).join('');}
-    document.querySelectorAll('[data-delkit]').forEach(b=>b.addEventListener('click',async()=>{if(!b.dataset.armed){b.dataset.armed='1';b.textContent='?';setTimeout(()=>{delete b.dataset.armed;b.textContent='✕';},2500);return;}await apiSend('DELETE','/agency/kits/'+b.getAttribute('data-delkit'));loadKits();}));
-    const save=$('kitSave'); if(save)save.addEventListener('click',async()=>{
-      const sid=$('kitFromSite').value,nm=$('kitName').value.trim();
-      if(!sid||!nm){toast('Pick a client and name the kit.',true);return;}
-      const r2=await apiSend('POST','/agency/kits',{site_id:sid,name:nm});
-      if(r2.ok){$('kitName').value='';toast('Kit saved.');loadKits();}else toast((r2.body&&r2.body.message)||'That didn’t save.',true);
-    });
-    const ap=$('kitApply'); if(ap)ap.addEventListener('click',async()=>{
-      const kid=$('kitPick').value,sid=$('kitToSite').value;
-      if(!kid||!sid){toast('Pick a kit and a client.',true);return;}
-      const r3=await apiSend('POST','/agency/kits/'+kid+'/apply',{site_id:sid});
-      if(r3.ok){const a=(r3.body.data&&r3.body.data.applied)||{};const sk=(r3.body.data&&r3.body.data.skipped)||[];toast('Applied: '+(a.offerings||0)+' services, '+(a.faqs||0)+' FAQs'+(a.voice?', voice':'')+(a.colors?', colors':'')+(a.industry?', industry':'')+(sk.length?' · skipped '+sk.length+' already set':''));loadKits();}
-      else toast((r3.body&&r3.body.message)||'That didn’t apply.',true);
-    });
-  }catch(_){host.textContent='Kits wouldn’t load just now.';}
+    const r=await api('/agency/kits');
+    if(!r.ok){KITS_STATE='failed';paintKits();return;}
+    KITS=(r.body&&r.body.data)||[];KITS_STATE='ok';paintKits();
+  }catch(_){KITS_STATE='failed';paintKits();}
 }
-// FIX 7: opening a client goes to that customer's DELIVERY view — the project
-// thread, Share-a-file, approvals and support on the STUDIO's own site — which is
-// where the work FOR the customer actually lives. Only when the client has no
-// delivery project (e.g. a plain managed-website client) do we fall back to their
-// website cockpit (today.html?client=<their site>), which is also the explicit
-// "Manage their website" secondary action.
+// ONE delegated listener for every kit action, attached ONCE at parse time —
+// #main re-renders can never duplicate it, and loadKits never touches wiring.
+document.addEventListener('click',async(e)=>{
+  const del=e.target.closest&&e.target.closest('[data-delkit]');
+  if(del){
+    if(!del.dataset.armed){del.dataset.armed='1';del.textContent='?';setTimeout(()=>{delete del.dataset.armed;del.textContent='✕';},2500);return;}
+    await apiSend('DELETE','/agency/kits/'+del.getAttribute('data-delkit'));loadKits();return;
+  }
+  if(e.target.closest&&e.target.closest('#kitSave')){
+    if(KIT_BUSY)return;
+    const sid=($('kitFromSite')||{}).value,nm=(($('kitName')||{}).value||'').trim();
+    if(!sid||!nm){toast('Pick a client and name the kit.',true);return;}
+    KIT_BUSY=true;const btn=$('kitSave');if(btn)btn.disabled=true;
+    try{
+      const r=await apiSend('POST','/agency/kits',{site_id:sid,name:nm});
+      if(r.ok){const ni=$('kitName');if(ni)ni.value='';toast('Kit saved.');loadKits();}
+      else toast((r.body&&r.body.message)||'That didn’t save.',true);
+    }finally{KIT_BUSY=false;const nb=$('kitSave');if(nb)nb.disabled=false;}
+    return;
+  }
+  if(e.target.closest&&e.target.closest('#kitApply')){
+    if(KIT_BUSY)return;
+    const kid=($('kitPick')||{}).value,sid=($('kitToSite')||{}).value;
+    if(!kid||!sid){toast('Pick a kit and a client.',true);return;}
+    KIT_BUSY=true;const btn=$('kitApply');if(btn)btn.disabled=true;
+    try{
+      const r=await apiSend('POST','/agency/kits/'+kid+'/apply',{site_id:sid});
+      if(r.ok){const a=(r.body.data&&r.body.data.applied)||{};const sk=(r.body.data&&r.body.data.skipped)||[];toast('Applied: '+(a.offerings||0)+' services, '+(a.faqs||0)+' FAQs'+(a.voice?', voice':'')+(a.colors?', colors':'')+(a.industry?', industry':'')+(sk.length?' · skipped '+sk.length+' already set':''));loadKits();}
+      else toast((r.body&&r.body.message)||'That didn’t apply.',true);
+    }finally{KIT_BUSY=false;const nb=$('kitApply');if(nb)nb.disabled=false;}
+    return;
+  }
+});
+
+// FIX 7 (preserved verbatim): opening a client goes to that customer's DELIVERY
+// view — the project thread, Share-a-file, approvals and support on the STUDIO's
+// own site — which is where the work FOR the customer actually lives. Only when
+// the client has no delivery project (e.g. a plain managed-website client) do we
+// fall back to their client record.
 function openClient(siteId){
   const c = CLIENTS.find(x=>x.site_id===siteId); if(!c) return;
   // Open the customer's unified CLIENT RECORD (Overview · Deal · Delivery · Details).
@@ -160,7 +404,40 @@ function openClient(siteId){
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your agency workspace.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your portfolio just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+// FAILED portfolio read = an honest couldn't-load with Try-again wired to load()
+// in place — NEVER the empty roster ("No clients yet" was the old lie).
+function trouble(){
+  $('main').innerHTML=`<div class="center"><h2>We couldn’t load your portfolio just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="primary">Try again</button></div>`;
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
+}
+
+// soft=true (the ↻ refresh): any failure keeps the current list and toasts —
+// leads.html's soft-fail contract; the in-place trouble state is for hard loads.
+async function load(soft){
+  const gen=++REQ_SEQ;
+  let pf,cust;
+  try{[pf,cust]=await Promise.all([api('/agency/portfolio'),api('/studio/customers').catch(()=>({ok:false}))]);}
+  catch(_){pf={ok:false,status:0,body:{}};cust={ok:false};}
+  if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
+  if(!pf.ok){
+    if(soft&&LOADED_ONCE){toast('Couldn’t refresh just now.',true);return;}
+    if(pf.status===401){signedOut();return;}
+    if(pf.status===403){notAgency();return;}
+    trouble();return;
+  }
+  CLIENTS=Array.isArray(pf.body.data)?pf.body.data:[];
+  // FIX 7: map each customer's own site → their delivery project id, so opening a
+  // client from the portfolio lands on the delivery view. Its failure degrades
+  // per-source (a notice; records still open) — never silently.
+  CUST_FAILED=!(cust&&cust.ok);
+  if(!CUST_FAILED){
+    const clist=Array.isArray(cust.body.data)?cust.body.data:[];
+    PROJECT_BY_SITE={};clist.forEach(c=>{if(c.customer_site_id&&c.project_id)PROJECT_BY_SITE[c.customer_site_id]=c.project_id;});
+  }
+  LOADED_ONCE=true;LOADED_AT=Date.now();
+  render();
+  loadKits();
+}
 
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
@@ -170,15 +447,7 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
     if(me.status===403){notAgency();return;}
     if(!me.ok){trouble();return;}
     ME=me.body.data||{};
-    const pf=await api('/agency/portfolio');
-    CLIENTS=(pf.ok&&Array.isArray(pf.body.data))?pf.body.data:[];
-    // FIX 7: map each customer's own site → their delivery project id, so opening a
-    // client from the portfolio lands on the delivery view (not their website).
-    try{ const cust=await api('/studio/customers');
-      const clist=(cust.ok&&Array.isArray(cust.body.data))?cust.body.data:[];
-      PROJECT_BY_SITE={}; clist.forEach(c=>{ if(c.customer_site_id&&c.project_id) PROJECT_BY_SITE[c.customer_site_id]=c.project_id; });
-    }catch(_){/* the portfolio still opens (falls back to the website cockpit) */}
-    renderList('');
+    await load();
     mountQueues();   // "what needs me today" — the cross-client morning cockpit
     mountHealthDoor();   // staff-only doorway to the platform Health Center
   }catch(_){trouble();}
@@ -204,28 +473,32 @@ async function mountHealthDoor(){
   }catch(_){/* the door is a nicety, never a blocker */}
 }
 
-// ── Work queues: the backend has aggregated cross-client queues since L5.7 —
-//    this is their first UI. One calm panel; each row jumps into that client. ──
+// ── Work queues: aggregated cross-client queues (L5.7). One calm panel of
+//    today.html rail-cards; each row jumps into that client (?client= carried).
+//    Failure renders an HONEST "wouldn't load" line + Try again — never silent
+//    absence (the old behavior swallowed every error). ──
+let QSEQ=0;
 async function mountQueues(){
-  try{
-    const r=await api('/agency/queues');
-    if(!r.ok||!r.body.data)return;
-    const queues=(r.body.data.queues||[]).filter(q=>q.items&&q.items.length);
-    if(!queues.length)return;
-    const host=document.createElement('section');
-    host.style.cssText='max-width:980px;margin:8px auto 22px;padding:0 20px';
-    host.innerHTML='<h2 style="font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft,#6b6478);font-weight:600;margin:0 0 10px">What needs you today</h2>'+
-      queues.map(q=>`<div style="background:var(--card,#fff);border:1px solid var(--line,#eee9e0);border-radius:14px;padding:14px 16px;margin-bottom:10px">
-        <p style="font-weight:600;font-size:14px;margin:0 0 6px">${esc(q.title)} <span style="color:var(--soft,#6b6478);font-weight:400">· ${q.items.length}</span></p>
-        ${q.items.slice(0,5).map(it=>`<a href="/today.html?client=${encodeURIComponent(it.site_id)}" style="display:block;padding:6px 0;color:inherit;text-decoration:none;font-size:13.5px"><strong>${esc(it.name)}</strong> — ${esc(it.why)} <span style="color:var(--p,#5b3fa0)">→</span></a>`).join('')}
-        ${q.items.length>5?`<p style="color:var(--soft,#6b6478);font-size:12.5px;margin:6px 0 0">+ ${q.items.length-5} more</p>`:''}
-      </div>`).join('');
-    // OUTSIDE #main — the client-search re-render rewrites #main.innerHTML on
-    // every keystroke and would silently wipe this panel.
-    const list=document.getElementById('main');
-    if(list&&list.parentNode)list.parentNode.insertBefore(host,list);
-    else document.body.appendChild(host);
-  }catch(_){/* the portfolio list is the fallback */}
+  const host=$('queues');if(!host)return;
+  const gen=++QSEQ;
+  let r;try{r=await api('/agency/queues');}catch(_){r={ok:false,status:0,body:{}};}
+  if(gen!==QSEQ)return;   // a newer queues read started — drop this one
+  if(!r.ok||!r.body.data){
+    host.hidden=false;
+    host.innerHTML=`<h2 class="qhead">What needs you today</h2>
+      <div class="qfail">Your queues wouldn’t load just now — the portfolio below is complete.<button id="qretry" type="button">Try again</button></div>`;
+    const qr=$('qretry');if(qr)qr.addEventListener('click',()=>mountQueues());
+    return;
+  }
+  const queues=((r.body.data.queues)||[]).filter(q=>q.items&&q.items.length);
+  if(!queues.length){host.hidden=true;host.innerHTML='';return;}   // genuinely nothing waiting — absence is truth
+  host.hidden=false;
+  host.innerHTML=`<h2 class="qhead">What needs you today</h2>`+
+    queues.map(q=>`<div class="rcard">
+      <p class="rh">${esc(q.title)} · ${q.items.length}</p>
+      <div class="rrows">${q.items.slice(0,5).map(it=>`<a href="/today.html?client=${encodeURIComponent(it.site_id)}"><span><strong>${esc(it.name)}</strong> — ${esc(it.why)}</span><span class="rn" aria-hidden="true">→</span></a>`).join('')}</div>
+      ${q.items.length>5?`<p class="qmore">+ ${q.items.length-5} more</p>`:''}
+    </div>`).join('');
 }
 </script>
 </body>
