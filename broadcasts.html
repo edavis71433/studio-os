@@ -8,10 +8,17 @@
 <meta name="description" content="Write one update and send it to your contacts or website enquiries — you preview and press send.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — same aliasing pattern
+     as files.html / customers.html / inbox.html. */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#6f677d);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:680px;margin:0 auto;padding:34px 20px 90px}
@@ -42,9 +49,23 @@
   .preview iframe{width:100%;height:420px;border:0;background:#f4f2ef}
   .preview .subj{padding:10px 14px;font-size:13.5px;color:var(--soft);border-bottom:1px solid var(--line);background:var(--card)}
   .preview .subj b{color:var(--ink)}
+  /* history — leads-style .lhead-lite header on the card */
+  .hh{display:flex;align-items:center;gap:10px}
+  .hh h2{flex:1;min-width:0}
+  .lbtn{flex:none;font-family:inherit;font-size:16px;line-height:1;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;width:34px;height:34px;cursor:pointer}
+  .lbtn:hover{border-color:var(--p);color:var(--p)}
+  .lmeta{font-size:12.5px;color:var(--faint);margin:2px 0 12px}
+  .notice{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13.5px;margin:2px 0 4px}
   .bc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px}
+  .bchead{display:block;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;border-radius:8px}
   .bc .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
   .bc .subj{font-weight:600;font-size:15px}
+  .bcdetail{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+  .bcdetail .kv{font-size:13.5px;color:var(--soft)}
+  .bcdetail .kv b{color:var(--ink)}
+  .bcdetail .preview iframe{height:320px}
+  .failnote{font-size:13px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px 10px;margin-top:8px}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .bc .st{font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;border-radius:999px;padding:2px 9px}
   .st.draft{color:var(--warn);background:var(--warn-soft)}
   .st.scheduled{color:var(--p);background:var(--p-soft)}
@@ -81,10 +102,66 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",SEGMENTS=[],BROADCASTS=[],SEL='contacts',DRAFT=null,BUSY=false;
+let REQ_SEQ=0;      // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
+let DET_SEQ=0;      // same guard for the per-row drill-in read
+let LOADED_AT=Date.now();
+let SEG_OK=true,LIST_OK=true;   // per-read health — one read failing degrades ITS section, never the whole page
+let OPEN=null;      // the drilled-in broadcast id (accordion)
+const DETAILS={};   // per-id detail cache (GET /broadcasts/:id)
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+// Small styled confirm — replaces native confirm(), matching the app's surfaces
+// (same pattern as files.html / connections.html / visual-studio.html). Resolves true/false.
+function askConfirm(title, body, okLabel){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div'); box.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
+      b.style.cssText=primary
+        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
+        :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b; };
+    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
+    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    cancel.addEventListener('click',()=>finish(false));
+    ok.addEventListener('click',()=>finish(true));
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
+    dlg.showModal(); setTimeout(()=>ok.focus(),20);
+  });
+}
+// Small styled text prompt — matches askConfirm; resolves the trimmed string, or null on cancel/empty.
+function askPrompt(title, body, okLabel, placeholder){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div'); box.style.cssText='padding:20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=200;
+    inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
+    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b; };
+    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
+    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
+    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
+    const submit=()=>{ const v=inp.value.trim(); finish(v||null); };
+    cancel.addEventListener('click',()=>finish(null));
+    ok.addEventListener('click',submit);
+    inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
+    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
+    dlg.showModal(); setTimeout(()=>inp.focus(),20);
+  });
+}
 function scParam(){const c=new URLSearchParams(location.search).get('client');return c?'?client='+encodeURIComponent(c):'';}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
@@ -95,7 +172,7 @@ function render(){
     <div class="card">
       <h2>Who it goes to</h2>
       <p class="hint">Pick a list. Anyone who has unsubscribed is left out automatically.</p>
-      <div class="segs" id="segs">${SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" data-seg="${esc(s.key)}"><span>${esc(s.label)}</span> <span class="n">· ${s.count}</span></button>`).join('')||'<span class="muted">Loading lists…</span>'}</div>
+      <div class="segs" id="segs">${segsHtml()}</div>
     </div>
     <div class="card">
       <h2>Your message</h2>
@@ -112,19 +189,41 @@ function render(){
     </div>
     <div id="stage"></div>
     <div class="card">
-      <h2>Recent broadcasts</h2>
-      ${BROADCASTS.length?BROADCASTS.map(bcCard).join(''):'<p class="muted">Nothing sent yet.</p>'}
+      <div class="hh"><h2>Recent broadcasts</h2><button class="lbtn" id="bcRefresh" type="button" aria-label="Refresh broadcasts" title="Refresh">↻</button></div>
+      ${histMeta()}
+      ${histBody()}
     </div>`;
   $('main').innerHTML=h;wire();
 }
+// audience picker — or its honest failure notice when the segments read failed
+function segsHtml(){
+  if(!SEG_OK)return `<div class="notice" id="segNotice"><span>Your lists couldn’t load just now, so a send can’t be counted honestly yet.</span> <button class="ghost" id="segRetry" type="button">Try again</button></div>`;
+  return SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" data-seg="${esc(s.key)}" aria-pressed="${s.key===SEL?'true':'false'}"><span>${esc(s.label)}</span> <span class="n">· ${s.count}</span></button>`).join('')||'<span class="muted">No lists yet.</span>';
+}
+function histMeta(){
+  if(!LIST_OK)return '';
+  const lastSent=BROADCASTS.reduce((m,b)=>(b.sent_at&&(!m||b.sent_at>m))?b.sent_at:m,null);
+  return `<div class="lmeta" id="bcMeta">${BROADCASTS.length} broadcast${BROADCASTS.length===1?'':'s'}${lastSent?' · last sent '+esc(when(lastSent)):''} · ${esc(updatedLabel())}</div>`;
+}
+function histBody(){
+  if(!LIST_OK)return `<div class="notice" id="bcNotice"><span>Your broadcast history couldn’t load just now.</span> <button class="ghost" id="bcRetry" type="button">Try again</button></div>`;
+  return BROADCASTS.length?BROADCASTS.map(bcCard).join(''):'<p class="muted">Nothing sent yet — your first update will show up here.</p>';
+}
 function bcCard(b){
-  const cnt=b.status==='sent'?`${b.sent_count} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}`
+  const cnt=b.status==='sent'?`${b.sent_count||0} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}`
     :b.status==='scheduled'?`Scheduled for ${b.scheduled_at?new Date(b.scheduled_at).toLocaleString():'soon'}`
-    :b.status==='draft'?'Draft':b.status;
-  return `<div class="bc">
-    <div class="top"><span class="subj">${esc(b.subject||'(no subject)')}</span><span class="st ${esc(b.status)}">${esc(b.status)}</span></div>
-    <div class="meta">${esc(cnt)} · ${esc(when(b.sent_at||b.created_at))}</div>
-    ${(b.status==='draft'||b.status==='scheduled')?`<div class="acts">${b.status==='scheduled'?`<button class="ghost" data-cancel="${esc(b.id)}">Cancel</button>`:''}</div>`:''}
+    :b.status==='draft'?'Draft — not sent':b.status;
+  const open=OPEN===b.id;
+  const acts=[];
+  if(b.status==='draft')acts.push(`<button class="ghost" data-edit="${esc(b.id)}">Edit draft</button>`);
+  if(b.status==='scheduled'){acts.push(`<button class="ghost" data-cancel="${esc(b.id)}">Cancel</button>`);acts.push(`<button class="ghost" data-resched="${esc(b.id)}">Reschedule</button>`);}
+  return `<div class="bc" data-bc="${esc(b.id)}">
+    <button class="bchead" type="button" data-open="${esc(b.id)}" aria-expanded="${open?'true':'false'}">
+      <span class="top"><span class="subj">${esc(b.subject||'(no subject)')}</span><span class="st ${esc(b.status)}">${esc(b.status)}</span></span>
+      <span class="meta">${esc(cnt)} · ${esc(when(b.sent_at||b.created_at))}</span>
+    </button>
+    ${acts.length?`<div class="acts">${acts.join('')}</div>`:''}
+    <div class="bcdetail" id="d-${esc(b.id)}" ${open?'':'hidden'}></div>
   </div>`;
 }
 function wire(){
@@ -132,12 +231,75 @@ function wire(){
   const a=$('assist');if(a)a.addEventListener('click',assist);
   const p=$('preview');if(p)p.addEventListener('click',doPreview);
   document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelBc(b.getAttribute('data-cancel'))));
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>editDraft(b.getAttribute('data-edit'))));
+  document.querySelectorAll('[data-resched]').forEach(b=>b.addEventListener('click',()=>reschedule(b.getAttribute('data-resched'))));
+  document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>toggleRow(b.getAttribute('data-open'),b)));
+  const rf=$('bcRefresh');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('bcRefresh');if(nr)nr.focus();}));
+  const sr=$('segRetry');if(sr)sr.addEventListener('click',()=>load());
+  const br=$('bcRetry');if(br)br.addEventListener('click',()=>load());
   const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;});
+  if(OPEN&&DETAILS[OPEN]){const box=$('d-'+OPEN);if(box)paintDetail(box,OPEN);}
+}
+// ── history drill-in (client.html Messages idiom): status · audience · counts ·
+//    the delivered body in a sandboxed srcdoc iframe · honest failed line ──────
+async function toggleRow(id,btn){
+  const box=$('d-'+id);if(!box)return;
+  const wasOpen=OPEN===id;
+  document.querySelectorAll('.bcdetail').forEach(el=>{el.hidden=true;});
+  document.querySelectorAll('.bchead').forEach(el=>el.setAttribute('aria-expanded','false'));
+  OPEN=null;
+  if(wasOpen)return;
+  OPEN=id;btn.setAttribute('aria-expanded','true');box.hidden=false;
+  if(DETAILS[id])return void paintDetail(box,id);
+  box.innerHTML='<p class="muted">Opening…</p>';
+  const gen=++DET_SEQ;
+  let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
+  if(gen!==DET_SEQ||OPEN!==id)return;   // a newer drill-in started, or the row was closed — never paint stale
+  if(!r.ok||!r.body.data){
+    box.innerHTML='<p class="muted">Couldn’t open this one just now. <button class="ghost" data-dretry type="button">Try again</button></p>';
+    const rt=box.querySelector('[data-dretry]');if(rt)rt.addEventListener('click',()=>{OPEN=null;toggleRow(id,btn);});
+    return;
+  }
+  DETAILS[id]=r.body.data;paintDetail(box,id);
+}
+function paintDetail(box,id){const d=DETAILS[id];box.innerHTML=detailHtml(d);const f=box.querySelector('iframe');if(f)f.srcdoc=(d&&d.preview_html)||'';}
+function detailHtml(d){
+  const b=(d&&d.broadcast)||{};
+  let counts='';
+  if(b.status==='sent')counts=`${b.sent_count||0} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}${b.sent_at?' · '+when(b.sent_at):''}`;
+  else if(b.status==='scheduled')counts=`Scheduled for ${b.scheduled_at?new Date(b.scheduled_at).toLocaleString():'soon'} · ${d.recipient_count||0} on the list today`;
+  else counts=`${d.recipient_count||0} ${d.recipient_count===1?'person':'people'} would get this today${d.suppressed_count?' · '+d.suppressed_count+' unsubscribed and left out':''}`;
+  // The API doesn't expose per-address failures — the honest line is the count.
+  const failed=(b.status==='sent'&&b.failed_count)?`<p class="failnote">${b.failed_count} address${b.failed_count===1?'':'es'} couldn’t be reached — everyone else got it.</p>`:'';
+  return `<div class="kv"><b>${esc(d.audience_label||'')}</b> · ${esc(counts)}</div>${failed}
+    <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||b.subject||'')}</b></div><iframe title="${b.status==='sent'?'Email as delivered':'Email preview'}" sandbox=""></iframe></div>`;
+}
+// ── "Drafts live again" (the L fix): a saved draft reopens INTO THE COMPOSER
+//    with DRAFT.id set, so the next preview PATCHes it instead of POSTing a twin.
+async function editDraft(id){
+  if(BUSY)return;BUSY=true;
+  let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
+  BUSY=false;
+  if(!r.ok||!r.body.data||!r.body.data.broadcast){toast('Couldn’t open that draft just now.');return;}
+  const b=r.body.data.broadcast;
+  DETAILS[id]=r.body.data;
+  DRAFT={id:b.id,subject:b.subject||'',body:b.body||'',audience:b.audience};
+  if(b.audience)SEL=b.audience;
+  OPEN=null;render();
+  const s=$('subj');if(s)s.focus();
+  toast('Draft opened — edit anything, then preview.');
+}
+async function reschedule(id){
+  if(BUSY)return;BUSY=true;
+  let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
+  BUSY=false;
+  if(!r.ok||!r.body.data){toast('Couldn’t open that one just now.');return;}
+  stageFor(id,r.body.data,{scheduleFirst:true,laterLabel:'Reschedule'});
 }
 function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAFT||{};DRAFT.subject=s.value;DRAFT.body=t.value;}}
 
 async function assist(){
-  const goal=prompt("What's this update about? (a sentence is enough)");
+  const goal=await askPrompt('What’s this update about?','A sentence is enough — you’ll get a draft you can edit.','Draft it','e.g. the summer menu is live');
   if(!goal)return;
   toast('Writing a draft…');
   const r=await api('/broadcasts/draft-assist','POST',{goal});
@@ -153,7 +315,12 @@ async function ensureDraft(){
   const body=($('bodytx')&&$('bodytx').value||'').trim();
   if(!subject){toast('Add a subject line first.');return null;}
   if(!body){toast('Write your message first.');return null;}
-  if(DRAFT&&DRAFT.id){await api('/broadcasts/'+DRAFT.id,'PATCH',{subject,body,audience:SEL});return DRAFT.id;}
+  if(DRAFT&&DRAFT.id){
+    const u=await api('/broadcasts/'+DRAFT.id,'PATCH',{subject,body,audience:SEL});
+    if(!u.ok){toast((u.body&&u.body.message)||'That didn’t save.');return null;}
+    delete DETAILS[DRAFT.id];   // the cached drill-in is stale now
+    return DRAFT.id;
+  }
   const r=await api('/broadcasts','POST',{subject,body,audience:SEL});
   if(!r.ok||!r.body.data||!r.body.data.id){toast('Couldn’t save the draft.');return null;}
   DRAFT=r.body.data;return DRAFT.id;
@@ -164,8 +331,19 @@ async function doPreview(){
   const id=await ensureDraft();BUSY=false;if(!id)return;
   const r=await api('/broadcasts/'+id);
   if(!r.ok){toast('Couldn’t build the preview.');return;}
-  const d=r.body.data;const cnt=d.recipient_count||0;
+  stageFor(id,r.body.data,{});
+}
+// The ONE preview-and-approve stage — used by the composer's Preview and by
+// Reschedule on a scheduled row (schedule mode preselected, time prefilled).
+function stageFor(id,d,opts){
+  opts=opts||{};
+  const cnt=d.recipient_count||0;
   const skip=d.suppressed_count?` <span class="sub">· ${d.suppressed_count} unsubscribed and left out</span>`:'';
+  const later=!!opts.scheduleFirst;
+  const laterLabel=opts.laterLabel||'Schedule';
+  let pre='';
+  const sat=d.broadcast&&d.broadcast.scheduled_at;
+  if(later&&sat){const dt=new Date(sat);const pad=(n)=>String(n).padStart(2,'0');pre=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;}
   $('stage').innerHTML=`<div class="card">
     <h2>Preview & send</h2>
     <p class="hint">This is exactly what lands in their inbox.</p>
@@ -173,21 +351,21 @@ async function doPreview(){
     <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||'')}</b></div><iframe id="pvframe" title="Email preview" sandbox=""></iframe></div>
     <label for="when">When</label>
     <div class="row" style="margin-top:4px">
-      <label style="display:inline-flex;align-items:center;gap:7px;font-weight:500;color:var(--ink);margin:0"><input type="radio" name="whenmode" value="now" checked> Send now</label>
-      <label style="display:inline-flex;align-items:center;gap:7px;font-weight:500;color:var(--ink);margin:0"><input type="radio" name="whenmode" value="later"> Schedule</label>
-      <input type="datetime-local" id="when" style="display:none">
+      <label style="display:inline-flex;align-items:center;gap:7px;font-weight:500;color:var(--ink);margin:0"><input type="radio" name="whenmode" value="now" ${later?'':'checked'}> Send now</label>
+      <label style="display:inline-flex;align-items:center;gap:7px;font-weight:500;color:var(--ink);margin:0"><input type="radio" name="whenmode" value="later" ${later?'checked':''}> Schedule</label>
+      <input type="datetime-local" id="when" value="${esc(pre)}" style="display:${later?'inline-block':'none'}">
     </div>
     <div class="row">
-      <button class="primary" id="send" ${cnt?'':'disabled'}>${cnt?'Send now':'No one to send to'}</button>
-      <button class="ghost" id="reedit">Keep editing</button>
+      <button class="primary" id="send" ${cnt?'':'disabled'}>${later?laterLabel:(cnt?'Send now':'No one to send to')}</button>
+      <button class="ghost" id="reedit">${later?'Never mind':'Keep editing'}</button>
     </div>
   </div>`;
   // sandboxed preview via srcdoc (isolated, no scripts run)
   const f=$('pvframe');if(f)f.srcdoc=d.preview_html||'';
   $('stage').scrollIntoView({behavior:'smooth',block:'start'});
-  document.querySelectorAll('[name=whenmode]').forEach(r=>r.addEventListener('change',()=>{const later=document.querySelector('[name=whenmode]:checked').value==='later';$('when').style.display=later?'inline-block':'none';$('send').textContent=later?'Schedule':'Send now';}));
+  document.querySelectorAll('[name=whenmode]').forEach(r=>r.addEventListener('change',()=>{const l=document.querySelector('[name=whenmode]:checked').value==='later';$('when').style.display=l?'inline-block':'none';$('send').textContent=l?laterLabel:'Send now';}));
   $('send').addEventListener('click',()=>doSend(id));
-  $('reedit').addEventListener('click',()=>{$('stage').innerHTML='';$('subj').focus();});
+  $('reedit').addEventListener('click',()=>{$('stage').innerHTML='';const s=$('subj');if(s)s.focus();});
 }
 
 async function doSend(id){
@@ -195,7 +373,7 @@ async function doSend(id){
   const later=document.querySelector('[name=whenmode]:checked').value==='later';
   let scheduled_at=null;
   if(later){const v=$('when').value;if(!v){toast('Pick a date and time.');return;}scheduled_at=new Date(v).toISOString();if(Date.parse(scheduled_at)<=Date.now()){toast('Pick a time in the future — or choose Send now.');return;}}
-  if(!later&&!confirm('Send this to your list now?'))return;
+  if(!later&&!(await askConfirm('Send this to your list now?','It goes straight out to everyone on the list — an email can’t be unsent.','Send now')))return;
   BUSY=true;$('send').disabled=true;$('send').textContent=later?'Scheduling…':'Sending…';
   const r=await api('/broadcasts/'+id+'/send','POST',scheduled_at?{scheduled_at}:{});
   BUSY=false;
@@ -204,31 +382,44 @@ async function doSend(id){
   if(d.status==='scheduled')toast('Scheduled. It’ll go out then — you can cancel any time before.');
   else if(d.status==='queued')toast('Sending now — it goes out over the next few minutes.');
   else toast(`Sent to ${d.sent_count||0} ${(d.sent_count===1)?'person':'people'}.`+(d.failed_count?` (${d.failed_count} couldn’t be reached.)`:''));
-  DRAFT=null;$('stage').innerHTML='';
+  if(DRAFT&&DRAFT.id===id)DRAFT=null;   // only clear the composer if IT was the thing sent
+  delete DETAILS[id];
+  $('stage').innerHTML='';
   await load();
 }
 
 async function cancelBc(id){
-  if(!confirm('Cancel this scheduled broadcast?'))return;
+  if(!(await askConfirm('Cancel this scheduled broadcast?','It won’t go out. It stays in your history and nothing is deleted.','Cancel it')))return;
   const r=await api('/broadcasts/'+id+'/cancel','POST',{});
   if(!r.ok){toast(r.body&&r.body.message||'Couldn’t cancel.');return;}
+  delete DETAILS[id];if(OPEN===id)OPEN=null;
   toast('Canceled.');await load();
 }
 
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to send an update.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button class="primary" onclick="location.reload()" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;}
+// Try again retries load() IN PLACE — never location.reload() (the leads.html contract).
+function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
 
-async function load(){
-  // failure honesty: a non-403 failure on EITHER read gets the honest trouble
-  // screen — never a quietly empty "Loading lists…" / no-history render that
-  // masquerades as having nothing to send to.
-  let seg;try{seg=await api('/broadcasts/segments');}catch(_){seg={ok:false,status:0,body:{}};}
-  if(seg.status===403){$('main').innerHTML=`<div class="center"><h2>Broadcasts live in your studio workspace.</h2></div>`;return;}
-  if(!seg.ok){trouble();return;}
-  SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];
-  let list;try{list=await api('/broadcasts');}catch(_){list={ok:false,status:0,body:{}};}
-  if(!list.ok){trouble();return;}
-  BROADCASTS=(list.body.data&&list.body.data.broadcasts)||[];
+// ── Boot reads run in PARALLEL (D6) with per-read failure honesty ────────────
+// One read failing degrades ITS section with a visible notice (never a quietly
+// empty render that masquerades as having nothing); only BOTH failing gets the
+// full trouble screen. soft=true (the ↻ button): any failure keeps the current
+// render and toasts — the error surfaces are for the initial load only.
+async function load(soft){
+  const gen=++REQ_SEQ;
+  const [seg,list]=await Promise.all([
+    api('/broadcasts/segments').catch(()=>({ok:false,status:0,body:{}})),
+    api('/broadcasts').catch(()=>({ok:false,status:0,body:{}})),
+  ]);
+  if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
+  if(seg.status===403||list.status===403){$('main').innerHTML=`<div class="center"><h2>Broadcasts live in your studio workspace.</h2></div>`;return;}
+  if(!seg.ok&&!list.ok){if(soft)return void toast('Couldn’t refresh just now.');trouble();return;}
+  if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.');
+  if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;}
+  else if(!soft)SEG_OK=false;   // soft keeps the last good lists on screen
+  if(list.ok){BROADCASTS=(list.body.data&&list.body.data.broadcasts)||[];LIST_OK=true;LOADED_AT=Date.now();}
+  else if(!soft)LIST_OK=false;
+  syncDraftFromForm();   // a re-render must never eat what's typed in the composer
   render();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
