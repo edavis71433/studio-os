@@ -40,6 +40,79 @@ test.describe('Leads inbox', () => {
     await expect(page.locator('#main').getByRole('link', { name: /Sign in/ })).toBeVisible();
     await expect(page.locator('.lead')).toHaveCount(0);
   });
+
+  // ── SS6 (C2/C5/C7): search · honest filter group · REQ_SEQ ────────────────
+  test('boots quiet: one h1, the search bar, zero console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await installApp(page);
+    await page.goto('/leads.html');
+    await expect(page.getByRole('heading', { level: 1, name: 'Website enquiries' })).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('#q')).toBeVisible();
+    await expect(page.locator('.lmeta')).toContainText('2 enquiries · 1 new · Updated just now');
+    expect(errors).toEqual([]);
+  });
+
+  test('C2 — search filters the queue client-side without rebuilding the input', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/leads.html');
+    await expect(page.locator('.lead')).toHaveCount(2);
+    const q = page.locator('#q');
+    // mark the live input node: list-only re-renders must never replace it
+    await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
+    await q.pressSequentially('dana');
+    await expect(page.locator('.lead')).toHaveCount(1);
+    await expect(page.locator('.lead').first()).toContainText('Dana Lee');
+    expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
+    // the meta line reflects what the queue shows (C7 vocabulary: count + new)
+    await expect(page.locator('.lmeta')).toContainText('1 enquiry');
+    await q.fill('');
+    await expect(page.locator('.lead')).toHaveCount(2);
+    // no-match stays honest, never a blank page
+    await q.fill('zzz-nobody');
+    await expect(page.locator('#main')).toContainText('No enquiries match');
+  });
+
+  test('C5 — the status filters are an honest role=group with aria-pressed (no fake tablist)', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/leads.html');
+    const filters = page.locator('.filters');
+    await expect(filters).toHaveAttribute('role', 'group');
+    await expect(filters.locator('[role=tab]')).toHaveCount(0);
+    await expect(filters.locator('[data-f="open"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(filters.locator('[data-f="new"]')).toHaveAttribute('aria-pressed', 'false');
+    await filters.locator('[data-f="new"]').click();
+    await expect(filters.locator('[data-f="new"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(filters.locator('[data-f="open"]')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('REQ_SEQ — a slow superseded load never paints over the newest one', async ({ page }) => {
+    await installApp(page);
+    const sub = (id: string, name: string) => ({ id, form_kind: 'contact', name, email: 'x@example.com', phone: '', message: 'Hi', source_page: '/', status: 'new', created_at: '2026-07-07T00:00:00Z' });
+    let call = 0;
+    // registered AFTER installApp so it wins for the list GET only (the POST
+    // status routes carry an /:id segment and fall through to the harness)
+    await page.route('**/functions/v1/presence/forms/inbox', (route) => {
+      call++;
+      const fulfill = (subs: unknown[]) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { submissions: subs, unread: 1 } }) });
+      // call 2 is delayed WITHOUT blocking the handler (an awaited sleep here
+      // would serialize the responses and defeat the race under test)
+      if (call === 2) { setTimeout(() => { fulfill([sub('l2', 'Stale Lead')]).catch(() => {}); }, 700); return; }
+      return fulfill(call === 1 ? [sub('l1', 'Boot Lead')] : [sub('l3', 'Fresh Lead')]);
+    });
+    await page.goto('/leads.html');
+    await expect(page.locator('.lead')).toContainText(['Boot Lead']);
+    // two refreshes in quick succession: the FIRST response is delayed and lands
+    // last — the page must keep the newest request's rows, not the stale ones
+    await page.locator('#refreshBtn').click();
+    await page.locator('#refreshBtn').click();
+    await expect(page.locator('.lead')).toContainText(['Fresh Lead']);
+    await page.waitForTimeout(900);   // let the stale response land
+    await expect(page.locator('.lead')).toContainText(['Fresh Lead']);
+    await expect(page.locator('#main')).not.toContainText('Stale Lead');
+  });
 });
 
 test.describe('Relationship view', () => {
