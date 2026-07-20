@@ -39,6 +39,17 @@ html.dds-embed #detailWrap{padding-top:0}
   .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
   h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:4px}
   .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
+  /* ── roster header (.lhead) — the same list-view anatomy as customers.html /
+        leads.html / contacts.html: object icon · ONE h1 · ↻ · count/money meta ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:12px}
+  .lrow1{display:flex;align-items:center;gap:10px}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 10px;min-height:34px;cursor:pointer}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .search{width:100%;font-family:inherit;font-size:16px;padding:10px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:12px}
+  .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   /* the calm "your numbers" strip — plain numbers, tabular, no chart */
   .summary{margin-bottom:18px}
   .summary:empty{display:none}
@@ -208,8 +219,15 @@ html.dds-embed #detailWrap{padding-top:0}
 </head>
 <body>
 <div class="wrap" id="listWrap">
-  <h1>Pipeline</h1>
-  <div class="sub">From first enquiry through onboarding — one deal at a time.</div>
+  <div class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">🤝</span>
+      <h1>Pipeline</h1>
+      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta" id="lmeta">From first enquiry through onboarding — one deal at a time.</div>
+  </div>
+  <input class="search" id="dealSearch" type="search" autocomplete="off" aria-label="Search deals" placeholder="Search deals — title, company, or contact…">
   <div class="summary" id="summary" aria-live="polite"></div>
   <div class="bar" id="filters" role="tablist" aria-label="Filter by stage"></div>
   <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span><div class="viewtog" role="tablist" aria-label="View"><button class="chip on" id="viewList" role="tab" aria-selected="true">List</button><button class="chip" id="viewBoard" role="tab" aria-selected="false">Board</button><button class="chip" id="viewTable" role="tab" aria-selected="false">Table</button></div></div>
@@ -329,6 +347,9 @@ function ago(iso){const then=Date.parse(iso),now=Date.now();if(!isFinite(then))r
 // The activity quick-log kinds (calm, plain — icon + label).
 const ACTKINDS=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 Meeting'],['note','📝 Note']];
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
+let Q='';                    // the .lhead search query — client-side, across List/Board/Table
+let LOADED_AT=Date.now();    // when the roster last loaded (the .lmeta "Updated …" fact)
+const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 // The chosen display (List · Board · Table) persists across visits. Embed mode
 // (the record page's Deal tab) never sees the list side, so it's exempt.
 const VIEW_KEY='dds-display:pipeline';
@@ -496,29 +517,30 @@ $('viewTable').onclick=()=>{if(VIEW!=='table')setView('table');};
 // propagation, so they survive; everything else dismisses it).
 document.addEventListener('click',(e)=>{if(e.target&&e.target.closest&&e.target.closest('.bc-move,.bc-menu'))return;document.querySelectorAll('.bc-menu').forEach(m=>m.remove());document.querySelectorAll('.bc-move[aria-expanded="true"]').forEach(b=>b.setAttribute('aria-expanded','false'));});
 
-async function load(){
+// soft=true (the ↻ button): a failure keeps the current render and toasts —
+// the skeleton + error surfaces are for hard loads only (the leads.html
+// contract). NOTE: load must always be WRAPPED when passed as a handler —
+// a click event in the first slot would become its soft flag.
+async function load(soft){
   renderSummary();   // refresh the numbers whenever the pipeline reloads (add/move/convert)
   const board=VIEW==='board';
   const host=board?$('board'):VIEW==='table'?$('table'):$('list');
-  if(window.ddsSkeleton) window.ddsSkeleton(host,4);
+  if(!soft&&window.ddsSkeleton) window.ddsSkeleton(host,4);
   try{
     // Board shows every open stage, so it ignores the list's stage filter.
     const res=await api('/sales/deals'+((!board&&FILTER)?('?stage='+FILTER):''));
     DEALS=res.data||[];
-    if(board){ renderBoard(); return; }
-    if(!DEALS.length){ if(window.ddsEmpty) window.ddsEmpty(host,{icon:'🧭',title:'No deals yet',body:'New enquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal}); else host.innerHTML='<p class="mut">No deals yet.</p>'; return; }
-    if(VIEW==='table'){ renderTable(); return; }
-    // Deals with a DUE next step float to the top (overdue first) — the pipeline
-    // answers "what do I do today", not just "what exists".
-    const today=new Date().toISOString().slice(0,10);
-    DEALS.sort((a,b)=>{const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
-    $('list').innerHTML=DEALS.map(d=>{
-      const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
-      const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
-      return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
-    }).join('');
-    $('list').querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
-  }catch(e){ if(window.ddsError) window.ddsError(host,nice(e),load); else host.innerHTML='<p class="mut">'+esc(nice(e))+'</p>'; }
+    LOADED_AT=Date.now();
+    renderCurrent();
+  }catch(e){
+    if(soft){toast('Couldn’t refresh just now.',true);return;}   // keep the last good render
+    if(window.ddsError) window.ddsError(host,nice(e),()=>load()); else host.innerHTML='<p class="mut">'+esc(nice(e))+'</p>';
+  }
+}
+// ↻ soft refresh + the static search input (never re-rendered → caret-safe).
+{
+  const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>{load(true);});
+  const si=$('dealSearch'); if(si)si.addEventListener('input',()=>{Q=si.value;renderCurrent();});
 }
 
 // ── Table view: the deals as a sortable list-view table (Deal · Contact ·
@@ -526,15 +548,71 @@ async function load(){
 // nothing edits inline. Contact names aren't in the deals LIST response (only
 // contact_id), so the Contact column joins them client-side from the EXISTING
 // GET /sales/contacts read — fetched once, cached, degrading to “—”. ──
-let CONTACT_NAME=null,CONTACT_LOADING=null,CONTACT_FAILED=false;
+let CONTACT_NAME=null,CONTACT_TEXT=null,CONTACT_LOADING=null,CONTACT_FAILED=false;
 function ensureContactNames(){
   if(CONTACT_NAME&&!CONTACT_FAILED)return Promise.resolve();
   if(CONTACT_LOADING)return CONTACT_LOADING;
   CONTACT_LOADING=api('/sales/contacts?limit=500')
-    .then(r=>{CONTACT_NAME={};CONTACT_FAILED=false;for(const c of (r.data||[]))CONTACT_NAME[c.id]=c.name||c.email||'';})
-    .catch(()=>{CONTACT_NAME={};CONTACT_FAILED=true;})   // plan-gated or offline → cells read “—” for THIS render; a failure is never cached — the next render retries
+    .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;for(const c of (r.data||[])){CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}})
+    .catch(()=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=true;})   // plan-gated or offline → cells read “—” for THIS render; a failure is never cached — the next render retries
     .finally(()=>{CONTACT_LOADING=null;});
   return CONTACT_LOADING;
+}
+// ── the .lhead search: ONE client-side filter across every display. Matches the
+// deal title plus the contact's name/email/company (the same cached
+// /sales/contacts join the Table's Contact column uses — kicked lazily the
+// first time a query needs it, degrading to title-only until it lands). The
+// input is STATIC markup: only the list re-renders, so focus + caret survive
+// every keystroke by construction (the contacts.html list-only-re-render idiom).
+function visibleDeals(){
+  const q=Q.trim().toLowerCase();
+  if(!q)return DEALS;
+  if(!CONTACT_TEXT&&!CONTACT_LOADING)ensureContactNames().then(()=>{if(Q.trim())renderCurrent();});
+  return DEALS.filter(d=>{
+    const ct=(CONTACT_TEXT&&d.contact_id&&CONTACT_TEXT[d.contact_id])||'';
+    return (String(d.title||'').toLowerCase()+' '+ct).includes(q);
+  });
+}
+// ── the .lmeta line: visible count · total value (money0 — the same cents
+// formatter the summary strip uses) · freshness · table sort, in one breath.
+function renderMeta(){
+  const el=$('lmeta'); if(!el)return;
+  const list=visibleDeals();
+  const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
+  let m=list.length+' deal'+(list.length===1?'':'s')+' · '+money0(sum)+' total · '+updatedLabel();
+  if(VIEW==='table'){const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];m+=' · Sorted by '+col[1]+' — '+(TSORT.dir>0?'ascending':'descending');}
+  el.textContent=m;
+}
+// Roster-empty honesty: a stage-filtered empty says WHICH stage is empty (the
+// won landing gets its own line); only a truly empty pipeline gets the starter.
+function renderRosterEmpty(host){
+  if(FILTER==='won'){host.innerHTML='<div class="dds-empty"><div class="ico">🏆</div><h3>No won deals yet</h3><p>Deals you win show up here with their values.</p></div>';return;}
+  if(FILTER){host.innerHTML='<div class="dds-empty"><h3>Nothing in “'+esc(stageLabel(FILTER))+'” right now.</h3><p>Deals in this stage will show up here.</p></div>';return;}
+  if(window.ddsEmpty) window.ddsEmpty(host,{icon:'🧭',title:'No deals yet',body:'New enquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal});
+  else host.innerHTML='<p class="mut">No deals yet.</p>';
+}
+// ONE re-render for whatever display is active — the search, refresh, and sort
+// paths all come through here so the meta line never drifts from the list.
+function renderCurrent(){
+  renderMeta();
+  if(VIEW==='board'){renderBoard();return;}
+  const host=VIEW==='table'?$('table'):$('list');
+  if(!DEALS.length){renderRosterEmpty(host);return;}
+  if(!visibleDeals().length){host.innerHTML='<div class="dds-empty"><h3>No deals match that.</h3><p>Try a different deal, company, or contact name.</p></div>';return;}
+  if(VIEW==='table')renderTable();else renderList();
+}
+function renderList(){
+  const host=$('list');
+  // Deals with a DUE next step float to the top (overdue first) — the pipeline
+  // answers "what do I do today", not just "what exists".
+  const today=new Date().toISOString().slice(0,10);
+  const list=[...visibleDeals()].sort((a,b)=>{const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
+  host.innerHTML=list.map(d=>{
+    const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
+    const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
+    return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+  }).join('');
+  host.querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
 const TCOLS=[
   ['title','Deal',(d)=>String(d.title||'').toLowerCase()],
@@ -556,7 +634,7 @@ function renderTable(){
   }
   const today=new Date().toISOString().slice(0,10);
   const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];
-  const list=[...DEALS].sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-TSORT.dir:av>bv?TSORT.dir:0;});
+  const list=[...visibleDeals()].sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-TSORT.dir:av>bv?TSORT.dir:0;});
   const ths=TCOLS.map(([k,label])=>{
     const on=TSORT.key===k;
     return `<th scope="col"${on?` aria-sort="${TSORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-tsort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${TSORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
@@ -577,12 +655,12 @@ function renderTable(){
       <td>${d.last_contacted_at?esc(ago(d.last_contacted_at)):'—'}</td>
     </tr>`;
   }).join('');
-  host.innerHTML=`<p class="tmeta">${list.length} deal${list.length===1?'':'s'} · Sorted by ${esc(col[1])} — ${TSORT.dir>0?'ascending':'descending'}</p>
-    <div class="tscroll"><table aria-label="Deals"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  // the count/sort meta lives in the .lhead's .lmeta now — ONE meta line per page
+  host.innerHTML=`<div class="tscroll"><table aria-label="Deals"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
   host.querySelectorAll('[data-tsort]').forEach(b=>b.onclick=()=>{
     const k=b.getAttribute('data-tsort');
     if(TSORT.key===k)TSORT.dir=-TSORT.dir; else TSORT={key:k,dir:k==='last'?-1:1};   // last-contacted reads newest-first on first click
-    renderTable();
+    renderTable();renderMeta();
     const nb=host.querySelector('[data-tsort="'+k+'"]'); if(nb)nb.focus();
     // announce just the sort (the table itself is NOT a live region)
     const sc=TCOLS.find(x=>x[0]===k)||TCOLS[0];
@@ -614,7 +692,8 @@ function renderBoard(){
   const host=$('board');
   const today=new Date().toISOString().slice(0,10);
   // Open deals only — won/lost are outcomes (mirrors the summary), shown in List.
-  const open=DEALS.filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);
+  // visibleDeals() so the .lhead search narrows the board's cards too.
+  const open=visibleDeals().filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);
   const cols=BOARD_STAGES.map(stg=>{
     const ds=open.filter(d=>d.stage===stg);
     const sum=ds.reduce((a,d)=>a+(d.expected_value_cents||0),0);   // per-column total value (pipeline health at a glance)

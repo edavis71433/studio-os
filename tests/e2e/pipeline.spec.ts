@@ -116,6 +116,94 @@ test.describe('Pipeline table view', () => {
   });
 });
 
+// ── SS5: pipeline to the roster standard — .lhead anatomy, soft ↻ refresh,
+// client-side search across title/company/contact (caret-safe: the input is
+// static; only the list re-renders). Money meta uses the page's money0.
+test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
+  test('boots under the roster anatomy: .lhead, ONE h1, money meta — zero console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await expect(page.getByRole('heading', { level: 1, name: 'Pipeline' })).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('.lhead .obj-ic')).toBeVisible();
+    // 2 deals, $5,000 + $2,500 expected value
+    await expect(page.locator('.lhead .lmeta')).toContainText('2 deals · $7,500 total · Updated just now');
+    await expect(page.locator('#refreshBtn')).toBeVisible();
+    await expect(page.locator('#dealSearch')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('↻ soft refresh keeps the last good list and toasts on failure — never the error screen', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    // now the network sours — the soft refresh must NOT wipe the list
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'boom' }) }));
+    await page.locator('#refreshBtn').click();
+    await expect(page.locator('.dds-toast')).toContainText('Couldn’t refresh just now.');
+    await expect(page.locator('#list .card')).toHaveCount(2);          // last good render kept
+    await expect(page.locator('.dds-error')).toHaveCount(0);           // no error screen on soft
+    // the network heals — the same button refreshes in place
+    await page.unroute(/\/functions\/v1\/presence\/sales\/deals(\?|$)/);
+    await page.locator('#refreshBtn').click();
+    await expect(page.locator('#list .card')).toHaveCount(2);
+  });
+
+  test('search filters by title, contact name, and company — the input keeps focus and caret', async ({ page }) => {
+    const contacts = { data: [
+      { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', updated_at: past(1) },
+      { id: 'ct-2', name: 'Dana Lee', email: 'dana@example.com', phone: '', company: 'Northwind', updated_at: past(2) },
+    ] };
+    await installApp(page, { api: { ...API, '/sales/contacts': contacts } });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    const s = page.locator('#dealSearch');
+    // by title
+    await s.pressSequentially('acme');
+    await expect(page.locator('#list .card')).toHaveCount(1);
+    await expect(page.locator('#list .card')).toContainText('Acme website');
+    await expect(page.locator('.lhead .lmeta')).toContainText('1 deal · $5,000 total');
+    // the input survived every list re-render: same element, focused, caret at the end
+    await expect(s).toBeFocused();
+    expect(await s.evaluate((el: HTMLInputElement) => el.selectionStart)).toBe(4);
+    // by CONTACT name (client-side join)
+    await s.fill('');
+    await s.pressSequentially('dana');
+    await expect(page.locator('#list .card')).toHaveCount(1);
+    await expect(page.locator('#list .card')).toContainText('Beta rebrand');
+    // by COMPANY (only the contact record knows "Northwind")
+    await s.fill('northwind');
+    await expect(page.locator('#list .card')).toHaveCount(1);
+    await expect(page.locator('#list .card')).toContainText('Beta rebrand');
+    // no match → the honest "no match" state, never the starter empty state
+    await s.fill('zzz-nothing');
+    await expect(page.locator('#list')).toContainText('No deals match that.');
+    await expect(page.locator('#list')).not.toContainText('No deals yet');
+    // clearing restores the roster
+    await s.fill('');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+  });
+
+  test('search narrows the table and the board too', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#table tbody tr')).toHaveCount(2);
+    await page.locator('#dealSearch').fill('beta');
+    await expect(page.locator('#table tbody tr')).toHaveCount(1);
+    await expect(page.locator('#table tbody tr')).toContainText('Beta rebrand');
+    // board: the same query keeps filtering
+    await page.locator('#viewBoard').click();
+    await expect(page.locator('#board .col').first()).toBeVisible();
+    await expect(page.locator('#board .bcard')).toHaveCount(1);
+    await expect(page.locator('#board .bcard')).toContainText('Beta rebrand');
+  });
+});
+
 test.describe('Deal drawer Path', () => {
   test('the Path chevron bar renders with guidance tip AND action (suggested_action fix)', async ({ page }) => {
     await installApp(page, { api: API });
