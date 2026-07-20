@@ -825,7 +825,7 @@ $('dealForm').onsubmit=async(e)=>{
     let contactId=null;
     // capture a real name/phone if given (no more "jane.doe" contacts from the email)
     if(email||cname){ const c=await api('/sales/contacts','POST',{email:email||undefined,name:cname||(email?email.split('@')[0]:'New contact'),phone:cphone||undefined}); contactId=c.data&&c.data.id;
-      CONTACT_NAME=null;CONTACT_FAILED=false; }   // the Table's contact-name join is stale now — refetch on the next render
+      CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false; }   // BOTH contact caches are stale now — the Table's name join AND the search index (visibleDeals gates its refetch on !CONTACT_TEXT); refetch on the next render
     const created=await api('/sales/deals','POST',{title,contact_id:contactId});
     $('formDlg').close(); toast('Deal added'); load();
     if(created&&created.data&&created.data.id) openDeal(created.data.id);   // straight into the deal — no hunting the list

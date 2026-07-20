@@ -485,6 +485,59 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     await expect(page.locator('#list .card')).toHaveCount(4);
     await expect(page.locator('.lhead .lmeta')).toContainText('4 deals · $18,490 total');
   });
+
+  // SS5 item 3: creating a deal with a NEW contact invalidated only the Table's
+  // CONTACT_NAME join — the search index (CONTACT_TEXT) kept the stale set, so
+  // searching the new contact's company found nothing until a full reload.
+  test('after creating a deal with a new contact, searching that company finds the deal', async ({ page }) => {
+    const DEAL3 = '44444444-4444-4444-8444-444444444444';
+    const NEWDEAL = { id: DEAL3, title: 'Gamma site', stage: 'lead', source: 'manual', expected_value_cents: 0, expected_close: null, contact_id: 'ct-3', converted_client_id: null, updated_at: past(0), next_step: null, next_step_at: null, last_contacted_at: null, agreement_signed: false };
+    const DETAIL3 = { data: {
+      deal: { id: DEAL3, title: 'Gamma site', stage: 'lead', expected_value_cents: 0, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-3', converted_client_id: null, retainer: null },
+      contact: { id: 'ct-3', name: 'Pat Field', email: 'pat@newco.com', phone: '', company: 'Newco', notes: '' },
+      proposals: [], contracts: [], events: [], timeline: [], invoices: [], last_contacted_at: null,
+    } };
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL3}`]: DETAIL3, [`/sales/deals/${DEAL3}/tasks`]: { data: [] } } });
+    let created = false;   // flips when the new contact is POSTed — the fixtures grow with it
+    await page.route(/\/functions\/v1\/presence\/sales\/contacts(\?|$)/, (route) => {
+      if (route.request().method() === 'POST') {
+        created = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-3' } }) });
+      }
+      const base = [
+        { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', updated_at: past(1) },
+        { id: 'ct-2', name: 'Dana Lee', email: 'dana@example.com', phone: '', company: 'Beta', updated_at: past(2) },
+      ];
+      const contacts = created ? [{ id: 'ct-3', name: 'Pat Field', email: 'pat@newco.com', phone: '', company: 'Newco', updated_at: past(0) }, ...base] : base;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: contacts }) });
+    });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) => {
+      if (route.request().method() === 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: DEAL3 } }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(created ? { data: [NEWDEAL, ...DEALS.data] } : DEALS) });
+    });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    // prime the contact-search cache with the OLD contact set
+    const s = page.locator('#dealSearch');
+    await s.fill('acme');
+    await expect(page.locator('#list .card')).toHaveCount(1);
+    await s.fill('');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    // create a deal with a brand-new contact at a brand-new company
+    await page.locator('#newDeal').click();
+    await page.locator('#f-title').fill('Gamma site');
+    await page.locator('#f-email').fill('pat@newco.com');
+    await page.locator('#f-name').fill('Pat Field');
+    await page.locator('#dealForm button[type="submit"]').click();
+    await expect(page.locator('#dtitle')).toContainText('Gamma site');   // lands straight in the new deal
+    await page.locator('#closeD').click();
+    await expect(page.locator('#list .card')).toHaveCount(3);
+    // the company search must find the new deal — the search cache was invalidated too
+    await s.fill('newco');
+    await expect(page.locator('#list .card')).toHaveCount(1);
+    await expect(page.locator('#list .card')).toContainText('Gamma site');
+    await expect(page.locator('#list')).not.toContainText('No deals match that.');
+  });
 });
 
 test.describe('Deal drawer Path', () => {
