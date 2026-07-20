@@ -1980,8 +1980,9 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
         : route.fallback();
     });
     await page.goto('/client.html');
-    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    expect(bundleGets).toBe(1);
+    // the heading paints BEFORE buildNeedsYou's async bundle fetch — poll, or
+    // this pin races a request that may not have fired yet
+    await expect.poll(() => bundleGets).toBe(1);
     // Files re-enters ensureSnaps → the failed id is REFETCHED (not served from
     // a poisoned cache) and this time renders the project's real files
     await page.locator('#tabnav [data-tab="files"]').click();
