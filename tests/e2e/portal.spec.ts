@@ -1961,4 +1961,25 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect(page.getByText('We couldn’t load this project’s files just now', { exact: false })).toHaveCount(0);
     await expect.poll(() => bundleGets).toBe(2);
   });
+
+  test('a transiently failed website-stats read is NOT cached: the next Home visit really retries', async ({ page }) => {
+    let calls = 0;
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/website-stats', (route) => {
+      calls++;
+      if (calls === 1) return fail500(route);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WS_STATS) });
+    });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // the failure hides the slot (no error card — slice 8b's contract)…
+    await expect(page.locator('.wscard')).toHaveCount(0);
+    await expect.poll(() => calls).toBe(1);
+    // …but is NOT session-cached: Home→away→Home retries and the card appears
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.locator('#tabnav [data-tab="home"]').click();
+    await expect(page.locator('#home-website .wscard')).toBeVisible();
+    await expect.poll(() => calls).toBe(2);
+  });
 });
