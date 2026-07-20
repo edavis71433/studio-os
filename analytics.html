@@ -164,6 +164,12 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
 const num=(n)=>(Number(n)||0).toLocaleString();
 const withScope=(href)=>scope()?href+(href.includes('?')?'&':'?')+'client='+encodeURIComponent(scope()):href;
+// D1 — the withScopePeriod pair: card() layers withScope onto every footer href,
+// so passing a withPeriod()'d target means the drill link carries the active
+// window AND the scope. Only targets that understand windows get a period
+// (business-insights — SS11 consumes these); pipeline's stage=won landing is
+// SS5, so pipeline footers stay bare until then.
+const withPeriod=(href)=>href+(href.includes('?')?'&':'?')+'period='+encodeURIComponent(PERIOD);
 const PERIODS=[['this_month','This month'],['last_30','Last 30 days'],['quarter','This quarter'],['all','All time']];
 const periodLabel=()=>{const p=PERIODS.find(x=>x[0]===PERIOD);return p?p[1]:'This month';};
 // Truncation honesty (AN-4): a capped read is "the most recent N", so the card
@@ -245,18 +251,21 @@ function salesBand(d){
     s.pipeline?kpi(money(s.pipeline.open.value_cents),`${num(s.pipeline.open.count)} open deal${s.pipeline.open.count===1?'':'s'}`)
       :emptyState('Nothing to count yet','Your open deals will total up here.'),
     ['/pipeline.html','View pipeline']);
-  // KPI: won this month (↑/↓ vs last month)
+  // KPI: won this month (↑/↓ vs last month). D3: the number is summed
+  // expected_value_cents, so the copy says so — never implied invoiced revenue.
   {
     let body;
     if(s.won){
       const tm=s.won.this_month||{count:0,value_cents:0},lm=s.won.last_month||{count:0,value_cents:0};
       const hint=(tm.value_cents||lm.value_cents)?(tm.value_cents>lm.value_cents?' · <b class="up">↑ vs last month</b>':tm.value_cents<lm.value_cents?' · <b class="down">↓ vs last month</b>':' · same as last month'):'';
-      body=tm.count?kpi(money(tm.value_cents),`${num(tm.count)} deal${tm.count===1?'':'s'}${hint}`):kpi('$0',`none yet${hint}`);
+      body=tm.count?kpi(money(tm.value_cents),`expected value of ${num(tm.count)} deal${tm.count===1?'':'s'} won${hint}`):kpi('$0',`none won yet${hint}`);
     }else body=emptyState('Nothing to count yet','Deals you win will show up here.');
+    // stage=won landing deferred to SS5 — pipeline.html doesn't read ?stage yet.
     h+=card('c3','Won this month',based('',s.truncated_deals),body,['/pipeline.html','View won deals']);
   }
-  // KPI: new enquiries
-  h+=card('c3','New enquiries',based('',s.truncated_enquiries),
+  // KPI: new enquiries (D2: the count is period-windowed — label the window,
+  // matching the sibling cards' periodLabel() wording)
+  h+=card('c3','New enquiries',based(periodLabel(),s.truncated_enquiries),
     s.enquiries?kpi(num(s.enquiries.count),s.enquiries.unanswered?`${num(s.enquiries.unanswered)} not yet answered`:'all answered')
       :emptyState('Nothing to count yet','Website enquiries will land here.'),
     ['/leads.html','View enquiries']);
@@ -322,6 +331,7 @@ function salesBand(d){
     const rows=(s.recent_wins||[]);
     const body=rows.length?`<table><caption>Recent wins — deal, value, closed date</caption><thead><tr><th scope="col">Deal</th><th class="r" scope="col">Value</th><th class="r" scope="col">Closed</th></tr></thead><tbody>${rows.map(w=>`<tr><td>${esc(w.title)}</td><td class="r">${money(w.value_cents)}</td><td class="r">${esc(shortDate(w.closed_at))}</td></tr>`).join('')}</tbody></table>`
       :emptyState('No wins yet','Deals you win in the next 90 days will be listed here.');
+    // stage=won landing deferred to SS5 — pipeline.html doesn't read ?stage yet.
     h+=card(s.invoices?'c4':'c6','Recent wins',based('Last 90 days',s.truncated_deals),body,['/pipeline.html','View won deals']);
   }
   return h;
@@ -336,31 +346,34 @@ function websiteBand(d){
   // connect CTA — the user may well be connected); g null = not connected.
   const gDown=!!(g&&g.unavailable);
   const gOk=!!(g&&!g.unavailable);
+  // D1: every business-insights drill carries the active period (it understands
+  // windows — SS11 consumes it); the connections CTA never does.
+  const BI=withPeriod('/business-insights.html');
   let h=`<h2 class="band">Your website</h2>`;
-  h+=card('c3','Visitors',based('',tTrunc),
+  h+=card('c3','Visitors',based(periodLabel(),tTrunc),
     measuring?kpi(num(t.visitors),`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`)
       :t?emptyState('Not measured yet','Visitor counts appear once your site is collecting them.')
       :emptyState('Visitor counts hit a hiccup','Refresh in a moment.'),
-    ['/business-insights.html','View website insights']);
-  h+=card('c3','Actions taken',based('',tTrunc),
+    [BI,'View website insights']);
+  h+=card('c3','Actions taken',based(periodLabel(),tTrunc),
     measuring?kpi(num(t.actions),'calls, emails & booking taps')
       :emptyState('Not measured yet','Calls, emails and booking taps will count up here.'),
-    ['/business-insights.html','View website insights']);
+    [BI,'View website insights']);
   h+=card('c3','Google clicks','',
     gDown?emptyState('Search data is catching its breath','Check back shortly.')
       :gOk?kpi(num(g.clicks),`${num(g.impressions)} times seen in search${gscQual(g.period)}`)
       :emptyState('Not measured yet','Connect Search Console to see your Google numbers.'),
-    (gOk||gDown)?['/business-insights.html','View search insights']:['/connections.html','Connect Search Console']);
+    (gOk||gDown)?[BI,'View search insights']:['/connections.html','Connect Search Console']);
   {
     const top=measuring&&(t.top_sources||[])[0];
     h+=card('c3','Top source',based('',tTrunc),
       top?kpi(esc(top.source),`${num(top.share)}% of visits`,'small')
         :emptyState('Not measured yet','Where visitors come from shows up here.'),
-      ['/business-insights.html','View website insights']);
+      [BI,'View website insights']);
   }
   h+=card('c6','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
     (measuring&&lineChart(t.weekly,'var(--c2)','visitors'))||emptyState('No visits yet','Once people start visiting, the trend shows here.'),
-    ['/business-insights.html','View website insights']);
+    [BI,'View website insights']);
   {
     let body=null;
     if(measuring&&(t.top_sources||[]).length){
@@ -368,20 +381,20 @@ function websiteBand(d){
       const segs=t.top_sources.map((s,i)=>({v:s.visits,c:ramp[i]||ramp[4]}));
       body=donut(segs,num(t.visitors),'visitors',t.top_sources.map((s,i)=>({c:ramp[i]||ramp[4],text:`${s.source} · ${num(s.share)}%`})));
     }
-    h+=card('c6','Where visitors come from',based(periodLabel(),tTrunc),body||emptyState('No visits yet','Your visitor sources will appear here.'),['/business-insights.html','View website insights']);
+    h+=card('c6','Where visitors come from',based(periodLabel(),tTrunc),body||emptyState('No visits yet','Your visitor sources will appear here.'),[BI,'View website insights']);
   }
   {
     const rows=(measuring&&t.top_pages)||[];
     const body=rows.length?`<table><caption>Top pages — page and views</caption><thead><tr><th scope="col">Page</th><th class="r" scope="col">Views</th></tr></thead><tbody>${rows.map(p=>`<tr><td>${p.path==='/'?'Home':esc(p.path)}</td><td class="r">${num(p.views)}</td></tr>`).join('')}</tbody></table>`
       :emptyState('No page views yet','Your most-visited pages will be listed here.');
-    h+=card('c6','Top pages',based(periodLabel(),tTrunc),body,['/business-insights.html','View website insights']);
+    h+=card('c6','Top pages',based(periodLabel(),tTrunc),body,[BI,'View website insights']);
   }
   {
     const rows=(gOk&&g.top_terms)||[];
     const body=rows.length?`<table><caption>Google search performance — search term, clicks, times seen</caption><thead><tr><th scope="col">Search</th><th class="r" scope="col">Clicks</th><th class="r" scope="col">Seen</th></tr></thead><tbody>${rows.map(q=>`<tr><td>${esc(q.term)}</td><td class="r">${num(q.clicks)}</td><td class="r">${num(q.impressions)}</td></tr>`).join('')}</tbody></table>`
       :gDown?emptyState('Search data is catching its breath','Check back shortly.')
       :emptyState(gOk?'No search terms yet':'Not measured yet',gOk?'What people search to find you will be listed here.':'Connect Search Console to see what people search to find you.');
-    h+=card('c6','Google search performance','What people searched to find you',body,(gOk||gDown)?['/business-insights.html','View search insights']:['/connections.html','Connect Search Console']);
+    h+=card('c6','Google search performance','What people searched to find you',body,(gOk||gDown)?[BI,'View search insights']:['/connections.html','Connect Search Console']);
   }
   return h;
 }
