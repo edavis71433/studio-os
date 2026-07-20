@@ -9,10 +9,40 @@
 <link rel="stylesheet" href="/fonts/brand.css">
 <link rel="stylesheet" href="/cms.css">
 <style>
+  /* SS8 — page skin re-aliased onto the shell's --dds-* tokens. shell.css is the
+     canonical palette and carries the full four-block theme contract (light base ·
+     prefers-color-scheme dark · data-theme="light" · data-theme="dark"), so this
+     page follows every mode automatically. The selector list mirrors cms.css's
+     own explicit data-theme blocks so this alias wins in all four states;
+     fallbacks only cover a missing shell.css. (--bad-soft has no --dds token —
+     cms.css's four themed literals keep covering it.) */
+  :root,:root[data-theme="light"],:root[data-theme="dark"]{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#6f677d);--line:var(--dds-line,#eee9e0);
+    --accent:var(--dds-accent,#5b3fa0);--accent-soft:var(--dds-accent-soft,#efeafa);--good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);
+    --warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#a2453f);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05));
+  }
   header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:52ch}
 
+  /* ── SS8 shared cms-family chrome: .lhead-lite (icon · count meta · "Updated
+        just now" · ↻ soft refresh) — kept in sync by hand with
+        website-health.html / content-tree.html (the SS9–SS12 primitive). ── */
+  .lhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px;margin:22px 0 0}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lmeta{flex:1;min-width:0;font-size:13px;color:var(--soft);margin:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--accent);background:var(--accent-soft)}
+  .lbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .retry{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer;margin-top:16px}
+  .retry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  /* dark mode: the filled retry needs dark ink (#fff on the lifted accent fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .retry{color:#171320}}
+  :root[data-theme="dark"] .retry{color:#171320}
+
   .group{margin-top:34px}
-  .glabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px}
+  .glabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px;font-family:var(--sans)}
 
   .card{display:flex;gap:15px;background:var(--card);border:1px solid var(--line);border-radius:15px;
     padding:17px 19px;box-shadow:var(--shadow);margin-bottom:12px;position:relative;overflow:hidden}
@@ -48,8 +78,14 @@
     <h1 id="h1">What needs you</h1>
     <p class="sub" id="sub">A focused view of just your website's attention items. Your <a class="link" href="/inbox.html">Inbox</a> is the one place for everything — this is the website-only cut of it. Each thing tells you what happened, why it matters, and the one step to take.</p>
   </header>
+  <div class="lhead" id="lhead" hidden>
+    <span class="obj-ic" aria-hidden="true">📌</span>
+    <p class="lmeta" id="lmeta"></p>
+    <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+  </div>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -68,7 +104,12 @@ let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
 
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':CLIENT });
-async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); if(r.status===401) return Promise.reject(401); return r.ok ? r.json() : Promise.reject(r.status); }
+// SS8 family api(): never throws — {ok:false,status:0} on a network hiccup, so
+// every failure routes through ONE honest state switch (401/403/404/other).
+async function api(p){ try{ const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body:await r.json().catch(()=>({})) }; }catch(_){ return { ok:false, status:0, body:{} }; } }
+let LOADED_AT = Date.now();
+const updatedLabel = () => { const m = Math.floor((Date.now()-LOADED_AT)/60000); return m<1 ? 'Updated just now' : 'Updated '+m+' min ago'; };
+function toast(m){ if(window.ddsToast) return void ddsToast(m); const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
 
 function href(link){
   if(!link) return null;
@@ -106,6 +147,10 @@ function allClear(){
 }
 
 function render(a){
+  // SS8 family chrome: the count meta ("N need you" / "All clear") + freshness
+  const n = (a && a.needs_count) || 0;
+  $('lmeta').textContent = (n > 0 ? `${n} need${n===1?'s':''} you` : 'All clear') + ' · ' + updatedLabel();
+  $('lhead').hidden = false;
   if(!a || !a.groups || !a.groups.length || a.status !== 'needs_attention'){
     // still show "Coming soon"/"Completed" if present, but lead with the all-clear feel
     const nonNeeds = (a && a.groups || []).filter((g) => g.key !== 'needs_attention');
@@ -118,24 +163,49 @@ function render(a){
   $('sub').textContent = a.headline + ' Each one tells you what happened, why it matters, and the single step to take.';
   $('main').innerHTML = a.groups.map(groupHtml).join('');
 }
+// SS8: group labels are REAL headings — the page outline is h1 → h2 per group
 function groupHtml(g){
   return `<section class="group ${esc(g.key)}">
-    <p class="glabel">${esc(g.label)}</p>
+    <h2 class="glabel">${esc(g.label)}</h2>
     ${(g.cards||[]).map(cardHtml).join('')}
   </section>`;
 }
 
-function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2 style="color:var(--ink)">Sign in to see what needs you.</h2><p class="sub">Your website lives with your account — sign in to see anything waiting on you.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
-function trouble(){ $('main').innerHTML = `<div class="center"><h2 style="color:var(--ink)">We couldn’t check just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page. Please refresh in a moment.</p></div>`; }
+function signedOut(){ $('lhead').hidden = true; $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2 style="color:var(--ink)">Sign in to see what needs you.</h2><p class="sub">Your website lives with your account — sign in to see anything waiting on you.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
+// SS8 honest failure states — each status gets its own truth, and trouble()
+// carries a Try-again wired to load() in place (never a dead end).
+function notAllowed(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2 style="color:var(--ink)">This website isn’t in your workspace.</h2><p class="sub">You’re signed in, but this account can’t see this website’s attention items. If you look after more than one business, switch to the right account and try again.</p><p style="margin-top:22px"><a class="link" href="/today.html">Back to Today →</a></p></div>`; }
+function notFound(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2 style="color:var(--ink)">We couldn’t find this website.</h2><p class="sub">It may have been removed, or this link may be out of date.</p><p style="margin-top:22px"><a class="link" href="/today.html">Back to Today →</a></p></div>`; }
+function trouble(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2 style="color:var(--ink)">We couldn’t check just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page.</p><button class="retry" id="retry">Try again</button></div>`; const rt=$('retry'); if(rt)rt.addEventListener('click',()=>load()); }
+
+// SS8 family load(soft): REQ_SEQ so a superseded response (success OR failure)
+// never paints; soft=true (the ↻ button) keeps the last good render on failure
+// and toasts instead of destroying the page into a full-screen error.
+let REQ_SEQ = 0;
+async function load(soft){
+  const seq = ++REQ_SEQ;
+  if(!soft) $('main').innerHTML = '<div class="spin" role="status" aria-label="Loading"></div>';
+  const r = await api('/attention');
+  if(seq !== REQ_SEQ) return;
+  if(!r.ok){
+    if(soft){ toast('Couldn’t refresh just now.'); return; }
+    if(r.status === 401){ signedOut(); return; }
+    if(r.status === 403){ notAllowed(); return; }
+    if(r.status === 404){ notFound(); return; }
+    trouble(); return;
+  }
+  LOADED_AT = Date.now();
+  render(r.body && r.body.data);
+}
 
 (async function init(){
+  $('refreshBtn').addEventListener('click', () => load(true));   // wrapped — the click event must never become the soft flag
   try{
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
-    const res = await apiGet('/attention');
-    render(res && res.data);
-  }catch(e){ if(e === 401){ signedOut(); return; } trouble(); }
+    await load();
+  }catch(_){ trouble(); }
 })();
 </script>
 </body>
