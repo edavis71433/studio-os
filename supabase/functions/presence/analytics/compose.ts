@@ -176,3 +176,40 @@ export function portfolioInsights(clients: PortfolioClientLite[], nowMs: number)
   const headline = total === 0 ? 'No clients yet.' : insights.length ? `Across ${total} ${total === 1 ? 'client' : 'clients'}, here’s what stands out.` : `All ${total} clients are quiet and current — nothing needs you.`;
   return { headline, insights };
 }
+
+/** SS7 seams: the per-site website rows for /analytics/portfolio (P2-F G4),
+ *  PURE so the fixture pins can hold the KPI band to the SAME client set as
+ *  the /agency/portfolio rollup. Input rows are buildPortfolio output ALREADY
+ *  filtered to ACTIVE clients (filterPortfolio default) — archived clients
+ *  never reach this band. Additive fields (older frontends unaffected):
+ *    site_id  — the join/drill key the rollup matches on (uuid)
+ *    visitors — unique visitors this week; null = the visits read FAILED
+ *               (AN-4: never a fabricated 0), a missing site on a successful
+ *               read is an honest 0. */
+export interface WebsiteRowLite { site_id: string; name?: string; last_published_at?: string | null; unpublished_changes?: unknown; leads_waiting?: number; attention?: number }
+export interface WebsiteRowCtx {
+  planBySite?: Record<string, string>;                 // site_id → coarse plan status (active|paused|lapsed|…) — never payment details
+  failedSites?: string[];                              // sites with a recent failed publish
+  visitorsBySite?: Record<string, number> | null;      // null = the visits read failed this time
+}
+export function websiteRows(portfolio: WebsiteRowLite[], ctx: WebsiteRowCtx) {
+  const failed = new Set(ctx.failedSites || []);
+  const plans = ctx.planBySite || {};
+  const visitors = ctx.visitorsBySite || null;
+  return (portfolio || []).map((c) => {
+    const plan = plans[String(c.site_id)] || 'unknown';
+    const pubFailed = failed.has(String(c.site_id));
+    return {
+      site_id: c.site_id,
+      name: c.name,
+      draft_live: c.last_published_at ? 'live' : 'draft',
+      last_published_at: c.last_published_at || null,
+      unpublished_changes: !!c.unpublished_changes,
+      leads_waiting: c.leads_waiting || 0,
+      visitors: visitors ? (Number(visitors[String(c.site_id)]) || 0) : null,
+      publish_failed: pubFailed,
+      plan_status: plan,   // coarse SaaS blocker (active|paused|lapsed|…), never payment details
+      needs_attention: !!c.attention || pubFailed || plan === 'paused' || plan === 'lapsed',
+    };
+  });
+}

@@ -14,9 +14,9 @@ import { coachRead } from '../lib/health_coach.ts';
 import { buildTimeline } from '../lib/customer_timeline.ts';
 import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
 import { gather } from '../agency/routes.ts';
-import { buildPortfolio } from '../agency/portfolio.ts';
+import { buildPortfolio, filterPortfolio } from '../agency/portfolio.ts';
 import {
-  inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights,
+  inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights, websiteRows,
   trafficInsights, trafficNotice, periodWord, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
@@ -258,7 +258,13 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
   const input = await gather(member.agency_id, nowIso);
-  const portfolio = buildPortfolio(input);
+  // SS7 fix (review-confirmed): gather() is deliberately UNFILTERED (archived
+  // links included, for /agency/portfolio?archived=true) — but THIS band must
+  // count the SAME clients as client_count (agencySiteIds, active-only) and the
+  // /agency/portfolio rollup (archived excluded by default). filterPortfolio's
+  // default drops archived, so "Sites live" can never exceed "Clients" and an
+  // archived client's waiting leads never raise "Needs attention" here.
+  const portfolio = filterPortfolio(buildPortfolio(input), {});
   // AN-2.4: per-client visitor counts (this week) — one bounded query, aggregated
   // in code; reuses the same visits store (no duplicate aggregation).
   const sinceIso = new Date(nowMs - 7 * 86_400_000).toISOString();
@@ -310,24 +316,17 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // the agency, at the already-authorized site scope. Two bounded queries; reads
   // live (no customer data duplicated into the agency workspace); billing shown
   // only at the coarse plan-status level (never payment details).
-  const siteToClient = new Map(sites.map((s: any) => [String(s.id), String(s.client_id)]));
   const failed7 = new Set(arr(await svc(`presence_publishes?site_id=in.(${siteIds.join(',')})&status=eq.failed&completed_at=gte.${sinceIso}&select=site_id&limit=2000`)).map((r: any) => String(r.site_id)));
   const entRows = clientIds.length ? arr(await svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status`)) : [];
   const planStatus = new Map(entRows.map((e: any) => [String(e.client_id), String(e.status)]));
-  const websites = (portfolio || []).map((c: any) => {
-    const cid = siteToClient.get(String(c.site_id)) || '';
-    const plan = planStatus.get(cid) || 'unknown';
-    const pubFailed = failed7.has(String(c.site_id));
-    return {
-      name: c.name,
-      draft_live: c.last_published_at ? 'live' : 'draft',
-      last_published_at: c.last_published_at || null,
-      unpublished_changes: !!c.unpublished_changes,
-      leads_waiting: c.leads_waiting || 0,
-      publish_failed: pubFailed,
-      plan_status: plan,   // coarse SaaS blocker (active|paused|lapsed|…), never payment details
-      needs_attention: !!c.attention || pubFailed || plan === 'paused' || plan === 'lapsed',
-    };
+  // SS7 seams: rows built by the PURE websiteRows (analytics/compose.ts) so the
+  // active-only parity + additive site_id/visitors shape are fixture-pinned.
+  // visitors reuses the perSite aggregation above; a FAILED visits read is
+  // null per row (AN-4: never a fabricated 0).
+  const websites = websiteRows(portfolio, {
+    planBySite: Object.fromEntries(sites.map((s: any) => [String(s.id), planStatus.get(String(s.client_id)) || 'unknown'])),
+    failedSites: [...failed7] as string[],
+    visitorsBySite: (vr as any).ok ? Object.fromEntries([...perSite].map(([k, v]) => [k, v.size])) : null,
   });
   const websiteInsights: any[] = [];
   const failedCount = websites.filter((w: any) => w.publish_failed).length;
