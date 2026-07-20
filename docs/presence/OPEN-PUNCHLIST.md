@@ -283,6 +283,62 @@ certs and all that" → SSL provisioning/renewal is a HARD REQUIREMENT of the
 DNS slices (post-delegation cert re-trigger + status + renewal watch + DS
 pre-check). G13 slice 1 (server stamping) building.
 
+## 🟢 POST-AUDIT BUILD — WAVE 1 (2026-07-20)
+
+Three pieces built + independently reviewed. Eric's call (2026-07-20): **ship
+Batch A + DNS D1 now, HOLD G13 slice 1** for a proper divergence fix.
+
+**SHIPPED to main this wave (gates green: node --check, Deno pure sweep
+205/0/4, full Playwright e2e):**
+- ✅ **Batch A** — all 12 audit bugs fixed (aba667b/e2becac) + specs (07e58ac).
+  Consolidated-review fixes (eae371d): (1) reviewer Requests contract — deleted
+  the two slice-11 e2e tests that fed a `client_reviewer` populated 200s on
+  `/client/services`+`/client/support` (impossible: `reviewerAllowed()` 403s both,
+  workspace.ts:31); the honest contract lives in "Batch A regressions › A2" (calm
+  card, ZERO `/client/*` reads), now carrying the zero-tiles/zero-Request-buttons
+  guards. (2) A6 over-scoping — dropped `customers` from shell.js `APP_PAGES`:
+  customers.html is the agency-portfolio roster (`/studio/customers` keyed on
+  `agency_site_id`), so carrying a drilled LEAF's scope stranded the operator on
+  an empty "← Customers"/"Open Customers"; those anchors stay UNSCOPED. broadcasts
+  stays scoped (per-site).
+- ✅ **DNS D1** — Route 53 adapter + zone lifecycle (1761370) + test suite/runbook
+  (1e7b9ec). DORMANT + fail-closed (returns notConfigured until AWS secrets land).
+  My inline review: safe-to-merge-dormant (authorization is server-pinned via
+  `siteDomain(site)`, `validateRecord` robust, `mergeSpf` never loosens,
+  presence_dns_zones has site_id PRIMARY KEY). Two non-blocking follow-ups for
+  **D2**: (1) GET re-triggers `provisionSsl` on `propagated && !sslOk` — a write
+  side-effect on a read; add a debounce/marker. (2) DELETE snapshots+deletes the
+  zone but does NOT clear `presence_dns_zones` desired records, so stale records
+  resurface on re-attach — clear on delete. First LIVE zone must be a throwaway
+  test domain, not a customer's.
+
+**Batch-A review residuals (tracked, NOT blockers):**
+- A4 Home needs-you glance/queue still drops unpaid invoices on a FAILED billing
+  read (no `billingFailed` signal into `glanceData`) — deferred-by-design to **B1**;
+  de-caching means it self-heals next load.
+- Spec-quality (low): A8 test pins only 1 of 4 identical fixes; A4 `#glance-due`
+  assertion is non-load-bearing. Fold into a later spec-hardening pass.
+- D7 (agency drill-in over-scopes the customers NAV item via `withScope`) is
+  UNCHANGED — still a batch-D item; A6's fix only stopped it being *widened*.
+
+**⛔ G13 slice 1 — HELD (do NOT merge until fixed):** review found a HIGH,
+conditional join-divergence. The `/settings` sidecar computes sids via
+`validateBlocksWithMap(row.blocks)` (validate-only), but the RENDER stamps
+`data-dds-sid` over `resolveBlockMedia(validateBlocks(resolveLinkedBlocks(...)))`.
+When a resolve step changes list length — a linked placeholder resolves in, or a
+deleted-media block drops — the per-type `#N` counter shifts, so the canvas
+toolbar's sid→BLOCKS_WORK join (Edit/Duplicate/Cut/Hide/Delete/Move via
+`eeClassify`→`DDS_SIDMAP`) can hit the WRONG same-type block. Trigger: a page with
+(a) a linked section OR (b) a deleted-media block, AND a same-type sibling after
+it. Comment WRITE path is unaffected (uses the DOM stamp). **Fix plan:** compute
+the sidecar over the SAME resolved list the render stamps — thread raw-index
+provenance through `resolveLinkedBlocks` (1:1 or 1:0 drop) + `resolveBlockMedia`
+so each resolved block's `src_index` points to its true stored BLOCKS_WORK index
+(linked-expanded blocks → the placeholder's index). Add a regression test for the
+linked + media-drop cases (the current `dds_stamps_test` blind spot), and re-prove
+the render golden is byte-identical. Must land before G13 s1 AND slice 2 (editor)
+ship. G13 code stays on branch `claude/supabase-migrations-0107-0108-779hh9`.
+
 ## 🌐 DNS ONE-STOP SHOP — DECISIONS LOCKED (Eric 2026-07-19)
 
 Spec: docs/design/DNS-ONE-STOP-SHOP.md. Eric chose: **FULL SHOP** (real
