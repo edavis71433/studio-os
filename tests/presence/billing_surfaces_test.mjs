@@ -32,9 +32,19 @@ ok('studio: only on the studio side, resolved via the service link', /if \(studi
 ok('studio: labels it billing_type saas (the customer software subscription, not agency billing)', /customer_saas = \{[\s\S]*?billing_type: 'saas'/.test(projects));
 
 // ── Client App renders the service-billing section, labeled distinct from SaaS ──
-ok('client app: fetches /client/billing and renders it', /api\('\/client\/billing'\)/.test(clientHtml) && /function appendBilling/.test(clientHtml));
+// PS2 rewrote appendBilling's paragraph cards into invoiceRowHtml .frow rows:
+// the pins follow the new renderer but stay non-vacuous — rerouting the tab off
+// /client/billing (via ensureBilling), dropping the row renderer, or unwiring
+// the rows from renderInvoices must each redden here.
+ok('client app: fetches /client/billing (ensureBilling) and renders it through invoiceRowHtml rows',
+  /api\('\/client\/billing'\)/.test(clientHtml) && /function invoiceRowHtml/.test(clientHtml)
+  && /const b=await ensureBilling\(\);/.test(clientHtml) && /inv\.map\(i=>invoiceRowHtml\(i,today\)\)/.test(clientHtml));
 ok('client app: states the software subscription is billed separately', /billed separately/i.test(clientHtml));
-ok('client app: shows a pay link for unpaid invoices', /i\.pay_url\?/.test(clientHtml) && /Pay this invoice/.test(clientHtml));
+// the Pay action exists ONLY past the paid and void/canceled guards, opens the
+// server's pay_url in a new tab with rel=noopener, and is named per invoice
+ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, noopener)',
+  /const act=i\.status==='paid'\?/.test(clientHtml) && /:dead\?''/.test(clientHtml)
+  && /:i\.pay_url\?`<a class="fbtn" href="\$\{esc\(i\.pay_url\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E W11 BILLING SURFACES (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
