@@ -62,6 +62,22 @@ ok('migration: rollback present', /drop table if exists public\.presence_service
 // function URL — the default *.supabase.co domain downgrades text/html to text/plain.
 ok('documents: portal view_url mints via docViewerUrl (site-origin doc.html viewer)', /docViewerUrl\(await signDocToken\(/.test(cd) && !/functions\/v1\/presence\/sales\/doc/.test(cd));
 
+// ── client-upload provenance: the MEDIA row itself is stamped (SS1 F1) ────────
+// The deliverable's note never reaches presence_media; the studio's Files roster
+// reads the media row via /assets, so the client door must stamp THAT row —
+// site-scoped, with the marker shape the frontend detection reads.
+{
+  const media = read('supabase/functions/presence/routes/media.ts');
+  const mlib = read('supabase/functions/presence/lib/media.ts');
+  const assetsRoute = read('supabase/functions/presence/routes/assets.ts');
+  ok('provenance: the client upload-url flow stamps the media row metadata (client_upload + note), site-scoped',
+    /handleClientUploadUrl[\s\S]*?presence_media\?id=eq\.\$\{.*?media_id\}&site_id=eq\.\$\{link\.agency_site_id\}[\s\S]*?client_upload: true, note: 'Uploaded by the client\.'[\s\S]*?handleClientUploadCreate/.test(cd));
+  ok('provenance: the STUDIO upload path stamps no client marker (studio uploads must never wear the chip)',
+    !/client_upload/.test(media) && !/client_upload/.test(mlib));
+  ok('provenance: /assets present() surfaces the marker via the pure isClientUpload detection',
+    /client_upload: isClientUpload\(a\)/.test(assetsRoute));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ CLIENT BRIDGE ROUTES (P2-D hardening): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

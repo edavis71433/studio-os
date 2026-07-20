@@ -8,7 +8,10 @@ import { installApp } from './helpers/app';
 const NOW = new Date().toISOString();
 const LOGO = { id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Logo', kind: 'image', mime: 'image/png', in_use: true, favorite: false, alt_text: 'Company logo', tags: [], collection: 'Brand', brand: true, asset_status: 'approved', state: 'live', bytes: 40000, created_at: NOW };
 const CONTRACT = { id: 'cccccccc-3333-4333-8333-cccccccccccc', name: 'Contract', kind: 'document', mime: 'application/pdf', in_use: false, favorite: false, alt_text: 'Contract', tags: [], collection: '', asset_status: 'approved', state: 'approved', bytes: 120000, created_at: '2026-06-01T00:00:00Z',
-  metadata: { note: 'Uploaded by the client.' } };   // A10's studio-side marker (client_delivery.ts stamp)
+  // the REAL production shape: client_delivery.ts stamps the media row's metadata
+  // (client_upload + the human note) and /assets' present() surfaces the explicit
+  // top-level boolean (isClientUpload) — this mock certifies that true contract
+  client_upload: true, metadata: { client_upload: true, note: 'Uploaded by the client.' } };
 
 const filesApi = {
   '/assets/collections': { data: [{ name: 'Brand', count: 1 }] },
@@ -101,7 +104,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(docRow).toContainText('Not used');
   });
 
-  test('client-upload provenance: the "by client" chip renders from the server note (A10 sibling)', async ({ page }) => {
+  test('client-upload provenance: the "by client" chip renders from the server-stamped media marker (A10 sibling)', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');

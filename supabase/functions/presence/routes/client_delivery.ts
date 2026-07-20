@@ -115,6 +115,15 @@ export async function handleClientUploadUrl(req: Request, site: SiteRow, princip
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const res = await createUpload(link.agency_site_id, { mime: String(b?.mime || ''), bytes: Number(b?.bytes || 0), alt_text: clean(b?.title, 200) || 'Client upload' });
   if ('error' in (res as any)) return json(res, 422, cors);
+  // Provenance: stamp the MEDIA row itself as a client upload — the deliverable's
+  // note (handleClientUploadCreate below) never reaches the media row, and the
+  // studio's Files roster reads THIS row through /assets' present(). Same metadata
+  // convention as lib/media.ts importImage (a post-create PATCH); the explicit
+  // boolean + the human note are exactly what the frontend detection reads.
+  // Best-effort: a failed stamp must never block the upload.
+  await svc(`presence_media?id=eq.${(res as { media_id: string }).media_id}&site_id=eq.${link.agency_site_id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ metadata: { client_upload: true, note: 'Uploaded by the client.' } }) }).catch(() => {});
   return json({ data: res }, 200, cors); // { media_id, upload_url, storage_path }
 }
 // ── Post-verification of a client upload (the declared-bytes bypass) ─────────

@@ -5,7 +5,7 @@
 //   deno run --allow-read --allow-env tests/presence/dam_test.mjs
 import {
   assetApprovalPolicy, assetAvailable, nextAssetStatus, detectDuplicates, dupKey,
-  usageMap, canDelete, assetHealth, collectionsOf, tagsOf, searchAssets,
+  usageMap, canDelete, assetHealth, collectionsOf, tagsOf, searchAssets, isClientUpload,
 } from '../../supabase/functions/presence/lib/dam.ts';
 
 const results = [];
@@ -83,6 +83,20 @@ const A = (id, o = {}) => ({ id, storage_path: `p/${id}.webp`, alt_text: o.alt ?
   ok('keyword search ranks exact tag hits above text hits', searchAssets(assets, { q: 'team' })[0].id === '1');
   ok('keyword search reaches metadata + alt text', searchAssets(assets, { q: 'special' }).map((a) => a.id).join() === '2' && searchAssets(assets, { q: 'founder' }).map((a) => a.id).join() === '1');
   ok('no matches → empty (honest)', searchAssets(assets, { q: 'zzz nothing' }).length === 0);
+}
+
+// ═══ client-upload provenance (the studio roster's "by client" chip) ═══
+// The client door stamps the MEDIA row's metadata (client_upload=true + the human
+// note); a studio upload carries no marker. These pin the detection BOTH ways.
+{
+  const clientRow = A('c1', { metadata: { client_upload: true, note: 'Uploaded by the client.' } });   // exactly what client_delivery.ts stamps
+  const noteOnly = A('c2', { metadata: { note: 'Uploaded by the client.' } });                          // older stamp shape — note only
+  const studioRow = A('s1');                                                                            // studio upload: no marker
+  const studioNote = A('s2', { metadata: { note: 'Uploaded by me for the client meeting' } });          // a studio-written note must not false-positive
+  ok('a client-uploaded media row carries the marker (boolean + note stamp)', isClientUpload(clientRow) === true);
+  ok('the note prefix alone is enough (deploy-order tolerant)', isClientUpload(noteOnly) === true);
+  ok('a studio-uploaded row carries NO marker', isClientUpload(studioRow) === false && isClientUpload(studioNote) === false);
+  ok('metadata-less rows never throw', isClientUpload({ ...A('s3'), metadata: null }) === false);
 }
 
 const passed = results.filter((r) => r.p).length;

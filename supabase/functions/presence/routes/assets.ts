@@ -36,7 +36,7 @@ import { saveVisualPlan, attachVariations, getVisualPlan, withPreviews } from '.
 import {
   searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
-  fileKind, isFavorite, replaceNeedsApproval, fileState,
+  fileKind, isFavorite, isClientUpload, replaceNeedsApproval, fileState,
   normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef,
 } from '../lib/dam.ts';
 import { socialCropList } from '../lib/social_crops.ts';
@@ -113,6 +113,10 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null } = {
     favorite: isFavorite(a),
     in_use: opts.in_use,
     thumb: opts.thumb ?? undefined,
+    // client-upload provenance (the "by client" chip): the client door stamps the
+    // media row's metadata; surface the explicit boolean here so the UI contract
+    // never depends on string-matching the note. Additive; omitted when false.
+    client_upload: isClientUpload(a) ? true : undefined,
     // DAM-2: approval state + who/when, from reused metadata (no new columns)
     state: fileState(a.asset_status, !!opts.in_use, !!meta.pending_replace),
     approval: { approved_by: meta.approved_by || null, approved_at: meta.approved_at || null, submitted_by: meta.submitted_by || null, submitted_at: meta.submitted_at || null, pending_replace: !!meta.pending_replace },

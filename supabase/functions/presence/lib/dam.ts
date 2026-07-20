@@ -119,6 +119,16 @@ export function displayName(a: Asset): string {
 export function isFavorite(a: Asset): boolean {
   return !!(a.metadata as Record<string, unknown> | null | undefined)?.favorite;
 }
+/** Client-upload provenance (the studio Files roster's "by client" chip). The
+ *  client door (routes/client_delivery.ts) stamps the MEDIA row's metadata at
+ *  upload time: the explicit `client_upload: true` boolean plus the human note
+ *  'Uploaded by the client.'. Detection mirrors the frontend's: the boolean, or
+ *  the note PREFIX (so a studio-written note never false-positives). Pure. */
+export function isClientUpload(a: Asset): boolean {
+  const meta = (a.metadata || {}) as Record<string, unknown>;
+  if (meta.client_upload === true) return true;
+  return String(meta.note || '').startsWith('Uploaded by the client');
+}
 
 // ── DAM-1 (Files): "where used" — the website-awareness value-add ─────────────
 // A single, complete usage model mirroring exactly what the renderer serializes:
