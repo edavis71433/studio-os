@@ -204,6 +204,75 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
   });
 });
 
+// ── SS5: request-generation guards (REQ_SEQ/DET_SEQ) + honest boot retry.
+test.describe('SS5 stale-race guards + boot retry', () => {
+  test('a slow older roster response can never paint over a newer one (REQ_SEQ)', async ({ page }) => {
+    let releaseSlow!: () => void;
+    const slowGate = new Promise<void>((r) => { releaseSlow = r; });
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, async (route) => {
+      const stage = new URL(route.request().url()).searchParams.get('stage');
+      if (stage === 'qualified') {          // the OLDER request — held until the newer one has rendered
+        await slowGate;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DEALS) });
+    });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    await page.locator('#filters .chip[data-stage="qualified"]').click();   // starts the held request
+    await page.locator('#filters .chip[data-stage=""]').click();           // newer request, resolves NOW
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    releaseSlow();                                                          // stale empty arrives late…
+    await page.waitForTimeout(150);
+    await expect(page.locator('#list .card')).toHaveCount(2);               // …and is discarded, not painted
+    await expect(page.locator('#list')).not.toContainText('Nothing in');
+  });
+
+  test('a slow older deal-detail response can never paint over a newer drawer (DET_SEQ)', async ({ page }) => {
+    const DETAIL2 = JSON.parse(JSON.stringify(DEAL_DETAIL));
+    DETAIL2.data.deal = { ...DETAIL2.data.deal, id: DEAL2, title: 'Beta rebrand', stage: 'lead' };
+    DETAIL2.data.contact = { id: 'ct-2', name: 'Dana Lee', email: 'dana@example.com', phone: '', company: 'Beta', notes: '' };
+    let releaseSlow!: () => void;
+    const slowGate = new Promise<void>((r) => { releaseSlow = r; });
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL2}`]: DETAIL2, [`/sales/deals/${DEAL2}/tasks`]: { data: [] } } });
+    await page.route(new RegExp(`/functions/v1/presence/sales/deals/${DEAL}(\\?|$)`), async (route) => {
+      await slowGate;                        // the FIRST deal opened — its read hangs
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DEAL_DETAIL) });
+    });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    // open the hung deal, then the other one — the second render must win
+    await page.evaluate((id) => { (window as any).openDeal(id); return 0; }, DEAL);   // fire-and-forget: this read hangs
+    await page.evaluate((id) => { (window as any).openDeal(id); return 0; }, DEAL2);
+    await expect(page.locator('#dtitle')).toContainText('Beta rebrand');
+    releaseSlow();                                                          // the stale Acme response lands late…
+    await page.waitForTimeout(150);
+    await expect(page.locator('#dtitle')).toContainText('Beta rebrand');    // …and is discarded
+  });
+
+  test('a failed boot renders honest trouble with a Try again that recovers in place', async ({ page }) => {
+    await installApp(page, { api: API });
+    // a supabase stub whose getSession fails until the test heals it
+    await page.route(/@supabase\/supabase-js|\/vendor\/supabase-js/, (route) =>
+      route.fulfill({ contentType: 'application/javascript', body: `
+        window.supabase = { createClient: function(){ return { auth: {
+          getSession: async function(){ if (!window.__HEALED) throw new Error('boom'); return { data: { session: window.__E2E_SESSION || null } }; },
+          getUser: async function(){ return { data: { user: (window.__E2E_SESSION||{}).user || null } }; },
+          onAuthStateChange: function(){ return { data: { subscription: { unsubscribe: function(){} } } }; },
+          signOut: async function(){ return { error: null }; },
+        } }; } };` }));
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list')).toContainText('We couldn’t load your pipeline just now.');
+    const retry = page.locator('#list .retry');
+    await expect(retry).toContainText('Try again');
+    await page.evaluate(() => { (window as any).__HEALED = 1; });
+    await retry.click();                                                    // recovers IN PLACE — no navigation
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    await expect(page.locator('.lhead .lmeta')).toContainText('2 deals');
+  });
+});
+
 test.describe('Deal drawer Path', () => {
   test('the Path chevron bar renders with guidance tip AND action (suggested_action fix)', async ({ page }) => {
     await installApp(page, { api: API });

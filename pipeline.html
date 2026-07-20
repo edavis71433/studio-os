@@ -349,6 +349,8 @@ const ACTKINDS=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 M
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
 let Q='';                    // the .lhead search query — client-side, across List/Board/Table
 let LOADED_AT=Date.now();    // when the roster last loaded (the .lmeta "Updated …" fact)
+let REQ_SEQ=0;               // roster-read generation: a slow response that resolves after a newer request started is DISCARDED
+let DET_SEQ=0;               // same guard for the deal-detail read
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 // The chosen display (List · Board · Table) persists across visits. Embed mode
 // (the record page's Deal tab) never sees the list side, so it's exempt.
@@ -451,11 +453,12 @@ function renderFilters(){
 // a tiny per-stage breakdown. Whole-pipeline (ignores the stage filter), computed
 // server-side over ALL deals. Best-effort — it must never block or break the list,
 // and it stays honest on empty (each figure reads calmly when zero).
-async function renderSummary(){
+async function renderSummary(gen){
   const host=$('summary'); if(!host) return;
   let s;
   try{ const r=await api('/sales/summary'); s=r&&r.data; }
-  catch(_){ host.innerHTML=''; return; }              // never let the summary sink the page
+  catch(_){ if(gen===undefined||gen===REQ_SEQ)host.innerHTML=''; return; }   // never let the summary sink the page
+  if(gen!==undefined&&gen!==REQ_SEQ)return;           // a newer roster read started — this strip is stale
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
   const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   const open=s.open||{count:0,value_cents:0}, wm=s.won_month||{count:0,value_cents:0}, wr=s.win_rate||{pct:null,won:0,lost:0};
@@ -477,6 +480,7 @@ async function renderSummary(){
 async function loadDealTasks(id){
   const host=$('dealTasks'); if(!host)return;
   let items=[];try{const r=await api('/sales/deals/'+id+'/tasks');items=(r&&r.data)||[];}catch(_){}
+  if(CURRENT_DEAL!==id||host!==$('dealTasks'))return;   // the drawer moved on while this read was in flight
   if(!items.length){host.innerHTML='<span class="mut">No to-dos yet.</span>';return;}
   const today=new Date().toISOString().slice(0,10);
   host.innerHTML=items.map(t=>{const done=t.status==='done';const overdue=!done&&t.due_date&&t.due_date<=today;return `<div class="row2" style="align-items:center;gap:8px"><input type="checkbox" data-tk="${t.id}"${done?' checked':''} aria-label="Mark done"><span style="flex:1;${done?'text-decoration:line-through;color:var(--soft,#888)':''}">${esc(t.title)}${t.due_date?` <span class="mut" style="${overdue?'color:var(--warn,#775d31);font-weight:600':''}">· ${overdue?'due ':''}${esc(t.due_date)}</span>`:''}</span><button class="btn ghost sm" data-tkdel="${t.id}" aria-label="Remove to-do">✕</button></div>`;}).join('');
@@ -522,17 +526,20 @@ document.addEventListener('click',(e)=>{if(e.target&&e.target.closest&&e.target.
 // contract). NOTE: load must always be WRAPPED when passed as a handler —
 // a click event in the first slot would become its soft flag.
 async function load(soft){
-  renderSummary();   // refresh the numbers whenever the pipeline reloads (add/move/convert)
+  const gen=++REQ_SEQ;   // request-generation guard: only the NEWEST read may paint
+  renderSummary(gen);    // refresh the numbers whenever the pipeline reloads (add/move/convert)
   const board=VIEW==='board';
   const host=board?$('board'):VIEW==='table'?$('table'):$('list');
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton(host,4);
   try{
     // Board shows every open stage, so it ignores the list's stage filter.
     const res=await api('/sales/deals'+((!board&&FILTER)?('?stage='+FILTER):''));
+    if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];
     LOADED_AT=Date.now();
     renderCurrent();
   }catch(e){
+    if(gen!==REQ_SEQ)return;   // a stale failure is nobody's news
     if(soft){toast('Couldn’t refresh just now.',true);return;}   // keep the last good render
     if(window.ddsError) window.ddsError(host,nice(e),()=>load()); else host.innerHTML='<p class="mut">'+esc(nice(e))+'</p>';
   }
@@ -834,6 +841,7 @@ function closeDealDetail(){
   if(c&&c.focus)c.focus();
 }
 async function openDeal(id){
+  const dgen=++DET_SEQ;                  // detail-read generation: a slower older open must never paint over this one
   const wasOpen=!$('detailWrap').hidden; // an in-view refresh re-renders; remember to restore focus
   if(CURRENT_DEAL!==id)PENDING_BACK='';  // a back-confirm strip never carries over to another deal
   CURRENT_DEAL=id;
@@ -842,6 +850,7 @@ async function openDeal(id){
   bizName(); // warm the studio-name cache so the agreement starter fills instantly
   try{
     const [{data},tplRes,svcRes]=await Promise.all([api('/sales/deals/'+id),api('/sales/templates').catch(()=>({data:[]})),api('/sales/services').catch(()=>({data:[]}))]);
+    if(dgen!==DET_SEQ)return;   // a newer deal was opened while this read was in flight — discard, never paint
     SERVICES=(svcRes&&svcRes.data)||[];
     const d=data.deal, c=data.contact;
     const TPLS=(tplRes&&tplRes.data)||[]; const propTpls=TPLS.filter(t=>t.kind==='proposal'); const conTpls=TPLS.filter(t=>t.kind==='contract');
@@ -1254,10 +1263,14 @@ async function openDeal(id){
     // a11y: an in-view action re-rendered the page and dropped focus — land it back
     // on the deal title (a stable, focusable anchor) so keyboard users aren't lost.
     if(wasOpen){const t=$('dtitle');if(t)t.focus();}
-  }catch(e){ $('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div><div class="dbody mut">'+esc(nice(e))+'</div>'; const b=$('closeD'); if(b)b.onclick=closeDealDetail; }
+  }catch(e){ if(dgen!==DET_SEQ)return; $('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div><div class="dbody mut">'+esc(nice(e))+'</div>'; const b=$('closeD'); if(b)b.onclick=closeDealDetail; }
 }
 
-(async function(){
+// Boot honesty: a failed boot renders real trouble WITH a Try again that
+// re-runs the whole boot in place (session + load — a bare load() couldn't
+// paint without the token the failed boot never got). Markup is hand-rolled
+// dds-error classes: shell.js (defer) may not have registered ddsError yet.
+async function boot(){
   try{
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
@@ -1265,8 +1278,12 @@ async function openDeal(id){
     renderFilters();
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
-  }catch(_){ $('list').innerHTML='<p class="mut">We couldn’t load your pipeline just now.</p>'; }
-})();
+  }catch(_){
+    $('list').innerHTML='<div class="dds-error"><span class="ico">!</span><span>We couldn’t load your pipeline just now.</span><button type="button" class="retry" id="bootRetry">Try again</button></div>';
+    const b=$('bootRetry'); if(b)b.onclick=()=>boot();
+  }
+}
+boot();
 </script>
 </body>
 </html>
