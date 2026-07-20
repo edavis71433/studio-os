@@ -62,6 +62,10 @@
   #ovfMenu button:hover{background:var(--p-soft)}
   .lmeta{margin-top:4px;font-size:12px;color:var(--faint)}
   .lnotice{margin-top:6px;font-size:12.5px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:6px 9px}
+  /* ── C2 search under the list-pane header — the rosters' .search anatomy ── */
+  .lhead .search{width:100%;margin-top:8px;font-family:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:7px 12px;outline:none}
+  .lhead .search:focus{border-color:var(--p)}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* ── two-line rows (SLDS split-view listbox idiom) ── */
   #rows{flex:1;overflow-y:auto;list-style:none;margin:0;padding:0}
@@ -225,7 +229,9 @@ function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/(
 // ── state ─────────────────────────────────────────────────────────────────────
 let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
 let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest partial notice (both → the boot error)
-let VIEW='everything',SEL='',ACTIVE=-1,COLLAPSED=false;
+let VIEW='everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
+const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 // one delegated closer for both header menus (attached ONCE — renderConsole may
 // rebuild the header many times; per-render document listeners would pile up)
 document.addEventListener('click',(e)=>{
@@ -275,13 +281,15 @@ function buildItems(feed,leads,notifs){
     items.push({kind:'approval',id:'ok:'+p.id,name:p.title||'A change is ready',when:'',
       preview:p.summary||'Waiting for your OK',chip:'Needs your OK',chipCls:'',unread:true,needs:true,approval:p});
   }
-  // enquiries: the feed's per-lead rows (slice 2). An older function build without
-  // feed.enquiries degrades to /forms/inbox 'new' items — same rows, heuristic dots.
-  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status==='new');
+  // enquiries: the feed's per-lead rows (slice 2 — the server serves status=new
+  // only). An older function build without feed.enquiries degrades to the page's
+  // own /forms/inbox read, counting NON-ARCHIVED (C7: the same arithmetic as
+  // leads.html's Open — one queue, one count; heuristic dots for 'new' only).
+  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived');
   for(const l of enq){
     items.push({kind:'lead',id:'lead:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
       name:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
-      chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:true,needs:true,lead:l});
+      chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
   }
   // sorted by newest first; undated items (approvals) stay on top — they're waiting
   items.sort((a,b)=>{if(!a.when&&!b.when)return 0;if(!a.when)return -1;if(!b.when)return 1;return b.when.localeCompare(a.when);});
@@ -310,6 +318,7 @@ function buildSystem(feed,notifs){
 // ── the console shell ─────────────────────────────────────────────────────────
 function renderConsole(){
   $('main').innerHTML=`
+  <h1 class="sr-only">Inbox</h1>
   <div class="console${COLLAPSED?' collapsed':''}" id="console">
     <aside class="lpane" aria-label="Conversation list">
       <div class="lhead">
@@ -328,6 +337,7 @@ function renderConsole(){
             </div>
           </div>
         </div>
+        <input class="search" id="q" type="search" aria-label="Search conversations" placeholder="Search conversations…" value="${esc(Q)}">
         <div class="lmeta" id="lmeta"></div>
         <div class="lnotice" id="lnotice" role="status" hidden></div>
       </div>
@@ -361,6 +371,10 @@ function renderConsole(){
   $('ovfSaved').addEventListener('click',()=>{closeMenu(om,ob);openSaved();});
   $('ovfFaq').addEventListener('click',()=>{closeMenu(om,ob);openFaq();});
   $('refreshBtn').addEventListener('click',()=>refresh());
+  // C2 search — debounced, list-only re-render: the input node is never rebuilt
+  // while typing (renderConsole only re-runs on a view change), so caret + focus
+  // survive; the roving keyboard index resets so it can't point past the filter.
+  const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;ACTIVE=-1;renderList();}));
   // the collapse toggle (SLDS: "Open Split View" / "Close Split View")
   $('edgeBtn').addEventListener('click',()=>{COLLAPSED=!COLLAPSED;const c=$('console');c.classList.toggle('collapsed',COLLAPSED);const b=$('edgeBtn');b.setAttribute('aria-expanded',COLLAPSED?'false':'true');b.setAttribute('aria-label',COLLAPSED?'Open Split View':'Close Split View');b.querySelector('span').textContent=COLLAPSED?'▶':'◀';});
   // keyboard: arrows move the focused row, Enter opens it
@@ -371,7 +385,14 @@ function renderConsole(){
     else if(e.key==='Enter'&&ACTIVE>=0&&vis[ACTIVE]){e.preventDefault();activateRow(vis[ACTIVE]);}
   });
 }
-function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])];}
+// C2: the search filters EVERYTHING the list shows — conversations (name ·
+// preview · chip) and system rows (label · tag) alike.
+function rowMatch(r){
+  const q=Q.trim().toLowerCase();if(!q)return true;
+  const hay=r.sys?((r.label||'')+' '+(r.tag||'')):((r.name||'')+' '+(r.preview||'')+' '+(r.chip||''));
+  return hay.toLowerCase().includes(q);
+}
+function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])].filter(rowMatch);}
 function paintActive(){
   const rows=$('rows');const vis=visibleRows();
   rows.querySelectorAll('.row').forEach((el,i)=>el.classList.toggle('kfocus',i===ACTIVE));
@@ -384,9 +405,16 @@ function activateRow(it){if(it.sys){location.href=it.href||'/today.html';return;
 function renderList(){
   const rows=$('rows');if(!rows)return;
   const vis=visibleRows();
-  const convs=ITEMS.filter(viewMatch);
+  const convs=vis.filter(r=>!r.sys);   // the meta counts what the list SHOWS (search included)
   const need=convs.filter(i=>i.unread||i.needs).length;
-  $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} need${need===1?'s':''} you · Sorted by newest`;
+  if(VIEW==='enquiries'){
+    // C7: the Enquiries count speaks leads.html's vocabulary — non-archived
+    // total with the "M new" qualifier (one queue, one arithmetic).
+    const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
+    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by newest`;
+  }else{
+    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} need${need===1?'s':''} you · Sorted by newest`;
+  }
   // partial-failure honesty: one of the two reads failed (loadData renders the
   // surviving half) — say so instead of presenting a quietly complete inbox
   const ln=$('lnotice');
@@ -395,7 +423,7 @@ function renderList(){
     if(miss){ln.textContent=`Part of your inbox couldn’t load just now — ${miss} may be missing. Refresh to try again.`;ln.hidden=false;}
     else ln.hidden=true;
   }
-  if(!vis.length){rows.innerHTML=`<li class="lempty" role="presentation">${VIEW==='everything'&&!TOTAL?((FEED_FAILED||LEADS_FAILED)?'Nothing we could load just now.':'✓ You’re all caught up.'):'Nothing here — this view is all clear.'}</li>`;renderPane();return;}
+  if(!vis.length){rows.innerHTML=`<li class="lempty" role="presentation">${Q.trim()?`Nothing here matches “${esc(Q)}”.`:VIEW==='everything'&&!TOTAL?((FEED_FAILED||LEADS_FAILED)?'Nothing we could load just now.':'✓ You’re all caught up.'):'Nothing here — this view is all clear.'}</li>`;renderPane();return;}
   let h='';
   for(const it of vis){
     if(it.sys){
@@ -484,13 +512,37 @@ let PANE_SEQ=0;   // a stale async pane render must never paint over a newer one
 // successful sends clear their field BEFORE re-rendering, so nothing resurrects.
 const COMPOSER_FIELDS=['msgBody','supBody'];
 let DRAFT=null;   // {sel, vals, focus} — set by refresh(), consumed once by the pane loaders
+// ── C3 (SS6): insertSavedReplies(textareaId) — the shared saved-reply insert.
+// ONE lazy cached fetch of /service/saved-replies per page-load; a picker only
+// renders when replies exist (no dead chrome for studios without any). Bodies
+// live in a JS map keyed by id (projects.html's picker idiom — nothing goes
+// into an attribute); insert APPENDS after what's typed and refocuses the
+// textarea. Kept in sync by hand with crm.html's copy. ──
+let SR_FETCH=null;
+function insertSavedReplies(taId){
+  const ta=$(taId);if(!ta)return;
+  if(!SR_FETCH)SR_FETCH=api('/service/saved-replies').then(r=>(r.ok&&r.body.data&&r.body.data.replies)||[]).catch(()=>[]);
+  SR_FETCH.then((replies)=>{
+    const cur=$(taId);
+    if(!replies.length||cur!==ta)return;   // nothing saved / the pane re-rendered under us
+    if(ta.previousElementSibling&&ta.previousElementSibling.classList.contains('sr-pick'))return;
+    const map={};replies.forEach(x=>{map[x.id]=x.body;});
+    const sel=document.createElement('select');
+    sel.className='sr-pick';sel.setAttribute('aria-label','Insert a saved reply');
+    sel.style.cssText='display:block;margin-bottom:6px;max-width:100%';
+    sel.innerHTML='<option value="">Insert a saved reply…</option>'+replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
+    sel.onchange=()=>{const b=map[sel.value];if(b){const v=ta.value;ta.value=v?(v.replace(/\s*$/,'')+'\n\n'+b):b;ta.focus();}sel.value='';};
+    ta.parentNode.insertBefore(sel,ta);
+  });
+}
 function snapComposer(){const s={sel:SEL,vals:{},focus:''};for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}const ae=document.activeElement;if(ae&&COMPOSER_FIELDS.includes(ae.id))s.focus=ae.id;return s;}
 function restoreComposer(it){const s=DRAFT;if(!s||s.sel!==it.id)return;DRAFT=null;for(const id in s.vals){const el=$(id);if(el)el.value=s.vals[id];}if(s.focus){const el=$(s.focus);if(el)el.focus();}}
 async function paneMessage(host,it){
   const seq=++PANE_SEQ;
   const recHref=scoped(it.client_id?('/crm.html?client_id='+encodeURIComponent(it.client_id)+'&tab=messages'):(it.href||'/projects.html'));
+  // aria-live: thread updates (send → reload) announce instead of passing silently
   host.innerHTML=paneHead(it,`<span class="pchip">Customer</span><a class="link" href="${esc(recHref)}">Open full record →</a>`)+
-    `<div class="pbody" id="pbody"><div class="spin" role="status" aria-label="Loading conversation"></div></div><div class="pcomposer" id="pcomposer"></div>`;
+    `<div class="pbody" id="pbody" aria-live="polite"><div class="spin" role="status" aria-label="Loading conversation"></div></div><div class="pcomposer" id="pcomposer"></div>`;
   wireBack();
   // send BOTH keys when we have them: the server derives reply_to from the
   // project (adopting a bridged one on client_id-only calls), so the composer
@@ -528,6 +580,7 @@ async function paneMessage(host,it){
       if(rr.ok){ta.value='';toast('Sent.');paneMessage(host,it);}
       else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
     };
+    insertSavedReplies('msgBody');   // C3: the saved-reply picker, when any exist
   }else{
     pc.innerHTML='<p class="muted" style="font-size:13px">Replies open once this client has a project or an open support thread.</p>';
   }
@@ -587,7 +640,7 @@ async function paneSupport(host,it){
   const seq=++PANE_SEQ;
   const recHref=it.client_id?scoped('/crm.html?client_id='+encodeURIComponent(it.client_id)+'&tab=messages'):'';
   host.innerHTML=paneHead(it,`<span id="paneStatusWrap"></span>${recHref?`<a class="link" href="${esc(recHref)}">Open full record →</a>`:''}`)+
-    `<div class="pbody" id="pbody"><div class="spin" role="status" aria-label="Loading request"></div></div><div class="pcomposer" id="pcomposer"></div>`;
+    `<div class="pbody" id="pbody" aria-live="polite"><div class="spin" role="status" aria-label="Loading request"></div></div><div class="pcomposer" id="pcomposer"></div>`;
   wireBack();
   let r;
   try{r=await api('/support/'+encodeURIComponent(it.support_id));}
@@ -630,6 +683,7 @@ async function paneSupport(host,it){
     if(rr.ok){ta.value='';toast('Sent.');paneSupport(host,it);}
     else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
   };
+  insertSavedReplies('supBody');   // C3: the saved-reply picker, when any exist
   restoreComposer(it);   // a refresh() mid-draft puts the reply (and focus) back
 }
 

@@ -227,6 +227,7 @@ test.describe('Inbox — split-view console', () => {
       '/forms/inbox': { data: { submissions: [
         { id: 'l-1', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote?', status: 'new', created_at: '2026-07-13T00:00:00Z' },
         { id: 'l-2', form_kind: 'contact', name: 'Dana Lee', email: 'dana@example.com', phone: '', message: 'Loved it', status: 'read', created_at: '2026-07-02T00:00:00Z' },
+        { id: 'l-3', form_kind: 'contact', name: 'Gone Person', email: 'gone@example.com', phone: '', message: 'Old', status: 'archived', created_at: '2026-06-01T00:00:00Z' },
       ], unread: 1 } },
     } });
     await page.goto('/inbox.html');
@@ -234,14 +235,19 @@ test.describe('Inbox — split-view console', () => {
     // F2: the unattributed conversation lands in the misc bucket, never dropped
     const misc = rows.getByRole('option').filter({ hasText: 'Other clients' });
     await expect(misc).toBeVisible();
-    // F11: no enquiries key → leads come from the page's own /forms/inbox read ('new' only)
+    // F11/C7: no enquiries key → leads come from the page's own /forms/inbox read,
+    // counting NON-ARCHIVED (new + read — the same arithmetic as leads.html Open);
+    // archived stays out
     await expect(rows.getByRole('option').filter({ hasText: 'Sam Rivera' })).toBeVisible();
-    await expect(rows.getByRole('option').filter({ hasText: 'Dana Lee' })).toHaveCount(0);
-    // dots fall back to the needs-reply heuristic (no unread field anywhere)
+    await expect(rows.getByRole('option').filter({ hasText: 'Dana Lee' })).toBeVisible();
+    await expect(rows.getByRole('option').filter({ hasText: 'Gone Person' })).toHaveCount(0);
+    // dots fall back to the needs-reply heuristic (no unread field anywhere);
+    // a READ lead never fakes an unread dot
     await expect(rows.getByRole('option').filter({ hasText: 'Marlow’s Kitchen' }).first().locator('.unread-dot')).toHaveCount(1);
     await expect(rows.getByRole('option').filter({ hasText: 'Beacon Bakery' }).locator('.unread-dot')).toHaveCount(0);
-    // the meta line counts what is RENDERED (3 message groups + 1 support + 1 lead)
-    await expect(page.locator('#lmeta')).toContainText('5 conversations');
+    await expect(rows.getByRole('option').filter({ hasText: 'Dana Lee' }).locator('.unread-dot')).toHaveCount(0);
+    // the meta line counts what is RENDERED (3 message groups + 1 support + 2 leads)
+    await expect(page.locator('#lmeta')).toContainText('6 conversations');
     // the misc row still opens — with its old href fallback on the record link
     await misc.click();
     await expect(page.locator('#rpane').getByRole('link', { name: 'Open full record →' })).toHaveAttribute('href', '/projects.html');
@@ -286,6 +292,104 @@ test.describe('Inbox — split-view console', () => {
     await page.goto('/inbox.html');
     await expect(page.locator('#rows')).toContainText('all caught up');
     // ≥760px the pane shows the calm all-clear; mobile shows the list only
+  });
+});
+
+// ── SS6 — C2 search · C3 saved-reply insert · C7 enquiry count · a11y ────────
+test.describe('SS6 — inbox console quick wins', () => {
+  const SAVED = { data: { replies: [
+    { id: 'r1', title: 'Opening hours', body: 'We open at 9am, Monday to Saturday.' },
+    { id: 'r2', title: 'Thanks', body: 'Thanks for reaching out!' },
+  ] } };
+
+  test('C2 — the list-pane search filters visibleRows without rebuilding the input', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    const rows = page.locator('#rows');
+    await expect(rows.getByRole('option').first()).toBeVisible();
+    const q = page.locator('#q');
+    await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
+    await q.pressSequentially('sam');
+    // conversations AND system rows filter down to the match
+    await expect(rows.getByRole('option')).toHaveCount(1);
+    await expect(rows.getByRole('option').first()).toContainText('Sam Rivera');
+    expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
+    // the meta line follows what the list shows
+    await expect(page.locator('#lmeta')).toContainText('1 conversation');
+    await q.fill('');
+    await expect(rows.getByRole('option').filter({ hasText: 'Marlow’s Kitchen' }).first()).toBeVisible();
+    // no-match stays honest
+    await q.fill('zzz-nobody');
+    await expect(rows).toContainText('Nothing here');
+  });
+
+  test('C3 — the message composer gains an Insert-saved-reply picker (lazy /service/saved-replies)', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/service/saved-replies': SAVED } });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Sent you a message' }).first().click();
+    const pane = page.locator('#rpane');
+    const pick = pane.locator('select[aria-label="Insert a saved reply"]');
+    await expect(pick).toBeVisible();
+    await pane.locator('#msgBody').fill('Hi Sam —');
+    await pick.selectOption('r1');
+    // the body appends after what's typed; the picker resets for the next insert
+    await expect(pane.locator('#msgBody')).toHaveValue('Hi Sam —\n\nWe open at 9am, Monday to Saturday.');
+    await expect(pick).toHaveValue('');
+  });
+
+  test('C3 — the support composer gains the same picker', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/service/saved-replies': SAVED } });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    const pick = pane.locator('select[aria-label="Insert a saved reply"]');
+    await expect(pick).toBeVisible();
+    await pick.selectOption('r2');
+    await expect(pane.locator('#supBody')).toHaveValue('Thanks for reaching out!');
+  });
+
+  test('C3 — no saved replies (or the route failing) renders no picker and stays quiet', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await installApp(page, { api: API });   // default harness: no saved-replies fixture
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Sent you a message' }).first().click();
+    await expect(page.locator('#rpane #msgBody')).toBeVisible();
+    await expect(page.locator('#rpane select[aria-label="Insert a saved reply"]')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('C7 — the Enquiries view labels its count: non-archived total with the new qualifier', async ({ page }) => {
+    await installApp(page, { api: { ...API,
+      // fallback path: NO enquiries key — the page's own /forms/inbox read counts
+      '/portal/feed': { data: { ...FEED.data, enquiries: undefined } },
+      '/forms/inbox': { data: { submissions: [
+        { id: 'l-1', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Quote?', status: 'new', created_at: '2026-07-13T00:00:00Z' },
+        { id: 'l-2', form_kind: 'contact', name: 'Dana Lee', email: 'dana@example.com', phone: '', message: 'Loved it', status: 'read', created_at: '2026-07-02T00:00:00Z' },
+        { id: 'l-3', form_kind: 'contact', name: 'Gone Person', email: 'gone@example.com', phone: '', message: 'Old', status: 'archived', created_at: '2026-06-01T00:00:00Z' },
+      ], unread: 1 } },
+    } });
+    await page.goto('/inbox.html');
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="enquiries"]').click();
+    const rows = page.locator('#rows');
+    await expect(rows.getByRole('option')).toHaveCount(2);   // non-archived: new + read
+    // one queue, one vocabulary: "N enquiries · M new" — leads.html's arithmetic
+    await expect(page.locator('#lmeta')).toContainText('2 enquiries · 1 new');
+  });
+
+  test('a11y — sr-only h1, aria-live reading pane, zero console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeAttached();
+    await expect(page.locator('h1')).toHaveCount(1);
+    // opening a conversation: the reading pane announces thread updates
+    await page.locator('#rows [role=option]').filter({ hasText: 'Sent you a message' }).first().click();
+    await expect(page.locator('#pbody')).toHaveAttribute('aria-live', 'polite');
+    expect(errors).toEqual([]);
   });
 });
 
