@@ -81,7 +81,10 @@
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
   a.link{color:var(--p);text-decoration:none;font-weight:600}
-  dialog{border:none;border-radius:16px;padding:0;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  /* margin:auto + max-height/overflow: the *{margin:0} reset would pin the open
+     dialog to the top-left corner, and the provision form outgrows a phone
+     viewport without its own scroll — kept in sync with customers.html (SS6) */
+  dialog{border:none;border-radius:16px;padding:0;margin:auto;max-width:420px;width:92%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dbody{padding:22px}
   .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 12px}

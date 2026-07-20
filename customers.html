@@ -52,7 +52,9 @@
         (C4); anatomy kept in sync by hand ── */
   /* max-height + overflow: the provision form is taller than a phone viewport —
      without its own scroll the form spills and overlays its own submit row */
-  dialog{border:none;border-radius:16px;padding:0;max-width:420px;width:92%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  /* margin:auto restores centering — the page's *{margin:0} reset would
+     otherwise pin the open dialog to the viewport's top-left corner */
+  dialog{border:none;border-radius:16px;padding:0;margin:auto;max-width:420px;width:92%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dbody{padding:22px}
   .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 12px}

@@ -194,7 +194,9 @@ html.dds-embed #detailWrap{padding-top:0}
   .chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.chk input{width:auto}
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
-  dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);padding:18px 20px}
+  /* margin:auto restores centering — the *{margin:0} reset would otherwise pin
+     the open dialog to the viewport's top-left corner (SS6, with the rosters) */
+  dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);margin:auto;max-height:calc(100vh - 32px);overflow:auto;padding:18px 20px}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
