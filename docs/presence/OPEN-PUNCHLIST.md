@@ -343,7 +343,17 @@ Batch A + DNS D1 now, HOLD G13 slice 1** for a proper divergence fix.
 - D7 (agency drill-in over-scopes the customers NAV item via `withScope`) is
   UNCHANGED — still a batch-D item; A6's fix only stopped it being *widened*.
 
-**⛔ G13 slice 1 — HELD (do NOT merge until fixed):** review found a HIGH,
+**✅ G13 slice 1 + divergence fix — MERGED to main b03cff6, 2026-07-20 (Eric:
+"Merge and deploy"). The held divergence was fixed the chosen way: the render
+stamps each block's TRUE stored index as `data-dds-src` (provenance threaded
+through the resolve pipeline) and the canvas joins by it — sid join demoted to
+deploy-window fallback. Adversarial review: safe-to-merge (formula proven under
+stacked divergences + 200-fixture fuzz); hardening applied (DDS_SRCMAP
+compensation for non-move edits, composeBlocks exported + directly tested).
+Gates: 207/207 pure, 699/0 full e2e ×2, golden byte-identical. Functions deploy
+triggered post-merge. Next: G13 slice 2 (in-place editor), sequenced with the
+standards sweep.** Original hold record follows for history:
+⛔ (historical) G13 slice 1 — HELD (do NOT merge until fixed): review found a HIGH,
 conditional join-divergence. The `/settings` sidecar computes sids via
 `validateBlocksWithMap(row.blocks)` (validate-only), but the RENDER stamps
 `data-dds-sid` over `resolveBlockMedia(validateBlocks(resolveLinkedBlocks(...)))`.
