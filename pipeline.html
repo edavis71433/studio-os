@@ -607,15 +607,28 @@ function visibleDeals(){
 // totals for won/lost (so it can't serve the ?stage=won landing, the worst
 // offender) and can't follow the client-side search filter — the page-sum with
 // honest scoping is the option whose semantics actually fit this line.
+// ONE definition of "what the board shows" — renderBoard AND renderMeta read
+// it, so the Board meta can never count deals the board doesn't render
+// (SS5 item 2: won/lost/converted are outcomes the board deliberately hides;
+// the board-foot line explains where they live).
+function boardVisible(){return visibleDeals().filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);}
 function renderMeta(){
   const el=$('lmeta'); if(!el)return;
-  const list=visibleDeals();
+  const board=VIEW==='board';
+  // Board view: the meta reflects exactly the rendered open cards ("$X open",
+  // the sweep's wording). List/Table keep the full-fetched-set semantics.
+  const list=board?boardVisible():visibleDeals();
   const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
   const n=list.length,atCap=DEALS.length>=FETCH_LIMIT;
-  const count=atCap
-    ?(n===DEALS.length?'Latest '+FETCH_LIMIT+' deals':n+' of the latest '+FETCH_LIMIT+' deals')
-    :n+' deal'+(n===1?'':'s');
-  let m=count+' · '+money0(sum)+(atCap?'':' total')+' · '+updatedLabel();
+  let m;
+  if(board){
+    m=(atCap?n+' open of the latest '+FETCH_LIMIT+' deals':n+' open deal'+(n===1?'':'s'))+' · '+money0(sum)+' open · '+updatedLabel();
+  }else{
+    const count=atCap
+      ?(n===DEALS.length?'Latest '+FETCH_LIMIT+' deals':n+' of the latest '+FETCH_LIMIT+' deals')
+      :n+' deal'+(n===1?'':'s');
+    m=count+' · '+money0(sum)+(atCap?'':' total')+' · '+updatedLabel();
+  }
   if(VIEW==='table'){const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];m+=' · Sorted by '+col[1]+' — '+(TSORT.dir>0?'ascending':'descending');}
   el.textContent=m;
 }
@@ -728,8 +741,9 @@ function renderBoard(){
   const host=$('board');
   const today=new Date().toISOString().slice(0,10);
   // Open deals only — won/lost are outcomes (mirrors the summary), shown in List.
-  // visibleDeals() so the .lhead search narrows the board's cards too.
-  const open=visibleDeals().filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);
+  // boardVisible() = visibleDeals() (the .lhead search narrows the board too)
+  // minus outcomes — the SAME set renderMeta counts, by construction.
+  const open=boardVisible();
   const cols=BOARD_STAGES.map(stg=>{
     const ds=open.filter(d=>d.stage===stg);
     const sum=ds.reduce((a,d)=>a+(d.expected_value_cents||0),0);   // per-column total value (pipeline health at a glance)

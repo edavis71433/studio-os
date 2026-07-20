@@ -459,6 +459,32 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     await expect(page.locator('.lhead .lmeta')).toContainText('11 of the latest 100 deals · $11,000');
     await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
   });
+
+  // SS5 item 2: the Board renders ONLY open, unconverted deals — so in Board
+  // view the meta must count and sum exactly those cards ("$X open", the sweep's
+  // wording), never the won/lost rows the board deliberately hides. The
+  // board-foot keeps explaining where the rest live; List restores the
+  // full-fetched-set meta.
+  test('Board view: the meta counts only the rendered open cards — "$X open"', async ({ page }) => {
+    const mixed = { data: [
+      ...DEALS.data,   // proposal $5,000 + lead $2,500 — the two open cards
+      { id: '55555555-5555-4555-8555-555555555555', title: 'Gamma launch', stage: 'won', source: 'manual', expected_value_cents: 999000, expected_close: null, contact_id: 'ct-1', converted_client_id: 'cl-9', updated_at: past(4), next_step: null, next_step_at: null, last_contacted_at: past(9), agreement_signed: true },
+      { id: '66666666-6666-4666-8666-666666666666', title: 'Delta site', stage: 'lost', source: 'manual', expected_value_cents: 100000, expected_close: null, contact_id: 'ct-2', converted_client_id: null, updated_at: past(5), next_step: null, next_step_at: null, last_contacted_at: past(20), agreement_signed: false },
+    ] };
+    await pinBoard(page);
+    await installApp(page, { api: { ...API, '/sales/deals': mixed } });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#board .bcard')).toHaveCount(2);
+    // the meta reflects what the board shows: 2 open cards, $5,000 + $2,500
+    await expect(page.locator('.lhead .lmeta')).toContainText('2 open deals · $7,500 open');
+    await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
+    // the board-foot still explains the hidden outcomes
+    await expect(page.locator('.board-foot')).toContainText('2 won or closed deals — see them in List view.');
+    // switching to List restores the full-fetched-set semantics (item 1)
+    await page.locator('#viewList').click();
+    await expect(page.locator('#list .card')).toHaveCount(4);
+    await expect(page.locator('.lhead .lmeta')).toContainText('4 deals · $18,490 total');
+  });
 });
 
 test.describe('Deal drawer Path', () => {
