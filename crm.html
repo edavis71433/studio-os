@@ -329,7 +329,7 @@ function renderShell(){
   if(hd.email)bits.push(`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`);
   if(hd.phone)bits.push(`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`);
   const avail=availTabs();
-  const tabsHtml=avail.map(t=>`<button data-tab="${t}"${t===TAB?' class="on"':''} role="tab" id="tab-${t}" aria-selected="${t===TAB?'true':'false'}" aria-controls="tabbody">${TAB_LABEL[t]}</button>`).join('');
+  const tabsHtml=avail.map(t=>`<button data-tab="${t}"${t===TAB?' class="on"':''} role="tab" id="tab-${t}" aria-selected="${t===TAB?'true':'false'}" tabindex="${t===TAB?'0':'-1'}" aria-controls="tabbody">${TAB_LABEL[t]}</button>`).join('');
   // a customer-scoped record (sections.overview) resolves its identity from the
   // scope alone — the rail works there even with no explicit keys
   const showRail=!!(idParams().project||idParams().deal||(REC.identity&&REC.identity.client_id)||(REC.sections&&REC.sections.overview));
@@ -353,6 +353,19 @@ function renderShell(){
       </aside>
     </div>`;
   document.querySelectorAll('.tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
+  // E2: the record-section tablist honors the arrow-key contract — arrows move
+  // focus AND selection, Home/End jump, roving tabindex (showTab keeps it).
+  const tl=document.querySelector('.tabs[role=tablist]');
+  if(tl)tl.addEventListener('keydown',(e)=>{
+    const tabsEls=[...tl.querySelectorAll('[data-tab]')];const i=tabsEls.indexOf(document.activeElement);
+    if(i<0)return;let j=-1;
+    if(e.key==='ArrowRight')j=(i+1)%tabsEls.length;
+    else if(e.key==='ArrowLeft')j=(i-1+tabsEls.length)%tabsEls.length;
+    else if(e.key==='Home')j=0;
+    else if(e.key==='End')j=tabsEls.length-1;
+    if(j<0)return;e.preventDefault();
+    const t=tabsEls[j];showTab(t.getAttribute('data-tab'));t.focus();
+  });
   HL_EDIT=false;   // the shell rebuild destroyed any open editor — never leave the flag stale
   renderHighlights();
 }
@@ -471,7 +484,7 @@ function setTabUrl(tab){ const q=QP(); q.set('tab',tab); history.replaceState(nu
 
 function showTab(tab,initial){
   TAB=tab;
-  document.querySelectorAll('.tabs [data-tab]').forEach(b=>{const on=b.getAttribute('data-tab')===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');});
+  document.querySelectorAll('.tabs [data-tab]').forEach(b=>{const on=b.getAttribute('data-tab')===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.setAttribute('tabindex',on?'0':'-1');});
   if(!initial)setTabUrl(tab);
   const host=$('tabbody'); if(!host)return;
   host.setAttribute('aria-labelledby','tab-'+tab);
@@ -644,7 +657,12 @@ function renderFilesTab(host){
 // (404 / no items array — the function may not be redeployed), compose the same
 // shape client-side from the OLD routes (/crm/messages + /crm/timeline). The
 // fallback lacks deal system events — accepted; it never breaks the page.
+// ACT_SEQ (SS6): a superseded activity load must never repaint the rail — only
+// the newest request's outcome (server path OR fallback) is allowed to touch
+// ACT and render.
+let ACT_SEQ=0;
 async function loadActivity(){
+  const seq=++ACT_SEQ;
   const ids=idParams(); const q=[];
   if(ids.project)q.push('project='+encodeURIComponent(ids.project));
   if(REC.identity&&REC.identity.client_id)q.push('client_id='+encodeURIComponent(REC.identity.client_id));
@@ -652,12 +670,14 @@ async function loadActivity(){
   const scopedCustomer=!!(REC.sections&&REC.sections.overview);   // the scope header alone resolves the identity server-side
   if(!q.length&&!scopedCustomer){ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};renderRail();return;}
   const r=await api('/crm/activity?'+q.join('&'));
+  if(seq!==ACT_SEQ)return;
   const d=(r.ok&&r.body.data)||{};
   if(r.ok&&Array.isArray(d.items)){
     ACT={items:d.items,upcoming:Array.isArray(d.upcoming)?d.upcoming:[],reply_to:d.reply_to||null,reply_support_to:d.reply_support_to||null,failed:false};
     renderRail();return;
   }
-  await loadActivityFallback(q);
+  await loadActivityFallback(q,seq);
+  if(seq!==ACT_SEQ)return;
   renderRail();
 }
 // thin adapter mirroring the server's crm/activity.ts mappers
@@ -683,13 +703,14 @@ function siteItem(t){
   const meta={publish:'Website',change:'Website',connected:'Connected',moment:'Moment',approval:'Approval',lead:'Enquiry'}[t.kind]||null;
   return{id:'site:'+t.id,kind:t.kind,type:'system',title:t.title||t.kind,body:t.detail||null,at:t.at,meta,href:null};
 }
-async function loadActivityFallback(q){
+async function loadActivityFallback(q,seq){
   const ids=idParams(); const s=(REC&&REC.sections)||{};
   const [mr,tr,tk]=await Promise.all([
     api('/crm/messages?'+q.join('&')),
     s.overview?api('/crm/timeline'):Promise.resolve({ok:false,body:{}}),
     ids.deal?apiAg('/sales/deals/'+encodeURIComponent(ids.deal)+'/tasks'):Promise.resolve({ok:false,body:{}}),
   ]);
+  if(seq!==undefined&&seq!==ACT_SEQ)return;   // superseded mid-flight — never mutate ACT
   if(!mr.ok&&!tr.ok){ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:true};return;}
   const md=(mr.ok&&mr.body.data)||{};
   const items=[]; const push=(x)=>{if(x&&x.at)items.push(x);};
@@ -702,6 +723,7 @@ async function loadActivityFallback(q){
   // next step + unpaid invoices) — await the deal fetch so the band is deterministic
   // instead of racing loadPanels' parallel /sales/deals read
   await DEAL_READY.catch(()=>{});
+  if(seq!==undefined&&seq!==ACT_SEQ)return;   // superseded while waiting on the deal read
   const today=new Date().toISOString().slice(0,10); const upcoming=[];
   const dealHref=ids.deal?agHref('pipeline.html','deal='+encodeURIComponent(ids.deal)):null;
   for(const t of tasks)if(t.status==='open')upcoming.push({kind:'task',id:t.id,title:t.title||'To-do',due:t.due_date||null,overdue:!!(t.due_date&&String(t.due_date).slice(0,10)<today),href:dealHref});
@@ -733,6 +755,31 @@ function restoreComposer(s){
   for(const id in s.vals){const el=$(id);if(el)el.value=s.vals[id];}
   if(s.focus){const el=$(s.focus);if(el)el.focus();}
 }
+// ── C3 (SS6): insertSavedReplies(textareaId) — the shared saved-reply insert.
+// ONE lazy cached fetch per page-load; a picker only renders when replies
+// exist. Bodies live in a JS map keyed by id (projects.html's picker idiom —
+// nothing goes into an attribute); insert APPENDS after what's typed and
+// refocuses the textarea. apiAg on purpose: saved replies are the OPERATOR's
+// toolkit (their own site's settings) — a customer-scoped record must not
+// resolve them against the customer's site (the /sales/* doctrine above).
+// Kept in sync by hand with inbox.html's copy. ──
+let SR_FETCH=null;
+function insertSavedReplies(taId){
+  const ta=$(taId);if(!ta)return;
+  if(!SR_FETCH)SR_FETCH=apiAg('/service/saved-replies').then(r=>(r.ok&&r.body.data&&r.body.data.replies)||[]).catch(()=>[]);
+  SR_FETCH.then((replies)=>{
+    const cur=$(taId);
+    if(!replies.length||cur!==ta)return;   // nothing saved / the composer re-rendered under us
+    if(ta.previousElementSibling&&ta.previousElementSibling.classList.contains('sr-pick'))return;
+    const map={};replies.forEach(x=>{map[x.id]=x.body;});
+    const sel=document.createElement('select');
+    sel.className='sr-pick';sel.setAttribute('aria-label','Insert a saved reply');
+    sel.style.cssText='display:block;margin-bottom:6px;max-width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:6px 9px';
+    sel.innerHTML='<option value="">Insert a saved reply…</option>'+replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
+    sel.onchange=()=>{const b=map[sel.value];if(b){const v=ta.value;ta.value=v?(v.replace(/\s*$/,'')+'\n\n'+b):b;ta.focus();}sel.value='';};
+    ta.parentNode.insertBefore(sel,ta);
+  });
+}
 function renderRail(){
   const host=$('acard'); if(!host)return;
   if(ACT.failed){host.innerHTML='<p class="muted">Couldn’t load this record’s activity just now. <button id="actRetry" style="font-size:12.5px;padding:5px 12px">Try again</button></p>';const rt=$('actRetry');if(rt)rt.addEventListener('click',loadActivity);return;}
@@ -755,7 +802,7 @@ function renderComposer(){
   const host=$('composer'); if(!host)return;
   const tabs=composerTabs();
   if(!tabs.some(t=>t[0]===COMPOSER))COMPOSER=tabs[0][0];
-  let html=`<div class="composer-tabs" role="tablist" aria-label="Compose">${tabs.map(t=>`<button role="tab" data-ct="${t[0]}" aria-selected="${COMPOSER===t[0]?'true':'false'}"${COMPOSER===t[0]?' class="on"':''}>${t[1]}</button>`).join('')}</div><div class="composer-pane">`;
+  let html=`<div class="composer-tabs" role="tablist" aria-label="Compose">${tabs.map(t=>`<button role="tab" data-ct="${t[0]}" aria-selected="${COMPOSER===t[0]?'true':'false'}" tabindex="${COMPOSER===t[0]?'0':'-1'}"${COMPOSER===t[0]?' class="on"':''}>${t[1]}</button>`).join('')}</div><div class="composer-pane">`;
   if(COMPOSER==='message'){
     const replyPath=ACT.reply_to||ACT.reply_support_to;
     if(replyPath){
@@ -779,7 +826,23 @@ function renderComposer(){
   html+=`</div>`;
   host.innerHTML=html;
   host.querySelectorAll('[data-ct]').forEach(b=>b.addEventListener('click',()=>{COMPOSER=b.getAttribute('data-ct');renderComposer();}));
+  // E2: the composer tablist honors the arrow-key contract — arrows move focus
+  // AND selection (the re-render hands focus back to the moved-to tab);
+  // Home/End jump. Roving tabindex is set in the markup above.
+  const ctl=host.querySelector('.composer-tabs');
+  if(ctl)ctl.addEventListener('keydown',(e)=>{
+    const tabsEls=[...ctl.querySelectorAll('[data-ct]')];const i=tabsEls.indexOf(document.activeElement);
+    if(i<0)return;let j=-1;
+    if(e.key==='ArrowRight')j=(i+1)%tabsEls.length;
+    else if(e.key==='ArrowLeft')j=(i-1+tabsEls.length)%tabsEls.length;
+    else if(e.key==='Home')j=0;
+    else if(e.key==='End')j=tabsEls.length-1;
+    if(j<0)return;e.preventDefault();
+    COMPOSER=tabsEls[j].getAttribute('data-ct');renderComposer();
+    const nb=host.querySelector('[data-ct="'+COMPOSER+'"]');if(nb)nb.focus();
+  });
   const f=$('msgForm'); if(f)f.onsubmit=sendMessage;
+  if($('msgBody'))insertSavedReplies('msgBody');   // C3: the saved-reply picker, when any exist
   host.querySelectorAll('[data-lk]').forEach(b=>b.addEventListener('click',()=>{LOGKIND=b.getAttribute('data-lk');host.querySelectorAll('[data-lk]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});}));
   const lg=$('logGo'); if(lg)lg.addEventListener('click',logActivity);
   const tg=$('taskGo'); if(tg)tg.addEventListener('click',addTask);

@@ -213,6 +213,101 @@ test.describe('Relationship view', () => {
     await expect(page.locator('.dds-toast')).toContainText('Done.');
   });
 
+  // ── SS6: C3 saved-reply insert · ACT_SEQ · real tablist keyboard ───────────
+  test('C3 — the record composer gains an Insert-saved-reply picker above #msgBody', async ({ page }) => {
+    await installApp(page, { api: {
+      '/crm/record': RECORD,
+      '/crm/activity': activityFx({ reply_to: `/projects/${PROJECT}/messages` }),
+      '/service/saved-replies': { data: { replies: [{ id: 'r1', title: 'Opening hours', body: 'We open at 9am.' }] } },
+    } });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    const body = page.locator('#msgBody');
+    await expect(body).toBeVisible();
+    const pick = page.locator('select[aria-label="Insert a saved reply"]');
+    await expect(pick).toBeVisible();
+    await body.fill('Hi —');
+    await pick.selectOption('r1');
+    await expect(body).toHaveValue('Hi —\n\nWe open at 9am.');
+    await expect(pick).toHaveValue('');   // reset for the next insert
+  });
+
+  test('C3 — no saved replies → no picker, no noise', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await installApp(page, { api: {
+      '/crm/record': RECORD,
+      '/crm/activity': activityFx({ reply_to: `/projects/${PROJECT}/messages` }),
+    } });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await expect(page.locator('#msgBody')).toBeVisible();
+    await expect(page.locator('select[aria-label="Insert a saved reply"]')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('ACT_SEQ — a slow superseded activity load never repaints the rail', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': RECORD } });
+    const fx = (items: unknown[], upcoming: unknown[]) => JSON.stringify({ data: {
+      items, upcoming, project_id: PROJECT, deal_id: DEAL, reply_to: null, reply_support_to: null,
+    } });
+    const item = (id: string, title: string) => ({ id, kind: 'message', type: 'message', title, body: null, at: '2026-07-10T00:00:00Z', meta: null, href: null });
+    const tk = (id: string, title: string) => ({ kind: 'task', id, title, due: null, overdue: false, href: null });
+    let call = 0;
+    await page.route(/\/functions\/v1\/presence\/crm\/activity(\?|$)/, (route) => {
+      call++;
+      const fulfill = (b: string) => route.fulfill({ status: 200, contentType: 'application/json', body: b });
+      if (call === 1) return fulfill(fx([item('i1', 'Baseline item')], [tk('t1', 'First to-do'), tk('t2', 'Second to-do')]));
+      // call 2 (after the first checkbox) delays WITHOUT blocking the handler
+      if (call === 2) { setTimeout(() => { fulfill(fx([item('i2', 'Stale item')], [tk('t2', 'Second to-do')])).catch(() => {}); }, 700); return; }
+      return fulfill(fx([item('i3', 'Fresh item')], []));
+    });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await expect(page.locator('#timeline')).toContainText('Baseline item');
+    await page.locator('[data-updone="t1"]').click();       // → activity call 2 (slow)
+    await page.locator('[data-updone="t2"]').click();       // → activity call 3 (fast)
+    await expect(page.locator('#timeline')).toContainText('Fresh item');
+    await page.waitForTimeout(900);                          // the stale response lands
+    await expect(page.locator('#timeline')).toContainText('Fresh item');
+    await expect(page.locator('#acard')).not.toContainText('Stale item');
+  });
+
+  test('E2 — both tablists honor the arrow-key contract (roving tabindex, selection follows focus)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'keyboard path once, on desktop');
+    await installApp(page, { api: {
+      '/crm/record': { data: {
+        identity: { contact_id: 'ct-1', deal_id: DEAL, client_id: null, customer_site_id: CLIENT, project_id: PROJECT },
+        header: { name: 'Marlow’s Kitchen', company: '', email: '', phone: '', status: 'customer' },
+        highlights: {},
+        sections: { overview: true, details: true, deal: true, delivery: true },
+        default_tab: 'details',
+        canonical: { key: 'client', value: CLIENT },
+      } },
+      '/crm/activity': activityFx(),
+      '/sales/contacts/ct-1': { data: { contact: { id: 'ct-1', name: 'Sam' }, custom_fields: [], deals: [] } },
+      '/sales/deals': { data: { deal: { id: DEAL, title: 'Site build', stage: 'qualified' }, proposals: [], contracts: [], invoices: [] } },
+      ['/projects/' + PROJECT]: { data: { project: { id: PROJECT, name: 'Site', status: 'active' }, milestones: [], tasks: [], deliverables: [], progress: {} } },
+    } });
+    await page.goto(`/crm.html?client=${CLIENT}&tab=details`);
+    // record-section tablist: roving tabindex + arrows move AND select
+    const tabs = page.locator('.tabs[role=tablist] [data-tab]');
+    await expect(tabs.first()).toHaveAttribute('tabindex', '0');
+    await expect(tabs.nth(1)).toHaveAttribute('tabindex', '-1');
+    await tabs.first().focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(tabs.nth(1)).toBeFocused();
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    await expect(tabs.nth(1)).toHaveAttribute('tabindex', '0');
+    await expect(tabs.first()).toHaveAttribute('tabindex', '-1');
+    await page.keyboard.press('Home');
+    await expect(tabs.first()).toBeFocused();
+    await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+    // composer tablist: same contract (the re-render must hand focus back)
+    const ct = page.locator('.composer-tabs [role=tab]');
+    await ct.first().focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(ct.nth(1)).toBeFocused();
+    await expect(ct.nth(1)).toHaveAttribute('aria-selected', 'true');
+  });
+
   test('a failed to-do PATCH re-unchecks the box', async ({ page }) => {
     await installApp(page, { api: {
       '/crm/record': RECORD,
