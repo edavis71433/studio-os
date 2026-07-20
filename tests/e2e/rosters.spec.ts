@@ -439,3 +439,87 @@ test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', () =
     await expect(page.locator('#custDlg')).toBeVisible();   // the done panel replaces the form in-dialog
   });
 });
+
+// ── SS6 — the Add-a-customer dialog tells the truth (both copies) ────────────
+// (a) The roster refresh after a SUCCESSFUL provision is best-effort: its
+//     failure must never repaint the success as "we couldn't set them up".
+// (b) handleSalesAddCustomer returns invited:false when the invitation email
+//     fails — the done panel must say so instead of "Invitation sent".
+test.describe('Dialog honesty — customers + contacts (SS6)', () => {
+  const PROVISION_OK = { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } };
+  const PROVISION_NO_EMAIL = { data: { created: true, invited: false, portal_url: 'https://x.example/portal.html' } };
+
+  // the boot load serves the roster; every later read dies on the network —
+  // exactly the refresh-after-provision failure under test
+  const failRefresh = (page: import('@playwright/test').Page, re: RegExp) => {
+    let reads = 0;
+    return page.route(re, (route) => {
+      reads++;
+      if (reads === 1) return route.fallback();
+      return route.abort();
+    });
+  };
+
+  test('customers — a failed refresh after a successful provision stays a success (soft toast, never "couldn’t set them up")', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/sales/customers': PROVISION_OK } });
+    await failRefresh(page, /\/functions\/v1\/presence\/studio\/customers(\?|$)/);
+    await page.goto('/customers.html');
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    await page.locator('#cu-submit').click();
+    // the provision SUCCEEDED — the panel says so, and the refresh failure
+    // surfaces only as the soft couldn't-refresh line
+    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t refresh' }).first()).toBeVisible();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t set them up' })).toHaveCount(0);
+  });
+
+  test('contacts — the same refresh honesty on its copy of the dialog', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/sales/customers': PROVISION_OK } });
+    await failRefresh(page, /\/functions\/v1\/presence\/sales\/contacts(\?|$)/);
+    await page.goto('/contacts.html');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    await page.locator('#cu-submit').click();
+    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t refresh' }).first()).toBeVisible();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t set them up' })).toHaveCount(0);
+  });
+
+  test('customers — invited:false renders the honest outcome: account created, the email didn’t send, share the link', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/sales/customers': PROVISION_NO_EMAIL } });
+    await page.goto('/customers.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('#cu-name').fill('Jane Doe');
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    await page.locator('#cu-submit').click();
+    const done = page.locator('#cust-done');
+    await expect(done).toContainText('the invitation email couldn’t be sent');
+    await expect(done).not.toContainText('Invitation sent to');
+    // the portal link is already in the done panel — the honest line points at it
+    await expect(done.locator('a.link')).toHaveAttribute('href', 'https://x.example/portal.html');
+  });
+
+  test('contacts — the same invited:false honesty on its copy of the dialog', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/sales/customers': PROVISION_NO_EMAIL } });
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('#cu-name').fill('Jane Doe');
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    await page.locator('#cu-submit').click();
+    const done = page.locator('#cust-done');
+    await expect(done).toContainText('the invitation email couldn’t be sent');
+    await expect(done).not.toContainText('Invitation sent to');
+    await expect(done.locator('a.link')).toHaveAttribute('href', 'https://x.example/portal.html');
+  });
+});

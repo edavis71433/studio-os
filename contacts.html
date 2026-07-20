@@ -477,6 +477,11 @@ $('custForm').onsubmit=async(e)=>{
     }else if(d.already_exists){
       heading='They already have a workspace';
       line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
+    }else if(d.invited===false){
+      // honest outcome: the account exists but the invitation email failed —
+      // never claim "Invitation sent" (SS6; server: handleSalesAddCustomer)
+      heading='Account created — the invitation email couldn’t be sent';
+      line='Their workspace is ready, but our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.';
     }else{
       heading='Invitation sent';
       line='Invitation sent to '+esc(email)+'. They’ll set their password and land in their guided setup.';
@@ -489,8 +494,11 @@ $('custForm').onsubmit=async(e)=>{
     done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
     done.style.display='';
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
-    await load();
-  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;}
+  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
+  // The creation SUCCEEDED — the roster refresh is best-effort and must never
+  // repaint that success as a failure (SS6): its own failure gets the soft
+  // couldn’t-refresh line, never the creation-failed toast.
+  load().catch(()=>toast('We couldn’t refresh the list just now — Refresh will catch it up.'));
 };
 // ── CSV IMPORT: bring an existing contact list in one go. Pure frontend — the
 // server already dedupes per email and validates every row, so this simply
