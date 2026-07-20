@@ -75,10 +75,22 @@ export function linkedUsageMap(homeBlocks: unknown, pages: unknown): Record<stri
  *  CONTENT stays single-source); otherwise the payload's own values ride through.
  *  Returns a raw block list to hand straight to validateBlocks. Pure. */
 export function resolveLinkedBlocks(rawBlocks: unknown, lookup: (id: string) => unknown): unknown[] {
-  if (!Array.isArray(rawBlocks)) return [];
+  return resolveLinkedBlocksTracked(rawBlocks, lookup).blocks;
+}
+
+/** resolveLinkedBlocks + provenance: `src[j]` is the RAW-list index that output
+ *  block `blocks[j]` came from (a linked placeholder's index for the block it
+ *  resolved to; a passthrough block's own index). Index-aligned with `blocks`.
+ *  Behavior of `blocks` is byte-identical to resolveLinkedBlocks — the src
+ *  bookkeeping is the only addition. G13 uses this so the /settings sidecar can
+ *  map a stamped sid back to its BLOCKS_WORK (raw) index across the resolve. */
+export function resolveLinkedBlocksTracked(rawBlocks: unknown, lookup: (id: string) => unknown): { blocks: unknown[]; src: number[] } {
+  if (!Array.isArray(rawBlocks)) return { blocks: [], src: [] };
   const out: unknown[] = [];
-  for (const b of rawBlocks) {
-    if (!isLinkedBlock(b)) { out.push(b); continue; }
+  const src: number[] = [];
+  for (let ri = 0; ri < rawBlocks.length; ri++) {
+    const b = rawBlocks[ri];
+    if (!isLinkedBlock(b)) { out.push(b); src.push(ri); continue; }
     const payload = lookup(b.ref);
     if (!payload || typeof payload !== 'object') continue;   // deleted/missing → drop (graceful)
     const resolved: Record<string, unknown> = { ...(payload as Record<string, unknown>) };
@@ -87,7 +99,7 @@ export function resolveLinkedBlocks(rawBlocks: unknown, lookup: (id: string) => 
     if (b.show_from !== undefined) resolved.show_from = b.show_from;
     if (b.show_until !== undefined) resolved.show_until = b.show_until;
     if ((b as { variant?: unknown }).variant !== undefined) resolved.variant = (b as { variant?: unknown }).variant;   // Wave-1 G4: per-placement style variant overrides the payload's
-    out.push(resolved);
+    out.push(resolved); src.push(ri);
   }
-  return out;
+  return { blocks: out, src };
 }

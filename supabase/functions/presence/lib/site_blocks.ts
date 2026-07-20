@@ -877,6 +877,24 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
   return out;
 }
 
+/** resolveBlockMedia + provenance: `src[m]` is the INPUT (validated-list) index
+ *  that output block `blocks[m]` came from. resolveBlockMedia is per-block
+ *  independent (each input yields 0 or 1 output — a media-less block DROPS, a
+ *  reviews_wall with no approved reviews DROPS; nothing ever expands), so probing
+ *  it one block at a time reproduces the exact same output, in order, while
+ *  recording which input survived. G13: lets the render stamp each block's true
+ *  stored index so the canvas never re-derives it from a post-resolve sid.
+ *  `blocks` is byte-identical to resolveBlockMedia(blocks, ref, extras). */
+export function resolveBlockMediaTracked(blocks: StoredBlock[], ref: (id: string) => MediaRef | null, extras?: BlockResolveExtras): { blocks: SiteBlock[]; src: number[] } {
+  const out: SiteBlock[] = [];
+  const src: number[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const one = resolveBlockMedia([blocks[i]], ref, extras);   // 0 or 1 (per-block independent)
+    for (const r of one) { out.push(r); src.push(i); }
+  }
+  return { blocks: out, src };
+}
+
 // ── G27 · server-side contrast recomputation (design doc §3/§5). NEVER a hard
 // block, per Eric ("ship with contrast warnings, not blocks"): a failing pair
 // still validates, stores, and publishes — this pure helper is what the save
