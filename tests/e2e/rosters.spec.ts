@@ -402,3 +402,40 @@ test.describe('Contacts — Manage fields (A1)', () => {
     await expect(page.locator('#fieldsDlg')).toBeHidden();
   });
 });
+
+// ── SS6 regression pin: dialogs must SUBMIT on phones ────────────────────────
+// The f6176a4 centering (`margin:auto` on the top-layer dialog) broke phone
+// submission two ways: mobile browsers widen the layout viewport to court the
+// wide roster table (even scroll-contained), and they resolve the dialog's
+// containing block against the DOCUMENT box — together the Save button landed
+// beyond the visible viewport and taps could never reach it. The customers C4
+// tests above pin that page; this pins contacts' own copy of the dialog with
+// the roster table behind it, so the regression can't sneak back per-page.
+test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', () => {
+  test('provision submits over the pinned roster table: POST /sales/customers lands and the done panel renders', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: {
+      '/sales/contacts': CONTACTS,
+      '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
+    } });
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    // the open dialog must fit the DEVICE viewport — the broken geometry sized
+    // it against the widened layout viewport, pushing Save out of reach
+    const vp = page.viewportSize()!;
+    const box = (await page.locator('#custDlg').boundingBox())!;
+    expect(box.x, 'dialog left edge on-screen').toBeGreaterThanOrEqual(0);
+    expect(box.y, 'dialog top edge on-screen').toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, 'dialog right edge within the device viewport').toBeLessThanOrEqual(vp.width + 1);
+    expect(box.y + box.height, 'dialog bottom edge within the device viewport').toBeLessThanOrEqual(vp.height + 1);
+    await page.locator('#cu-name').fill('Jane Doe');
+    await page.locator('#cu-biz').fill('Acme Bakery');
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
+    await page.locator('#cu-submit').click();
+    expect((await post).postDataJSON()).toEqual({ mode: 'provision', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com', edition: 'presence' });
+    await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
+    await expect(page.locator('#custDlg')).toBeVisible();   // the done panel replaces the form in-dialog
+  });
+});

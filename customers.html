@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- minimum-scale=1: without it, mobile browsers widen the layout viewport to
+     court the wide roster table (even inside its own scroll container), which
+     zooms the page out and mis-sizes the top-layer dialog (SS6 review) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
 <title>Customers — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Your customers — everyone you deliver work for, in one list.">
@@ -50,13 +53,19 @@
 
   /* ── the Add-a-customer dialog — contacts.html's custDlg, ported wholesale
         (C4); anatomy kept in sync by hand ── */
-  /* max-height + overflow: the provision form is taller than a phone viewport —
-     without its own scroll the form spills and overlays its own submit row */
-  /* margin:auto restores centering — the page's *{margin:0} reset would
-     otherwise pin the open dialog to the viewport's top-left corner */
-  dialog{border:none;border-radius:16px;padding:0;margin:auto;max-width:420px;width:92%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  /* Centering, mobile-safe (SS6 review). NOT margin:auto — mobile browsers
+     resolve the top-layer dialog's containing block against the DOCUMENT
+     height, so vertical auto-margins push a tall dialog's bottom below the
+     visible viewport and the browser pans/zooms chasing it, leaving the
+     submit row untappable. Explicit 8vh margins anchor it in the visible
+     viewport (near-centered when tall); the *{margin:0} reset no longer
+     matters because the margins are stated outright. */
+  /* The dialog element itself must NOT be the scroller either — browsers
+     won't programmatically scroll the top-layer <dialog> — so the inner
+     .dbody scrolls, sized to the 8vh offsets (pipeline's shipped pattern). */
+  dialog{border:none;border-radius:16px;padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
-  .dbody{padding:22px}
+  .dbody{padding:22px;max-height:calc(84vh - 22px);overflow:auto}
   .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 12px}
   .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 5px}
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none}

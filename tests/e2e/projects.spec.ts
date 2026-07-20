@@ -644,3 +644,40 @@ test.describe('Project record — client-upload origin (A10)', () => {
     await expect(studioRow.locator('.tag.fromclient')).toHaveCount(0);
   });
 });
+
+// ── SS6 regression pin: the New-project dialog must SUBMIT on phones ─────────
+// Same failure family as the rosters' Add-a-customer pin: `margin:auto` on the
+// top-layer dialog + the mobile layout-viewport widening (courting the wide
+// roster table) put the Create button beyond the visible viewport, so taps
+// never reached it. Pinned with the table view behind the dialog on purpose.
+test.describe('Projects — the New-project dialog on phones (SS6 pin)', () => {
+  test('create submits over the pinned roster table: POST /projects lands and the new record opens', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    await routeP3Report404(page);
+    // POST /projects is a write — serve the created id; reads fall through
+    await page.route(/\/functions\/v1\/presence\/projects(\?|$)/, (route) => {
+      if (route.request().method() === 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'p9' } }) });
+      return route.fallback();
+    });
+    await page.goto('/projects.html');
+    await page.locator('#newProject').click();
+    await expect(page.locator('#newDlg')).toBeVisible();
+    // the open dialog must fit the DEVICE viewport — the broken geometry sized
+    // it against the widened layout viewport, pushing Create out of reach
+    const vp = page.viewportSize()!;
+    const box = (await page.locator('#newDlg').boundingBox())!;
+    expect(box.x, 'dialog left edge on-screen').toBeGreaterThanOrEqual(0);
+    expect(box.y, 'dialog top edge on-screen').toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, 'dialog right edge within the device viewport').toBeLessThanOrEqual(vp.width + 1);
+    expect(box.y + box.height, 'dialog bottom edge within the device viewport').toBeLessThanOrEqual(vp.height + 1);
+    await page.locator('#np-name').fill('Zeta rebuild');
+    await page.locator('#np-desc').fill('Scope: a full site refresh with a new booking flow.');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/presence\/projects(\?|$)/.test(r.url()));
+    await page.locator('#newForm button[type="submit"]').click();
+    // exactly what the handler sends: empty optional fields are omitted
+    expect((await post).postDataJSON()).toEqual({ name: 'Zeta rebuild', description: 'Scope: a full site refresh with a new booking flow.' });
+    await expect(page.locator('#newDlg')).toBeHidden();
+    await expect(page.locator('#dtitle')).toContainText('Bare project');   // openProject(created id)
+  });
+});
