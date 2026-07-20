@@ -171,6 +171,22 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('tbody')).not.toContainText('Fern Florist'); // …a 31-45d domain is NOT "all clear"
   });
 
+  test('search-issues-only clients surface in "Needs attention" (they are platform-flagged), never in "All clear"', async ({ page }) => {
+    // A client with attention=0 but search_issues>0 used to appear ONLY in "All"
+    // — invisible in every focused view. They're platform-flagged, so "Needs
+    // attention" must include them; "All clear" already excluded them (kept).
+    await pinDisplay(page, 'table');
+    const quarry = row({ site_id: 'a7', name: 'Quiet Quarry', search_issues: 2 });   // attention 0, search issues only
+    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [MARLOW, DENTAL, CEDAR, quarry] } } });
+    await page.goto('/agency.html');
+    await page.locator('[data-view="attention"]').click();
+    await expect(page.locator('tbody')).toContainText('Quiet Quarry');   // platform-flagged → visible in the focused view
+    await expect(page.locator('tbody tr')).toHaveCount(2);               // Marlow (attention 4) + Quarry (search issues only)
+    await page.locator('[data-view="clear"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);               // Bright Dental alone…
+    await expect(page.locator('tbody')).not.toContainText('Quiet Quarry'); // …open search issues are never "all clear"
+  });
+
   test('search re-renders never destroy the input, its caret POSITION, or focus (the L bug)', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');

@@ -169,7 +169,10 @@ const VIEWS=[['all','All'],['attention','Needs attention'],['domain','Domain exp
 let VIEWNAME='all',Q='';
 const viewMatch=(c)=>{
   const att=Number(c.attention||0);
-  if(VIEWNAME==='attention')return att>0;
+  // search_issues counts too: a search-issues-only client is platform-flagged
+  // (and already kept out of "All clear") — without this it was invisible in
+  // every focused view.
+  if(VIEWNAME==='attention')return att>0||Number(c.search_issues||0)>0;
   if(VIEWNAME==='domain')return domainSoon(c);
   if(VIEWNAME==='billing')return !!c.billing_issue;
   if(VIEWNAME==='clear')return att===0&&!c.billing_issue&&!domainSoon(c)&&!Number(c.search_issues||0);
