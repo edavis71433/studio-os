@@ -39,6 +39,7 @@ function safeRecents(a){return Array.isArray(a)?a.filter(function(r){return r&&r
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
+function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
 function glanceData(feed,snaps,notifs,billing,projects,failed){
   failed=failed||{};
   const needsOk=(failed.feed||failed.snaps)?null:((feed&&feed.pending_approvals)||[]).length+(snaps||[]).reduce((a,s)=>a+snapWaiting(s),0);
@@ -47,7 +48,7 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
   // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
   const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
-  return{needsOk,newMsgs,due:dueTotal>0?'$'+dueTotal.toLocaleString('en-US'):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
+  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
 }
 function glanceTiles(g){
   g=g||{};const t=[];
@@ -223,6 +224,10 @@ const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Websit
     gb.due==='' && !glanceTiles(gb).some(t=>t.id==='glance-due') && glanceTiles(gb).some(t=>t.id==='glance-ok'));
   ok('glance: a SUCCESSFUL billing read still sums unpaid invoices (the contract gates failure, not success)',
     glanceData(FEED,SNAPS,NOTIFS,BILLING,PROJECTS,{}).due==='$750');
+  // PS2: the ONE portal money formatter — thousands grouped, whole dollars
+  // clean, fractional amounts keep both cent digits (never $1,234.5).
+  ok('fmtMoney: $1,200 (grouped) / $750 (clean) / $1,234.50 (cents kept) / $0 (guarded)',
+    fmtMoney(1200)==='$1,200' && fmtMoney(750)==='$750' && fmtMoney(1234.5)==='$1,234.50' && fmtMoney(null)==='$0');
 }
 
 // ═══ structural pins — the wiring both pages must keep ═══
@@ -237,8 +242,8 @@ for(const fn of ['greet','dateLine','monthTiles','monthTrend','siteYmd','todaySl
   ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
 }
 ok('mirror: today.html defines money verbatim',today.includes(String(money)));
-for(const fn of ['portalGreeting','snapWaiting','glanceData','glanceTiles']){
-  const m=String({portalGreeting,snapWaiting,glanceData,glanceTiles}[fn]);
+for(const fn of ['portalGreeting','snapWaiting','fmtMoney','glanceData','glanceTiles']){
+  const m=String({portalGreeting,snapWaiting,fmtMoney,glanceData,glanceTiles}[fn]);
   ok(`mirror: client.html defines ${fn} verbatim`,portal.includes(m));
 }
 

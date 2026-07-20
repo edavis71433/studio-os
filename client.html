@@ -415,6 +415,12 @@ function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon
 // "N things need your OK" line both use it, so Home can never show two
 // contradictory counts on the same render.
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
+// PS2: the ONE portal money formatter — the glance tile, the Needs-you invoice
+// row, the Invoices rows and the tab's unpaid-total line all render the same
+// cents the same way ($1,200, $1,234.50 — never a bare $1200 drifting from the
+// glance's $1,200). Server amounts are dollars (amount_cents/100), so a
+// fractional amount keeps its two cent digits; whole dollars stay clean.
+function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
 // The strip's inputs, from data Home ALREADY loads (feed + snaps + notifs +
 // billing + projects — zero new reads). due/project are '' /null when their
 // datum is absent so their tiles hide — no fake zeros for missing data.
@@ -433,7 +439,7 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
   // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
   const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
-  return{needsOk,newMsgs,due:dueTotal>0?'$'+dueTotal.toLocaleString('en-US'):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
+  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
 }
 // A tile exists only when its datum does: counts are always real (0 included;
 // null = the read failed → hidden); "to pay" only when something actually is;
