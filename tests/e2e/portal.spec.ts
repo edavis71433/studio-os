@@ -1870,6 +1870,25 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect(page.getByText('We couldn’t check', { exact: false })).toHaveCount(0);
   });
 
+  test('a failed notifications read: the bell panel says so — and NEVER fires the mark-seen POST', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/client/notifications', (route) =>
+      route.request().method() === 'GET' ? fail500(route) : route.fallback());
+    let markSeen = 0;
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/client/notifications/read')) markSeen++; });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // whichever bell this viewport shows (Home topbar <720px, context bar above)
+    await page.locator('#navbell:visible, #bell:visible').first().click();
+    const panel = page.locator('.notifpanel:visible');
+    await expect(panel.getByText('We couldn’t check just now — try again in a moment.')).toBeVisible();
+    // never the all-clear copy a failed read can't earn…
+    await expect(panel.getByText('You’re all caught up — nothing new right now.')).toHaveCount(0);
+    // …and nothing was "seen": the last_seen_at cursor POST must not fire on the
+    // failed branch (it would silently swallow whatever the read really held)
+    expect(markSeen).toBe(0);
+  });
+
   test('a failed billing read: surviving queue rows + its own calm line, due tile hidden — no fake $0', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.route('**/functions/v1/presence/client/billing', fail500);

@@ -21,6 +21,23 @@ function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];co
 function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
 function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function notifPanelHtml(notifs,failed){
+  // a FAILED notifications read must never masquerade as "all caught up" —
+  // the panel says so calmly (A3's copy), and the caller skips the mark-seen
+  // POST (there is nothing seen to mark).
+  if(failed)return'<p class="nempty">We couldn’t check just now — try again in a moment.</p>';
+  if(!notifs.length)return'<p class="nempty">You’re all caught up — nothing new right now.</p>';
+  const groups=groupNotifs(notifs,Date.now());
+  let h='';
+  for(const g of groups){
+    h+=`<div class="ngroup">${esc(g.bucket)}</div>`;
+    for(const it of g.items){
+      h+=`<button class="nitem${it.read?'':' unread'}" data-nav="${esc(it.href||'')}"><span class="nt">${esc(it.label||'Activity')}</span><span class="nw">${esc(rel(it.created_at))}</span></button>`;
+    }
+  }
+  return h;
+}
 function pathSteps(ms){
   let firstOpen=true;
   return (ms||[]).filter(m=>m&&m.title).map(m=>{
@@ -184,6 +201,17 @@ ok('group: three buckets in Today→This week→Earlier order',
 ok('group: items keep their input order within a bucket',
   G[0].items.length===2 && G[0].items[0].label==='a' && G[0].items[1].label==='d');
 ok('group: empty input → no groups', groupNotifs([],NOW).length===0 && groupNotifs(null,NOW).length===0);
+
+// ═══ notifPanelHtml — PS1: a failed read never reads as "all caught up" ═══
+ok('panel: a FAILED notifications read renders the honest couldn\'t-check copy',
+  notifPanelHtml([],true)==='<p class="nempty">We couldn’t check just now — try again in a moment.</p>');
+ok('panel: failed wins even when stale items are still around — no half-truth list',
+  notifPanelHtml([{label:'stale',created_at:'2026-07-13T09:00:00Z'}],true).includes('We couldn’t check just now'));
+ok('panel: only a SUCCESSFUL empty read may claim "You\'re all caught up"',
+  notifPanelHtml([],false)==='<p class="nempty">You’re all caught up — nothing new right now.</p>');
+ok('panel: a successful read renders grouped items with their nav hrefs',
+  (()=>{const h=notifPanelHtml([{label:'New message',href:'/client.html?support=s1',created_at:new Date().toISOString(),read:false}],false);
+    return h.includes('class="ngroup"')&&h.includes('data-nav="/client.html?support=s1"')&&h.includes('New message')&&h.includes('nitem unread');})());
 
 // ═══ sectionForAnchor — notification href anchor → chip section id ═══
 ok('anchor: #approvals / #approval-123 → sec-approvals',

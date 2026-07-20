@@ -313,6 +313,10 @@ ok('portal: the queue renders per-source couldn\'t-check lines for feed / projec
   && portal.includes('We couldn’t check on invoices just now — please try again in a moment.'));
 ok('portal: ONLY an all-sources-ok-and-empty queue may claim "You\'re all caught up."',
   portal.includes('if(!items.length&&!srcFails.length)') && portal.includes('You’re all caught up.'));
+ok('portal: the bell panel renders the failed branch and SKIPS the mark-seen POST on it',
+  portal.includes('notifPanelHtml(PORTAL.notifs,PORTAL.notifsFailed)')
+  && portal.includes('We couldn’t check just now — try again in a moment.')
+  && /if\(PORTAL\.notifsFailed\)return;[\s\S]*?api\('\/client\/notifications\/read','POST'/.test(portal));
 ok('portal: Recent updates gates its empty copy on feedFailed — the couldn\'t-load line first',
   portal.includes('We couldn’t load recent updates just now — please try again in a moment.')
   && /if\(P\.feedFailed\)html\+=[\s\S]{0,200}else if\(!moments\.length\)html\+=emptyCard\('Nothing new to share/.test(portal));

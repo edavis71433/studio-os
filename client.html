@@ -1681,7 +1681,11 @@ function wireWelcome(){
 // What's-new bell/panel over the ALREADY-BUILT /client/notifications (with
 // read-state). Marks read via /client/notifications/read only when opened, so
 // the badge reflects genuinely-unseen activity.
-function notifPanelHtml(notifs){
+function notifPanelHtml(notifs,failed){
+  // a FAILED notifications read must never masquerade as "all caught up" —
+  // the panel says so calmly (A3's copy), and the caller skips the mark-seen
+  // POST (there is nothing seen to mark).
+  if(failed)return'<p class="nempty">We couldn’t check just now — try again in a moment.</p>';
   if(!notifs.length)return'<p class="nempty">You’re all caught up — nothing new right now.</p>';
   const groups=groupNotifs(notifs,Date.now());
   let h='';
@@ -1703,10 +1707,14 @@ function wireBellAt(bellId,panelId){
   let built=false;
   const close=()=>{panel.hidden=true;bell.setAttribute('aria-expanded','false');};
   const open=()=>{
-    if(!built){panel.innerHTML=notifPanelHtml(PORTAL.notifs);built=true;
+    if(!built){panel.innerHTML=notifPanelHtml(PORTAL.notifs,PORTAL.notifsFailed);built=true;
       panel.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>{close();navFromHref(b.getAttribute('data-nav'));}));
     }
     panel.hidden=false;bell.setAttribute('aria-expanded','true');
+    // a FAILED notifications read: the honest panel above, and NOTHING seen to
+    // mark — persisting the last_seen_at cursor for a read we never got would
+    // silently swallow whatever it held.
+    if(PORTAL.notifsFailed)return;
     // Seen now — ALWAYS clear the derived unread styling AND persist the server
     // cursor (an idempotent last_seen_at upsert), regardless of the local count:
     // reading threads in the Messages split view drives PORTAL.unread to 0
