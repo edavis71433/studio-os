@@ -810,9 +810,15 @@ async function buildNeedsYou(){
       items.push(row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
         `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`));
   }
-  for(const i of unpaidInvoices(billing))
-    items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc((i.status||'').replace('_',' '))}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
-      i.pay_url?`<a class="link" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`));
+  const nyToday=portalTodayYmd();
+  for(const i of unpaidInvoices(billing)){
+    // the SAME derived state word the Invoices tab chips (PS2 D2) — the two
+    // surfaces must never disagree about whether the same invoice is overdue
+    const stWord=invOverdue(i,nyToday)?'overdue':(i.status||'').replace('_',' ');
+    const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
+    items.push(row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
+      nyPay?`<a class="link" href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`));
+  }
   // Per-source failure honesty (the glance strip's rule, on the queue itself):
   // any failed source keeps its OWN calm line under the surviving rows, and
   // ONLY an all-sources-ok-and-empty queue may claim "You're all caught up."
@@ -1485,10 +1491,13 @@ function invoiceRowHtml(i,todayYmd){
   const over=invOverdue(i,todayYmd);
   const due=invDueLabel(i.due_date)||String(i.due_date||'');
   const meta=[i.amount?fmtMoney(i.amount):'',due?'due '+due:''].filter(Boolean).join(' · ');
-  const chip=i.status==='paid'?'Paid':over?'Overdue':String(i.status||'sent').replace(/_/g,' ');
+  const chip=i.status==='paid'?'Paid':over?'Overdue':String(i.status||'open').replace(/_/g,' ');
+  // https-only pay links (defense-in-depth on the money surface): the server
+  // only ever writes Stripe https URLs, so anything else is treated as absent.
+  const pay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
   const act=i.status==='paid'?`<span class="finote">Paid — thank you.</span>`
     :dead?''
-    :i.pay_url?`<a class="fbtn" href="${esc(i.pay_url)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
+    :pay?`<a class="fbtn" href="${esc(pay)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
     :`<span class="finote">Your studio will send payment details.</span>`;
   return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">🧾</span>`+
     `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+

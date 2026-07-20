@@ -42,9 +42,12 @@ ok('client app: fetches /client/billing (ensureBilling) and renders it through i
 ok('client app: states the software subscription is billed separately', /billed separately/i.test(clientHtml));
 // the Pay action exists ONLY past the paid and void/canceled guards, opens the
 // server's pay_url in a new tab with rel=noopener, and is named per invoice
-ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, noopener)',
+ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, https-only, noopener)',
   /const act=i\.status==='paid'\?/.test(clientHtml) && /:dead\?''/.test(clientHtml)
-  && /:i\.pay_url\?`<a class="fbtn" href="\$\{esc\(i\.pay_url\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
+  // the anchor renders ONLY through the https-allowlisted `pay` value (the
+  // scheme gate is the review's defense-in-depth on the money surface)
+  && /const pay=i\.pay_url&&\/\^https:\\\/\\\/\/\.test\(i\.pay_url\)\?i\.pay_url:null;/.test(clientHtml)
+  && /:pay\?`<a class="fbtn" href="\$\{esc\(pay\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E W11 BILLING SURFACES (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

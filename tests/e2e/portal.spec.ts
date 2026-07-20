@@ -2041,7 +2041,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
   const INVOICES = [
     { id: 'v1', name: 'Kickoff deposit', description: null, amount: 1200, status: 'paid', due_date: ymd(-30), paid_at: '2026-06-20T00:00:00Z', pay_url: null, created_at: '2026-06-01T00:00:00Z' },
     { id: 'v2', name: 'Design phase', description: null, amount: 1234.5, status: 'open', due_date: ymd(-1), paid_at: null, pay_url: 'https://pay.example/v2', created_at: '2026-06-20T00:00:00Z' },
-    { id: 'v3', name: 'Build phase', description: null, amount: 800, status: 'sent', due_date: ymd(1), paid_at: null, pay_url: null, created_at: '2026-07-01T00:00:00Z' },
+    { id: 'v3', name: 'Build phase', description: null, amount: 800, status: 'open', due_date: ymd(1), paid_at: null, pay_url: null, created_at: '2026-07-01T00:00:00Z' },
   ];
   const INV_API = { ...CLIENT_API,
     '/client/billing': { data: { billing_type: 'service', note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.', invoices: INVOICES, summary: { open_count: 2, paid_count: 1 } } } };
@@ -2068,9 +2068,10 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const over = rows.filter({ hasText: 'Design phase' });
     await expect(over.locator('.fst.od')).toHaveText('Overdue');
     await expect(over.locator('.fmeta').first()).toHaveText(`$1,234.50 · due ${dueLabel(-1)}`);
-    // due-tomorrow unpaid: NOT overdue — the server's own word, default chip
+    // due-tomorrow unpaid: NOT overdue — the server's own word ('open' is the
+    // real third status; the 0086 schema allows exactly open|paid|void)
     const sent = rows.filter({ hasText: 'Build phase' });
-    await expect(sent.locator('.fst')).toHaveText('sent');
+    await expect(sent.locator('.fst')).toHaveText('open');
     await expect(sent.locator('.fst.od')).toHaveCount(0);
     await expect(sent.locator('.fst.sig')).toHaveCount(0);
     await expect(sent.getByText('Your studio will send payment details.')).toBeVisible();
