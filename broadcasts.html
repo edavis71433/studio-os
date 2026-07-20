@@ -374,15 +374,25 @@ async function doSend(id){
   let scheduled_at=null;
   if(later){const v=$('when').value;if(!v){toast('Pick a date and time.');return;}scheduled_at=new Date(v).toISOString();if(Date.parse(scheduled_at)<=Date.now()){toast('Pick a time in the future — or choose Send now.');return;}}
   if(!later&&!(await askConfirm('Send this to your list now?','It goes straight out to everyone on the list — an email can’t be unsent.','Send now')))return;
-  BUSY=true;$('send').disabled=true;$('send').textContent=later?'Scheduling…':'Sending…';
+  const sendBtn=$('send'),sendLabel=sendBtn.textContent;
+  BUSY=true;sendBtn.disabled=true;sendBtn.textContent=later?'Scheduling…':'Sending…';
   const r=await api('/broadcasts/'+id+'/send','POST',scheduled_at?{scheduled_at}:{});
   BUSY=false;
-  if(!r.ok){toast(r.body&&r.body.message||'That didn’t send.');$('send').disabled=false;return;}
+  if(!r.ok){toast(r.body&&r.body.message||'That didn’t send.');sendBtn.disabled=false;sendBtn.textContent=sendLabel;return;}
   const d=r.body.data||{};
   if(d.status==='scheduled')toast('Scheduled. It’ll go out then — you can cancel any time before.');
   else if(d.status==='queued')toast('Sending now — it goes out over the next few minutes.');
   else toast(`Sent to ${d.sent_count||0} ${(d.sent_count===1)?'person':'people'}.`+(d.failed_count?` (${d.failed_count} couldn’t be reached.)`:''));
-  if(DRAFT&&DRAFT.id===id)DRAFT=null;   // only clear the composer if IT was the thing sent
+  if(DRAFT&&DRAFT.id===id){
+    // This send CONSUMED the composer's draft — so empty the FORM too, before
+    // load() runs: load() calls syncDraftFromForm(), which re-captures whatever
+    // the fields still hold, and a still-populated form would resurrect an
+    // id-less twin of a broadcast that was just SENT (the next Preview would
+    // POST a duplicate draft). The composer must end genuinely empty.
+    DRAFT=null;SEL='contacts';
+    const s=$('subj');if(s)s.value='';
+    const t=$('bodytx');if(t)t.value='';
+  }
   delete DETAILS[id];
   $('stage').innerHTML='';
   await load();

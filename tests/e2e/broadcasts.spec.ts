@@ -97,6 +97,33 @@ test.describe('SS4 — broadcasts console', () => {
     expect(creates).toHaveLength(0);
   });
 
+  test('a successful send clears the composer — the next Preview cannot POST a twin draft of a SENT broadcast', async ({ page }) => {
+    await installApp(page, { api: { ...API, ['/broadcasts/' + D_ID + '/send']: { data: { status: 'sent', sent_count: 5, skipped_count: 0, failed_count: 0, recipient_count: 5 } } } });
+    await page.goto('/broadcasts.html');
+    // a resurrected draft-create would be a POST to the bare /broadcasts path
+    const creates: string[] = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/presence\/broadcasts$/.test(new URL(r.url()).pathname)) creates.push(r.url()); });
+    // open the saved draft into the composer and take it to the send stage
+    await page.locator('.bc').filter({ hasText: 'July opening hours' }).getByRole('button', { name: 'Edit draft' }).click();
+    await expect(page.locator('#subj')).toHaveValue('July opening hours');
+    await page.getByRole('button', { name: /Preview/ }).click();
+    await expect(page.locator('#stage')).toContainText('Preview & send');
+    await page.locator('#send').click();
+    const dlg = page.locator('dialog[open]');
+    await expect(dlg).toContainText(/Send this to your list now/);
+    const sent = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/broadcasts/' + D_ID + '/send'));
+    await dlg.getByRole('button', { name: 'Send now' }).click();
+    await sent;
+    // the composer is genuinely empty again — the send CONSUMED the draft; the
+    // regression re-created it from the still-populated form during load()
+    await expect(page.locator('#subj')).toHaveValue('');
+    await expect(page.locator('#bodytx')).toHaveValue('');
+    // and a fresh Preview on the empty composer creates NOTHING on the server
+    await page.getByRole('button', { name: /Preview/ }).click();
+    await expect(page.getByText('Add a subject line first.')).toBeVisible();
+    expect(creates).toHaveLength(0);
+  });
+
   test('history header carries honest .lhead meta and rows render the production list shape', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/broadcasts.html');
