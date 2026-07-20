@@ -9,7 +9,42 @@
 <link rel="stylesheet" href="/fonts/brand.css">
 <link rel="stylesheet" href="/cms.css">
 <style>
+  /* SS8 — page skin re-aliased onto the shell's --dds-* tokens. shell.css is the
+     canonical palette and carries the full four-block theme contract (light base ·
+     prefers-color-scheme dark · data-theme="light" · data-theme="dark"), so this
+     page follows every mode automatically. The selector list mirrors cms.css's
+     own explicit data-theme blocks so this alias wins in all four states;
+     fallbacks only cover a missing shell.css. (--bad-soft has no --dds token —
+     cms.css's four themed literals keep covering it.) */
+  :root,:root[data-theme="light"],:root[data-theme="dark"]{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#6f677d);--line:var(--dds-line,#eee9e0);
+    --accent:var(--dds-accent,#5b3fa0);--accent-soft:var(--dds-accent-soft,#efeafa);--good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);
+    --warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#a2453f);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05));
+  }
   header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:52ch}
+
+  /* ── SS8 shared cms-family chrome: .lhead-lite (icon · count meta · "Updated
+        just now" · ↻ soft refresh) — kept in sync by hand with attention.html /
+        website-health.html (the SS9–SS12 primitive). ── */
+  .lhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px;margin:22px 0 0}
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lmeta{flex:1;min-width:0;font-size:13px;color:var(--soft);margin:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--accent);background:var(--accent-soft)}
+  .lbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .retry{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer;margin-top:16px}
+  .retry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  /* dark mode: the filled retry needs dark ink (#fff on the lifted accent fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .retry{color:#171320}}
+  :root[data-theme="dark"] .retry{color:#171320}
+  /* the live search — the rosters' .search anatomy, static node (caret survives re-renders) */
+  .bar{display:flex;gap:8px;margin:16px 0 0;align-items:center}
+  .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
+  .search:focus{border-color:var(--accent)}
+  .muted{color:var(--soft);font-size:14.5px}
   /* the one-line state of the whole site */
   .summary{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px 20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
   .summary .dot{width:10px;height:10px;border-radius:50%;flex:none}
@@ -30,9 +65,11 @@
   @media (max-width:560px){ .tree-kids{margin-left:10px;padding-left:12px} }
   /* sections list inside a page */
   ul.sections{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
-  ul.sections li{display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line)}
+  /* SS8: rows may WRAP — a long section label folds Edit onto the next line
+     instead of pushing it past a 360px viewport (the narrow-screen clip). */
+  ul.sections li{display:flex;align-items:center;gap:8px 12px;padding:12px 20px;border-top:1px solid var(--line);flex-wrap:wrap}
   ul.sections li:first-child{border-top:none}
-  .sec-name{font-size:15px;font-weight:500;flex:none;min-width:0}
+  .sec-name{font-size:15px;font-weight:500;flex:0 1 auto;min-width:0;overflow-wrap:anywhere}
   .sec-name .req{color:var(--soft);font-size:11.5px;font-weight:400;margin-left:6px;letter-spacing:.02em}
   .sec-status{font-size:13px;color:var(--soft);margin-left:2px}
   .sec-status.attn{color:var(--warn)} .sec-status.bad{color:var(--bad)}
@@ -54,8 +91,14 @@
     <h1>Your website map</h1>
     <p class="sub" id="sub">Every page on your site, and what’s on each one — what’s ready, what needs a look, and a way straight to editing it. Nothing here changes your site; it’s just a map.</p>
   </header>
+  <div class="lhead" id="lhead" hidden>
+    <span class="obj-ic" aria-hidden="true">🗺️</span>
+    <p class="lmeta" id="lmeta"></p>
+    <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+  </div>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -75,7 +118,14 @@ let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
 
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':CLIENT });
-async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
+// SS8 family api(): never throws — {ok:false,status:0} on a network hiccup, so
+// every failure routes through ONE honest state switch (401/403/404/other).
+async function api(p){ try{ const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body:await r.json().catch(()=>({})) }; }catch(_){ return { ok:false, status:0, body:{} }; } }
+let LOADED_AT = Date.now(), TREE = null, Q = '';
+const updatedLabel = () => { const m = Math.floor((Date.now()-LOADED_AT)/60000); return m<1 ? 'Updated just now' : 'Updated '+m+' min ago'; };
+// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html
+const debounce = (fn,ms) => { let t; return function(){ clearTimeout(t); t=setTimeout(fn,ms||150); }; };
+function toast(m){ if(window.ddsToast) return void ddsToast(m); const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
 
 // status → a badge tone (kept purely presentational; the words come from the API)
 const TONE = {
@@ -96,10 +146,18 @@ function editHref(link){
   const [base, hash] = String(link).split('#');
   return base + (base.includes('?') ? '&' : '?') + 'client=' + encodeURIComponent(CLIENT) + (hash ? '#'+hash : '');
 }
+// SS8: "Last published" speaks the shared rel-time vocabulary (leads.html's
+// when()) — a calm "3 days ago", never a raw ISO date.
 function when(iso){
   if(!iso) return '';
-  const d = String(iso).slice(0,10);
-  return 'Last published ' + d;
+  const d = Math.floor((Date.now() - Date.parse(iso)) / 86400000);
+  if(!isFinite(d)) return '';
+  let w;
+  if(d <= 0) w = 'today'; else if(d === 1) w = 'yesterday';
+  else if(d < 7) w = d + ' days ago';
+  else if(d < 60){ const wk = Math.floor(d/7); w = wk + (wk===1?' week':' weeks') + ' ago'; }
+  else { const mo = Math.floor(d/30); w = mo + (mo===1?' month':' months') + ' ago'; }
+  return 'Last published ' + w;
 }
 
 function sectionRow(s){
@@ -164,40 +222,89 @@ function renderHierarchy(roots, depth){
 }
 
 function render(tree){
+  TREE = tree || null;
   if(!tree || !Array.isArray(tree.pages) || !tree.pages.length){
+    $('lhead').hidden = true;   // nothing to count yet — no roster chrome over an empty map
     $('main').innerHTML = `<div class="center"><h2>Your site is being set up.</h2>
       <p class="sub" style="margin:8px auto 0">As soon as your pages are ready, they’ll appear here as a simple map. Nothing to do in the meantime.</p></div>`;
     return;
   }
-  const st = SITE_STATE[tree.site_status] || SITE_STATE.never_published;
+  // SS8 family chrome: "N pages · M sections · X to look at · Updated just now"
+  const nPages = tree.pages.length;
+  const nSections = tree.pages.reduce((a,p)=>a+((p.sections||[]).length),0);
   const attn = tree.attention_count || 0;
+  $('lmeta').textContent = `${nPages} page${nPages===1?'':'s'} · ${nSections} section${nSections===1?'':'s'}${attn ? ` · ${attn} to look at` : ''} · ${updatedLabel()}`;
+  $('lhead').hidden = false;
+  const st = SITE_STATE[tree.site_status] || SITE_STATE.never_published;
   const attnLine = attn > 0
     ? `<span class="meta">${attn} thing${attn===1?'':'s'} to look at</span>`
     : (tree.last_published_at ? `<span class="meta">${esc(when(tree.last_published_at))}</span>` : '');
-  let html = `<div class="summary">
+  // the search input is STATIC — only #treelist re-renders on a keystroke, so
+  // focus and caret survive (the rosters' static-input contract, C2/C5).
+  $('main').innerHTML = `<div class="summary">
     <span class="dot ${st.dot}"></span>
     <span class="state">${esc(st.text)}</span>
     ${attnLine}
-  </div>`;
-  html += renderHierarchy(buildHierarchy(tree.pages));
-  html += `<p class="foot">This map reads your site — it never changes it. Editing happens in your editor, and nothing goes live until you publish.</p>`;
-  $('main').innerHTML = html;
+  </div>
+  <div class="bar"><input class="search" id="q" type="search" aria-label="Search your pages" placeholder="Search pages and sections…" value="${esc(Q)}"></div>
+  <div id="treelist"></div>
+  <p class="foot">This map reads your site — it never changes it. Editing happens in your editor, and nothing goes live until you publish.</p>`;
+  const q = $('q'); if(q) q.addEventListener('input', debounce(() => { Q = q.value; renderTreeList(); }));
+  renderTreeList();
+}
+// the pages the map shows: the live search matches a page's own name/path OR
+// anything a visitor would find on it (its section names)
+function treeRows(){
+  const q = Q.trim().toLowerCase();
+  const pages = (TREE && TREE.pages) || [];
+  if(!q) return pages;
+  return pages.filter((p) =>
+    ((p.label||'') + ' ' + (p.path||'')).toLowerCase().includes(q) ||
+    (p.sections||[]).some((s) => (s.label||'').toLowerCase().includes(q)));
+}
+function renderTreeList(){
+  const host = $('treelist'); if(!host) return;
+  const rows = treeRows();
+  host.innerHTML = rows.length
+    ? renderHierarchy(buildHierarchy(rows))
+    : `<p class="muted" style="text-align:center;padding:30px">No pages match “${esc(Q)}”.</p>`;
 }
 
-function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to see your website map.</h2><p class="sub" style="margin:8px auto 0">Your site lives with your account — sign in to see every page at a glance.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
-function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your map just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your site — this is only this page. Please refresh in a moment.</p></div>`; }
+function signedOut(){ $('lhead').hidden = true; $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to see your website map.</h2><p class="sub" style="margin:8px auto 0">Your site lives with your account — sign in to see every page at a glance.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
+// SS8 honest failure states — each status gets its own truth, and trouble()
+// carries a Try-again wired to load() in place (never a dead end).
+function notAllowed(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2>This website isn’t in your workspace.</h2><p class="sub" style="margin:8px auto 0">You’re signed in, but this account can’t see this website’s map. If you look after more than one business, switch to the right account and try again.</p><p style="margin-top:22px"><a class="link" href="/today.html">Back to Today →</a></p></div>`; }
+function notFound(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2>We couldn’t find this website.</h2><p class="sub" style="margin:8px auto 0">It may have been removed, or this link may be out of date.</p><p style="margin-top:22px"><a class="link" href="/today.html">Back to Today →</a></p></div>`; }
+function trouble(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2>We couldn’t load your map just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your site — this is only this page.</p><button class="retry" id="retry">Try again</button></div>`; const rt=$('retry'); if(rt)rt.addEventListener('click',()=>load()); }
+
+// SS8 family load(soft): REQ_SEQ so a superseded response (success OR failure)
+// never paints; soft=true (the ↻ button) keeps the last good render on failure
+// and toasts instead of destroying the map into a full-screen error.
+let REQ_SEQ = 0;
+async function load(soft){
+  const seq = ++REQ_SEQ;
+  if(!soft) $('main').innerHTML = '<div class="spin" role="status" aria-label="Loading"></div>';
+  const r = await api('/content-tree');
+  if(seq !== REQ_SEQ) return;
+  if(!r.ok){
+    if(soft){ toast('Couldn’t refresh just now.'); return; }
+    if(r.status === 401){ signedOut(); return; }
+    if(r.status === 403){ notAllowed(); return; }
+    if(r.status === 404){ notFound(); return; }
+    trouble(); return;
+  }
+  LOADED_AT = Date.now();
+  render(r.body && r.body.data);
+}
 
 (async function init(){
+  $('refreshBtn').addEventListener('click', () => load(true));   // wrapped — the click event must never become the soft flag
   try{
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
-    const res = await apiGet('/content-tree');
-    render(res && res.data);
-  }catch(e){
-    if(e === 401){ signedOut(); return; }
-    trouble();
-  }
+    await load();
+  }catch(_){ trouble(); }
 })();
 </script>
 </body>
