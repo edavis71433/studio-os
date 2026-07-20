@@ -2701,3 +2701,71 @@ test.describe('PS5 — booking flow honesty (B4)', () => {
     expect(await focusedH1()).toContain('Confirm your booking');
   });
 });
+
+// ── booking day-integrity (the PS4/PS5 review's confirmed slot-race bug) ─────
+// VIEW_SEQ distinguishes VIEWS only — two slot reads in the SAME view shared
+// the token, so a delayed day-A response painted its slots over day B's after
+// a date-picker switch. Compounding it, the confirm summary stripped the date
+// ("10:00" alone), so a client could book the wrong DAY with zero visible cue.
+// Pinned here: a per-panel BK_SLOT_SEQ token (the REQ_SEQ pattern) drops the
+// stale paint, the confirm/success lines name the DAY, and the flow's LAST
+// step (the success takeover) hands focus to its h1.
+test.describe('booking day-integrity (slot-read race + the day-labeled confirm)', () => {
+  test('BK_SLOT_SEQ: a delayed day-A slots response, released only AFTER day B painted, never overwrites day B’s slots', async ({ page }) => {
+    // Deterministic ordering — no sleep decides the winner: day A's response is
+    // PARKED on a promise the test resolves only after day B's slots are on
+    // screen. If a stale same-view response could still paint, this MUST fail.
+    const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    const dayA = iso(Date.now() + 86400000);        // the picker's default (tomorrow)
+    const dayB = iso(Date.now() + 3 * 86400000);    // the day the user switches to
+    let releaseA!: () => void;
+    const parkedA = new Promise<void>((r) => { releaseA = r; });
+    const served: string[] = [];
+    await installApp(page, { api: BOOK_API });
+    await page.route('**/book/site-1/slots**', async (route) => {
+      const d = new URL(route.request().url()).searchParams.get('date') || '';
+      if (d === dayA) await parkedA;                 // held until the test releases it
+      served.push(d);
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { slots: [d === dayA ? `${dayA}T09:00:00Z` : `${dayB}T14:00:00Z`] } }) });
+    });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();   // fires day A's read — parked in flight
+    await page.locator('#bk-date').fill(dayB);                    // switch days while A is still pending
+    await expect(page.getByRole('button', { name: '14:00' })).toBeVisible();   // day B painted
+    expect(served).toEqual([dayB]);                               // marker: day A really is still parked
+    const staleLanded = page.waitForResponse((r) => r.url().includes(`date=${dayA}`));
+    releaseA();                                                   // NOW the stale day-A response arrives
+    await staleLanded;
+    await page.waitForTimeout(250);                               // room for a (buggy) stale paint to happen
+    await expect(page.getByRole('button', { name: '14:00' })).toBeVisible();   // day B still owns the panel
+    await expect(page.getByRole('button', { name: '09:00' })).toHaveCount(0);  // the stale paint was dropped
+    expect(served.slice().sort()).toEqual([dayA, dayB].sort());   // both responses fully served — the race really ran
+  });
+
+  test('the confirm step names the DAY being booked — weekday + date alongside the time', async ({ page }) => {
+    await installApp(page, { api: BOOK_API });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await page.getByRole('button', { name: '10:00' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirm your booking' })).toBeVisible();
+    // BOOK_SLOT is 2026-08-01T10:00:00Z — what the client confirms must name the day
+    await expect(page.locator('#main header .sub')).toContainText('Saturday, August 1');
+    await expect(page.locator('#main header .sub')).toContainText('10:00');
+  });
+
+  test('the booked success step hands focus to its h1 — the flow’s LAST step (the focus pin used to stop at confirm)', async ({ page }) => {
+    await installApp(page, { api: BOOK_API });
+    await openBookingFlow(page);
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await page.getByRole('button', { name: '10:00' }).click();
+    await page.locator('#bk-name').fill('Sam Client');
+    await page.locator('#bk-email').fill('sam@example.com');
+    await page.getByRole('button', { name: 'Book it' }).click();
+    await expect(page.getByRole('heading', { name: /You’re booked/ })).toBeVisible();
+    expect(await page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.tagName === 'H1' ? (el.textContent || '') : '';
+    })).toContain('You’re booked');
+  });
+});

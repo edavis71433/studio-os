@@ -1714,8 +1714,20 @@ let REQ_FILTER='';
 // services, reads open slots for a chosen day, and books — all grounded on the
 // existing public booking flow. The slot string is passed straight back as slot_start.
 let BOOK={site:'',type:null,slot:'',maxDays:30};
+// Slot-read token (the REQ_SEQ pattern): VIEW_SEQ distinguishes VIEWS only, so
+// two slot reads in the SAME view (a date-picker switch) shared a token and a
+// delayed day-A response could paint its slots over day B's. Each bookLoadSlots
+// call takes a fresh token and re-checks it after the await — a stale day's
+// response never paints.
+let BK_SLOT_SEQ=0;
 const bkInput='style="width:100%;box-sizing:border-box;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
 function bookLabel(s){s=String(s);const t=s.indexOf('T')>=0?s.slice(s.indexOf('T')+1):s;return t.slice(0,5);}
+// The DAY half of a slot's identity — bookLabel alone ("10:00") strips the
+// date, and a client who switched days could confirm the wrong DAY with zero
+// visible cue. Same date voice as invDueLabel: parse the Y-M-D off the slot
+// string itself (no timezone math — the slot string is what's booked) and
+// render weekday + Month day.
+function bookDayLabel(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}):'';}
 // PS5 (B4): failure ≠ absence in all three reads — only an OK /client/book with
 // no site_id earns "isn't set up", only an OK-but-disabled/empty types read
 // earns "hasn't opened any times", only an OK slots read earns "No open times
@@ -1763,8 +1775,10 @@ function bookPickDate(t){
 async function bookLoadSlots(date){
   const host=$('bk-slots');if(!host)return;host.innerHTML='<p class="muted">Finding open times…</p>';
   const view=VIEW_SEQ;   // captured — a newer view mid-fetch means this panel is gone
+  const seq=++BK_SLOT_SEQ;   // per-panel token — two same-view day reads must not share VIEW_SEQ
   let r=null;try{r=await api('/book/'+BOOK.site+'/slots?type='+encodeURIComponent(BOOK.type.id)+'&date='+encodeURIComponent(date));}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  if(seq!==BK_SLOT_SEQ)return;   // a newer day's read owns this panel — a stale day's slots never paint
   const h2=$('bk-slots');if(!h2)return;   // the panel was re-rendered away
   // a failed slots read must never masquerade as "no open times" — the honest
   // couldn't-check line, with a retry that re-runs THIS day's read in place
@@ -1779,7 +1793,10 @@ function bookConfirm(slot){
   // D5a: the portal knows who's signed in — prefill, keep editable (booking on
   // someone else's behalf stays one edit away)
   const meName=firstName(USER),meEmail=(USER&&USER.email)?USER.email:'';
-  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>Confirm your booking</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(slot))}</p></header><section><div class="card"><label for="bk-name" style="display:block;font-weight:600;margin-bottom:6px">Your name</label><input id="bk-name" type="text" value="${esc(meName)}" ${bkInput}><label for="bk-email" style="display:block;font-weight:600;margin:12px 0 6px">Email</label><input id="bk-email" type="email" value="${esc(meEmail)}" placeholder="you@example.com" ${bkInput}><div class="row" style="margin-top:14px"><button class="approve" id="bk-go">Book it</button></div></div></section>`;
+  // the summary names the DAY, not just the time — what the client confirms
+  // must name the day they're booking (the race fix's visible partner)
+  const day=bookDayLabel(slot);
+  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>Confirm your booking</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(slot))}</p></header><section><div class="card"><label for="bk-name" style="display:block;font-weight:600;margin-bottom:6px">Your name</label><input id="bk-name" type="text" value="${esc(meName)}" ${bkInput}><label for="bk-email" style="display:block;font-weight:600;margin:12px 0 6px">Email</label><input id="bk-email" type="email" value="${esc(meEmail)}" placeholder="you@example.com" ${bkInput}><div class="row" style="margin-top:14px"><button class="approve" id="bk-go">Book it</button></div></div></section>`;
   const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();bookPickDate(BOOK.type);});
   bookFocusH1();
   $('bk-go').addEventListener('click',submitBooking);
@@ -1792,7 +1809,7 @@ async function submitBooking(){
   const view=VIEW_SEQ;   // captured — the success takeover must not paint over a newer view
   let r=null;try{r=await api('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-POST — the confirm UI is gone; never repaint #main
-  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});bookFocusH1();}
+  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){const day=bookDayLabel(BOOK.slot);$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});bookFocusH1();}
   else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
 }
 // Client file upload — signed-URL flow (mirrors the studio deliverable upload):
