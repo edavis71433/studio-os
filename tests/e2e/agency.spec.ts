@@ -344,6 +344,23 @@ test.describe('Agency portfolio', () => {
     await expect(link).toHaveAttribute('href', '/today.html?client=a1');
   });
 
+  test('soft ↻ re-reads the queues panel too, not just the roster (request-count pin)', async ({ page }) => {
+    // ↻ used to wire only load(true); mountQueues ran at boot and via its own
+    // Try-again, so a morning's stale cockpit survived every refresh click.
+    await installApp(page, { api: agencyApi });
+    let qcalls = 0;
+    await page.route(/\/functions\/v1\/presence\/agency\/queues/, (route) => {
+      qcalls++;
+      return route.fulfill(ok(agencyApi['/agency/queues']));
+    });
+    await page.goto('/agency.html');
+    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority');
+    expect(qcalls).toBe(1);                    // boot mounted the cockpit once
+    await page.locator('#refreshBtn').click();
+    await expect.poll(() => qcalls).toBe(2);   // ↻ re-read the queues as well
+    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority');   // and it still renders
+  });
+
   test('queues failure surfaces honestly (never silent absence) and Try again refetches', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     let calls = 0;

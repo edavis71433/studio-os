@@ -322,8 +322,14 @@ function wire(){
     VIEWNAME=b.getAttribute('data-view');render();
     const nb=document.querySelector('[data-view="'+VIEWNAME+'"]');if(nb)nb.focus();
   }));
-  // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract)
-  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true)));
+  // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract).
+  // The queues cockpit refreshes too (it's QSEQ-guarded and re-renders its own
+  // failure state honestly; no listeners survive its innerHTML swap, so nothing
+  // double-mounts) — ↻ used to leave it stale all morning.
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{
+    mountQueues();
+    load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true));
+  });
   const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
   const dc=$('dispCards');if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
   // sortable column headers — click toggles asc/desc (aria-sort on the <th>);
