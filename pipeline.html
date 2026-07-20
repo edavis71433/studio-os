@@ -175,10 +175,11 @@ html.dds-embed #detailWrap{padding-top:0}
   .bc-stale{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
   .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:3px}
   .bc-actions{margin-top:8px;position:relative}
-  .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer}
+  /* popup contract: the Move trigger + every menu option meet the 44px touch floor */
+  .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 12px;min-height:44px;cursor:pointer}
   .bc-move:hover{border-color:var(--p)}
   .bc-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
-  .bc-menu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;border-radius:7px;cursor:pointer}
+  .bc-menu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;min-height:44px;display:flex;align-items:center;border-radius:7px;cursor:pointer}
   .bc-menu button:hover{background:var(--p-soft)}
   .board-foot{margin-top:12px;font-size:12.5px}
 
@@ -229,8 +230,9 @@ html.dds-embed #detailWrap{padding-top:0}
   </div>
   <input class="search" id="dealSearch" type="search" autocomplete="off" aria-label="Search deals" placeholder="Search deals — title, company, or contact…">
   <div class="summary" id="summary" aria-live="polite"></div>
-  <div class="bar" id="filters" role="tablist" aria-label="Filter by stage"></div>
-  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span><div class="viewtog" role="tablist" aria-label="View"><button class="chip on" id="viewList" role="tab" aria-selected="true">List</button><button class="chip" id="viewBoard" role="tab" aria-selected="false">Board</button><button class="chip" id="viewTable" role="tab" aria-selected="false">Table</button></div></div>
+  <!-- not tabs — chips that filter/switch in place, so: role=group + aria-pressed -->
+  <div class="bar" id="filters" role="group" aria-label="Filter by stage"></div>
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
   <div id="list" aria-live="polite"></div>
   <div id="board" aria-live="polite" hidden></div>
   <!-- NOT aria-live: renderTable() swaps the whole innerHTML per sort click, and a
@@ -445,7 +447,7 @@ Signed for the Studio — ${STUDIO}`;
 
 function renderFilters(){
   const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
-  $('filters').innerHTML=opts.map(([v,l])=>`<button role="tab" aria-selected="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
+  $('filters').innerHTML=opts.map(([v,l])=>`<button type="button" aria-pressed="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
   $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.stage;renderFilters();load();});
 }
 
@@ -508,7 +510,7 @@ function setView(v){
   VIEW=v;
   if(!EMBED){try{localStorage.setItem(VIEW_KEY,v);}catch(_){/* */}}
   [['list',$('viewList')],['board',$('viewBoard')],['table',$('viewTable')]].forEach(([k,el])=>{
-    if(!el)return; el.classList.toggle('on',v===k); el.setAttribute('aria-selected',String(v===k));
+    if(!el)return; el.classList.toggle('on',v===k); el.setAttribute('aria-pressed',String(v===k));
   });
   $('list').hidden=v!=='list'; $('board').hidden=v!=='board'; $('table').hidden=v!=='table';
   $('filters').style.display=v==='board'?'none':'';
@@ -724,18 +726,37 @@ function wireBoard(){
       host.querySelectorAll('.col-body').forEach(b=>{if(boardCanMove(c.dataset.stage,b.dataset.drop))b.classList.add('drop-ok');});};
     c.ondragend=()=>{c.classList.remove('dragging');host.querySelectorAll('.col-body').forEach(b=>b.classList.remove('drop-ok','drop-over'));DRAG=null;};
   });
-  // Tap-to-move menu — the accessible, mobile-friendly primary interaction.
-  host.querySelectorAll('.bc-move').forEach(btn=>btn.onclick=(e)=>{
-    e.stopPropagation();
-    const card=btn.closest('.bcard'); const already=card.querySelector('.bc-menu');
-    host.querySelectorAll('.bc-menu').forEach(m=>m.remove());
-    host.querySelectorAll('.bc-move').forEach(b=>b.setAttribute('aria-expanded','false'));
-    if(already) return;   // second tap closes it
-    btn.setAttribute('aria-expanded','true');
-    const menu=document.createElement('div'); menu.className='bc-menu'; menu.setAttribute('role','menu');
-    menu.innerHTML=boardMoveTargets(card.dataset.stage).map(t=>`<button type="button" role="menuitem" data-to="${t}">${t==='lost'?'Mark as not a fit':'Move to '+esc(stageLabel(t))}</button>`).join('');
-    card.querySelector('.bc-actions').appendChild(menu);
-    menu.querySelectorAll('button').forEach(mb=>mb.onclick=(ev)=>{ev.stopPropagation();move(card.dataset.id,mb.dataset.to);});
+  // Tap-to-move menu — the accessible, mobile-friendly primary interaction and
+  // the keyboard alternative to drag. Full popup contract: opening focuses the
+  // first option, arrows walk the list, Escape closes back to the invoker
+  // (outside clicks dismiss via the ONE document-level closer above).
+  host.querySelectorAll('.bc-move').forEach(btn=>{
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      const card=btn.closest('.bcard'); const already=card.querySelector('.bc-menu');
+      host.querySelectorAll('.bc-menu').forEach(m=>m.remove());
+      host.querySelectorAll('.bc-move').forEach(b=>b.setAttribute('aria-expanded','false'));
+      if(already) return;   // second tap closes it
+      btn.setAttribute('aria-expanded','true');
+      const menu=document.createElement('div'); menu.className='bc-menu'; menu.setAttribute('role','menu');
+      menu.innerHTML=boardMoveTargets(card.dataset.stage).map(t=>`<button type="button" role="menuitem" data-to="${t}">${t==='lost'?'Mark as not a fit':'Move to '+esc(stageLabel(t))}</button>`).join('');
+      card.querySelector('.bc-actions').appendChild(menu);
+      menu.querySelectorAll('button').forEach(mb=>mb.onclick=(ev)=>{ev.stopPropagation();move(card.dataset.id,mb.dataset.to);});
+      const close=()=>{menu.remove();btn.setAttribute('aria-expanded','false');btn.focus();};
+      menu.addEventListener('keydown',(ev)=>{
+        const items=[...menu.querySelectorAll('button')]; const i=items.indexOf(document.activeElement);
+        if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close();}
+        else if(ev.key==='ArrowDown'){ev.preventDefault();items[Math.min(i+1,items.length-1)].focus();}
+        else if(ev.key==='ArrowUp'){ev.preventDefault();items[Math.max(i-1,0)].focus();}
+      });
+      const f=menu.querySelector('button'); if(f)f.focus();
+    };
+    // Escape on the trigger itself (menu open, focus not yet inside) also closes.
+    btn.onkeydown=(e)=>{
+      if(e.key!=='Escape')return;
+      const m=btn.closest('.bcard').querySelector('.bc-menu'); if(!m)return;
+      e.preventDefault();e.stopPropagation();m.remove();btn.setAttribute('aria-expanded','false');
+    };
   });
   // Drop targets — only accept a move canTransition allows; a disallowed drop is
   // gently refused (and the column never lights up as droppable in the first place).

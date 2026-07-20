@@ -45,7 +45,7 @@ test.describe('Pipeline table view', () => {
     await pinTable(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
-    await expect(page.locator('#viewTable')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#viewTable')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#table table')).toBeVisible();
     // columns per the spec
     for (const col of ['Deal', 'Contact', 'Stage', 'Value', 'Next step (due)', 'Last contacted']) {
@@ -101,13 +101,13 @@ test.describe('Pipeline table view', () => {
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
     // no stored choice → List (today's default), cards render
-    await expect(page.locator('#viewList')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#viewList')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#list .card').first()).toBeVisible();
     await page.locator('#viewTable').click();
     await expect(page.locator('#table table')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('dds-display:pipeline'))).toBe('table');
     await page.goto('/pipeline.html');                         // reload — the choice sticks
-    await expect(page.locator('#viewTable')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#viewTable')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#table table')).toBeVisible();
     // Board still works from the same control
     await page.locator('#viewBoard').click();
@@ -270,6 +270,76 @@ test.describe('SS5 stale-race guards + boot retry', () => {
     await retry.click();                                                    // recovers IN PLACE — no navigation
     await expect(page.locator('#list .card')).toHaveCount(2);
     await expect(page.locator('.lhead .lmeta')).toContainText('2 deals');
+  });
+});
+
+// ── SS5: board affordances — the .bc-move popup's full keyboard contract and
+// the tablist-shaped rows downgraded to what they are (role=group + pressed).
+const pinBoard = (page: import('@playwright/test').Page) =>
+  page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:pipeline')) localStorage.setItem('dds-display:pipeline', 'board'); } catch { /* denied */ } });
+
+test.describe('SS5 board popup contract + group semantics', () => {
+  test('the Move menu: opens focused, arrows walk it, Escape closes back to the invoker, outside click dismisses', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
+    await move.click();
+    const menu = page.locator('#board .bc-menu');
+    await expect(menu).toBeVisible();
+    await expect(move).toHaveAttribute('aria-expanded', 'true');
+    // opening moves focus INTO the menu (keyboard users aren't stranded)
+    const items = menu.locator('button');
+    await expect(items.first()).toBeFocused();
+    // arrows walk the options
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(1)).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(items.first()).toBeFocused();
+    // Escape closes and RETURNS focus to the invoker
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(move).toHaveAttribute('aria-expanded', 'false');
+    await expect(move).toBeFocused();
+    // outside click also dismisses (and resets the expanded state)
+    await move.click();
+    await expect(page.locator('#board .bc-menu')).toBeVisible();
+    await page.locator('h1').click();
+    await expect(page.locator('#board .bc-menu')).toHaveCount(0);
+    await expect(move).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('Move popup touch targets meet the 44px floor', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
+    const mb = await move.boundingBox();
+    expect(mb && mb.height).toBeGreaterThanOrEqual(44);
+    await move.click();
+    for (const it of await page.locator('#board .bc-menu button').all()) {
+      const b = await it.boundingBox();
+      expect(b && b.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('the filter row and the view toggle are role=group with aria-pressed — no fake tablists', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#list .card')).toHaveCount(2);
+    await expect(page.locator('[role="tablist"]')).toHaveCount(0);
+    await expect(page.locator('#filters')).toHaveAttribute('role', 'group');
+    await expect(page.locator('.viewtog')).toHaveAttribute('role', 'group');
+    await expect(page.locator('#viewList')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#viewTable')).toHaveAttribute('aria-pressed', 'false');
+    await page.locator('#viewTable').click();
+    await expect(page.locator('#viewTable')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#viewList')).toHaveAttribute('aria-pressed', 'false');
+    // filter chips carry pressed-state too
+    await expect(page.locator('#filters .chip[data-stage=""]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('#filters .chip[data-stage="lead"]').click();
+    await expect(page.locator('#filters .chip[data-stage="lead"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#filters .chip[data-stage=""]')).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
