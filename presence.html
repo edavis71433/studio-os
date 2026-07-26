@@ -9368,6 +9368,7 @@ function ipeStart(doc, fieldEl, secEl) {
   fieldEl.addEventListener('input', ipeInput);
   fieldEl.addEventListener('drop', ipeDrop);
   fieldEl.addEventListener('dragover', ipeDragover);
+  fieldEl.addEventListener('beforeinput', ipeBeforeInput);   // F-4: native format gestures route through the guarded wrap
   if (md) ipeShowBar(doc, fieldEl);
   try { fieldEl.focus(); } catch (_) {}
   // keep the double-click's own selection when it landed inside; else caret at end
@@ -9396,6 +9397,22 @@ function ipeKeydown(e) {
   }
 }
 function ipeBlur() { if (IPE && !IPE.busy) ipeCommit(); }   // click/focus-away commits (panel idiom)
+// Review F-4: native formatting can arrive OUTSIDE the keydown intercept —
+// the context menu, the browser's Edit menu, an IME surface — as a
+// beforeinput with a format* inputType. Bold/italic route through the SAME
+// guarded wrap the mini-bar uses (md fields); every other format*
+// (underline, indent, justify…) has no markdown form and is swallowed, on
+// plain fields all of them are. Non-format input (typing, paste, undo) is
+// untouched. Best-effort by design: a script-driven execCommand fires a
+// non-cancelable beforeinput in Chromium — the serializer's allowlist
+// (unknown nodes collapse to content) remains the backstop there.
+function ipeBeforeInput(e) {
+  if (!IPE) return;
+  const it = String(e.inputType || '');
+  if (!/^format/.test(it)) return;
+  e.preventDefault();
+  if (IPE.md && (it === 'formatBold' || it === 'formatItalic')) ipeWrapSel(it === 'formatBold' ? 'strong' : 'em');
+}
 // any real input marks the session dirty — the belt-and-braces half of the
 // finding-4 no-op gate (the serialization compare is the other half).
 function ipeInput() { if (IPE) IPE.dirty = true; }
@@ -9445,6 +9462,7 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     s.el.removeEventListener('input', ipeInput);
     s.el.removeEventListener('drop', ipeDrop);
     s.el.removeEventListener('dragover', ipeDragover);
+    s.el.removeEventListener('beforeinput', ipeBeforeInput);
     Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) s.el.removeAttribute(a); else s.el.setAttribute(a, s.prev[a]); });
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }

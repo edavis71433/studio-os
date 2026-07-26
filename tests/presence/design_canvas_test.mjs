@@ -696,6 +696,32 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(!/ipeStart/.test(extractFn(html, 'eeInjectChrome')), 'the read-only stage proof gets NO text editing (its bar is unchanged)');
   const wrap = extractFn(html, 'ipeWrapSel');
   ok(/surroundContents|extractContents/.test(wrap) && !/execCommand/.test(wrap), 'B/I use direct Range wrapping — not the deprecated execCommand');
+  // ── review F-4: native formatting outside the keydown intercept (context
+  // menu, browser Edit menu, IME) arrives as beforeinput format* — bold and
+  // italic route through the SAME guarded wrap, everything else format* is
+  // swallowed (no markdown form), non-format input is untouched. ──
+  ok(/addEventListener\('beforeinput', ipeBeforeInput\)/.test(extractFn(html, 'ipeStart')) && /removeEventListener\('beforeinput', ipeBeforeInput\)/.test(extractFn(html, 'ipeEnd')), 'F-4: the beforeinput guard is wired for exactly the session lifetime');
+  {
+    const bi = extractFn(html, 'ipeBeforeInput');
+    const mkBi = new Function('IPE', 'ipeWrapSel', 'return (' + bi + ')');
+    let wrapped = null, prevented = 0;
+    const ev = (t2) => ({ inputType: t2, preventDefault: () => { prevented++; } });
+    const fnMd = mkBi({ md: true }, (tg) => { wrapped = tg; });
+    fnMd(ev('formatBold'));
+    ok(prevented === 1 && wrapped === 'strong', 'F-4: a native formatBold routes through the guarded wrap as strong');
+    wrapped = null; fnMd(ev('formatItalic'));
+    ok(prevented === 2 && wrapped === 'em', 'F-4: a native formatItalic routes through the guarded wrap as em');
+    wrapped = null; fnMd(ev('formatUnderline'));
+    ok(prevented === 3 && wrapped === null, 'F-4: any other format* (no markdown form) is swallowed — no DOM shape the serializer must degrade');
+    fnMd(ev('insertText'));
+    ok(prevented === 3, 'F-4: non-format input passes through untouched (typing/paste/undo unaffected)');
+    const fnPlain = mkBi({ md: false }, (tg) => { wrapped = tg; });
+    fnPlain(ev('formatBold'));
+    ok(prevented === 4 && wrapped === null, 'F-4: on a PLAIN field every format* is swallowed — formatting can never enter');
+    const fnOff2 = mkBi(null, (tg) => { wrapped = tg; });
+    fnOff2(ev('formatBold'));
+    ok(prevented === 4, 'F-4: outside a session the handler is inert');
+  }
   const link = extractFn(html, 'ipeLink');
   ok(/askText\(/.test(link) && /https:\/\//.test(link), 'Link reuses the parent askText dialog + the bare-domain→https normalization (rtLink rule)');
   // ── review fix 6: ipeLink mirrors the server's safeHref scheme allowlist so
