@@ -365,6 +365,19 @@ function extractConst(src, name) {
   ok(ipeCapFor('unknown_type', 'weird.path') === null, 'an unknown field has NO client cap (the server still enforces truth)');
 }
 
+// ── ipeCleanCut (review fix 9): the cap clamp never stores a torn construct ──
+{
+  const ipeCleanCut = new Function('return (' + extractFn(html, 'ipeCleanCut') + ')')();
+  const cut = ipeCleanCut('intro text [link text](https://example.com/a-very-long-url-path)', 30);
+  ok(cut === 'intro text ', 'FIX 9 (the reviewer’s clamp repro): a cap landing inside [text](href drops the torn construct, keeps everything before it: ' + JSON.stringify(cut));
+  ok(ipeCleanCut('see [par', 6) === 'see ', 'a cap landing inside [text… drops the unclosed bracket tail');
+  ok(ipeCleanCut('ab🎉cd', 3) === 'ab', 'a cap splitting an emoji’s surrogate pair backs off — never a lone surrogate in storage');
+  ok(ipeCleanCut('plain text stays', 10) === 'plain text', 'a clean cut is exactly the slice');
+  ok(ipeCleanCut('done [ok](https://x.example) t', 29) === 'done [ok](https://x.example) ', 'a CLOSED link right at the edge survives whole');
+  const commit9 = extractFn(html, 'ipeCommit');
+  ok(/ipeCleanCut\(value, cap\)/.test(commit9) && !/value\.slice\(0, cap\)/.test(commit9), 'the commit clamp goes through ipeCleanCut — raw slice is gone');
+}
+
 // ── ipeGate: Edit-mode-only + feature-detect + block-sections-only ──
 {
   const ipeGate = new Function('return (' + extractFn(html, 'ipeGate') + ')')();

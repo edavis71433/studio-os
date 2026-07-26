@@ -9232,6 +9232,18 @@ function ipeSerializeMd(root, notes) {
 }
 // Plain read-back mirrors the validator's s() shape: collapse whitespace, trim.
 function ipeReadPlain(el2) { return String(el2.textContent || '').replace(/\s+/g, ' ').trim(); }
+// PURE, review fix 9: the commit-time cap clamp must not cut mid-construct —
+// a torn '[text](https:/' tail would be STORED and re-render as raw noise,
+// and a sliced surrogate pair is not even valid text. Back off past an
+// unclosed '[…](…' or '[…' at the cut edge and past a lone high surrogate;
+// everything before the tear is kept.
+function ipeCleanCut(value, cap) {
+  let v = String(value).slice(0, cap);
+  const cc = v.charCodeAt(v.length - 1);
+  if (cc >= 0xd800 && cc <= 0xdbff) v = v.slice(0, -1);          // never store half an emoji
+  v = v.replace(/\[[^\]]*\]\([^)]*$/, '').replace(/\[[^\]]*$/, ''); // no unclosed link construct at the tail
+  return v;
+}
 // 'items.2.summary' → 'summary' — the human name for announcements.
 function ipeFieldLabel(path) {
   const segs = String(path || '').split('.').filter((sg) => !/^\d+$/.test(sg));
@@ -9414,7 +9426,7 @@ function ipeCommit() {
   if (c.kind !== 'block' || !(BLOCKS_WORK || [])[c.bi]) { toast('That section is no longer on the page — this text wasn’t saved.', true); return; }
   const block = BLOCKS_WORK[c.bi];
   const cap = ipeCapFor(block.type, s.path);
-  if (cap && value.length > cap) { value = value.slice(0, cap); toast('Trimmed to the field’s limit of ' + cap + ' characters.'); }
+  if (cap && value.length > cap) { value = ipeCleanCut(value, cap); toast('Trimmed to the field’s limit of ' + cap + ' characters.'); }
   const before = ipeGetPath(block, s.path);
   if (String(before == null ? '' : before) === value) { ipeAnnounce(s.doc, 'Done — nothing changed.'); return; }   // unchanged → no save
   if (!ipeSetPath(block, s.path, value)) { toast('That text couldn’t be saved in place — use the section’s editor panel.', true); return; }
