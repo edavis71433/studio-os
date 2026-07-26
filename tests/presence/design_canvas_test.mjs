@@ -335,6 +335,14 @@ function extractConst(src, name) {
   const tb = { type: 'table', headers: ['A'], rows: [['r1a', 'r1b'], ['r2a', 'r2b']] };
   ok(ipeSetPath(tb, 'rows.1.0', 'X') === true && tb.rows[1][0] === 'X', 'nested array indices (table cells) write the right cell');
   ok(ipeSetPath(tb, 'rows.2.0', 'X') === false, 'a table row past the end is refused');
+  // Review fix 7 — the >= vs > off-by-one: index === length on a FINAL numeric
+  // segment would APPEND (the slot is undefined, which the string-slot check
+  // lets through) if the bounds check slipped to '>'. The intermediate-segment
+  // pins above can't catch that (the walk dies on the undefined parent), so
+  // pin the final-segment shape directly, and pin that nothing was appended.
+  ok(ipeSetPath(tb, 'headers.1', 'B') === false && tb.headers.length === 1, 'append-at-end via a FINAL numeric segment (index === length) is refused — the array never extends');
+  ok(ipeSetPath(tb, 'rows.1.2', 'Z') === false && tb.rows[1].length === 2, 'append-at-end on a nested cell row is refused too');
+  ok(ipeSetPath(b1, 'items.2.title', 'Q') === false && b1.items.length === 2, 'append-at-end one level up (items.length) is refused — never a new item');
   ok(ipeSetPath({}, 'a.b', 'x') === false, 'a missing parent object is refused (no vivification)');
   ok(ipeSetPath({ a: {} }, '0', 'x') === false, 'a numeric segment on a non-array is refused');
   ok(ipeSetPath(b1, 'title', '<b>x</b> & "quotes"') === true && b1.title === '<b>x</b> & "quotes"', 'THE MOAT: the value is stored as a literal STRING — markup is data, never interpreted');
