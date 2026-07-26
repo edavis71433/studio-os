@@ -1,0 +1,110 @@
+/* ============================================================
+   Davis Digital Studio — tool-page.css (MS3)
+   THE tool-page layer: shared anatomy for the free-tool family
+   (ai-critique, report-card, roi-calculator, pricing-estimator),
+   loaded AFTER styles.css. The overhaul plan's answer to "the
+   tools pages look like a whole different site" — one template
+   on index.html's design system.
+
+   RULES (pinned by tests/e2e/marketing-tools.spec.ts):
+   - styles.css owns every token. No :root forks here or in pages.
+   - No page dark skins (styles.css's sitewide remap covers dark).
+   - No pill buttons, no gradient bands, no emoji icons.
+   - Page anatomy: breadcrumb → light hero → tool → tool-switch →
+     soft-capture → ONE dark closer → footer.
+
+   Components:
+     .crumbs            one breadcrumb standard (Home / Free tools / X)
+     .tool-hero         light hero (+ .tool-hero-grid for a specimen)
+     .tool-wrap         the tool column
+     .tool-switch-*     cross-tool navigation cards
+     .soft-capture      THE tokenized soft-capture band. Built once
+                        here (killing the #EDE8F7/#5b3fa0 inline-hex
+                        copies); MS5 reuses it on the industry landers.
+     .final-cta extras  secondary link + focus ring for the single
+                        dark closer (visuals ported from home.css)
+   ============================================================ */
+
+/* ---------- breadcrumb standard ---------- */
+.crumbs{background:var(--paper);border-bottom:1px solid var(--hair);padding:13px 24px}
+.crumbs-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;gap:10px;
+  font-size:13px;flex-wrap:wrap;color:var(--muted)}
+.crumbs a{color:var(--muted);transition:.15s}
+.crumbs a:hover{color:var(--ink)}
+.crumbs .sep{opacity:.45}
+.crumbs [aria-current="page"]{color:var(--ink);font-weight:550}
+
+/* ---------- hero ---------- */
+.tool-hero{padding:64px 0 72px;background:var(--paper)}
+.tool-hero h1{font-size:clamp(36px,5.2vw,56px);max-width:18ch}
+.tool-hero h1 em{font-style:italic;color:var(--p)}
+.tool-hero .lede{font-size:clamp(16px,1.8vw,18px);color:var(--muted);max-width:52ch;
+  margin:22px 0 0;line-height:1.65}
+.tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center;
+  max-width:var(--maxw);margin:0 auto;padding:0 32px}
+.tool-hero-single{max-width:680px;margin:0 auto;padding:0 24px;text-align:center}
+.tool-hero-single h1,.tool-hero-single .lede{margin-inline:auto}
+@media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;gap:36px}}
+@media(max-width:600px){.tool-hero{padding:36px 0 44px}}
+
+/* specimen card — the honest example artifact beside the hero copy,
+   same framing language as index's .hero-card */
+.tool-specimen{background:var(--paper);border:1px solid var(--hair);border-radius:3px;
+  padding:26px 24px;box-shadow:0 30px 60px -34px rgba(27,21,37,.28)}
+.tool-specimen .spec-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--brass-deep);margin-bottom:16px}
+.tool-specimen .spec-track{height:6px;background:var(--p-mist);border-radius:2px;overflow:hidden}
+.tool-specimen .spec-fill{height:100%;background:var(--p);border-radius:2px}
+.tool-specimen .spec-callout{margin-top:4px;padding:14px;background:var(--p-mist);
+  border-radius:3px;text-align:center}
+.tool-specimen .spec-callout .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--p);margin-bottom:4px}
+.tool-specimen .spec-callout .v{font-family:var(--serif);font-size:26px;color:var(--ink)}
+
+/* ---------- tool column ---------- */
+.tool-wrap{max-width:760px;margin:0 auto;padding:56px 24px 80px}
+.tool-wrap--narrow{max-width:680px}
+
+/* ---------- tool switcher (cross-tool navigation, not a closer) ---------- */
+.tool-switch-section{padding:72px 24px;background:var(--paper);border-top:1px solid var(--hair)}
+.tool-switch-inner{max-width:1080px;margin:0 auto}
+.tool-switch-head{text-align:center;margin-bottom:40px}
+.tool-switch-head h2{font-size:clamp(24px,3vw,32px);margin-top:12px}
+.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;
+  margin-left:auto;margin-right:auto;line-height:1.6}
+.tool-switch-head p a{color:var(--brass-deep);border-bottom:1px solid var(--brass)}
+.tool-switch-head p a:hover{color:var(--ink);border-color:var(--ink)}
+.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.tool-switch-item{display:block;background:var(--paper);border:1px solid var(--hair);
+  border-radius:16px;padding:22px 20px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2);
+  transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1)}
+.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 30px 56px -30px rgba(27,21,37,.26)}
+.tool-switch-item h3{font-size:16px;margin-bottom:6px;color:var(--ink)}
+.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5}
+.tool-switch-item.current{background:var(--p-mist);border-color:var(--p);cursor:default;
+  pointer-events:none;box-shadow:none}
+.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--brass-deep);border:1px solid var(--brass);
+  border-radius:3px;padding:2px 8px;margin-bottom:8px}
+@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr}}
+
+/* ---------- soft-capture band (tokenized component; MS5 reuses this) ---------- */
+.soft-capture-wrap{max-width:var(--maxw);margin:0 auto;padding:24px 24px 56px}
+.soft-capture{background:var(--p-mist);border-radius:18px;padding:44px 28px;text-align:center}
+.soft-capture h2{font-size:clamp(24px,3.4vw,32px);color:var(--ink);margin:0 0 10px}
+.soft-capture p{font-size:15px;color:var(--muted);line-height:1.7;max-width:520px;margin:0 auto 22px}
+.soft-capture form{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0}
+.soft-capture input[type=email]{padding:13px 15px;border:1px solid var(--hair);border-radius:2px;
+  font-size:14.5px;font-family:var(--sans);min-width:min(280px,80vw);
+  background:var(--paper);color:var(--ink);transition:.15s}
+.soft-capture input[type=email]:focus{outline:none;border-color:var(--p);
+  box-shadow:0 0 0 3px rgba(91,63,160,.25)}
+
+/* ---------- the single dark closer (index anatomy) ---------- */
+.final-cta .secondary-link{display:inline-block;margin-top:18px;font-size:13.5px;
+  color:rgba(255,255,255,.6);border-bottom:1px solid rgba(255,255,255,.3);
+  padding-bottom:1px;transition:.15s}
+.final-cta .secondary-link:hover{color:var(--paper);border-color:var(--paper)}
+.final-cta a:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.55);border-radius:4px}
