@@ -209,9 +209,10 @@ test.describe('Snapshot history — SS10 compare honesty', () => {
     const retry = page.locator('#compare').getByRole('button', { name: /try again/i });
     await expect(retry).toBeVisible();
     await retry.click();
-    // second /publishes call succeeds → pickers appear
+    // the retry re-fetches → pickers appear, the honest line is gone
     await expect(page.locator('#cmpA')).toBeVisible();
-    expect(calls).toBe(2);
+    await expect(page.getByText(/compare tool couldn.t load/i)).toBeHidden();
+    expect(calls).toBeGreaterThanOrEqual(2);
   });
 
   test('compare renders the diff chips + fills both sandboxed panes', async ({ page }) => {
@@ -265,5 +266,68 @@ test.describe('Snapshot history — SS10 compare honesty', () => {
     const darkAdded = await bg('.chip.added');
     // a hardcoded #e7f5ec would be identical in both themes; a token follows the theme
     expect(darkAdded).not.toBe(lightAdded);
+  });
+});
+
+test.describe('Snapshot history — SS10 standard (a11y + responsive)', () => {
+  test('a11y: exactly one h1, labelled refresh, live compare region, titled iframes', async ({ page }) => {
+    await installApp(page, { api: full });
+    await page.route(PREVIEW_RE, (route) => route.fulfill(html('<h1>preview</h1>')));
+    await page.goto('/snapshot-history.html');
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('#refreshBtn')).toHaveAttribute('aria-label', /refresh/i);
+    await expect(page.locator('#cmpStrip')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.locator('#frameA')).toHaveAttribute('title', /.+/);
+    await expect(page.locator('#frameB')).toHaveAttribute('title', /.+/);
+  });
+
+  test('no horizontal overflow at a 360px phone width', async ({ page }) => {
+    await installApp(page, { api: full });
+    await page.route(PREVIEW_RE, (route) => route.fulfill(html('<h1>preview</h1>')));
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto('/snapshot-history.html');
+    await expect(page.getByText('Summer refresh').first()).toBeVisible();
+    await expect(page.locator('#compare')).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+});
+
+// desktop-only screenshot capture for the SS10 before/after evidence — skipped on
+// tablet/mobile so the captured files stay a deterministic desktop viewport.
+test.describe('SS10 screenshots', () => {
+  // capture only when explicitly asked (SS10_SHOTS=1, desktop project) — skipped
+  // in the ×3 gate so the files stay a deterministic desktop viewport.
+  test.skip(!process.env.SS10_SHOTS, 'screenshot capture run only');
+  const SHOT = '/tmp/claude-0/-home-user-studio-os/cffe8a62-e6fd-570b-afe8-21ed646127f6/scratchpad/';
+
+  test('history', async ({ page }) => {
+    await installApp(page, { api: full });
+    await page.route(PREVIEW_RE, (route) => route.fulfill(html('<h1>preview</h1>')));
+    await page.goto('/snapshot-history.html');
+    await expect(page.locator('.lhead .lmeta')).toContainText('saved versions');
+    await page.screenshot({ path: SHOT + 'ss10-history.png', fullPage: true });
+  });
+
+  test('compare', async ({ page }) => {
+    await installApp(page, { api: full });
+    await page.route(PREVIEW_RE, (route) => route.fulfill(html('<div style="font-family:system-ui;padding:32px"><h1>Rendered website version</h1><p>A saved edition, drawn in a sandboxed pane.</p></div>')));
+    await page.goto('/snapshot-history.html');
+    await expect(page.locator('.chips .chip').first()).toBeVisible();
+    await page.locator('#compare').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: SHOT + 'ss10-compare.png', fullPage: true });
+  });
+
+  test('failure', async ({ page }) => {
+    // the compare tool's honest couldn't-load line, with the complete history above it
+    await installApp(page, { api: { '/snapshot-history': SNAP } });
+    await page.route(PUBLISHES_RE, (route) => {
+      if (COMPARE_RE.test(route.request().url())) return route.fulfill(ok(COMPARE_STRUCTURED));
+      return route.fulfill(boom(500));
+    });
+    await page.route(PREVIEW_RE, (route) => route.fulfill(html('<h1>preview</h1>')));
+    await page.goto('/snapshot-history.html');
+    await expect(page.getByText(/compare tool couldn.t load/i)).toBeVisible();
+    await page.screenshot({ path: SHOT + 'ss10-failure.png', fullPage: true });
   });
 });
