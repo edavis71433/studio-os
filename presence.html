@@ -6208,7 +6208,11 @@ async function saveBlocks() {
     }
     BLOCKS_WORK = currentBlocks();
     dcHistoryCommit();   // the new persisted state becomes the history baseline
-    renderBlocksCard();
+    // G13 §3: never rebuild the panel under a focused input — its uncommitted
+    // text (panel inputs commit on change = blur) would be destroyed mid-typing.
+    // The input's own blur/change re-renders; every other save re-renders here.
+    const ae = document.activeElement;
+    if (!(ae && ae.closest && ae.closest("#blocksCard"))) renderBlocksCard();
     if (typeof renderBlockTray === "function" && $("designTray") && $("designTray").childElementCount) renderBlockTray();   // reflect which types are now on the page
     toast("Sections saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) {
@@ -7786,6 +7790,7 @@ function dcModeSync() {
 async function dcSetMode(mode) {
   mode = ["edit", "preview", "comments", "timewarp"].indexOf(mode) >= 0 ? mode : "edit";
   if (mode === DC_MODE) { if (mode === "comments") dcSetMode("edit"); return; }   // Comments keeps its G11 toggle-off
+  if (IPE) ipeCommit();   // G13 slice 2: leaving Edit banks the in-flight text
   const prev = DC_MODE;
   const twWasLoaded = prev === "timewarp" && DC_TW_LOADED;   // captured before the reset just below
   if (prev === "comments" && CM_ON) cmToggle();   // the exact G11 OFF path (sync branch)
@@ -8731,6 +8736,9 @@ function refreshDesignPreview() {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
+      // G13 slice 2: a repaint replaces the canvas document — bank any active
+      // in-place session FIRST so typed text is never silently lost.
+      if (IPE) ipeCommit();
       frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) box.hidden = true;
     } catch (_) {
@@ -8982,6 +8990,348 @@ function dcInjectColControls(doc, main) {
 // in the PARENT over the iframe and reads section rects to resolve a single list-
 // index gap — so the drop can never be lost across the frame boundary. See pdGaps().
 
+// ─────────────────────────────────────────────────────────────────────────────
+// G13 slice 2 · IN-PLACE TEXT EDITING (docs/design/G13-INPLACE-EDITING.md §2–3)
+// Double-click a stamped text region (data-dds-field, block sections only, Edit
+// mode only) → contenteditable session on that element → commit writes the
+// STRING through the guarded dot-path writer into BLOCKS_WORK and rides the ONE
+// debounced saveBlocks. Markdown fields (data-dds-md) edit their rendered DOM
+// with a minimal B·I·Link bar and serialize back to markdown SOURCE — nothing
+// read from the canvas is ever written anywhere as HTML (the server's
+// escape-first renderMarkdown stays the only HTML producer). Feature-detect:
+// an unstamped render (old deployed function) simply never offers the editor.
+// ─────────────────────────────────────────────────────────────────────────────
+// Client cap table — MUST MATCH validateBlocks' s()/ml() caps in
+// supabase/functions/presence/lib/site_blocks.ts. A soft mirror by design: a
+// drift only mis-warns locally; the server validator stays the moat and the
+// client never widens it. '*' carries the shared block-title cap (s(title, 80));
+// types with their OWN title bound (title/spotlight) override it.
+const IPE_CAPS = {
+  '*': { title: 80 },
+  features: { 'items.N.title': 80, 'items.N.text': 240 },
+  stats: { 'items.N.value': 24, 'items.N.label': 60 },
+  team: { 'members.N.name': 80, 'members.N.role': 80, 'members.N.bio': 300 },
+  process: { 'steps.N.step': 80, 'steps.N.detail': 300 },
+  pricing: { 'tiers.N.name': 60, 'tiers.N.price_text': 40, 'tiers.N.features.N': 100 },
+  certifications: { 'items.N.name': 100 },
+  service_areas: { 'areas.N': 60 },
+  cta: { text: 160, button: 40 },
+  gallery: { 'captions.N': 160 },
+  before_after: { 'items.N.caption': 120 },
+  video: { caption: 160 },
+  appointment: { text: 200, button: 40 },
+  newsletter: { text: 200, button: 40 },
+  events: { 'items.N.name': 100, 'items.N.time': 40, 'items.N.detail': 240 },
+  map: { address: 200 },
+  richtext: { body: 4000 },
+  image: { caption: 200 },
+  image_text: { body: 2000, 'button.label': 40 },
+  accordion: { 'items.N.summary': 120, 'items.N.body': 1500 },
+  tabs: { 'tabs.N.label': 40, 'tabs.N.body': 1500 },
+  carousel: { 'slides.N.caption': 160 },
+  progress: { 'items.N.label': 60 },
+  buttons: { 'buttons.N.label': 40 },
+  booking: { intro: 400 },
+  columns: { 'columns.N.body': 1200, 'columns.N.button.label': 40 },
+  cards: { 'cards.N.heading': 80, 'cards.N.text': 240 },
+  title: { title: 120, subtitle: 200 },
+  link_list: { 'links.N.label': 80 },
+  table: { 'headers.N': 80, 'rows.N.N': 200 },
+  spotlight: { title: 120, eyebrow: 60, body: 800, 'button.label': 40 },
+  toc: { title: 80 },
+};
+// The cap for one stored field — numeric path segments normalize to N. null =
+// no client cap (unknown type/field): the server still enforces its own bounds.
+function ipeCapFor(type, path) {
+  const norm = String(path || '').split('.').map((sg) => (/^\d+$/.test(sg) ? 'N' : sg)).join('.');
+  const t = IPE_CAPS[type] || null;
+  const v = (t && t[norm]) || IPE_CAPS['*'][norm] || null;
+  return typeof v === 'number' ? v : null;
+}
+// PURE, guarded dot-path writer into a stored block: array indices must be in
+// bounds (never extends), numeric segments only index arrays, and the target
+// slot must be a string (or an absent slot on an existing parent) — a field
+// path can never overwrite an object/array or vivify structure. The value is
+// stored as a literal STRING: it is data, never interpreted as HTML anywhere.
+function ipeSetPath(obj, path, value) {
+  const segs = String(path || '').split('.').filter(Boolean);
+  if (!segs.length || !obj || typeof obj !== 'object') return false;
+  let cur = obj;
+  for (let i = 0; i < segs.length; i++) {
+    const isNum = /^\d+$/.test(segs[i]);
+    const k = isNum ? Number(segs[i]) : segs[i];
+    if (Array.isArray(cur) ? (!isNum || k >= cur.length) : isNum) return false;
+    if (i === segs.length - 1) {
+      const prev = cur[k];
+      if (prev !== undefined && typeof prev !== 'string') return false;
+      cur[k] = value;
+      return true;
+    }
+    cur = cur[k];
+    if (!cur || typeof cur !== 'object') return false;
+  }
+  return false;
+}
+// The same walk, reading — the unchanged-commit check.
+function ipeGetPath(obj, path) {
+  const segs = String(path || '').split('.').filter(Boolean);
+  let cur = obj;
+  for (let i = 0; i < segs.length; i++) {
+    if (!cur || typeof cur !== 'object') return undefined;
+    const isNum = /^\d+$/.test(segs[i]);
+    if (Array.isArray(cur) ? !isNum : isNum) return undefined;
+    cur = cur[isNum ? Number(segs[i]) : segs[i]];
+  }
+  return cur;
+}
+// PURE gate: in-place editing exists ONLY in Edit mode, ONLY on a stamped
+// field, ONLY inside a resolved block section. Everything else — Comments/
+// Preview/Timewarp, core sections, unstamped (old-function) renders — is out.
+function ipeGate(mode, path, cls) {
+  return mode === 'edit' && !!path && !!cls && cls.kind === 'block';
+}
+// PURE DOM→markdown serializer over EXACTLY renderMarkdown's output allowlist
+// (lib/markdown.ts): p→paragraph, br→line break, strong/em→**/*,
+// a→[text](href), h2/h3→##/###, ul/ol li→-/1., blockquote→"> ". Any OTHER node
+// collapses to its content — pasted or hand-crafted markup is stripped of
+// meaning, never of content (renderMarkdown's posture in reverse). Elements
+// carrying their OWN data-dds-field (the image_text button riding inside the
+// md container) or contenteditable="false" are other fields/chrome — skipped
+// whole. Inner whitespace is preserved exactly (round-trip property §2.3).
+function ipeSerializeMd(root) {
+  const skip = (n) => !!(n.getAttribute && (n.getAttribute('data-dds-field') != null || n.getAttribute('contenteditable') === 'false' || (n.id && /^dds-/.test(n.id))));
+  const inline = (node) => {
+    let out = '';
+    const kids = node.childNodes || [];
+    for (let i = 0; i < kids.length; i++) {
+      const ch = kids[i];
+      if (ch.nodeType === 3) { out += String(ch.nodeValue || '').replace(/\s+/g, ' '); continue; }
+      if (ch.nodeType !== 1 || skip(ch)) continue;
+      const t = String(ch.tagName || '').toUpperCase();
+      if (t === 'BR') out += '\n';
+      else if (t === 'STRONG' || t === 'B') { const s2 = inline(ch); if (s2) out += '**' + s2 + '**'; }
+      else if (t === 'EM' || t === 'I') { const s2 = inline(ch); if (s2) out += '*' + s2 + '*'; }
+      else if (t === 'A') { const href = (ch.getAttribute && ch.getAttribute('href')) || ''; const s2 = inline(ch); out += href && s2 ? '[' + s2 + '](' + href + ')' : s2; }
+      else out += inline(ch);
+    }
+    return out;
+  };
+  const blocks = [];
+  const kids = root.childNodes || [];
+  for (let i = 0; i < kids.length; i++) {
+    const ch = kids[i];
+    if (ch.nodeType === 3) { const s2 = String(ch.nodeValue || '').replace(/\s+/g, ' ').trim(); if (s2) blocks.push(s2); continue; }
+    if (ch.nodeType !== 1 || skip(ch)) continue;
+    const t = String(ch.tagName || '').toUpperCase();
+    if (t === 'H2' || t === 'H3') { const s2 = inline(ch).trim(); if (s2) blocks.push((t === 'H2' ? '## ' : '### ') + s2); }
+    else if (t === 'UL' || t === 'OL') {
+      const items = []; const lk = ch.childNodes || []; let n = 0;
+      for (let k = 0; k < lk.length; k++) {
+        const li = lk[k];
+        if (li.nodeType !== 1 || String(li.tagName).toUpperCase() !== 'LI' || skip(li)) continue;
+        n++; const s2 = inline(li).trim();
+        if (s2) items.push((t === 'UL' ? '- ' : n + '. ') + s2.replace(/\n/g, ' '));
+      }
+      if (items.length) blocks.push(items.join('\n'));
+    } else if (t === 'BLOCKQUOTE') {
+      const s2 = inline(ch).trim();
+      if (s2) blocks.push(s2.split('\n').map((l) => '> ' + l.trim()).join('\n'));
+    } else { const s2 = inline(ch).trim(); if (s2) blocks.push(s2); }   // p + any unknown block → a paragraph
+  }
+  return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+// Plain read-back mirrors the validator's s() shape: collapse whitespace, trim.
+function ipeReadPlain(el2) { return String(el2.textContent || '').replace(/\s+/g, ' ').trim(); }
+// 'items.2.summary' → 'summary' — the human name for announcements.
+function ipeFieldLabel(path) {
+  const segs = String(path || '').split('.').filter((sg) => !/^\d+$/.test(sg));
+  return segs[segs.length - 1] || 'text';
+}
+
+// ── the session (one at a time; parent-scope state like every canvas control) ──
+let IPE = null;                 // { doc, el, sec, path, md, orig, prev, busy }
+let IPE_SAVE_T = null, IPE_SAVE_PENDING = false;
+// The in-place save IS the canvas auto-save, debounced ~1.2s so a burst of
+// field commits collapses into ONE saveBlocks (= one undo checkpoint). If the
+// timer fires while a NEW session is active, the save defers to that session's
+// end — the save→srcdoc-reload cycle can never destroy an active contenteditable.
+function ipeSaveSoon() {
+  clearTimeout(IPE_SAVE_T);
+  IPE_SAVE_T = setTimeout(() => {
+    IPE_SAVE_T = null;
+    if (IPE) { IPE_SAVE_PENDING = true; return; }
+    saveBlocks();
+  }, 1200);
+}
+function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
+  try {
+    let lv = doc.getElementById('dds-ipe-live');
+    if (!lv) { lv = doc.createElement('div'); lv.id = 'dds-ipe-live'; lv.setAttribute('role', 'status'); lv.setAttribute('aria-live', 'polite'); lv.className = 'ipe-sr'; doc.body.appendChild(lv); }
+    lv.textContent = msg;
+  } catch (_) {}
+}
+function ipeStart(doc, fieldEl, secEl) {
+  if (IPE) ipeCommit();                       // starting a new session banks the old one
+  const c = eeClassify(secEl);
+  const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
+  if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeEditTarget(secEl); return; }   // never a dead double-click
+  const md = fieldEl.hasAttribute('data-dds-md');
+  const prev = {};
+  ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
+  IPE = { doc: doc, el: fieldEl, sec: secEl, path: path, md: md, orig: fieldEl.innerHTML, prev: prev, busy: false };
+  try { const bar = doc.getElementById('dds-dc-bar'); if (bar) bar.classList.remove('on'); } catch (_) {}   // toolbar sleeps for the session
+  // plaintext-only where supported keeps rich formatting out of plain fields;
+  // the paste guard below is the universal fallback either way.
+  fieldEl.setAttribute('contenteditable', md ? 'true' : 'plaintext-only');
+  if (!md && fieldEl.contentEditable !== 'plaintext-only') fieldEl.setAttribute('contenteditable', 'true');
+  fieldEl.setAttribute("role", "textbox");
+  if (md) fieldEl.setAttribute('aria-multiline', 'true');
+  fieldEl.setAttribute('aria-label', 'Editing ' + ipeFieldLabel(path) + ' — ' + (md ? 'Ctrl+Enter saves' : 'Enter saves') + ', Escape cancels');
+  fieldEl.setAttribute('spellcheck', 'true');
+  fieldEl.classList.add('ipe-on');
+  fieldEl.addEventListener('keydown', ipeKeydown);
+  fieldEl.addEventListener('blur', ipeBlur);
+  fieldEl.addEventListener('paste', ipePaste);
+  if (md) ipeShowBar(doc, fieldEl);
+  try { fieldEl.focus(); } catch (_) {}
+  // keep the double-click's own selection when it landed inside; else caret at end
+  try {
+    const sel = doc.getSelection();
+    if (!sel.rangeCount || !fieldEl.contains(sel.anchorNode)) {
+      const r = doc.createRange(); r.selectNodeContents(fieldEl); r.collapse(false);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+  } catch (_) {}
+  ipeAnnounce(doc, 'Editing ' + ipeFieldLabel(path) + '. ' + (md ? 'Control Enter saves' : 'Enter saves') + ', Escape cancels.');
+}
+function ipeKeydown(e) {
+  if (!IPE) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ipeCancel(); return; }
+  if (e.key === 'Enter') {
+    if (!IPE.md) { e.preventDefault(); e.stopPropagation(); ipeCommit(); return; }        // plain: Enter commits (AEM UE)
+    if (e.metaKey || e.ctrlKey) { e.preventDefault(); e.stopPropagation(); ipeCommit(); } // md: ⌘/Ctrl+Enter commits, Enter = paragraph
+  }
+}
+function ipeBlur() { if (IPE && !IPE.busy) ipeCommit(); }   // click/focus-away commits (panel idiom)
+function ipePaste(e) {
+  // UNCONDITIONAL paste-as-plain-text guard (plaintext-only support varies):
+  // clipboard markup can never enter a field — only its text/plain content.
+  if (!IPE) return;
+  e.preventDefault();
+  const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+  if (!t) return;
+  try { IPE.doc.execCommand('insertText', false, t); }
+  catch (_) {
+    try {
+      const sel = IPE.doc.getSelection();
+      if (sel.rangeCount) { const r = sel.getRangeAt(0); r.deleteContents(); r.insertNode(IPE.doc.createTextNode(t)); r.collapse(false); }
+    } catch (_) {}
+  }
+}
+function ipeEnd() {   // restore the element's pre-session attributes + chrome
+  const s = IPE; IPE = null;
+  if (!s) return null;
+  try {
+    s.el.classList.remove('ipe-on');
+    s.el.removeEventListener('keydown', ipeKeydown);
+    s.el.removeEventListener('blur', ipeBlur);
+    s.el.removeEventListener('paste', ipePaste);
+    Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) s.el.removeAttribute(a); else s.el.setAttribute(a, s.prev[a]); });
+    ipeHideBar(s.doc);
+  } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
+  if (IPE_SAVE_PENDING) { IPE_SAVE_PENDING = false; ipeSaveSoon(); }   // the deferred burst-save resumes
+  return s;
+}
+function ipeCancel() {
+  const s = IPE; if (!s) return;
+  try { s.el.innerHTML = s.orig; } catch (_) {}   // the ORIGINAL server-rendered fragment, same document
+  ipeEnd();
+  ipeAnnounce(s.doc, 'Edit canceled.');
+}
+function ipeCommit() {
+  const s = IPE; if (!s) return;
+  // Read back per §2.3: markdown SOURCE for md fields, collapsed plain text
+  // otherwise. The value is DATA — a string field on a structured block — and
+  // is never interpreted as HTML anywhere on the way to storage.
+  let value;
+  try { value = s.md ? ipeSerializeMd(s.el) : ipeReadPlain(s.el); } catch (_) { value = ipeReadPlain(s.el); }
+  // Re-resolve the section NOW: a tree-rail delete/move mid-session shifted
+  // indices, and eeClassify applies the DDS_SRCMAP compensation for us.
+  const c = eeClassify(s.sec);
+  ipeEnd();
+  if (c.kind !== 'block' || !(BLOCKS_WORK || [])[c.bi]) { toast('That section is no longer on the page — this text wasn’t saved.', true); return; }
+  const block = BLOCKS_WORK[c.bi];
+  const cap = ipeCapFor(block.type, s.path);
+  if (cap && value.length > cap) { value = value.slice(0, cap); toast('Trimmed to the field’s limit of ' + cap + ' characters.'); }
+  const before = ipeGetPath(block, s.path);
+  if (String(before == null ? '' : before) === value) { ipeAnnounce(s.doc, 'Done — nothing changed.'); return; }   // unchanged → no save
+  if (!ipeSetPath(block, s.path, value)) { toast('That text couldn’t be saved in place — use the section’s editor panel.', true); return; }
+  ipeAnnounce(s.doc, 'Saved.');
+  ipeSaveSoon();
+}
+// ── the md mini-bar: B · I · Link (the inline subset; H2/lists stay a panel capability) ──
+function ipeShowBar(doc, el2) {
+  let bar = doc.getElementById('dds-ipe-bar');
+  if (!bar) {
+    bar = doc.createElement('div'); bar.id = 'dds-ipe-bar';
+    bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Text formatting');
+    const mk = (label, aria, fn) => {
+      const b = doc.createElement('button'); b.type = 'button'; b.textContent = label;
+      b.setAttribute('aria-label', aria); b.title = aria;
+      // mousedown (default prevented) keeps the session's focus + selection
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+      return b;
+    };
+    bar.appendChild(mk('B', 'Bold', () => ipeWrapSel('strong')));
+    bar.appendChild(mk('I', 'Italic', () => ipeWrapSel('em')));
+    bar.appendChild(mk('Link', 'Add a link', () => ipeLink()));
+    doc.body.appendChild(bar);
+  }
+  const win = doc.defaultView, r = el2.getBoundingClientRect();
+  bar.style.top = Math.max(2, r.top + win.scrollY - 36) + 'px';
+  bar.style.left = Math.max(2, r.left + win.scrollX) + 'px';
+  bar.classList.add('on');
+}
+function ipeHideBar(doc) { try { const b = doc.getElementById('dds-ipe-bar'); if (b) b.classList.remove('on'); } catch (_) {} }
+// Direct Range wrapping (execCommand is deprecated): wrap the selection in
+// strong/em; partial-node selections fall back to extract+insert.
+function ipeWrapSel(tag) {
+  const s = IPE; if (!s || !s.md) return;
+  try {
+    const sel = s.doc.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+    const r = sel.getRangeAt(0);
+    if (!s.el.contains(r.commonAncestorContainer)) return;
+    const w = s.doc.createElement(tag);
+    try { r.surroundContents(w); } catch (_) { w.appendChild(r.extractContents()); r.insertNode(w); }
+    sel.removeAllRanges();
+    const nr = s.doc.createRange(); nr.selectNodeContents(w); sel.addRange(nr);
+  } catch (_) {}
+}
+async function ipeLink() {
+  const s = IPE; if (!s || !s.md) return;
+  s.busy = true;   // the parent dialog steals focus — that blur must not commit
+  let url = '';
+  try { url = await askText('Add a link', { hint: 'Where should this link go?', placeholder: 'https://…', ok: 'Add link' }); } catch (_) {}
+  if (IPE !== s) return;    // the session ended some other way while the dialog was up
+  s.busy = false;
+  try { s.el.focus(); } catch (_) {}
+  if (!url) return;
+  let u = String(url).trim();
+  if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;   // rtLink's bare-domain rule
+  try {
+    const sel = s.doc.getSelection();
+    const a = s.doc.createElement('a'); a.setAttribute('href', u); a.setAttribute('rel', 'noopener');
+    if (sel.rangeCount && !sel.isCollapsed && s.el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      const r = sel.getRangeAt(0);
+      try { r.surroundContents(a); } catch (_) { a.appendChild(r.extractContents()); r.insertNode(a); }
+    } else {
+      a.textContent = u;
+      if (sel.rangeCount && s.el.contains(sel.anchorNode)) sel.getRangeAt(0).insertNode(a); else s.el.appendChild(a);
+    }
+  } catch (_) {}
+}
+
 // ── inject the editing chrome into the rendered preview document ─────────────
 function dcInjectCanvas(doc, main) {
   const win = doc.defaultView;
@@ -9030,7 +9380,16 @@ function dcInjectCanvas(doc, main) {
       // a just-added section pulses so a drop is never invisible
       "@keyframes dcJustAdded{0%{box-shadow:0 0 0 3px rgba(91,63,160,.55),0 0 0 9px rgba(91,63,160,.22)}100%{box-shadow:0 0 0 3px rgba(91,63,160,0),0 0 0 9px rgba(91,63,160,0)}}" +
       ".dc-justadded{animation:dcJustAdded 1.5s ease-out;border-radius:6px}" +
-      "@media (prefers-reduced-motion:reduce){.dc-justadded{animation:none;outline:3px solid rgba(91,63,160,.5);outline-offset:-3px}}";
+      "@media (prefers-reduced-motion:reduce){.dc-justadded{animation:none;outline:3px solid rgba(91,63,160,.5);outline-offset:-3px}}" +
+      // ── G13 slice 2: the in-place text session + its md mini-bar + a11y bits ──
+      ".ipe-on{outline:2px solid #5b3fa0!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(91,63,160,.14);border-radius:4px;cursor:text;caret-color:#5b3fa0}" +
+      "[data-ipe]:focus-visible{outline:2px dashed #5b3fa0;outline-offset:2px}" +
+      "#dds-ipe-bar{position:absolute;z-index:2147483001;display:none;gap:4px;background:#5b3fa0;border-radius:9px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:system-ui,-apple-system,sans-serif}" +
+      "#dds-ipe-bar.on{display:flex}" +
+      "#dds-ipe-bar button{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 10px;cursor:pointer;min-width:30px}" +
+      "#dds-ipe-bar button:hover{background:rgba(255,255,255,.32)}" +
+      "#dds-ipe-bar button:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
+      ".ipe-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}";
     (doc.head || doc.documentElement).appendChild(st);
   }
   let bar = doc.getElementById("dds-dc-bar");
@@ -9048,6 +9407,7 @@ function dcInjectCanvas(doc, main) {
     return b;
   };
   const showBar = (el2) => {
+    if (IPE) return;   // G13 slice 2: the hover toolbar sleeps while a text session is active
     clearTimeout(hideT);
     if (current && current !== el2) current.classList.remove("dc-hot");
     current = el2; el2.classList.add("dc-hot");
@@ -9092,13 +9452,41 @@ function dcInjectCanvas(doc, main) {
   // window; worst case is one mis-resolved hover, never a crash.
   ddsRebuildSidMap();
   DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the local-edit remap is consumed
+  // G13 slice 2: a reload replaced any active session's document — its text was
+  // already banked by refreshDesignPreview's pre-repaint commit; the stale
+  // handle can't be restored, so drop it and let a deferred burst-save through.
+  if (IPE) IPE = null;
+  if (IPE_SAVE_PENDING) { IPE_SAVE_PENDING = false; ipeSaveSoon(); }
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {
     if (!el2.hasAttribute("data-dc")) {
       el2.setAttribute("data-dc", "1");
       el2.addEventListener("mouseenter", () => showBar(el2));
       el2.addEventListener("mouseleave", scheduleHide);
+      // G13 slice 2 · §2.1: double-click TEXT → edit it in place (Edit mode
+      // only — the same chrome also serves Comments mode, which never edits).
+      // Anything else — image, chrome, core, an unstamped section — routes to
+      // the panel exactly as a single click would: never a dead double-click.
+      el2.addEventListener("dblclick", (e) => {
+        if (DC_MODE !== "edit") return;
+        if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
+        if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // inside the live session = word-select
+        const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
+        e.preventDefault();
+        if (f && el2.contains(f)) ipeStart(doc, f, el2); else eeEditTarget(el2);
+      });
     }
+    // keyboard path (a11y contract): every stamped field is Tab-reachable in
+    // the editor chrome; Enter starts the session (the session's own handler
+    // takes over once active). Idempotent across re-injects via data-ipe.
+    Array.prototype.forEach.call(el2.querySelectorAll("[data-dds-field]"), (f) => {
+      if (f.hasAttribute("data-ipe")) return;
+      f.setAttribute("data-ipe", "1");
+      if (f.tabIndex < 0) f.setAttribute("tabindex", "0");
+      f.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !IPE && DC_MODE === "edit") { e.preventDefault(); e.stopPropagation(); ipeStart(doc, f, el2); }
+      });
+    });
   });
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
