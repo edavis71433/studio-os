@@ -9485,6 +9485,15 @@ async function ipeLink() {
   if (!url) return;
   let u = String(url).trim();
   if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;   // rtLink's bare-domain rule
+  // Review fix 6: mirror the server's safeHref allowlist (https/mailto/tel).
+  // A scheme the repaint would silently un-link (javascript:, data:, http:,
+  // relative tricks) must never sit in the live session DOM looking like a
+  // link — refuse it honestly instead. Drift is caught by the pure pin
+  // against lib/markdown.ts.
+  if (!/^https:\/\/[^\s]+$/i.test(u) && !/^mailto:[^\s]+@[^\s]+$/i.test(u) && !/^tel:\+?[\d\-().\s]+$/i.test(u)) {
+    toast('Links must be https, mailto, or tel — that link wasn’t added.', true);
+    return;
+  }
   try {
     const sel = s.doc.getSelection();
     const a = s.doc.createElement('a'); a.setAttribute('href', u); a.setAttribute('rel', 'noopener');

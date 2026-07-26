@@ -616,6 +616,19 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(/surroundContents|extractContents/.test(wrap) && !/execCommand/.test(wrap), 'B/I use direct Range wrapping — not the deprecated execCommand');
   const link = extractFn(html, 'ipeLink');
   ok(/askText\(/.test(link) && /https:\/\//.test(link), 'Link reuses the parent askText dialog + the bare-domain→https normalization (rtLink rule)');
+  // ── review fix 6: ipeLink mirrors the server's safeHref scheme allowlist so
+  // the live session DOM never holds a link the repaint will silently un-link.
+  ok(link.includes('/^https:\\/\\/[^\\s]+$/i') && link.includes('/^mailto:[^\\s]+@[^\\s]+$/i') && link.includes('/^tel:\\+?[\\d\\-().\\s]+$/i'), 'FIX 6: ipeLink carries the three safeHref scheme rules verbatim');
+  ok(/wasn’t added/.test(link) && link.indexOf('wasn’t added') < link.indexOf("createElement('a')"), 'a refused scheme toasts honestly BEFORE any anchor is created');
+  {
+    // drift pin: the mirrored allowlist must AGREE with the real safeHref.
+    const { safeHref } = await import('../../supabase/functions/presence/lib/markdown.ts');
+    const client = (u2) => /^https:\/\/[^\s]+$/i.test(u2) || /^mailto:[^\s]+@[^\s]+$/i.test(u2) || /^tel:\+?[\d\-().\s]+$/i.test(u2);
+    const probes = ['https://x.example/a', 'http://x.example', 'javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.c', 'mailto:bad',
+      'tel:+1 (555) 123-4567', 'tel:5551234', 'ftp://x.example', 'vbscript:x', 'https://', 'HTTPS://X.EXAMPLE/OK'];
+    const drift = probes.filter((u2) => client(u2) !== (safeHref(u2) !== null));
+    ok(drift.length === 0, 'the client allowlist agrees with the REAL safeHref on every probe: ' + drift.join(', '));
+  }
 }
 
 const done = fail === 0;
