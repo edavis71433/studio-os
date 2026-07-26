@@ -218,10 +218,12 @@
   <span class="eyebrow reveal">What it costs</span>
   <h2 class="kicker mt-s reveal">An honest number, not a guessing game.</h2>
   <p class="lead-muted mt-m reveal">New sites start around $1,500 depending on scope. A Growth Partnership starts around $400 a month. On the call, I'll give you a real number for your specific business &mdash; not a range designed to make you call just to find out.</p>
+  <!-- One honest button. The old "Full pricing for web design/GP" ghosts
+       promised full pricing from pages that publish one number each — the
+       label now only ever means /pricing (pinned by marketing.spec.ts).
+       Service deep-dives keep their own links in the panels above. -->
   <div class="mt-m reveal" style="display:flex;gap:10px;flex-wrap:wrap">
     <a href="/pricing" class="btn btn-primary btn-sm">See pricing &rarr;</a>
-    <a href="/web-design" class="btn btn-ghost btn-sm">Full pricing for web design &rarr;</a>
-    <a href="/monthly-retainer" class="btn btn-ghost btn-sm">Full pricing for a Growth Partnership &rarr;</a>
   </div>
 
   <!-- Proof where the money conversation happens — fixes the "inverted trust"
@@ -257,6 +259,19 @@
 </div>
 </section>
 
+<!-- Soft capture: free site review (no popup, one calm ask). Sits ABOVE the
+     dark closer on purpose — the page ends dark CTA -> footer, one closer. -->
+<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
+  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
+    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
+    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
+      <input type="email" name="email" autocomplete="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
+      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+    </form>
+  </div>
+</section>
+
 <section class="pad panel-dark">
 <div class="wrap center">
   <span class="eyebrow" style="color:var(--brass);justify-content:center">Let's talk</span>
@@ -267,17 +282,6 @@
     <a href="/audit" class="btn btn-ghost" style="color:var(--paper);border-color:rgba(255,255,255,.3)">See what your site needs</a>
   </div>
 </div>
-</section>
-<!-- Soft capture: free site review (no popup, one calm ask) -->
-<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
-  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
-    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
-    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
-    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
-      <input type="email" name="email" autocomplete="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
-      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
-    </form>
-  </div>
 </section>
 
 </main>
