@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <title>Web Design Pricing Estimator | Davis Digital Studio</title>
 <meta name="description" content="Answer 5 questions for a real ballpark price on your web design project. No signup, no sales call. Honest estimates from Davis Digital Studio.">
 <link rel="canonical" href="https://davisdigitalstudio.com/pricing-estimator">
@@ -28,168 +28,102 @@
 <noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <script src="/analytics.js" defer></script>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="tool-page.css">
 <style>
+/* ============================================================
+   Pricing estimator — page layer on styles.css + tool-page.css
+   (MS3). styles.css owns the tokens: no :root fork, no page dark
+   skin, no pill buttons, no gradient bands, no emoji icons —
+   the option icons are stroked SVG (pinned by
+   tests/e2e/marketing-tools.spec.ts). The quiz logic, scoring,
+   and lead intake are unchanged; tier AMOUNTS are the ones MS2
+   verified ($1,500 / $3,800 / $6,500 · Growth Partnership starts
+   around $400 a month). The "Package" catalog FRAMING is flagged
+   for Eric in the slice report, not silently rewritten.
+   ============================================================ */
 
-*{box-sizing:border-box;margin:0;padding:0;}
-html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw;}
-:root{--p:#5B3FA0;--pxl:#c4aee8;--pxxl:#EDE8F7;--pxxxl:#f7f4fd;--pdark:#2A1B4A;--ink:#1B1525;--muted:#6B6276;--brass:#B08D57;--paper:#FBFAF7;--serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;}
-*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;}
-.skip-link{position:absolute;left:-9999px;top:8px;background:var(--p);color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
-.skip-link:focus{left:8px;}
-
-
-.tool-wrap{max-width:680px;margin:0 auto;padding:56px 24px 80px;}
-
-/* Progress bar */
-.progress-bar{height:4px;background:var(--pxxl);border-radius:2px;margin-bottom:40px;overflow:hidden;}
-.progress-fill{height:100%;background:var(--p);border-radius:2px;transition:width 0.4s ease;}
-.progress-label{font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;}
+/* Progress */
+.progress-bar{height:4px;background:var(--p-mist);border-radius:2px;margin-bottom:40px;overflow:hidden}
+.progress-fill{height:100%;background:var(--p);border-radius:2px;transition:width 0.4s ease}
+.progress-label{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:10px;letter-spacing:.04em}
 
 /* Question cards */
-.q-card{background:#fff;border-radius:24px;padding:40px;box-shadow:0 4px 40px rgba(91,63,160,0.08);border:1px solid rgba(91,63,160,0.1);display:none;animation:fadeUp 0.3s ease;}
-.q-card.active{display:block;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
-.q-num{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
-.q-card h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:8px;letter-spacing:-0.5px;line-height:1.2;}
-.q-card p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+.q-card{background:var(--paper);border-radius:18px;padding:40px;border:1px solid var(--hair);
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2);display:none;animation:fadeUp 0.3s ease}
+.q-card.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.q-num{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass-deep);margin-bottom:10px}
+.q-card h2{font-family:var(--serif);font-size:26px;font-weight:380;margin-bottom:8px;letter-spacing:-.5px;line-height:1.2}
+.q-card > p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6}
 
-.opts{display:flex;flex-direction:column;gap:10px;}
-.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1.5px solid rgba(91,63,160,0.15);border-radius:12px;cursor:pointer;transition:all 0.15s;background:#fff;}
-.opt:hover{border-color:var(--p);background:var(--pxxxl);}
-.opt.selected{border-color:var(--p);background:var(--pxxxl);}
-.opt-icon{width:36px;height:36px;border-radius:10px;background:var(--pxxxl);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.opt.selected .opt-icon{background:rgba(91,63,160,0.15);}
-.opt-text h3{font-size:14px;font-weight:600;margin-bottom:2px;}
-.opt-text p{font-size:12px;color:var(--muted);line-height:1.4;}
-.opt-price{font-size:12px;font-weight:700;color:var(--p);margin-left:auto;white-space:nowrap;padding-left:12px;}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--hair);
+  border-radius:12px;cursor:pointer;transition:all 0.15s;background:var(--paper)}
+.opt:hover{border-color:var(--p)}
+.opt.selected{border-color:var(--p);background:var(--p-mist)}
+.opt-icon{width:36px;height:36px;border-radius:8px;background:var(--p-mist);color:var(--p);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.opt-icon svg{width:18px;height:18px}
+.opt.selected .opt-icon{background:var(--p);color:var(--paper)}
+.opt-text h3{font-size:14px;font-weight:550;margin-bottom:2px}
+.opt-text p{font-size:12px;color:var(--muted);line-height:1.4}
+.opt-price{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--brass-deep);
+  margin-left:auto;white-space:nowrap;padding-left:12px}
 
-/* Multi-select note */
-.multi-note{font-size:12px;color:var(--muted);margin-bottom:16px;font-style:italic;}
+.multi-note{font-size:12px;color:var(--muted);margin-bottom:16px;font-style:italic}
+.nav-btns{display:flex;align-items:center;gap:12px;margin-top:24px}
+.back-btn{background:transparent;border:1px solid var(--hair);color:var(--ink);border-radius:2px;
+  padding:12px 22px;font-size:14px;font-weight:550;font-family:var(--sans);cursor:pointer;transition:.15s}
+.back-btn:hover{border-color:var(--ink)}
+.next-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:var(--ink);
+  color:var(--paper);border:none;border-radius:2px;padding:13px 28px;font-size:14px;font-weight:550;
+  font-family:var(--sans);letter-spacing:.01em;cursor:pointer;transition:.2s ease;margin-left:auto}
+.next-btn:hover{background:var(--p-deep);transform:translateY(-1px)}
+.next-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
-.back-btn{background:transparent;border:1.5px solid var(--pxl);color:var(--p);border-radius:100px;padding:10px 22px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:background 0.15s;}
-.back-btn:hover{background:var(--pxxxl);}
-.next-btn{background:var(--p);color:#fff;border:none;border-radius:100px;padding:11px 28px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:opacity 0.15s;margin-left:auto;}
-.next-btn:hover{opacity:0.88;}
-.next-btn:disabled{opacity:0.4;cursor:not-allowed;}
+/* Results — one flat tokenized card family, no gradients, no dim text */
+.results{display:none;animation:fadeUp 0.4s ease}
+.tier-result{background:var(--paper);border:1px solid var(--hair);border-left:3px solid var(--p);
+  border-radius:18px;padding:40px;margin-bottom:20px;box-shadow:0 22px 46px -32px rgba(27,21,37,.2)}
+.tier-badge{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--brass-deep);border:1px solid var(--brass);border-radius:3px;
+  padding:3px 10px;margin-bottom:16px}
+.tier-rush{display:inline-block;background:rgba(240,180,41,.16);color:#8a5a00;font-family:var(--mono);
+  font-size:11px;letter-spacing:.04em;padding:4px 10px;border-radius:3px;margin:0 0 14px 8px}
+.tier-name{font-family:var(--serif);font-size:28px;font-weight:380;margin-bottom:6px}
+.tier-range{font-family:var(--serif);font-size:40px;font-weight:380;letter-spacing:-1px;margin-bottom:6px}
+.tier-cadence{font-size:13px;color:var(--muted);margin-bottom:20px}
+.tier-reason{background:var(--p-mist);border-left:3px solid var(--brass);border-radius:3px;
+  padding:16px 20px;margin-bottom:20px;font-size:13.5px;color:var(--ink);line-height:1.75}
+.tier-includes{list-style:none;margin-bottom:24px}
+.tier-includes li{font-size:13.5px;color:var(--ink);padding:8px 0;display:flex;align-items:flex-start;
+  gap:10px;border-bottom:1px solid var(--hair)}
+.tier-includes li:last-child{border-bottom:none}
+.tier-includes li::before{content:'→';flex-shrink:0;font-weight:600;color:var(--brass-deep)}
+.tier-who{font-size:12.5px;color:var(--muted);margin-bottom:20px;font-style:italic;line-height:1.6}
+.tier-cta{display:inline-flex;align-items:center;gap:9px;background:var(--ink);color:var(--paper);
+  font-size:14.5px;font-weight:550;padding:15px 28px;border-radius:2px;text-decoration:none;
+  transition:.2s ease}
+.tier-cta:hover{background:var(--p-deep);transform:translateY(-1px)}
 
-/* Results */
-.results{display:none;animation:fadeUp 0.4s ease;}
-.tier-result{border-radius:24px;padding:40px;margin-bottom:20px;position:relative;overflow:hidden;}
-.tier-result.starter{background:linear-gradient(135deg,#f7f4fd,#fff);border:2px solid var(--p);}
-.tier-result.growth{background:linear-gradient(135deg,#2A1B4A,#2d1f55);border:2px solid #7c5cc4;}
-.tier-result.studio{background:linear-gradient(135deg,#0f0820,#2A1B4A);border:2px solid #c4aee8;}
-.tier-glow{position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;pointer-events:none;}
-.tier-badge{display:inline-block;font-size:11px;font-weight:700;padding:4px 14px;border-radius:100px;margin-bottom:16px;letter-spacing:0.5px;position:relative;}
-.tier-name{font-family:var(--serif);font-size:28px;font-weight:400;margin-bottom:6px;position:relative;}
-.tier-range{font-family:var(--serif);font-size:40px;font-weight:400;letter-spacing:-1px;margin-bottom:6px;position:relative;}
-.tier-cadence{font-size:13px;margin-bottom:20px;position:relative;}
-.tier-includes{list-style:none;margin-bottom:24px;position:relative;}
-.tier-includes li{font-size:13px;padding:7px 0;display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid rgba(91,63,160,0.06);}
-.tier-includes li:last-child{border-bottom:none;}
-.tier-includes li::before{content:'→';flex-shrink:0;font-weight:600;}
-.tier-cta{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;padding:13px 26px;border-radius:100px;text-decoration:none;transition:transform 0.15s,opacity 0.15s;position:relative;}
-.tier-cta:hover{transform:translateY(-2px);}
-
-.addons-note{background:#fff;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid rgba(91,63,160,0.1);}
-.addons-note h3{font-size:14px;font-weight:600;margin-bottom:12px;}
-.addons-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.addon-pill{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--pxxxl);border-radius:8px;font-size:12px;}
-.addon-pill span:first-child{color:var(--ink);font-weight:500;}
-.addon-pill span:last-child{color:var(--p);font-weight:700;}
-
-.disclaimer{font-size:12px;color:var(--muted);text-align:center;line-height:1.7;padding:16px;background:var(--pxxxl);border-radius:12px;margin-bottom:20px;}
-.restart-btn{display:block;text-align:center;font-size:13px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:var(--sans);text-decoration:underline;margin:0 auto;}
-
+.info-card{background:var(--paper);border-radius:16px;border:1px solid var(--hair);padding:24px;margin-bottom:20px}
+.info-card .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:12px}
+.addons-note{display:none}
+.addons-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.addon-pill{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px;
+  background:var(--p-mist);border-radius:3px;font-size:12px}
+.disclaimer{font-size:12px;color:var(--muted);text-align:center;line-height:1.7;padding:16px;
+  background:var(--paper-2);border:1px solid var(--hair);border-radius:12px;margin-bottom:20px}
+.restart-btn{display:block;text-align:center;font-size:13px;color:var(--muted);cursor:pointer;
+  background:none;border:none;font-family:var(--sans);text-decoration:underline;margin:0 auto}
+.restart-btn:hover{color:var(--ink)}
 
 @media(max-width:700px){
-  .addons-grid{grid-template-columns:1fr;}
-}
-
-
-/* NAV-FINAL-V5 */
-
-.skip-link{position:absolute;left:-9999px;top:8px;background:#5b3fa0;color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
-.skip-link:focus{left:8px;}
-*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;border-radius:4px;}
-
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}}
-
-
-/* Dropdown gap fix - bridge pseudo-element */
-
-
-/* Dropdown bridge - prevents menu closing when moving mouse down */
-
-
-/* ---------------------------------------------------------------
-   TOOL SWITCHER — cross-tool navigation, added so a visitor on any
-   one tool has a clear, designed path to the other five, plus back
-   to the Resources hub. Not a footer link dump — real cards with
-   the same shadow/radius language used across the rest of V2.
-   --------------------------------------------------------------- */
-.tool-switch-section{padding:72px 24px;background:#fff;position:relative;}
-.tool-switch-inner{max-width:1080px;margin:0 auto;}
-.tool-switch-head{text-align:center;margin-bottom:40px;}
-.tool-switch-head span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);}
-.tool-switch-head h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;letter-spacing:-.5px;margin-top:10px;}
-.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
-.tool-switch-head p a{color:var(--p);text-decoration:underline;}
-.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-.tool-switch-item{display:block;background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:18px;padding:22px 20px;text-decoration:none;transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
-.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 26px 50px -28px rgba(27,21,37,.24);}
-.tool-switch-item h3{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--ink);margin-bottom:6px;}
-.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5;}
-.tool-switch-item.current{background:var(--p);border-color:var(--p);cursor:default;box-shadow:0 22px 44px -24px rgba(91,63,160,.42);pointer-events:none;}
-.tool-switch-item.current h3{color:#fff;}
-.tool-switch-item.current p{color:rgba(255,255,255,.72);}
-.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:100px;margin-bottom:8px;}
-@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr;}}
-@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr;}}
-
-
-/* Tool-hero two-column grid — was inline-only with zero mobile breakpoint,
-   causing horizontal overflow on phones (confirmed via screenshot: the
-   sample card was spilling off-screen). Now a real class with a real
-   breakpoint. */
-.tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
-@media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
-
-/* ── Dark-mode variant (page-scoped, token-level — same recipe as audit.html) ── */
-@media (prefers-color-scheme: dark){
-  :root{
-    --paper:#171320; --ink:#EFEAF7; --muted:#A79DBE;
-    --pxxxl:#241d38; --pxxl:#2c2344;
-    /* styles.css tokens the shared nav/footer read on this page */
-    --paper-2:#1f1a2e; --hair:#332B49; --p-mist:#241d38; --brass-deep:#C9A468;
-  }
-  header.nav,header.nav.is-scrolled{background:rgba(23,19,32,.85);}
-  .eyebrow{color:#C9A468;}
-  .btn-primary{background:#EFEAF7;color:#171320;}
-  .btn-primary:hover{background:#c4aee8;color:#1B1525;}
-  footer.site{background:#0f0c18;}
-  [style*="color:var(--p)"]{color:#c4aee8 !important;}
-  .page-hero-v2{background:linear-gradient(180deg,#171320 0%,#241d38 100%) !important;}
-  /* the example specimen card flips to a dark surface */
-  .page-hero-v2 .tool-hero-grid > div:last-child{background:#241d38 !important;}
-  .page-hero-v2 [style*="background:#f7f4fd"]{background:#171320 !important;}
-  .q-card{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 4px 40px rgba(0,0,0,.4);}
-  .q-num{color:#c4aee8;}
-  .opt{background:#171320;border-color:rgba(196,174,232,.2);}
-  .opt-price{color:#c4aee8;}
-  .back-btn{color:#c4aee8;border-color:rgba(196,174,232,.4);}
-  .tier-result.starter{background:linear-gradient(135deg,#241d38,#2c2344);}
-  .addons-note{background:#241d38;border-color:rgba(196,174,232,.12);}
-  .addon-pill span:last-child{color:#c4aee8;}
-  /* JS-rendered inline white cards flip to the dark surface */
-  #tierCard [style*="background:#fff"],#addonsNote [style*="background:#fff"]{background:#241d38 !important;}
-  #tierCard [style*="color:#b8860b"]{color:#f0b429 !important;}
-  #leadCard{background:#241d38 !important;border-color:rgba(196,174,232,.18) !important;}
-  #peResults div[style*="background:#fff"],#results div[style*="background:#fff"]{background:#241d38 !important;border-color:rgba(196,174,232,.18) !important;}
-  #leadCard input{background:#171320;color:var(--ink);}
-  .tool-switch-section{background:#171320;}
-  .tool-switch-item{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 20px 42px -32px rgba(0,0,0,.5);}
-  .tool-switch-head span,.tool-switch-head p a{color:#c4aee8;}
-  ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
+  .addons-grid{grid-template-columns:1fr}
+  .q-card{padding:26px 22px}
+  .tier-result{padding:28px 24px}
 }
 </style>
 <link rel="stylesheet" href="/enhance.css">
@@ -235,38 +169,51 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
 </header>
 <!-- dds-marketing-nav:end -->
 <main id="main-content" tabindex="-1">
-<section class="page-hero-v2" style="padding:64px 24px 72px;background:linear-gradient(180deg,#FBFAF7 0%,#ede8f7 100%);position:relative;overflow:hidden;">
-  <div class="tool-hero-grid" style="max-width:1100px;margin:0 auto;gap:56px;align-items:center;position:relative;z-index:1;">
+
+<!-- BREADCRUMBS — the one standard: Home / Free tools / X -->
+<nav aria-label="Breadcrumb" class="crumbs">
+  <div class="crumbs-in">
+    <a href="/">Home</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <a href="/tools">Free tools</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <span aria-current="page">Pricing Estimator</span>
+  </div>
+</nav>
+
+<!-- HERO — light, on tokens, with the specimen beside the copy -->
+<section class="tool-hero">
+  <div class="tool-hero-grid">
     <div>
-      <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; Pricing Estimator</div>
-      <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">What will your project <em style="color:var(--p);font-style:italic;">actually cost?</em></h1>
-      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">Not knowing what a website should cost is what keeps a lot of good businesses stuck — guessing, over-paying, or putting it off for another year. Answer five quick questions for an honest range in under a minute. No signup, no sales call unless you want one.</p>
+      <span class="eyebrow">Free tool &middot; Pricing estimator</span>
+      <h1 class="mt-s">What will your project <em>actually cost?</em></h1>
+      <p class="lede">Not knowing what a website should cost is what keeps a lot of good businesses stuck &mdash; guessing, over-paying, or putting it off for another year. Answer five quick questions for an honest range in under a minute. No signup, no sales call unless you want one.</p>
     </div>
-    <div style="background:#fff;border-radius:22px;padding:28px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);" aria-hidden="true">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">Example &middot; 5 quick questions</div>
+    <div class="tool-specimen" aria-hidden="true">
+      <div class="spec-label">Example &middot; 5 quick questions</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="width:20px;height:20px;border-radius:50%;background:var(--p);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10003;</span>
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
           <span style="font-size:13px;color:var(--ink);">What kind of site do you need?</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="width:20px;height:20px;border-radius:50%;background:var(--p);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10003;</span>
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
           <span style="font-size:13px;color:var(--ink);">How many pages, roughly?</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="width:20px;height:20px;border-radius:50%;background:rgba(91,63,160,.15);color:var(--p);font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--p-mist);color:var(--p);font-size:11px;font-family:var(--mono);display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
           <span style="font-size:13px;color:var(--muted);">Do you need ongoing SEO?</span>
         </div>
       </div>
-      <div style="padding:14px;background:#f7f4fd;border-radius:12px;text-align:center;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--p);text-transform:uppercase;margin-bottom:4px;">Estimated range</div>
-        <div style="font-family:var(--serif);font-size:26px;color:var(--ink);">$1,500 &ndash; $3,800</div>
+      <div class="spec-callout">
+        <div class="k">Estimated range</div>
+        <div class="v">$1,500 &ndash; $3,800</div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="tool-wrap">
+<div class="tool-wrap tool-wrap--narrow">
 
   <div id="progressWrap">
     <div class="progress-label" id="progressLabel">Question 1 of 5</div>
@@ -280,19 +227,19 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <p>This gives us a starting point. Most projects fall into one of these buckets.</p>
     <div class="opts">
       <div class="opt" onclick="pick(1,'new')" id="q1_new">
-        <div class="opt-icon">✨</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.9 2.9M15.5 15.5l2.9 2.9M18.4 5.6l-2.9 2.9M8.5 15.5l-2.9 2.9"/></svg></div>
         <div class="opt-text"><h3>Brand new website</h3><p>Starting from scratch, no existing site</p></div>
       </div>
       <div class="opt" onclick="pick(1,'redesign')" id="q1_redesign">
-        <div class="opt-icon">🔄</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></div>
         <div class="opt-text"><h3>Redesign an existing site</h3><p>I have a site but it needs a full overhaul</p></div>
       </div>
       <div class="opt" onclick="pick(1,'additions')" id="q1_additions">
-        <div class="opt-icon">➕</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg></div>
         <div class="opt-text"><h3>Add pages or features to my site</h3><p>My site is decent but needs specific improvements</p></div>
       </div>
       <div class="opt" onclick="pick(1,'ecommerce')" id="q1_ecommerce">
-        <div class="opt-icon">🛒</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></div>
         <div class="opt-text"><h3>E-commerce or online store</h3><p>I need to sell products or services online</p></div>
       </div>
     </div>
@@ -306,24 +253,20 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <p>Count the main sections. Home, About, Services, Contact, etc. Don't overthink it.</p>
     <div class="opts">
       <div class="opt" onclick="pick(2,'1-3')" id="q2_1-3">
-        <div class="opt-icon">📄</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
         <div class="opt-text"><h3>1 to 3 pages</h3><p>One-pager or very simple site</p></div>
-        <span class="opt-price">Starter</span>
       </div>
       <div class="opt" onclick="pick(2,'4-7')" id="q2_4-7">
-        <div class="opt-icon">📑</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 4H6a2 2 0 0 0-2 2v10"/></svg></div>
         <div class="opt-text"><h3>4 to 7 pages</h3><p>Most small business sites</p></div>
-        <span class="opt-price">Growth</span>
       </div>
       <div class="opt" onclick="pick(2,'8-15')" id="q2_8-15">
-        <div class="opt-icon">📚</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
         <div class="opt-text"><h3>8 to 15 pages</h3><p>Larger site with multiple services or locations</p></div>
-        <span class="opt-price">Studio</span>
       </div>
       <div class="opt" onclick="pick(2,'15+')" id="q2_15+">
-        <div class="opt-icon">🗂️</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
         <div class="opt-text"><h3>15+ pages</h3><p>Complex site, blog, or large catalog</p></div>
-        <span class="opt-price">Studio+</span>
       </div>
     </div>
     <div class="nav-btns">
@@ -339,19 +282,19 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <p>This affects cost and timeline. Not sure? I can recommend what fits your project best.</p>
     <div class="opts">
       <div class="opt" onclick="pick(3,'custom')" id="q3_custom">
-        <div class="opt-icon">⚡</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
         <div class="opt-text"><h3>Custom HTML/CSS (fastest, no monthly fees)</h3><p>Built from scratch, no platform dependency, fastest load times</p></div>
       </div>
       <div class="opt" onclick="pick(3,'squarespace')" id="q3_squarespace">
-        <div class="opt-icon">🟦</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
         <div class="opt-text"><h3>Squarespace or Wix</h3><p>Easy to update yourself, with a monthly fee</p></div>
       </div>
       <div class="opt" onclick="pick(3,'wordpress')" id="q3_wordpress">
-        <div class="opt-icon">🔵</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
         <div class="opt-text"><h3>WordPress</h3><p>Most flexible, good for blogs and larger sites</p></div>
       </div>
       <div class="opt" onclick="pick(3,'unsure')" id="q3_unsure">
-        <div class="opt-icon">🤔</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
         <div class="opt-text"><h3>Not sure, help me decide</h3><p>I'll recommend the right fit after we chat</p></div>
       </div>
     </div>
@@ -368,27 +311,27 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <p class="multi-note">Select all that apply.</p>
     <div class="opts" id="q4opts">
       <div class="opt" onclick="toggleMulti(4,'seo')" id="q4_seo">
-        <div class="opt-icon">🔍</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
         <div class="opt-text"><h3>SEO setup</h3><p>Keyword research, on-page optimization, Google Search Console</p></div>
         <span class="opt-price">+$800</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'copy')" id="q4_copy">
-        <div class="opt-icon">✍️</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></div>
         <div class="opt-text"><h3>Copywriting</h3><p>I need help writing the actual words on the site</p></div>
         <span class="opt-price">+$400/pg</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'brand')" id="q4_brand">
-        <div class="opt-icon">🎨</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l10 6.5L12 15 2 8.5z"/><path d="M2 15.5L12 22l10-6.5"/></svg></div>
         <div class="opt-text"><h3>Brand identity</h3><p>Logo, colors, fonts, visual identity package</p></div>
         <span class="opt-price">+$500</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'booking')" id="q4_booking">
-        <div class="opt-icon">📅</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
         <div class="opt-text"><h3>Booking or reservations</h3><p>Online scheduling, reservations, or appointment booking</p></div>
         <span class="opt-price">+$300</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'none')" id="q4_none">
-        <div class="opt-icon">👍</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>
         <div class="opt-text"><h3>None of the above</h3><p>Just the website is fine for now</p></div>
       </div>
     </div>
@@ -405,19 +348,19 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <p>Timeline affects scope and sometimes cost. Rush projects may include a surcharge.</p>
     <div class="opts">
       <div class="opt" onclick="pick(5,'flexible')" id="q5_flexible">
-        <div class="opt-icon">😌</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
         <div class="opt-text"><h3>Flexible, no hard deadline</h3><p>Standard timeline of 4-8 weeks is fine</p></div>
       </div>
       <div class="opt" onclick="pick(5,'2months')" id="q5_2months">
-        <div class="opt-icon">📅</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
         <div class="opt-text"><h3>Within 2 months</h3><p>Moderate urgency</p></div>
       </div>
       <div class="opt" onclick="pick(5,'1month')" id="q5_1month">
-        <div class="opt-icon">⚡</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
         <div class="opt-text"><h3>Within 1 month</h3><p>May include a 25% rush surcharge</p></div>
       </div>
       <div class="opt" onclick="pick(5,'asap')" id="q5_asap">
-        <div class="opt-icon">🚨</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
         <div class="opt-text"><h3>ASAP, under 2 weeks</h3><p>Rush surcharge applies, limited availability</p></div>
       </div>
     </div>
@@ -429,11 +372,11 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
 
   <!-- Results -->
   <div class="results" id="peResults" role="region" aria-label="Your estimate" aria-live="polite">
-    <h2 id="peResultsHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:22px;color:var(--ink);margin-bottom:16px;outline:none;">Here's your estimate.</h2>
+    <h2 id="peResultsHeading" tabindex="-1" class="serif" style="font-size:22px;color:var(--ink);margin-bottom:16px;outline:none;">Here's your estimate.</h2>
     <div id="tierCard"></div>
 
-    <div class="addons-note" id="addonsNote" style="display:none;">
-      <h3>Add-ons in your estimate</h3>
+    <div class="info-card addons-note" id="addonsNote">
+      <div class="k">Add-ons in your estimate</div>
       <div class="addons-grid" id="addonsGrid"></div>
     </div>
 
@@ -443,14 +386,14 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
 
     <!-- Trust + education (consultative, not salesy): explain what actually moves
          the number and what happens next, so the estimate reads as advice. -->
-    <div style="background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:16px;padding:24px;margin-bottom:20px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">What can change this number</div>
+    <div class="info-card">
+      <div class="k">What can change this number</div>
       <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 12px;">A ballpark is honest about being a ballpark. What moves the real number &mdash; up or down &mdash; is usually one of these, and it's exactly what a discovery call is for:</p>
       <ul style="list-style:none;margin:0;padding:0;display:grid;gap:9px;">
-        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>How much content is ready.</strong> Finished copy and photos speed things up; needing them written or shot adds scope.</li>
-        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>How custom the design needs to be.</strong> Applying a brand you already have vs. building one from scratch.</li>
-        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>Special functionality.</strong> Booking, e-commerce, or a custom tool built around how your business actually runs.</li>
-        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--p);">&bull;</span> <strong>Timeline.</strong> A tight deadline compresses the work and can add a rush fee; a flexible one keeps costs lower.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--brass-deep);">&bull;</span> <strong>How much content is ready.</strong> Finished copy and photos speed things up; needing them written or shot adds scope.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--brass-deep);">&bull;</span> <strong>How custom the design needs to be.</strong> Applying a brand you already have vs. building one from scratch.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--brass-deep);">&bull;</span> <strong>Special functionality.</strong> Booking, e-commerce, or a custom tool built around how your business actually runs.</li>
+        <li style="font-size:13.5px;color:var(--ink);padding-left:18px;position:relative;line-height:1.6;"><span aria-hidden="true" style="position:absolute;left:0;color:var(--brass-deep);">&bull;</span> <strong>Timeline.</strong> A tight deadline compresses the work and can add a rush fee; a flexible one keeps costs lower.</li>
       </ul>
       <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:14px 0 0;">Every business is different &mdash; that's the point. On a short call I turn this range into a confirmed number in writing, with no surprises after.</p>
     </div>
@@ -458,27 +401,27 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
     <!-- Lead capture (Master Plan §14, same architecture as the ROI Calculator):
          value delivered first; optional email step routes the full estimate +
          answers into clever-api lead_intake with a Formspree fallback. -->
-    <div id="leadCard" style="background:#fff;border:1px solid rgba(91,63,160,0.18);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div class="info-card" id="leadCard">
       <form id="leadForm" onsubmit="return submitLead(event,'pricing_estimator','Pricing Estimator')" novalidate>
-        <h3 style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;">Want this estimate emailed to you?</h3>
+        <h3 class="serif" style="font-size:20px;font-weight:380;margin:0 0 8px;">Want this estimate emailed to you?</h3>
         <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 16px;">I'll send your estimate along with a short, plain-English note on what would actually make sense for your project &mdash; so you have it to think over, share, or bring to a call. No spam, no obligation.</p>
-        <label for="leadEmail" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Email address</label>
-        <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
-        <label for="leadBiz" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Business name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-        <input id="leadBiz" type="text" autocomplete="organization" placeholder="Your business" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+        <label for="leadEmail" style="display:block;font-size:13px;font-weight:550;margin-bottom:6px;color:var(--ink);">Email address</label>
+        <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:13px 15px;border:1px solid var(--hair);border-radius:2px;font-size:15px;font-family:var(--sans);background:var(--paper);color:var(--ink);margin-bottom:14px;">
+        <label for="leadBiz" style="display:block;font-size:13px;font-weight:550;margin-bottom:6px;color:var(--ink);">Business name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input id="leadBiz" type="text" autocomplete="organization" placeholder="Your business" style="width:100%;padding:13px 15px;border:1px solid var(--hair);border-radius:2px;font-size:15px;font-family:var(--sans);background:var(--paper);color:var(--ink);margin-bottom:14px;">
         <div id="leadError" role="alert" style="display:none;color:#c0392b;font-size:13px;margin-bottom:12px;"></div>
-        <button type="submit" class="btn btn-primary" id="leadSubmit">Email me my estimate &rarr;</button>
+        <button type="submit" class="btn btn-primary" id="leadSubmit">Email me my estimate <span class="arr">&rarr;</span></button>
         <p style="font-size:12px;color:var(--muted);margin-top:12px;">I reply personally, usually within one business day. Your email is only used to send this and follow up &mdash; never sold, never spammed.</p>
       </form>
       <div id="leadThanks" style="display:none;" role="status">
-        <h3 id="leadThanksHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;outline:none;">On its way &mdash; thank you.</h3>
+        <h3 id="leadThanksHeading" tabindex="-1" class="serif" style="font-size:20px;font-weight:380;margin:0 0 8px;outline:none;">On its way &mdash; thank you.</h3>
         <p style="font-size:14px;color:var(--muted);line-height:1.7;">I've got your answers and your estimate. I'll follow up personally, usually within one business day, with a plain-English note on what would make sense for your project.</p>
-        <p style="font-size:14px;margin-top:12px;"><a href="/contact" style="color:var(--p);">Prefer to talk it through now? Book a free call &rarr;</a></p>
+        <p style="font-size:14px;margin-top:12px;"><a href="/contact" class="textlink">Prefer to talk it through now? Book a free call &rarr;</a></p>
       </div>
     </div>
 
     <div style="text-align:center;margin-bottom:20px;">
-      <a href="https://calendly.com/eric-davisdigitalstudio/30min" style="display:inline-flex;align-items:center;gap:8px;background:var(--p);color:#fff;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;transition:opacity 0.15s;" onmouseover="this.style.opacity=0.88" onmouseout="this.style.opacity=1">Book a free 30-min call to confirm scope →</a>
+      <a href="/contact" class="btn btn-primary">Book a free 30-min call to confirm scope <span class="arr">&rarr;</span></a>
     </div>
 
     <button class="restart-btn" onclick="restart()">Start over</button>
@@ -488,96 +431,65 @@ html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);col
 <section class="tool-switch-section">
   <div class="tool-switch-inner">
     <div class="tool-switch-head">
-      <span>Free tools</span>
-      <h2>Explore the other free tools.</h2>
-      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="/tools">the Resources hub &rarr;</a></p>
+      <span class="eyebrow">Free tools</span>
+      <h2 class="serif">Explore the other free tools.</h2>
+      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="/tools">the Free tools hub &rarr;</a></p>
     </div>
     <div class="tool-switch-grid">
     <a href="/audit" class="tool-switch-item">
-      <h3>Free Site Review</h3>
+      <h3 class="serif">Free Site Review</h3>
       <p>Get your free site review and see exactly what's costing you customers.</p>
     </a>
     <a href="/ai-critique" class="tool-switch-item">
-      <h3>AI Website Review</h3>
+      <h3 class="serif">AI Website Review</h3>
       <p>A free AI read on what's costing you clicks, in plain English.</p>
     </a>
     <a href="/report-card" class="tool-switch-item">
-      <h3>Digital Report Card</h3>
+      <h3 class="serif">Digital Report Card</h3>
       <p>A prioritized snapshot of what to fix first.</p>
     </a>
     <a href="/roi-calculator" class="tool-switch-item">
-      <h3>ROI Calculator</h3>
+      <h3 class="serif">ROI Calculator</h3>
       <p>See what a better site could actually be worth.</p>
     </a>
     <span class="tool-switch-item current">
       <span class="tsw-badge">You're here</span>
-      <h3>Pricing Estimator</h3>
+      <h3 class="serif">Pricing Estimator</h3>
       <p>Get a real ballpark price for your project.</p>
     </span>
     <a href="/local-visibility" class="tool-switch-item">
-      <h3>Local Visibility Score</h3>
+      <h3 class="serif">Local Visibility Score</h3>
       <p>Check how findable your business actually is nearby.</p>
     </a>
     </div>
   </div>
 </section>
 
-
-<!-- Soft capture: free site review (no popup, one calm ask) -->
-<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
-  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
-    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
-    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
-    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
-      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
-      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+<!-- Soft capture — the tokenized component (tool-page.css), one calm ask -->
+<section class="soft-capture-wrap" aria-labelledby="softReviewH">
+  <div class="soft-capture">
+    <h2 id="softReviewH" class="serif">Not sure what your site needs?</h2>
+    <p>The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get">
+      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)">
+      <button type="submit" class="btn btn-primary">Get the free site review &rarr;</button>
     </form>
   </div>
 </section>
+
+<!-- THE closer — one dark CTA, then the footer (index anatomy) -->
+<section class="pad panel-dark final-cta">
+<div class="wrap center">
+  <span class="eyebrow" style="color:var(--brass);justify-content:center">Let's talk</span>
+  <h2 class="kicker mt-s" style="margin-inline:auto;color:var(--paper)">Ready to turn a ballpark into a real number?</h2>
+  <p class="lead-muted mt-m" style="margin-inline:auto;color:rgba(255,255,255,.6)">No sales pitch. No obligation. A confirmed scope and exact price, in writing, before you decide anything.</p>
+  <div class="hero-cta mt-l" style="justify-content:center;flex-direction:column;align-items:center">
+    <a href="/contact" class="btn btn-light">Book a free call <span class="arr">&rarr;</span></a>
+    <a href="/audit" class="secondary-link">See what your site needs</a>
+  </div>
+</div>
+</section>
 </main>
-
-
-<section class="dds-final-cta" aria-label="Get in touch" style="background:linear-gradient(135deg,#2A1B4A 0%,#5b3fa0 100%);padding:48px 24px;position:relative;overflow:hidden;">
-  <div aria-hidden="true" style="position:absolute;top:-100px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.18) 0%,transparent 65%);pointer-events:none;"></div>
-  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;position:relative;z-index:1;">
-    <div style="flex-shrink:0;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c4aee8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-    </div>
-    <div style="flex:1;min-width:260px;color:#fff;text-align:left;">
-      <h3 style="font-family:var(--serif);font-size:clamp(22px,3.5vw,28px);font-weight:400;margin:0 0 6px;line-height:1.2;letter-spacing:-0.5px;color:#fff;">Ready to grow your business online?</h3>
-      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0;line-height:1.6;">Let's build a website that works as hard as you do.</p>
-    </div>
-    <a href="/contact" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#2A1B4A;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;font-family:var(--sans);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Book a free call &rarr;</a>
-  </div>
-</section>
-
-<!-- TRUST STRIP -->
-<section style="background:var(--pdark);padding:32px 24px;border-top:1px solid rgba(255,255,255,0.06);">
-  <div style="max-width:1100px;margin:0 auto;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;padding:22px 28px;background:rgba(196,174,232,0.06);border:1px solid rgba(196,174,232,0.10);border-radius:16px;">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Founder</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Eric Davis</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Web Design &amp; SEO Strategist</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Background</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise digital team</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Domain Name Manager &amp; Content Producer &middot; 9+ years</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Education</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">M.S. Business Analytics</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">CSUN &middot; Dean's Scholar</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Scale</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise scale</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Enterprise governance experience</div>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- dds-marketing-footer:start — generated by scripts/sync-marketing-chrome.mjs from scripts/marketing-chrome.template.html; do not hand-edit (byte-identity pinned by tests/e2e/marketing.spec.ts) -->
 <footer class="site">
@@ -709,7 +621,7 @@ function showResults() {
         'You manage updates after launch, no code'
       ],
       cta: 'Book a free call to confirm scope',
-      ctaUrl: 'https://calendly.com/eric-davisdigitalstudio/30min',
+      ctaUrl: '/contact',
       who: 'Best for: New businesses, pop-ups, or anyone who needs a clean professional presence fast without a large upfront investment.'
     },
     growth: {
@@ -727,7 +639,7 @@ function showResults() {
         '2 revision rounds + 30-day post-launch support'
       ],
       cta: 'Book a free call to confirm scope',
-      ctaUrl: 'https://calendly.com/eric-davisdigitalstudio/30min',
+      ctaUrl: '/contact',
       who: 'Best for: Established businesses ready to compete online and rank on Google, not just have a website, but have one that works.'
     },
     studio: {
@@ -751,28 +663,26 @@ function showResults() {
   };
 
   var t = tiers[tier];
-  var rushHtml = rush ? '<div style="display:inline-block;background:rgba(240,180,41,0.15);color:#b8860b;font-size:11px;font-weight:700;padding:3px 12px;border-radius:100px;margin-bottom:14px;">⚡ Rush pricing applied, ' + timelineLabel + '</div><br>' : '';
+  var rushHtml = rush ? '<span class="tier-rush">Rush pricing applied, ' + timelineLabel + '</span>' : '';
 
   // Conversational reasoning block
-  var reasoningHtml = '<div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:13px;color:rgba(255,255,255,0.6);line-height:1.75;border-left:3px solid var(--pxl);">' + reasoning + rushNote + '</div>';
+  var reasoningHtml = '<div class="tier-reason">' + reasoning + rushNote + '</div>';
 
   document.getElementById('tierCard').innerHTML =
     '<div class="tier-result ' + t.cls + '">' +
-    '<div class="tier-glow"></div>' +
-    rushHtml +
-    '<div class="tier-badge">' + t.name + ' Package</div>' +
+    '<div class="tier-badge">' + t.name + ' Package</div>' + rushHtml +
     '<div class="tier-name">' + t.name + '</div>' +
     '<div class="tier-range">' + t.range + '</div>' +
     '<div class="tier-cadence">' + t.cadence + '</div>' +
     reasoningHtml +
     '<ul class="tier-includes">' + t.items.map(function(i) { return '<li>' + i + '</li>'; }).join('') + '</ul>' +
-    '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:20px;font-style:italic;">' + t.who + '</div>' +
+    '<div class="tier-who">' + t.who + '</div>' +
     '<a href="' + t.ctaUrl + '" class="tier-cta">' + t.cta + ' →</a>' +
     '</div>';
 
   // What happens next block
-  var nextHtml = '<div style="background:#fff;border-radius:16px;border:1px solid rgba(91,63,160,0.1);padding:24px;margin-bottom:20px;">' +
-    '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">What happens next</div>' +
+  var nextHtml = '<div class="info-card">' +
+    '<div class="k">What happens next</div>' +
     '<div style="display:flex;flex-direction:column;gap:12px;">' +
     '<div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div><div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">Book a free 30-minute discovery call</div><div style="font-size:12px;color:var(--muted);">No pitch, no pressure. I want to understand your business before I give you a real number.</div></div></div>' +
     '<div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div><div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">I send a confirmed scope and exact price</div><div style="font-size:12px;color:var(--muted);">No surprises. Everything is in writing before you decide.</div></div></div>' +
@@ -785,14 +695,13 @@ function showResults() {
   // Add-ons
   var addonDetails = { seo:{label:'SEO Strategy',price:'$800',desc:'Keyword research, competitor analysis, and a 6-month content roadmap.'}, copy:{label:'Copywriting',price:'$400/page',desc:'Professional website copy written for clarity, SEO, and conversion.'}, brand:{label:'Brand Identity',price:'$500',desc:'Logo, color palette, typography system, and usage guidelines.'}, booking:{label:'Booking Integration',price:'$300',desc:'Online scheduling, reservations, or appointment booking setup.'} };
   if (addons.length > 0) {
-    var addonsHtml = '<div style="background:#fff;border-radius:16px;border:1px solid rgba(91,63,160,0.1);padding:24px;margin-bottom:20px;">' +
-      '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Add-ons included in your estimate</div>' +
+    var addonsHtml = '<div class="k">Add-ons included in your estimate</div>' +
       '<div class="addons-grid">' +
       addons.map(function(k) {
         var a = addonDetails[k];
-        return a ? '<div class="addon-pill" style="flex-direction:column;align-items:flex-start;gap:4px;padding:12px;"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;">' + a.label + '</span><span style="color:var(--p);font-weight:700;">' + a.price + '</span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
+        return a ? '<div class="addon-pill"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;color:var(--ink);">' + a.label + '</span><span style="color:var(--brass-deep);font-weight:700;">' + a.price + '</span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
       }).join('') +
-      '</div></div>';
+      '</div>';
     document.getElementById('addonsNote').innerHTML = addonsHtml;
     document.getElementById('addonsNote').style.display = 'block';
   }
@@ -851,19 +760,6 @@ function submitLead(ev, source, toolName){
   return false;
 }
 
-// Keyboard operability for the option cards (they are click-only <div>s): expose
-// them as buttons and activate on Enter/Space so the estimator is fully usable
-// without a mouse.
-(function(){
-  Array.prototype.forEach.call(document.querySelectorAll('.opt'), function(o){
-    o.setAttribute('role','button');
-    if(!o.hasAttribute('tabindex')) o.setAttribute('tabindex','0');
-    o.addEventListener('keydown', function(e){
-      if(e.key==='Enter' || e.key===' ' || e.key==='Spacebar'){ e.preventDefault(); o.click(); }
-    });
-  });
-})();
-
 function restart() {
   ans = {};
   multiSel = {};
@@ -886,6 +782,8 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 
 // A11y: the quiz options are click-only <div>s. Make every .opt keyboard-operable
 // (role=button, focusable, Enter/Space activates) without editing each one.
+// ONE guarded pass — the old page attached this twice, so Enter toggled an
+// add-on on and immediately off again; the data-kb guard keeps it single.
 (function(){
   function enable(){
     document.querySelectorAll('.opt').forEach(function(o){
