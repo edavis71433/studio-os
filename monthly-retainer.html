@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Growth Partnership — Davis Digital Studio</title>
-<meta name="description" content="Most websites peak on launch day. Growth Partnership is ongoing, hands-on attention from the person who built your site — not a maintenance checklist. From $400/month.">
+<meta name="description" content="Most websites peak on launch day. Growth Partnership is ongoing, hands-on attention from the person who built your site — not a maintenance checklist. Starts around $400 a month.">
 <link rel="canonical" href="https://davisdigitalstudio.com/monthly-retainer">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
@@ -25,7 +25,7 @@
 <meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="monthly-retainer.css">
 <link rel="stylesheet" href="portal-mock.css">
@@ -82,7 +82,7 @@
     </div>
   </div>
   <aside class="gp-curve reveal" aria-hidden="true">
-    <svg viewBox="0 0 300 170" width="100%" height="auto" fill="none">
+    <svg viewBox="0 0 300 170" style="width:100%;height:auto" fill="none">
       <path d="M20,40 C70,20 90,18 120,34 C170,60 190,92 220,116 C240,132 260,140 280,146" stroke="url(#gpGrad)" stroke-width="2.5" stroke-linecap="round"/>
       <circle cx="20" cy="40" r="5" fill="var(--p)"/>
       <circle cx="120" cy="34" r="4.5" fill="var(--brass)"/>
@@ -265,11 +265,28 @@
   <span class="eyebrow reveal">What it costs</span>
   <h2 class="kicker mt-s reveal">An honest number, same as everywhere else.</h2>
   <p class="lead-muted mt-m reveal">A Growth Partnership starts around $400 a month &mdash; real work behind it, not a flat fee for doing nothing. On the call, I'll tell you what makes sense for where your business actually is right now.</p>
+  <div class="mt-m reveal" style="display:flex;gap:10px;flex-wrap:wrap">
+    <a href="/pricing" class="btn btn-primary btn-sm">See pricing &rarr;</a>
+  </div>
 </div>
 </section>
 
+<!-- Soft capture: free site review (no popup, one calm ask). Sits ABOVE the
+     dark closer on purpose — the page ends dark CTA -> footer, one closer. -->
+<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
+  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
+    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
+    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
+      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
+      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+    </form>
+  </div>
+</section>
+
 <!-- ============================================================
-     FINAL CTA — reframes the risk, per the brief's actual goal.
+     FINAL CTA — reframes the risk, per the brief's actual goal. The
+     ONE closer: nothing interactive stands between this and the footer.
      ============================================================ -->
 <section class="pad panel-dark">
 <div class="wrap center">
@@ -281,19 +298,6 @@
     <a href="/how-we-work" class="btn btn-ghost" style="color:var(--paper);border-color:rgba(255,255,255,.3)">See how I work</a>
   </div>
 </div>
-</section>
-
-
-<!-- Soft capture: free site review (no popup, one calm ask) -->
-<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
-  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
-    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
-    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
-    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
-      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
-      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
-    </form>
-  </div>
 </section>
 
 </main>
