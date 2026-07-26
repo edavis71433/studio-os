@@ -8,43 +8,105 @@
 <meta name="description" content="One operational read: cron, domains, billing, AI, email, usage, errors, alerts, backups.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;
-    --ok:#3f7a5a;--ok-soft:#e7f1ea;--attn:#8a6d3b;--attn-soft:#f3ead9;--off:#7a7280;--off-soft:#eeecef;
-    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+  /* SS12 — re-skinned onto the shell's canonical --dds-* palette (shell.css carries
+     the full four-block theme contract: light base · prefers-color-scheme dark ·
+     data-theme="light" · data-theme="dark"), so this page follows every mode
+     automatically. This DELETES the hand-maintained theme copy A11 patched — the
+     shell is the source of truth now. --ok/--attn map to --dds-good/--dds-warn.
+     Fallbacks only cover a missing shell.css. */
+  :root,:root[data-theme="light"],:root[data-theme="dark"]{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --ok:var(--dds-good,#33664b);--ok-soft:var(--dds-good-soft,#e7f1ea);
+    --attn:var(--dds-warn,#775d31);--attn-soft:var(--dds-warn-soft,#f3ead9);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--serif:'Fraunces',"Iowan Old Style",Georgia,serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--ok:#8bbf9f;--ok-soft:#1f2a24;--attn:#d3ac6e;--attn-soft:#2a2316;--off:#9a92a6;--off-soft:#232030}}
-  /* the shell's explicit theme toggle (data-theme on <html>) must override the OS
-     scheme — both blocks mirror every token the @media block flips (the page-local
-     --ok/--attn/--off families included), shell.css's four-block contract. */
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--ok:#3f7a5a;--ok-soft:#e7f1ea;--attn:#8a6d3b;--attn-soft:#f3ead9;--off:#7a7280;--off-soft:#eeecef}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--ok:#8bbf9f;--ok-soft:#1f2a24;--attn:#d3ac6e;--attn-soft:#2a2316;--off:#9a92a6;--off-soft:#232030}
+  /* --off is the ONE page-local neutral — shell.css has no neutral --dds token, so
+     SS12 keeps its own themed copy (the four-block contract, mirroring shell.css so
+     an explicit toggle beats the OS scheme). This is the only palette line kept. */
+  :root{--off:#7a7280;--off-soft:#eeecef}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--off:#9a92a6;--off-soft:#232030}}
+  :root[data-theme="light"]{--off:#7a7280;--off-soft:#eeecef}
+  :root[data-theme="dark"]{--off:#9a92a6;--off-soft:#232030}
+
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:900px;margin:0 auto;padding:34px 20px 90px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 .1em}
-  header .sub{color:var(--soft);font-size:15px}
-  .overall{margin:22px 0 8px;padding:14px 18px;border-radius:13px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .wrap{max-width:1100px;margin:0 auto;padding:26px 20px 90px}
+
+  /* ── dashboard header (analytics .dhead anatomy): object icon · serif title ·
+        "As of" freshness · ↻ soft refresh ── */
+  .dhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .obj{width:36px;height:36px;border-radius:10px;background:var(--p-soft);display:grid;place-items:center;font-size:18px;flex:none}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(23px,4.4vw,30px);letter-spacing:-.01em;margin:0}
+  .asof{color:var(--faint);font-size:12.5px;margin-left:auto}
+  .asof[hidden]{display:none}
+  .rbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;font:600 12.5px var(--sans);cursor:pointer}
+  .rbtn:hover{border-color:var(--p);color:var(--p)}
+  .rbtn[hidden]{display:none}
+  .sub{color:var(--soft);font-size:14.5px;margin:8px 0 0;max-width:60ch}
+
+  /* ── the 12-column banded grid + card chrome (analytics standard) ── */
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:18px}
+  .band{grid-column:1/-1;font-family:var(--sans);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:12px 2px -4px}
+  .overall{grid-column:1/-1;padding:14px 18px;border-radius:13px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px}
   .overall.ok{background:var(--ok-soft);color:var(--ok)} .overall.attention{background:var(--attn-soft);color:var(--attn)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:14px}
-  .area{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);border-left:3px solid var(--line)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;min-width:0}
+  .c3{grid-column:span 3}.c4{grid-column:span 4}
+  /* KPI tile */
+  .kpi .cb{padding:15px 17px}
+  .kn{font-size:30px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.05}
+  .kn.warn{color:var(--attn)}
+  .kd{font-size:12.5px;color:var(--faint);margin-top:4px}
+  /* area card */
+  .area{border-left:3px solid var(--line)}
   .area.ok{border-left-color:var(--ok)} .area.attention{border-left-color:var(--attn)} .area.off{border-left-color:var(--off)}
-  .area .lbl{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .area .n{font-weight:600;font-size:15px} .area .dt{color:var(--soft);font-size:13.5px;margin-top:6px}
-  .pill{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+  .area .ch{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 0}
+  .area .t{font-size:14.5px;font-weight:600;margin:0;line-height:1.3;text-wrap:pretty}
+  .area .cb{padding:8px 16px 14px;flex:1}
+  .area .dt{color:var(--soft);font-size:13.5px;margin:0;overflow-wrap:anywhere}
+  .cf{border-top:1px solid var(--line);padding:9px 16px}
+  .cf a{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
+  .cf a:hover{text-decoration:underline}
+  .pill{flex:none;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
   .pill.ok{color:var(--ok);background:var(--ok-soft)} .pill.attention{color:var(--attn);background:var(--attn-soft)} .pill.off{color:var(--off);background:var(--off-soft)}
-  .center{text-align:center;padding:56px 20px} .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin-bottom:8px}
-  a.link{color:var(--p);text-decoration:none;font-weight:600}
-  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+
   .foot{margin-top:26px;color:var(--faint);font-size:12.5px}
-  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  /* shared states */
+  .center{text-align:center;padding:56px 20px}
+  .center .mark{font-size:40px;display:block;margin-bottom:12px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .center .sub{color:var(--soft);font-size:15px;max-width:44ch;margin:0 auto}
+  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  .retry{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer;margin-top:18px}
+  .retry:hover{filter:brightness(1.06)}
+  /* dark mode: filled retry needs dark ink (#fff on the lifted accent fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .retry{color:#171320}}
+  :root[data-theme="dark"] .retry{color:#171320}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:50px auto}
+  @media (prefers-reduced-motion:no-preference){.spin{animation:sp .8s linear infinite}}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:40}
+  .toast.show{opacity:1}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  /* mobile: KPI tiles pair up, area cards stack — a 1fr grid never scrolls sideways */
+  @media (max-width:900px){.c3{grid-column:span 6}.c4{grid-column:span 12}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <header><h1>Health Center</h1><p class="sub">One operational read — no second monitoring system.</p></header>
+  <header>
+    <div class="dhead">
+      <span class="obj" aria-hidden="true">🩺</span>
+      <h1 id="h1">Health Center</h1>
+      <span class="asof" id="asof" hidden></span>
+      <button class="rbtn" id="refreshBtn" hidden>↻ Refresh</button>
+    </div>
+    <p class="sub" id="sub">One operational read — no second monitoring system.</p>
+  </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
@@ -54,29 +116,129 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
-async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN}});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
+
+// SS8 family api(): never throws — {ok:false,status:0} on a network hiccup, so
+// every failure routes through ONE honest state switch (401/403/404/other).
+async function api(path){
+  try{
+    const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN}});
+    return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};
+  }catch(_){return{ok:false,status:0,body:{}};}
+}
+function toast(m){ const t=$('toast'); if(!t) return; t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+// No server timestamp in the payload — the "as of" honestly reflects the CLIENT
+// read time (stated absolutely, so it can never quietly go stale).
+function asOf(d){const t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const sameDay=d.toDateString()===new Date().toDateString();return 'As of '+(sameDay?'today, ':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+t;}
+
 const WORD={ok:'OK',attention:'Needs a look',off:'Off'};
+const RANK={attention:0,ok:1,off:2};
+// Attention-first within each band.
+function orderAreas(arr){return arr.slice().sort((a,b)=>(RANK[a.state]==null?3:RANK[a.state])-(RANK[b.state]==null?3:RANK[b.state]));}
+// Analytics-style banding of the ten operational areas.
+const BANDS=[
+  {label:'Jobs & delivery',keys:['cron','errors','email']},
+  {label:'Reach',keys:['domains','usage']},
+  {label:'Money & usage',keys:['billing','ai']},
+  {label:'Notices',keys:['platform','alerts','backups']},
+];
+// Real navigations to the surface where each area is actually FIXED. Areas with no
+// in-app fixing surface (platform config, cron, AI, errors, alerts, backups) get
+// NO footer — honestly non-interactive, never a dead link.
+const DEST={
+  domains:['/connections.html','Manage domains'],
+  email:['/broadcasts.html','Open broadcasts'],
+  billing:['/admin-growth.html','Open Growth'],
+  usage:['/admin-growth.html','Open Growth'],
+};
+
+function kpiTile(n,label,mod){
+  return '<section class="card kpi c3"><div class="cb"><p class="kn'+(mod?' '+mod:'')+'">'+esc(n)+'</p><p class="kd">'+esc(label)+'</p></div></section>';
+}
+function areaCard(a){
+  const dest=DEST[a.key];
+  const cf=dest?'<div class="cf"><a href="'+esc(dest[0])+'">'+esc(dest[1])+' →</a></div>':'';
+  return '<section class="card area c4 '+esc(a.state)+'">'
+    +'<div class="ch"><h3 class="t">'+esc(a.label)+'</h3><span class="pill '+esc(a.state)+'">'+esc(WORD[a.state]||a.state)+'</span></div>'
+    +'<div class="cb"><p class="dt">'+esc(a.detail)+'</p></div>'+cf+'</section>';
+}
 
 function render(hc){
-  if(!hc||!Array.isArray(hc.areas)){$('main').innerHTML='<div class="center"><h2>No health data.</h2><p class="sub">The read came back empty — try again shortly.</p></div>';return;}
-  let h='<div class="overall '+esc(hc.overall)+'">'+(hc.overall==='ok'?'✓ Everything is running normally.':'⚠ Some areas need a look.')+'</div><div class="grid">';
-  for(const a of hc.areas){
-    h+='<div class="area '+esc(a.state)+'"><div class="lbl"><span class="n">'+esc(a.label)+'</span><span class="pill '+esc(a.state)+'">'+esc(WORD[a.state]||a.state)+'</span></div><div class="dt">'+esc(a.detail)+'</div></div>';
+  const areas=hc&&Array.isArray(hc.areas)?hc.areas:null;
+  if(!areas){ emptyState(); return; }
+  $('asof').textContent=asOf(new Date());
+  $('asof').hidden=false; $('refreshBtn').hidden=false;
+  const ok=areas.filter(a=>a.state==='ok').length;
+  const attn=areas.filter(a=>a.state==='attention').length;
+  const off=areas.filter(a=>a.state==='off').length;
+  const isAttn=hc.overall==='attention';
+  let h='<div class="grid">';
+  h+='<div class="overall '+(isAttn?'attention':'ok')+'" role="status">'+(isAttn?'⚠ Some areas need a look.':'✓ Everything is running normally.')+'</div>';
+  // KPI band — ONLY honest counts derived from the real payload states.
+  h+='<h2 class="band">At a glance</h2>';
+  h+=kpiTile(String(areas.length),'Areas monitored','');
+  h+=kpiTile(String(attn),'Needs a look',attn?'warn':'');
+  h+=kpiTile(String(ok),'Running clean','');
+  h+=kpiTile(String(off),'Off / not set up','');
+  // area bands, attention-first
+  const seen={};
+  for(const band of BANDS){
+    const inBand=orderAreas(areas.filter(a=>band.keys.indexOf(a.key)>=0));
+    if(!inBand.length) continue;
+    inBand.forEach(a=>{seen[a.key]=1;});
+    h+='<h2 class="band">'+esc(band.label)+'</h2>';
+    h+=inBand.map(areaCard).join('');
   }
-  h+='</div><p class="foot">Aggregated from what the platform already produces — activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, active notices.</p>';
+  // any area the payload adds beyond the known keys is never dropped
+  const rest=orderAreas(areas.filter(a=>!seen[a.key]));
+  if(rest.length){ h+='<h2 class="band">More</h2>'; h+=rest.map(areaCard).join(''); }
+  h+='</div>';
+  h+='<p class="foot">Aggregated from what the platform already produces — activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, active notices.</p>';
   $('main').innerHTML=h;
 }
-function signedOut(){$('main').innerHTML='<div class="center"><h2>Sign in as an operator.</h2><p style="margin-top:16px"><a class="link" href="/studio.html">Sign in →</a></p></div>';}
-function notOperator(){$('main').innerHTML='<div class="center"><h2>Operators only.</h2><p class="sub">This page shows platform-wide operations and needs an operator account.</p></div>';}
-function trouble(){$('main').innerHTML='<div class="center"><h2>Couldn’t load the Health Center.</h2><p class="sub">A brief hiccup — refresh in a moment.</p></div>';}
-async function load(){
+
+function hideChrome(){ $('asof').hidden=true; $('refreshBtn').hidden=true; }
+function emptyState(){ hideChrome(); $('main').innerHTML='<div class="center"><h2>No health data.</h2><p class="sub">The read came back empty — try again shortly.</p><button class="retry" id="retry">Try again</button></div>'; wireRetry(); }
+function signedOut(){ hideChrome(); $('main').innerHTML='<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>Sign in as an operator.</h2><p class="sub">This page shows platform-wide operations and needs an operator account.</p><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>'; }
+// A 403 here is NOT a hiccup and NOT an all-clear: this account simply isn't an
+// operator. It gets its own honest truth — never a blank page, never a fake
+// everything-is-fine.
+function notOperator(){ hideChrome(); $('main').innerHTML='<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>Operators only.</h2><p class="sub">You’re signed in, but this account can’t see platform-wide operations. This page is for operator accounts.</p><p style="margin-top:20px"><a class="link" href="/today.html">Back to Today →</a></p></div>'; }
+function notFound(){ hideChrome(); $('main').innerHTML='<div class="center"><h2>This operations read isn’t available.</h2><p class="sub">The Health Center endpoint isn’t enabled on this deployment yet, or this link is out of date.</p><p style="margin-top:20px"><a class="link" href="/today.html">Back to Today →</a></p></div>'; }
+function trouble(){ hideChrome(); $('main').innerHTML='<div class="center"><h2>Couldn’t load the Health Center.</h2><p class="sub">A brief hiccup — nothing here is down; this is only this page.</p><button class="retry" id="retry">Try again</button></div>'; wireRetry(); }
+function wireRetry(){ const rt=$('retry'); if(rt) rt.addEventListener('click',()=>load()); }
+
+// SS8 family load(soft): REQ_SEQ (= VIEW_SEQ) so a superseded response never
+// paints; soft=true (the ↻ button) keeps the last good render on failure and
+// toasts instead of destroying the board.
+let REQ_SEQ=0, HC_DATA=null;
+async function load(soft){
+  const seq=++REQ_SEQ;
+  if(!soft) $('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   const r=await api('/admin/health-center');
-  if(r.status===401){signedOut();return;}
-  if(r.status===403){notOperator();return;}
-  if(!r.ok){trouble();return;}
-  render(r.body&&r.body.data);
+  if(seq!==REQ_SEQ) return;
+  if(!r.ok){
+    if(soft&&HC_DATA){ toast('Couldn’t refresh just now.'); return; }
+    if(r.status===401){ signedOut(); return; }
+    if(r.status===403){ notOperator(); return; }
+    if(r.status===404){ notFound(); return; }
+    trouble(); return;
+  }
+  const d=r.body&&r.body.data;
+  if(!d||!Array.isArray(d.areas)){ if(soft&&HC_DATA){ toast('Couldn’t refresh just now.'); return; } emptyState(); return; }
+  HC_DATA=d;
+  render(d);
 }
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+
+(async function init(){
+  $('refreshBtn').addEventListener('click',()=>load(true).then(()=>{const b=$('refreshBtn');if(b&&!b.hidden)b.focus();}));
+  try{
+    const{data}=await sb.auth.getSession();
+    TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){ signedOut(); return; }
+    await load();
+  }catch(_){ trouble(); }
+})();
 </script>
 </body>
 </html>
