@@ -249,7 +249,9 @@ header/refresh/VIEW_SEQ treatment.
 ### SS12 — Admin-health ops chrome (admin-health.html) — **M** — SS8 primitive optional
 dhead header (🩺 · "As of {generated_at}" · ↻ under REQ_SEQ); grid banded into
 Jobs & delivery · Reach · Money & usage · Notices; `.cf` drill footers to fixing
-surfaces (domains→connections, email→broadcasts, billing/usage→admin-growth),
+surfaces (domains→presence.html#foundations — the Foundations desk is the one
+surface that manages custom domains; connections.html is OAuth-only [corrected
+by the SS12 review], email→broadcasts, billing/usage→admin-growth),
 attention-first within bands; re-skin onto `--dds-*` (keep `--off` as the one
 page-local neutral — deletes the hand-maintained theme copy A11 just patched);
 :focus-visible + VIEW_SEQ. Honest 401/403/empty/trouble states kept verbatim.

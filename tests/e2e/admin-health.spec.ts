@@ -69,7 +69,7 @@ test.describe('Admin Health Center — drill footers to fixing surfaces', () => 
     await installApp(page, { api: { '/admin/health-center': HC } });
     await page.goto('/admin-health.html');
     // domains → connections, email → broadcasts, billing/usage → admin-growth
-    await expect(page.locator('.card.area', { hasText: 'Domains' }).locator('a[href="/connections.html"]')).toBeVisible();
+    await expect(page.locator('.card.area', { hasText: 'Domains' }).locator('a[href="/presence.html#foundations"]')).toBeVisible();
     await expect(page.locator('.card.area', { hasText: 'Email delivery' }).locator('a[href="/broadcasts.html"]')).toBeVisible();
     await expect(page.locator('.card.area', { hasText: 'Billing' }).locator('a[href="/admin-growth.html"]')).toBeVisible();
     await expect(page.locator('.card.area', { hasText: 'Usage' }).locator('a[href="/admin-growth.html"]')).toBeVisible();

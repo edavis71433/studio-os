@@ -146,7 +146,11 @@ const BANDS=[
 // in-app fixing surface (platform config, cron, AI, errors, alerts, backups) get
 // NO footer — honestly non-interactive, never a dead link.
 const DEST={
-  domains:['/connections.html','Manage domains'],
+  // domains land on the Foundations desk (#foundations deep-link, presence.html:1522)
+  // — the ONE surface that actually manages custom domains. connections.html is
+  // OAuth services and has no domain UI (SS12 review F1; the sweep-spec line was
+  // wrong about the codebase).
+  domains:['/presence.html#foundations','Manage domains'],
   email:['/broadcasts.html','Open broadcasts'],
   billing:['/admin-growth.html','Open Growth'],
   usage:['/admin-growth.html','Open Growth'],
