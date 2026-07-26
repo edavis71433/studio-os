@@ -909,7 +909,7 @@ async function buildNeedsYou(){
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
   body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
-  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'))));
+  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'),b)));
   body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
 }
 // ── slice 8b: the "Your website" card — plain-English site stats, in place ──
@@ -2178,7 +2178,7 @@ async function openProject(id,focusSection){
   // shareSend — a client who moved on mid-send is never yanked back)
   wireShareCard({pid:id,ondone:()=>openProject(id,'sec-files')});
   wireDownloads(document);
-  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id);}));
+  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a);}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
   $('newSupport').addEventListener('click',()=>openSupport(id));
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
@@ -2271,41 +2271,82 @@ function renderProjTimeline(){
 }
 // C1: the client's own support thread — see the studio's replies and reply back
 async function openSupportThread(rid,pid){
-  VIEW_SEQ++;   // this drill-in owns #main now — a late tab render must not clobber it
+  const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
   setWide(false);
   $('main').innerHTML=skeleton();
-  const r=await api('/client/support/'+rid);
+  let r;
+  try{r=await api('/client/support/'+rid);}catch(_){
+    // the thread read THREW (network down mid-read) — a calm couldn't-load card
+    // with a way back, never a skeleton stuck forever (openProject's contract)
+    if(view!==VIEW_SEQ)return;
+    $('main').innerHTML=`<p><a class="link" href="#" id="back">← Back</a></p>`+
+      emptyCard('We couldn’t load this request just now — please try again in a moment.','💬');
+    const bb=$('back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):goHome();});
+    return;
+  }
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   if(!r.ok){toast('That request isn’t available.');return pid?openProject(pid):goHome();}
   const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
   pid=pid||rq.project_id;
   const resolved=rq.status==='resolved'||rq.status==='closed';
   let html=`<p><a class="link" href="#" id="back">← Back</a></p><header><h1>${esc(rq.subject||'Support request')}</h1><p class="sub"><span class="tag">${esc((rq.status||'open').replace('_',' '))}</span></p></header><section><div id="sthread"></div>`;
-  if(!resolved)html+=`<div class="card"><textarea id="smsg" rows="2" aria-label="Add to this request" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px" placeholder="Add to this request…"></textarea><div class="row"><button class="approve" id="ssend">Send</button></div></div>`;
+  // the reply textarea carries the card/ink tokens (white-on-dark before) + font:inherit
+  if(!resolved)html+=`<div class="card"><textarea id="smsg" rows="2" aria-label="Add to this request" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Add to this request…"></textarea><div class="row"><button class="approve" id="ssend">Send</button></div></div>`;
   else html+=`<div class="card"><p class="muted">This request is resolved. Open a new one if you need anything else.</p></div>`;
   html+=`</section>`;
   $('main').innerHTML=html;
   $('back').addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):goHome();});
-  // attribution goes through the ONE honest renderer (supportThreadItems — the
-  // server `from` field first, author_kind only as the old-build fallback), the
-  // same anatomy as the Messages pane: a studio reply must never read as "You".
-  const items=supportThreadItems(rq,msgs);
-  $('sthread').innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
-  if(!resolved){const sbtn=$('ssend');sbtn.addEventListener('click',async()=>{const v=$('smsg').value.trim();if(!v)return;sbtn.disabled=true;const rr=await api('/client/support/'+rid+'/messages','POST',{body:v});if(rr.ok){openSupportThread(rid,pid);}else{toast('That didn’t send.');sbtn.disabled=false;}});}
+  paintSThread(rq,msgs);
+  if(!resolved){const sbtn=$('ssend');sbtn.addEventListener('click',async()=>{
+    const ta=$('smsg');const v=ta.value.trim();if(!v)return;sbtn.disabled=true;
+    let rr;try{rr=await api('/client/support/'+rid+'/messages','POST',{body:v});}catch(_){rr=null;}
+    if(view!==VIEW_SEQ)return;   // moved on mid-send — never paint over the newer view
+    if(rr&&rr.ok){
+      // surgical: re-fetch THIS thread and repaint #sthread in place — the
+      // composer, its focus, and the page scroll all survive (the old full-view
+      // re-run flashed the skeleton, reset scroll, and dropped focus to <body>)
+      ta.value='';
+      let r2;try{r2=await api('/client/support/'+rid);}catch(_){r2=null;}
+      if(view!==VIEW_SEQ)return;
+      if(r2&&r2.ok){const d2=(r2.body&&r2.body.data)||{};paintSThread(d2.request||rq,d2.messages||msgs);}
+      sbtn.disabled=false;ta.focus();
+    }else{toast('That didn’t send.');sbtn.disabled=false;}
+  });}
 }
-async function openSurvey(sid,pid){
-  VIEW_SEQ++;   // this drill-in paints #main on success — a late tab render must not clobber it
-  const r=await api('/client/surveys/'+sid);
-  if(!r.ok){toast('That survey isn’t available.');return;}   // the current view (often the wide record page) stays intact
+// paints the thread body (#sthread) — factored out so a reply can repaint it in
+// place without re-running the whole view. Attribution goes through the ONE
+// honest renderer (supportThreadItems — the server `from` field first,
+// author_kind only as the old-build fallback), the same anatomy as the Messages
+// pane: a studio reply must never read as "You".
+function paintSThread(rq,msgs){
+  const host=$('sthread');if(!host)return;
+  const items=supportThreadItems(rq,msgs);
+  host.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
+}
+async function openSurvey(sid,pid,ctrl){
+  const view=++VIEW_SEQ;   // this drill-in paints #main on success — a late tab render must not clobber it
+  // busy state on the INVOKING control — a slow read is never a dead click, and
+  // the current view (often the wide record page) stays put until the survey
+  // actually renders (a failure or a throw never collapses it). Both call sites
+  // pass plain-text controls, so textContent swap/restore is safe.
+  const label=ctrl?ctrl.textContent:'';
+  const busy=(on)=>{if(!ctrl)return;ctrl.setAttribute('aria-busy',on?'true':'false');ctrl.style.pointerEvents=on?'none':'';ctrl.textContent=on?'Opening…':label;};
+  busy(true);
+  let r;try{r=await api('/client/surveys/'+sid);}catch(_){r=null;}   // a throw surfaces honestly — the toast-and-stay path below
+  if(view!==VIEW_SEQ){busy(false);return;}   // the user moved on mid-fetch — never paint over the newer view (and un-busy the control)
+  if(!r||!r.ok){toast('That survey isn’t available.');busy(false);return;}   // the current view stays intact
+  busy(false);
   setWide(false);   // only collapse the wide layout once the survey actually renders
   const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
-  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1>${esc(sv.title||'Survey')}</h1></header><section>`;
-  if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
+  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1 tabindex="-1">${esc(sv.title||'Survey')}</h1></header><section>`;
+  if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;const h=$('main').querySelector('h1');if(h)h.focus({preventScroll:true});$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
   let qi=0;
   for(const q of (sv.questions||[])){
     // Each generated field gets a real id so its label's `for` associates it
     // (q.key is server data — an index-based id is guaranteed attribute-safe).
+    // Fields carry font:inherit + the card/ink tokens (white-on-dark before).
     const fid=`svq-${++qi}`;
-    const box=`id="${fid}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"`;
+    const box=`id="${fid}" style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"`;
     let field;
     if(q.type==='rating') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select>`;
     else if(q.type==='choice') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose…</option>${(q.choices||[]).map(c=>`<option>${esc(c)}</option>`).join('')}</select>`;
@@ -2314,6 +2355,7 @@ async function openSurvey(sid,pid){
   }
   html+=`<div class="row"><button class="approve" id="subSurvey">Send your answers</button></div></section>`;
   $('main').innerHTML=html;
+  const h1=$('main').querySelector('h1');if(h1)h1.focus({preventScroll:true});   // entry focus — the drill-in says where you are
   $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
   $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
 }

@@ -3066,4 +3066,159 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await expect(page.locator('#mrows .mempty')).toHaveText('We couldn’t check just now — try again in a moment.');
     await expect(page.getByText('No conversations yet', { exact: false })).toHaveCount(0);
   });
+
+  // ── openSupportThread (the project-scoped fallback view) to the cross-cutting
+  // contract: VIEW_SEQ re-check + a caught throw → calm trouble card (never a
+  // stuck skeleton), a themed reply textarea, and a reply that repaints the
+  // thread IN PLACE (focus + scroll survive, no full-view re-run). ──
+  const STID = '88888888-8888-4888-8888-888888888888';
+  const STHREAD_API = {
+    ...CLIENT_API,
+    '/client/support': { data: [
+      { id: STID, subject: 'Logo tweak', status: 'open', project_id: PID, updated_at: '2026-07-10T00:00:00Z', last_activity_at: '2026-07-10T00:00:00Z' },
+    ] },
+    [`/client/support/${STID}`]: { data: {
+      request: { id: STID, subject: 'Logo tweak', body: 'Could we nudge the logo left?', status: 'open', project_id: PID, created_at: '2026-07-05T00:00:00Z' },
+      messages: [{ id: 'sm1', body: 'On it — new version tomorrow.', author_kind: 'staff', created_at: '2026-07-06T00:00:00Z' }],
+    } },
+  };
+
+  test('openSupportThread — a network throw lands the calm trouble card with a way back — never a stuck skeleton', async ({ page }) => {
+    await installApp(page, { api: STHREAD_API });
+    await page.route(`**/functions/v1/presence/client/support/${STID}`, (route) =>
+      route.request().method() === 'GET' ? route.abort() : route.fallback());
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await page.locator('#sec-support .reqrow').first().click();
+    await expect(page.getByText('We couldn’t load this request just now — please try again in a moment.')).toBeVisible();
+    await expect(page.locator('.skel')).toHaveCount(0);   // the skeleton resolved, not stuck
+    // the Back link really returns to the project record
+    await page.getByRole('link', { name: '← Back' }).click();
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+  });
+
+  test('openSupportThread — the reply textarea carries card/ink tokens + font:inherit (never white-on-dark)', async ({ page }) => {
+    await installApp(page, { api: STHREAD_API });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await page.locator('#sec-support .reqrow').first().click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Logo tweak' })).toBeVisible();
+    const style = await page.locator('#smsg').getAttribute('style');
+    expect(style).toContain('background:var(--card)');
+    expect(style).toContain('color:var(--ink)');
+    expect(style).toContain('font:inherit');
+  });
+
+  test('openSupportThread — a reply repaints the thread in place and keeps focus on the composer (no full re-run)', async ({ page }) => {
+    let threadGets = 0;
+    await installApp(page, { api: STHREAD_API });
+    await page.route(`**/functions/v1/presence/client/support/${STID}/messages`, (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'sm9' } }) })
+        : route.fallback());
+    await page.route(`**/functions/v1/presence/client/support/${STID}`, (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      threadGets++;
+      const messages = threadGets >= 2
+        ? [{ id: 'sm1', body: 'On it — new version tomorrow.', author_kind: 'staff', created_at: '2026-07-06T00:00:00Z' },
+           { id: 'sm9', body: 'Perfect, thank you.', author_kind: 'client', created_at: '2026-07-11T00:00:00Z' }]
+        : [{ id: 'sm1', body: 'On it — new version tomorrow.', author_kind: 'staff', created_at: '2026-07-06T00:00:00Z' }];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+        request: { id: STID, subject: 'Logo tweak', body: 'Could we nudge the logo left?', status: 'open', project_id: PID, created_at: '2026-07-05T00:00:00Z' },
+        messages,
+      } }) });
+    });
+    await page.goto(`/client.html?project=${PID}`);
+    await page.locator('#sec-support .reqrow').first().click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Logo tweak' })).toBeVisible();
+    const ta = page.locator('#smsg');
+    await ta.fill('Perfect, thank you.');
+    await page.getByRole('button', { name: 'Send' }).click();
+    // the reply lands in the thread via the surgical refetch…
+    await expect(page.locator('#sthread')).toContainText('Perfect, thank you.');
+    // …focus stays on the composer (a full view re-run drops it to the body)…
+    await expect.poll(() => page.evaluate(() => (document.activeElement && (document.activeElement as HTMLElement).id) || '')).toBe('smsg');
+    // …and the textarea is cleared for the next reply
+    await expect(ta).toHaveValue('');
+  });
+
+  // ── openSurvey to the cross-cutting contract: a busy state on the invoking
+  // control (never a dead click), a caught throw routed to the toast-and-stay
+  // path, VIEW_SEQ re-check, themed fields, and entry focus on the h1. ──
+  const SVID = '99999999-9999-4999-8999-999999999999';
+  const SURVEY_API = {
+    ...CLIENT_API,
+    [`/client/projects/${PID}`]: { data: {
+      ...(CLIENT_API[`/client/projects/${PID}`] as any).data,
+      surveys: [{ id: SVID, title: 'How did we do?' }],
+    } },
+    [`/client/surveys/${SVID}`]: { data: {
+      survey: { id: SVID, title: 'How did we do?', questions: [
+        { key: 'q1', type: 'text', label: 'Any feedback?' },
+        { key: 'q2', type: 'rating', label: 'Rate us' },
+      ] },
+      my_response: null,
+    } },
+  };
+
+  test('openSurvey — a slow read shows a busy state on the invoking control (never a dead click)', async ({ page }) => {
+    await installApp(page, { api: SURVEY_API });
+    await page.route(`**/functions/v1/presence/client/surveys/${SVID}`, async (route) => {
+      await new Promise((r) => setTimeout(r, 800));
+      return route.fallback();
+    });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    const link = page.locator('[data-survey]');
+    await link.click();
+    await expect(link).toHaveText('Opening…');   // the click is acknowledged, never dead
+    await expect(page.getByRole('heading', { name: 'How did we do?' })).toBeVisible();   // …and it opens once the read lands
+  });
+
+  test('openSurvey — a network throw surfaces honestly: the toast, the record stays, the control is restored', async ({ page }) => {
+    await installApp(page, { api: SURVEY_API });
+    await page.route(`**/functions/v1/presence/client/surveys/${SVID}`, (route) =>
+      route.request().method() === 'GET' ? route.abort() : route.fallback());
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await page.locator('[data-survey]').click();
+    await expect(page.locator('#toast')).toContainText('That survey isn’t available.');
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();   // a failed read never collapses the record
+    await expect(page.locator('[data-survey]')).toHaveText('Open survey →');   // busy control restored — never a dead "Opening…"
+  });
+
+  test('openSurvey — VIEW_SEQ: a slow survey read never paints over the tab the user moved on to', async ({ page }) => {
+    await installApp(page, { api: SURVEY_API });
+    await page.route(`**/functions/v1/presence/client/surveys/${SVID}`, async (route) => {
+      await new Promise((r) => setTimeout(r, 700));
+      return route.fallback();
+    });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await page.locator('[data-survey]').click();          // survey read in flight
+    await page.locator('#tabnav [data-tab="messages"]').click();   // …but the client moves on
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.waitForTimeout(900);
+    await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
+    await expect(page.getByRole('heading', { name: 'How did we do?' })).toHaveCount(0);
+  });
+
+  test('openSurvey — fields are themed (font:inherit + card/ink) and entry focus lands on the h1', async ({ page }) => {
+    await installApp(page, { api: SURVEY_API });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await page.locator('[data-survey]').click();
+    await expect(page.getByRole('heading', { name: 'How did we do?' })).toBeVisible();
+    // entry focus — the drill-in says where you are (poll: the record's focus pins do too)
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.tagName === 'H1' ? (el.textContent || '') : '';
+    })).toContain('How did we do?');
+    // the fields carry the theme tokens (never white-on-dark)
+    const style = await page.locator('#svq-1').getAttribute('style');
+    expect(style).toContain('font:inherit');
+    expect(style).toContain('var(--card)');
+    expect(style).toContain('var(--ink)');
+  });
 });
+
