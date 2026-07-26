@@ -9268,15 +9268,25 @@ function ipeSaveSoon() {
     // true). Failures announce alongside the existing failure toast. The
     // message lands in the current canvas doc AND is stashed so the repaint's
     // injection re-announces it into the fresh document.
+    IPE_SAVE_INFLIGHT = true;
     const p = saveBlocks();
     if (p && p.then) p.then((okz) => {
+      IPE_SAVE_INFLIGHT = false;
       const msg = okz ? 'Saved' : 'The save failed — see the message on screen.';
       const d = ipeCanvasDoc(); if (d) ipeAnnounce(d, msg);
       IPE_LIVE_MSG = msg;
-    });
+    }); else IPE_SAVE_INFLIGHT = false;
   }, 1200);
 }
 function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.contentDocument : null; } catch (_) { return null; } }
+// Review fix 10 (finding 11): a committed edit inside the 1.2s debounce
+// window — or a PUT still in flight, or a session holding unsaved typing —
+// must not die silently with a closed tab. The browser shows its own generic
+// prompt; nothing is blocked outright.
+let IPE_SAVE_INFLIGHT = false;
+window.addEventListener('beforeunload', (e) => {
+  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty)) { e.preventDefault(); e.returnValue = ''; }
+});
 function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   try {
     let lv = doc.getElementById('dds-ipe-live');

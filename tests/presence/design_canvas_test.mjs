@@ -635,6 +635,9 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   const sb2 = extractFn(html, 'saveBlocks');
   ok(/return true;/.test(sb2) && /return false;/.test(sb2), 'saveBlocks reports its outcome (true only after the PUT + repaint kick actually succeeded)');
   ok(/IPE_LIVE_MSG/.test(soon) && /IPE_LIVE_MSG/.test(extractFn(html, 'dcInjectCanvas')), 'the outcome announcement survives the repaint (stashed, re-announced once into the fresh document)');
+  // ── review fix 10 (finding 11): a committed edit must not die with the tab ──
+  ok(/addEventListener\('beforeunload'/.test(html) && /IPE_SAVE_T != null \|\| IPE_SAVE_PENDING \|\| IPE_SAVE_INFLIGHT \|\| \(IPE && IPE\.dirty\)/.test(html), 'FIX 10: beforeunload guards the debounce window, an in-flight PUT, and a dirty session');
+  ok(/IPE_SAVE_INFLIGHT = true/.test(soon) && /IPE_SAVE_INFLIGHT = false/.test(soon), 'the in-flight flag brackets exactly the saveBlocks call the debounce fires');
   const rdp = extractFn(html, 'refreshDesignPreview');
   ok(/if \(IPE\) ipeCommit\(\);[\s\S]*?frame\.srcdoc = html/.test(rdp), 'a canvas repaint banks any in-flight session FIRST (text is never silently lost)');
   const sb = extractFn(html, 'saveBlocks');
