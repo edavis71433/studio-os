@@ -239,10 +239,14 @@ test.describe('G13 in-place canvas text editor', () => {
 
   // ── review finding 4: a zero-edit session must never write — not the render's
   // English fallback text, not the serializer's normalizations. ──
-  test('REVIEW F4a: dblclick a FALLBACK heading (no stored title) + click away with zero typing → NO PUT, no fallback text into storage', async ({ page }) => {
+  test('REVIEW F4a: open a FALLBACK heading (no stored title) + leave with zero typing → NO PUT, no fallback text into storage', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const h2 = frame.locator('section.block-features [data-dds-field="title"]');
-    await h2.dblclick();
+    // keyboard entry: the features section sits at the bottom, where the shipped
+    // hover toolbar / add-FAB occlude pointer dblclicks on narrow viewports
+    // (same reason the keyboard path exists at all — see the first test).
+    await h2.focus();
+    await page.keyboard.press('Enter');
     await expect(h2).toHaveAttribute('contenteditable', /.+/);
     await frame.locator('section.block-titleonly').click();   // blur commits
     await page.waitForTimeout(1800);                          // past the 1.2s debounce
