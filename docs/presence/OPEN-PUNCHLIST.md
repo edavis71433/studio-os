@@ -326,10 +326,15 @@ verbatim. One combined slice plan covers studio + portal.
   360px only, structurally safe at 768. (4) health fixture label values diverge
   from the real generators (shapes correct — test-realism only). (5) one
   unreachable REQ_SEQ race. Ready to merge with PS6/PS7 as wave 7.
-- **PS6/PS7: building** — 3 PS6 commits already on origin (640210e record
-  cohesion, cf02f99 share-card Files, f8e8090 support rows); remaining
-  openSupportThread/openSurvey guards+theming, PS7 composer VIEW_SEQ/theming/
-  focus, + the PS1 residual (projectsFailed honesty at Files/Messages).
+- **PS6/PS7: BUILT + pushed — REVIEW RUNNING.** 5 commits (640210e record
+  cohesion + the PS1 projectsFailed-at-Files/Messages residual, cf02f99
+  share-card Files, f8e8090 support rows, fa147ad openSupportThread+openSurvey
+  cohesion, a02448f PS7 composers). All 4 brief items done (residual was in
+  640210e); portal.spec ×3 = 478/0/29, four pure suites green, 11 pins
+  red-first. NOTE: a coordinator hard-reset mid-build briefly reverted a
+  today_home anchorTarget mirror line — restored verbatim (c97f571), 106/106;
+  lesson: doc commits use scoped `git commit <path>`, never stash+reset, while
+  a sibling agent shares the tree.
 
 ## ⏸️ PAUSED BY ERIC (2026-07-20: "lets pause until i have more fable")
 
