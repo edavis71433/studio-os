@@ -9098,21 +9098,90 @@ function ipeGate(mode, path, cls) {
 // carrying their OWN data-dds-field (the image_text button riding inside the
 // md container) or contenteditable="false" are other fields/chrome — skipped
 // whole. Inner whitespace is preserved exactly (round-trip property §2.3).
-function ipeSerializeMd(root) {
+//
+// INLINE EMISSION (review findings 1+2): renderMarkdown parses strong FIRST
+// ('**…**' can never span a '*'), then em ('*…*' holds only when no bare '*'
+// survives once '**…**' pairs are consumed). So em may contain strong
+// ('*a **b***') but never the reverse: a strong holding an em is emitted as
+// SPLIT runs — '**a ***b*** c**' re-renders as strong(a) em(strong(b))
+// strong(c), the exact visual the session shows (the browser bolds a nested
+// em too). Same-tag nesting emits once (never '****x****'), directly-adjacent
+// ems merge ('*a**b*' would tear), a multi-line wrap emits per line ('**…**'
+// cannot span a newline), and a block element inside a wrap contributes a
+// LINE BREAK, never a glue. A run holding a literal '*' has no faithful form
+// at all (no escape support) and stays unwrapped: meaning stripped, never
+// content. The optional `notes` array collects human-readable degrades for
+// the commit path to surface.
+function ipeSerializeMd(root, notes) {
   const skip = (n) => !!(n.getAttribute && (n.getAttribute('data-dds-field') != null || n.getAttribute('contenteditable') === 'false' || (n.id && /^dds-/.test(n.id))));
-  const inline = (node) => {
+  const note = (m) => { if (notes && notes.indexOf(m) < 0) notes.push(m); };
+  const tagOf = (n) => (n && n.nodeType === 1 ? String(n.tagName || '').toUpperCase() : '');
+  const isEm = (n) => n && n.nodeType === 1 && !skip(n) && /^(EM|I)$/.test(tagOf(n));
+  const BLOCKY = /^(P|DIV|H2|H3|H4|H5|H6|UL|OL|LI|BLOCKQUOTE|SECTION|ARTICLE|HEADER|FOOTER|TABLE|THEAD|TBODY|TR|TD|TH|FIGURE|PRE)$/;
+  const wrapLines = (s2, fn) => s2.split('\n').map((l) => (l ? fn(l) : l)).join('\n');
+  const emitEmStr = (s2) => (s2 ? wrapLines(s2, (l) => {
+    if (l.replace(/\*\*([^*]+)\*\*/g, '').indexOf('*') < 0) return '*' + l + '*';
+    note('Italic can’t hold a “*” — that part kept its stars, unstyled.');
+    return l;
+  }) : '');
+  const emitStrongEl = (el2, ital) => {
+    let res = '', seg = '';
+    const flushSeg = () => {
+      if (seg) res += wrapLines(seg, (l) => {
+        if (l.indexOf('*') < 0) return '**' + l + '**';
+        note('Bold can’t hold a “*” — that part kept its stars, unstyled.');
+        return l;
+      });
+      seg = '';
+    };
+    const kids = el2.childNodes || [];
+    for (let i = 0; i < kids.length; i++) {
+      const ch = kids[i];
+      if (isEm(ch)) {
+        if (ital) { seg += inline(ch, true, true); continue; }   // both formats already active — content only
+        let s2 = inline(ch, true, true);
+        while (i + 1 < kids.length && isEm(kids[i + 1])) { i++; s2 += inline(kids[i], true, true); }
+        flushSeg();
+        if (s2) res += s2.indexOf('*') < 0 ? wrapLines(s2, (l) => '***' + l + '***') : emitEmStr(s2);
+        continue;
+      }
+      if (ch.nodeType === 1 && !skip(ch) && BLOCKY.test(tagOf(ch))) {
+        const s2 = inline(ch, true, ital);
+        if (s2) seg += (seg && !/\n$/.test(seg) ? '\n' : '') + s2;
+        continue;
+      }
+      seg += one(ch, true, ital);
+    }
+    flushSeg();
+    return res;
+  };
+  const one = (ch, bold, ital) => {
+    if (ch.nodeType === 3) return String(ch.nodeValue || '').replace(/\s+/g, ' ');
+    if (ch.nodeType !== 1 || skip(ch)) return '';
+    const t = tagOf(ch);
+    if (t === 'BR') return '\n';
+    if (t === 'STRONG' || t === 'B') return bold ? inline(ch, bold, ital) : emitStrongEl(ch, ital);
+    if (t === 'EM' || t === 'I') { const s2 = inline(ch, bold, true); return ital ? s2 : emitEmStr(s2); }
+    if (t === 'A') { const href = (ch.getAttribute && ch.getAttribute('href')) || ''; const s2 = inline(ch, bold, ital); return href && s2 ? '[' + s2 + '](' + href + ')' : s2; }
+    return inline(ch, bold, ital);
+  };
+  const inline = (node, bold, ital) => {
     let out = '';
     const kids = node.childNodes || [];
     for (let i = 0; i < kids.length; i++) {
       const ch = kids[i];
-      if (ch.nodeType === 3) { out += String(ch.nodeValue || '').replace(/\s+/g, ' '); continue; }
-      if (ch.nodeType !== 1 || skip(ch)) continue;
-      const t = String(ch.tagName || '').toUpperCase();
-      if (t === 'BR') out += '\n';
-      else if (t === 'STRONG' || t === 'B') { const s2 = inline(ch); if (s2) out += '**' + s2 + '**'; }
-      else if (t === 'EM' || t === 'I') { const s2 = inline(ch); if (s2) out += '*' + s2 + '*'; }
-      else if (t === 'A') { const href = (ch.getAttribute && ch.getAttribute('href')) || ''; const s2 = inline(ch); out += href && s2 ? '[' + s2 + '](' + href + ')' : s2; }
-      else out += inline(ch);
+      if (isEm(ch) && !ital) {
+        let s2 = inline(ch, bold, true);
+        while (i + 1 < kids.length && isEm(kids[i + 1])) { i++; s2 += inline(kids[i], bold, true); }
+        out += emitEmStr(s2);
+        continue;
+      }
+      if (ch.nodeType === 1 && !skip(ch) && BLOCKY.test(tagOf(ch))) {
+        const s2 = inline(ch, bold, ital);
+        if (s2) out += (out && !/\n$/.test(out) ? '\n' : '') + s2;
+        continue;
+      }
+      out += one(ch, bold, ital);
     }
     return out;
   };
@@ -9207,6 +9276,13 @@ function ipeStart(doc, fieldEl, secEl) {
 function ipeKeydown(e) {
   if (!IPE) return;
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ipeCancel(); return; }
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+    const k2 = String(e.key || '').toLowerCase();
+    // the browser's NATIVE bold/italic would inject DOM shapes the markdown
+    // subset can't hold — route ⌘/Ctrl+B/I through the same guarded wrap the
+    // mini-bar uses (md fields), or swallow them (plain fields never format).
+    if (k2 === 'b' || k2 === 'i') { e.preventDefault(); e.stopPropagation(); if (IPE.md) ipeWrapSel(k2 === 'b' ? 'strong' : 'em'); return; }
+  }
   if (e.key === 'Enter') {
     if (!IPE.md) { e.preventDefault(); e.stopPropagation(); ipeCommit(); return; }        // plain: Enter commits (AEM UE)
     if (e.metaKey || e.ctrlKey) { e.preventDefault(); e.stopPropagation(); ipeCommit(); } // md: ⌘/Ctrl+Enter commits, Enter = paragraph
@@ -9295,6 +9371,16 @@ function ipeShowBar(doc, el2) {
 function ipeHideBar(doc) { try { const b = doc.getElementById('dds-ipe-bar'); if (b) b.classList.remove('on'); } catch (_) {} }
 // Direct Range wrapping (execCommand is deprecated): wrap the selection in
 // strong/em; partial-node selections fall back to extract+insert.
+// Review findings 1+2 semantics — a wrap is applied only when its
+// serialization re-renders to the exact visual on screen:
+//   · B/I with the whole selection already inside that format TOGGLES the run
+//     off (the whole run — predictable, and always re-renderable);
+//   · a boundary tearing partway into a strong/em snaps out to the whole
+//     element first (a half-wrap has no faithful markdown form);
+//   · a selection whose text holds a literal '*' is refused with an honest
+//     toast (renderMarkdown has no escape support);
+//   · a selection crossing a paragraph/list/heading boundary is refused with
+//     an honest toast (an inline wrap can't span blocks without gluing).
 function ipeWrapSel(tag) {
   const s = IPE; if (!s || !s.md) return;
   try {
@@ -9302,8 +9388,25 @@ function ipeWrapSel(tag) {
     if (!sel.rangeCount || sel.isCollapsed) return;
     const r = sel.getRangeAt(0);
     if (!s.el.contains(r.commonAncestorContainer)) return;
+    const sameTag = tag === 'strong' ? /^(STRONG|B)$/ : /^(EM|I)$/;
+    const tagAnc = (n, re) => { let a = null; for (let p = n; p && p !== s.el; p = p.parentNode) { if (p.nodeType === 1 && re.test(String(p.tagName || '').toUpperCase())) a = p; } return a; };
+    const on = tagAnc(r.commonAncestorContainer, sameTag);
+    if (on) {                                    // toggle OFF: unwrap the whole run
+      const par = on.parentNode;
+      while (on.firstChild) par.insertBefore(on.firstChild, on);
+      par.removeChild(on);
+      s.dirty = true;
+      return;
+    }
+    const sa = tagAnc(r.startContainer, /^(STRONG|B|EM|I)$/); if (sa) r.setStartBefore(sa);
+    const ea = tagAnc(r.endContainer, /^(STRONG|B|EM|I)$/); if (ea) r.setEndAfter(ea);
+    const BLK = /^(P|DIV|H2|H3|H4|LI|BLOCKQUOTE|TABLE|SECTION)$/;
+    const nearBlock = (n) => { for (let p = n; p && p !== s.el; p = p.parentNode) { if (p.nodeType === 1 && BLK.test(String(p.tagName || '').toUpperCase())) return p; } return s.el; };
+    if (nearBlock(r.startContainer) !== nearBlock(r.endContainer)) { toast('Format one paragraph at a time — that selection crosses a paragraph break.', true); return; }
+    if (/\*/.test(String(r))) { toast((tag === 'strong' ? 'Bold' : 'Italic') + ' can’t wrap a “*” — that text keeps its stars as typed.', true); return; }
     const w = s.doc.createElement(tag);
     try { r.surroundContents(w); } catch (_) { w.appendChild(r.extractContents()); r.insertNode(w); }
+    s.dirty = true;
     sel.removeAllRanges();
     const nr = s.doc.createRange(); nr.selectNodeContents(w); sel.addRange(nr);
   } catch (_) {}

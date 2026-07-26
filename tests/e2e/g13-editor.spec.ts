@@ -141,6 +141,71 @@ test.describe('G13 in-place canvas text editor', () => {
     expect((puts[0].blocks as typeof BLOCKS)[1].title).toBe('Our story');
   });
 
+  // ── review findings 1+2: the mini-bar must never emit markdown the renderer
+  // can't parse — B toggles on already-bold, refuses cross-paragraph ranges. ──
+  const selectInBody = async (frame: Mounted['frame'], needle: string) => {
+    const found = await frame.locator('[data-dds-field="body"]').evaluate((el, want) => {
+      const doc = el.ownerDocument!;
+      const w = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n: Node | null;
+      while ((n = w.nextNode())) {
+        const i = (n.nodeValue || '').indexOf(want);
+        if (i >= 0) {
+          const r = doc.createRange(); r.setStart(n, i); r.setEnd(n, i + want.length);
+          const s = doc.getSelection()!; s.removeAllRanges(); s.addRange(r);
+          return true;
+        }
+      }
+      return false;
+    }, needle);
+    expect(found).toBe(true);
+  };
+
+  test('mini-bar B stores markdown the REAL renderer parses back to the exact visual (never **a *b* c** fabrications)', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const prose = frame.locator('[data-dds-field="body"]');
+    await prose.dblclick();
+    await expect(prose).toHaveAttribute('contenteditable', 'true');
+    await selectInBody(frame, 'Hello');
+    await frame.locator('#dds-ipe-bar button[aria-label="Bold"]').click();
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const body = (puts[0].blocks as typeof BLOCKS)[1].body as string;
+    expect(body).toBe('**Hello** **world**\n\n- first\n- second');   // parseable source, byte-pinned
+  });
+
+  test('mini-bar B on an already-bold selection TOGGLES the run off (⌘/Ctrl+B routes through the same guarded wrap)', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const prose = frame.locator('[data-dds-field="body"]');
+    await prose.dblclick();
+    await expect(prose).toHaveAttribute('contenteditable', 'true');
+    await selectInBody(frame, 'world');            // sits inside the rendered <strong>
+    await page.keyboard.press('ControlOrMeta+b');  // the native-shortcut intercept
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const body = (puts[0].blocks as typeof BLOCKS)[1].body as string;
+    expect(body).toBe('Hello world\n\n- first\n- second');           // bold gone, nothing else touched
+  });
+
+  test('mini-bar B across a paragraph break is refused with an honest toast — no glue, no write', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const prose = frame.locator('[data-dds-field="body"]');
+    await prose.dblclick();
+    await expect(prose).toHaveAttribute('contenteditable', 'true');
+    await frame.locator('[data-dds-field="body"]').evaluate((el) => {
+      const doc = el.ownerDocument!;
+      const p = el.querySelector('p')!.firstChild as Node;          // 'Hello '
+      const li = el.querySelector('ul li')!.firstChild as Node;     // 'first'
+      const r = doc.createRange(); r.setStart(p, 0); r.setEnd(li, 3);
+      const s = doc.getSelection()!; s.removeAllRanges(); s.addRange(r);
+    });
+    await page.keyboard.press('ControlOrMeta+b');
+    await expect(page.getByText(/crosses a paragraph break/)).toBeVisible();
+    await page.keyboard.press('Escape');           // leave without committing anything
+    await page.waitForTimeout(1500);
+    expect(puts.length).toBe(0);
+  });
+
   test('caps: a plain field clamps at the validator cap (cta text 160) with a visible warning', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const cta = frame.locator('[data-dds-field="text"]');

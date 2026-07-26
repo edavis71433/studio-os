@@ -406,6 +406,90 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(ipeSerializeMd(junk) === 'pasted *markup*\n\ntabular', 'unknown nodes collapse to content (meaning stripped, content kept); contenteditable=false chrome is skipped');
   ok(ipeSerializeMd(E('div', {})) === '', 'an empty container serializes to the empty string');
 }
+// ── G13 slice-2 review, finding 1+2: the MINI-BAR INVARIANT ──────────────────
+// After ANY wrap action, serialize(session DOM) re-rendered through the REAL
+// renderMarkdown must show EXACTLY the formatting the user was looking at.
+// renderMarkdown parses strong FIRST ('**…**' can never span a '*'), then em —
+// so em may contain strong but never the reverse; the serializer emits a
+// strong-holding-em as split runs ('**a ***b*** c**' → strong/em·strong/strong,
+// the same visual, since the browser bolds a nested em too), same-tag nesting
+// once (never '****x****'), and merges directly-adjacent ems ('*a**b*' tears).
+// The comparison is FORMATTING RUNS (text + bold/italic/href), the observable
+// truth independent of em(strong) vs strong(em) nesting order.
+{
+  const { renderMarkdown } = await import('../../supabase/functions/presence/lib/markdown.ts');
+  const parseHtml = (src) => {
+    const unesc = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const root = E('div', {}); const stack = [root];
+    const re = /<(\/?)([a-z0-9]+)((?:\s+[a-z-]+="[^"]*")*)\s*>|([^<]+)/gi;
+    let m;
+    while ((m = re.exec(src))) {
+      if (m[4] !== undefined) { stack[stack.length - 1].childNodes.push(T(unesc(m[4]))); continue; }
+      if (m[1]) { if (stack.length > 1) stack.pop(); continue; }
+      const el2 = E(m[2], {});
+      (m[3] || '').replace(/([a-z-]+)="([^"]*)"/gi, (_x, k, v) => { el2.attrs[k] = unesc(v); return ''; });
+      stack[stack.length - 1].childNodes.push(el2);
+      if (m[2].toLowerCase() !== 'br') stack.push(el2);
+    }
+    return root;
+  };
+  const runsOf = (root) => {
+    const nh = (h) => { try { return h == null ? null : decodeURIComponent(h); } catch (_) { return h; } };
+    const acc = [];
+    const walk = (n, b, i2, href) => {
+      for (const ch of n.childNodes || []) {
+        if (ch.nodeType === 3) { const t2 = String(ch.nodeValue || ''); if (t2) acc.push({ t: t2, b, i: i2, href }); continue; }
+        if (ch.nodeType !== 1) continue;
+        const t = String(ch.tagName || '').toUpperCase();
+        walk(ch, b || t === 'STRONG' || t === 'B', i2 || t === 'EM' || t === 'I', t === 'A' ? nh(ch.getAttribute('href') || href) : href);
+      }
+    };
+    walk(root, false, false, null);
+    const out = [];
+    for (const r of acc) {
+      const last = out[out.length - 1];
+      if (last && last.b === r.b && last.i === r.i && last.href === r.href) last.t += r.t;
+      else out.push({ t: r.t, b: r.b, i: r.i, href: r.href });
+    }
+    return out.map((r) => ({ t: r.t.replace(/\s+/g, ' '), b: r.b, i: r.i, href: r.href })).filter((r) => r.t.trim());
+  };
+  const SHAPES = [
+    ['B over a run containing italics', E('div', {}, E('p', {}, E('strong', {}, T('a '), E('em', {}, T('b')), T(' c'))))],
+    ['B on already-bold (nested strong)', E('div', {}, E('p', {}, E('strong', {}, E('strong', {}, T('x')))))],
+    ['I on already-italic (nested em)', E('div', {}, E('p', {}, E('em', {}, E('em', {}, T('x')))))],
+    ['directly-adjacent ems', E('div', {}, E('p', {}, E('em', {}, T('a')), E('em', {}, T('b'))))],
+    ['I over a run containing bold', E('div', {}, E('p', {}, E('em', {}, T('a '), E('strong', {}, T('b')), T(' c'))))],
+    ['bold run containing a link', E('div', {}, E('p', {}, E('strong', {}, T('go '), E('a', { href: 'https://x.example' }, T('here')), T(' now'))))],
+    ['em-of-strong (stored ***both***)', E('div', {}, E('p', {}, E('em', {}, E('strong', {}, T('both')))))],
+    ['strong at line edges via br', E('div', {}, E('p', {}, E('strong', {}, T('a'), E('br', {}), T('b'))))],
+    ['B snapped around a whole em mid-word', E('div', {}, E('p', {}, E('strong', {}, T('x'), E('em', {}, T('both')), T('y'))))],
+  ];
+  for (const [name, dom] of SHAPES) {
+    const src = ipeSerializeMd(dom);
+    const h = renderMarkdown(src);
+    const want = JSON.stringify(runsOf(dom));
+    const got = JSON.stringify(runsOf(parseHtml(h)));
+    ok(want === got, 'MINI-BAR INVARIANT (' + name + '): serialized=' + JSON.stringify(src) + ' want=' + want + ' got=' + got);
+  }
+  // finding 2: a block boundary inside a wrap is a LINE BREAK, never a glue —
+  // the reviewer's exact repro (extractContents put two <p>s inside a strong).
+  const cross = E('div', {},
+    E('p', {}, T('before '), E('strong', {}, E('p', {}, T('tail one')), E('p', {}, T('head two')))),
+    E('p', {}, T(' after')));
+  const crossSrc = ipeSerializeMd(cross);
+  ok(!/onehead/.test(crossSrc), 'FINDING 2 PINNED: cross-paragraph bold never glues words (no "onehead"): ' + JSON.stringify(crossSrc));
+  ok(crossSrc === 'before **tail one**\n**head two**\n\nafter',
+    'cross-paragraph bold emits per-line bold with the break kept: ' + JSON.stringify(crossSrc));
+  const crossH = renderMarkdown(crossSrc);
+  ok(/<strong>tail one<\/strong><br><strong>head two<\/strong>/.test(crossH), 'the re-render keeps both lines bold with the break: ' + JSON.stringify(crossH));
+  // a literal '*' typed inside what became a strong has NO faithful bold form
+  // (no escape support): the serializer must not tear — it keeps the content,
+  // drops only the meaning it cannot express.
+  const litStar = ipeSerializeMd(E('div', {}, E('p', {}, E('strong', {}, T('2 * 3')))));
+  const litH = renderMarkdown(litStar);
+  ok(!/\*\*/.test(litH.replace(/<[^>]*>/g, '')), 'a literal * inside strong never fabricates torn ** markers: stored=' + JSON.stringify(litStar) + ' renders=' + JSON.stringify(litH));
+}
+
 // The §2.3 property: for every fixture, render(serialize(render(x))) === render(x)
 // — driven through the REAL renderMarkdown and a subset parser of its output.
 {
