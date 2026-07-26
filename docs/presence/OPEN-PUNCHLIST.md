@@ -342,6 +342,38 @@ catalog $3,800/$6,500?) · Results page (publish Bacchus vs footer-demote) ·
 dark mode (contact-only today). Estimator "Package" catalog framing has no
 published counterpart — part of the price-architecture decision.
 
+### MS1 LIVE · MS2+MS3 BUILT (in combined review) — 2026-07-26
+
+**MS1 MERGED to main @7eaa111 (Netlify):** ONE canonical chrome across 29 pages
+via scripts/marketing-chrome.template.html + sync-marketing-chrome.mjs (--check
+wired into build-public.sh as a tripwire; byte-identity pinned in
+tests/e2e/marketing.spec.ts; only per-page variance = stamped aria-current).
+Review fix: dark-OS contact form was 1.18:1 after P4's dark-skin removal —
+contact.css restates dark surfaces behind prefers-color-scheme (P4a full strip
+stays an Eric decision).
+
+**MS2 BUILT (4884001…a4ac068):** six money pages, one price story — 7
+contradictions resolved from published sources only (P2). pricing (audits-from-
+$99 cross-quote + SEO answer), services (ghost buttons died), web-design
+(~$1,500 + 4–6wk), seo-strategy (honest no-separate-SEO-price), monthly-
+retainer (~$400/mo starts-around), audit (tier sentence). +21 red-first pins.
+FLAGGED for Eric: /monthly-retainer→/growth-partnership rename (P5);
+standalone SEO price if he wants one.
+
+**MS3 BUILT (bde582a…dd93cbd) + GAP CLOSED (fa26ef3):** all EIGHT tools-family
+pages rebuilt onto the index system (NEW tool-page.css; tools.css; purple
+template dead: :root forks, pills, gradients, 19 emoji→stroked SVG, exit
+popups, custom cursor, idle timers, CTA gauntlets→one closer, Calendly deep-
+links→/contact). buy-audit got the slim payment chrome. local-visibility (the
+page outside MS3's fence) rebuilt same pattern — quiz math + lead capture
+preserved verbatim, 12 red→57/0 green. NEW tests/e2e/marketing-tools.spec.ts.
+FLAGGED: estimator "Package" catalog framing + 25% rush (P2 decision),
+ROI retire-into-estimator, concierge.js untouched (not in kill list), MS7 owes
+email-signature removal from the public build.
+STATUS: combined MS2+MS3+gap defensive review in flight → fixes → gates →
+Eric's one merge ask (frontend-only, Netlify). Then MS4 (P1 301) → MS5 → MS6
+→ MS7 (ghost deletions).
+
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
 
 Eric's "go" → the marquee feature. dblclick any stamped text on the canvas →
