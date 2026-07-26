@@ -211,11 +211,16 @@ test.describe('marketing chrome (static pins)', () => {
     }
   });
 
-  test('one light system (P4): no marketing page ships a page-scoped dark chrome', () => {
-    // chrome = the delimited regions + the tokens they render with. The tool
-    // bodies keep their (MS3-owned) local skins for now; what MUST be gone is
-    // contact.html's token flip — the only one that re-skinned header/footer.
+  test('P4: contact.html no longer ships its page-scoped TOKEN flip (chrome stays canonical)', () => {
+    // Honest scope: the sitewide dark remap (styles.css) and the tool bodies'
+    // MS3-owned local skins still exist; 7 tool pages restate chrome dark rules
+    // byte-identical to styles.css's (benign). What MS1 removed is contact's
+    // inline token-flip STYLE BLOCK. contact.css now carries the two dark
+    // SURFACE rules (review F1) so dark-OS visitors keep a legible form —
+    // that file-level media query is expected and correct.
     expect(read('contact.html')).not.toContain('prefers-color-scheme');
+    expect(read('contact.css')).toContain('prefers-color-scheme: dark');
+    expect(read('contact.css')).toContain('#241d38');
   });
 });
 

@@ -110,7 +110,9 @@ function count(haystack, needle) {
 /** Replace a region in a page; migrate from legacy anatomy if markers absent. */
 function placeRegion(html, name, stamped, file) {
   const re = new RegExp(`<!-- ${name}:start[\\s\\S]*?<!-- ${name}:end -->`);
-  if (re.test(html)) return html.replace(re, stamped);
+  // function replacement — a template containing $&, $` or $' must never be
+  // interpreted as a replacement pattern (it would silently corrupt all pages)
+  if (re.test(html)) return html.replace(re, () => stamped);
 
   // one-time adoption of a page still carrying hand-copied chrome
   if (name === 'dds-marketing-nav') {

@@ -49,6 +49,17 @@ body[data-page="contact"] .ct-expect{
   padding-top:24px;
 }
 
+/* The SITEWIDE dark remap (styles.css) flips the ink tokens for dark-OS
+   visitors, but these two surfaces are hardcoded light — without dark
+   counterparts the flipped ink lands near-white-on-white (MS1 review F1:
+   labels measured 1.18:1). Restates the pre-MS1 dark surfaces so the money
+   page stays legible; the one-light-everywhere call (P4a, stripping the
+   sitewide remap) is a separate Eric decision. */
+@media (prefers-color-scheme: dark){
+  body[data-page="contact"] #contactForm{ background:#241d38; box-shadow:0 30px 60px -34px rgba(0,0,0,.6); }
+  body[data-page="contact"] .ct-side{ background:#1f1a2e; }
+}
+
 @media(max-width:880px){
   body[data-page="contact"] .ct-grid{ grid-template-columns:1fr; gap:32px; }
   body[data-page="contact"] #contactForm{ padding:32px 26px; }
