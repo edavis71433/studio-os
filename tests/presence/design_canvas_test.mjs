@@ -565,6 +565,26 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   const inserter = extractFn(html, 'ipeInsertPlain');
   ok(/preventDefault\(\)/.test(paste) && /text\/plain/.test(paste) && /ipeInsertPlain\(/.test(paste), 'the UNCONDITIONAL paste guard inserts plain text only (plaintext-only is non-universal)');
   ok(/insertText/.test(inserter) && /createTextNode/.test(inserter) && !/innerHTML/.test(inserter), 'the shared plain-text inserter never writes markup');
+  // ── review fix 5: the DROP mirror of the paste guard. The reviewer couldn't
+  // drive synthetic drops headlessly, so this is a source pin + a stub-driven
+  // behavior test on the handler's dataTransfer handling. ──
+  const drop2 = extractFn(html, 'ipeDrop');
+  ok(/preventDefault\(\)/.test(drop2) && /text\/plain/.test(drop2) && !/text\/html/.test(drop2) && /ipeInsertPlain\(/.test(drop2), 'the drop guard cancels the browser default and reads ONLY text/plain (markup can never enter)');
+  ok(/addEventListener\('drop', ipeDrop\)/.test(extractFn(html, 'ipeStart')) && /removeEventListener\('drop', ipeDrop\)/.test(extractFn(html, 'ipeEnd')), 'the drop guard is wired for exactly the session lifetime (dragover too)');
+  {
+    const mk = new Function('IPE', 'ipeInsertPlain', 'return (' + drop2 + ')');
+    let inserted = null, prevented = 0;
+    const fn = mk({ md: true }, (t2) => { inserted = t2; });
+    fn({ preventDefault: () => { prevented++; }, dataTransfer: { getData: (k) => (k === 'text/plain' ? 'plain wins' : '<img src=x onerror=1><b>rich</b>') } });
+    ok(prevented === 1 && inserted === 'plain wins', 'a drop carrying BOTH flavors inserts the text/plain content only');
+    inserted = null; prevented = 0;
+    fn({ preventDefault: () => { prevented++; }, dataTransfer: { getData: (k) => (k === 'text/plain' ? '' : '<b>rich only</b>') } });
+    ok(prevented === 1 && inserted === null, 'a rich-only drop is refused whole — cancelled, nothing inserted');
+    const fnOff = mk(null, (t2) => { inserted = t2; });
+    prevented = 0;
+    fnOff({ preventDefault: () => { prevented++; }, dataTransfer: { getData: () => 'x' } });
+    ok(prevented === 0 && inserted === null, 'outside a session the handler is inert (no session, no interception)');
+  }
   const kd = extractFn(html, 'ipeKeydown');
   ok(/Escape/.test(kd) && /ipeCancel\(\)/.test(kd), 'Escape always exits without saving (no trap)');
   // ── review finding 4: the phantom-write gate ──

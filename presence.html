@@ -9287,6 +9287,8 @@ function ipeStart(doc, fieldEl, secEl) {
   fieldEl.addEventListener('blur', ipeBlur);
   fieldEl.addEventListener('paste', ipePaste);
   fieldEl.addEventListener('input', ipeInput);
+  fieldEl.addEventListener('drop', ipeDrop);
+  fieldEl.addEventListener('dragover', ipeDragover);
   if (md) ipeShowBar(doc, fieldEl);
   try { fieldEl.focus(); } catch (_) {}
   // keep the double-click's own selection when it landed inside; else caret at end
@@ -9327,6 +9329,19 @@ function ipePaste(e) {
   if (!t) return;
   ipeInsertPlain(t);
 }
+// Review fix 5 — the DROP mirror of the paste guard: dragged rich content
+// (from the page or outside) must never enter a session as markup. The
+// browser's default contenteditable drop inserts text/html wholesale, so the
+// drop is always cancelled and only the text/plain flavor is inserted (at the
+// caret — a small honesty trade for never holding markup).
+function ipeDrop(e) {
+  if (!IPE) return;
+  e.preventDefault();
+  const t = (e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain')) || '';
+  if (!t) return;
+  ipeInsertPlain(t);
+}
+function ipeDragover(e) { if (IPE) e.preventDefault(); }
 // the ONE plain-text inserter paste and drop share (the range fallback fires
 // no input event, so the dirty flag is set here explicitly).
 function ipeInsertPlain(t) {
@@ -9349,6 +9364,8 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     s.el.removeEventListener('blur', ipeBlur);
     s.el.removeEventListener('paste', ipePaste);
     s.el.removeEventListener('input', ipeInput);
+    s.el.removeEventListener('drop', ipeDrop);
+    s.el.removeEventListener('dragover', ipeDragover);
     Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) s.el.removeAttribute(a); else s.el.setAttribute(a, s.prev[a]); });
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
