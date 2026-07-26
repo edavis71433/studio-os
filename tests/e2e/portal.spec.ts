@@ -3222,3 +3222,69 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
   });
 });
 
+// ── PS7 (B6 remainder): the two remaining composers to every cross-cutting
+// contract. VIEW_SEQ++ at the top of each so a stale in-flight guarded render
+// can never paint over — and wipe — a half-typed brief/message; openSupport's
+// fields carry the card/ink tokens + font:inherit its sibling composer already
+// had; both focus their first field on paint.
+test.describe('PS7 — composer VIEW_SEQ + polish (B6 remainder)', () => {
+  test('openServiceRequest bumps VIEW_SEQ: a stale in-flight render never wipes a half-typed brief', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    // gate the Requests render's services read so that render stays IN FLIGHT
+    let releaseSvc: (() => void) | null = null;
+    const gate = new Promise<void>((res) => { releaseSvc = res; });
+    await page.route('**/functions/v1/presence/client/services', async (route) => { await gate; return route.fallback(); });
+    // kick a stale Requests render (captures a token, paints a spinner, awaits the
+    // gated read) then open the brief composer OVER that spinner
+    await page.evaluate(() => { (window as any).showTab('requests'); (window as any).openServiceRequest({ id: 'svc-x', name: 'Brand refresh' }); });
+    await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
+    await page.getByLabel('What do you need?').fill('A softer palette, please.');
+    releaseSvc!();   // the stale Requests render lands now
+    await page.waitForTimeout(400);
+    // the composer + the half-typed brief survive — the stale render was dropped
+    await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
+    await expect(page.getByLabel('What do you need?')).toHaveValue('A softer palette, please.');
+  });
+
+  test('openSupport bumps VIEW_SEQ: a stale in-flight render never wipes a half-typed message', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    let releaseSvc: (() => void) | null = null;
+    const gate = new Promise<void>((res) => { releaseSvc = res; });
+    await page.route('**/functions/v1/presence/client/services', async (route) => { await gate; return route.fallback(); });
+    await page.evaluate(() => { (window as any).showTab('requests'); (window as any).openSupport(null, 'requests'); });
+    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
+    await page.getByLabel('What do you need?').fill('A half-typed message.');
+    releaseSvc!();
+    await page.waitForTimeout(400);
+    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
+    await expect(page.getByLabel('What do you need?')).toHaveValue('A half-typed message.');
+  });
+
+  test('openSupport fields carry card/ink tokens + font:inherit, and entry focus lands on the subject', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#newReq').click();
+    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (document.activeElement && (document.activeElement as HTMLElement).id) || '')).toBe('sup-subj');
+    for (const id of ['sup-subj', 'sup-body']) {
+      const style = await page.locator('#' + id).getAttribute('style');
+      expect(style).toContain('background:var(--card)');
+      expect(style).toContain('color:var(--ink)');
+      expect(style).toContain('font:inherit');
+    }
+  });
+
+  test('openServiceRequest focuses its first field on paint', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (document.activeElement && (document.activeElement as HTMLElement).id) || '')).toBe('sr-need');
+  });
+});

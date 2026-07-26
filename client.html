@@ -1842,6 +1842,7 @@ async function submitBooking(){
 // request (service ref + structured fields). Per-service custom fields are out
 // of R2 scope. Crystal-clear that NOTHING is charged or ordered automatically.
 async function openServiceRequest(svc){
+  VIEW_SEQ++;   // this drill-in owns #main now — a late guarded render must not clobber (and wipe) the half-typed brief
   const box='style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
   let html=`<p><a class="link" href="#" id="back">← Back to requests</a></p><header><h1>Request: ${esc(svc.name)}</h1><p class="sub">Tell your studio a little about what you need. They’ll review and reply with next steps — nothing is charged and nothing is ordered automatically.</p></header><section><div class="card">`+
     `<label for="sr-need" style="display:block;font-weight:600;margin-bottom:6px">What do you need?</label><textarea id="sr-need" rows="3" ${box} placeholder="A short description of what you’re looking for…"></textarea>`+
@@ -1850,6 +1851,7 @@ async function openServiceRequest(svc){
     `<p class="muted" style="margin-top:12px;font-size:12.5px">This sends a request only. Your studio will review it and get back to you with next steps and pricing — nothing is charged now.</p>`+
     `<div class="row"><button class="approve" id="sr-send">Send request</button></div></div></section>`;
   $('main').innerHTML=html;
+  {const f=$('sr-need');if(f)f.focus();}   // entry focus on the first field (shareCompose's pattern)
   $('back').addEventListener('click',(e)=>{e.preventDefault();renderRequests();});
   $('sr-send').addEventListener('click',async()=>{
     const btn=$('sr-send');const need=$('sr-need').value.trim();
@@ -2364,9 +2366,13 @@ async function openSurvey(sid,pid,ctrl){
 // to the tab (and the fresh request), not to the Home feed. Other callers keep
 // the old default (project → the project; otherwise the client home).
 async function openSupport(pid,ret){
+  VIEW_SEQ++;   // this drill-in owns #main now — a late guarded render must not clobber (and wipe) the half-typed message
   setWide(false);
-  let html=`<p><a class="link" href="#" id="back">${pid?'← Back to project':'← Back'}</a></p><header><h1>${pid?'Open a support request':'Message your studio'}</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px"></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
+  // fields carry the card/ink tokens + font:inherit its sibling composer already had
+  const fbox='style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
+  let html=`<p><a class="link" href="#" id="back">${pid?'← Back to project':'← Back'}</a></p><header><h1>${pid?'Open a support request':'Message your studio'}</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" ${fbox}><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" ${fbox}></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
   $('main').innerHTML=html;
+  {const f=$('sup-subj');if(f)f.focus();}   // entry focus on the first field (shareCompose's pattern)
   // No project yet? Back and success return to the client home (load), not a
   // missing project — so a managed client with zero projects never hits a dead end.
   const backTo=()=>{if(pid)return openProject(pid);if(ret==='requests')return showTab('requests');load();};
