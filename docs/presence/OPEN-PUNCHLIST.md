@@ -313,6 +313,24 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🟢 WAVE 7 IN PROGRESS (resumed 2026-07-20 — Eric "continue" while doing Resend)
+
+- **SS8 (attention + website-health + content-tree): BUILT + REVIEWED — SAFE, no
+  required fixes.** 84 page specs + shell green; the website-health 403-lie fix
+  and .lhead[hidden] guard both proven red-first; all fields map to real
+  payloads. Backlog (all LOW/informational, NOT blocking): (1) website-health
+  freshness uses the CLIENT clock ("As of 3:45 PM") — could misstate on a wrong
+  client clock; attention/content-tree use clock-skew-immune relative labels;
+  cheap fix = make website-health relative too (frontend-only, no server field).
+  (2) freshness label doesn't live-tick (cosmetic). (3) Edit-no-clip pinned at
+  360px only, structurally safe at 768. (4) health fixture label values diverge
+  from the real generators (shapes correct — test-realism only). (5) one
+  unreachable REQ_SEQ race. Ready to merge with PS6/PS7 as wave 7.
+- **PS6/PS7: building** — 3 PS6 commits already on origin (640210e record
+  cohesion, cf02f99 share-card Files, f8e8090 support rows); remaining
+  openSupportThread/openSurvey guards+theming, PS7 composer VIEW_SEQ/theming/
+  focus, + the PS1 residual (projectsFailed honesty at Files/Messages).
+
 ## ⏸️ PAUSED BY ERIC (2026-07-20: "lets pause until i have more fable")
 
 State at pause — everything through WAVE 6 is MERGED + LIVE (main@11a0af9).
