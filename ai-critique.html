@@ -311,10 +311,10 @@ a{color:inherit;}
 .crit-hero::after{content:'';position:absolute;bottom:-160px;left:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.14) 0%,transparent 66%);pointer-events:none;}
 .crit-hero-inner{max-width:680px;margin:0 auto;position:relative;z-index:1;text-align:center;}
 .crit-scan-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:22px 0 28px;}
-.crit-scan-row span{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.75);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:100px;padding:6px 14px;}
+.crit-scan-row span{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--p);background:rgba(91,63,160,.07);border:1px solid rgba(91,63,160,.16);border-radius:100px;padding:6px 14px;}
 .crit-hero h1{font-family:var(--serif);font-size:clamp(34px,5vw,58px);font-weight:400;color:var(--ink);line-height:1.06;letter-spacing:-1.5px;margin:14px 0 18px;}
-.crit-hero h1 em{font-style:italic;color:var(--pxl);}
-.crit-hero > .crit-hero-inner > p{font-size:16px;color:rgba(255,255,255,0.55);line-height:1.75;max-width:540px;margin:0 auto 36px;}
+.crit-hero h1 em{font-style:italic;color:var(--p);}
+.crit-hero > .crit-hero-inner > p{font-size:16px;color:var(--muted);line-height:1.75;max-width:540px;margin:0 auto 36px;}
 
 /* card */
 .crit-card{background:#fff;border-radius:20px;padding:32px 30px;box-shadow:0 24px 60px rgba(15,8,32,0.42);text-align:left;max-width:520px;margin:0 auto;}
@@ -437,6 +437,8 @@ a{color:inherit;}
   nav[aria-label="Breadcrumb"]{background:#171320 !important;border-bottom-color:rgba(196,174,232,.12) !important;}
   nav[aria-label="Breadcrumb"] [style*="color:var(--p)"],.crit-result-head [style*="color:var(--p)"]{color:#c4aee8 !important;}
   .crit-hero{background:linear-gradient(180deg,#171320 0%,#241d38 100%);}
+  .crit-hero h1 em{color:var(--pxl);}
+  .crit-scan-row span{color:rgba(255,255,255,.75);background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14);}
   .crit-card{background:#241d38;box-shadow:0 24px 60px rgba(0,0,0,.55);}
   .crit-input{background:#171320;color:var(--ink);border-color:rgba(196,174,232,.22);}
   .crit-input::placeholder{color:rgba(239,234,247,.38);}
