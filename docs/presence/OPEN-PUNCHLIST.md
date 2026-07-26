@@ -313,7 +313,7 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
-## 🎨 G13 SLICE 2 — THE IN-PLACE EDITOR: BUILT + 3-ROUND-VERIFIED (2026-07-20, pending Eric merge)
+## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
 
 Eric's "go" → the marquee feature. dblclick any stamped text on the canvas →
 edit in place (plaintext fields plain-only; md fields WYSIWYG w/ B·I·Link
