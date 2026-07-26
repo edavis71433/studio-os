@@ -534,6 +534,32 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
     const ser = extractFn(html, 'ipeSerializeMd');
     ok(/typeof root\.normalize === 'function'/.test(ser), 'the real DOM path canonicalizes via root.normalize() before serializing (guarded for stub roots)');
   }
+  // ── G13 final review, CONFIRMED corruption #2 (MED): the renderer trims
+  // every stored line and reads '^[-*]\s+' as a bullet (lib/markdown.ts UL
+  // rule) — an italic wrap over a space-leading selection ('*' + ' part' +
+  // '*' = '* part*') at a paragraph line start would FABRICATE a UL, a BLOCK
+  // structure change. The leading whitespace hoists OUT of the wrap: an
+  // italic space is the same glyph as a plain one, and line-leading
+  // whitespace already dies at the renderer's per-line trim styled or not —
+  // the italics survive, the paragraph stays a paragraph. ──
+  {
+    const dom3 = E('div', {}, E('p', {}, T('intro'), E('br', {}), E('em', {}, T(' part'))));
+    const src3 = ipeSerializeMd(dom3);
+    ok(!src3.split('\n').some((l) => /^([-*]|\d+[.)])\s/.test(l.trim())), 'CONFIRMED #2: no stored line may begin with a renderer list trigger: ' + JSON.stringify(src3));
+    ok(src3 === 'intro\n *part*', 'the leading space hoists out of the wrap — the emission starts *text: ' + JSON.stringify(src3));
+    const h3 = renderMarkdown(src3);
+    ok(!/<ul>|<ol>/.test(h3) && /<em>part<\/em>/.test(h3), 'the re-render keeps the paragraph AND the italics — never a fabricated bullet: ' + JSON.stringify(h3));
+    const solo = ipeSerializeMd(E('div', {}, E('p', {}, E('em', {}, T(' a')), T(' y'))));
+    ok(renderMarkdown(solo) === '<p><em>a</em> y</p>', 'a space-leading em opening the paragraph: still a paragraph, still italic: ' + JSON.stringify(solo));
+    const wsOnly = ipeSerializeMd(E('div', {}, E('p', {}, E('em', {}, T(' ')), T('x'))));
+    ok(wsOnly === 'x' && !/<ul>/.test(renderMarkdown(wsOnly)), 'a whitespace-ONLY em at line start has no wrappable body — never "* *" (ALSO the list trigger): ' + JSON.stringify(wsOnly));
+    // marker-prefixed contexts are NOT hazard lines — there the wrapped space
+    // round-trips byte-true inside the em, exactly as before the fix
+    const inLi = ipeSerializeMd(E('div', {}, E('ul', {}, E('li', {}, E('em', {}, T(' a')), T(' y')))));
+    ok(inLi === '- * a* y' && /<li><em> a<\/em> y<\/li>/.test(renderMarkdown(inLi)), 'inside an LI the marker protects the line — the in-em space is preserved byte-true: ' + JSON.stringify(inLi));
+    const inH2 = ipeSerializeMd(E('div', {}, E('h2', {}, E('em', {}, T(' a')), T(' y'))));
+    ok(inH2 === '## * a* y' && /<h2><em> a<\/em> y<\/h2>/.test(renderMarkdown(inH2)), 'inside an H2 likewise — no hoist where no line rule can fire: ' + JSON.stringify(inH2));
+  }
 
   // ── finding 3: link syntax must survive the renderer's grammar. The link
   // rule reads [text](url) with text=[^\]]+ and url=[^)\s]+, safeHref allows

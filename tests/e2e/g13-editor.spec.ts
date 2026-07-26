@@ -245,6 +245,57 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(body).toBe('*Hello* **world**\n\n- first\n- second');
   });
 
+  // ── CONFIRMED corruption #2: the renderer trims each stored line and reads
+  // '^[-*]\s+' as a bullet, so italicizing a space-leading run at a line
+  // start must never store a line beginning '* ' — that would re-render a
+  // paragraph as a fabricated UL (a BLOCK structure change). ──
+  test('italicizing a space-leading run at a line start never stores a "* " line — no fabricated bullet list', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const prose = frame.locator('[data-dds-field="body"]');
+    await prose.dblclick();
+    await expect(prose).toHaveAttribute('contenteditable', 'true');
+    // caret at the very start of the paragraph text, then a line + soft
+    // break + a space-leading run — the typo shape
+    await frame.locator('[data-dds-field="body"]').evaluate((el) => {
+      const doc = el.ownerDocument!;
+      const r = doc.createRange();
+      r.setStart(el.querySelector('p')!.firstChild!, 0); r.collapse(true);
+      const s = doc.getSelection()!; s.removeAllRanges(); s.addRange(r);
+    });
+    await page.keyboard.type('intro');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type(' part');
+    // select " part" INCLUDING its leading (non-breaking) space and italicize
+    await frame.locator('[data-dds-field="body"]').evaluate((el) => {
+      const doc = el.ownerDocument!;
+      const w = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n: Node | null; let prev: Node | null = null;
+      while ((n = w.nextNode())) {
+        const i = (n.nodeValue || '').indexOf('part');
+        if (i >= 0) {
+          const r = doc.createRange();
+          if (i > 0) r.setStart(n, i - 1);                                        // the space sits in the same node
+          else if (prev && (prev.nodeValue || '').length) r.setStart(prev, (prev.nodeValue as string).length - 1);   // …or in the previous one
+          else r.setStart(n, i);
+          r.setEnd(n, i + 4);
+          const s = doc.getSelection()!; s.removeAllRanges(); s.addRange(r);
+          return;
+        }
+        prev = n;
+      }
+      throw new Error('typed run not found');
+    });
+    await page.keyboard.press('ControlOrMeta+i');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const body = (puts[0].blocks as typeof BLOCKS)[1].body as string;
+    // the hazard: a trimmed stored line beginning '* ' re-renders as a UL.
+    // (The REAL list in this fixture uses '- ', so the star check is exact.)
+    expect(body.split('\n').some((l) => /^\*\s/.test(l.trim()))).toBe(false);
+    expect(body).toContain('*part*');              // the italics the session showed survive
+    expect(body).toContain('**world**');           // the rest of the body is untouched
+  });
+
   test('caps: a plain field clamps at the validator cap (cta text 160) with a visible warning', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const cta = frame.locator('[data-dds-field="text"]');

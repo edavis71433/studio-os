@@ -9113,7 +9113,9 @@ function ipeGate(mode, path, cls) {
 // points ('T("") EM T("") EM' is what two italicize gestures over one word
 // really leave). A multi-line wrap emits per line ('**…**' cannot span a
 // newline), a block element inside a wrap contributes a LINE BREAK, never a
-// glue. A run holding a
+// glue, and an italic wrap that would BEGIN a stored paragraph line as '* '
+// hoists its leading whitespace out of the wrap (the renderer's UL rule
+// would read the wrap's own star as a bullet marker). A run holding a
 // literal '*' has no faithful form at all (no escape support) and stays
 // unwrapped: meaning stripped, never content. The optional `notes` array
 // collects human-readable degrades for the commit path to surface.
@@ -9134,11 +9136,31 @@ function ipeSerializeMd(root, notes) {
   const isEmptyT = (n) => !!n && n.nodeType === 3 && !String(n.nodeValue || '');
   const BLOCKY = /^(P|DIV|H2|H3|H4|H5|H6|UL|OL|LI|BLOCKQUOTE|SECTION|ARTICLE|HEADER|FOOTER|TABLE|THEAD|TBODY|TR|TD|TH|FIGURE|PRE)$/;
   const wrapLines = (s2, fn) => s2.split('\n').map((l) => (l ? fn(l) : l)).join('\n');
-  const emitEmStr = (s2) => (s2 ? wrapLines(s2, (l) => {
-    if (l.replace(/\*\*([^*]+)\*\*/g, '').indexOf('*') < 0) return '*' + l + '*';
-    note('Italic can’t hold a “*” — that part kept its stars, unstyled.');
-    return l;
-  }) : '');
+  // An italic wrap must never BEGIN a stored line as '* ' — the renderer
+  // trims each line and reads '^[-*]\s+' as a bullet (lib/markdown.ts UL
+  // rule), so '*' + ' part' + '*' at a line start would FABRICATE a list out
+  // of a space-leading selection. Leading whitespace hoists OUT of the wrap
+  // there (' *part*'): an italic space is the same glyph as a plain one, and
+  // line-leading whitespace already dies at the renderer's per-line trim,
+  // styled or not — the italics survive at full fidelity. `atLS` marks a
+  // call whose first line begins a stored PARAGRAPH line (only there is the
+  // emission unprefixed); continuation lines after a '\n' always begin one.
+  // Marker-prefixed contexts (h2/li/blockquote) keep the space inside the
+  // wrap — there the emission never starts a raw line and round-trips
+  // byte-true. A whitespace-only line has no wrappable body ('* *' is ALSO
+  // the list trigger) and emits unwrapped.
+  const emitEmStr = (s2, atLS) => (s2 ? s2.split('\n').map((l, li) => {
+    if (!l) return l;
+    if (l.replace(/\*\*([^*]+)\*\*/g, '').indexOf('*') >= 0) {
+      note('Italic can’t hold a “*” — that part kept its stars, unstyled.');
+      return l;
+    }
+    if (li > 0 || atLS) {
+      const ws = /^(\s+)(.*)$/.exec(l);
+      if (ws) return ws[2] ? ws[1] + '*' + ws[2] + '*' : l;
+    }
+    return '*' + l + '*';
+  }).join('\n') : '');
   const emitStrongEl = (el2, ital) => {
     let res = '', seg = '';
     const flushSeg = () => {
@@ -9203,7 +9225,7 @@ function ipeSerializeMd(root, notes) {
     }
     return inline(ch, bold, ital);
   };
-  const inline = (node, bold, ital) => {
+  const inline = (node, bold, ital, para) => {   // `para` = this content forms unprefixed paragraph lines
     let out = '';
     const kids = node.childNodes || [];
     for (let i = 0; i < kids.length; i++) {
@@ -9215,11 +9237,11 @@ function ipeSerializeMd(root, notes) {
           if (!isEm(kids[j])) break;
           s2 += inline(kids[j], bold, true); i = j;
         }
-        out += emitEmStr(s2);
+        out += emitEmStr(s2, !!para && !out.slice(out.lastIndexOf('\n') + 1).trim());
         continue;
       }
       if (ch.nodeType === 1 && !skip(ch) && BLOCKY.test(tagOf(ch))) {
-        const s2 = inline(ch, bold, ital);
+        const s2 = inline(ch, bold, ital, para);
         if (s2) out += (out && !/\n$/.test(out) ? '\n' : '') + s2;
         continue;
       }
@@ -9247,7 +9269,7 @@ function ipeSerializeMd(root, notes) {
     } else if (t === 'BLOCKQUOTE') {
       const s2 = inline(ch).trim();
       if (s2) blocks.push(s2.split('\n').map((l) => '> ' + l.trim()).join('\n'));
-    } else { const s2 = inline(ch).trim(); if (s2) blocks.push(s2); }   // p + any unknown block → a paragraph
+    } else { const s2 = inline(ch, 0, 0, true).trim(); if (s2) blocks.push(s2); }   // p + any unknown block → a paragraph (unprefixed lines)
   }
   return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
 }
