@@ -74,10 +74,16 @@ async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<
 }
 
 test.describe('G13 in-place canvas text editor', () => {
-  test('double-click → edit → Enter commits: ONE debounced PUT carries the new string at the stored path', async ({ page }) => {
+  test('keyboard entry (Tab-reachable field + Enter) → edit → Enter commits: ONE debounced PUT carries the new string at the stored path', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
-    await h2.dblclick();
+    // the a11y entry path: every stamped field is keyboard-reachable; Enter
+    // starts the session. (The topmost field sits under the shipped hover
+    // toolbar on narrow viewports, so dblclick entry is pinned on the subtitle
+    // and md tests below — the keyboard path must work EVERYWHERE.)
+    await expect(h2).toHaveAttribute('tabindex', '0');
+    await h2.focus();
+    await page.keyboard.press('Enter');
     // the session: an editable, a11y-labelled textbox with a live announcement
     await expect(h2).toHaveAttribute('contenteditable', /true|plaintext-only/);
     await expect(h2).toHaveAttribute('role', 'textbox');
@@ -91,15 +97,14 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect(h2).not.toHaveAttribute('contenteditable', /.+/);
     await expect(h2).not.toHaveAttribute('role', /.+/);
     // the debounced save lands as ONE PUT with the string at the right path
-    await page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/settings'), { timeout: 6000 });
-    expect(puts.length).toBe(1);
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     const blocks = puts[0].blocks as typeof BLOCKS;
     expect(blocks[0].title).toBe('A bolder heading');
     expect(blocks[0].subtitle).toBe('A quiet sub line');   // siblings untouched
     expect(blocks[1]).toEqual(BLOCKS[1]);                  // other blocks ride whole
   });
 
-  test('Escape cancels: the DOM reverts and NO save fires; click-away with no change also saves nothing', async ({ page }) => {
+  test('double-click enters editing; Escape cancels: the DOM reverts and NO save fires; click-away with no change also saves nothing', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const sub = frame.locator('[data-dds-field="subtitle"]');
     await sub.dblclick();
@@ -127,7 +132,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.keyboard.press('End');
     await page.keyboard.insertText(' plus more');
     await page.keyboard.press('ControlOrMeta+Enter');            // md commit
-    await page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/settings'), { timeout: 6000 });
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     const body = (puts[0].blocks as typeof BLOCKS)[1].body as string;
     expect(body).toContain('**world**');                   // existing markdown survives
     expect(body).toContain('plus more');                   // the edit landed
@@ -139,13 +144,14 @@ test.describe('G13 in-place canvas text editor', () => {
   test('caps: a plain field clamps at the validator cap (cta text 160) with a visible warning', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const cta = frame.locator('[data-dds-field="text"]');
-    await cta.dblclick();
+    await cta.focus();
+    await page.keyboard.press('Enter');
     await expect(cta).toHaveAttribute('contenteditable', /.+/);
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText('x'.repeat(200));
     await page.keyboard.press('Enter');
     await expect(page.getByText(/Trimmed to the field/)).toBeVisible();
-    await page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/settings'), { timeout: 6000 });
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     expect(((puts[0].blocks as typeof BLOCKS)[2].text as string).length).toBe(160);
   });
 
@@ -181,19 +187,19 @@ test.describe('G13 in-place canvas text editor', () => {
   test('the hover toolbar keeps working alongside: Duplicate after an in-place commit', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
-    await h2.dblclick();
+    await h2.focus();
+    await page.keyboard.press('Enter');
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText('Edited first');
     await page.keyboard.press('Enter');
-    await page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/settings'), { timeout: 6000 });
-    expect(puts.length).toBe(1);
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     // the canvas reloaded after the save — the toolbar still drives section ops
     await expect(frame.locator('#main > section').first()).toBeVisible();
     await frame.locator('section.block-richtext').hover();
     const dup = frame.locator('#dds-dc-bar button', { hasText: 'Duplicate' });
     await expect(dup).toBeVisible();
     await dup.click();
-    await page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/settings'), { timeout: 6000 });
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(2);
     const last = puts[puts.length - 1].blocks as typeof BLOCKS;
     expect(last.length).toBe(4);                            // duplicated in place
     expect(last[0].title).toBe('Edited first');             // the in-place edit persisted through
