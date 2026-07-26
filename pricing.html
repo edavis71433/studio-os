@@ -48,6 +48,7 @@
       },
       "about": [
         { "@type": "Service", "name": "Web design", "url": "https://davisdigitalstudio.com/web-design" },
+        { "@type": "Service", "name": "SEO strategy", "url": "https://davisdigitalstudio.com/seo-strategy" },
         { "@type": "Service", "name": "Growth Partnership", "url": "https://davisdigitalstudio.com/monthly-retainer" }
       ]
     }
@@ -145,6 +146,18 @@
 
   </div>
 
+  <!-- The third published price point: paid audits. Quoted from audit.html's
+       own live tiers ($99/$499/$899, credited toward a full project) — this
+       page states the fact and links the source instead of duplicating the
+       tier table (one truth, two surfaces would drift). -->
+  <div class="reveal mt-l" style="border:1px solid var(--hair);border-radius:16px;padding:20px 22px;background:var(--paper);display:flex;flex-wrap:wrap;gap:12px 26px;align-items:baseline;justify-content:space-between">
+    <div style="max-width:56ch">
+      <p style="margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p)">Paid audits from $99</p>
+      <p class="hint" style="margin:0">Want an expert read before committing to a project? Paid site audits run from $99 to $899 depending on depth &mdash; and every paid audit is credited toward a full project if you decide to move forward.</p>
+    </div>
+    <a href="/audit#pricing" class="textlink">See the audit tiers &rarr;</a>
+  </div>
+
   <!-- Proof where the money conversation happens — same real, verifiable
        signals as the services page. No fabricated proof. -->
   <div class="reveal mt-l" style="border:1px solid var(--hair);border-radius:16px;padding:20px 22px;background:var(--paper-2);">
@@ -157,6 +170,22 @@
       <li>You work directly with me &mdash; start to finish</li>
     </ul>
   </div>
+</div>
+</section>
+
+<!-- ============================================================
+     THE HONEST STANDALONE-SEO ANSWER (MS2) — SEO has no separate
+     price list here, and this page says so instead of hiding it.
+     Every claim is restated from published copy: web-design.html
+     ("included in every project, not sold as an add-on"), services
+     ("built into the foundation from day one"), and the Growth
+     Partnership pages. No invented number.
+     ============================================================ -->
+<section class="pad-sm">
+<div class="wrap" style="max-width:720px">
+  <span class="eyebrow reveal">What about SEO?</span>
+  <h2 class="kicker mt-s reveal">SEO isn't a separate line item here.</h2>
+  <p class="lead-muted mt-m reveal">Search is built into every web design project from day one &mdash; included, not sold as an add-on &mdash; and ongoing SEO attention continues through the Growth Partnership. There's no separate SEO price list, so you won't find one anywhere on this site. If search is your main concern, <a href="/seo-strategy" class="textlink">see what the SEO work covers</a>, or book a free call for an honest read on your situation.</p>
 </div>
 </section>
 
@@ -175,8 +204,22 @@
 </div>
 </section>
 
+<!-- Soft capture: free site review (no popup, one calm ask). Sits ABOVE the
+     dark closer on purpose — the page ends dark CTA -> footer, one closer. -->
+<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
+  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
+    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
+    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
+      <input type="email" name="email" autocomplete="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
+      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+    </form>
+  </div>
+</section>
+
 <!-- ============================================================
-     FINAL CTA — same panel-dark close as the services page.
+     FINAL CTA — same panel-dark close as the services page. The ONE
+     closer: nothing interactive stands between this and the footer.
      ============================================================ -->
 <section class="pad panel-dark">
 <div class="wrap center">
@@ -188,18 +231,6 @@
     <a href="/audit" class="btn btn-ghost" style="color:var(--paper);border-color:rgba(255,255,255,.3)">See what your site needs</a>
   </div>
 </div>
-</section>
-
-<!-- Soft capture: free site review (no popup, one calm ask) -->
-<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
-  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
-    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
-    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
-    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
-      <input type="email" name="email" autocomplete="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
-      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
-    </form>
-  </div>
 </section>
 
 </main>
