@@ -82,8 +82,14 @@
     </div>
     <div class="strip" id="cmpStrip" aria-live="polite"></div>
     <div class="panes">
-      <div class="pane"><p class="pane-t" id="paneAT">From</p><iframe id="frameA" title="Older version preview"></iframe></div>
-      <div class="pane"><p class="pane-t" id="paneBT">To</p><iframe id="frameB" title="Newer version preview"></iframe></div>
+      <!-- SS10 SECURITY: sandbox="" (no allow-* tokens) — these panes render
+           CLIENT-authored HTML; without the sandbox they would run same-origin
+           in the OPERATOR's auth context (client script could reach the operator
+           session). Empty token set = no scripts, no same-origin, no forms.
+           Content is assigned via the srcdoc *property* in runCompare(), never an
+           escaped attribute. (SS4 broadcasts drill-in is the shipped precedent.) -->
+      <div class="pane"><p class="pane-t" id="paneAT">From</p><iframe id="frameA" title="Older version preview" sandbox=""></iframe></div>
+      <div class="pane"><p class="pane-t" id="paneBT">To</p><iframe id="frameB" title="Newer version preview" sandbox=""></iframe></div>
     </div>
   </section>
 </div>
