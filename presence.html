@@ -9266,7 +9266,13 @@ function ipeStart(doc, fieldEl, secEl) {
   const md = fieldEl.hasAttribute('data-dds-md');
   const prev = {};
   ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
-  IPE = { doc: doc, el: fieldEl, sec: secEl, path: path, md: md, orig: fieldEl.innerHTML, prev: prev, busy: false };
+  // Review finding 4: capture the PRE-SESSION serialization NOW. The commit
+  // compares against THIS — never against the stored value — so a zero-typing
+  // session can't "commit" the render's English fallback text or the
+  // serializer's normalizations (*→-, 7.→1., #→##) into storage.
+  let base = '';
+  try { base = md ? ipeSerializeMd(fieldEl) : ipeReadPlain(fieldEl); } catch (_) { base = ipeReadPlain(fieldEl); }
+  IPE = { doc: doc, el: fieldEl, sec: secEl, path: path, md: md, orig: fieldEl.innerHTML, prev: prev, busy: false, base: base, dirty: false };
   try { const bar = doc.getElementById('dds-dc-bar'); if (bar) bar.classList.remove('on'); } catch (_) {}   // toolbar sleeps for the session
   // plaintext-only where supported keeps rich formatting out of plain fields;
   // the paste guard below is the universal fallback either way.
@@ -9280,6 +9286,7 @@ function ipeStart(doc, fieldEl, secEl) {
   fieldEl.addEventListener('keydown', ipeKeydown);
   fieldEl.addEventListener('blur', ipeBlur);
   fieldEl.addEventListener('paste', ipePaste);
+  fieldEl.addEventListener('input', ipeInput);
   if (md) ipeShowBar(doc, fieldEl);
   try { fieldEl.focus(); } catch (_) {}
   // keep the double-click's own selection when it landed inside; else caret at end
@@ -9308,6 +9315,9 @@ function ipeKeydown(e) {
   }
 }
 function ipeBlur() { if (IPE && !IPE.busy) ipeCommit(); }   // click/focus-away commits (panel idiom)
+// any real input marks the session dirty — the belt-and-braces half of the
+// finding-4 no-op gate (the serialization compare is the other half).
+function ipeInput() { if (IPE) IPE.dirty = true; }
 function ipePaste(e) {
   // UNCONDITIONAL paste-as-plain-text guard (plaintext-only support varies):
   // clipboard markup can never enter a field — only its text/plain content.
@@ -9315,6 +9325,12 @@ function ipePaste(e) {
   e.preventDefault();
   const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
   if (!t) return;
+  ipeInsertPlain(t);
+}
+// the ONE plain-text inserter paste and drop share (the range fallback fires
+// no input event, so the dirty flag is set here explicitly).
+function ipeInsertPlain(t) {
+  if (!IPE) return;
   try { IPE.doc.execCommand('insertText', false, t); }
   catch (_) {
     try {
@@ -9322,6 +9338,7 @@ function ipePaste(e) {
       if (sel.rangeCount) { const r = sel.getRangeAt(0); r.deleteContents(); r.insertNode(IPE.doc.createTextNode(t)); r.collapse(false); }
     } catch (_) {}
   }
+  IPE.dirty = true;
 }
 function ipeEnd() {   // restore the element's pre-session attributes + chrome
   const s = IPE; IPE = null;
@@ -9331,6 +9348,7 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     s.el.removeEventListener('keydown', ipeKeydown);
     s.el.removeEventListener('blur', ipeBlur);
     s.el.removeEventListener('paste', ipePaste);
+    s.el.removeEventListener('input', ipeInput);
     Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) s.el.removeAttribute(a); else s.el.setAttribute(a, s.prev[a]); });
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
@@ -9349,11 +9367,19 @@ function ipeCommit() {
   // otherwise. The value is DATA — a string field on a structured block — and
   // is never interpreted as HTML anywhere on the way to storage.
   let value;
-  try { value = s.md ? ipeSerializeMd(s.el) : ipeReadPlain(s.el); } catch (_) { value = ipeReadPlain(s.el); }
+  const notes = [];
+  try { value = s.md ? ipeSerializeMd(s.el, notes) : ipeReadPlain(s.el); } catch (_) { value = ipeReadPlain(s.el); }
+  // Review finding 4 — the no-op gate: a session with no input/mini-bar event,
+  // or whose serialization equals the PRE-SESSION serialization (s.base), is a
+  // zero-edit session: no write, no undo checkpoint, no PUT. Comparing against
+  // the STORED value here was the phantom-write bug (fallback headings and
+  // serializer normalizations differ from storage with zero typing).
+  const untouched = !s.dirty || value === s.base;
   // Re-resolve the section NOW: a tree-rail delete/move mid-session shifted
   // indices, and eeClassify applies the DDS_SRCMAP compensation for us.
   const c = eeClassify(s.sec);
   ipeEnd();
+  if (untouched) { ipeAnnounce(s.doc, 'Done — nothing changed.'); return; }
   if (c.kind !== 'block' || !(BLOCKS_WORK || [])[c.bi]) { toast('That section is no longer on the page — this text wasn’t saved.', true); return; }
   const block = BLOCKS_WORK[c.bi];
   const cap = ipeCapFor(block.type, s.path);
@@ -9361,6 +9387,7 @@ function ipeCommit() {
   const before = ipeGetPath(block, s.path);
   if (String(before == null ? '' : before) === value) { ipeAnnounce(s.doc, 'Done — nothing changed.'); return; }   // unchanged → no save
   if (!ipeSetPath(block, s.path, value)) { toast('That text couldn’t be saved in place — use the section’s editor panel.', true); return; }
+  if (notes.length) toast(notes[0]);   // surface the serializer's honest degrades (findings 1/3)
   ipeAnnounce(s.doc, 'Saved.');
   ipeSaveSoon();
 }
@@ -9451,6 +9478,7 @@ async function ipeLink() {
       a.textContent = u;
       if (sel.rangeCount && s.el.contains(sel.anchorNode)) sel.getRangeAt(0).insertNode(a); else s.el.appendChild(a);
     }
+    s.dirty = true;   // a link insert fires no input event
   } catch (_) {}
 }
 

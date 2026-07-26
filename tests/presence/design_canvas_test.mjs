@@ -562,11 +562,21 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(/plaintext-only/.test(start), 'plain fields request contenteditable=plaintext-only (rich formatting cannot enter)');
   ok(/setAttribute\("role", "textbox"\)/.test(start) && /aria-label/.test(start), 'a11y: the session element becomes an aria-labelled textbox');
   const paste = extractFn(html, 'ipePaste');
-  ok(/preventDefault\(\)/.test(paste) && /insertText/.test(paste) && /text\/plain/.test(paste), 'the UNCONDITIONAL paste guard inserts plain text only (plaintext-only is non-universal)');
+  const inserter = extractFn(html, 'ipeInsertPlain');
+  ok(/preventDefault\(\)/.test(paste) && /text\/plain/.test(paste) && /ipeInsertPlain\(/.test(paste), 'the UNCONDITIONAL paste guard inserts plain text only (plaintext-only is non-universal)');
+  ok(/insertText/.test(inserter) && /createTextNode/.test(inserter) && !/innerHTML/.test(inserter), 'the shared plain-text inserter never writes markup');
   const kd = extractFn(html, 'ipeKeydown');
   ok(/Escape/.test(kd) && /ipeCancel\(\)/.test(kd), 'Escape always exits without saving (no trap)');
+  // ── review finding 4: the phantom-write gate ──
+  const start2 = extractFn(html, 'ipeStart');
+  ok(/base = md \? ipeSerializeMd\(fieldEl\) : ipeReadPlain\(fieldEl\)/.test(start2), 'FINDING 4: the session captures its PRE-SESSION serialization at start');
+  ok(/dirty: false/.test(start2) && /addEventListener\('input', ipeInput\)/.test(start2), 'the session starts clean and tracks real input events');
   const commit = extractFn(html, 'ipeCommit');
   ok(/ipeSerializeMd\(/.test(commit) && /ipeReadPlain\(/.test(commit), 'commit reads markdown SOURCE for md fields, collapsed plain text otherwise');
+  ok(/!s\.dirty \|\| value === s\.base/.test(commit), 'FINDING 4: commit compares against the PRE-SESSION serialization + the any-event flag — never only the stored value');
+  ok(commit.indexOf('untouched') < commit.indexOf('ipeCapFor') && commit.indexOf('untouched') < commit.indexOf('ipeSetPath'), 'the no-op gate sits BEFORE the clamp and the write — no write, no undo checkpoint, no PUT');
+  const wrap2 = extractFn(html, 'ipeWrapSel');
+  ok(/dirty = true/.test(wrap2) && /dirty = true/.test(extractFn(html, 'ipeLink')) && /dirty = true/.test(extractFn(html, 'ipeInsertPlain')), 'mini-bar wraps, link inserts and paste-inserts all mark the session dirty (they fire no input event)');
   ok(/eeClassify\(/.test(commit), 'commit RE-RESOLVES the section index at commit time (tree-rail deletes/moves mid-session — DDS_SRCMAP applies)');
   ok(/ipeSetPath\(/.test(commit) && /ipeSaveSoon\(\)/.test(commit), 'commit writes through the guarded path writer then the debounced save — no other write path');
   ok(!/\bapi\(/.test(commit) && !/fetch\(/.test(commit), 'NO parallel save path: commit never calls the API directly');
