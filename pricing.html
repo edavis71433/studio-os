@@ -1,174 +1,254 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pricing — Studio OS Presence</title>
-<meta name="description" content="A website that stays correct — priced like a utility, governed like a trust. Monthly or annual. No metered fees, no surprises.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pricing — Davis Digital Studio</title>
+<meta name="description" content="Honest pricing, up front: new sites start around $1,500 depending on scope, and a Growth Partnership starts around $400 a month. On a free call, you get a real number for your specific business.">
+<link rel="canonical" href="https://davisdigitalstudio.com/pricing">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <meta name="theme-color" content="#5b3fa0">
+<meta property="og:title" content="Pricing — Davis Digital Studio">
+<meta property="og:description" content="Honest pricing, up front: new sites start around $1,500 depending on scope, and a Growth Partnership starts around $400 a month. Real numbers, not a guessing game.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://davisdigitalstudio.com/pricing">
+<meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pricing — Davis Digital Studio">
+<meta name="twitter:description" content="Honest pricing, up front: new sites start around $1,500 depending on scope, and a Growth Partnership starts around $400 a month. Real numbers, not a guessing game.">
+<meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..480&family=Inter:wght@400;450;500;550;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --p:#5b3fa0; --pdark:#3a2568; --ink:#1a1523; --muted:#6b6478; --line:#e7e1d6;
-    --cream:#faf8f5; --paper:#fff; --brass:#b08d57; --ok:#2e7d52;
-    --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
-    --shadow:0 18px 50px rgba(30,19,56,.08);
-  }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:var(--sans);background:var(--cream);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;}
-  a{color:inherit;}
-  .wrap{max-width:1080px;margin:0 auto;padding:38px 22px 90px;}
-  header.top{text-align:center;max-width:640px;margin:0 auto 10px;}
-  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--p);margin-bottom:16px;}
-  h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-height:1.08;letter-spacing:-.01em;text-wrap:balance;margin-bottom:14px;}
-  header.top p{font-size:16.5px;color:var(--muted);}
-  .foundersband{max-width:560px;margin:22px auto 0;background:linear-gradient(180deg,#fff,#f6f1ff);border:1px solid #e4d8f7;border-radius:14px;padding:12px 18px;font-size:13.5px;color:var(--pdark);display:flex;gap:10px;align-items:center;justify-content:center;}
-  .foundersband b{font-weight:650;}
-  /* term toggle */
-  .toggle{display:flex;justify-content:center;margin:30px 0 6px;}
-  .seg{display:inline-flex;background:#fff;border:1px solid var(--line);border-radius:100px;padding:4px;box-shadow:var(--shadow);}
-  .seg button{border:none;background:none;font:inherit;font-size:14px;font-weight:550;color:var(--muted);padding:9px 20px;border-radius:100px;cursor:pointer;transition:.18s;}
-  .seg button.on{background:var(--p);color:#fff;}
-  .savehint{text-align:center;font-size:13px;color:var(--ok);font-weight:550;min-height:20px;margin-bottom:18px;}
-  /* grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:8px;}
-  .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:26px 22px;display:flex;flex-direction:column;box-shadow:var(--shadow);position:relative;}
-  .card.feature{border-color:#d5c3f2;box-shadow:0 22px 60px rgba(91,63,160,.16);}
-  .badge{position:absolute;top:-11px;left:22px;background:var(--p);color:#fff;font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;padding:4px 11px;border-radius:100px;}
-  .pname{font-family:var(--serif);font-size:22px;font-weight:500;margin-bottom:4px;}
-  .ptag{font-size:13.5px;color:var(--muted);min-height:38px;margin-bottom:16px;}
-  .price{display:flex;align-items:baseline;gap:4px;margin-bottom:2px;}
-  .price .amt{font-family:var(--serif);font-size:38px;font-weight:500;letter-spacing:-.01em;}
-  .price .per{font-size:14px;color:var(--muted);}
-  .price .list{font-size:14px;color:var(--muted);text-decoration:line-through;margin-left:6px;}
-  .contact-amt{font-family:var(--serif);font-size:26px;font-weight:500;margin-bottom:4px;}
-  .annualnote{font-size:12.5px;color:var(--muted);min-height:18px;margin-bottom:16px;}
-  ul.feats{list-style:none;margin:8px 0 22px;display:flex;flex-direction:column;gap:9px;flex:1;}
-  ul.feats li{font-size:13.5px;padding-left:24px;position:relative;color:#2c2637;}
-  ul.feats li::before{content:"";position:absolute;left:0;top:7px;width:13px;height:13px;border-radius:50%;background:#eee6fb;}
-  ul.feats li::after{content:"";position:absolute;left:4px;top:10px;width:5px;height:3px;border-left:1.6px solid var(--p);border-bottom:1.6px solid var(--p);transform:rotate(-45deg);}
-  .cta{display:block;text-align:center;text-decoration:none;font-weight:600;font-size:14.5px;padding:12px 18px;border-radius:100px;transition:.18s;cursor:pointer;border:none;width:100%;font-family:inherit;}
-  .cta.primary{background:var(--p);color:#fff;}
-  .cta.primary:hover{background:var(--pdark);}
-  .cta.ghost{background:#fff;color:var(--p);border:1.5px solid #ddd0f4;}
-  .cta.ghost:hover{border-color:var(--p);}
-  .trybar{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px;min-height:18px;}
-  .laws{max-width:720px;margin:56px auto 0;text-align:center;}
-  .laws h2{font-family:var(--serif);font-weight:400;font-size:22px;margin-bottom:18px;}
-  .lawgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;text-align:left;}
-  .law{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px 16px;}
-  .law b{display:block;font-size:13.5px;font-weight:600;margin-bottom:3px;}
-  .law span{font-size:12.5px;color:var(--muted);}
-  footer{text-align:center;margin-top:52px;font-size:13px;color:var(--muted);}
-  footer a{color:var(--p);text-decoration:none;}
-  .loading{text-align:center;padding:60px;color:var(--muted);}
-  @media(max-width:560px){.wrap{padding:26px 16px 70px;}}
-</style>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://davisdigitalstudio.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Pricing", "item": "https://davisdigitalstudio.com/pricing" }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "name": "Pricing — Davis Digital Studio",
+      "url": "https://davisdigitalstudio.com/pricing",
+      "provider": {
+        "@type": "ProfessionalService",
+        "name": "Davis Digital Studio",
+        "legalName": "Davis Digital Studio LLC",
+        "url": "https://davisdigitalstudio.com/"
+      },
+      "about": [
+        { "@type": "Service", "name": "Web design", "url": "https://davisdigitalstudio.com/web-design" },
+        { "@type": "Service", "name": "Growth Partnership", "url": "https://davisdigitalstudio.com/monthly-retainer" }
+      ]
+    }
+  ]
+}
+</script>
 </head>
-<body>
-<div class="wrap">
-  <header class="top">
-    <div class="eyebrow">Studio OS · Presence</div>
-    <h1>A website that stays correct — without becoming your hobby.</h1>
-    <p>Priced like a utility, governed like a trust. Monthly or annual. No metered fees, no publishing charges, no surprise AI bills — you should never fear your own product.</p>
-    <div class="foundersband" id="foundersband" style="display:none">
-      <span>✦</span><span><b>Founders pricing is open.</b> Sign up now and your rate is locked for the life of your subscription.</span>
-    </div>
-  </header>
+<body data-page="pricing"><a href="#main-content" class="skip-link">Skip to main content</a>
+<header class="nav">
+<div class="wrap nav-in">
+  <a href="/" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="/how-we-work">How we work</a>
+    <a href="/the-experience">The experience</a>
+    <span class="nav-has-sub"><a href="/services" class="nav-sub-toggle" aria-haspopup="true" aria-expanded="false">Services <i class="caret" aria-hidden="true"></i></a>
+      <span class="nav-sub">
+        <a href="/services">All services<small>Pricing and the full picture</small></a>
+        <a href="/pricing" aria-current="page">Pricing<small>Honest numbers, up front</small></a>
+        <a href="/web-design">Web design<small>Strategy-led sites that convert</small></a>
+        <a href="/seo-strategy">SEO strategy<small>Get found by people searching</small></a>
+        <a href="/monthly-retainer">Growth Partnership<small>Keep your site working after launch</small></a>
+      </span></span>
+    <a href="/industries">Industries</a>
+    <a href="/work">Results</a>
+    <a href="/about">About</a>
+    <a href="/audit">Free site review</a>
+  </nav>
+  <div class="nav-actions">
+    <a href="portal.html" class="nav-login">Client login</a>
+    <a href="/contact" class="btn btn-primary" style="padding:11px 20px">Book a free call</a>
+  </div>
+  <button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+</div>
+</header>
 
-  <div class="toggle">
-    <div class="seg">
-      <button id="segMonthly" class="on" aria-pressed="true" onclick="setTerm('monthly')">Monthly</button>
-      <button id="segAnnual" aria-pressed="false" onclick="setTerm('annual')">Annual</button>
+<main id="main-content" tabindex="-1">
+
+<!-- ============================================================
+     HERO — the two honest numbers, stated immediately. All copy on
+     this page recombines what services.html and monthly-retainer.html
+     already say; nothing here is a new claim or a new number.
+     ============================================================ -->
+<section class="hero">
+<div class="wrap">
+  <div class="hero-copy" style="max-width:720px">
+    <span class="eyebrow reveal">Pricing</span>
+    <h1 class="reveal mt-m">An honest number, not a guessing game.</h1>
+    <p class="lede reveal">New sites start around $1,500 depending on scope. A Growth Partnership starts around $400 a month. And on the call, I&rsquo;ll give you a real number for your specific business &mdash; not a range designed to make you call just to find out.</p>
+    <div class="hero-cta reveal" style="margin-top:26px">
+      <a href="/contact" class="btn btn-primary">Book a free call <span class="arr">&rarr;</span></a>
+      <a href="/audit" class="btn btn-ghost">Get the free site review</a>
     </div>
   </div>
-  <div class="savehint" id="savehint"></div>
-  <p id="termStatus" role="status" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></p>
-
-  <div id="cards" class="grid"><div class="loading">Loading plans…</div></div>
-
-  <section class="laws">
-    <h2>The same promises, on every plan</h2>
-    <div class="lawgrid">
-      <div class="law"><b>You own everything</b><span>Your content, media, domain, and history — export it all, any time, in any account state.</span></div>
-      <div class="law"><b>Leaving is easy</b><span>No lock-in and no hostage mechanics. If you go, your domain and site come with you.</span></div>
-      <div class="law"><b>The site never lies</b><span>Not in preview, not in failure, not if a payment lapses. Every version is restorable.</span></div>
-      <div class="law"><b>Calm by default</b><span>Plain language, no dashboards of vanity metrics, no gamified scores. Health is a sentence.</span></div>
-    </div>
-  </section>
-
-  <footer>
-    Questions? <a href="/contact.html">Talk to us</a> · <a href="/studio.html">Already have an account? Sign in</a>
-  </footer>
 </div>
+</section>
 
+<!-- ============================================================
+     THE TWO OFFERS — one card per real price point. Inclusions are
+     drawn from the pages that describe each service, not invented.
+     ============================================================ -->
+<section class="pad-sm">
+<div class="wrap" style="max-width:1040px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px">
+
+    <div class="reveal" style="border:1px solid var(--hair);border-radius:20px;padding:30px 28px;background:var(--paper);display:flex;flex-direction:column">
+      <span class="eyebrow" style="margin-bottom:10px">Web design</span>
+      <p style="margin:0 0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Starts around</p>
+      <p class="serif" style="font-size:40px;line-height:1.1;margin:0 0 4px">$1,500</p>
+      <p class="hint" style="margin:0 0 18px">One-time project &middot; depending on scope</p>
+      <ul role="list" style="list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:12px;font-size:14.5px;color:var(--muted);line-height:1.55;flex:1">
+        <li style="border-left:1px solid var(--brass);padding-left:14px">Strategy-led design with real photography where it matters &mdash; so the site looks like the business you actually run.</li>
+        <li style="border-left:1px solid var(--brass);padding-left:14px">Search built into the foundation from day one &mdash; the technical basics, local SEO, and content that answers what people are actually typing.</li>
+        <li style="border-left:1px solid var(--brass);padding-left:14px">Every page built around one clear next step, so the same traffic starts turning into calls and customers.</li>
+        <li style="border-left:1px solid var(--brass);padding-left:14px">You approve every decision in your project workspace before it goes live.</li>
+      </ul>
+      <a href="/web-design" class="textlink" style="align-self:flex-start">See web design in depth &rarr;</a>
+    </div>
+
+    <div class="reveal" style="border:1px solid var(--hair);border-radius:20px;padding:30px 28px;background:var(--paper-2);display:flex;flex-direction:column">
+      <span class="eyebrow" style="margin-bottom:10px">Growth Partnership</span>
+      <p style="margin:0 0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Starts around</p>
+      <p class="serif" style="font-size:40px;line-height:1.1;margin:0 0 4px">$400<span style="font-size:18px;color:var(--muted)">/month</span></p>
+      <p class="hint" style="margin:0 0 18px">Ongoing &middot; real work behind it, not a flat fee for doing nothing</p>
+      <ul role="list" style="list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:12px;font-size:14.5px;color:var(--muted);line-height:1.55;flex:1">
+        <li style="border-left:1px solid var(--brass);padding-left:14px">The same person on your account every month &mdash; me. No account managers, no handoffs, no re-explaining your business.</li>
+        <li style="border-left:1px solid var(--brass);padding-left:14px">Something real every month &mdash; refreshed hours, a new service added, broken links Google flagged, fixed &mdash; always in your project workspace.</li>
+        <li style="border-left:1px solid var(--brass);padding-left:14px">Backups, updates, and security patches happen too, quietly, in the background.</li>
+        <li style="border-left:1px solid var(--brass);padding-left:14px">Your workspace stays open and your whole history stays intact, long after launch.</li>
+      </ul>
+      <a href="/monthly-retainer" class="textlink" style="align-self:flex-start">See what a Growth Partnership looks like &rarr;</a>
+    </div>
+
+  </div>
+
+  <!-- Proof where the money conversation happens — same real, verifiable
+       signals as the services page. No fabricated proof. -->
+  <div class="reveal mt-l" style="border:1px solid var(--hair);border-radius:16px;padding:20px 22px;background:var(--paper-2);">
+    <p style="margin:0 0 12px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);">Who you're hiring</p>
+    <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px 26px;font-size:14px;color:var(--muted);">
+      <li>Nearly a decade in enterprise digital systems</li>
+      <li aria-hidden="true" style="opacity:.4">&middot;</li>
+      <li>M.S. Business Analytics, CSUN</li>
+      <li aria-hidden="true" style="opacity:.4">&middot;</li>
+      <li>You work directly with me &mdash; start to finish</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================
+     TAILORED NUMBER — the pricing estimator, described in its own
+     words: five questions, a real ballpark, no signup, no sales call.
+     ============================================================ -->
+<section class="pad-sm panel-warm">
+<div class="wrap" style="max-width:720px">
+  <span class="eyebrow reveal">Want a number before the call?</span>
+  <h2 class="kicker mt-s reveal">Get a real ballpark in under a minute.</h2>
+  <p class="lead-muted mt-m reveal">Answer five questions about your project and the pricing estimator gives you an honest price range for your web design project &mdash; no signup, no sales call, instant results.</p>
+  <div class="mt-m reveal">
+    <a href="/pricing-estimator" class="btn btn-primary btn-sm">Try the pricing estimator &rarr;</a>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================
+     FINAL CTA — same panel-dark close as the services page.
+     ============================================================ -->
+<section class="pad panel-dark">
+<div class="wrap center">
+  <span class="eyebrow" style="color:var(--brass);justify-content:center">Let's talk</span>
+  <h2 class="kicker mt-s" style="margin-inline:auto;color:var(--paper)">The real number costs nothing to find out.</h2>
+  <p class="lead-muted mt-m" style="margin-inline:auto;color:rgba(255,255,255,.6)">Tell me what's happening with your business and I'll give you a real number for your specific situation &mdash; and tell you honestly whether I'm the right person for the work.</p>
+  <div class="hero-cta mt-l" style="justify-content:center">
+    <a href="/contact" class="btn btn-light">Book a free call <span class="arr">&rarr;</span></a>
+    <a href="/audit" class="btn btn-ghost" style="color:var(--paper);border-color:rgba(255,255,255,.3)">See what your site needs</a>
+  </div>
+</div>
+</section>
+
+<!-- Soft capture: free site review (no popup, one calm ask) -->
+<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
+  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
+    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
+    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
+      <input type="email" name="email" autocomplete="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
+      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+    </form>
+  </div>
+</section>
+
+</main>
+
+
+
+<footer class="site">
+<div class="wrap">
+  <div class="fwrap">
+    <div>
+      <div class="brand serif">Davis Digital Studio LLC</div>
+      <p>Strategy-led web design and SEO for small businesses, plus ongoing support and one organized place to work together. Built around your business, from the first call onward.</p>
+      <p style="margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.55)">Burbank, California &middot; working with businesses nationwide</p>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Studio</p>
+      <a href="/how-we-work">How we work</a>
+      <a href="/services">Services</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/industries">Industries</a>
+      <a href="/about">About</a>
+      <a href="/work">Results</a>
+    </div>
+    <div class="fcol">
+      <p class="fcol-h">Start</p>
+      <a href="/audit">Free site review</a>
+      <a href="/tools">Free tools</a>
+      <a href="/contact">Book a free call</a>
+      <a href="portal.html">Client login</a>
+    </div>
+  </div>
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio LLC &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/accessibility">Accessibility</a>
+    </span>
+  </div>
+</div>
+</footer>
 <script>
-const ENVS = {
-  prod:    { url: "https://qksstlqzbhesadrrofgn.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo" },
-  staging: { url: "https://wjlpursnwbmlcdwbeowv.supabase.co", anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqbHB1cnNud2JtbGNkd2Jlb3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNzExMzUsImV4cCI6MjA5ODg0NzEzNX0.XAWyxx-7WsDC6Eg4nc2dlcFmHRe6NUKYEVBkjRvkGXQ" },
-};
-const qs = new URLSearchParams(location.search);
-const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
-const FN = ENV.url + "/functions/v1/presence";
-const envSuffix = qs.get('env') === 'staging' ? '?env=staging' : '';
-let TERM = 'monthly';
-let PLANS = [];
-let TRIAL_DAYS = 14;
-
-async function load(){
-  try{
-    const r = await fetch(FN + "/commerce/plans", { headers: { apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } });
-    const j = await r.json();
-    PLANS = (j.data && j.data.plans) || [];
-    TRIAL_DAYS = (j.data && j.data.trial_days) || 14;
-    if (j.data && j.data.founders_open) document.getElementById('foundersband').style.display = 'flex';
-    render();
-  }catch(e){
-    document.getElementById('cards').innerHTML = '<div class="loading">We couldn’t load pricing just now. Please refresh, or <a href="/contact.html">reach out</a>.</div>';
-  }
-}
-function setTerm(t){
-  TERM = t;
-  document.getElementById('segMonthly').classList.toggle('on', t==='monthly');
-  document.getElementById('segAnnual').classList.toggle('on', t==='annual');
-  document.getElementById('segMonthly').setAttribute('aria-pressed', t==='monthly' ? 'true' : 'false');
-  document.getElementById('segAnnual').setAttribute('aria-pressed', t==='annual' ? 'true' : 'false');
-  // setTerm only runs on a click, so this announces the change — not page load.
-  document.getElementById('termStatus').textContent = t==='annual' ? 'Prices show annual billing.' : 'Prices show monthly billing.';
-  render();
-}
-function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-function render(){
-  document.getElementById('savehint').textContent = TERM==='annual' ? 'Annual saves you two months — and the calm of not thinking about it.' : '';
-  const cards = PLANS.map(p => {
-    const feature = p.key === 'presence';
-    let priceHtml, ctaHtml, tryHtml = '';
-    if (p.price) {
-      const amt = TERM==='annual' ? p.price.annual : p.price.monthly;
-      const list = TERM==='annual' ? p.price.list_annual : p.price.list_monthly;
-      const per = TERM==='annual' ? '/yr' : '/mo';
-      const listHtml = (p.price.founder && list && list !== amt) ? `<span class="list">$${list}${per}</span>` : '';
-      priceHtml = `<div class="price"><span class="amt">$${amt}</span><span class="per">${per}</span>${listHtml}</div>`
-        + `<div class="annualnote">${TERM==='annual' ? 'Billed yearly' : 'Billed monthly'}${p.price.founder ? ' · founders rate, locked' : ''}</div>`;
-      ctaHtml = `<a class="cta primary" href="/signup.html${envSuffix}${envSuffix?'&':'?'}plan=${p.key}&term=${TERM}">Get started</a>`;
-      if (p.trial_eligible) tryHtml = `<div class="trybar"><a href="/signup.html${envSuffix}${envSuffix?'&':'?'}plan=${p.key}&term=${TERM}&trial=1" style="color:inherit">or start a ${TRIAL_DAYS}-day trial — no card needed →</a></div>`;
-    } else {
-      priceHtml = `<div class="contact-amt">Let’s talk</div><div class="annualnote">Set up with our team</div>`;
-      ctaHtml = `<a class="cta ghost" href="/contact.html?about=${p.key}">Contact us</a>`;
-    }
-    const feats = (p.features||[]).map(f=>`<li>${esc(f)}</li>`).join('');
-    return `<div class="card${feature?' feature':''}">`
-      + (feature?'<div class="badge">Most popular</div>':'')
-      + `<div class="pname">${esc(p.name)}</div><div class="ptag">${esc(p.tagline)}</div>`
-      + priceHtml + `<ul class="feats">${feats}</ul>` + ctaHtml + tryHtml + `</div>`;
-  }).join('');
-  document.getElementById('cards').innerHTML = cards;
-}
-load();
+// Opt into animation only when JS runs; content is visible by default otherwise.
+document.documentElement.classList.add('js-anim');
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+const els=document.querySelectorAll('.reveal');
+els.forEach(el=>io.observe(el));
+// safety net: if anything is still hidden after load, show it
+window.addEventListener('load',()=>setTimeout(()=>els.forEach(el=>el.classList.add('in')),1200));
 </script>
+<script src="nav.js" defer></script>
+<script src="analytics.js" defer></script>
 </body>
 </html>
