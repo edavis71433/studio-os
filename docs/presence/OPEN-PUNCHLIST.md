@@ -313,6 +313,32 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🎨 G13 SLICE 2 — THE IN-PLACE EDITOR: BUILT + 3-ROUND-VERIFIED (2026-07-20, pending Eric merge)
+
+Eric's "go" → the marquee feature. dblclick any stamped text on the canvas →
+edit in place (plaintext fields plain-only; md fields WYSIWYG w/ B·I·Link
+mini-bar serializing to MARKDOWN SOURCE, never HTML); Enter/blur commits via
+eeClassify→ipeSetPath→the existing debounced saveBlocks (one PUT+undo per
+burst); Escape byte-restores; caps clamp+toast; feature-detect degrade;
+Comments/Preview/Timewarp never editable; full a11y.
+
+QUALITY TRAIL (the deepest of the effort — this writes customer sites):
+build (94/0) → review: injection moat SOLID but 4 CONFIRMED corruptions →
+fix pass (10 findings, fuzz fabrication classes eliminated) → verification
+(all gates reproduced; 2 REMAINING browser-only corruptions caught: empty-
+text-node em tear, space-leading-em bullet fabrication) → final patch
+(3f436a1/b458ba9/c7c84f7): verifier probes 4/4, design_canvas 245, e2e 118/0
+×3, zero fabrication classes, zero new fuzz divergences. Tip c7c84f7.
+
+ERIC DECISIONS at merge (non-blocking, surfaced with the demo):
+1. Typed markdown metacharacters in md fields render as markdown next paint
+   (panel parity; fixing needs renderMarkdown escape support — server change).
+2. Clearing a required field (e.g. a title) hides the whole section at publish
+   with no warning — wants at least an honest toast (product call).
+Known limits (accepted): literal-* adjacency shifts; execCommand script path
+(serializer allowlist is the backstop). Backlog: 409 second-save window,
+undo-inside-debounce, blockquote edge empties. SLICE 3: hero/core sections.
+
 ## 🏁 STANDARDS SWEEP — ALL DECISION-FREE WORK COMPLETE (wave 8 LIVE, 2026-07-20)
 
 Wave 8 merged to main (Netlify): **SS10 snapshot-history** — the compare-iframe
