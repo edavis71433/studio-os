@@ -51,7 +51,7 @@ body[data-page="tools"] .res-card-tag{
   font-family:var(--mono); font-size:10.5px; letter-spacing:.05em;
   text-transform:uppercase; color:var(--brass-deep);
   background:rgba(176,141,87,.1);
-  border-radius:100px; padding:4px 11px;
+  border-radius:3px; padding:4px 11px;
   margin-bottom:14px;
 }
 body[data-page="tools"] .res-card h3{ font-size:19px; margin-bottom:10px; line-height:1.3; }
